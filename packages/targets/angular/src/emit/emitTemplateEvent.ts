@@ -25,11 +25,8 @@ import type {
   IRComponent,
   Listener,
 } from '../../../../core/src/ir/types.js';
-import type {
-  ModifierRegistry,
-  AngularEmissionDescriptor,
-} from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
+import type { ModifierRegistry, AngularEmissionDescriptor } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import { isEventModifier } from '../../../../core/src/modifiers/ModifierRegistry.js';
 import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';

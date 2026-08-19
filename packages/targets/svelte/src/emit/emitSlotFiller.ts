@@ -51,11 +51,7 @@
 // TemplateNode under the name `IRTemplateNode` (the bare `TemplateNode`
 // barrel export refers to the AST-side TemplateNode for parser consumers).
 // We need the IR-side type here, so alias on the way in.
-import type {
-  SlotFillerDecl,
-  IRComponent,
-  IRTemplateNode as TemplateNode,
-} from '@rozie/core';
+import type { SlotFillerDecl, IRComponent, TemplateNode } from '../../../../core/src/ir/types.js';
 import {
   rewriteTemplateExpression,
   type ScopeRename,

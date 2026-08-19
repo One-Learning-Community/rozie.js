@@ -35,8 +35,8 @@ import type {
   LitDecoratorImportCollector,
   RuntimeLitImportCollector,
 } from '../rewrite/collectLitImports.js';
-import type { ModifierRegistry, LitEmissionDescriptor } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
+import type { ModifierRegistry, LitEmissionDescriptor } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import { isEventModifier } from '../../../../core/src/modifiers/ModifierRegistry.js';
 import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';

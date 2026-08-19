@@ -63,7 +63,7 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative as pathRelative } from 'node:path';
 import { parse } from '../../core/src/parse.js';
 import { lowerToIR } from '../../core/src/ir/lower.js';
-import { ModifierRegistry } from '@rozie/core';
+import { ModifierRegistry } from '../../core/src/modifiers/ModifierRegistry.js';
 import { registerBuiltins } from '../../core/src/modifiers/registerBuiltins.js';
 import { emitReactTypes } from '../../targets/react/src/emit/emitTypes.js';
 import { emitVueTypes } from '../../targets/vue/src/emit/emitTypes.js';

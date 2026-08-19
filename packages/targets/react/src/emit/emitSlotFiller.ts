@@ -49,7 +49,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { SlotFillerDecl } from '@rozie/core';
+import type { SlotFillerDecl } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { renderRecordKey } from './refineSlotTypes.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';

@@ -40,7 +40,7 @@ import type {
   Listener,
   ListenerSpreadIR,
 } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '@rozie/core';
+import type { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { jsxBoundaryText } from '../../../../core/src/emit/jsxBoundaryWhitespace.js';

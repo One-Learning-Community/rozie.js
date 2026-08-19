@@ -30,7 +30,8 @@ import type {
 // ../../../core/src/ir/types.js path. The deep path produces a distinct `.d.ts`
 // SlotFillerDecl identity per target package and reintroduces the cross-package
 // type-identity bug Phase 07.1 fixed.
-import type { ModifierRegistry, SlotFillerDecl } from '@rozie/core';
+import type { SlotFillerDecl } from '../../../../core/src/ir/types.js';
+import type { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';

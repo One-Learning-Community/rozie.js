@@ -56,7 +56,7 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 // `synthesizeHandleType` is not yet in the `@rozie/core` barrel (22-02-SUMMARY
 // "Next Phase Readiness") — import it relatively as React/Vue's emitTypes.ts do.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
-import { renderPropsInterface } from '@rozie/core';
+import { renderPropsInterface } from '../../../../core/src/codegen/renderPropsInterface.js';
 // Reuse the SAME tag-deriving helper the runtime `@customElement` decorator
 // uses so the HTMLElementTagNameMap key cannot drift from the registration.
 import { emitTagName } from './emitDecorator.js';

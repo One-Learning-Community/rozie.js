@@ -70,8 +70,7 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
 // The framework-agnostic props body + the single-source prop→TS-type mapping
 // come from `@rozie/core` (Plan 22-02 LOCKED CONTRACT).
-import { renderPropsInterface, renderPropType } from '@rozie/core';
-
+import { renderPropsInterface, renderPropType } from '../../../../core/src/codegen/renderPropsInterface.js';
 /**
  * Options controlling Angular `.d.rozie.ts` emission.
  *

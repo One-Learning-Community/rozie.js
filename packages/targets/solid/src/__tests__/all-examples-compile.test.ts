@@ -10,8 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compile } from '@rozie/core';
-
+import { compile } from '../../../../core/src/compile.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../../../..');
 const EXAMPLES = ['Counter', 'SearchInput', 'Dropdown', 'TodoList', 'Modal', 'TreeNode', 'Card', 'CardHeader'] as const;

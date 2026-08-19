@@ -22,8 +22,7 @@ import { mkdtempSync, writeFileSync, rmSync, symlinkSync, readFileSync } from 'n
 import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { compile } from '@rozie/core';
-
+import { compile } from '../../../../core/src/compile.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 // packages/targets/solid/src/__tests__ -> repo root is 5 levels up.
 const PKG_ROOT = resolve(HERE, '../..');

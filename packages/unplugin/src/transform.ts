@@ -79,7 +79,7 @@ import { validatePortalScopedStyle } from '../../core/src/ir/validatePortalScope
 import { substituteCompiledStyle } from '../../core/src/codegen/substituteCompiledStyle.js';
 import { IRCache } from '../../core/src/ir/cache.js';
 import { ProducerResolver } from '../../core/src/resolver/index.js';
-import type { ModifierRegistry } from '@rozie/core';
+import type { ModifierRegistry } from '../../core/src/modifiers/ModifierRegistry.js';
 import { emitVue, type EmitVueResult } from '../../targets/vue/src/emitVue.js';
 import { emitReact, type EmitReactResult } from '../../targets/react/src/emitReact.js';
 import { emitSvelte, type EmitSvelteResult } from '../../targets/svelte/src/emitSvelte.js';

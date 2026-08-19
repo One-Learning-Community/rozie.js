@@ -36,7 +36,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import type { ModifierRegistry } from '@rozie/core';
+import type { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import type { ScriptInjection } from './emitTemplateEvent.js';
 
