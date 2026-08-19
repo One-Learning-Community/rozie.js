@@ -149,7 +149,7 @@ function applyInverseTransform(current: string, baseline: string): string {
   //    baseline, restricted to the small permitted set.
   const currentCore = coreImportSymbols(current);
   const baselineCore = coreImportSymbols(baseline);
-  const toRemove = PERMITTED_CORE_ADDITIONS.filter(
+  const toRemove: string[] = PERMITTED_CORE_ADDITIONS.filter(
     (s) => currentCore.has(s) && !baselineCore.has(s),
   );
   if (toRemove.length > 0) {

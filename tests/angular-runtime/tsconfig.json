@@ -1,4 +1,5 @@
 {
+  "//": "These two `paths` entries are module-IDENTITY pins, not error suppression. `@rozie/core`: `@rozie/unplugin` publishes `exports['.'].types`/`exports['./vite'].types` pointing at raw `src/**`, so importing it drags in `packages/targets/*/src/emit*.ts`, which mix a bare `@rozie/core` specifier with relative `../../../core/src/**` imports; every one of those packages' own tsconfigs already carries this identical pin, and this package lacked it. `vite`: `packages/unplugin` dev-resolves `vite@8.1.0` while this harness runs `vite@6.4.2`, producing two unrelated `Plugin` types at `vitest.config.ts`; this is the type-level analog of the `resolve.dedupe` block `vitest.config.ts` already applies at runtime. The source-level alternative -- unmixing the ~68 files across `packages/targets` and `packages/unplugin` that import bare `@rozie/core` -- was weighed and rejected here as a whole-repo rebuild + dist-parity re-bless; see the 2026-08-18 deferred item in Phase 80's deferred-items.md.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ES2022",
@@ -10,7 +11,12 @@
     "noEmit": true,
     "useDefineForClassFields": false,
     "lib": ["ES2022", "DOM"],
-    "types": ["vitest/globals", "node"]
+    "types": ["vitest/globals", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@rozie/core": ["../../packages/core/src/index.ts"],
+      "vite": ["./node_modules/vite"]
+    }
   },
   "include": ["*.ts", "probe/**/*.ts", "hosts/**/*.ts"],
   "angularCompilerOptions": {

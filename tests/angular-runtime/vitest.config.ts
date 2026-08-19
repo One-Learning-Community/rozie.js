@@ -1,8 +1,8 @@
 import { defineConfig } from 'vitest/config';
 import angular from '@analogjs/vite-plugin-angular';
-// @ts-expect-error — @rozie/unplugin's /vite entry ships types via its own
-// package export map; the workspace TS project reference resolves it at
-// build time, but this package's isolated tsconfig doesn't wire the path.
+// @rozie/unplugin/vite resolves its types through the package export map to
+// the plugin's own source entry, and its `vite` type identity is pinned to
+// this package's copy by the `paths` block in tsconfig.json.
 import Rozie from '@rozie/unplugin/vite';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
