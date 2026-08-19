@@ -45,7 +45,7 @@ jobs:
           - svelte-version: '5'
             vite-version: '5'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6
 
