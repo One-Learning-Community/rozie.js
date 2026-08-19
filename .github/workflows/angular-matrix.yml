@@ -266,8 +266,22 @@ jobs:
       # dist/src-*.mjs with `Cannot find module '@rozie/core/dist/index.mjs'`
       # because the leaf dep was never produced. Mirror the angular-matrix
       # job above which uses `pnpm turbo run build`.
+      #
+      # `@rozie/runtime-angular` needs its OWN filter. It is a direct dependency
+      # of the integration project, NOT of @rozie/unplugin, so it is absent from
+      # the `--filter @rozie/unplugin` graph (which does pull in runtime-lit,
+      # -react, -solid and -vue via the target packages — hence the omission
+      # being easy to miss). Without it, packages/runtime/angular/dist is never
+      # produced and `vite build` dies with
+      #   [commonjs--resolver] Failed to resolve entry for package
+      #   "@rozie/runtime-angular"
+      # because the package's `exports` point at ./dist/* that does not exist.
+      # Phase 80 made the Angular emitter import RozieSlot into every
+      # slot-bearing component, so RecordPathProducer.rozie.ts now pulls this in.
+      # This job never caught it because it is `needs: [angular-matrix]`, and
+      # angular-matrix was itself red — the failure was masked behind a skip.
       - name: Build @rozie/unplugin and its workspace deps
-        run: pnpm turbo run build --filter @rozie/unplugin
+        run: pnpm turbo run build --filter @rozie/unplugin --filter @rozie/runtime-angular
 
       - name: Build integration project (Phase 5 success criterion #3)
         run: pnpm -F rozie-angular-analogjs-integration build
