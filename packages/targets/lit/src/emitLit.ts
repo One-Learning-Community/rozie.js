@@ -570,9 +570,12 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // the already-present `lit` dependency — no new package. Threaded the SAME
     // way as `keyed`/`repeat` (concurrency-safe — read off templateResult, no
     // module singleton).
-    templateResult.unsafeHtmlUsed
-      ? `import { unsafeHTML } from 'lit/directives/unsafe-html.js';\n`
-      : '',
+    // biome-ignore format: the `unsafeHtmlUsed` gate MUST stay on the SAME LINE as
+    // the unsafe-html import string. `emitLit-shape.test.ts` (T-06.4-03) asserts
+    // that co-location as an XSS-surface guard — every line importing
+    // `lit/directives/unsafe-html.js` must visibly carry its gate. Splitting this
+    // ternary across lines silently defeats that check.
+    templateResult.unsafeHtmlUsed ? `import { unsafeHTML } from 'lit/directives/unsafe-html.js';\n` : '',
   ]
     .filter((s) => s.length > 0)
     .join('');
