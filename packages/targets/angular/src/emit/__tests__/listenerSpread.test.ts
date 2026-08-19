@@ -61,10 +61,9 @@
  * detaches the prior listeners (per-effect-run cleanup); the onDestroy hook
  * fires on component destroy (final cleanup). T-15-V5-04b mitigation.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../../emitAngular.js';
 
 function compile(rozieSrc: string): string {
@@ -195,7 +194,9 @@ const someObj = {};
     // Template-ref attribute splice.
     expect(template).toMatch(/#rozieListenersTarget_\d+/);
     // Class-body effect + Renderer2.listen + DestroyRef onDestroy.
-    expect(code).toMatch(/private rozieListenersTarget_\d+ = viewChild<ElementRef>\('rozieListenersTarget_\d+'\);/);
+    expect(code).toMatch(
+      /private rozieListenersTarget_\d+ = viewChild<ElementRef>\('rozieListenersTarget_\d+'\);/,
+    );
     expect(code).toContain('__rozieListenersRenderer = inject(Renderer2);');
     expect(code).toMatch(/private __rozieListenersDisposers_\d+: Array<\(\) => void> = \[\];/);
     expect(code).toMatch(/private __rozieListenersEffect_\d+ = effect\(\(\) => \{/);
@@ -289,6 +290,8 @@ $onMount(() => {
     // Both sources are wired:
     //  - lifecycle path emits `this.__rozieDestroyRef.onDestroy(cleanup)`
     //  - listener-spread effect emits `this.__rozieDestroyRef.onDestroy(...)`
-    expect((code.match(/this\.__rozieDestroyRef\.onDestroy/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect((code.match(/this\.__rozieDestroyRef\.onDestroy/g) ?? []).length).toBeGreaterThanOrEqual(
+      2,
+    );
   });
 });

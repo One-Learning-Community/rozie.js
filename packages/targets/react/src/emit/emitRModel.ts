@@ -16,18 +16,19 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
+
 import type { GeneratorOptions } from '@babel/generator';
+import _generate from '@babel/generator';
 import { parseExpression } from '@babel/parser';
+import * as t from '@babel/types';
 import type {
-  IRComponent,
-  TemplateElementIR,
   AttributeBinding,
+  Diagnostic,
+  IRComponent,
   ResolvedModelModifier,
-} from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+  TemplateElementIR,
+} from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
 // Phase 06.2 P1 D-116 — shared PascalCase predicate. Replaces the local
 // isCustomComponent fn so IR lowering and per-target emit cannot drift.
 import { isPascalCase } from '../../../../core/src/ir/utils/isPascalCase.js';
@@ -37,7 +38,7 @@ type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: true };
 
@@ -77,10 +78,7 @@ function resolveModelTarget(
 /**
  * Find a static attribute by name; returns the value or null.
  */
-function getStaticAttr(
-  attrs: AttributeBinding[],
-  name: string,
-): string | null {
+function getStaticAttr(attrs: AttributeBinding[], name: string): string | null {
   for (const a of attrs) {
     if (a.kind === 'static' && a.name === name) return a.value;
   }
@@ -116,9 +114,11 @@ function makeBindingAttr(name: string, expression: t.Expression): AttributeBindi
  *     `.trim` -> custom string-transforms -> `.number` terminal).
  *   - `isLazy`: whether any modifier declares `eventSwap: 'change'` (`.lazy`).
  */
-function partitionModifiers(
-  modifiers: ResolvedModelModifier[] | undefined,
-): { valueTransforms: string[]; isLazy: boolean; resultType: string | undefined } {
+function partitionModifiers(modifiers: ResolvedModelModifier[] | undefined): {
+  valueTransforms: string[];
+  isLazy: boolean;
+  resultType: string | undefined;
+} {
   const valueTransforms: string[] = [];
   let isLazy = false;
   // Spike-012 R7-2 — the composed transform's contractual result type is the
@@ -167,10 +167,7 @@ function applyResultTypeCast(node: t.Expression, resultType: string | undefined)
  * a later iteration. `$` is a JS identifier character, so the lookbehind
  * excludes both `\w` and `$` and the lookahead excludes `\w`.
  */
-function substituteValuePlaceholder(
-  fragment: string,
-  replacement: string,
-): string {
+function substituteValuePlaceholder(fragment: string, replacement: string): string {
   return fragment.replace(/(?<![\w$])\$v(?!\w)/g, `(${replacement})`);
 }
 
@@ -225,18 +222,13 @@ function applyValueTransforms(
  * replacement attributes are rewritten via rewriteTemplateExpression at
  * emit time, so we encode them as Babel identifier/call nodes.
  */
-export function emitRModel(
-  element: TemplateElementIR,
-  ir: IRComponent,
-): EmitRModelResult {
+export function emitRModel(element: TemplateElementIR, ir: IRComponent): EmitRModelResult {
   const diagnostics: Diagnostic[] = [];
 
   // Find the r-model attribute. Phase 14 — `spreadBinding` is the name-less
   // kind; guard before reading `.name`.
   const rModelAttr = element.attributes.find(
-    (a) =>
-      a.kind !== 'spreadBinding' &&
-      (a.name === 'r-model' || a.name === 'r-model:value'),
+    (a) => a.kind !== 'spreadBinding' && (a.name === 'r-model' || a.name === 'r-model:value'),
   );
   if (!rModelAttr) return { replacementAttributes: [], diagnostics };
 
@@ -296,10 +288,7 @@ export function emitRModel(
       applyValueTransforms(eTargetValue, valueTransforms, diagnostics),
       resultType,
     );
-    const handlerArrow = t.arrowFunctionExpression(
-      [eId],
-      t.callExpression(setterId, [committed]),
-    );
+    const handlerArrow = t.arrowFunctionExpression([eId], t.callExpression(setterId, [committed]));
     if (isLazy) {
       return {
         replacementAttributes: [
@@ -368,11 +357,7 @@ export function emitRModel(
       });
     }
     const radioValue = getStaticAttr(element.attributes, 'value') ?? '';
-    const checkedExpr = t.binaryExpression(
-      '===',
-      localId,
-      t.stringLiteral(radioValue),
-    );
+    const checkedExpr = t.binaryExpression('===', localId, t.stringLiteral(radioValue));
     const onChangeArrow = t.arrowFunctionExpression(
       [eId],
       t.callExpression(setterId, [t.stringLiteral(radioValue)]),

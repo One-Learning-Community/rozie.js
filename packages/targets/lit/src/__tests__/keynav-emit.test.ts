@@ -11,18 +11,19 @@
  * component with NO `r-keynav` directive is completely untouched
  * (SPEC §11: "no corpus rebless").
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 function compile(src: string, filename: string): IRComponent {
   const parsed = parse(src, { filename });
-  if (!parsed.ast) throw new Error(`parse failed for ${filename}: ${JSON.stringify(parsed.diagnostics)}`);
+  if (!parsed.ast)
+    throw new Error(`parse failed for ${filename}: ${JSON.stringify(parsed.diagnostics)}`);
   const lowered = lowerToIR(parsed.ast, { modifierRegistry: createDefaultRegistry() });
-  if (!lowered.ir) throw new Error(`lower failed for ${filename}: ${JSON.stringify(lowered.diagnostics)}`);
+  if (!lowered.ir)
+    throw new Error(`lower failed for ${filename}: ${JSON.stringify(lowered.diagnostics)}`);
   return lowered.ir;
 }
 
@@ -150,9 +151,7 @@ describe('Lit r-keynav emitter (Plan 71-08 Task 2)', () => {
     expect(code).toContain(
       'private _rozieKeynavGroupId = `keynav-${Math.random().toString(36).slice(2)}`;',
     );
-    expect(code).toContain(
-      'id=${`${this._rozieKeynavGroupId}-item-${_idx}`}',
-    );
+    expect(code).toContain('id=${`${this._rozieKeynavGroupId}-item-${_idx}`}');
   });
 
   it('SEAM: aria — combobox emits aria-activedescendant on the input bound to the active <li> id', () => {
@@ -170,9 +169,7 @@ describe('Lit r-keynav emitter (Plan 71-08 Task 2)', () => {
 
   it('SEAM: tabindex — menu items carry a roving tabindex binding; combobox items do not (activedescendant model)', () => {
     const menu = emitMenu();
-    expect(menu.code).toContain(
-      'tabindex=${this._active.value === _idx ? 0 : -1}',
-    );
+    expect(menu.code).toContain('tabindex=${this._active.value === _idx ? 0 : -1}');
 
     const combo = emitCombobox();
     expect(combo.code).not.toMatch(/tabindex=\$\{this\._active\.value === /);
@@ -180,9 +177,7 @@ describe('Lit r-keynav emitter (Plan 71-08 Task 2)', () => {
 
   it('SEAM: root field-decl — a KeynavController field wires config, source, active get/set, and commit', () => {
     const { code } = emitMenu();
-    expect(code).toContain(
-      'private _rozieKeynavController = new KeynavController(this, {',
-    );
+    expect(code).toContain('private _rozieKeynavController = new KeynavController(this, {');
     expect(code).toContain(
       "config: { focusModel: 'tabindex', orientation: 'vertical', loop: true, typeahead: false, skipDisabled: true },",
     );
@@ -228,9 +223,7 @@ describe('Lit r-keynav emitter (Plan 71-08 Task 2)', () => {
 
   it('the active item carries the data-rozie-keynav-active boolean-attribute sigil in emitted output', () => {
     const { code } = emitMenu();
-    expect(code).toContain(
-      '?data-rozie-keynav-active=${this._active.value === _idx}',
-    );
+    expect(code).toContain('?data-rozie-keynav-active=${this._active.value === _idx}');
   });
 
   it('NO-REGRESS: a component with no r-keynav directive is byte-identical to pre-Phase-71 emit (no KeynavController/keynav attrs)', () => {
@@ -504,7 +497,7 @@ describe('Lit r-keynav emitter — multi-root, grid, page, explicit index (Plan 
         '};\n\n' +
         '  /**\n' +
         '   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the\n' +
-        '   * host custom element\'s attributes on each call so a consumer-side bound\n' +
+        "   * host custom element's attributes on each call so a consumer-side bound\n" +
         '   * attribute flows through on every render. The `rozieSpread` directive\n' +
         '   * (D-02) does the cross-render diff downstream.\n' +
         '   *\n' +
@@ -512,12 +505,12 @@ describe('Lit r-keynav emitter — multi-root, grid, page, explicit index (Plan 
         '   * out so `$attrs` returns "rest after declared props" (semantic parity\n' +
         '   * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming\n' +
         '   * forms are folded into the skip set: kebab-case for model props\n' +
-        '   * (explicit `attribute:`) AND lowercased property name (Lit\'s default).\n' +
+        "   * (explicit `attribute:`) AND lowercased property name (Lit's default).\n" +
         '   *\n' +
         '   * command-palette-per-level-virtual / portal-through-portal cluster —\n' +
         '   * `data-rozie-ref` is ALWAYS skipped too (a reserved compiler bookkeeping\n' +
         '   * attribute, never a consumer prop) so a parent-assigned `ref=` on this\n' +
-        '   * component\'s own host tag can never clobber this component\'s OWN\n' +
+        "   * component's own host tag can never clobber this component's OWN\n" +
         '   * internal `data-rozie-ref` ref markers via fallthrough re-application.\n' +
         '   */\n' +
         '  private get $attrs(): Record<string, string> {\n' +
@@ -533,7 +526,7 @@ describe('Lit r-keynav emitter — multi-root, grid, page, explicit index (Plan 
         '   * Phase 15 D-19 — consumer-passed listener cluster placeholder.\n' +
         '   * Lit attaches event listeners directly on the host element via\n' +
         '   * `addEventListener` (no per-instance prop rest binding), so the\n' +
-        '   * runtime value is undefined; the `rozieListeners` directive\'s\n' +
+        "   * runtime value is undefined; the `rozieListeners` directive's\n" +
         '   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.\n' +
         '   * The declaration exists to satisfy `tsc --noEmit` on consumer\n' +
         '   * projects with strict mode — bare `$listeners` in `render()`\n' +

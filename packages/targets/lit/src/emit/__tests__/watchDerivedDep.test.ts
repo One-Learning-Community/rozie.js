@@ -12,15 +12,14 @@
  * (`$props.slides.length`) — should fire when the LENGTH changes, not
  * merely when Lit's `@property` setter runs for `xs`.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
-import { emitLit } from '../../emitLit.js';
-import { emitVue } from '../../../../vue/src/emitVue.js';
-import { emitSvelte } from '../../../../svelte/src/emitSvelte.js';
-import { emitSolid } from '../../../../solid/src/emitSolid.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../../../../angular/src/emitAngular.js';
+import { emitSolid } from '../../../../solid/src/emitSolid.js';
+import { emitSvelte } from '../../../../svelte/src/emitSvelte.js';
+import { emitVue } from '../../../../vue/src/emitVue.js';
+import { emitLit } from '../../emitLit.js';
 
 const CONTROL_SRC = `<rozie name="Test">
 <props>
@@ -86,23 +85,35 @@ $watch(() => $props.xs.length, () => {
     // fires correctly). If any of these four is ALSO identity-shaped for
     // this getter, the docket's parity claim is wrong -> S1 for that
     // target, re-scope.
-    const vueCode = emitVue(irFor(CONTROL_SRC), { filename: 'Test.rozie', source: CONTROL_SRC }).code;
+    const vueCode = emitVue(irFor(CONTROL_SRC), {
+      filename: 'Test.rozie',
+      source: CONTROL_SRC,
+    }).code;
     // Vue's watch(getter, cb) passes the REWRITTEN GETTER FUNCTION literally
     // -- Vue's own reactivity system tracks whatever the getter reads, so
     // the derived `.length` read is watched directly (no narrowing).
     expect(vueCode).toMatch(/watch\(\(\)\s*=>\s*props\.xs\.length/);
 
-    const svelteCode = emitSvelte(irFor(CONTROL_SRC), { filename: 'Test.rozie', source: CONTROL_SRC }).code;
+    const svelteCode = emitSvelte(irFor(CONTROL_SRC), {
+      filename: 'Test.rozie',
+      source: CONTROL_SRC,
+    }).code;
     // Svelte 5 runes: $effect tracks whatever reactive reads occur INSIDE its
     // body -- the derived `.length` read must appear inside the effect body.
     expect(svelteCode).toContain('xs.length');
 
-    const solidCode = emitSolid(irFor(CONTROL_SRC), { filename: 'Test.rozie', source: CONTROL_SRC }).code;
+    const solidCode = emitSolid(irFor(CONTROL_SRC), {
+      filename: 'Test.rozie',
+      source: CONTROL_SRC,
+    }).code;
     // Solid's createEffect fine-grained-tracks whatever signal reads occur
     // inside its body -- same shape as Svelte.
     expect(solidCode).toContain('.xs.length');
 
-    const angularCode = emitAngular(irFor(CONTROL_SRC), { filename: 'Test.rozie', source: CONTROL_SRC }).code;
+    const angularCode = emitAngular(irFor(CONTROL_SRC), {
+      filename: 'Test.rozie',
+      source: CONTROL_SRC,
+    }).code;
     // Angular's effect() tracks whatever signal reads occur inside its body.
     expect(angularCode).toContain('.length');
   });

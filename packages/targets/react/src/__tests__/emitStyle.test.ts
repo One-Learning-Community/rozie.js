@@ -17,14 +17,13 @@
  * a per-component scope hash so the on-disk CSS matches what `emitReact`
  * actually wires into the .tsx import.
  */
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, StyleSection } from '../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent, StyleSection } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitStyle } from '../emit/emitStyle.js';
 import { computeScopeHash } from '../emit/scopeHash.js';
 
@@ -122,17 +121,13 @@ describe('emitStyle (React target) — Wave 0 + reference example tests', () => 
     const scopeHash = computeScopeHash('Counter', 'Counter.rozie');
     const result = emitStyle(ir.styles, src, scopeHash);
     // Bare element selectors get the scope attr appended.
-    expect(result.moduleCss).toMatch(
-      new RegExp(`button\\[data-rozie-s-${scopeHash}\\]\\s*\\{`),
-    );
+    expect(result.moduleCss).toMatch(new RegExp(`button\\[data-rozie-s-${scopeHash}\\]\\s*\\{`));
     // Pseudo-classes stay AFTER the scope attribute (CSS-spec ordering).
     expect(result.moduleCss).toMatch(
       new RegExp(`button\\[data-rozie-s-${scopeHash}\\]:disabled\\s*\\{`),
     );
     // Class selectors also get scoped.
-    expect(result.moduleCss).toMatch(
-      new RegExp(`\\.counter\\[data-rozie-s-${scopeHash}\\]`),
-    );
+    expect(result.moduleCss).toMatch(new RegExp(`\\.counter\\[data-rozie-s-${scopeHash}\\]`));
     // :root rules are NOT in moduleCss (they go to globalCss separately).
     expect(result.moduleCss).not.toContain(':root');
   });

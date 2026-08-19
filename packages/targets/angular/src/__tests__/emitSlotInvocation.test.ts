@@ -12,13 +12,10 @@
  *
  * Closes Angular row of F-07.3.2-05-A tier 2.
  */
-import { describe, it, expect } from 'vitest';
+
+import type { IRComponent, SlotDecl, TemplateSlotInvocationIR } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSlotInvocation } from '../emit/emitSlotInvocation.js';
-import type {
-  IRComponent,
-  SlotDecl,
-  TemplateSlotInvocationIR,
-} from '../../../../core/src/ir/types.js';
 
 const sloc = { start: 0, end: 0 } as unknown as SlotDecl['sourceLoc'];
 
@@ -124,8 +121,6 @@ describe('§inner-guard-merged — @if guard uses mergedTplRef (Plan 10 F-07.3.2
     expect(out).toContain('*ngTemplateOutlet');
     // Outlet binding still uses the merged form (Plan 03), now with the
     // amended (Plan 10/12) fill-map tier spliced in the middle.
-    expect(out).toContain(
-      "(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])",
-    );
+    expect(out).toContain("(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])");
   });
 });

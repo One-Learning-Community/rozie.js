@@ -40,10 +40,10 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { SlotDecl } from '../../../../core/src/ir/types.js';
+import type { SlotDecl } from '@rozie/core';
+import { renderRecordKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
-import { renderRecordKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 
 // WR-05 fix (79-REVIEW-FIX): re-export so existing `import { renderRecordKey }
 // from './refineSlotTypes.js'` call sites (emitSlotInvocation.ts,
@@ -134,7 +134,9 @@ export function buildSlotsRecordType(slots: SlotDecl[], slotChildrenType: string
   for (const s of slots) {
     if (isDynamicOnlySlot(s)) continue;
     if (!isRecordOnlySlotName(s.name)) continue;
-    members.push(`${renderRecordKey(s.name)}?: (${buildFamilyFnType(s, slotChildrenType)}) | undefined;`);
+    members.push(
+      `${renderRecordKey(s.name)}?: (${buildFamilyFnType(s, slotChildrenType)}) | undefined;`,
+    );
   }
   for (const s of dynamicSlots) {
     if (s.namePrefix === undefined || s.namePrefix.length === 0) continue;
@@ -205,7 +207,9 @@ export function refineSlotTypes(slot: SlotDecl): RefinedSlotType {
     // Default slot WITH params — union shape per dropdown-react-default-slot
     // bugfix. Function-type notation in a union MUST be parenthesised
     // (TS1385: `ReactNode | (ctx: X) => ReactNode` is a parse error).
-    const paramFields = slot.params.map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`).join(' ');
+    const paramFields = slot.params
+      .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`)
+      .join(' ');
     const ctxInterface = `interface ChildrenCtx { ${paramFields} }`;
     return {
       propFieldName: 'children',
@@ -241,7 +245,9 @@ export function refineSlotTypes(slot: SlotDecl): RefinedSlotType {
       defaultFnName: lifting === 'function-const' ? `__default${pascal}` : null,
     };
   }
-  const paramFields = slot.params.map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`).join(' ');
+  const paramFields = slot.params
+    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`)
+    .join(' ');
   const ctxName = pascal + 'Ctx';
   const ctxInterface = `interface ${ctxName} { ${paramFields} }`;
   return {

@@ -36,13 +36,12 @@
  *      auto-renames to `X$local` via a Svelte `{ kind: 'binding', programOnly }`
  *      deconflict group — a NESTED legal shadow is NOT renamed.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSvelte } from '../../emitSvelte.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -56,14 +55,8 @@ function compileSvelte(src: string, filename = 'Test.rozie'): string {
   return emitSvelte(ir, { filename, source: src }).code;
 }
 
-const SLOT_PARAM_SHADOW = readFileSync(
-  resolve(FIXTURES, 'SvelteSlotParamShadow.rozie'),
-  'utf8',
-);
-const LOOP_VAR_HELPER = readFileSync(
-  resolve(FIXTURES, 'SvelteLoopVarHelper.rozie'),
-  'utf8',
-);
+const SLOT_PARAM_SHADOW = readFileSync(resolve(FIXTURES, 'SvelteSlotParamShadow.rozie'), 'utf8');
+const LOOP_VAR_HELPER = readFileSync(resolve(FIXTURES, 'SvelteLoopVarHelper.rozie'), 'utf8');
 
 // ── RUNTIME-ONLY risk 1: slot-param shadow ──────────────────────────────────
 describe('Svelte slot-param shadow auto-fix (risk 1, runtime-only)', () => {

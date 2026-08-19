@@ -7,14 +7,13 @@
  * Also enforces D-68 (NO `import React from 'react'` ever — automatic JSX
  * runtime is the only supported mode).
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../emitReact.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

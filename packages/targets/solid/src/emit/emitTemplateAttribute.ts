@@ -18,16 +18,14 @@
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
+import type { AttributeBinding, Diagnostic, IRComponent, ListenerSpreadIR } from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
 import postcss from 'postcss';
-import type {
-  IRComponent,
-  AttributeBinding,
-  ListenerSpreadIR,
-} from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
-import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
+import type {
+  RuntimeSolidImportCollector,
+  SolidImportCollector,
+} from '../rewrite/collectSolidImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { resolveTwoWayTarget } from './resolveTwoWayTarget.js';
 
@@ -52,9 +50,7 @@ export interface EmitAttrCtx {
    * (`:data-selected`, `:data-label`, `:class`, …) rewrite scope-param reads to
    * `<accessor>().<prop>` (in-place re-render). Undefined everywhere else.
    */
-  scopeAccessorParams?:
-    | { accessorIdent: string; params: ReadonlyMap<string, string> }
-    | undefined;
+  scopeAccessorParams?: { accessorIdent: string; params: ReadonlyMap<string, string> } | undefined;
   /**
    * Phase 26 — host element tagKind + tagName. The `rozieDisplay` wrap (SPEC-4)
    * applies ONLY where a binding renders as attribute TEXT on an HTML host.
@@ -150,7 +146,7 @@ const HTML_TO_SOLID_ATTR: Readonly<Record<string, string>> = {
   readonly: 'readOnly',
   maxlength: 'maxLength',
   minlength: 'minLength',
-  for: 'for',           // Solid: <label for="..."> stays as `for`
+  for: 'for', // Solid: <label for="..."> stays as `for`
   contenteditable: 'contentEditable',
   // Quick 260802-v1v seam 5 — solid-js@1.9.12/types/jsx.d.ts:1233 declares
   // lowercase `spellcheck` and NO `spellCheck`. Native-lowercase passthrough,
@@ -586,16 +582,10 @@ function capitalize(name: string): string {
 type RenderExprOpts = {
   invokeAccessors?: ReadonlySet<string> | undefined;
   loopValueBindings?: ReadonlySet<string> | undefined;
-  scopeAccessorParams?:
-    | { accessorIdent: string; params: ReadonlyMap<string, string> }
-    | undefined;
+  scopeAccessorParams?: { accessorIdent: string; params: ReadonlyMap<string, string> } | undefined;
 };
 
-function renderExpr(
-  expr: t.Expression,
-  ir: IRComponent,
-  opts?: RenderExprOpts,
-): string {
+function renderExpr(expr: t.Expression, ir: IRComponent, opts?: RenderExprOpts): string {
   return rewriteTemplateExpression(expr, ir, {
     invokeAccessors: opts?.invokeAccessors,
     loopValueBindings: opts?.loopValueBindings,
@@ -660,10 +650,7 @@ function composeClassValue(
     let lit = '';
     for (const seg of a.segments) {
       if (seg.kind === 'static') {
-        lit += seg.text
-          .replace(/\\/g, '\\\\')
-          .replace(/`/g, '\\`')
-          .replace(/\$\{/g, '\\${');
+        lit += seg.text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
       } else {
         // Phase 26 (D-06/SPEC-4) — wrap a non-primitive class interpolation.
         const segCode = renderExpr(seg.expression, ir, exprOpts);
@@ -704,7 +691,10 @@ function composeClassValue(
       // it needs no extra parens in the `+ " " +` concat. Provably-string
       // members AND template literals (provably a string) stay the
       // byte-identical parenthesized raw form.
-      if ((a.wrapForDisplay || t.isObjectExpression(a.expression)) && !t.isTemplateLiteral(a.expression)) {
+      if (
+        (a.wrapForDisplay || t.isObjectExpression(a.expression)) &&
+        !t.isTemplateLiteral(a.expression)
+      ) {
         // Object-form `:class` and other non-provably-string bindings normalize
         // through rozieClass (clsx-style) so they join the class string as a
         // valid space-joined token list — never a separate classList=.
@@ -717,17 +707,12 @@ function composeClassValue(
       // Phase 14 — `spreadBinding` is the name-less kind: it never reaches a
       // class merge (no name to coalesce on). Unreachable; mirrors the
       // `twoWayBinding` guard above.
-      throw new Error(
-        `Solid target: spreadBinding not valid in class array context (Phase 14).`,
-      );
+      throw new Error(`Solid target: spreadBinding not valid in class array context (Phase 14).`);
     } else {
       let lit = '';
       for (const seg of a.segments) {
         if (seg.kind === 'static') {
-          lit += seg.text
-            .replace(/\\/g, '\\\\')
-            .replace(/`/g, '\\`')
-            .replace(/\$\{/g, '\\${');
+          lit += seg.text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
         } else {
           // Phase 26 (D-06/SPEC-4) — wrap a non-primitive class interpolation.
           const segCode = renderExpr(seg.expression, ir, exprOpts);
@@ -930,13 +915,21 @@ function emitNonClassAttribute(
       }
       if (!t.isObjectExpression(attr.expression)) {
         ctx.collectors.runtime.add('parseInlineStyle');
-        const exprCode = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
+        const exprCode = renderExpr(attr.expression, ctx.ir, {
+          invokeAccessors: ctx.invokeAccessors,
+          loopValueBindings: ctx.loopValueBindings,
+          scopeAccessorParams: ctx.scopeAccessorParams,
+        });
         return { jsx: `style={parseInlineStyle(${exprCode})}`, diagnostics };
       }
       // ObjectExpression falls through to the generic binding emit.
     }
     const jsxName = colonPropToSolidName(attr.name, ctx.elementTagKind, ctx.producerProps);
-    const exprCode = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
+    const exprCode = renderExpr(attr.expression, ctx.ir, {
+      invokeAccessors: ctx.invokeAccessors,
+      loopValueBindings: ctx.loopValueBindings,
+      scopeAccessorParams: ctx.scopeAccessorParams,
+    });
     // Phase 26 (D-06/SPEC-4) — attribute-binding wrap on an HTML host attribute
     // text position only (structural component props / controlled-input props
     // are exempt). A non-primitive value renders portable JSON; raw otherwise
@@ -1008,7 +1001,11 @@ function emitNonClassAttribute(
     const target = resolveTwoWayTarget(attr.expression, ctx.ir);
     if (target === null) {
       const jsxNameFallback = colonPropToSolidName(attr.name, ctx.elementTagKind);
-      const exprCodeFallback = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
+      const exprCodeFallback = renderExpr(attr.expression, ctx.ir, {
+        invokeAccessors: ctx.invokeAccessors,
+        loopValueBindings: ctx.loopValueBindings,
+        scopeAccessorParams: ctx.scopeAccessorParams,
+      });
       return { jsx: `${jsxNameFallback}={${exprCodeFallback}}`, diagnostics };
     }
     const { local, setter } = target;
@@ -1035,13 +1032,14 @@ function emitNonClassAttribute(
   let lit = '';
   for (const seg of attr.segments) {
     if (seg.kind === 'static') {
-      lit += seg.text
-        .replace(/\\/g, '\\\\')
-        .replace(/`/g, '\\`')
-        .replace(/\$\{/g, '\\${');
+      lit += seg.text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
     } else {
       // Phase 26 (D-06/SPEC-4) — per-segment wrap for attribute interpolation.
-      const segCode = renderExpr(seg.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
+      const segCode = renderExpr(seg.expression, ctx.ir, {
+        invokeAccessors: ctx.invokeAccessors,
+        loopValueBindings: ctx.loopValueBindings,
+        scopeAccessorParams: ctx.scopeAccessorParams,
+      });
       if (seg.wrapForDisplay) {
         ctx.collectors.runtime.add('rozieDisplay');
         lit += '${rozieDisplay(' + segCode + ')}';
@@ -1112,8 +1110,7 @@ function emitSpread(
   // alias table must not run; but a bare `{...expr}` would drop the runtime
   // `FORBIDDEN_KEYS` strip, so the gate selects a sibling helper that strips
   // identically (shared const) and aliases nothing, rather than un-wrapping.
-  const isComponentTag =
-    ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self';
+  const isComponentTag = ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self';
   const helper = isComponentTag ? 'normalizeComponentAttrs' : 'normalizeAttrs';
   ctx.collectors.runtime.add(helper);
   return `{...${helper}(${renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })})}`;
@@ -1148,10 +1145,7 @@ function isListenersIdentifier(expr: t.Expression): boolean {
  *   - DYNAMIC expression               →  `{...normalizeListeners(<expr>)}`
  *                                          + runtime import collected
  */
-export function emitListenerSpread(
-  spread: ListenerSpreadIR,
-  ctx: EmitAttrCtx,
-): string {
+export function emitListenerSpread(spread: ListenerSpreadIR, ctx: EmitAttrCtx): string {
   if (isListenersIdentifier(spread.expression)) {
     return `{...${renderExpr(spread.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })}}`;
   }
@@ -1172,7 +1166,11 @@ export function emitListenerSpreadAsMergePartial(
   ctx: EmitAttrCtx,
 ): string {
   if (isListenersIdentifier(spread.expression)) {
-    return renderExpr(spread.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
+    return renderExpr(spread.expression, ctx.ir, {
+      invokeAccessors: ctx.invokeAccessors,
+      loopValueBindings: ctx.loopValueBindings,
+      scopeAccessorParams: ctx.scopeAccessorParams,
+    });
   }
   ctx.collectors.runtime.add('normalizeListeners');
   return `normalizeListeners(${renderExpr(spread.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })})`;
@@ -1235,7 +1233,11 @@ function opaqueSpreadClassReadExpr(
   // Dynamic — read `.class` off the source expression. `normalizeAttrs` does
   // not alter the `class` key for Solid (SOLID_ATTR_KEY_MAP omits `class`),
   // so reading from the raw expression matches the spread's `class` key.
-  const exprCode = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
+  const exprCode = renderExpr(attr.expression, ctx.ir, {
+    invokeAccessors: ctx.invokeAccessors,
+    loopValueBindings: ctx.loopValueBindings,
+    scopeAccessorParams: ctx.scopeAccessorParams,
+  });
   return `((${exprCode}) as unknown as Record<string, unknown>)?.class as string | undefined`;
 }
 
@@ -1244,10 +1246,7 @@ function opaqueSpreadClassReadExpr(
  * Buckets `class` and `:class` together for composition.
  * Skips consumed (r-* / @event / :key) attributes.
  */
-export function emitAttributes(
-  attrs: AttributeBinding[],
-  ctx: EmitAttrCtx,
-): EmitAttributesResult {
+export function emitAttributes(attrs: AttributeBinding[], ctx: EmitAttrCtx): EmitAttributesResult {
   const diagnostics: Diagnostic[] = [];
   if (attrs.length === 0) return { jsx: '', diagnostics };
 
@@ -1346,7 +1345,16 @@ export function emitAttributes(
       // Emit a single `class=` for all class sources (object forms wrapped in
       // rozieClass by composeClassValue).
       if (classStrAttrs.length > 0) {
-        let classValue = composeClassValue(classStrAttrs, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams }, ctx.collectors.runtime);
+        let classValue = composeClassValue(
+          classStrAttrs,
+          ctx.ir,
+          {
+            invokeAccessors: ctx.invokeAccessors,
+            loopValueBindings: ctx.loopValueBindings,
+            scopeAccessorParams: ctx.scopeAccessorParams,
+          },
+          ctx.collectors.runtime,
+        );
         if (needsPostSpreadClass) {
           // R6 opaque-spread merge: append each opaque spread's class at the
           // tail of the value so an `extra-variant` from `$attrs` joins our

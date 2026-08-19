@@ -5,14 +5,13 @@
 // primitive, whose own emitPortals.ts is untouched by this phase). The
 // React target lowers it to `react-dom`'s native `createPortal`, combined
 // with the `r-if` on the same element (open-driven mount).
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../emitReact.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

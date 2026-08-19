@@ -19,9 +19,10 @@
  *
  * @experimental — shape may change before v1.0
  */
-import MagicString from 'magic-string';
+
 import type { EncodedSourceMap } from '@ampproject/remapping';
-import type { BlockMap } from '../../../../core/src/ast/types.js';
+import type { BlockMap } from '@rozie/core';
+import MagicString from 'magic-string';
 
 export interface ShellParts {
   componentName: string;
@@ -223,8 +224,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   if (parts.reactImports.length > 0) moduleParts.push(parts.reactImports);
   if (parts.reactTypeImports && parts.reactTypeImports.length > 0)
     moduleParts.push(parts.reactTypeImports);
-  if (parts.portalImport && parts.portalImport.length > 0)
-    moduleParts.push(parts.portalImport);
+  if (parts.portalImport && parts.portalImport.length > 0) moduleParts.push(parts.portalImport);
   if (parts.runtimeImports.length > 0) moduleParts.push(parts.runtimeImports);
   if (parts.cssModuleImport !== null) moduleParts.push(parts.cssModuleImport + '\n');
   if (parts.globalCssImport !== null) moduleParts.push(parts.globalCssImport + '\n');
@@ -285,9 +285,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
 
   // Top-of-file scriptInjections that are NOT hooks (default-content lifts).
   if (parts.scriptInjections && parts.scriptInjections.length > 0) {
-    const moduleTop = parts.scriptInjections.filter((s) =>
-      s.startsWith('function '),
-    );
+    const moduleTop = parts.scriptInjections.filter((s) => s.startsWith('function '));
     for (const inj of moduleTop) {
       moduleParts.push(inj);
       moduleParts.push('\n\n');
@@ -401,8 +399,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   // Remove pre-envelope and post-envelope characters (e.g. leading whitespace,
   // trailing newlines, HTML comments outside the envelope).
   if (anchorStart > 0) ms.remove(0, anchorStart);
-  if (anchorEnd < parts.rozieSource.length)
-    ms.remove(anchorEnd, parts.rozieSource.length);
+  if (anchorEnd < parts.rozieSource.length) ms.remove(anchorEnd, parts.rozieSource.length);
 
   return { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: parts.scriptMap ?? null };
 }
@@ -420,8 +417,7 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   if (parts.reactImports.length > 0) ms.append(parts.reactImports);
   if (parts.reactTypeImports && parts.reactTypeImports.length > 0)
     ms.append(parts.reactTypeImports);
-  if (parts.portalImport && parts.portalImport.length > 0)
-    ms.append(parts.portalImport);
+  if (parts.portalImport && parts.portalImport.length > 0) ms.append(parts.portalImport);
   if (parts.runtimeImports.length > 0) ms.append(parts.runtimeImports);
   if (parts.cssModuleImport) ms.append(parts.cssModuleImport + '\n');
   if (parts.globalCssImport) ms.append(parts.globalCssImport + '\n');

@@ -15,14 +15,14 @@
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
-import type { IRComponent, PropTypeAnnotation, SlotDecl } from '../../../../core/src/ir/types.js';
-import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
-import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
-import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import type { IRComponent, PropTypeAnnotation, SlotDecl } from '@rozie/core';
+import { buildPropJsdoc } from '@rozie/core';
 // WR-05 fix (79-REVIEW-FIX): was a local copy of this exact one-line
 // escaping predicate — consolidated into core; see that module's doc
 // comment for why (drift risk on shared, security-relevant escaping logic).
 import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 
 export function renderType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {

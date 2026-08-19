@@ -45,10 +45,9 @@
  * component with `$emit` in BOTH `$onMount` and `$onUpdate`, proving the mount
  * half is indirected and the update half is untouched.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../../emitReact.js';
 
 function compile(rozieSrc: string): string {
@@ -174,7 +173,9 @@ $watch(() => $props.gain, (v) => { note(v); });
     // Still deps on the tracked read path (lazy — not `{ immediate: true }`).
     expect(watcher!.deps).toBe('[props.gain]');
     // Still carries its first-run guard.
-    expect(watcher!.body).toContain('if (_watch0First.current) { _watch0First.current = false; return; }');
+    expect(watcher!.body).toContain(
+      'if (_watch0First.current) { _watch0First.current = false; return; }',
+    );
     // The watcher body reads the prop DIRECTLY, not through the ref.
     expect(watcher!.body).toContain('const v = props.gain;');
   });

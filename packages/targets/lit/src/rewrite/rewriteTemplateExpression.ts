@@ -14,30 +14,34 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
+
+import type { GeneratorOptions } from '@babel/generator';
 import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
-import type { GeneratorOptions } from '@babel/generator';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
 import { kebabize } from '../emit/resolveLitSetterText.js';
+import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
 
 function flattenInlineCode(code: string): string {
-  return code.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim();
+  return code
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
 }
 
 function slotFieldSuffix(name: string): string {
@@ -127,17 +131,13 @@ export function rewriteTemplateExpression(
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? 'default' : s.name)));
-  const portalSlotNames = new Set(
-    ir.slots.filter((s) => s.isPortal === true).map((s) => s.name),
-  );
+  const portalSlotNames = new Set(ir.slots.filter((s) => s.isPortal === true).map((s) => s.name));
   // Scoped (non-portal) slots receive the consumer's `.X=${fn}` property fill
   // when the consumer uses a destructured `<template #X="{ p }">` (ec24d26).
   // The producer's `_hasSlot<X>` light-DOM detector never flips for property
   // fills, so the `$slots.X` presence check must union both signals.
   const scopedSlotNames = new Set(
-    ir.slots
-      .filter((s) => s.isPortal !== true && s.params.length > 0)
-      .map((s) => s.name),
+    ir.slots.filter((s) => s.isPortal !== true && s.params.length > 0).map((s) => s.name),
   );
   const methodNames = collectMethodNames(ir);
 
@@ -171,10 +171,7 @@ export function rewriteTemplateExpression(
         path.get('left').replaceWith(thisSignalRead(prop.name));
         return;
       }
-      if (
-        obj.name === '$props' &&
-        (modelProps.has(prop.name) || nonModelProps.has(prop.name))
-      ) {
+      if (obj.name === '$props' && (modelProps.has(prop.name) || nonModelProps.has(prop.name))) {
         path.get('left').replaceWith(thisDot(prop.name));
         return;
       }
@@ -208,11 +205,7 @@ export function rewriteTemplateExpression(
         // for `.X=${fn}` consumer fills).
         if (portalSlotNames.has(prop.name)) {
           path.replaceWith(
-            t.binaryExpression(
-              '!==',
-              thisDot(prop.name),
-              t.identifier('undefined'),
-            ),
+            t.binaryExpression('!==', thisDot(prop.name), t.identifier('undefined')),
           );
           path.skip();
           return;
@@ -227,11 +220,7 @@ export function rewriteTemplateExpression(
             t.logicalExpression(
               '||',
               thisDot(`_hasSlot${slotFieldSuffix(prop.name)}`),
-              t.binaryExpression(
-                '!==',
-                thisDot(prop.name),
-                t.identifier('undefined'),
-              ),
+              t.binaryExpression('!==', thisDot(prop.name), t.identifier('undefined')),
             ),
           );
           path.skip();
@@ -292,12 +281,17 @@ export function rewriteTemplateExpression(
         if (parentPath) {
           if (
             (parentPath.isMemberExpression() || parentPath.isOptionalMemberExpression()) &&
-            (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property === path.node &&
+            (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property ===
+              path.node &&
             !(parentPath.node as t.MemberExpression | t.OptionalMemberExpression).computed
           ) {
             return;
           }
-          if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) {
+          if (
+            parentPath.isObjectProperty() &&
+            parentPath.node.key === path.node &&
+            !parentPath.node.computed
+          ) {
             return;
           }
         }
@@ -320,11 +314,22 @@ export function rewriteTemplateExpression(
         if (parentPath) {
           if (
             (parentPath.isMemberExpression() || parentPath.isOptionalMemberExpression()) &&
-            (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property === path.node &&
+            (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property ===
+              path.node &&
             !(parentPath.node as t.MemberExpression | t.OptionalMemberExpression).computed
-          ) return;
-          if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) return;
-          if (parentPath.isFunctionExpression() || parentPath.isArrowFunctionExpression() || parentPath.isFunctionDeclaration()) {
+          )
+            return;
+          if (
+            parentPath.isObjectProperty() &&
+            parentPath.node.key === path.node &&
+            !parentPath.node.computed
+          )
+            return;
+          if (
+            parentPath.isFunctionExpression() ||
+            parentPath.isArrowFunctionExpression() ||
+            parentPath.isFunctionDeclaration()
+          ) {
             if ((parentPath.node as t.Function).params.some((p) => p === path.node)) return;
           }
         }
@@ -341,12 +346,23 @@ export function rewriteTemplateExpression(
       // OptionalMemberExpression — both have the same property-position shape).
       if (
         (parentPath.isMemberExpression() || parentPath.isOptionalMemberExpression()) &&
-        (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property === path.node &&
+        (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property ===
+          path.node &&
         !(parentPath.node as t.MemberExpression | t.OptionalMemberExpression).computed
-      ) return;
-      if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) return;
+      )
+        return;
+      if (
+        parentPath.isObjectProperty() &&
+        parentPath.node.key === path.node &&
+        !parentPath.node.computed
+      )
+        return;
       // Skip if it's a function parameter or pattern target.
-      if (parentPath.isFunctionExpression() || parentPath.isArrowFunctionExpression() || parentPath.isFunctionDeclaration()) {
+      if (
+        parentPath.isFunctionExpression() ||
+        parentPath.isArrowFunctionExpression() ||
+        parentPath.isFunctionDeclaration()
+      ) {
         if ((parentPath.node as t.Function).params.some((p) => p === path.node)) return;
       }
 
@@ -382,9 +398,7 @@ export function rewriteTemplateExpression(
       const eventName = kebabize(firstArg.value);
       const restArgs = args.slice(1);
       const detail =
-        restArgs.length === 0
-          ? t.identifier('undefined')
-          : (restArgs[0] as t.Expression);
+        restArgs.length === 0 ? t.identifier('undefined') : (restArgs[0] as t.Expression);
       const customEvent = t.newExpression(t.identifier('CustomEvent'), [
         t.stringLiteral(eventName),
         t.objectExpression([
@@ -394,10 +408,9 @@ export function rewriteTemplateExpression(
         ]),
       ]);
       path.replaceWith(
-        t.callExpression(
-          t.memberExpression(t.thisExpression(), t.identifier('dispatchEvent')),
-          [customEvent],
-        ),
+        t.callExpression(t.memberExpression(t.thisExpression(), t.identifier('dispatchEvent')), [
+          customEvent,
+        ]),
       );
     },
   });

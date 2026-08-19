@@ -20,9 +20,10 @@
  * surrounding JSX-tracked expression context); hoisting to `untrack(...)` or
  * a top-level `const merged = ...` would break Solid's reactivity-on-change.
  */
-import { describe, it, expect } from 'vitest';
+
 import * as t from '@babel/types';
-import type { IRComponent, SlotDecl, ParamDecl } from '../../../../core/src/ir/types.js';
+import type { IRComponent, ParamDecl, SlotDecl } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 function buildSlotDecl(name: string, params: ParamDecl[] = []): SlotDecl {
@@ -51,7 +52,14 @@ function buildIR(overrides: Partial<IRComponent> = {}): IRComponent {
     lifecycle: [],
     watchers: [],
     listeners: [],
-    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+    styles: {
+      type: 'StyleSection',
+      scopedRules: [],
+      rootRules: [],
+      portalRules: [],
+      engineRules: [],
+      sourceLoc: { start: 0, end: 0 },
+    },
     components: [],
     setupBody: {
       type: 'SetupBody',
@@ -76,7 +84,7 @@ describe('§slots-X-merge — $slots.X rewrites to merged dynamic-fallback form 
     expect(out).toBe("(_props.headerSlot ?? _props.slots?.['header'])");
   });
 
-  it("rewrites $props.title || $slots.header r-if guard so it contains the merge AND no bare _props.headerSlot alone", () => {
+  it('rewrites $props.title || $slots.header r-if guard so it contains the merge AND no bare _props.headerSlot alone', () => {
     // Mirrors examples/Modal.rozie L77 `r-if="$props.title || $slots.header"`.
     // After rewrite, the LHS becomes local.title (non-model prop) and the RHS
     // becomes the merged form. Asserts BOTH that the merge is present AND
@@ -139,10 +147,7 @@ describe('§slots-X-merge — $slots.X rewrites to merged dynamic-fallback form 
 
     // $data.foo
     expect(
-      rewriteTemplateExpression(
-        t.memberExpression(t.identifier('$data'), t.identifier('foo')),
-        ir,
-      ),
+      rewriteTemplateExpression(t.memberExpression(t.identifier('$data'), t.identifier('foo')), ir),
     ).toBe('foo()');
 
     // $props.bar (non-model)
@@ -155,10 +160,7 @@ describe('§slots-X-merge — $slots.X rewrites to merged dynamic-fallback form 
 
     // $refs.baz
     expect(
-      rewriteTemplateExpression(
-        t.memberExpression(t.identifier('$refs'), t.identifier('baz')),
-        ir,
-      ),
+      rewriteTemplateExpression(t.memberExpression(t.identifier('$refs'), t.identifier('baz')), ir),
     ).toBe('bazRef');
   });
 
@@ -229,7 +231,12 @@ function computedDecl(name: string): IRComponent['computed'][number] {
 }
 
 import { parseExpression as _parseExpression } from '@babel/parser';
-function rewrite(srcExpr: string, ir: IRComponent, opts?: { invokeAccessors?: Set<string> }): string {
+
+function rewrite(
+  srcExpr: string,
+  ir: IRComponent,
+  opts?: { invokeAccessors?: Set<string> },
+): string {
   const expr = _parseExpression(srcExpr) as t.Expression;
   return rewriteTemplateExpression(expr, ir, opts);
 }
@@ -391,9 +398,7 @@ describe('rewriteTemplateExpression — CallExpression $emit', () => {
 
   it("$emit('value-change', x) → _props.onValueChange?.(x) (kebab → camelCase)", () => {
     const ir = buildIR();
-    expect(rewrite("$emit('value-change', x)", ir)).toBe(
-      '_props.onValueChange?.(x)',
-    );
+    expect(rewrite("$emit('value-change', x)", ir)).toBe('_props.onValueChange?.(x)');
   });
 
   it("$emit('') → _props.on?.() (empty event name yields bare 'on')", () => {
@@ -430,9 +435,7 @@ describe('rewriteTemplateExpression — Identifier visitor (computed + invokeAcc
 
   it('an invokeAccessors identifier → name() (loop-index accessor wrap)', () => {
     const ir = buildIR();
-    expect(rewrite('index', ir, { invokeAccessors: new Set(['index']) })).toBe(
-      'index()',
-    );
+    expect(rewrite('index', ir, { invokeAccessors: new Set(['index']) })).toBe('index()');
   });
 
   it('a bare identifier that is neither computed nor an accessor is left bare', () => {
@@ -474,9 +477,7 @@ describe('rewriteTemplateExpression — nesting & passthrough', () => {
       props: [nonModelProp('disabled')],
       state: [stateDecl('count')],
     });
-    expect(rewrite('$props.disabled ? 0 : $data.count', ir)).toBe(
-      'local.disabled ? 0 : count()',
-    );
+    expect(rewrite('$props.disabled ? 0 : $data.count', ir)).toBe('local.disabled ? 0 : count()');
   });
 
   it('a pure literal expression passes through unchanged', () => {

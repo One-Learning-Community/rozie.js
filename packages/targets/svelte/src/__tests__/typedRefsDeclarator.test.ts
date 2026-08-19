@@ -22,8 +22,9 @@
  * behavior so a future refactor cannot silently reintroduce the gap the
  * workaround wrongly believed still existed.
  */
-import { describe, it, expect } from 'vitest';
-import { compile } from '../../../../core/src/compile.js';
+
+import { compile } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 
 function svelteCode(source: string): string {
   const result = compile(source, { target: 'svelte', filename: 'X.rozie', types: true });

@@ -9,13 +9,16 @@
 // Test surface drives the public `emitTemplate` output (template text) — the
 // same path the production compiler uses — and a custom-registry compile for
 // the custom-modifier case.
+
+import type { IRComponent, ModelModifierImpl } from '@rozie/core';
+import {
+  createDefaultRegistry,
+  lowerToIR,
+  ModifierRegistry,
+  parse,
+  registerBuiltins,
+} from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { ModifierRegistry, registerBuiltins } from '@rozie/core';
-import type { ModelModifierImpl } from '@rozie/core';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { emitTemplate } from '../emit/emitTemplate.js';
 
 const REGISTRY = createDefaultRegistry();
@@ -27,9 +30,7 @@ function lowerInline(
 ): IRComponent {
   const result = parse(src, { filename });
   if (!result.ast) {
-    throw new Error(
-      `parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`,
-    );
+    throw new Error(`parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`);
   }
   const lowered = lowerToIR(result.ast, { modifierRegistry: registry });
   if (!lowered.ir) {

@@ -21,15 +21,14 @@
  * signal call; (2) the getter reads the signal exactly once; (3) reference
  * examples without a double-read accessor are untouched.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseExpression } from '@babel/parser';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, PropDecl } from '../../../../core/src/ir/types.js';
+import type { IRComponent, PropDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../emitAngular.js';
 import { hoistTemplateDoubleReadAccessor } from '../rewrite/rewriteTemplateExpression.js';
 
@@ -57,9 +56,7 @@ function templateOf(code: string): string {
 function makeIR(props: Array<{ name: string; isModel?: boolean }>): IRComponent {
   return {
     name: 'TestComp',
-    props: props.map(
-      (p) => ({ name: p.name, isModel: p.isModel ?? false }) as unknown as PropDecl,
-    ),
+    props: props.map((p) => ({ name: p.name, isModel: p.isModel ?? false }) as unknown as PropDecl),
     state: [],
     refs: [],
     computed: [],
@@ -113,9 +110,7 @@ describe('Angular template double-read accessor — Uppy :accept', () => {
     // allowedFileTypes references the prop via the source `restrictionsFromProps`
     // arrow — that lowers separately and is not the getter.)
     expect(code).toContain('const __allowedFileTypes = this.allowedFileTypes();');
-    expect(code).toContain(
-      "return __allowedFileTypes ? __allowedFileTypes.join(',') : null;",
-    );
+    expect(code).toContain("return __allowedFileTypes ? __allowedFileTypes.join(',') : null;");
     expect(getterCalls).toBeGreaterThanOrEqual(1);
   });
 
@@ -123,9 +118,7 @@ describe('Angular template double-read accessor — Uppy :accept', () => {
     const ir = makeIR([{ name: 'allowedFileTypes' }]);
     // Single read — the existing single-call lowering already type-checks.
     const expr = parseExpression('$props.allowedFileTypes');
-    expect(
-      hoistTemplateDoubleReadAccessor(expr, ir, 'accept', new Set()),
-    ).toBeNull();
+    expect(hoistTemplateDoubleReadAccessor(expr, ir, 'accept', new Set())).toBeNull();
   });
 
   it('helper returns null for two DIFFERENT accessors each read once', () => {
@@ -133,9 +126,7 @@ describe('Angular template double-read accessor — Uppy :accept', () => {
     // `$props.disabled || $props.busy` — each accessor lowers to one call;
     // no narrowing problem, must NOT synthesise a getter.
     const expr = parseExpression('$props.disabled || $props.busy');
-    expect(
-      hoistTemplateDoubleReadAccessor(expr, ir, 'data-x', new Set()),
-    ).toBeNull();
+    expect(hoistTemplateDoubleReadAccessor(expr, ir, 'data-x', new Set())).toBeNull();
   });
 
   it('helper synthesises a getter for a same-accessor double read', () => {
@@ -146,9 +137,7 @@ describe('Angular template double-read accessor — Uppy :accept', () => {
     const hoist = hoistTemplateDoubleReadAccessor(expr, ir, 'accept', new Set());
     expect(hoist).not.toBeNull();
     expect(hoist!.memberName).toBe('__accept');
-    expect(hoist!.decl).toContain(
-      'const __allowedFileTypes = this.allowedFileTypes();',
-    );
+    expect(hoist!.decl).toContain('const __allowedFileTypes = this.allowedFileTypes();');
     // The signal is read exactly once inside the getter.
     expect((hoist!.decl.match(/this\.allowedFileTypes\(\)/g) ?? []).length).toBe(1);
   });
@@ -158,12 +147,7 @@ describe('Angular template double-read accessor — Uppy :accept', () => {
     const expr = parseExpression(
       "$props.allowedFileTypes ? $props.allowedFileTypes.join(',') : null",
     );
-    const hoist = hoistTemplateDoubleReadAccessor(
-      expr,
-      ir,
-      'accept',
-      new Set(['__accept']),
-    );
+    const hoist = hoistTemplateDoubleReadAccessor(expr, ir, 'accept', new Set(['__accept']));
     expect(hoist!.memberName).toBe('__accept_2');
   });
 

@@ -15,15 +15,13 @@
  * NOTE: Solid's vitest include is `src/**` only — this test lives under
  * src/__tests__, NOT tests/.
  */
-import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
 
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolidTypes } from '../emit/emitTypes.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -49,9 +47,7 @@ describe('emitSolidTypes — Phase 22 Plan 22-03', () => {
     expect(out).toContain(`defaultValue?: number;`);
     expect(out).toContain(`onValueChange?: (next: number) => void;`);
     expect(out).toContain(`step?: number;`);
-    expect(out).toContain(
-      `declare const Counter: import('solid-js').Component<CounterProps>;`,
-    );
+    expect(out).toContain(`declare const Counter: import('solid-js').Component<CounterProps>;`);
     expect(out).toContain(`export default Counter;`);
   });
 
@@ -60,9 +56,7 @@ describe('emitSolidTypes — Phase 22 Plan 22-03', () => {
     expect(out).toContain(`export interface DropdownHandle {`);
     expect(out).toMatch(/\btoggle:/);
     expect(out).toMatch(/\bclose:/);
-    expect(out).toContain(
-      `declare const Dropdown: import('solid-js').Component<DropdownProps>;`,
-    );
+    expect(out).toContain(`declare const Dropdown: import('solid-js').Component<DropdownProps>;`);
   });
 
   it('Test 3: empty ir.expose — NO handle interface', () => {
@@ -73,7 +67,7 @@ describe('emitSolidTypes — Phase 22 Plan 22-03', () => {
     expect(out).not.toContain('CounterHandle');
   });
 
-  it('Test 4: default export idiom is import(\'solid-js\').Component<CounterProps>', () => {
+  it("Test 4: default export idiom is import('solid-js').Component<CounterProps>", () => {
     const out = emitSolidTypes(load('Counter'));
     expect(out).toContain(`import('solid-js').Component<CounterProps>`);
     expect(out).not.toContain('DefineComponent');

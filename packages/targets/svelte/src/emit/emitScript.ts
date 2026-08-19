@@ -29,43 +29,44 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
-import type { GeneratorOptions } from '@babel/generator';
+
 import type { EncodedSourceMap } from '@ampproject/remapping';
+import type { GeneratorOptions } from '@babel/generator';
+import _generate from '@babel/generator';
+import * as t from '@babel/types';
 import type {
+  ComputedDecl,
+  Diagnostic,
   IRComponent,
   PropDecl,
   PropTypeAnnotation,
-  ComputedDecl,
-} from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
+} from '@rozie/core';
+import { buildPropJsdoc } from '@rozie/core';
+import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { isMutableLiteralFactoryDefault } from '../../../../core/src/codegen/propDefaultFactory.js';
+import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
-import { rewriteRozieIdentifiers, svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 import { collectSvelteImports } from '../rewrite/collectSvelteImports.js';
+import { rewriteRozieIdentifiers, svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { dynamicSlotBindingName } from './dynamicSlotOrdinal.js';
+import { emitContext } from './emitContext.js';
+import { emitPortals } from './emitPortals.js';
+import { portalSlotMergeName } from './portalSlotMergeName.js';
 import {
   buildSlotTypeFields,
-  distinctSlotsByName,
   buildSnippetsRecordType,
+  distinctSlotsByName,
   renderRecordKey,
 } from './refineSlotTypes.js';
-import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
-import { emitPortals } from './emitPortals.js';
-import { emitContext } from './emitContext.js';
-import { portalSlotMergeName } from './portalSlotMergeName.js';
-import { dynamicSlotBindingName } from './dynamicSlotOrdinal.js';
-import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
-import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 // Phase 06.1 P2: GEN_OPTS gains sourceMaps:true + sourceFileName so each
 // @babel/generator call emits a per-expression child map anchored to the
@@ -371,9 +372,7 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
       const prevTrail = prev.trailingComments;
       const curLead = cur.leadingComments;
       if (prevTrail && prevTrail.length > 0 && curLead && curLead.length > 0) {
-        const deduped = prevTrail.filter(
-          (c) => !curLead.some((lc) => isSameSourceComment(c, lc)),
-        );
+        const deduped = prevTrail.filter((c) => !curLead.some((lc) => isSameSourceComment(c, lc)));
         prev.trailingComments = deduped.length > 0 ? deduped : null;
       }
       continue;
@@ -390,7 +389,13 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
     // (within-partial pairs already share their objects and are handled below). A
     // LEADING CommentLine renders own-line with no same-line collision (unlike the
     // TRAILING-seam clone below), so the shared comment objects can be reused as-is.
-    if (curSpliced && !prevSpliced && (!lead || lead.length === 0) && prevTrail && prevTrail.length > 0) {
+    if (
+      curSpliced &&
+      !prevSpliced &&
+      (!lead || lead.length === 0) &&
+      prevTrail &&
+      prevTrail.length > 0
+    ) {
       cur.leadingComments = [...prevTrail];
       // Quick task 260718-uvn — the boundary comment now lives on BOTH prev.trailing
       // AND the mirrored cur.leading → artificially doubled. Post-260714-orv the inline
@@ -400,9 +405,7 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
       // copy on cur.leading. (Every mirrored comment is the same object, so all are
       // dropped; an independent prev-trailing comment, if any, would survive.)
       const newLead = cur.leadingComments;
-      const deduped = prevTrail.filter(
-        (c) => !newLead.some((lc) => isSameSourceComment(c, lc)),
-      );
+      const deduped = prevTrail.filter((c) => !newLead.some((lc) => isSameSourceComment(c, lc)));
       prev.trailingComments = deduped.length > 0 ? deduped : null;
       continue;
     }
@@ -422,7 +425,12 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
     // and the after-side branch are untouched; a SURVIVING predecessor (plain `let`/`const`,
     // e.g. `let expandedTouched` above `groupingActiveDefault`) leaves the seam UNSTAMPED → the
     // mirror still doubles, matching ITS inline oracle (data-table baseline + HostK unchanged).
-    if (curSpliced && (curExtra as { __rozieLeadingSeamPrevStripped?: boolean } | undefined)?.__rozieLeadingSeamPrevStripped === true) continue;
+    if (
+      curSpliced &&
+      (curExtra as { __rozieLeadingSeamPrevStripped?: boolean } | undefined)
+        ?.__rozieLeadingSeamPrevStripped === true
+    )
+      continue;
     const lastLead = lead[lead.length - 1];
     // Identity guard (Pitfall 2 / A4): a node can be simultaneously the spliced
     // successor of one seam and the spliced predecessor of the next. If the comment
@@ -472,8 +480,7 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
         (c) => !(cur.leadingComments ?? []).some((lc) => isSameSourceComment(c, lc)),
       );
       const afterGap = (curExtra as { __rozieAfterGap?: number } | undefined)?.__rozieAfterGap;
-      const anchorLine =
-        (prev.loc?.end.line ?? 0) + (typeof afterGap === 'number' ? afterGap : 1);
+      const anchorLine = (prev.loc?.end.line ?? 0) + (typeof afterGap === 'number' ? afterGap : 1);
       // Phase 56-R11 (after-side INTER-COMMENT-BLOCK seam): when CUR (the host successor)
       // carries MORE THAN ONE leading comment block — `[comment A][blank][comment B]` (the
       // real 56-09 Wave-9 P9 `gridKeydownHandlers` / P12 `fillDrag` after-sides, two
@@ -959,8 +966,7 @@ function emitPropsBlock(ir: IRComponent): string {
   // Phase 14.1 follow-up — also widen the gate to the explicit-manual case
   // (`inherit-attrs="false"` + `r-bind="$attrs"`), which carries a
   // `spreadBinding` in the IR template.
-  const hasAttrsFallthrough =
-    ir.inheritAttrs !== false || templateUsesSpreadBinding(ir.template);
+  const hasAttrsFallthrough = ir.inheritAttrs !== false || templateUsesSpreadBinding(ir.template);
   if (
     ir.props.length === 0 &&
     ir.slots.length === 0 &&
@@ -995,9 +1001,7 @@ function emitPropsBlock(ir: IRComponent): string {
   }
 
   const preludeBlock =
-    factoryDefaultPrelude.length > 0
-      ? `${factoryDefaultPrelude.join('\n')}\n\n`
-      : '';
+    factoryDefaultPrelude.length > 0 ? `${factoryDefaultPrelude.join('\n')}\n\n` : '';
   const mergeBlock = mergeLines.length > 0 ? `\n\n${mergeLines.join('\n')}` : '';
   return `${interfaceBlock}\n\n${preludeBlock}${destructure}${mergeBlock}`;
 }
@@ -1220,9 +1224,11 @@ function watchCallIsImmediate(expr: t.CallExpression): boolean {
   return false;
 }
 
-function emitWatcherHooks(
-  clonedProgram: t.File,
-): { lines: string[]; consumedIndices: Set<number>; needsUntrack: boolean } {
+function emitWatcherHooks(clonedProgram: t.File): {
+  lines: string[];
+  consumedIndices: Set<number>;
+  needsUntrack: boolean;
+} {
   const lines: string[] = [];
   const consumed = new Set<number>();
   let needsUntrack = false;
@@ -1244,10 +1250,7 @@ function emitWatcherHooks(
     ) {
       continue;
     }
-    if (
-      !cbArg ||
-      (!t.isArrowFunctionExpression(cbArg) && !t.isFunctionExpression(cbArg))
-    ) {
+    if (!cbArg || (!t.isArrowFunctionExpression(cbArg) && !t.isFunctionExpression(cbArg))) {
       continue;
     }
     consumed.add(i);
@@ -1282,9 +1285,7 @@ function emitWatcherHooks(
           `$effect(() => { const __watchVal = (${getterCode})(); untrack(() => (${cbCode})(__watchVal)); });`,
         );
       } else {
-        lines.push(
-          `$effect(() => { (${getterCode})(); untrack(() => (${cbCode})()); });`,
-        );
+        lines.push(`$effect(() => { (${getterCode})(); untrack(() => (${cbCode})()); });`);
       }
     } else {
       const flag = `__rozieWatchInitial_${idx}`;
@@ -1303,9 +1304,7 @@ function emitWatcherHooks(
   return { lines, consumedIndices: consumed, needsUntrack };
 }
 
-function cbParamCount(
-  cbArg: t.ArrowFunctionExpression | t.FunctionExpression,
-): number {
+function cbParamCount(cbArg: t.ArrowFunctionExpression | t.FunctionExpression): number {
   return cbArg.params.length;
 }
 
@@ -1331,9 +1330,11 @@ function cbParamCount(
  *   - `$onUpdate` STAYS a `$effect` — it IS the update phase: re-run on every
  *     tracked reactive change. Svelte's `$effect` auto-tracks signal reads.
  */
-function emitLifecycleHooks(
-  clonedProgram: t.File,
-): { lines: string[]; consumedIndices: Set<number>; runtimeImports: Set<string> } {
+function emitLifecycleHooks(clonedProgram: t.File): {
+  lines: string[];
+  consumedIndices: Set<number>;
+  runtimeImports: Set<string>;
+} {
   const lines: string[] = [];
   const consumed = new Set<number>();
   const runtimeImports = new Set<string>();
@@ -1349,11 +1350,7 @@ function emitLifecycleHooks(
     const expr = unwrapTsCast(stmt.expression);
     if (!t.isCallExpression(expr) || !t.isIdentifier(expr.callee)) continue;
     const calleeName = expr.callee.name;
-    if (
-      calleeName !== '$onMount' &&
-      calleeName !== '$onUnmount' &&
-      calleeName !== '$onUpdate'
-    ) {
+    if (calleeName !== '$onMount' && calleeName !== '$onUnmount' && calleeName !== '$onUpdate') {
       continue;
     }
 
@@ -1448,10 +1445,7 @@ function emitLifecycleHooks(
         // in this emitter is passed whole to `genCode` (param annotations
         // survive); Svelte has no `t.functionDeclaration` /
         // `t.arrowFunctionExpression` rebuild of a USER function.
-        const merged = t.blockStatement([
-          ...setupBody.body,
-          t.returnStatement(cleanupExpr),
-        ]);
+        const merged = t.blockStatement([...setupBody.body, t.returnStatement(cleanupExpr)]);
         lines.push(`onMount(${arrowBody(merged)});`);
         continue;
       }
@@ -1680,10 +1674,7 @@ export interface EmitScriptOptions {
   portalScopeHash?: string;
 }
 
-export function emitScript(
-  ir: IRComponent,
-  opts: EmitScriptOptions = {},
-): EmitScriptResult {
+export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitScriptResult {
   const diagnostics: Diagnostic[] = [];
   const scriptInjections: SvelteScriptInjection[] = [];
 
@@ -1789,9 +1780,10 @@ export function emitScript(
   //   - 2nd '\n' creates a blank separator line
   // So lines before residual = (newlines_in_preambleText + 1 lines) + 1 blank = N + 2.
   const preambleText = preambleSections.join('\n\n');
-  const preambleSectionLines = preambleText.length > 0
-    ? (preambleText.match(/\n/g) ?? []).length + 2  // +2: last preamble line + blank separator
-    : 0;
+  const preambleSectionLines =
+    preambleText.length > 0
+      ? (preambleText.match(/\n/g) ?? []).length + 2 // +2: last preamble line + blank separator
+      : 0;
 
   // 6. Assemble in canonical order with blank-line separators.
   // Residual body BEFORE derived/effect — DX-03 trust-erosion: console.log
@@ -1827,10 +1819,10 @@ export function emitScript(
   // map references the correct .svelte output line numbers.
   let scriptMap: EncodedSourceMap | null = null;
   if (residualStmts.length > 0 && opts.filename) {
-    const genResult = generate(
-      t.file(t.program(residualStmts)),
-      { ...GEN_OPTS_MAP, sourceFileName: opts.filename },
-    );
+    const genResult = generate(t.file(t.program(residualStmts)), {
+      ...GEN_OPTS_MAP,
+      sourceFileName: opts.filename,
+    });
     if (genResult.map) {
       scriptMap = genResult.map as EncodedSourceMap;
     }

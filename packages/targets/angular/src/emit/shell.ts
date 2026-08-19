@@ -22,9 +22,10 @@
  *
  * @experimental — shape may change before v1.0
  */
-import MagicString from 'magic-string';
+
 import type { EncodedSourceMap } from '@ampproject/remapping';
-import type { BlockMap } from '../../../../core/src/ast/types.js';
+import type { BlockMap } from '@rozie/core';
+import MagicString from 'magic-string';
 
 export interface ShellParts {
   /** `import { ... } from '@angular/core';` (and common/forms lines if needed). */
@@ -186,8 +187,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   // Remove pre-envelope and post-envelope characters (e.g. leading whitespace,
   // trailing newlines, HTML comments outside the envelope).
   if (anchorStart > 0) ms.remove(0, anchorStart);
-  if (anchorEnd < parts.rozieSource.length)
-    ms.remove(anchorEnd, parts.rozieSource.length);
+  if (anchorEnd < parts.rozieSource.length) ms.remove(anchorEnd, parts.rozieSource.length);
 
   return {
     ms,

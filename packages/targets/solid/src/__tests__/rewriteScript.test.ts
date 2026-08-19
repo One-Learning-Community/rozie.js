@@ -17,23 +17,21 @@
  *   $slots.X → (_props.XSlot ?? _props.slots?.['X']) ; default slot → _props.children
  *   $snapshot(x) → x ; bare computed name → name() ; $el → __rozieRootRef!
  */
-import { describe, expect, it } from 'vitest';
-import * as t from '@babel/types';
+
 import _generate from '@babel/generator';
 import { parse as babelParse } from '@babel/parser';
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
-import {
-  rewriteRozieExpressionNode,
-  rewriteRozieIdentifiers,
-} from '../rewrite/rewriteScript.js';
+import { rewriteRozieExpressionNode, rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 function buildSlotDecl(name: string): SlotDecl {
   return {

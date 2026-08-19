@@ -6,19 +6,15 @@
  *   - `:root { }` rules extract to a module-level `injectGlobalStyles(id, ...)` call
  *     imported from @rozie/runtime-lit.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { emitLit } from '../emitLit.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitStyle } from '../emit/emitStyle.js';
-import {
-  LitImportCollector,
-  RuntimeLitImportCollector,
-} from '../rewrite/collectLitImports.js';
+import { emitLit } from '../emitLit.js';
+import { LitImportCollector, RuntimeLitImportCollector } from '../rewrite/collectLitImports.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../../../..');
@@ -61,7 +57,14 @@ describe('emitStyle — D-LIT-15 / D-LIT-16 split', () => {
 
   it('emitStyle() unit: empty styles still emit the host-display parity default', () => {
     const result = emitStyle(
-      { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      {
+        type: 'StyleSection',
+        scopedRules: [],
+        rootRules: [],
+        portalRules: [],
+        engineRules: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
       '',
       {
         componentName: 'X',
@@ -151,9 +154,7 @@ describe('emitStyle — ::part() cross-shadow styling bridge (Phase 17, SPEC-R1/
     // `part="body"` shadow element: tag lowered to the custom-element tag
     // `rozie-part-card`, scope attr stamped on the child-tag compound BEFORE
     // `::part`, part name literal (SPEC-R2 + SPEC-R6).
-    expect(code).toMatch(
-      /rozie-part-card\[data-rozie-s-[a-z0-9]+\]::part\(body\)/,
-    );
+    expect(code).toMatch(/rozie-part-card\[data-rozie-s-[a-z0-9]+\]::part\(body\)/);
     // Scope attr lands BEFORE ::part, never after.
     expect(code).not.toMatch(/::part\(body\)\[data-rozie-s/);
     // Part name `body` is literal — no scope hash adjacent to the name.

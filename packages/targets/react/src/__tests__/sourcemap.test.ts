@@ -16,14 +16,13 @@
  * nodes with no .rozie source location. The P1 shell-level fallback covered
  * them coarsely; P2 focuses on user-authored code precision.
  */
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { SourceMapConsumer } from 'source-map-js';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../emitReact.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -73,8 +72,7 @@ describe('Phase 06.1 D-110/A1 — React sourcemap resolves to correct .rozie lin
     const pos = consumer.originalPositionFor({ line, column });
 
     // Per Pitfall 10 — derive expected source line at runtime.
-    const scriptConsoleLogLine =
-      src.split('\n').findIndex((l) => /console\.log\(/.test(l)) + 1;
+    const scriptConsoleLogLine = src.split('\n').findIndex((l) => /console\.log\(/.test(l)) + 1;
     const styleEndLine = src.split('\n').findIndex((l) => /<\/style>/.test(l)) + 1;
     expect(scriptConsoleLogLine).toBeGreaterThan(0);
 

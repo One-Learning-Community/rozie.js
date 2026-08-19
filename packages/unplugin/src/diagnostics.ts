@@ -13,11 +13,10 @@
  * @experimental — shape may change before v1.0
  */
 
-import { renderDiagnostic } from '../../core/src/diagnostics/frame.js';
+import type { Diagnostic, SourceLoc } from '@rozie/core';
+import { renderDiagnostic } from '@rozie/core';
 import { offsetToLineCol } from '../../core/src/diagnostics/offsetToLineCol.js';
 import { createSourceResolver } from '../../core/src/diagnostics/sourceResolver.js';
-import type { Diagnostic } from '../../core/src/diagnostics/Diagnostic.js';
-import type { SourceLoc } from '../../core/src/ast/types.js';
 
 export interface ViteShapedError extends Error {
   loc: { file: string; line: number; column: number };
@@ -52,7 +51,10 @@ export function formatViteError(
   const resolveSource = createSourceResolver(id, source);
   const { line, column } = offsetToLineCol(resolveSource(first.filename), first.loc.start);
   const frame = renderDiagnostic(first, source, { resolveSource });
-  const tail = errors.length > 1 ? `\n(plus ${errors.length - 1} more error${errors.length - 1 === 1 ? '' : 's'} — fix and recompile)` : '';
+  const tail =
+    errors.length > 1
+      ? `\n(plus ${errors.length - 1} more error${errors.length - 1 === 1 ? '' : 's'} — fix and recompile)`
+      : '';
   const message = `[${first.code}] ${first.message}${tail}`;
   const err = new Error(message) as ViteShapedError;
   err.loc = { file: id, line, column };

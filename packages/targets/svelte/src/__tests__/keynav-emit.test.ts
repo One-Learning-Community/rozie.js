@@ -11,18 +11,19 @@
  * component with NO `r-keynav` directive is completely untouched (SPEC §11:
  * "no corpus rebless").
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSvelte } from '../emitSvelte.js';
 
 function compile(src: string, filename: string): IRComponent {
   const parsed = parse(src, { filename });
-  if (!parsed.ast) throw new Error(`parse failed for ${filename}: ${JSON.stringify(parsed.diagnostics)}`);
+  if (!parsed.ast)
+    throw new Error(`parse failed for ${filename}: ${JSON.stringify(parsed.diagnostics)}`);
   const lowered = lowerToIR(parsed.ast, { modifierRegistry: createDefaultRegistry() });
-  if (!lowered.ir) throw new Error(`lower failed for ${filename}: ${JSON.stringify(lowered.diagnostics)}`);
+  if (!lowered.ir)
+    throw new Error(`lower failed for ${filename}: ${JSON.stringify(lowered.diagnostics)}`);
   return lowered.ir;
 }
 
@@ -137,9 +138,7 @@ describe('Svelte r-keynav emitter (Plan 71-06 Task 2)', () => {
     const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
     const { code } = emitSvelte(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
     expect(code).toContain('__rozieKeynavGroupId = `keynav-${Math.random()');
-    expect(code).toMatch(
-      /id=\{`\$\{__rozieKeynavGroupId\}-item-\$\{__rozieKeynavIndex\}`\}/,
-    );
+    expect(code).toMatch(/id=\{`\$\{__rozieKeynavGroupId\}-item-\$\{__rozieKeynavIndex\}`\}/);
   });
 
   it('SEAM: aria — combobox emits aria-activedescendant on the input bound to the active <li> id', () => {
@@ -187,7 +186,9 @@ describe('Svelte r-keynav emitter (Plan 71-06 Task 2)', () => {
     // walk collected (e.g. `applyListeners`/`rozieDisplay`) — see
     // `emitSvelte.ts`'s `tmplRuntimeImports` splice.
     expect(code).toMatch(/import \{[^}]*\bkeynav\b[^}]*\} from '@rozie\/runtime-svelte';/);
-    expect(code).toContain('let __rozieKeynavRootRef = $state<HTMLElement | undefined>(undefined);');
+    expect(code).toContain(
+      'let __rozieKeynavRootRef = $state<HTMLElement | undefined>(undefined);',
+    );
     expect(code).toContain('bind:this={__rozieKeynavRootRef}');
   });
 
@@ -362,8 +363,12 @@ describe('Svelte r-keynav emitter — multi-root, grid, page, explicit index (Pl
     const { code } = emitSvelte(ir, { filename: 'KeynavTwoGroups.rozie', source: TWO_ROOT_SRC });
     expect(code).toContain('bind:this={__rozieKeynavRootRef}');
     expect(code).toContain('bind:this={__rozieKeynavRootRef1}');
-    expect(code).toContain('let __rozieKeynavRootRef = $state<HTMLElement | undefined>(undefined);');
-    expect(code).toContain('let __rozieKeynavRootRef1 = $state<HTMLElement | undefined>(undefined);');
+    expect(code).toContain(
+      'let __rozieKeynavRootRef = $state<HTMLElement | undefined>(undefined);',
+    );
+    expect(code).toContain(
+      'let __rozieKeynavRootRef1 = $state<HTMLElement | undefined>(undefined);',
+    );
     expect(code).toContain('__rozieKeynavGroupId = `keynav-${Math.random()');
     expect(code).toContain('__rozieKeynavGroupId1 = `keynav-${Math.random()');
   });
@@ -381,16 +386,12 @@ describe('Svelte r-keynav emitter — multi-root, grid, page, explicit index (Pl
     const ir = compile(TWO_ROOT_SRC, 'KeynavTwoGroups.rozie');
     const { code } = emitSvelte(ir, { filename: 'KeynavTwoGroups.rozie', source: TWO_ROOT_SRC });
     // Group 0 (rows) — bare group-id/active identifiers.
-    expect(code).toMatch(
-      /id=\{`\$\{__rozieKeynavGroupId\}-item-\$\{__rozieKeynavIndex\}`\}/,
-    );
+    expect(code).toMatch(/id=\{`\$\{__rozieKeynavGroupId\}-item-\$\{__rozieKeynavIndex\}`\}/);
     expect(code).toMatch(/data-rozie-keynav-active=\{rowActive === __rozieKeynavIndex/);
     // Group 1 (cells) — suffixed group-id/active identifiers, and a
     // suffixed loop index alias (the compiler-synthesized index is scoped
     // per-loop, so the SECOND loop gets its own alias name).
-    expect(code).toMatch(
-      /id=\{`\$\{__rozieKeynavGroupId1\}-item-\$\{__rozieKeynavIndex\d*\}`\}/,
-    );
+    expect(code).toMatch(/id=\{`\$\{__rozieKeynavGroupId1\}-item-\$\{__rozieKeynavIndex\d*\}`\}/);
     expect(code).toMatch(/data-rozie-keynav-active=\{cellActive === __rozieKeynavIndex\d*/);
   });
 
@@ -430,7 +431,10 @@ describe('Svelte r-keynav emitter — multi-root, grid, page, explicit index (Pl
 
   it("explicit item index: an item's own index expression overrides a NESTED inner loop's index alias in all four attributes", () => {
     const ir = compile(EXPLICIT_INDEX_SRC, 'KeynavExplicitIndex.rozie');
-    const { code } = emitSvelte(ir, { filename: 'KeynavExplicitIndex.rozie', source: EXPLICIT_INDEX_SRC });
+    const { code } = emitSvelte(ir, {
+      filename: 'KeynavExplicitIndex.rozie',
+      source: EXPLICIT_INDEX_SRC,
+    });
     expect(code).toMatch(/id=\{`\$\{__rozieKeynavGroupId\}-item-\$\{w \* 7 \+ d\}`\}/);
     expect(code).toMatch(/data-rozie-keynav-item=\{w \* 7 \+ d\}/);
     expect(code).toMatch(/data-rozie-keynav-active=\{active === w \* 7 \+ d \? '' : undefined\}/);
@@ -456,7 +460,7 @@ describe('Svelte r-keynav emitter — multi-root, grid, page, explicit index (Pl
         '  console.log(item);\n' +
         '};\n' +
         '</script>\n\n' +
-        '<div role="menu" {...__rozieAttrs} use:applyListeners={__rozieAttrs} bind:this={__rozieKeynavRootRef} use:keynav={{ config: { focusModel: \'tabindex\', orientation: \'vertical\', loop: true, typeahead: false, skipDisabled: true }, active: active, getSource: () => (items).map((it) => ({ label: it.label, disabled: it.disabled })), getActive: () => active, setActive: (v) => { active = v; }, onCommit: (i) => { run(items[active]); }, activeClass: \'is-active\', getFocusScope: () => [__rozieKeynavRootRef] }} data-rozie-s-d30ecb02>{#each items as it, __rozieKeynavIndex (it.id)}<button role="menuitem" id={`${__rozieKeynavGroupId}-item-${__rozieKeynavIndex}`} data-rozie-keynav-item={__rozieKeynavIndex} data-rozie-keynav-active={active === __rozieKeynavIndex ? \'\' : undefined} tabindex={active === __rozieKeynavIndex ? 0 : -1} data-rozie-s-d30ecb02>{rozieDisplay(it.label)}</button>{/each}</div>\n',
+        "<div role=\"menu\" {...__rozieAttrs} use:applyListeners={__rozieAttrs} bind:this={__rozieKeynavRootRef} use:keynav={{ config: { focusModel: 'tabindex', orientation: 'vertical', loop: true, typeahead: false, skipDisabled: true }, active: active, getSource: () => (items).map((it) => ({ label: it.label, disabled: it.disabled })), getActive: () => active, setActive: (v) => { active = v; }, onCommit: (i) => { run(items[active]); }, activeClass: 'is-active', getFocusScope: () => [__rozieKeynavRootRef] }} data-rozie-s-d30ecb02>{#each items as it, __rozieKeynavIndex (it.id)}<button role=\"menuitem\" id={`${__rozieKeynavGroupId}-item-${__rozieKeynavIndex}`} data-rozie-keynav-item={__rozieKeynavIndex} data-rozie-keynav-active={active === __rozieKeynavIndex ? '' : undefined} tabindex={active === __rozieKeynavIndex ? 0 : -1} data-rozie-s-d30ecb02>{rozieDisplay(it.label)}</button>{/each}</div>\n",
     );
   });
 });

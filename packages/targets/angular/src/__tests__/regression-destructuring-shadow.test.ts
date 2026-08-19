@@ -17,14 +17,13 @@
  *   That is the coverage gap this spec closes: it parses the emitted Angular
  *   source with @babel/parser and fails loudly if it is syntactically invalid.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse as babelParse } from '@babel/parser';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../emitAngular.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -37,15 +36,11 @@ const PKG_SRC: Record<string, string> = {
 };
 
 function compile(name: string): string {
-  const source = readFileSync(
-    resolve(ROOT, PKG_SRC[name] ?? `examples/${name}.rozie`),
-    'utf8',
-  );
+  const source = readFileSync(resolve(ROOT, PKG_SRC[name] ?? `examples/${name}.rozie`), 'utf8');
   const { ast } = parse(source, { filename: `${name}.rozie` });
   const registry = createDefaultRegistry();
   const { ir } = lowerToIR(ast!, { modifierRegistry: registry });
-  return emitAngular(ir!, { filename: `${name}.rozie`, source, modifierRegistry: registry })
-    .code;
+  return emitAngular(ir!, { filename: `${name}.rozie`, source, modifierRegistry: registry }).code;
 }
 
 describe('Bug 1 (Angular) — scope-aware identifier rewrite', () => {

@@ -23,8 +23,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent, Listener } from '../../../../core/src/ir/types.js';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
+import type { IRComponent, Listener, ModifierArg } from '@rozie/core';
 import { rewriteScriptExpression } from '../rewrite/rewriteListenerExpression.js';
 
 /**

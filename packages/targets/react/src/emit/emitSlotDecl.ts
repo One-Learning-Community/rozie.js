@@ -21,9 +21,9 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import { refineSlotTypes, isDynamicOnlySlot } from './refineSlotTypes.js';
+import type { IRComponent } from '@rozie/core';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { isDynamicOnlySlot, refineSlotTypes } from './refineSlotTypes.js';
 
 export interface EmitSlotDeclResult {
   slotPropFields: string[];

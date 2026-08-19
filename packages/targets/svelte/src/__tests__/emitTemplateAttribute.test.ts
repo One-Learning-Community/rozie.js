@@ -10,18 +10,18 @@
 // Test surface targets the public `emitTemplate` output (template text) since
 // emitAttributes/emitSingleAttr's contract is observable only through the
 // rendered template — the same path the production compiler uses.
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { emitTemplate } from '../emit/emitTemplate.js';
 
 const REGISTRY = createDefaultRegistry();
 
 function lowerInline(src: string, filename = 'Test.rozie'): IRComponent {
   const result = parse(src, { filename });
-  if (!result.ast) throw new Error(`parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`);
+  if (!result.ast)
+    throw new Error(`parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`);
   const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
   if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
   return lowered.ir;
@@ -36,7 +36,7 @@ describe('emitTemplateAttribute — `:style` literal-object lowering (Svelte / S
   // precedence). These three tests isolate the pre-residual `style:` directive
   // lowering; the dedicated `…interacts with auto-fallthrough` test below
   // covers the new string-form path.
-  it('single-key literal object: `:style="{ background: \'#f00\' }"` → `style:background={\'#f00\'}`', () => {
+  it("single-key literal object: `:style=\"{ background: '#f00' }\"` → `style:background={'#f00'}`", () => {
     const ir = lowerInline(`<rozie name="Test" inherit-attrs="false">
 <template>
   <span :style="{ background: '#f00' }"></span>

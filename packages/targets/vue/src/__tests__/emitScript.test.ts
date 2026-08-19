@@ -6,14 +6,13 @@
 // Behavior tests assert the 10 must-haves from the plan (Pattern 3 macro
 // emission, Pitfall 3 defineModel exclusion, Pitfall 5 cross-scope cleanup,
 // Pitfall 10 paired-identifier lifecycle).
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitScript } from '../emit/emitScript.js';
 import { emitVue } from '../emitVue.js';
 
@@ -44,7 +43,7 @@ function lowerExample(name: string): IRComponent {
 }
 
 describe('emitScript — behavior', () => {
-  it('Test 1: Counter contains defineModel<number>(\'value\', { default: 0 })', () => {
+  it("Test 1: Counter contains defineModel<number>('value', { default: 0 })", () => {
     const { script } = emitScript(lowerExample('Counter'));
     expect(script).toContain("defineModel<number>('value', { default: 0 })");
   });
@@ -77,7 +76,7 @@ describe('emitScript — behavior', () => {
     expect(script).toContain('onBeforeUnmount(unlockScroll);');
   });
 
-  it('Test 7: Counter import line is `import { computed, ref } from \'vue\';` (sorted)', () => {
+  it("Test 7: Counter import line is `import { computed, ref } from 'vue';` (sorted)", () => {
     const { script } = emitScript(lowerExample('Counter'));
     // First non-empty line should be the import.
     const firstLine = script.split('\n').find((l) => l.trim().length > 0);
@@ -94,7 +93,7 @@ describe('emitScript — behavior', () => {
     expect(searchInputScript).toMatch(/clear:\s*\[/);
   });
 
-  it('SearchInput contains `const query = ref(\'\')` (data → ref)', () => {
+  it("SearchInput contains `const query = ref('')` (data → ref)", () => {
     const { script } = emitScript(lowerExample('SearchInput'));
     expect(script).toMatch(/const query = ref\(['"]['"]\);/);
   });

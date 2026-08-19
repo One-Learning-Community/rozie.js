@@ -11,11 +11,10 @@
 //     → const theme = useContext(rozieContext('theme'));
 //
 // Plus the R12 / D-5 empty-case byte-identity gate.
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../emitSolid.js';
 
 function lower(src: string, filename: string): IRComponent {
@@ -135,7 +134,7 @@ describe('Solid emit — cross-component context ($provide / $inject)', () => {
     expect(closeLayout).toBeLessThan(closeTheme);
   });
 
-  it("CR-01 — a key containing an apostrophe is JSON-escaped (valid source + matching provider/consumer token)", () => {
+  it('CR-01 — a key containing an apostrophe is JSON-escaped (valid source + matching provider/consumer token)', () => {
     const APOSTROPHE_PROVIDE = `<rozie name="AposProvider">
 <data>
 { color: 'red' }

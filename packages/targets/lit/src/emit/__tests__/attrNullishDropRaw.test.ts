@@ -21,12 +21,11 @@
  * (`emitTemplateAttribute.ts:88`) and Solid's (`:128`) treat `key`/`:key` as
  * unconditionally consumed. Lit leaks `key=${rozieAttr(c)}` into the DOM.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
-import { emitLit } from '../../emitLit.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../../../../react/src/emitReact.js';
+import { emitLit } from '../../emitLit.js';
 
 const PROBE_SRC = `<rozie name="Probe">
 <props>

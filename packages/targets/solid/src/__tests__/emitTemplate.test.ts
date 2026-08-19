@@ -10,11 +10,10 @@
 //
 // No standalone emitTemplate.test.ts existed for the Solid target before this
 // plan; this is the new file (the harness mirrors classSelector.test.ts).
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../emitSolid.js';
 
 function lowerInline(source: string, name = 'PartProducer'): IRComponent {

@@ -8,15 +8,14 @@
 // may synthesize it; Teleport tolerates a v-if child, so r-portal + r-if
 // on the same element compose without special-casing the conditional
 // emitter.
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { parse as parseVueSFC } from '@vue/compiler-sfc';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { describe, expect, it } from 'vitest';
 import { emitVue } from '../emitVue.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

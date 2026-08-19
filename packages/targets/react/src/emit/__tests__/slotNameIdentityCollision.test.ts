@@ -52,12 +52,11 @@
  * which solves a DIFFERENT problem (declaration-time CLASS-MEMBER dedup, not
  * a per-invocation declaration lookup).
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../../emitReact.js';
-import type { IRComponent } from '../../../../../core/src/ir/types.js';
 
 /**
  * Recursive walker collecting the `sourceLoc.start` of every
@@ -207,9 +206,11 @@ describe('React sourceLoc identity — IDENTICAL dynamicNameExpr text on two dec
     // Both invocations share the identical runtime key text `col.key` and the
     // identical `props.slots?.[col.key]` prefix, so distinguish by counting
     // occurrences of each call SHAPE rather than a bare toContain.
-    const paramCallCount = (code.match(/\(props\.slots\?\.\[col\.key\] as Function\)\(\{ value: 1 \}\)/g) ?? [])
+    const paramCallCount = (
+      code.match(/\(props\.slots\?\.\[col\.key\] as Function\)\(\{ value: 1 \}\)/g) ?? []
+    ).length;
+    const zeroArgCallCount = (code.match(/\(props\.slots\?\.\[col\.key\] as Function\)\(\)/g) ?? [])
       .length;
-    const zeroArgCallCount = (code.match(/\(props\.slots\?\.\[col\.key\] as Function\)\(\)/g) ?? []).length;
     expect(paramCallCount).toBe(1);
     expect(zeroArgCallCount).toBe(1);
   });
@@ -217,9 +218,11 @@ describe('React sourceLoc identity — IDENTICAL dynamicNameExpr text on two dec
   it('zero-param declared first: the with-params declaration (declared second) still receives its own param object', () => {
     const ir = lowerInline(IDENTICAL_EXPR_REVERSED_SRC);
     const { code } = emitReact(ir, { filename: 'IdenticalExprSlotsRev.rozie' });
-    const paramCallCount = (code.match(/\(props\.slots\?\.\[col\.key\] as Function\)\(\{ value: 1 \}\)/g) ?? [])
+    const paramCallCount = (
+      code.match(/\(props\.slots\?\.\[col\.key\] as Function\)\(\{ value: 1 \}\)/g) ?? []
+    ).length;
+    const zeroArgCallCount = (code.match(/\(props\.slots\?\.\[col\.key\] as Function\)\(\)/g) ?? [])
       .length;
-    const zeroArgCallCount = (code.match(/\(props\.slots\?\.\[col\.key\] as Function\)\(\)/g) ?? []).length;
     expect(paramCallCount).toBe(1);
     expect(zeroArgCallCount).toBe(1);
   });

@@ -34,22 +34,26 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
+
 import type { GeneratorOptions } from '@babel/generator';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import _generate from '@babel/generator';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
 
 // CJS interop normalization (mirrors emitTemplateAttribute.ts / emitRModel.ts).
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
 
 function flattenInlineCode(code: string): string {
-  return code.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim();
+  return code
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
 }
 
 /**

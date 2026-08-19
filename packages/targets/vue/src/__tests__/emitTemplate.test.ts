@@ -9,22 +9,21 @@
 // in-attribute D-37 array merge, D-35 native slot + presence wrapper, D-39
 // native modifier passthrough, D-40 listenerOnly violation, debounce wrap
 // scriptInjection).
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import * as t from '@babel/types';
+import { fileURLToPath } from 'node:url';
 import { parseExpression } from '@babel/parser';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import * as t from '@babel/types';
 import type {
-  IRComponent,
   AttributeBinding,
+  IRComponent,
   Listener,
-  TemplateNode,
   SlotDecl,
-} from '../../../../core/src/ir/types.js';
+  IRTemplateNode as TemplateNode,
+} from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitTemplate } from '../emit/emitTemplate.js';
 import { emitMergedAttributes } from '../emit/emitTemplateAttribute.js';
 import { emitTemplateEvent } from '../emit/emitTemplateEvent.js';
@@ -63,7 +62,14 @@ function emptyIR(): IRComponent {
     listeners: [],
     setupBody: { type: 'SetupBody', scriptProgram: t.file(t.program([])), annotations: [] },
     template: null,
-    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+    styles: {
+      type: 'StyleSection',
+      scopedRules: [],
+      rootRules: [],
+      portalRules: [],
+      engineRules: [],
+      sourceLoc: { start: 0, end: 0 },
+    },
     sourceLoc: { start: 0, end: 0 },
   };
 }
@@ -326,9 +332,7 @@ describe('emitTemplate — behavior tests (synthetic IR)', () => {
       type: 'Listener',
       target: { kind: 'self', el: '$el' },
       event: 'click',
-      modifierPipeline: [
-        { kind: 'filter', modifier: 'stop', args: [], sourceLoc: LOC },
-      ],
+      modifierPipeline: [{ kind: 'filter', modifier: 'stop', args: [], sourceLoc: LOC }],
       when: null,
       handler: t.identifier('increment'),
       deps: [],
@@ -347,9 +351,7 @@ describe('emitTemplate — behavior tests (synthetic IR)', () => {
       type: 'Listener',
       target: { kind: 'self', el: '$el' },
       event: 'keydown',
-      modifierPipeline: [
-        { kind: 'filter', modifier: 'escape', args: [], sourceLoc: LOC },
-      ],
+      modifierPipeline: [{ kind: 'filter', modifier: 'escape', args: [], sourceLoc: LOC }],
       when: null,
       handler: t.identifier('close'),
       deps: [],
@@ -406,7 +408,9 @@ describe('emitTemplate — behavior tests (synthetic IR)', () => {
     expect(result.scriptInjection).toBeDefined();
     expect(result.scriptInjection!.import.from).toBe('@rozie/runtime-vue');
     expect(result.scriptInjection!.import.name).toBe('debounce');
-    expect(result.scriptInjection!.decl).toMatch(/const debouncedOnSearch = debounce\(onSearch, 300\);/);
+    expect(result.scriptInjection!.decl).toMatch(
+      /const debouncedOnSearch = debounce\(onSearch, 300\);/,
+    );
     expect(result.diagnostics).toEqual([]);
   });
 
@@ -447,8 +451,18 @@ describe('buildSlotTypeBlock — slot type signatures (Plan 03 Task 2 unit)', ()
         name: 'trigger',
         defaultContent: null,
         params: [
-          { type: 'ParamDecl', name: 'open', valueExpression: t.identifier('open'), sourceLoc: LOC },
-          { type: 'ParamDecl', name: 'toggle', valueExpression: t.identifier('toggle'), sourceLoc: LOC },
+          {
+            type: 'ParamDecl',
+            name: 'open',
+            valueExpression: t.identifier('open'),
+            sourceLoc: LOC,
+          },
+          {
+            type: 'ParamDecl',
+            name: 'toggle',
+            valueExpression: t.identifier('toggle'),
+            sourceLoc: LOC,
+          },
         ],
         presence: 'always',
         nestedSlots: [],
@@ -458,14 +472,19 @@ describe('buildSlotTypeBlock — slot type signatures (Plan 03 Task 2 unit)', ()
     expect(block).toContain('trigger(props: { open: any; toggle: any }): any;');
   });
 
-  it('default slot (name === \'\') maps to key `default`', () => {
+  it("default slot (name === '') maps to key `default`", () => {
     const block = buildSlotTypeBlock([
       {
         type: 'SlotDecl',
         name: '',
         defaultContent: null,
         params: [
-          { type: 'ParamDecl', name: 'close', valueExpression: t.identifier('close'), sourceLoc: LOC },
+          {
+            type: 'ParamDecl',
+            name: 'close',
+            valueExpression: t.identifier('close'),
+            sourceLoc: LOC,
+          },
         ],
         presence: 'always',
         nestedSlots: [],
@@ -507,7 +526,7 @@ describe('buildSlotTypeBlock — slot type signatures (Plan 03 Task 2 unit)', ()
     expect(block).toBe('  header(props: {  }): any;');
   });
 
-  it('[D-04] the default slot (name === \'\') still emits the unquoted key `default`, byte-identical to pre-phase', () => {
+  it("[D-04] the default slot (name === '') still emits the unquoted key `default`, byte-identical to pre-phase", () => {
     const block = buildSlotTypeBlock([
       {
         type: 'SlotDecl',
@@ -573,9 +592,7 @@ describe('buildSlotTypeBlock — slot type signatures (Plan 03 Task 2 unit)', ()
         sourceLoc: LOC,
       },
     ]);
-    expect(block).toBe(
-      '  header(props: {  }): any;\n' + "  'cell-status'(props: {  }): any;",
-    );
+    expect(block).toBe('  header(props: {  }): any;\n' + "  'cell-status'(props: {  }): any;");
   });
 });
 

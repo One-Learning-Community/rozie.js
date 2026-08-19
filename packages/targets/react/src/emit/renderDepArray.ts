@@ -32,8 +32,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import type { SignalRef } from '../../../../core/src/reactivity/signalRef.js';
+import type { IRComponent, SignalRef } from '@rozie/core';
 
 function capitalize(name: string): string {
   if (name.length === 0) return name;

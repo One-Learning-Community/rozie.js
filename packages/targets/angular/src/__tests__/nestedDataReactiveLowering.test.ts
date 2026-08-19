@@ -11,10 +11,9 @@
 // Drives emitAngular DIRECTLY (parse → lowerToIR → emitAngular) — ROZ207 is an
 // error and `compile()` gates emit on errors while the validator narrowing lands
 // LAST (coherence invariant); the IR survives ROZ207 (a diagnostic).
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../emitAngular.js';
 
 function rozie(data: string, scriptBody: string): string {

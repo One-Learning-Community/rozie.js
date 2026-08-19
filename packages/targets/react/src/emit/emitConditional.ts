@@ -14,7 +14,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { TemplateConditionalIR, TemplateNode } from '../../../../core/src/ir/types.js';
+import type { TemplateConditionalIR, IRTemplateNode as TemplateNode } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
 import { stripBalancedMustache } from './unwrapMustache.js';

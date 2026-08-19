@@ -10,30 +10,36 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
-import type { GeneratorOptions } from '@babel/generator';
+
 import type { EncodedSourceMap } from '@ampproject/remapping';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
-import { isMutableLiteralFactoryDefault } from '../../../../core/src/codegen/propDefaultFactory.js';
-import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
-import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
-import { partitionUserImports } from '../rewrite/partitionUserImports.js';
-import { rewriteRozieIdentifiers, rewriteRozieExpressionNode as rewriteNode } from '../rewrite/rewriteScript.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { emitPortals } from './emitPortals.js';
-import { emitContext } from './emitContext.js';
-import { renderType, zeroValueFor } from './emitPropsInterface.js';
+import type { GeneratorOptions } from '@babel/generator';
+import _generate from '@babel/generator';
+import * as t from '@babel/types';
+import type { Diagnostic, IRComponent } from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
+import { isMutableLiteralFactoryDefault } from '../../../../core/src/codegen/propDefaultFactory.js';
+import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
+import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
+import type {
+  RuntimeSolidImportCollector,
+  SolidImportCollector,
+} from '../rewrite/collectSolidImports.js';
+import { partitionUserImports } from '../rewrite/partitionUserImports.js';
+import {
+  rewriteRozieExpressionNode as rewriteNode,
+  rewriteRozieIdentifiers,
+} from '../rewrite/rewriteScript.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { emitContext } from './emitContext.js';
+import { emitPortals } from './emitPortals.js';
+import { renderType, zeroValueFor } from './emitPropsInterface.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const GEN_OPTS: GeneratorOptions = {
   retainLines: false,
@@ -601,8 +607,7 @@ export function emitScript(
     bodyStmts,
   } = partitionUserImports(rewriteResult.rewrittenProgram);
   rewriteResult.rewrittenProgram.program.body = bodyStmts;
-  const userImports =
-    userImportNodes.length > 0 ? genImportsBlock(userImportNodes) + '\n' : '';
+  const userImports = userImportNodes.length > 0 ? genImportsBlock(userImportNodes) + '\n' : '';
   const hoistedTypeDecls = hoistedTypeNodes.map((decl) => genCode(decl));
 
   // Phase 36 — cross-component context ($provide/$inject). Reads the rewritten
@@ -640,9 +645,7 @@ export function emitScript(
   // once-per-instance behavior because mergeProps runs ONCE at component
   // setup — no additional caching needed (verified Plan 16-01 RESEARCH §
   // Standard Stack Solid finding).
-  const nonModelDefaultProps = ir.props.filter(
-    (p) => !p.isModel && p.defaultValue !== null,
-  );
+  const nonModelDefaultProps = ir.props.filter((p) => !p.isModel && p.defaultValue !== null);
   let mergePropsCall: string | null = null;
   if (nonModelDefaultProps.length > 0) {
     collectors.solidImports.add('mergeProps');
@@ -757,10 +760,7 @@ export function emitScript(
       stateTypeArg = '<any[]>';
     } else if (t.isNullLiteral(s.initializer)) {
       stateTypeArg = '<any>';
-    } else if (
-      t.isObjectExpression(s.initializer) &&
-      s.initializer.properties.length === 0
-    ) {
+    } else if (t.isObjectExpression(s.initializer) && s.initializer.properties.length === 0) {
       stateTypeArg = '<Record<string, any>>';
     }
     // Quick 260717-uvl (ROZ208 make-it-work) — route the initializer through
@@ -886,9 +886,7 @@ export function emitScript(
           );
           hookLines.push(
             genCode(
-              t.expressionStatement(
-                t.callExpression(t.identifier('onMount'), [onMountArrow]),
-              ),
+              t.expressionStatement(t.callExpression(t.identifier('onMount'), [onMountArrow])),
             ),
           );
         } else {
@@ -899,10 +897,10 @@ export function emitScript(
           const cleanupCode = genCode(rewrittenCleanup);
           hookLines.push(
             `onMount(() => {\n` +
-            `  const _cleanup = ${setupCall} as unknown;\n` +
-            `  if (_cleanup) onCleanup(_cleanup as () => void);\n` +
-            `  onCleanup(${cleanupCode});\n` +
-            `});`,
+              `  const _cleanup = ${setupCall} as unknown;\n` +
+              `  if (_cleanup) onCleanup(_cleanup as () => void);\n` +
+              `  onCleanup(${cleanupCode});\n` +
+              `});`,
           );
         }
       } else {
@@ -1117,10 +1115,10 @@ export function emitScript(
 
   if (filteredStmts.length > 0) {
     const sourceFileName = collectors.filename ?? '<rozie>';
-    const genResult = generate(
-      t.file(t.program(filteredStmts)),
-      { ...GEN_OPTS_MAP, sourceFileName },
-    );
+    const genResult = generate(t.file(t.program(filteredStmts)), {
+      ...GEN_OPTS_MAP,
+      sourceFileName,
+    });
     userArrowsSection = genResult.code;
     if (genResult.map) {
       scriptMap = genResult.map as EncodedSourceMap;

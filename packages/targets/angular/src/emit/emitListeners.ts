@@ -39,19 +39,16 @@
  * @experimental — shape may change before v1.0
  */
 import type {
+  AngularEmissionDescriptor,
+  Diagnostic,
   IRComponent,
   Listener,
   ListenerTarget,
-} from '../../../../core/src/ir/types.js';
-import type {
-  ModifierRegistry,
+  ModifierArg,
   ModifierPipelineEntry,
-  AngularEmissionDescriptor,
+  ModifierRegistry,
 } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
 import { rewriteListenerExpression } from '../rewrite/rewriteListenerExpression.js';
 
 export interface AngularListenerInjection {
@@ -76,18 +73,24 @@ const NATIVE_KEY_GUARDS: Record<string, string> = {
   end: "if ($event.key !== 'End') return;",
   pageUp: "if ($event.key !== 'PageUp') return;",
   pageDown: "if ($event.key !== 'PageDown') return;",
-  middle: "if ($event.button !== 1) return;",
+  middle: 'if ($event.button !== 1) return;',
 };
 
 function eventTypeFor(event: string): string {
   if (
-    event === 'click' || event === 'mousedown' || event === 'mouseup' ||
-    event === 'mousemove' || event === 'mouseenter' || event === 'mouseleave'
-  ) return 'MouseEvent';
+    event === 'click' ||
+    event === 'mousedown' ||
+    event === 'mouseup' ||
+    event === 'mousemove' ||
+    event === 'mouseenter' ||
+    event === 'mouseleave'
+  )
+    return 'MouseEvent';
   if (event === 'keydown' || event === 'keyup' || event === 'keypress') return 'KeyboardEvent';
   if (event === 'wheel') return 'WheelEvent';
   if (event === 'touchstart' || event === 'touchend' || event === 'touchmove') return 'TouchEvent';
-  if (event === 'pointerdown' || event === 'pointerup' || event === 'pointermove') return 'PointerEvent';
+  if (event === 'pointerdown' || event === 'pointerup' || event === 'pointermove')
+    return 'PointerEvent';
   if (event === 'focus' || event === 'blur') return 'FocusEvent';
   if (event === 'input') return 'InputEvent';
   if (event === 'submit') return 'SubmitEvent';
@@ -192,10 +195,7 @@ interface ClassifyOpts {
   event: string;
 }
 
-function classifyListener(
-  pipeline: ModifierPipelineEntry[],
-  opts: ClassifyOpts,
-): ListenerClass {
+function classifyListener(pipeline: ModifierPipelineEntry[], opts: ClassifyOpts): ListenerClass {
   const nativeKeyGuards: string[] = [];
   const listenerOpts = new Set<string>();
   let outsideArgs: ModifierArg[] | null = null;
@@ -241,7 +241,6 @@ function classifyListener(
     }
     if (descriptor.helperName === 'debounce' || descriptor.helperName === 'throttle') {
       wrapHelper = { name: descriptor.helperName, args: descriptor.args };
-      continue;
     }
   }
 
@@ -305,13 +304,15 @@ function renderListener(
       .map((refName) => `this.${refName}()?.nativeElement?.contains(target)`)
       .join(' || ');
 
-    const containsGuard = refChecks.length > 0
-      ? `        const target = $event.target as Node;\n        if (${refChecks}) return;\n`
-      : '';
+    const containsGuard =
+      refChecks.length > 0
+        ? `        const target = $event.target as Node;\n        if (${refChecks}) return;\n`
+        : '';
 
-    const guardLines = classification.nativeKeyGuards.length > 0
-      ? classification.nativeKeyGuards.map((g) => `        ${g}`).join('\n') + '\n'
-      : '';
+    const guardLines =
+      classification.nativeKeyGuards.length > 0
+        ? classification.nativeKeyGuards.map((g) => `        ${g}`).join('\n') + '\n'
+        : '';
 
     const invocation = handlerIsBareIdentifier
       ? `        ${handlerRef}();`
@@ -347,9 +348,10 @@ function renderListener(
   }
 
   // Class A: pure-native + key-filter inlineGuards.
-  const guardLines = classification.nativeKeyGuards.length > 0
-    ? classification.nativeKeyGuards.map((g) => `        ${g}`).join('\n') + '\n'
-    : '';
+  const guardLines =
+    classification.nativeKeyGuards.length > 0
+      ? classification.nativeKeyGuards.map((g) => `        ${g}`).join('\n') + '\n'
+      : '';
   const invocation = handlerIsBareIdentifier
     ? `        ${handlerRef}();`
     : `        (${userHandlerCode})($event);`;

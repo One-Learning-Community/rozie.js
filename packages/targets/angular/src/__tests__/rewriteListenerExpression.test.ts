@@ -15,18 +15,19 @@
  * Listener bodies run in class-body context, so IR member references carry
  * the `this.` prefix (mirrors rewriteScript output, NOT bare template shapes).
  */
-import { describe, it, expect } from 'vitest';
+
 import { parseExpression } from '@babel/parser';
 import type * as t from '@babel/types';
-import { rewriteListenerExpression } from '../rewrite/rewriteListenerExpression.js';
 import type {
+  ComputedDecl,
   IRComponent,
   PropDecl,
-  StateDecl,
   RefDecl,
-  ComputedDecl,
   SlotDecl,
-} from '../../../../core/src/ir/types.js';
+  StateDecl,
+} from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { rewriteListenerExpression } from '../rewrite/rewriteListenerExpression.js';
 
 const sloc = { start: 0, end: 0 };
 
@@ -42,13 +43,24 @@ function mkProp(name: string, isModel: boolean): PropDecl {
   } as PropDecl;
 }
 function mkState(name: string): StateDecl {
-  return { type: 'StateDecl', name, initializer: { type: 'NumericLiteral', value: 0 } as t.NumericLiteral, sourceLoc: sloc } as StateDecl;
+  return {
+    type: 'StateDecl',
+    name,
+    initializer: { type: 'NumericLiteral', value: 0 } as t.NumericLiteral,
+    sourceLoc: sloc,
+  } as StateDecl;
 }
 function mkRef(name: string): RefDecl {
   return { type: 'RefDecl', name, elementTag: 'div', sourceLoc: sloc } as RefDecl;
 }
 function mkComputed(name: string): ComputedDecl {
-  return { type: 'ComputedDecl', name, body: { type: 'NumericLiteral', value: 1 } as t.NumericLiteral, deps: [], sourceLoc: sloc } as ComputedDecl;
+  return {
+    type: 'ComputedDecl',
+    name,
+    body: { type: 'NumericLiteral', value: 1 } as t.NumericLiteral,
+    deps: [],
+    sourceLoc: sloc,
+  } as ComputedDecl;
 }
 function mkSlot(name: string): SlotDecl {
   return {
@@ -175,7 +187,12 @@ describe('rewriteListenerExpression — $refs on a composed-component ref (findi
     const ir = buildIR({
       refs: [{ type: 'RefDecl', name: 'tbl', elementTag: 'DataTable', sourceLoc: sloc } as RefDecl],
       components: [
-        { type: 'ComponentDecl', localName: 'DataTable', importPath: './DataTable.rozie', sourceLoc: sloc },
+        {
+          type: 'ComponentDecl',
+          localName: 'DataTable',
+          importPath: './DataTable.rozie',
+          sourceLoc: sloc,
+        },
       ],
     } as Partial<IRComponent>);
     expect(rw('$refs.tbl', ir)).toBe('this.tbl()');
@@ -185,7 +202,12 @@ describe('rewriteListenerExpression — $refs on a composed-component ref (findi
     const ir = buildIR({
       refs: [{ type: 'RefDecl', name: 'tbl', elementTag: 'DataTable', sourceLoc: sloc } as RefDecl],
       components: [
-        { type: 'ComponentDecl', localName: 'DataTable', importPath: './DataTable.rozie', sourceLoc: sloc },
+        {
+          type: 'ComponentDecl',
+          localName: 'DataTable',
+          importPath: './DataTable.rozie',
+          sourceLoc: sloc,
+        },
       ],
     } as Partial<IRComponent>);
     const out = rw('$refs.tbl.expandAll()', ir);
@@ -315,16 +337,12 @@ describe('rewriteListenerExpression — bare-identifier this. prefix + signal in
 
   it('a user-method class member (via classMembers opt, non-signal) → this.X (no call)', () => {
     const ir = buildIR();
-    expect(
-      rw('toggle()', ir, { classMembers: new Set(['toggle']) }),
-    ).toBe('this.toggle()');
+    expect(rw('toggle()', ir, { classMembers: new Set(['toggle']) })).toBe('this.toggle()');
   });
 
   it('a non-signal class member read as a bare identifier → this.X (no call suffix)', () => {
     const ir = buildIR();
-    expect(
-      rw('toggle', ir, { classMembers: new Set(['toggle']) }),
-    ).toBe('this.toggle');
+    expect(rw('toggle', ir, { classMembers: new Set(['toggle']) })).toBe('this.toggle');
   });
 
   it('a signal class member used as callee → this.X (no double call)', () => {
@@ -365,9 +383,7 @@ describe('rewriteListenerExpression — bare-identifier this. prefix + signal in
   it('an identifier in a VariableDeclarator id position is NOT prefixed', () => {
     const ir = buildIR({ state: [mkState('count')] });
     // The declarator id `count` inside an IIFE-style arrow body.
-    expect(rw('(() => { let count = 1; return count; })', ir)).toContain(
-      'let count = 1',
-    );
+    expect(rw('(() => { let count = 1; return count; })', ir)).toContain('let count = 1');
   });
 
   it('an identifier in a function-parameter position is NOT prefixed', () => {
@@ -388,8 +404,6 @@ describe('rewriteListenerExpression — bare-identifier this. prefix + signal in
 
   it('rewrites sigils nested inside a logical expression', () => {
     const ir = buildIR({ state: [mkState('open')], refs: [mkRef('el')] });
-    expect(rw('$data.open && $refs.el', ir)).toBe(
-      'this.open() && this.el()?.nativeElement',
-    );
+    expect(rw('$data.open && $refs.el', ir)).toBe('this.open() && this.el()?.nativeElement');
   });
 });

@@ -14,10 +14,9 @@
  * emit is a bare statement, NOT a call. Prevents future regressions of the
  * same shape — including any new Class-B-adjacent emit added later.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 function compile(source: string): string {

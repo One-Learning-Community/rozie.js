@@ -15,14 +15,16 @@
 //      AND the `import { styleMap } from 'lit/directives/style-map.js';`
 //      shell import, while a .rozie source WITHOUT one does NOT emit the
 //      import (no spurious unused-import noise).
-import { describe, expect, it } from 'vitest';
-import * as t from '@babel/types';
+
 import { parseExpression } from '@babel/parser';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, AttributeBinding } from '../../../../core/src/ir/types.js';
-import { emitTemplateAttribute, type EmitTemplateAttributeState } from '../emit/emitTemplateAttribute.js';
+import type * as t from '@babel/types';
+import type { AttributeBinding, IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import {
+  type EmitTemplateAttributeState,
+  emitTemplateAttribute,
+} from '../emit/emitTemplateAttribute.js';
 import { emitLit } from '../emitLit.js';
 
 /**
@@ -88,12 +90,7 @@ describe('emitTemplateAttribute (Lit) — `:style` literal-object → styleMap()
   it('non-object binding falls through to existing passthrough: `:style="someExpr"` → `style=${someExpr}`', () => {
     const ir = emptyIR();
     const state: EmitTemplateAttributeState = { styleMapUsed: false };
-    const out = emitTemplateAttribute(
-      bindingAttr('style', `someExpr`),
-      ir,
-      'span',
-      state,
-    );
+    const out = emitTemplateAttribute(bindingAttr('style', `someExpr`), ir, 'span', state);
     expect(out).toBe('style=${someExpr}');
     // Critical: did NOT mark styleMapUsed (would emit a spurious import).
     expect(state.styleMapUsed).toBe(false);
@@ -132,7 +129,11 @@ describe('emitTemplateAttribute (Lit) — `:style` literal-object → styleMap()
     const registry = createDefaultRegistry();
     const { ir } = lowerToIR(ast, { modifierRegistry: registry });
     if (!ir) throw new Error('lowerToIR() returned null');
-    const out = emitLit(ir, { filename: 'StyledSpan.rozie', source: src, modifierRegistry: registry }).code;
+    const out = emitLit(ir, {
+      filename: 'StyledSpan.rozie',
+      source: src,
+      modifierRegistry: registry,
+    }).code;
     expect(out).toContain("import { styleMap } from 'lit/directives/style-map.js';");
     expect(out).toContain('styleMap(');
   });
@@ -148,7 +149,11 @@ describe('emitTemplateAttribute (Lit) — `:style` literal-object → styleMap()
     const registry = createDefaultRegistry();
     const { ir } = lowerToIR(ast, { modifierRegistry: registry });
     if (!ir) throw new Error('lowerToIR() returned null');
-    const out = emitLit(ir, { filename: 'PlainSpan.rozie', source: src, modifierRegistry: registry }).code;
+    const out = emitLit(ir, {
+      filename: 'PlainSpan.rozie',
+      source: src,
+      modifierRegistry: registry,
+    }).code;
     expect(out).not.toContain("from 'lit/directives/style-map.js'");
   });
 });

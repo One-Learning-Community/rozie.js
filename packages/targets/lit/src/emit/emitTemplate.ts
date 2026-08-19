@@ -28,53 +28,53 @@
  */
 import * as bt from '@babel/types';
 import type {
-  IRComponent,
-  TemplateNode,
-  TemplateElementIR,
-  TemplateConditionalIR,
-  TemplateMatchIR,
-  TemplateLoopIR,
-  TemplateSlotInvocationIR,
-  TemplateFragmentIR,
-  TemplateInterpolationIR,
-  TemplateStaticTextIR,
   AttributeBinding,
+  Diagnostic,
+  IRComponent,
   Listener,
   ListenerSpreadIR,
-} from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import type { ModifierRegistry, LitEmissionDescriptor } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+  LitEmissionDescriptor,
+  ModifierRegistry,
+  TemplateConditionalIR,
+  TemplateElementIR,
+  TemplateFragmentIR,
+  TemplateInterpolationIR,
+  TemplateLoopIR,
+  TemplateMatchIR,
+  IRTemplateNode as TemplateNode,
+  TemplateSlotInvocationIR,
+  TemplateStaticTextIR,
+} from '@rozie/core';
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
+import { domElementType } from '../../../../core/src/codegen/domElementType.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import type {
-  LitImportCollector,
   LitDecoratorImportCollector,
+  LitImportCollector,
   RuntimeLitImportCollector,
 } from '../rewrite/collectLitImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { toKebabCase } from './emitDecorator.js';
+// Phase 71 (r-keynav) — REFERENCE emitter wiring modeled on the React target
+// (see emitKeynav.ts's module doc comment).
+import {
+  buildKeynavFieldDecls,
+  type KeynavEmitPlan,
+  keynavItemAttrs,
+  keynavRootAttrs,
+  resolveKeynavPlans,
+  stripKeynavSyntheticEvents,
+} from './emitKeynav.js';
 import { eventTypeFor } from './emitListeners.js';
-import { domElementType } from '../../../../core/src/codegen/domElementType.js';
-import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
-import { renderRecordKey } from './slotRecordKey.js';
 // Phase 07.2 Plan 03 — consumer-side slot-fill emit for component-tag elements.
-import { emitSlotFiller, findTagClose, type EmitSlotFillerCtx } from './emitSlotFiller.js';
+import { type EmitSlotFillerCtx, emitSlotFiller, findTagClose } from './emitSlotFiller.js';
+import { collectMethodNamesFromIR } from './methodNames.js';
 // Phase 07.3 Plan 09 — consumer-side `r-model:propName=` two-way binding.
 // resolveLitSetterText + kebabize are shared with the standalone
 // emitTemplateAttribute branch (re-exported from emitDecorator.toKebabCase
 // to guarantee byte-equal CustomEvent name parity with the producer).
 import { resolveLitSetterText } from './resolveLitSetterText.js';
-import { collectMethodNamesFromIR } from './methodNames.js';
-// Phase 71 (r-keynav) — REFERENCE emitter wiring modeled on the React target
-// (see emitKeynav.ts's module doc comment).
-import {
-  buildKeynavFieldDecls,
-  keynavItemAttrs,
-  keynavRootAttrs,
-  resolveKeynavPlans,
-  stripKeynavSyntheticEvents,
-  type KeynavEmitPlan,
-} from './emitKeynav.js';
+import { renderRecordKey } from './slotRecordKey.js';
 
 export interface EmitTemplateOpts {
   lit: LitImportCollector;
@@ -530,9 +530,7 @@ function isPureLiteral(node: bt.Node): boolean {
     return true;
   }
   if (bt.isArrayExpression(node)) {
-    return node.elements.every(
-      (el) => el !== null && !bt.isSpreadElement(el) && isPureLiteral(el),
-    );
+    return node.elements.every((el) => el !== null && !bt.isSpreadElement(el) && isPureLiteral(el));
   }
   if (bt.isObjectExpression(node)) {
     return node.properties.every(
@@ -710,15 +708,12 @@ function emitAttribute(
       // instance). The field is declared in the class body via emitLit.
       if (
         opts?._state &&
-        (bt.isArrayExpression(attr.expression) ||
-          bt.isObjectExpression(attr.expression)) &&
+        (bt.isArrayExpression(attr.expression) || bt.isObjectExpression(attr.expression)) &&
         isPureLiteral(attr.expression)
       ) {
         const idx = opts._state.hoistedLiteralFieldDecls.length;
         const fieldName = `_rozieLit${idx}`;
-        opts._state.hoistedLiteralFieldDecls.push(
-          `  private ${fieldName} = ${expr};`,
-        );
+        opts._state.hoistedLiteralFieldDecls.push(`  private ${fieldName} = ${expr};`);
         return `.${propName}=\${this.${fieldName}}`;
       }
       return `.${propName}=\${${expr}}`;
@@ -730,10 +725,7 @@ function emitAttribute(
     }
 
     // Property bindings: .prop = ${expr} for form-input value/checked etc.
-    if (
-      (attr.name === 'value' || attr.name === 'checked') &&
-      FORM_INPUT_TAGS.has(tagName)
-    ) {
+    if ((attr.name === 'value' || attr.name === 'checked') && FORM_INPUT_TAGS.has(tagName)) {
       return `.${attr.name}=\${${expr}}`;
     }
 
@@ -743,11 +735,7 @@ function emitAttribute(
     // otherwise (SPEC-3). Property bindings (`.prop=`) above are exempt — they
     // pass the value through structurally, not as attribute text. `style` and
     // object-expression bindings are structural too — never wrap.
-    if (
-      attr.wrapForDisplay &&
-      attr.name !== 'style' &&
-      !bt.isObjectExpression(attr.expression)
-    ) {
+    if (attr.wrapForDisplay && attr.name !== 'style' && !bt.isObjectExpression(attr.expression)) {
       // 260608-sya — whole-value generic-attribute binding: route through
       // `rozieAttr` so a nullish value DROPS the attribute (returns lit's
       // `nothing` sentinel in an `attr=${...}` binding) instead of rendering
@@ -818,16 +806,10 @@ function buildRModelParts(
 
   // WR-10 fix: detect checkbox/radio inputs via the sibling `type` attribute
   // and use `.checked` / `@change` instead of `.value` / `@input`.
-  const typeAttr = allAttrs.find(
-    (a) => a.kind === 'static' && a.name === 'type',
-  );
-  const inputType =
-    typeAttr && typeAttr.kind === 'static' ? typeAttr.value.toLowerCase() : '';
+  const typeAttr = allAttrs.find((a) => a.kind === 'static' && a.name === 'type');
+  const inputType = typeAttr && typeAttr.kind === 'static' ? typeAttr.value.toLowerCase() : '';
 
-  if (
-    FORM_INPUT_TAGS.has(tagName) &&
-    (inputType === 'checkbox' || inputType === 'radio')
-  ) {
+  if (FORM_INPUT_TAGS.has(tagName) && (inputType === 'checkbox' || inputType === 'radio')) {
     return {
       propBinding: `.checked=\${${code}}`,
       eventName: 'change',
@@ -903,10 +885,7 @@ function partitionModelModifiers(
  * a later iteration. `$` is a JS identifier character, so the lookbehind
  * excludes both `\w` and `$` and the lookahead excludes `\w`.
  */
-function substituteValuePlaceholder(
-  fragment: string,
-  replacement: string,
-): string {
+function substituteValuePlaceholder(fragment: string, replacement: string): string {
   return fragment.replace(/(?<![\w$])\$v(?!\w)/g, `(${replacement})`);
 }
 
@@ -916,10 +895,7 @@ function substituteValuePlaceholder(
  * substitute `$v` with the current expression text and chain. Empty list ⇒ the
  * input string is returned unchanged (bare `r-model` byte-identical).
  */
-function applyValueTransformsString(
-  valueAccess: string,
-  valueTransforms: string[],
-): string {
+function applyValueTransformsString(valueAccess: string, valueTransforms: string[]): string {
   let current = valueAccess;
   for (const fragment of valueTransforms) {
     current = substituteValuePlaceholder(fragment, current);
@@ -1074,9 +1050,7 @@ function buildEventParts(
         loc: listener.sourceLoc,
       });
     }
-    handler = isScopedCtxHandler
-      ? `($event) => (${handlerRaw})?.($event)`
-      : handlerRaw;
+    handler = isScopedCtxHandler ? `($event) => (${handlerRaw})?.($event)` : handlerRaw;
   }
 
   // Detect inlineGuard / native flags from the modifier pipeline.
@@ -1395,19 +1369,14 @@ function emitElementOpenTag(
     }
   }
   if (bindingClass !== null) {
-    if (
-      bindingClass.kind === 'binding' &&
-      bt.isObjectExpression(bindingClass.expression)
-    ) {
+    if (bindingClass.kind === 'binding' && bt.isObjectExpression(bindingClass.expression)) {
       // Object class binding — always use Object.entries so { done: true }
       // renders as "done" not "[object Object]" (CR-01 fix).
       const obj = bindingClass.expression;
       for (const value of staticClassValues) {
         for (const cls of value.split(/\s+/)) {
           if (!cls) continue;
-          obj.properties.unshift(
-            bt.objectProperty(bt.stringLiteral(cls), bt.booleanLiteral(true)),
-          );
+          obj.properties.unshift(bt.objectProperty(bt.stringLiteral(cls), bt.booleanLiteral(true)));
         }
       }
       const expr = rewriteTemplateExpression(obj, ir);
@@ -1416,9 +1385,7 @@ function emitElementOpenTag(
       );
     } else if (bindingClass.kind === 'binding') {
       const expr = rewriteTemplateExpression(bindingClass.expression, ir);
-      const staticPart = staticClassValues.length > 0
-        ? `${staticClassValues.join(' ')} `
-        : '';
+      const staticPart = staticClassValues.length > 0 ? `${staticClassValues.join(' ')} ` : '';
       // 260620-kby — normalize a non-provably-string plain `:class` binding
       // through `rozieClass` so an array/object class value renders a valid
       // space-joined string instead of JSON / `a,b` / `[object Object]` (this
@@ -1525,12 +1492,7 @@ function emitElementOpenTag(
   }> = [];
 
   if (rModelAttr) {
-    const modelParts = buildRModelParts(
-      rModelAttr,
-      ir,
-      node.tagName,
-      node.attributes,
-    );
+    const modelParts = buildRModelParts(rModelAttr, ir, node.tagName, node.attributes);
     if (modelParts) {
       parts.push(modelParts.propBinding);
       plainEvents.push({
@@ -1608,9 +1570,7 @@ function emitElementOpenTag(
   // semantic exists because their option flags may differ.)
   for (const ev of optionEvents) {
     const optsText = ev.optionParts.join(', ');
-    parts.push(
-      `@${ev.eventName}=\${{ handleEvent: ${ev.handlerBody}, ${optsText} }}`,
-    );
+    parts.push(`@${ev.eventName}=\${{ handleEvent: ${ev.handlerBody}, ${optsText} }}`);
   }
 
   // Phase 15 — dynamic `ListenerSpreadIR` entries emit as element-position
@@ -1733,10 +1693,7 @@ function emitElementOpenTag(
   // the host custom element (which carries `class="extra-variant"` from the
   // consumer's invocation), and the inner button inherits via `font: inherit`.
   // Mirrors the cross-target scope propagation applied to React + Solid.
-  if (
-    (node.tagKind === 'html' || node.tagKind === 'component') &&
-    opts.scopeHash
-  ) {
+  if ((node.tagKind === 'html' || node.tagKind === 'component') && opts.scopeHash) {
     parts.push(`data-rozie-s-${opts.scopeHash}`);
   }
 
@@ -1749,8 +1706,19 @@ function emitElementOpenTag(
 }
 
 const VOID_ELEMENTS = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link',
-  'meta', 'source', 'track', 'wbr',
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'source',
+  'track',
+  'wbr',
 ]);
 function isVoidElement(tagName: string): boolean {
   return VOID_ELEMENTS.has(tagName);
@@ -1972,9 +1940,7 @@ function emitElementInner(
     return `${openWithProps}${fillerChildren.join('')}</${tagName}>`;
   }
 
-  const children = node.children
-    .map((c) => emitNode(c, ir, hostListenerWiring, opts))
-    .join('');
+  const children = node.children.map((c) => emitNode(c, ir, hostListenerWiring, opts)).join('');
   // `r-external` engine-wrapper marker — wrap the marked element's children
   // in `keyed(this._rozieReconcileSeq ?? 0, html\`…\`)` so that the runtime
   // helper `__rozieReconcileAfterDomMutation` can dispose orphan DOM and
@@ -2069,9 +2035,10 @@ function emitMatchNode(
     // binds the discriminant temp once. `node.discriminant` is routed through
     // the SAME `rewriteTemplateExpression` the folded branch tests use.
     const ladderInterp = emitConditional(synthetic, ir, hostListenerWiring, opts);
-    const ladder = ladderInterp.startsWith('${') && ladderInterp.endsWith('}')
-      ? ladderInterp.slice(2, -1)
-      : ladderInterp;
+    const ladder =
+      ladderInterp.startsWith('${') && ladderInterp.endsWith('}')
+        ? ladderInterp.slice(2, -1)
+        : ladderInterp;
     const discriminantCode = rewriteTemplateExpression(node.discriminant, ir);
     const hoisted = `\${(() => { const ${node.tempName} = ${discriminantCode}; return ${ladder}; })()}`;
     if (node.hostElement !== undefined) {
@@ -2110,9 +2077,7 @@ function emitConditional(
   let hasElse = false;
   for (let i = node.branches.length - 1; i >= 0; i--) {
     const branch = node.branches[i]!;
-    const body = branch.body
-      .map((c) => emitNode(c, ir, hostListenerWiring, opts))
-      .join('');
+    const body = branch.body.map((c) => emitNode(c, ir, hostListenerWiring, opts)).join('');
     if (branch.test === null) {
       result = `html\`${body}\``;
       hasElse = true;
@@ -2161,9 +2126,7 @@ function emitLoop(
   // shallow opts copy — a keynav item's index alias from an outer loop must
   // never leak into an inner, unrelated loop's elements.
   const loopOpts: EmitTemplateOpts = { ...opts, keynavItemIndexAlias: idx };
-  const body = node.body
-    .map((c) => emitNode(c, ir, hostListenerWiring, loopOpts))
-    .join('');
+  const body = node.body.map((c) => emitNode(c, ir, hostListenerWiring, loopOpts)).join('');
   // For the key function, pass shadowAliases so the loop alias (and idx) are
   // not rewritten to `this.alias.value` — they are loop-scoped, not class fields.
   // This replaces the fragile string-regex hack that CR-03 identified.
@@ -2271,7 +2234,9 @@ function emitSlot(
       const obj = `{${dataEntries.join(', ')}}`;
       // Wrap in try/catch so non-JSON-safe values (BigInt, circular, undefined)
       // don't crash the render — CR-02 fix.
-      dataAttrs.push(`data-rozie-params=\${(() => { try { return JSON.stringify(${obj}); } catch { return '{}'; } })()}`);
+      dataAttrs.push(
+        `data-rozie-params=\${(() => { try { return JSON.stringify(${obj}); } catch { return '{}'; } })()}`,
+      );
     }
   }
 
@@ -2376,15 +2341,10 @@ function emitFragment(
   hostListenerWiring: string[],
   opts: EmitTemplateOpts,
 ): string {
-  return node.children
-    .map((c) => emitNode(c, ir, hostListenerWiring, opts))
-    .join('');
+  return node.children.map((c) => emitNode(c, ir, hostListenerWiring, opts)).join('');
 }
 
-export function emitTemplate(
-  ir: IRComponent,
-  opts: EmitTemplateOpts,
-): EmitTemplateResult {
+export function emitTemplate(ir: IRComponent, opts: EmitTemplateOpts): EmitTemplateResult {
   const diagnostics: Diagnostic[] = [];
   const hostListenerWiring: string[] = [];
   // Initialize per-call state (CR-06 fix: replaces module-level REPEAT_USED singleton).

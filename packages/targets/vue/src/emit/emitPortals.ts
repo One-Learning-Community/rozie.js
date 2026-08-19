@@ -25,10 +25,10 @@
  *
  * V1 reactivity constraint (REQ-5): portal slots are NOT reactive after mount.
  */
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
 import { portalKey } from '../../../../core/src/ir/types.js';
 import type { VueImportCollector } from '../rewrite/collectVueImports.js';
-import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
 
 /**
  * Spike 004 — portal-scope `setAttribute` line, or '' when no scopeHash.
@@ -70,9 +70,7 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   const paramNames = slot.portalParamNames ?? [];
   // Scope type from portalParamNames; falls back to `unknown` when omitted.
   const scopeType =
-    paramNames.length > 0
-      ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
-      : 'unknown';
+    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
   // Wrap the slot's VNode array in a `Fragment` so the rendered output has
   // NO extra wrapper element — the slot's nodes become direct children of
   // `container`. An earlier `h('div', null, slotFn(scope))` version added an
@@ -111,9 +109,7 @@ function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
   const slotName = portalKey(slot);
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
-    paramNames.length > 0
-      ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
-      : 'unknown';
+    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): ReactivePortalHandle => {\n` +
     `    const slotFn = slots.${slotName};\n` +

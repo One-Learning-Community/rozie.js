@@ -10,43 +10,44 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type {
-  IRComponent,
-  TemplateNode,
-  TemplateElementIR,
-  TemplateConditionalIR,
-  TemplateMatchIR,
-  TemplateLoopIR,
-  TemplateSlotInvocationIR,
-  TemplateInterpolationIR,
-  TemplateStaticTextIR,
-  TemplateFragmentIR,
-  AttributeBinding,
-  Listener,
-  ListenerSpreadIR,
-} from '../../../../core/src/ir/types.js';
 // Phase 07.1 self-reference pattern (per Phase 07.1 type-identity fix):
 // SlotFillerDecl MUST come from the `@rozie/core` barrel, not the deep-relative
 // ../../../core/src/ir/types.js path. The deep path produces a distinct `.d.ts`
 // SlotFillerDecl identity per target package and reintroduces the cross-package
 // type-identity bug Phase 07.1 fixed.
-import type { ModifierRegistry, SlotFillerDecl } from '@rozie/core';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import type {
+  AttributeBinding,
+  Diagnostic,
+  IRComponent,
+  Listener,
+  ListenerSpreadIR,
+  ModifierRegistry,
+  SlotFillerDecl,
+  TemplateConditionalIR,
+  TemplateElementIR,
+  TemplateFragmentIR,
+  TemplateInterpolationIR,
+  TemplateLoopIR,
+  TemplateMatchIR,
+  IRTemplateNode as TemplateNode,
+  TemplateSlotInvocationIR,
+  TemplateStaticTextIR,
+} from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { emitMergedAttributes, emitListenerSpread, findRHtml } from './emitTemplateAttribute.js';
-import { emitTemplateEvent, type ScriptInjection } from './emitTemplateEvent.js';
 // Phase 71 (r-keynav) — REFERENCE emitter wiring modeled on the React target
 // (see emitKeynav.ts's module doc comment).
 import {
+  type KeynavEmitPlan,
+  type KeynavFocusScopeRef,
   keynavFocusScopeAttrs,
   keynavItemAttrs,
   keynavRootAttrs,
   loopBodyHasKeynavItem,
   stripKeynavSyntheticEvents,
-  type KeynavEmitPlan,
-  type KeynavFocusScopeRef,
 } from './emitKeynav.js';
+import { emitListenerSpread, emitMergedAttributes, findRHtml } from './emitTemplateAttribute.js';
+import { emitTemplateEvent, type ScriptInjection } from './emitTemplateEvent.js';
 
 /**
  * HTML void elements (no closing tag, self-close `/>`).
@@ -128,18 +129,12 @@ function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
   return node.text;
 }
 
-function emitInterpolation(
-  node: TemplateInterpolationIR,
-  ctx: EmitNodeCtx,
-): string {
+function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): string {
   const expr = rewriteTemplateExpression(node.expression, ctx.ir);
   return `{{ ${expr} }}`;
 }
 
-function emitFragment(
-  node: TemplateFragmentIR,
-  ctx: EmitNodeCtx,
-): string {
+function emitFragment(node: TemplateFragmentIR, ctx: EmitNodeCtx): string {
   return node.children.map((c) => emitNode(c, ctx)).join('');
 }
 
@@ -151,18 +146,13 @@ function emitFragment(
  * branches[]; we unroll them as adjacent elements with the corresponding
  * v-* directive.
  */
-function emitConditional(
-  node: TemplateConditionalIR,
-  ctx: EmitNodeCtx,
-): string {
+function emitConditional(node: TemplateConditionalIR, ctx: EmitNodeCtx): string {
   const parts: string[] = [];
   for (let i = 0; i < node.branches.length; i++) {
     const branch = node.branches[i]!;
     let directive: string;
     if (i === 0) {
-      directive = branch.test
-        ? `v-if="${rewriteTemplateExpression(branch.test, ctx.ir)}"`
-        : 'v-if'; // shouldn't happen — first branch always has test
+      directive = branch.test ? `v-if="${rewriteTemplateExpression(branch.test, ctx.ir)}"` : 'v-if'; // shouldn't happen — first branch always has test
     } else if (branch.test) {
       directive = `v-else-if="${rewriteTemplateExpression(branch.test, ctx.ir)}"`;
     } else {
@@ -201,13 +191,9 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   // `loopBodyHasKeynavItem` deliberately does not recurse into a NESTED
   // r-for, so this synthesis never fires for an unrelated outer loop.
   const needsKeynavIndex =
-    (ctx.keynav ?? []).length > 0 &&
-    node.indexAlias === null &&
-    loopBodyHasKeynavItem(node.body);
+    (ctx.keynav ?? []).length > 0 && node.indexAlias === null && loopBodyHasKeynavItem(node.body);
   const indexAlias = node.indexAlias ?? (needsKeynavIndex ? '__rozieKeynavIndex' : null);
-  const itemDecl = indexAlias
-    ? `(${node.itemAlias}, ${indexAlias})`
-    : node.itemAlias;
+  const itemDecl = indexAlias ? `(${node.itemAlias}, ${indexAlias})` : node.itemAlias;
   const vfor = `v-for="${itemDecl} in ${iter}"`;
   const keyDir = node.keyExpression
     ? ` :key="${rewriteTemplateExpression(node.keyExpression, ctx.ir)}"`
@@ -226,15 +212,9 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     const inner = node.body[0]! as TemplateElementIR;
     const stripped: TemplateElementIR = {
       ...inner,
-      attributes: inner.attributes.filter(
-        (a) => !(a.kind === 'binding' && a.name === 'key'),
-      ),
+      attributes: inner.attributes.filter((a) => !(a.kind === 'binding' && a.name === 'key')),
     };
-    return emitElementWithExtraDirective(
-      stripped,
-      `${vfor}${keyDir}`,
-      childCtx,
-    );
+    return emitElementWithExtraDirective(stripped, `${vfor}${keyDir}`, childCtx);
   }
 
   const inner = node.body.map((c) => emitNode(c, childCtx)).join('');
@@ -258,10 +238,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
  *   own `defineSlots<{ title(props): any }>` declaration (auto-generated by
  *   refineSlotTypes from the wrapper's own SlotDecl set).
  */
-function emitSlotInvocation(
-  node: TemplateSlotInvocationIR,
-  ctx: EmitNodeCtx,
-): string {
+function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNodeCtx): string {
   // Portal-slot primitive (Spike 003) — skip template emit entirely. Portal
   // slots are invoked from script via `$portals.<name>(...)` and rendered
   // imperatively into foreign engine containers.
@@ -406,9 +383,7 @@ function emitElementWithExtraDirectiveInner(
   // React's strip-before-emit discipline (react emitTemplateNode.ts:224).
   const rHtml = findRHtml(node.attributes);
   const effectiveAttributes = rHtml
-    ? node.attributes.filter(
-        (a) => !(a.kind === 'binding' && a.name === 'r-html'),
-      )
+    ? node.attributes.filter((a) => !(a.kind === 'binding' && a.name === 'r-html'))
     : node.attributes;
 
   const attrText = emitMergedAttributes(effectiveAttributes, {
@@ -525,8 +500,7 @@ function emitElementWithExtraDirectiveInner(
     // render here, so the genuine "r-html clobbers real children" guard is
     // preserved for the non-slotFiller case.
     const hasRealChildren =
-      node.children.length > 0 &&
-      (node.slotFillers === undefined || node.slotFillers.length === 0);
+      node.children.length > 0 && (node.slotFillers === undefined || node.slotFillers.length === 0);
     if (hasRealChildren) {
       ctx.diagnostics.push({
         code: RozieErrorCode.TARGET_VUE_RHTML_WITH_CHILDREN,
@@ -553,9 +527,7 @@ function emitElementWithExtraDirectiveInner(
   // node.children and node.slotFillers reference the SAME underlying body
   // content; emit only the structured `slotFillers` view to avoid duplication.
   if (node.slotFillers !== undefined && node.slotFillers.length > 0) {
-    const inner = node.slotFillers
-      .map((f) => emitSlotFiller(f, ctx))
-      .join('');
+    const inner = node.slotFillers.map((f) => emitSlotFiller(f, ctx)).join('');
     if (inner.length === 0) {
       return `<${node.tagName}${head}></${node.tagName}>`;
     }
@@ -620,10 +592,7 @@ function emitSlotFiller(filler: SlotFillerDecl, ctx: EmitNodeCtx): string {
   // Dynamic-name form `<template #[expr]>`. Vue's compiler-sfc handles the
   // bracketed-name form natively (Vue 3.4+).
   if (filler.isDynamic && filler.dynamicNameExpr) {
-    const rewritten = rewriteTemplateExpression(
-      filler.dynamicNameExpr,
-      ctx.ir,
-    );
+    const rewritten = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir);
     return `<template #[${rewritten}]${paramsAttr}>${bodyText}</template>`;
   }
 
@@ -757,9 +726,7 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
     // other shape (already-arrow, expression) is wrapped in a callable
     // invocation `(...)($event);`.
     const branches = items.map((it) =>
-      /^[A-Za-z_$][\w$]*$/.test(it.body)
-        ? `${it.body}($event);`
-        : `(${it.body})($event);`,
+      /^[A-Za-z_$][\w$]*$/.test(it.body) ? `${it.body}($event);` : `(${it.body})($event);`,
     );
     out.push(`${head}="($event) => { ${branches.join(' ')} }"`);
   }
@@ -799,9 +766,7 @@ function astReferencesIdentifier(node: unknown, name: string): boolean {
 function hoistTempIsReferenced(node: TemplateMatchIR): boolean {
   if (node.tempName === undefined) return false;
   const tempName = node.tempName;
-  return node.branches.some(
-    (b) => b.test !== null && astReferencesIdentifier(b.test, tempName),
-  );
+  return node.branches.some((b) => b.test !== null && astReferencesIdentifier(b.test, tempName));
 }
 
 /**

@@ -51,7 +51,7 @@
  * synthesized binding for this component. Defensive `?? []` reads throughout so
  * hand-rolled partial test IRs do not throw.
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '@rozie/core';
 
 export function reactGeneratedBindingNames(ir: IRComponent): Set<string> {
   const out = new Set<string>();
@@ -62,9 +62,7 @@ export function reactGeneratedBindingNames(ir: IRComponent): Set<string> {
   // `_props` — the param is renamed to `_props` (and `const props` rebound) when
   // a non-model prop declares a default.
   const props = ir.props ?? [];
-  const defaultedNonModelProps = props.filter(
-    (p) => !p.isModel && p.defaultValue !== null,
-  );
+  const defaultedNonModelProps = props.filter((p) => !p.isModel && p.defaultValue !== null);
   if (defaultedNonModelProps.length > 0) out.add('_props');
 
   // `attrs` — the fallthrough spread object. Emitted when inherit-attrs or

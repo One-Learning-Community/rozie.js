@@ -18,30 +18,28 @@
 //
 // console.log calls survive byte-identical (no MemberExpression match against
 // $-prefixed objects). DX-03 trust-erosion floor.
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import * as t from '@babel/types';
+import { fileURLToPath } from 'node:url';
 import _generate from '@babel/generator';
 import { parse as babelParse } from '@babel/parser';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import type { IRComponent, RefDecl, StateDecl } from '../../../../core/src/ir/types.js';
-import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
-import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
-import { deconflictVueRefSuffix } from '../rewrite/deconflictRefSuffix.js';
+import * as t from '@babel/types';
+import type { Diagnostic, IRComponent, RefDecl, StateDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitScript } from '../emit/emitScript.js';
 import { emitVue } from '../emitVue.js';
+import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
+import { deconflictVueRefSuffix } from '../rewrite/deconflictRefSuffix.js';
+import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../..');
@@ -409,9 +407,7 @@ describe('rewriteRozieIdentifiers — refLowersToNonNull (synthetic IR)', () => 
 
   it('$refs.X as object of a non-optional member → XRef.value! ', () => {
     const ir = buildIR({ refs: [mkRef('dialogEl')] });
-    expect(rewrite('$refs.dialogEl.focus();', ir).code).toContain(
-      'dialogElRef.value!.focus()',
-    );
+    expect(rewrite('$refs.dialogEl.focus();', ir).code).toContain('dialogElRef.value!.focus()');
   });
 
   it('$refs.X invoked directly as a call callee → XRef.value!', () => {
@@ -421,9 +417,7 @@ describe('rewriteRozieIdentifiers — refLowersToNonNull (synthetic IR)', () => 
 
   it('$refs.X as a function-call argument → XRef.value!', () => {
     const ir = buildIR({ refs: [mkRef('inputEl')] });
-    expect(rewrite('flatpickr($refs.inputEl);', ir).code).toContain(
-      'inputElRef.value!',
-    );
+    expect(rewrite('flatpickr($refs.inputEl);', ir).code).toContain('inputElRef.value!');
   });
 
   it('$refs.X nested inside an object literal passed to a constructor → XRef.value!', () => {
@@ -435,9 +429,7 @@ describe('rewriteRozieIdentifiers — refLowersToNonNull (synthetic IR)', () => 
 
   it('$refs.X nested inside an array literal passed to a call → XRef.value!', () => {
     const ir = buildIR({ refs: [mkRef('hostEl')] });
-    expect(rewrite('mountAll([$refs.hostEl]);', ir).code).toContain(
-      'hostElRef.value!',
-    );
+    expect(rewrite('mountAll([$refs.hostEl]);', ir).code).toContain('hostElRef.value!');
   });
 
   it('$refs.X?.method() (author opted into optionality) stays optional → XRef.value', () => {
@@ -470,26 +462,18 @@ describe('rewriteRozieIdentifiers — $slots / $portals / $snapshot handlers', (
 
   it('$portals.X (matching portal slot) → portals.X', () => {
     const ir = buildIR({ slots: [mkSlot('item', true)] });
-    expect(rewrite('$portals.item(node, scope);', ir).code).toContain(
-      'portals.item(node, scope)',
-    );
+    expect(rewrite('$portals.item(node, scope);', ir).code).toContain('portals.item(node, scope)');
   });
 
   it('$portals.X with no matching portal slot is left untouched', () => {
     const ir = buildIR({ slots: [mkSlot('item', true)] });
-    expect(rewrite('$portals.other(node);', ir).code).toContain(
-      '$portals.other(node)',
-    );
+    expect(rewrite('$portals.other(node);', ir).code).toContain('$portals.other(node)');
   });
 
   it('$snapshot(x) → x (identity lowering)', () => {
     const ir = buildIR();
-    expect(rewrite('const c = $snapshot(payload);', ir).code).toContain(
-      'const c = payload',
-    );
-    expect(rewrite('const c = $snapshot(payload);', ir).code).not.toContain(
-      '$snapshot',
-    );
+    expect(rewrite('const c = $snapshot(payload);', ir).code).toContain('const c = payload');
+    expect(rewrite('const c = $snapshot(payload);', ir).code).not.toContain('$snapshot');
   });
 
   it('$snapshot with non-single args is left untouched', () => {
@@ -499,9 +483,7 @@ describe('rewriteRozieIdentifiers — $slots / $portals / $snapshot handlers', (
 
   it('$snapshot with a spread (non-expression) argument is left untouched', () => {
     const ir = buildIR();
-    expect(rewrite('const c = $snapshot(...x);', ir).code).toContain(
-      '$snapshot(...x)',
-    );
+    expect(rewrite('const c = $snapshot(...x);', ir).code).toContain('$snapshot(...x)');
   });
 
   it('a call whose callee is not an identifier passes through', () => {
@@ -558,9 +540,7 @@ describe('rewriteRozieIdentifiers — OptionalMemberExpression sigil branches', 
 
   it('$props?.X (unknown prop name) is left untouched', () => {
     const ir = buildIR();
-    expect(rewrite('const a = $props?.mystery;', ir).code).toContain(
-      '$props?.mystery',
-    );
+    expect(rewrite('const a = $props?.mystery;', ir).code).toContain('$props?.mystery');
   });
 
   it('$data?.X → X.value', () => {
@@ -570,23 +550,17 @@ describe('rewriteRozieIdentifiers — OptionalMemberExpression sigil branches', 
 
   it('$data?.X (unknown data name) is left untouched', () => {
     const ir = buildIR({ state: [mkState('known')] });
-    expect(rewrite('const a = $data?.unknown;', ir).code).toContain(
-      '$data?.unknown',
-    );
+    expect(rewrite('const a = $data?.unknown;', ir).code).toContain('$data?.unknown');
   });
 
   it('$refs?.X (bare read) → XRef?.value (optional chain preserved)', () => {
     const ir = buildIR({ refs: [mkRef('panelEl')] });
-    expect(rewrite('const el = $refs?.panelEl;', ir).code).toContain(
-      'panelElRef?.value',
-    );
+    expect(rewrite('const el = $refs?.panelEl;', ir).code).toContain('panelElRef?.value');
   });
 
   it('$refs?.X flowing into a constructor argument → XRef.value!', () => {
     const ir = buildIR({ refs: [mkRef('inputEl')] });
-    expect(rewrite('flatpickr($refs?.inputEl);', ir).code).toContain(
-      'inputElRef.value!',
-    );
+    expect(rewrite('flatpickr($refs?.inputEl);', ir).code).toContain('inputElRef.value!');
   });
 
   it('$slots?.X → slots.X (sets slotsUsed)', () => {
@@ -603,25 +577,19 @@ describe('rewriteRozieIdentifiers — OptionalMemberExpression sigil branches', 
 
   it('non-sigil OptionalMember object name is left untouched', () => {
     const ir = buildIR({ props: [mkProp('value', true)] });
-    expect(rewrite('const a = whatever?.value;', ir).code).toContain(
-      'whatever?.value',
-    );
+    expect(rewrite('const a = whatever?.value;', ir).code).toContain('whatever?.value');
   });
 
   it('OptionalMember whose object is not an identifier passes through', () => {
     const ir = buildIR();
-    expect(rewrite('const a = makeIt()?.value;', ir).code).toContain(
-      'makeIt()?.value',
-    );
+    expect(rewrite('const a = makeIt()?.value;', ir).code).toContain('makeIt()?.value');
   });
 });
 
 describe('rewriteRozieIdentifiers — bare computed-name parent-position skip ladder', () => {
   it('bare $computed read → name.value', () => {
     const ir = buildIR({ computed: [mkComputed('canIncrement')] });
-    expect(rewrite('if (canIncrement) doThing();', ir).code).toContain(
-      'canIncrement.value',
-    );
+    expect(rewrite('if (canIncrement) doThing();', ir).code).toContain('canIncrement.value');
   });
 
   it('computed name in a VariableDeclarator id position is NOT rewritten', () => {
@@ -660,7 +628,7 @@ describe('rewriteRozieIdentifiers — bare computed-name parent-position skip la
   it('computed name in an import specifier is NOT rewritten', () => {
     const ir = buildIR({ computed: [mkComputed('total')] });
     const { code } = rewrite("import { total } from 'x';", ir);
-    expect(code).toContain("import { total }");
+    expect(code).toContain('import { total }');
   });
 
   it('computed name in an export specifier is NOT rewritten', () => {
@@ -679,9 +647,7 @@ describe('rewriteRozieIdentifiers — bare computed-name parent-position skip la
 
   it('a non-computed bare identifier is left untouched', () => {
     const ir = buildIR({ computed: [mkComputed('total')] });
-    expect(rewrite('if (somethingElse) doThing();', ir).code).toContain(
-      'somethingElse',
-    );
+    expect(rewrite('if (somethingElse) doThing();', ir).code).toContain('somethingElse');
   });
 
   it('an already-wrapped `name.value` member is NOT double-wrapped', () => {
@@ -725,9 +691,7 @@ describe('rewriteRozieIdentifiers — $el free read', () => {
     // `() => $el` — `$el`'s parentPath is the arrow function but it is not in
     // `params`, so the `params.includes` guard's false arm falls through and
     // the free read lowers via $refs.__rozieRoot.
-    expect(rewrite('const f = () => $el;', ir).code).toContain(
-      '__rozieRootRef.value',
-    );
+    expect(rewrite('const f = () => $el;', ir).code).toContain('__rozieRootRef.value');
   });
 
   it('$el inside a type position is NOT rewritten', () => {
@@ -793,9 +757,7 @@ $onMount(() => {
   it('emitVue threads `rozieDeepClone` in the `@rozie/runtime-vue` import line', () => {
     const { code } = emitVue(lowerSource(SRC), { filename: 'CloneEmit.rozie' });
     expect(code).toContain('rozieDeepClone(graph.value)');
-    const runtimeImport = code
-      .split('\n')
-      .find((l) => l.includes("from '@rozie/runtime-vue'"));
+    const runtimeImport = code.split('\n').find((l) => l.includes("from '@rozie/runtime-vue'"));
     expect(runtimeImport).toBeDefined();
     expect(runtimeImport).toContain('rozieDeepClone');
     // No `toRaw` leaks into any `from 'vue'` line.

@@ -20,14 +20,13 @@
  * SECURITY (T-14-06): the compile-time literal key walk drops
  * `__proto__`/`constructor`/`prototype` keys.
  */
-import { describe, it, expect } from 'vitest';
+
 import { parseExpression } from '@babel/parser';
-import * as t from '@babel/types';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, AttributeBinding } from '../../../../core/src/ir/types.js';
-import { emitMergedAttributes, type EmitAttrCtx } from '../emit/emitTemplateAttribute.js';
+import type * as t from '@babel/types';
+import type { AttributeBinding, IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { type EmitAttrCtx, emitMergedAttributes } from '../emit/emitTemplateAttribute.js';
 
 function emptyIR(): IRComponent {
   const src = `<rozie name="Test">
@@ -79,13 +78,10 @@ function freshCtx(ir: IRComponent): EmitAttrCtx {
 }
 
 describe('emitTemplateAttribute (Vue) — spreadBinding (Plan 14-04 Task 1)', () => {
-  it('(1) plain LITERAL spread → `v-bind="{ id: \'x\', title: \'t\' }"` with HTML keys verbatim', () => {
+  it("(1) plain LITERAL spread → `v-bind=\"{ id: 'x', title: 't' }\"` with HTML keys verbatim", () => {
     const ir = emptyIR();
     const ctx = freshCtx(ir);
-    const out = emitMergedAttributes(
-      [spread(`{ id: 'x', title: 't' }`)],
-      ctx,
-    );
+    const out = emitMergedAttributes([spread(`{ id: 'x', title: 't' }`)], ctx);
     // HTML attribute names — no remap (no `class→className`).
     expect(out).toMatchInlineSnapshot(`"v-bind="{ id: 'x', title: 't' }""`);
     expect(out).toContain('v-bind=');
@@ -115,10 +111,7 @@ describe('emitTemplateAttribute (Vue) — spreadBinding (Plan 14-04 Task 1)', ()
   it('(4) R6 — :class + r-bind LITERAL class merge: both classes render, only `id` spreads', () => {
     const ir = emptyIR();
     const ctx = freshCtx(ir);
-    const out = emitMergedAttributes(
-      [classBinding(`'a'`), spread(`{ class: 'b', id: 'x' }`)],
-      ctx,
-    );
+    const out = emitMergedAttributes([classBinding(`'a'`), spread(`{ class: 'b', id: 'x' }`)], ctx);
     // The literal's `class` is extracted into the :class array; only `id`
     // remains in the v-bind spread.
     expect(out).toContain(':class=');
@@ -126,18 +119,13 @@ describe('emitTemplateAttribute (Vue) — spreadBinding (Plan 14-04 Task 1)', ()
     expect(out).toContain(`'b'`);
     expect(out).toContain(`v-bind="{ id: 'x' }"`);
     // Source order: explicit :class first, then v-bind="{ id: ... }".
-    expect(out).toMatchInlineSnapshot(
-      `":class="['a', 'b']" v-bind="{ id: 'x' }""`,
-    );
+    expect(out).toMatchInlineSnapshot(`":class="['a', 'b']" v-bind="{ id: 'x' }""`);
   });
 
   it('(5) R6 reordered — r-bind LITERAL before :class: both classes still render', () => {
     const ir = emptyIR();
     const ctx = freshCtx(ir);
-    const out = emitMergedAttributes(
-      [spread(`{ class: 'b', id: 'x' }`), classBinding(`'a'`)],
-      ctx,
-    );
+    const out = emitMergedAttributes([spread(`{ class: 'b', id: 'x' }`), classBinding(`'a'`)], ctx);
     // Both classes must still appear; reorder swaps their position in the
     // :class array (positional last-wins is preserved within the merge).
     expect(out).toContain(':class=');
@@ -150,10 +138,7 @@ describe('emitTemplateAttribute (Vue) — spreadBinding (Plan 14-04 Task 1)', ()
     const ir = emptyIR();
     const ctx = freshCtx(ir);
     const out = emitMergedAttributes(
-      [
-        styleBinding(`{ color: 'red' }`),
-        spread(`{ style: { fontSize: '12px' }, id: 'x' }`),
-      ],
+      [styleBinding(`{ color: 'red' }`), spread(`{ style: { fontSize: '12px' }, id: 'x' }`)],
       ctx,
     );
     expect(out).toContain(':style=');

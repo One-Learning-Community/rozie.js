@@ -16,12 +16,11 @@
  * tests). Task 3's cold-gate compile assertion exercises the full,
  * real-file-on-disk round trip against the actual DynamicSlots fixture pair.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import type { IRComponent, SlotFillerDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../emitReact.js';
-import type { IRComponent, SlotFillerDecl } from '../../../../core/src/ir/types.js';
 
 function lowerInline(rozie: string): IRComponent {
   const result = parse(rozie, { filename: 'inline.rozie' });
@@ -107,7 +106,7 @@ describe('React producer — runtime-keyed dispatch for a dynamic-name slot (R3/
 });
 
 describe('React consumer — matchedFamily fill routes into the merged slots record (R5/D-09)', () => {
-  it('a matchedFamily fill emits the record-object form keyed on the fill\'s own static name', () => {
+  it("a matchedFamily fill emits the record-object form keyed on the fill's own static name", () => {
     const ir = lowerInline(`
 <rozie name="ConsumerX">
 <components>{ Cell: "./Cell.rozie" }</components>

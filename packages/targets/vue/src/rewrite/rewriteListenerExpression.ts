@@ -17,29 +17,33 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
+
+import type { GeneratorOptions } from '@babel/generator';
 import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
-import type { GeneratorOptions } from '@babel/generator';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
 
 function flattenInlineCode(code: string): string {
-  return code.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim();
+  return code
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
 }
 
 /**
@@ -49,10 +53,7 @@ function flattenInlineCode(code: string): string {
  * Mirrors rewriteRozieIdentifiers (Plan 02) but works on a single Expression
  * embedded inside a fresh wrapper Program so `traverse()` can walk it.
  */
-export function rewriteScriptExpression(
-  expr: t.Expression,
-  ir: IRComponent,
-): string {
+export function rewriteScriptExpression(expr: t.Expression, ir: IRComponent): string {
   const cloned = t.cloneNode(expr, true, false);
 
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
@@ -210,9 +211,7 @@ export function rewriteScriptExpression(
 
   // Pull the rewritten expression back out of the wrapper.
   const stmt = wrapper.program.body[0]!;
-  const rewrittenExpr = !t.isExpressionStatement(stmt)
-    ? cloned
-    : stmt.expression;
+  const rewrittenExpr = !t.isExpressionStatement(stmt) ? cloned : stmt.expression;
   const raw = generate(rewrittenExpr, GEN_OPTS).code;
   return flattenInlineCode(raw);
 }

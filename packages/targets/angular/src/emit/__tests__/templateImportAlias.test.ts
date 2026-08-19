@@ -23,20 +23,16 @@
  * scope), so they emit NOTHING new — the negative cross-target case asserts a
  * React compile of the same source carries no alias.
  */
+
+import type { IRComponent } from '@rozie/core';
+import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
-import { compile } from '../../../../../core/src/compile.js';
-import type { IRComponent } from '../../../../../core/src/ir/types.js';
 import { emitAngular } from '../../emitAngular.js';
 
 function compileAngular(src: string, filename = 'Test.rozie'): string {
   const result = parse(src, { filename });
   if (!result.ast) {
-    throw new Error(
-      `parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`,
-    );
+    throw new Error(`parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`);
   }
   const lowered = lowerToIR(result.ast, {
     modifierRegistry: createDefaultRegistry(),
@@ -72,9 +68,7 @@ import listPlugin from '@fullcalendar/list'
     // protected/readonly are load-bearing: AOT cannot see `private` members.
     expect(code).not.toContain('private listPlugin');
     // Exactly ONE alias field (no duplicate).
-    const aliasCount = (
-      code.match(/protected readonly listPlugin = listPlugin;/g) ?? []
-    ).length;
+    const aliasCount = (code.match(/protected readonly listPlugin = listPlugin;/g) ?? []).length;
     expect(aliasCount).toBe(1);
   });
 

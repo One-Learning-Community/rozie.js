@@ -11,11 +11,10 @@
 // the synthesised `__rozieRoot` template-ref binding. `lowerRootElementRef`
 // is extended (Phase 16) to detect `$restoreFocus` calls and synthesise the
 // matching ref even when the user's source never explicitly mentions `$el`.
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+
+import type { Diagnostic } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSvelte } from '../emitSvelte.js';
 
 const SOURCE = `<rozie name="RestoreFocusProbe">
@@ -40,9 +39,7 @@ function compileProbe(): { code: string; diagnostics: Diagnostic[] } {
     filename: 'RestoreFocusProbe.rozie',
   });
   if (!ast) {
-    throw new Error(
-      `parse() returned null AST: ${parseDiags.map((d) => d.message).join(', ')}`,
-    );
+    throw new Error(`parse() returned null AST: ${parseDiags.map((d) => d.message).join(', ')}`);
   }
   const registry = createDefaultRegistry();
   const { ir, diagnostics: lowerDiags } = lowerToIR(ast, {

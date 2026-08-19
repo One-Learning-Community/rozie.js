@@ -9,14 +9,19 @@
 //   7. Peer-dep resolve check — emits console.warn (NOT throw) when @rozie/runtime-vue
 //      not resolvable from consumer (Pitfall 8). v1: warn-only.
 //   8. A non-fatal warning diagnostic calls this.warn(...) instead of throwing.
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ModifierRegistry, registerBuiltins } from '@rozie/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { unplugin } from '../index.js';
-import { createTransformHook, transformIncludeRozie, createLoadHook, createResolveIdHook } from '../transform.js';
-import { ModifierRegistry } from '@rozie/core';
-import { registerBuiltins } from '../../../core/src/modifiers/registerBuiltins.js';
+import {
+  createLoadHook,
+  createResolveIdHook,
+  createTransformHook,
+  transformIncludeRozie,
+} from '../transform.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../..');
@@ -139,9 +144,9 @@ describe('load hook — error handling (Test 6, D-28 Vite-shaped errors)', () =>
     // Instead: directly exercise the transform pipeline with a malformed source.
     // We call the transform helper directly so we can inject the source.
     const transform = createTransformHook(makeRegistry());
-    expect(() =>
-      transform.call(ctx as any, 'no envelope here', '/foo/Bad.rozie'),
-    ).toThrowError(/ROZ001|envelope|<rozie>/i);
+    expect(() => transform.call(ctx as any, 'no envelope here', '/foo/Bad.rozie')).toThrowError(
+      /ROZ001|envelope|<rozie>/i,
+    );
     try {
       transform.call(ctx as any, 'no envelope', '/foo/Bad.rozie');
     } catch (e) {

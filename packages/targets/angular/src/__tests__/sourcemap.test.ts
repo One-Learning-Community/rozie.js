@@ -19,14 +19,13 @@
  * trailer is a chain link FROM emitAngular's output TO analogjs; this test
  * directly examines emitAngular's output.
  */
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { SourceMapConsumer } from 'source-map-js';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../emitAngular.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -76,7 +75,8 @@ describe('Phase 06.1 D-110/A1 — Angular sourcemap resolves to correct .rozie l
     const pos = consumer.originalPositionFor({ line, column });
 
     // Find the .rozie source line for `console.log("hello from rozie")`.
-    const consoleDeclLine = src.split('\n').findIndex((l) => /console\.log\("hello from rozie"\)/.test(l)) + 1;
+    const consoleDeclLine =
+      src.split('\n').findIndex((l) => /console\.log\("hello from rozie"\)/.test(l)) + 1;
     const styleEndLine = src.split('\n').findIndex((l) => /<\/style>/.test(l)) + 1;
     expect(consoleDeclLine).toBeGreaterThan(0);
 

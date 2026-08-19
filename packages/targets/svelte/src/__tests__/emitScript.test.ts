@@ -13,14 +13,13 @@
 //  5. SearchInput $watch debounce → inline IIFE (no @rozie/runtime-svelte)
 //  6. Modal D-19 paired-cleanup: ONE $effect block per $onMount/$onUnmount pair
 //  7. console.log("hello from rozie") in <script> body survives byte-identical
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitScript } from '../emit/emitScript.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -116,12 +115,12 @@ describe('emitScript — behavior (Plan 05-02a Task 1)', () => {
     expect(scriptBlock).not.toContain('Snippet');
   });
 
-  it('Test 10: TodoList includes `import type { Snippet } from \'svelte\';`', () => {
+  it("Test 10: TodoList includes `import type { Snippet } from 'svelte';`", () => {
     const { scriptBlock } = emitScript(lowerExample('TodoList'));
     expect(scriptBlock).toContain("import type { Snippet } from 'svelte';");
   });
 
-  it('Quick 260515-u2b — WatchHook binds the getter value as the callback\'s first arg (when callback declares a param)', () => {
+  it("Quick 260515-u2b — WatchHook binds the getter value as the callback's first arg (when callback declares a param)", () => {
     // Callback declares a param `(v) => ...` so emit MUST bind `__watchVal` to
     // it; the zero-param variant is covered separately below to ensure the
     // svelte-check arity gate doesn't regress.
@@ -193,9 +192,7 @@ describe('emitScript — per-block fixture snapshots (Plan 05-02a Task 1)', () =
   for (const name of SCRIPT_FIXTURE_NAMES) {
     it(`${name}.script.snap`, async () => {
       const { scriptBlock } = emitScript(lowerExample(name));
-      await expect(scriptBlock).toMatchFileSnapshot(
-        resolve(FIXTURES, `${name}.script.snap`),
-      );
+      await expect(scriptBlock).toMatchFileSnapshot(resolve(FIXTURES, `${name}.script.snap`));
     });
   }
 });
@@ -254,9 +251,7 @@ describe('snippets-merge (Phase 07.3.1 D-SV-16)', () => {
     // snippets entry appended to destructure.
     expect(scriptBlock).toMatch(/\bsnippets\b[,\s}]/);
     // $derived merge line spliced after the destructure.
-    expect(scriptBlock).toContain(
-      'const header = $derived(__headerProp ?? snippets?.header);',
-    );
+    expect(scriptBlock).toContain('const header = $derived(__headerProp ?? snippets?.header);');
   });
 
   it('static-named header wins over snippets?.header via `??` left-precedence (T-07.3.1-14)', () => {

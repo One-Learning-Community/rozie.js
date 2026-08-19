@@ -11,14 +11,13 @@
 // `static styles` is shadow-scoped (`adoptedStyleSheets`), so the
 // relocated light-DOM element ALSO needs its scoped CSS pushed through
 // `injectGlobalStyles` (reusing the P33/`:root{}` sink).
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -57,14 +56,20 @@ describe('emitLit — PortalOverlay (command-palette-portal-overlay Task 3, r-po
     // tracked moved-node reference). See RoziePortalController's module doc.
     // Finding 5 (R1) — the portal marker rides a DISTINCT attribute name
     // (`data-rozie-portal-ref`) so it never collides with an author `ref=`.
-    expect(code).toMatch(/@query\('\[data-rozie-portal-ref="__roziePortal0"\]'\) private __roziePortal0!/);
+    expect(code).toMatch(
+      /@query\('\[data-rozie-portal-ref="__roziePortal0"\]'\) private __roziePortal0!/,
+    );
     expect(code).not.toMatch(/@query\('\[data-rozie-portal-ref="__roziePortal0"\]', true\)/);
     expect(code).toMatch(/data-rozie-portal-ref="__roziePortal0"/);
     // Sentinel: a distinct UNCACHED `data-rozie-portal-anchor` query + a
     // sibling `<span … hidden>` stamped ahead of the portalled element inside
     // the SAME r-if branch (the liveness signal that fixes close-while-portalled).
-    expect(code).toMatch(/@query\('\[data-rozie-portal-anchor="__roziePortal0"\]'\) private __roziePortal0Anchor!/);
-    expect(code).toMatch(/<span data-rozie-portal-anchor="__roziePortal0" hidden><\/span><div class="rozie-portal-overlay-backdrop"/);
+    expect(code).toMatch(
+      /@query\('\[data-rozie-portal-anchor="__roziePortal0"\]'\) private __roziePortal0Anchor!/,
+    );
+    expect(code).toMatch(
+      /<span data-rozie-portal-anchor="__roziePortal0" hidden><\/span><div class="rozie-portal-overlay-backdrop"/,
+    );
     expect(code).toMatch(
       /new RoziePortalController\(this, \(\) => this\.__roziePortal0, \(\) => this\.__roziePortal0Anchor, \(\) => \(/,
     );

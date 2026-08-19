@@ -12,17 +12,13 @@
  * the virtual id is `.rozie.css` and the `.tsx` body imports it for side effect
  * via `import './Foo.css'`.
  */
-import { describe, it, expect, vi } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  createResolveIdHook,
-  createLoadHook,
-  transformIncludeRozie,
-} from '../transform.js';
-import { ModifierRegistry } from '@rozie/core';
-import { registerBuiltins } from '../../../core/src/modifiers/registerBuiltins.js';
+import { ModifierRegistry, registerBuiltins } from '@rozie/core';
+import { describe, expect, it, vi } from 'vitest';
+import { createLoadHook, createResolveIdHook, transformIncludeRozie } from '../transform.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../..');

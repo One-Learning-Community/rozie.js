@@ -21,9 +21,10 @@
  *
  * @experimental — shape may change before v1.0
  */
-import MagicString from 'magic-string';
+
 import type { EncodedSourceMap } from '@ampproject/remapping';
-import type { BlockMap } from '../../../../core/src/ast/types.js';
+import type { BlockMap } from '@rozie/core';
+import MagicString from 'magic-string';
 
 export interface ShellParts {
   /** Body of `<script lang="ts">...</script>` — emitScript output + injections. */
@@ -141,11 +142,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
 
   // Svelte's top-level markup has no `<template>` wrapper — overwrite the
   // .rozie <template>...</template> range with the bare markup.
-  ms.overwrite(
-    blocks.template.loc.start,
-    blocks.template.loc.end,
-    `\n${parts.template}\n`,
-  );
+  ms.overwrite(blocks.template.loc.start, blocks.template.loc.end, `\n${parts.template}\n`);
 
   if (blocks.style) {
     if (parts.styleBlock.length > 0) {
@@ -176,14 +173,12 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     if (cursor < start) ms.remove(cursor, start);
     cursor = end;
   }
-  if (cursor < parts.rozieSource.length)
-    ms.remove(cursor, parts.rozieSource.length);
+  if (cursor < parts.rozieSource.length) ms.remove(cursor, parts.rozieSource.length);
 
   // STEP 3: compute scriptOutputOffset and userCodeLineOffset.
   const fullOutput = ms.toString();
   const scriptIdx = fullOutput.indexOf(scriptOpenFraming);
-  const scriptOutputOffset =
-    scriptIdx >= 0 ? scriptIdx + scriptOpenFraming.length : 0;
+  const scriptOutputOffset = scriptIdx >= 0 ? scriptIdx + scriptOpenFraming.length : 0;
 
   // userCodeLineOffset: 0-indexed line count up to where the user-authored
   // residual statements begin within the .svelte output.
@@ -194,9 +189,8 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   //   3. preambleSectionLines: from emitScript (imports, interface, state, refs sections).
   const preambleSectionLines = parts.preambleSectionLines ?? 0;
   // scriptPrelude = compImports + optional trailing blank line (emitted as compImports + '\n')
-  const scriptPreludeNewlines = scriptPrelude.length > 0
-    ? (scriptPrelude.match(/\n/g) ?? []).length
-    : 0;
+  const scriptPreludeNewlines =
+    scriptPrelude.length > 0 ? (scriptPrelude.match(/\n/g) ?? []).length : 0;
 
   let userCodeLineOffset = 0;
   if (scriptIdx >= 0) {

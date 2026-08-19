@@ -15,10 +15,9 @@
  * The inert `.key=` property binding is stripped at the same seam so it
  * isn't ALSO emitted.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 function compile(source: string, filename = 'KEYED_REMOUNT.rozie'): string {
@@ -65,9 +64,7 @@ const SRC_LOOP_KEY = `<rozie name="KeyedHostLoop">
 describe('emitLit — component :key wraps in keyed() (keyed-remount codegen Task 3)', () => {
   it('imports the `keyed` directive when a component carries :key', () => {
     const code = compile(SRC_KEYED);
-    expect(code).toContain(
-      "import { keyed } from 'lit/directives/keyed.js';",
-    );
+    expect(code).toContain("import { keyed } from 'lit/directives/keyed.js';");
   });
 
   it('wraps the component invocation in `keyed(<expr>, html`…`)`', () => {
@@ -87,9 +84,7 @@ describe('emitLit — component :key wraps in keyed() (keyed-remount codegen Tas
 
   it('control: component WITHOUT :key emits no keyed() wrap and no keyed import', () => {
     const code = compile(SRC_NO_KEY);
-    expect(code).not.toContain(
-      "import { keyed } from 'lit/directives/keyed.js';",
-    );
+    expect(code).not.toContain("import { keyed } from 'lit/directives/keyed.js';");
     expect(code).not.toMatch(/keyed\(/);
   });
 
@@ -98,8 +93,6 @@ describe('emitLit — component :key wraps in keyed() (keyed-remount codegen Tas
     // The r-for path does not route through remountKeyExpression, so there is
     // no `keyed()` wrap and no `keyed` import contributed by THIS element —
     // `repeat()` (or the loop's own key handling) is the loop's own concern.
-    expect(code).not.toContain(
-      "import { keyed } from 'lit/directives/keyed.js';",
-    );
+    expect(code).not.toContain("import { keyed } from 'lit/directives/keyed.js';");
   });
 });

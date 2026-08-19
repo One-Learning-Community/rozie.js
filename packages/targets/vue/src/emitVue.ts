@@ -22,29 +22,32 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent, TemplateNode } from '../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { BlockMap } from '../../../core/src/ast/types.js';
-import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
-import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
-import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
-import { computeScopeHash } from '../../../core/src/codegen/portalCss.js';
-import { deconflictVueGeneratedBindingNames } from '../../../core/src/rewrite/deconflict.js';
-import { vueGeneratedBindingNames } from './rewrite/vueGeneratedNames.js';
-import {
-  deconflictVueRefSuffix,
-  collectVueTopLevelBindingNames,
-} from './rewrite/deconflictRefSuffix.js';
+import type {
+  BlockMap,
+  Diagnostic,
+  IRComponent,
+  ModifierRegistry,
+  IRTemplateNode as TemplateNode,
+} from '@rozie/core';
+import { createDefaultRegistry } from '@rozie/core';
 import type { SourceMap } from 'magic-string';
-import { emitScript } from './emit/emitScript.js';
-import { emitTemplate } from './emit/emitTemplate.js';
-import { emitListeners } from './emit/emitListeners.js';
-import { emitStyle } from './emit/emitStyle.js';
-import { buildShell } from './emit/shell.js';
-import { composeSourceMap } from './sourcemap/compose.js';
 import { buildPartialLineOffsets } from '../../../core/src/codegen/composeMaps.js';
+import { computeScopeHash } from '../../../core/src/codegen/portalCss.js';
+import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import { deconflictVueGeneratedBindingNames } from '../../../core/src/rewrite/deconflict.js';
+import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
+import { emitListeners } from './emit/emitListeners.js';
+import { emitScript } from './emit/emitScript.js';
+import { emitStyle } from './emit/emitStyle.js';
+import { emitTemplate } from './emit/emitTemplate.js';
 import type { ScriptInjection } from './emit/emitTemplateEvent.js';
+import { buildShell } from './emit/shell.js';
+import {
+  collectVueTopLevelBindingNames,
+  deconflictVueRefSuffix,
+} from './rewrite/deconflictRefSuffix.js';
+import { vueGeneratedBindingNames } from './rewrite/vueGeneratedNames.js';
+import { composeSourceMap } from './sourcemap/compose.js';
 
 /**
  * Phase 06.2 P2 — recursive walk over the IR template detecting any
@@ -160,10 +163,7 @@ export interface EmitVueResult {
  *     them earlier produces a TDZ error (`Cannot access 'onSearch' before
  *     initialization`).
  */
-function mergeScriptInjections(
-  script: string,
-  injections: ScriptInjection[],
-): string {
+function mergeScriptInjections(script: string, injections: ScriptInjection[]): string {
   if (injections.length === 0) return script;
 
   // Dedupe import names per `from`. Skip empty-decl injections — these come
@@ -196,8 +196,6 @@ function mergeScriptInjections(
     if (trimmed.startsWith('import ')) {
       lastImportLine = i;
     } else if (trimmed.length === 0 && lastImportLine >= 0) {
-      // Continue past blank lines that are still in the import section.
-      continue;
     } else if (lastImportLine >= 0) {
       break;
     } else if (trimmed.length > 0) {
@@ -253,7 +251,10 @@ function mergeVueImportsAndListeners(
         // Extract names: grab everything between `{` and `}` on this line.
         const match = trimmed.match(/\{([^}]+)\}/);
         if (match && match[1]) {
-          for (const n of match[1].split(',').map((s) => s.trim()).filter(Boolean)) {
+          for (const n of match[1]
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)) {
             collectedNames.add(n);
           }
         }
@@ -314,10 +315,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
   // script Program — per-target clone/rewrite happens later, inside
   // `emitScript`. Only-on-collision: the non-colliding corpus (the entire
   // existing example set) stays byte-identical.
-  deconflictVueRefSuffix(
-    ir,
-    collectVueTopLevelBindingNames(ir.setupBody.scriptProgram),
-  );
+  deconflictVueRefSuffix(ir, collectVueTopLevelBindingNames(ir.setupBody.scriptProgram));
 
   // D-85 Vue full (Plan 06-02 Task 3): exactOptionalPropertyTypes:true
   // requires conditional spread on `genericParams` so `undefined` is never
@@ -331,7 +329,13 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
   if (opts.genericParams !== undefined) scriptOpts.genericParams = opts.genericParams;
   if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
   scriptOpts.portalScopeHash = portalScopeHash;
-  const { script, scriptMap, preambleSectionLines, usesDeepClone, diagnostics: scriptDiags } = emitScript(ir, scriptOpts);
+  const {
+    script,
+    scriptMap,
+    preambleSectionLines,
+    usesDeepClone,
+    diagnostics: scriptDiags,
+  } = emitScript(ir, scriptOpts);
   const {
     template,
     scriptInjections,
@@ -352,7 +356,10 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     .names()
     .map((name) => ({
       wrapName: name,
-      import: { from: '@rozie/runtime-vue', name: name as 'useOutsideClick' | 'debounce' | 'throttle' | 'normalizeListeners' },
+      import: {
+        from: '@rozie/runtime-vue',
+        name: name as 'useOutsideClick' | 'debounce' | 'throttle' | 'normalizeListeners',
+      },
       decl: '', // No decl — emitListeners renders its own block.
     }));
 
@@ -384,20 +391,22 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     ...(listenerVueImports.has('watchEffect') ? ['watchEffect'] : []),
     ...keynavExtraVueImportNames,
   ];
-  enrichedScript = mergeVueImportsAndListeners(
-    enrichedScript,
-    listenerCode,
-    extraVueNames,
-  );
+  enrichedScript = mergeVueImportsAndListeners(enrichedScript, listenerCode, extraVueNames);
 
   // Plan 05 — emit styles. emitStyle requires the original .rozie source
   // (Wave 0 finding: StyleSection has StyleRule.loc but no cssText). When
   // opts.source is missing, skip the style emission entirely so the SFC
   // shell has no `<style>` blocks (back-compat with Plan 02-04 callers that
   // never invoked emitStyle).
-  const styleResult = opts.source !== undefined
-    ? emitStyle(ir.styles, opts.source, portalScopeHash)
-    : { scoped: '', global: null as string | null, portal: null as string | null, diagnostics: [] };
+  const styleResult =
+    opts.source !== undefined
+      ? emitStyle(ir.styles, opts.source, portalScopeHash)
+      : {
+          scoped: '',
+          global: null as string | null,
+          portal: null as string | null,
+          diagnostics: [],
+        };
   const styleScoped = styleResult.scoped;
   const styleGlobal = styleResult.global;
   const stylePortal = styleResult.portal;
@@ -439,21 +448,22 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     return `import ${decl.localName} from '${rewritten}';`;
   });
   const componentImportsBlock =
-    componentImportsLines.length > 0
-      ? componentImportsLines.join('\n') + '\n'
-      : '';
+    componentImportsLines.length > 0 ? componentImportsLines.join('\n') + '\n' : '';
   const hasSelfReference = templateContainsSelfReference(ir.template);
 
-  const { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: shellScriptMap } = buildShell({
+  const {
+    ms,
+    scriptOutputOffset,
+    userCodeLineOffset,
+    scriptMap: shellScriptMap,
+  } = buildShell({
     template,
     script: enrichedScript,
     styleScoped,
     styleGlobal,
     stylePortal,
     scriptGeneric:
-      opts.genericParams && opts.genericParams.length > 0
-        ? opts.genericParams.join(', ')
-        : null,
+      opts.genericParams && opts.genericParams.length > 0 ? opts.genericParams.join(', ') : null,
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
     scriptMap,

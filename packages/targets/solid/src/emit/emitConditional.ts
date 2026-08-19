@@ -11,7 +11,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { TemplateConditionalIR, TemplateNode } from '../../../../core/src/ir/types.js';
+import type { TemplateConditionalIR, IRTemplateNode as TemplateNode } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
 import { stripBalancedMustache } from './unwrapMustache.js';
@@ -53,11 +53,7 @@ function renderBranchBody(
  * (no re-wrap) since the `fallback={ }` attribute already supplies the
  * delimiters.
  */
-function buildShow(
-  testCode: string,
-  bodyJsx: string,
-  fallbackJsx: string | null,
-): string {
+function buildShow(testCode: string, bodyJsx: string, fallbackJsx: string | null): string {
   if (fallbackJsx !== null) {
     const inner = stripBalancedMustache(fallbackJsx);
     const fallbackAttr = inner !== null ? inner : fallbackJsx;
@@ -93,7 +89,10 @@ export function emitConditional(
     currentFallback = renderBranchBody(lastBranch.body, ctx, emitNodeFn);
   } else {
     // No trailing r-else — last branch becomes a Show with no fallback
-    const testCode = rewriteTemplateExpression(lastBranch.test, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings });
+    const testCode = rewriteTemplateExpression(lastBranch.test, ctx.ir, {
+      invokeAccessors: ctx.invokeAccessors,
+      loopValueBindings: ctx.loopValueBindings,
+    });
     const bodyJsx = renderBranchBody(lastBranch.body, ctx, emitNodeFn);
     currentFallback = null;
     // Build from second-to-last going left
@@ -111,10 +110,17 @@ export function emitConditional(
         currentFallback = renderBranchBody(branch.body, ctx, emitNodeFn);
         continue;
       }
-      const bTestCode = rewriteTemplateExpression(branch.test, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings });
+      const bTestCode = rewriteTemplateExpression(branch.test, ctx.ir, {
+        invokeAccessors: ctx.invokeAccessors,
+        loopValueBindings: ctx.loopValueBindings,
+      });
       const bBodyJsx = renderBranchBody(branch.body, ctx, emitNodeFn);
       // The "show" we built for the next branch becomes the fallback here
-      const innerShow = buildShow(bTestCode, bBodyJsx, i === startIdx - 1 ? show : currentFallback!);
+      const innerShow = buildShow(
+        bTestCode,
+        bBodyJsx,
+        i === startIdx - 1 ? show : currentFallback!,
+      );
       currentFallback = innerShow;
     }
     if (currentFallback === show) {
@@ -132,7 +138,10 @@ export function emitConditional(
       currentFallback = renderBranchBody(branch.body, ctx, emitNodeFn);
       continue;
     }
-    const testCode = rewriteTemplateExpression(branch.test, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings });
+    const testCode = rewriteTemplateExpression(branch.test, ctx.ir, {
+      invokeAccessors: ctx.invokeAccessors,
+      loopValueBindings: ctx.loopValueBindings,
+    });
     const bodyJsx = renderBranchBody(branch.body, ctx, emitNodeFn);
     result = buildShow(testCode, bodyJsx, currentFallback);
     currentFallback = result;

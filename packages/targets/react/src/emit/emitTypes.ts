@@ -44,14 +44,14 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
+import type { IRComponent } from '@rozie/core';
 // Phase 22 Plan 22-02 — the framework-agnostic props-interface body is now
 // rendered by a single core-shared function so the five Wave-2 per-target
 // renderers cannot drift from the React prop→TS-type mapping. React passes its
 // own slot-children token (`ReactNode`); the per-target default-export
 // declaration below stays React-specific.
-import { renderPropsInterface } from '../../../../core/src/codegen/renderPropsInterface.js';
+import { renderPropsInterface } from '@rozie/core';
+import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
 
 /**
  * Options controlling .d.ts emission.
@@ -89,10 +89,7 @@ export interface EmitReactTypesOptions {
  * @public — consumed by `compile()` for the React target and by
  * Plan 06-05's bootstrap script for consumer-ts fixture refresh.
  */
-export function emitReactTypes(
-  ir: IRComponent,
-  opts: EmitReactTypesOptions = {},
-): string {
+export function emitReactTypes(ir: IRComponent, opts: EmitReactTypesOptions = {}): string {
   // Phase 06.2 P3 D-121: linkedComponents is RESERVED in v1.0 — accepted
   // but unused. The body below stays unchanged; opts.linkedComponents will
   // drive future cross-rozie type imports (e.g. `import type { ChildProps }
@@ -109,9 +106,7 @@ export function emitReactTypes(
   // always carry `expose: []`). Mirrors the `ir.components ?? []` guard in
   // emitReact.ts.
   const exposed = (ir.expose ?? []).length > 0;
-  const handleInterface = exposed
-    ? synthesizeHandleType(ir, `${ir.name}Handle`)
-    : null;
+  const handleInterface = exposed ? synthesizeHandleType(ir, `${ir.name}Handle`) : null;
 
   const lines: string[] = [];
   lines.push(`import type { ReactNode } from 'react';`);
@@ -127,9 +122,7 @@ export function emitReactTypes(
   lines.push('');
 
   const generics =
-    opts.genericParams && opts.genericParams.length > 0
-      ? `<${opts.genericParams.join(', ')}>`
-      : '';
+    opts.genericParams && opts.genericParams.length > 0 ? `<${opts.genericParams.join(', ')}>` : '';
 
   // Phase 22 Plan 22-02 — the entire `export interface ${ir.name}Props { … }`
   // body (model-triplet, required/optional gating, ir.emits→on<Event>, slot

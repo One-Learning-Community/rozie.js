@@ -39,11 +39,11 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '@rozie/core';
+import { renderPropsInterface } from '@rozie/core';
 // `synthesizeHandleType` is not yet in the `@rozie/core` barrel — import it
 // relatively as React's emitTypes.ts does.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
-import { renderPropsInterface } from '@rozie/core';
 
 /**
  * Options controlling Solid `.d.rozie.ts` emission.
@@ -64,19 +64,12 @@ export interface EmitSolidTypesOptions {
  *
  * @public — consumed by the Wave-3 unplugin sidecar emit + CLI fallback.
  */
-export function emitSolidTypes(
-  ir: IRComponent,
-  opts: EmitSolidTypesOptions = {},
-): string {
+export function emitSolidTypes(ir: IRComponent, opts: EmitSolidTypesOptions = {}): string {
   const exposed = (ir.expose ?? []).length > 0;
-  const handleInterface = exposed
-    ? synthesizeHandleType(ir, `${ir.name}Handle`)
-    : null;
+  const handleInterface = exposed ? synthesizeHandleType(ir, `${ir.name}Handle`) : null;
 
   const generics =
-    opts.genericParams && opts.genericParams.length > 0
-      ? `<${opts.genericParams.join(', ')}>`
-      : '';
+    opts.genericParams && opts.genericParams.length > 0 ? `<${opts.genericParams.join(', ')}>` : '';
 
   const lines: string[] = [];
 
@@ -93,9 +86,7 @@ export function emitSolidTypes(
     lines.push('');
   }
 
-  lines.push(
-    `declare const ${ir.name}: import('solid-js').Component<${ir.name}Props${generics}>;`,
-  );
+  lines.push(`declare const ${ir.name}: import('solid-js').Component<${ir.name}Props${generics}>;`);
   lines.push(`export default ${ir.name};`);
   lines.push('');
   return lines.join('\n');

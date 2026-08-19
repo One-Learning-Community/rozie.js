@@ -9,13 +9,12 @@
  *   importPath: './Modal.rozie' }] emits `import Modal from './Modal'`
  *   (extensionless per `solid: ''` in TARGET_EXT_MAP).
  */
-import { describe, it, expect } from 'vitest';
+
 import * as t from '@babel/types';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../emitSolid.js';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
 
 function compileSolid(src: string, filename = 'inline.rozie'): string {
   const result = parse(src, { filename });
@@ -41,7 +40,14 @@ function buildMinimalIR(overrides: Partial<IRComponent> = {}): IRComponent {
     lifecycle: [],
     watchers: [],
     listeners: [],
-    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+    styles: {
+      type: 'StyleSection',
+      scopedRules: [],
+      rootRules: [],
+      portalRules: [],
+      engineRules: [],
+      sourceLoc: { start: 0, end: 0 },
+    },
     components: [],
     setupBody: {
       type: 'SetupBody',

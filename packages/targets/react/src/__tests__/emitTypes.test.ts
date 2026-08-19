@@ -6,19 +6,16 @@
  * and the 5 reference-example file snapshots that Plan 06-06's parity gate
  * compares across unplugin/babel/CLI entrypoints.
  */
-import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
-import * as t from '@babel/types';
 
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { compile } from '../../../../core/src/compile.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import { emitReactTypes } from '../emit/emitTypes.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
+import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { makeSelectIR } from '../../../../../tests/fixtures/generics/select-ir.js';
+import { emitReactTypes } from '../emit/emitTypes.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../..');
@@ -64,7 +61,14 @@ function emptyIR(name: string): IRComponent {
       annotations: [],
     },
     template: null,
-    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+    styles: {
+      type: 'StyleSection',
+      scopedRules: [],
+      rootRules: [],
+      portalRules: [],
+      engineRules: [],
+      sourceLoc: { start: 0, end: 0 },
+    },
     sourceLoc: { start: 0, end: 0 },
   };
 }
@@ -161,10 +165,7 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
             name: 'mystery',
             // $props.notInProps — resolves through $props but the prop name
             // doesn't exist in ir.props → genuine 'unknown' fallback.
-            valueExpression: t.memberExpression(
-              t.identifier('$props'),
-              t.identifier('notInProps'),
-            ),
+            valueExpression: t.memberExpression(t.identifier('$props'), t.identifier('notInProps')),
             sourceLoc: { start: 0, end: 0 },
           },
         ],
@@ -180,13 +181,69 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
   it('Test 8: PropTypeAnnotation kinds map per spec', () => {
     const ir = emptyIR('Kinds');
     ir.props = [
-      { type: 'PropDecl', name: 'a', typeAnnotation: { kind: 'identifier', name: 'Number' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
-      { type: 'PropDecl', name: 'b', typeAnnotation: { kind: 'identifier', name: 'String' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
-      { type: 'PropDecl', name: 'c', typeAnnotation: { kind: 'identifier', name: 'Boolean' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
-      { type: 'PropDecl', name: 'd', typeAnnotation: { kind: 'identifier', name: 'Array' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
-      { type: 'PropDecl', name: 'e', typeAnnotation: { kind: 'identifier', name: 'Object' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
-      { type: 'PropDecl', name: 'f', typeAnnotation: { kind: 'identifier', name: 'Function' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
-      { type: 'PropDecl', name: 'g', typeAnnotation: { kind: 'identifier', name: 'MyType' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
+      {
+        type: 'PropDecl',
+        name: 'a',
+        typeAnnotation: { kind: 'identifier', name: 'Number' },
+        defaultValue: null,
+        isModel: false,
+        required: false,
+        sourceLoc: { start: 0, end: 0 },
+      },
+      {
+        type: 'PropDecl',
+        name: 'b',
+        typeAnnotation: { kind: 'identifier', name: 'String' },
+        defaultValue: null,
+        isModel: false,
+        required: false,
+        sourceLoc: { start: 0, end: 0 },
+      },
+      {
+        type: 'PropDecl',
+        name: 'c',
+        typeAnnotation: { kind: 'identifier', name: 'Boolean' },
+        defaultValue: null,
+        isModel: false,
+        required: false,
+        sourceLoc: { start: 0, end: 0 },
+      },
+      {
+        type: 'PropDecl',
+        name: 'd',
+        typeAnnotation: { kind: 'identifier', name: 'Array' },
+        defaultValue: null,
+        isModel: false,
+        required: false,
+        sourceLoc: { start: 0, end: 0 },
+      },
+      {
+        type: 'PropDecl',
+        name: 'e',
+        typeAnnotation: { kind: 'identifier', name: 'Object' },
+        defaultValue: null,
+        isModel: false,
+        required: false,
+        sourceLoc: { start: 0, end: 0 },
+      },
+      {
+        type: 'PropDecl',
+        name: 'f',
+        typeAnnotation: { kind: 'identifier', name: 'Function' },
+        defaultValue: null,
+        isModel: false,
+        required: false,
+        sourceLoc: { start: 0, end: 0 },
+      },
+      {
+        type: 'PropDecl',
+        name: 'g',
+        typeAnnotation: { kind: 'identifier', name: 'MyType' },
+        defaultValue: null,
+        isModel: false,
+        required: false,
+        sourceLoc: { start: 0, end: 0 },
+      },
     ];
     const out = emitReactTypes(ir);
     expect(out).toContain(`a: number;`);
@@ -268,10 +325,7 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
           {
             type: 'ParamDecl',
             name: 'open',
-            valueExpression: t.memberExpression(
-              t.identifier('$props'),
-              t.identifier('open'),
-            ),
+            valueExpression: t.memberExpression(t.identifier('$props'), t.identifier('open')),
             sourceLoc: { start: 0, end: 0 },
           },
         ],
@@ -321,16 +375,17 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
 });
 
 describe('emitReactTypes — file snapshots for the 5 reference examples', () => {
-  it.each(['Counter', 'SearchInput', 'Dropdown', 'TodoList', 'Modal'])(
-    '%s.d.ts snapshot is stable',
-    async (name) => {
-      const { ir } = load(name);
-      const out = emitReactTypes(ir);
-      await expect(out).toMatchFileSnapshot(
-        resolve(FIXTURES, `${name}.d.ts.snap`),
-      );
-    },
-  );
+  it.each([
+    'Counter',
+    'SearchInput',
+    'Dropdown',
+    'TodoList',
+    'Modal',
+  ])('%s.d.ts snapshot is stable', async (name) => {
+    const { ir } = load(name);
+    const out = emitReactTypes(ir);
+    await expect(out).toMatchFileSnapshot(resolve(FIXTURES, `${name}.d.ts.snap`));
+  });
 });
 
 describe('emitReactTypes — D-85 React full generic preservation (Plan 06-02 Task 2)', () => {
@@ -338,9 +393,7 @@ describe('emitReactTypes — D-85 React full generic preservation (Plan 06-02 Ta
     const ir = makeSelectIR();
     const out = emitReactTypes(ir, { genericParams: ['T'] });
     expect(out).toContain(`export interface SelectProps<T> {`);
-    expect(out).toContain(
-      `declare function Select<T>(props: SelectProps<T>): JSX.Element;`,
-    );
+    expect(out).toContain(`declare function Select<T>(props: SelectProps<T>): JSX.Element;`);
   });
 
   it('Test G2: model triplet propagates the T identifier', () => {
@@ -352,10 +405,7 @@ describe('emitReactTypes — D-85 React full generic preservation (Plan 06-02 Ta
   });
 
   it('Test G3: Select.rozie fixture file exists at canonical path', () => {
-    const fixturePath = resolve(
-      __dirname,
-      '../../../../../tests/fixtures/generics/Select.rozie',
-    );
+    const fixturePath = resolve(__dirname, '../../../../../tests/fixtures/generics/Select.rozie');
     expect(existsSync(fixturePath)).toBe(true);
   });
 

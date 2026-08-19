@@ -32,23 +32,21 @@
  * @experimental — shape may change before v1.0
  */
 import type {
+  Diagnostic,
   IRComponent,
   Listener,
-} from '../../../../core/src/ir/types.js';
-import type {
-  ModifierRegistry,
+  ModifierArg,
   ModifierPipelineEntry,
+  ModifierRegistry,
   ReactEmissionDescriptor,
 } from '@rozie/core';
 import { isEventModifier } from '@rozie/core';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import {
+import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
-import { emitListenerOutsideClick } from './emitListenerOutsideClick.js';
 import { emitListenerNative } from './emitListenerNative.js';
+import { emitListenerOutsideClick } from './emitListenerOutsideClick.js';
 import { emitListenerWrap } from './emitListenerWrap.js';
 
 export interface EmitListenersResult {
@@ -82,10 +80,7 @@ type ListenerClass =
     }
   | { kind: 'D'; pipeline: ModifierPipelineEntry[] };
 
-function classifyListener(
-  listener: Listener,
-  registry: ModifierRegistry,
-): ListenerClass {
+function classifyListener(listener: Listener, registry: ModifierRegistry): ListenerClass {
   const pipeline = listener.modifierPipeline;
   for (const entry of pipeline) {
     if (entry.kind !== 'wrap') continue;
@@ -113,9 +108,7 @@ function classifyListener(
   }
   // No wrap-helper → Class A or D depending on whether listenerOption present.
   const hasNative = pipeline.some((p) => p.kind === 'listenerOption');
-  return hasNative
-    ? { kind: 'A', pipeline }
-    : { kind: 'D', pipeline };
+  return hasNative ? { kind: 'A', pipeline } : { kind: 'D', pipeline };
 }
 
 /**

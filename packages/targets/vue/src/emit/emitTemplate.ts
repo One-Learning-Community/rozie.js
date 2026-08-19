@@ -18,17 +18,15 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
-import type { ScriptInjection } from './emitTemplateEvent.js';
+import type { Diagnostic, IRComponent, ModifierRegistry } from '@rozie/core';
 import {
   buildKeynavFocusScopeInjections,
   buildKeynavScriptInjections,
   resolveKeynavFocusScopeRefs,
   resolveKeynavPlans,
 } from './emitKeynav.js';
+import type { ScriptInjection } from './emitTemplateEvent.js';
+import { type EmitNodeCtx, emitNode } from './emitTemplateNode.js';
 
 export interface EmitTemplateResult {
   template: string;
@@ -51,10 +49,7 @@ export interface EmitTemplateResult {
   extraVueImportNames: string[];
 }
 
-export function emitTemplate(
-  ir: IRComponent,
-  registry: ModifierRegistry,
-): EmitTemplateResult {
+export function emitTemplate(ir: IRComponent, registry: ModifierRegistry): EmitTemplateResult {
   const diagnostics: Diagnostic[] = [];
   const scriptInjections: ScriptInjection[] = [];
 

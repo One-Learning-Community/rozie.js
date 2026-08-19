@@ -19,13 +19,12 @@
  * does not yet wire it in, so every gated-positive assertion below fails
  * until Task 3's implementation lands.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../../emitLit.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -62,7 +61,9 @@ describe('shouldDistributeSlots gate — emitted shape (D5)', () => {
     expect(code).toContain('static shadowRootOptions');
     expect(code).toContain("slotAssignment: 'manual'");
     expect(code).toContain('new RozieSlotDistributor(this)');
-    expect(code).toMatch(/import\s*\{[^}]*RozieSlotDistributor[^}]*\}\s*from\s*'@rozie\/runtime-lit'/);
+    expect(code).toMatch(
+      /import\s*\{[^}]*RozieSlotDistributor[^}]*\}\s*from\s*'@rozie\/runtime-lit'/,
+    );
   });
 
   it('ScopedSlotInLoop.rozie keeps the render-prop short-circuit branch byte-identical', () => {

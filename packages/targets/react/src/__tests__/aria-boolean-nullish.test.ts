@@ -17,18 +17,17 @@
  * Sibling of `aria-value-numeric.test.ts` (the NUMERIC class); drives
  * `emitAttributes` directly.
  */
-import { describe, it, expect } from 'vitest';
+
 import { parseExpression } from '@babel/parser';
-import * as t from '@babel/types';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, AttributeBinding } from '../../../../core/src/ir/types.js';
+import type * as t from '@babel/types';
+import type { AttributeBinding, IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { type EmitAttrCtx, emitAttributes } from '../emit/emitTemplateAttribute.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
-import { emitAttributes, type EmitAttrCtx } from '../emit/emitTemplateAttribute.js';
 
 function emptyIR(): IRComponent {
   const src = `<rozie name="Test">
@@ -109,21 +108,15 @@ describe('emitTemplateAttribute (React) — boolean-enumerated ARIA nullish-drop
   it('NO-REGRESS: aria-expanded (the original member) still drops via `?? undefined`', () => {
     const ir = emptyIR();
     const ctx = freshCtx(ir);
-    const { jsx } = emitAttributes(
-      [ariaBinding('aria-expanded', 'grouped ? !!open : null')],
-      ctx,
-    );
+    const { jsx } = emitAttributes([ariaBinding('aria-expanded', 'grouped ? !!open : null')], ctx);
     expect(jsx).toContain('?? undefined');
     expect(ctx.collectors.runtime.has('rozieAttr')).toBe(false);
   });
 
-  it('NO-REGRESS: a NON-nullish string form `cond ? \'true\' : \'false\'` stays on the rozieAttr path (correctly typed, no `?? undefined`)', () => {
+  it("NO-REGRESS: a NON-nullish string form `cond ? 'true' : 'false'` stays on the rozieAttr path (correctly typed, no `?? undefined`)", () => {
     const ir = emptyIR();
     const ctx = freshCtx(ir);
-    const { jsx } = emitAttributes(
-      [ariaBinding('aria-selected', "cond ? 'true' : 'false'")],
-      ctx,
-    );
+    const { jsx } = emitAttributes([ariaBinding('aria-selected', "cond ? 'true' : 'false'")], ctx);
     // A `'true' | 'false' | undefined` union is already assignable to Booleanish —
     // the `?? undefined` rescue is gated on `hasNullishBranch` (false here), so it
     // must NOT trigger (an unreachable right operand would be TS2869).

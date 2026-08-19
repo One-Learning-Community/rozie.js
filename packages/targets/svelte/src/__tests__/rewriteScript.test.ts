@@ -15,24 +15,21 @@
  * Pushes ROZ621 when a ref name collides with a data/computed/prop name.
  * Skips identifiers/member-exprs in TS type position.
  */
-import { describe, expect, it } from 'vitest';
-import * as t from '@babel/types';
+
 import _generate from '@babel/generator';
 import { parse as babelParse } from '@babel/parser';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { Diagnostic, IRComponent, SlotDecl } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
-import {
-  rewriteRozieIdentifiers,
-  svelteCallbackPropName,
-} from '../rewrite/rewriteScript.js';
+import { rewriteRozieIdentifiers, svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 function buildSlotDecl(name: string): SlotDecl {
   return {
@@ -198,7 +195,7 @@ describe('rewriteRozieIdentifiers — sigil rewrites', () => {
     expect(code).toContain('oneventclick?.(payload)');
   });
 
-  it("$emit() with zero args is left untouched", () => {
+  it('$emit() with zero args is left untouched', () => {
     const ir = buildIR();
     const { code } = rewrite('$emit();', ir);
     expect(code).toContain('$emit();');
@@ -427,10 +424,7 @@ describe('rewriteRozieIdentifiers — TS type-position skip', () => {
 describe('rewriteRozieIdentifiers — console preservation', () => {
   it('console.log survives byte-identical through clone + rewrite', () => {
     const ir = buildIR({ props: [prop('value', false)] });
-    const { code } = rewrite(
-      'console.log("hello from rozie"); const y = $props.value;',
-      ir,
-    );
+    const { code } = rewrite('console.log("hello from rozie"); const y = $props.value;', ir);
     expect(code).toContain('console.log("hello from rozie")');
     expect(code).toContain('const y = value;');
   });
@@ -633,10 +627,7 @@ describe('rewriteRozieIdentifiers — $snapshot non-expression argument', () => 
 describe('rewriteRozieIdentifiers — prop-shadow deconfliction (svelte-prop-shadow-self-ref)', () => {
   it('FACET A: `const X = $props.X` does NOT emit a self-referential `const X = X` (model prop)', () => {
     const ir = buildIR({ props: [prop('src', true)] });
-    const { code } = rewrite(
-      'function buildSource() { const src = $props.src; return src; }',
-      ir,
-    );
+    const { code } = rewrite('function buildSource() { const src = $props.src; return src; }', ir);
     // No TDZ self-reference.
     expect(code).not.toMatch(/const src = src\b/);
     // Local renamed; initializer reads the real prop (bare `src`).
@@ -648,10 +639,7 @@ describe('rewriteRozieIdentifiers — prop-shadow deconfliction (svelte-prop-sha
 
   it('FACET A: `const X = $props.X` for a NON-model prop also deconflicts', () => {
     const ir = buildIR({ props: [prop('step', false)] });
-    const { code } = rewrite(
-      'function f() { const step = $props.step; return step + 1; }',
-      ir,
-    );
+    const { code } = rewrite('function f() { const step = $props.step; return step + 1; }', ir);
     expect(code).not.toMatch(/const step = step\b/);
     expect(code).toContain('const step$local = step;');
     expect(code).toContain('return step$local + 1;');
@@ -659,10 +647,7 @@ describe('rewriteRozieIdentifiers — prop-shadow deconfliction (svelte-prop-sha
 
   it('FACET B: `$props.X` inside a function whose PARAM is named X reads the prop, not the param', () => {
     const ir = buildIR({ props: [prop('value', true)] });
-    const { code } = rewrite(
-      'function compute(value) { return value + $props.value; }',
-      ir,
-    );
+    const { code } = rewrite('function compute(value) { return value + $props.value; }', ir);
     // The param is renamed; the `$props.value` lowers to bare `value` (the rune
     // prop binding) while the param reference becomes `value$local`.
     expect(code).toContain('function compute(value$local)');
@@ -672,10 +657,7 @@ describe('rewriteRozieIdentifiers — prop-shadow deconfliction (svelte-prop-sha
 
   it('FACET B: destructured object PARAM shadowing a prop is deconflicted', () => {
     const ir = buildIR({ props: [prop('src', false)] });
-    const { code } = rewrite(
-      'function f({ src }) { return src + $props.src; }',
-      ir,
-    );
+    const { code } = rewrite('function f({ src }) { return src + $props.src; }', ir);
     expect(code).toContain('src: src$local');
     // `$props.src` → bare `src` (prop); the destructured value reference → renamed.
     expect(code).toContain('return src$local + src;');
@@ -683,10 +665,7 @@ describe('rewriteRozieIdentifiers — prop-shadow deconfliction (svelte-prop-sha
 
   it('leaves a local whose name does NOT collide with any prop untouched (byte-identical)', () => {
     const ir = buildIR({ props: [prop('value', true)] });
-    const { code } = rewrite(
-      'function f() { const other = $props.value; return other; }',
-      ir,
-    );
+    const { code } = rewrite('function f() { const other = $props.value; return other; }', ir);
     expect(code).toContain('const other = value;');
     expect(code).not.toContain('$local');
   });
@@ -696,10 +675,7 @@ describe('rewriteRozieIdentifiers — prop-shadow deconfliction (svelte-prop-sha
     // genuine ROZ621-class concern handled elsewhere; deconflictPropShadows
     // must not touch it.
     const ir = buildIR({ state: [state('count')], props: [prop('value', true)] });
-    const { code } = rewrite(
-      'function f() { const count = 0; return count; }',
-      ir,
-    );
+    const { code } = rewrite('function f() { const count = 0; return count; }', ir);
     expect(code).not.toContain('$local');
     expect(code).toContain('const count = 0;');
   });

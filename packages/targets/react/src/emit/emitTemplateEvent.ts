@@ -26,22 +26,19 @@
  */
 import * as t from '@babel/types';
 import type {
+  Diagnostic,
   IRComponent,
   Listener,
-} from '../../../../core/src/ir/types.js';
-import type {
+  ModifierArg,
   ModifierRegistry,
   ReactEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import {
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
+import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { renderDepArray } from './renderDepArray.js';
 
 export interface EmitEventCtx {
@@ -226,9 +223,11 @@ function makeWrapName(
   const baseName = t.isIdentifier(handler) ? handler.name : `handler${counter.next}`;
   const cap = baseName.charAt(0).toUpperCase() + baseName.slice(1);
   const prefix =
-    helperName === 'useDebouncedCallback' ? '_rozieDebounced' :
-    helperName === 'useThrottledCallback' ? '_rozieThrottled' :
-    '_rozieOutside';
+    helperName === 'useDebouncedCallback'
+      ? '_rozieDebounced'
+      : helperName === 'useThrottledCallback'
+        ? '_rozieThrottled'
+        : '_rozieOutside';
   const N = counter.next++;
   return N === 0 ? `${prefix}${cap}` : `${prefix}${cap}_${N}`;
 }
@@ -288,10 +287,7 @@ function classifyHandler(node: t.Expression): 'identifier' | 'callable' | 'state
  * `react()` hook returns a native `capture` descriptor is honored the same
  * way real emission honors it.
  */
-export function resolveJsxEventPropName(
-  listener: Listener,
-  registry: ModifierRegistry,
-): string {
+export function resolveJsxEventPropName(listener: Listener, registry: ModifierRegistry): string {
   let jsxName = eventNameToJsxProp(listener.event);
   for (const entry of listener.modifierPipeline) {
     let modifierName: string;
@@ -320,10 +316,7 @@ export function resolveJsxEventPropName(
 /**
  * Emit a single template @event listener as a JSX attribute.
  */
-export function emitTemplateEvent(
-  listener: Listener,
-  ctx: EmitEventCtx,
-): EmitTemplateEventResult {
+export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTemplateEventResult {
   const diagnostics: Diagnostic[] = [];
   const eventName = listener.event;
   let jsxName = eventNameToJsxProp(eventName);

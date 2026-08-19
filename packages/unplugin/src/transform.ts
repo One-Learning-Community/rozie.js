@@ -33,41 +33,41 @@
  * @experimental — shape may change before v1.0
  */
 
-import { existsSync, readFileSync, writeFileSync, readdirSync, statSync, lstatSync } from 'node:fs';
-import { isAbsolute, resolve as pathResolve, dirname, join as pathJoin, relative as pathRelative } from 'node:path';
-import { parse } from '../../core/src/parse.js';
-import { lowerToIR } from '../../core/src/ir/lower.js';
-// Phase 54 (Plan 04) — `.rzts`/`.rzjs` script-partial negative-routing predicate.
-// A partial import is a COMPILE-TIME inline (spliced into the host at lowerToIR),
-// NEVER a module: it must produce NO virtual id and NO sidecar. We consult this
-// shared predicate in resolveId + transformInclude so the negative-route
-// guarantee is explicit and durable against future catch-all branches, rather
-// than relying on the incidental fact that `.rzts`/`.rzjs` don't `endsWith` any
-// existing `.rozie*` suffix.
-import { isPartialExtension } from '../../core/src/ir/inlineScriptPartials.js';
-import { splitBlocks } from '../../core/src/splitter/splitBlocks.js';
-import type { BlockMap } from '../../core/src/ast/types.js';
+import {
+  existsSync,
+  lstatSync,
+  readdirSync,
+  readFileSync,
+  type statSync,
+  writeFileSync,
+} from 'node:fs';
+import {
+  dirname,
+  isAbsolute,
+  join as pathJoin,
+  relative as pathRelative,
+  resolve as pathResolve,
+} from 'node:path';
+import type { BlockMap, Diagnostic, ModifierRegistry } from '@rozie/core';
 // Phase 07.2 Plan 03 — thread producer paramTypes onto consumer SlotFillerDecl.
 // Without this step, unplugin's per-target output would diverge from compile()'s
 // output for the consumer-scoped-fill case (compile() runs threadParamTypes
 // step 2.5; unplugin's pipelines previously skipped it). dist-parity Leg 4
 // would then fail on every consumer-scoped-fill cell.
-import { threadParamTypes } from '../../core/src/ir/threadParamTypes.js';
-import { validateTwoWayBindings } from '../../core/src/ir/validateTwoWayBindings.js';
+import {
+  IRCache,
+  lowerToIR,
+  ProducerResolver,
+  parse,
+  threadParamTypes,
+  validateTwoWayBindings,
+} from '@rozie/core';
 // Phase 75 Plan 02 — threadParamTypes/validateTwoWayBindings now require the
 // per-call compile target (D-09, selects the derived per-target package for a
 // PUBLISHED <components> specifier). Each per-target pipeline below threads
 // its own literal target through threadParamTypesForPipeline/
 // validateTwoWayBindingsForPipeline, mirroring compile.ts's opts.target.
 import type { RozieTarget } from '../../core/src/codegen/rewriteRozieImport.js';
-// Phase 38 — ROZ088 portal-scoped-style Lit diagnostic. `@rozie/unplugin` does
-// NOT call `compile()`; each per-target pipeline threads + validates inline, so
-// this pass must be invoked at every pipeline site (mirrors how compile.ts wires
-// it after threadParamTypes — see compile.ts:312). Missing a site means the
-// warning fires in compile()/CLI/tests but NOT in a real Vite/Rollup build. The
-// pass reads only the already-threaded `filler.isPortal`, so it needs no
-// IRCache/ProducerResolver of its own — call it directly with `(ir, acc)`.
-import { validatePortalScopedStyle } from '../../core/src/ir/validatePortalScopedStyle.js';
 // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source string.
 // `@rozie/unplugin` does NOT call `compile()`; each per-target pipeline parses
 // and emits independently, so every parse-then-emit site must call this helper
@@ -77,20 +77,33 @@ import { validatePortalScopedStyle } from '../../core/src/ir/validatePortalScope
 // dist-parity 4-entrypoint byte gate is the proof a pipeline was missed
 // (SPEC-REQ-2 / SPEC-REQ-7). No-op (byte-identical) for plain CSS (SPEC-REQ-8).
 import { substituteCompiledStyle } from '../../core/src/codegen/substituteCompiledStyle.js';
-import { IRCache } from '../../core/src/ir/cache.js';
-import { ProducerResolver } from '../../core/src/resolver/index.js';
-import type { ModifierRegistry } from '@rozie/core';
-import { emitVue, type EmitVueResult } from '../../targets/vue/src/emitVue.js';
-import { emitReact, type EmitReactResult } from '../../targets/react/src/emitReact.js';
-import { emitSvelte, type EmitSvelteResult } from '../../targets/svelte/src/emitSvelte.js';
-import { emitAngular, type EmitAngularResult } from '../../targets/angular/src/emitAngular.js';
-import { emitSolid, type EmitSolidResult } from '../../targets/solid/src/emitSolid.js';
-import { emitLit, type EmitLitResult } from '../../targets/lit/src/emitLit.js';
-import type { Diagnostic } from '../../core/src/diagnostics/Diagnostic.js';
-import { stampMissingFilename } from '../../core/src/diagnostics/stampFilename.js';
 import { createSourceResolver } from '../../core/src/diagnostics/sourceResolver.js';
+import { stampMissingFilename } from '../../core/src/diagnostics/stampFilename.js';
+// Phase 54 (Plan 04) — `.rzts`/`.rzjs` script-partial negative-routing predicate.
+// A partial import is a COMPILE-TIME inline (spliced into the host at lowerToIR),
+// NEVER a module: it must produce NO virtual id and NO sidecar. We consult this
+// shared predicate in resolveId + transformInclude so the negative-route
+// guarantee is explicit and durable against future catch-all branches, rather
+// than relying on the incidental fact that `.rzts`/`.rzjs` don't `endsWith` any
+// existing `.rozie*` suffix.
+import { isPartialExtension } from '../../core/src/ir/inlineScriptPartials.js';
+// Phase 38 — ROZ088 portal-scoped-style Lit diagnostic. `@rozie/unplugin` does
+// NOT call `compile()`; each per-target pipeline threads + validates inline, so
+// this pass must be invoked at every pipeline site (mirrors how compile.ts wires
+// it after threadParamTypes — see compile.ts:312). Missing a site means the
+// warning fires in compile()/CLI/tests but NOT in a real Vite/Rollup build. The
+// pass reads only the already-threaded `filler.isPortal`, so it needs no
+// IRCache/ProducerResolver of its own — call it directly with `(ir, acc)`.
+import { validatePortalScopedStyle } from '../../core/src/ir/validatePortalScopedStyle.js';
+import { splitBlocks } from '../../core/src/splitter/splitBlocks.js';
+import { type EmitAngularResult, emitAngular } from '../../targets/angular/src/emitAngular.js';
+import { type EmitLitResult, emitLit } from '../../targets/lit/src/emitLit.js';
+import { type EmitReactResult, emitReact } from '../../targets/react/src/emitReact.js';
+import { type EmitSolidResult, emitSolid } from '../../targets/solid/src/emitSolid.js';
+import { type EmitSvelteResult, emitSvelte } from '../../targets/svelte/src/emitSvelte.js';
+import { type EmitVueResult, emitVue } from '../../targets/vue/src/emitVue.js';
+import { formatLoc, formatViteError } from './diagnostics.js';
 import type { TargetValue } from './options.js';
-import { formatViteError, formatLoc } from './diagnostics.js';
 
 /**
  * Synthetic suffix appended by Vue's resolveId. The downstream load hook
@@ -484,7 +497,9 @@ function absolutize(id: string, importer: string | undefined): string {
   // T-05-04b-03 + WR-07). Vite's own resolveId pipeline already filters
   // these for VFS ids, but the unplugin layer sees raw `id` strings.
   if (id.includes('\0')) {
-    throw new Error(`@rozie/unplugin: refusing to resolve id with null byte: ${JSON.stringify(id)}`);
+    throw new Error(
+      `@rozie/unplugin: refusing to resolve id with null byte: ${JSON.stringify(id)}`,
+    );
   }
   // Strip any query string before path resolution; query is re-attached by
   // the caller if needed (the React load hook re-detects the query suffix).
@@ -917,7 +932,10 @@ function runRoziePipeline(
     ...partialInlineLowerOptions(filePath),
   });
   // Surface parse-time warnings + IR-time warnings together
-  const warnings: Diagnostic[] = [...parseDiags.filter((d) => d.severity === 'warning'), ...irDiags.filter((d) => d.severity === 'warning')];
+  const warnings: Diagnostic[] = [
+    ...parseDiags.filter((d) => d.severity === 'warning'),
+    ...irDiags.filter((d) => d.severity === 'warning'),
+  ];
   const irErrors = irDiags.filter((d) => d.severity === 'error');
   if (!ir || irErrors.length > 0) {
     throw formatViteError(irDiags, filePath, source);
@@ -1481,7 +1499,9 @@ export function prebuildAngularRozieFiles(
         // request-time with a Vite-shaped error pointing at the source.
         const msg = err instanceof Error ? err.message : String(err);
         // biome-ignore lint/suspicious/noConsole: build-time diagnostic
-        console.warn(`[@rozie/unplugin] prebuildAngularRozieFiles: failed to emit ${roziePath} → ${msg}`);
+        console.warn(
+          `[@rozie/unplugin] prebuildAngularRozieFiles: failed to emit ${roziePath} → ${msg}`,
+        );
       }
     }
   }
@@ -1513,9 +1533,7 @@ export function emitRozieTsToDisk(
   // inside ANY ONE of the listed roots.
   if (rootDirOrAllowedRoots !== undefined) {
     const allowedRoots: readonly string[] =
-      typeof rootDirOrAllowedRoots === 'string'
-        ? [rootDirOrAllowedRoots]
-        : rootDirOrAllowedRoots;
+      typeof rootDirOrAllowedRoots === 'string' ? [rootDirOrAllowedRoots] : rootDirOrAllowedRoots;
     if (allowedRoots.length > 0) {
       const allowed = allowedRoots.some((root) => {
         const rel = pathRelative(root, roziePath);
@@ -1545,9 +1563,7 @@ export function emitRozieTsToDisk(
   if (result.map) {
     const mapJson = JSON.stringify(result.map);
     const base64 = Buffer.from(mapJson, 'utf8').toString('base64');
-    codeWithMap =
-      result.code +
-      `\n//# sourceMappingURL=data:application/json;base64,${base64}\n`;
+    codeWithMap = result.code + `\n//# sourceMappingURL=data:application/json;base64,${base64}\n`;
   }
 
   const outPath = roziePath + '.ts';

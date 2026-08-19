@@ -24,11 +24,10 @@
 // component declares any props. Both `$attrs` getter code-generation
 // branches (the declared-props skip-list branch AND the zero-declared-props
 // fast path) must exclude it unconditionally.
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { emitLit } from '../emitLit.js';
 
 function compile(src: string): string {
@@ -77,7 +76,7 @@ const grab = () => { const root = $el; return root; }
 `;
 
 describe('emitLit — $attrs fallthrough getter excludes the reserved data-rozie-ref attribute', () => {
-  it('(declared-props branch) skip-list includes data-rozie-ref so a parent-assigned ref= never clobbers the component\'s own internal ref markers', () => {
+  it("(declared-props branch) skip-list includes data-rozie-ref so a parent-assigned ref= never clobbers the component's own internal ref markers", () => {
     const code = compile(SRC_WITH_PROPS);
     expect(code).toMatch(/private get \$attrs\(\)/);
     const getterMatch = code.match(/private get \$attrs\(\)[\s\S]*?\n {2}\}/);

@@ -6,10 +6,11 @@
  *
  * Closes Angular row of F-07.3.2-05-A.
  */
-import { describe, it, expect } from 'vitest';
+
 import { parseExpression } from '@babel/parser';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { rewriteListenerExpression } from '../rewrite/rewriteListenerExpression.js';
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
 
 const sloc = { start: 0, end: 0 } as unknown as SlotDecl['sourceLoc'];
 

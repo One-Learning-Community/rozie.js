@@ -18,11 +18,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
-import type { SvelteScriptInjection } from './emitScript.js';
+import type { Diagnostic, IRComponent, ModifierRegistry } from '@rozie/core';
 // Phase 71 (r-keynav) — Svelte target-pair (Plan 71-06), extended Phase 77
 // (Plan 04) — modeled on the React/Vue references (see emitKeynav.ts's
 // module doc comment).
@@ -32,6 +28,8 @@ import {
   resolveKeynavFocusScopeRefs,
   resolveKeynavPlans,
 } from './emitKeynav.js';
+import type { SvelteScriptInjection } from './emitScript.js';
+import { type EmitNodeCtx, emitNode } from './emitTemplateNode.js';
 
 export interface EmitTemplateResult {
   template: string;

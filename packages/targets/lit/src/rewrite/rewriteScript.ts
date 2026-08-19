@@ -22,42 +22,40 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
-import _traverse from '@babel/traverse';
-import type { NodePath } from '@babel/traverse';
+
 import type { GeneratorOptions } from '@babel/generator';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import _generate from '@babel/generator';
+import type { NodePath } from '@babel/traverse';
+import _traverse from '@babel/traverse';
+import type { Expression, File, Program, Statement } from '@babel/types';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
+import { isInTypePosition } from '@rozie/core';
 import { portalKey } from '../../../../core/src/ir/types.js';
-import type { File, Program, Expression, Statement } from '@babel/types';
-import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import {
+  DECONFLICT_SUFFIX,
   deconflictReservedClassFields,
   reservedClassMembers,
-  DECONFLICT_SUFFIX,
 } from '../../../../core/src/rewrite/deconflict.js';
-import { cloneScriptProgram } from './cloneProgram.js';
-import {
-  hasShadowingBinding,
-  isInBindingPosition,
-} from './scopeAwareSkip.js';
-import { redirectNestedThis } from './redirectNestedThis.js';
-import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
-import type { RuntimeLitImportCollector } from './collectLitImports.js';
 import { kebabize } from '../emit/resolveLitSetterText.js';
+import { cloneScriptProgram } from './cloneProgram.js';
+import type { RuntimeLitImportCollector } from './collectLitImports.js';
+import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
+import { redirectNestedThis } from './redirectNestedThis.js';
+import { hasShadowingBinding, isInBindingPosition } from './scopeAwareSkip.js';
 
 // CJS interop normalization.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
 
@@ -167,9 +165,7 @@ function immutableArrayValue(
         t.spreadElement(slice(t.numericLiteral(0), t.cloneNode(start, true))),
         ...items,
         t.spreadElement(
-          slice(
-            t.binaryExpression('+', t.cloneNode(start, true), t.cloneNode(deleteCount, true)),
-          ),
+          slice(t.binaryExpression('+', t.cloneNode(start, true), t.cloneNode(deleteCount, true))),
         ),
       ]);
     }
@@ -421,15 +417,12 @@ export function rewriteScript(
   // The producer's `_hasSlot<X>` light-DOM detector never flips for property
   // fills, so the `$slots.X` presence check must union both signals.
   const scopedSlotNames = new Set(
-    ir.slots
-      .filter((s) => s.isPortal !== true && s.params.length > 0)
-      .map((s) => s.name),
+    ir.slots.filter((s) => s.isPortal !== true && s.params.length > 0).map((s) => s.name),
   );
   const portalSlotNames = new Set(
     ir.slots.filter((s) => s.isPortal === true).map((s) => portalKey(s)),
   );
-  const methodNames =
-    opts.methodNamesOverride ?? collectMethodNamesFromProgram(cloned, ir);
+  const methodNames = opts.methodNamesOverride ?? collectMethodNamesFromProgram(cloned, ir);
 
   // Spike-012 R4-E — a top-level user binding whose name is a reserved class
   // member (`const title` → HTMLElement.title) is renamed to `title$local` (both
@@ -531,9 +524,7 @@ export function rewriteScript(
         // `write(…)` argument so `$props.Y` / `$data.Y` reads in the RHS
         // (e.g. `$props.value += $props.step`, `[...$props.items, …]`) are
         // still rewritten by the MemberExpression visitor.
-        path.replaceWith(
-          buildModelWriteCall(prop.name, node.operator, node.right),
-        );
+        path.replaceWith(buildModelWriteCall(prop.name, node.operator, node.right));
         return;
       }
 
@@ -616,11 +607,7 @@ export function rewriteScript(
         // function-prop presence check `this.<X> !== undefined` instead.
         if (portalSlotNames.has(prop.name)) {
           path.replaceWith(
-            t.binaryExpression(
-              '!==',
-              thisDot(prop.name),
-              t.identifier('undefined'),
-            ),
+            t.binaryExpression('!==', thisDot(prop.name), t.identifier('undefined')),
           );
           path.skip();
           return;
@@ -633,11 +620,7 @@ export function rewriteScript(
             t.logicalExpression(
               '||',
               thisDot(`_hasSlot${slotFieldSuffix(prop.name)}`),
-              t.binaryExpression(
-                '!==',
-                thisDot(prop.name),
-                t.identifier('undefined'),
-              ),
+              t.binaryExpression('!==', thisDot(prop.name), t.identifier('undefined')),
             ),
           );
           path.skip();
@@ -751,9 +734,7 @@ export function rewriteScript(
           const params = (parentPath.node as { params: t.Node[] }).params;
           if (params.includes(path.node)) return;
         }
-        path.replaceWith(
-          t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')),
-        );
+        path.replaceWith(t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')));
         // Don't path.skip() — the synthesised MemberExpression should be
         // re-visited so the `$refs.__rozieRoot` handler fires.
         return;
@@ -763,12 +744,7 @@ export function rewriteScript(
       // reference by its normalized field name (a non-reserved name is unchanged),
       // and emit `this.<field>` below via `emitField`.
       const emitField = classFieldNameFor(name);
-      if (
-        !computedNames.has(name) &&
-        !methodNames.has(name) &&
-        !methodNames.has(emitField)
-      )
-        return;
+      if (!computedNames.has(name) && !methodNames.has(name) && !methodNames.has(emitField)) return;
 
       const parentPath = path.parentPath;
       if (!parentPath) return;
@@ -788,7 +764,8 @@ export function rewriteScript(
         (parentPath.isLabeledStatement() && parentPath.node.label === path.node) ||
         (parentPath.isBreakStatement() && parentPath.node.label === path.node) ||
         (parentPath.isContinueStatement() && parentPath.node.label === path.node)
-      ) return;
+      )
+        return;
 
       // Skip import/export specifier NAME slots — `imported`/`local`/`exported`
       // are module-binding names, never value references. An aliased import whose
@@ -803,7 +780,8 @@ export function rewriteScript(
         parentPath.isImportDefaultSpecifier() ||
         parentPath.isImportNamespaceSpecifier() ||
         parentPath.isExportSpecifier()
-      ) return;
+      )
+        return;
 
       // Skip property keys + member-expression property references.
       // OptionalMemberExpression (`obj?.X`) has the same shape — guard both,
@@ -811,9 +789,11 @@ export function rewriteScript(
       // get incorrectly rewritten and the AST validator throws.
       if (
         (parentPath.isMemberExpression() || parentPath.isOptionalMemberExpression()) &&
-        (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property === path.node &&
+        (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property ===
+          path.node &&
         !(parentPath.node as t.MemberExpression | t.OptionalMemberExpression).computed
-      ) return;
+      )
+        return;
 
       // ObjectProperty key positions:
       //   - non-shorthand `{ X: expr }` → the key is just a property name,
@@ -853,7 +833,8 @@ export function rewriteScript(
         (parentPath.isObjectMethod() || parentPath.isClassMethod()) &&
         parentPath.node.key === path.node &&
         !parentPath.node.computed
-      ) return;
+      )
+        return;
 
       // Skip function parameters that ARE a bare Identifier (e.g.
       // `(editor) => …`). Destructured params (`({ editor }) => …`) are
@@ -894,9 +875,7 @@ export function rewriteScript(
         const mkPrev = (): t.Expression => thisSignalRead(arrayMut.key);
         const value = immutableArrayValue(mkPrev, arrayMut.method, arrayMut.args);
         if (value !== null) {
-          path.replaceWith(
-            t.assignmentExpression('=', thisSignalRead(arrayMut.key), value),
-          );
+          path.replaceWith(t.assignmentExpression('=', thisSignalRead(arrayMut.key), value));
           return;
         }
       }
@@ -929,9 +908,7 @@ export function rewriteScript(
         if (args.length === 1) {
           const arg = args[0]!;
           if (t.isExpression(arg)) {
-            path.replaceWith(
-              t.callExpression(t.identifier('structuredClone'), [arg]),
-            );
+            path.replaceWith(t.callExpression(t.identifier('structuredClone'), [arg]));
           }
         }
         return;
@@ -959,9 +936,7 @@ export function rewriteScript(
       // time, so the in-source DOM-restore dance suffices).
       if (callee.name === '$reconcileAfterDomMutation') {
         path.replaceWith(
-          t.callExpression(t.identifier('__rozieReconcileAfterDomMutation'), [
-            t.thisExpression(),
-          ]),
+          t.callExpression(t.identifier('__rozieReconcileAfterDomMutation'), [t.thisExpression()]),
         );
         opts.runtime?.add('__rozieReconcileAfterDomMutation');
         return;
@@ -987,10 +962,7 @@ export function rewriteScript(
         const indexedAccess = t.optionalMemberExpression(
           t.callExpression(
             t.memberExpression(
-              t.memberExpression(
-                t.thisExpression(),
-                t.identifier('renderRoot'),
-              ),
+              t.memberExpression(t.thisExpression(), t.identifier('renderRoot')),
               t.identifier('querySelectorAll'),
             ),
             [selArg],
@@ -1001,10 +973,7 @@ export function rewriteScript(
         );
         const asHtmlElement = t.tsAsExpression(
           indexedAccess,
-          t.tsUnionType([
-            t.tsTypeReference(t.identifier('HTMLElement')),
-            t.tsUndefinedKeyword(),
-          ]),
+          t.tsUnionType([t.tsTypeReference(t.identifier('HTMLElement')), t.tsUndefinedKeyword()]),
         );
         const focusCall = t.optionalCallExpression(
           t.optionalMemberExpression(
@@ -1017,9 +986,7 @@ export function rewriteScript(
           /* optional */ true,
         );
         const arrow = t.arrowFunctionExpression([], focusCall);
-        path.replaceWith(
-          t.callExpression(t.identifier('queueMicrotask'), [arrow]),
-        );
+        path.replaceWith(t.callExpression(t.identifier('queueMicrotask'), [arrow]));
         return;
       }
 
@@ -1033,9 +1000,8 @@ export function rewriteScript(
         // camelCase dispatch. See emit-multiword-kebab.test.ts.
         const eventName = kebabize(firstArg.value);
         const restArgs = args.slice(1);
-        const detail = restArgs.length === 0
-          ? t.identifier('undefined')
-          : (restArgs[0] as t.Expression);
+        const detail =
+          restArgs.length === 0 ? t.identifier('undefined') : (restArgs[0] as t.Expression);
         // new CustomEvent('name', { detail, bubbles: true, composed: true })
         const customEvent = t.newExpression(t.identifier('CustomEvent'), [
           t.stringLiteral(eventName),
@@ -1046,10 +1012,9 @@ export function rewriteScript(
           ]),
         ]);
         path.replaceWith(
-          t.callExpression(
-            t.memberExpression(t.thisExpression(), t.identifier('dispatchEvent')),
-            [customEvent],
-          ),
+          t.callExpression(t.memberExpression(t.thisExpression(), t.identifier('dispatchEvent')), [
+            customEvent,
+          ]),
         );
         return;
       }
@@ -1074,13 +1039,13 @@ export function rewriteScript(
  * newlines for inline template embedding.
  */
 export function renderExpression(expr: Expression): string {
-  return generate(expr, GEN_OPTS).code.replace(/\s*\n\s*/g, ' ').trim();
+  return generate(expr, GEN_OPTS)
+    .code.replace(/\s*\n\s*/g, ' ')
+    .trim();
 }
 
 /** Render a statement (or array of statements) as a multi-line string. */
 export function renderStatements(stmts: Statement[]): string {
   if (stmts.length === 0) return '';
-  return stmts
-    .map((s) => generate(s, GEN_OPTS).code)
-    .join('\n');
+  return stmts.map((s) => generate(s, GEN_OPTS).code).join('\n');
 }

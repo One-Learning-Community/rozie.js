@@ -38,26 +38,26 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _traverse from '@babel/traverse';
+
 import _generate from '@babel/generator';
+import _traverse from '@babel/traverse';
 import type { File } from '@babel/types';
-import type { IRComponent, TemplateNode } from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import * as t from '@babel/types';
+import type { Diagnostic, IRComponent, IRTemplateNode as TemplateNode } from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
 
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 /**
  * OQ-2 (Phase 09 Plan 03) — resolve the TS type argument for a hoisted
@@ -114,10 +114,7 @@ export interface HoistResult {
 }
 
 /** Walk a function/arrow body and collect identifier references matching a name set. */
-function collectIdentifierRefs(
-  bodyNode: t.Node,
-  candidateNames: ReadonlySet<string>,
-): Set<string> {
+function collectIdentifierRefs(bodyNode: t.Node, candidateNames: ReadonlySet<string>): Set<string> {
   const found = new Set<string>();
   // The walker needs a Program-rooted path. BlockStatements lift directly
   // into the Program; a Statement node (e.g. a top-level `function X() {}`
@@ -291,10 +288,7 @@ export interface ModuleLetReachability {
  * without a direct `$refs.X` read, because it WILL be hoisted to its own
  * `useRef` regardless).
  */
-function analyzeModuleLetReachability(
-  program: File,
-  ir: IRComponent,
-): ModuleLetReachability {
+function analyzeModuleLetReachability(program: File, ir: IRComponent): ModuleLetReachability {
   // 1. Collect module-let candidates: top-level VariableDeclaration with kind === 'let'.
   const moduleLets = new Map<string, LetCandidate>();
   program.program.body.forEach((stmt, idx) => {
@@ -503,10 +497,7 @@ function analyzeModuleLetReachability(
  * `$refs.chart`, but still hoisted because it's referenced from a lifecycle
  * hook).
  */
-export function getHoistableModuleLetNames(
-  program: File,
-  ir: IRComponent,
-): Set<string> {
+export function getHoistableModuleLetNames(program: File, ir: IRComponent): Set<string> {
   return analyzeModuleLetReachability(program, ir).referencedLets;
 }
 
@@ -554,9 +545,7 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
 
   // Remove single-declarator let statements by index (descending for safety).
   if (indicesToRemove.size > 0) {
-    program.program.body = program.program.body.filter(
-      (_, i) => !indicesToRemove.has(i),
-    );
+    program.program.body = program.program.body.filter((_, i) => !indicesToRemove.has(i));
   }
 
   // 5. Walk again and rewrite all Identifier references to hoisted names
@@ -657,9 +646,7 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
         if (hasShadowingBinding(path, path.node.name)) return;
 
         // Replace `X` → `X.current`.
-        path.replaceWith(
-          t.memberExpression(t.identifier(path.node.name), t.identifier('current')),
-        );
+        path.replaceWith(t.memberExpression(t.identifier(path.node.name), t.identifier('current')));
         path.skip();
       },
     });
@@ -680,9 +667,20 @@ function isAncestorVia(ancestor: t.Node, key: 'left' | 'right', target: t.Node):
   let found = false;
   function walk(n: t.Node | null | undefined): void {
     if (!n || found) return;
-    if (n === target) { found = true; return; }
+    if (n === target) {
+      found = true;
+      return;
+    }
     for (const k of Object.keys(n)) {
-      if (k === 'loc' || k === 'start' || k === 'end' || k === 'leadingComments' || k === 'trailingComments' || k === 'innerComments') continue;
+      if (
+        k === 'loc' ||
+        k === 'start' ||
+        k === 'end' ||
+        k === 'leadingComments' ||
+        k === 'trailingComments' ||
+        k === 'innerComments'
+      )
+        continue;
       const v = (n as unknown as Record<string, unknown>)[k];
       if (Array.isArray(v)) {
         for (const item of v) {

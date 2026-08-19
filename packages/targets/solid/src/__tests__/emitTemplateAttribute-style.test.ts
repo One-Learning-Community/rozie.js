@@ -7,18 +7,17 @@
  *   - dynamic-string `:style` → `style={parseInlineStyle(<expr>)}` + import
  *   - object-form `:style` → unchanged (260518-e2t passthrough, no regression)
  */
-import { describe, it, expect } from 'vitest';
+
 import { parseExpression } from '@babel/parser';
-import * as t from '@babel/types';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, AttributeBinding } from '../../../../core/src/ir/types.js';
+import type * as t from '@babel/types';
+import type { AttributeBinding, IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { type EmitAttrCtx, emitAttributes } from '../emit/emitTemplateAttribute.js';
 import {
-  SolidImportCollector,
   RuntimeSolidImportCollector,
+  SolidImportCollector,
 } from '../rewrite/collectSolidImports.js';
-import { emitAttributes, type EmitAttrCtx } from '../emit/emitTemplateAttribute.js';
 
 function emptyIR(): IRComponent {
   const src = `<rozie name="Test">
@@ -103,10 +102,7 @@ describe('emitTemplateAttribute (Solid) — string-form `:style` (Plan 260520-8i
   it('string LITERAL with `!important` → object form AND a ROZ083 WARN', () => {
     const ir = emptyIR();
     const ctx = freshCtx(ir);
-    const { jsx, diagnostics } = emitAttributes(
-      [styleBinding(`'color: red !important'`)],
-      ctx,
-    );
+    const { jsx, diagnostics } = emitAttributes([styleBinding(`'color: red !important'`)], ctx);
     expect(jsx).toContain('style={{');
     expect(jsx).toContain('color:');
     expect(diagnostics).toHaveLength(1);
@@ -142,9 +138,7 @@ describe('emitTemplateAttribute (Solid) — string-form `:style` (Plan 260520-8i
     // `'a {'` is an unclosed CSS block — `postcss.parse` throws on it. Pre-fix
     // that raw exception aborted the whole compile; now it is caught and
     // surfaced as a ROZ080 with an empty-style-object fallback.
-    expect(() =>
-      emitAttributes([styleBinding(`'a {'`)], freshCtx(ir)),
-    ).not.toThrow();
+    expect(() => emitAttributes([styleBinding(`'a {'`)], freshCtx(ir))).not.toThrow();
     const { jsx, diagnostics } = emitAttributes([styleBinding(`'a {'`)], freshCtx(ir));
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('ROZ080');

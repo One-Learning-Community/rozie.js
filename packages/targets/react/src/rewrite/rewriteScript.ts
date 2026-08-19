@@ -28,31 +28,30 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _traverse from '@babel/traverse';
+
 import type { NodePath } from '@babel/traverse';
+import _traverse from '@babel/traverse';
 import type { File } from '@babel/types';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { Diagnostic, IRComponent } from '@rozie/core';
+import { isInTypePosition, RozieErrorCode } from '@rozie/core';
 import { portalKey } from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import {
-  deconflictGeneratedSymbols,
-  subtreeReads,
   DECONFLICT_SUFFIX,
+  deconflictGeneratedSymbols,
   type GeneratedSymbolGroup,
+  subtreeReads,
 } from '../../../../core/src/rewrite/deconflict.js';
+import { getHoistableModuleLetNames } from './hoistModuleLet.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import { reactGeneratedBindingNames } from './reactGeneratedNames.js';
-import { getHoistableModuleLetNames } from './hoistModuleLet.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 /**
  * Decide whether a `$refs.X` / `$el` access should lower to a non-null
@@ -107,11 +106,7 @@ function refLowersToNonNull(
       p = p.parentPath;
       continue;
     }
-    if (
-      t.isObjectExpression(n) ||
-      t.isArrayExpression(n) ||
-      t.isSpreadElement(n)
-    ) {
+    if (t.isObjectExpression(n) || t.isArrayExpression(n) || t.isSpreadElement(n)) {
       child = n;
       p = p.parentPath;
       continue;
@@ -131,9 +126,7 @@ function toReactEventPropName(eventName: string): string {
   // Hyphen / underscore split + camelCase + 'on' prefix.
   const parts = eventName.split(/[-_]/).filter(Boolean);
   if (parts.length === 0) return 'on';
-  const camel = parts
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-    .join('');
+  const camel = parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
   return 'on' + camel;
 }
 
@@ -180,12 +173,7 @@ function exprReadsAccessor(
         if (path.node.computed) return;
         const o = path.node.object;
         const pr = path.node.property;
-        if (
-          t.isIdentifier(o) &&
-          o.name === accessor &&
-          t.isIdentifier(pr) &&
-          pr.name === name
-        ) {
+        if (t.isIdentifier(o) && o.name === accessor && t.isIdentifier(pr) && pr.name === name) {
           found = true;
           path.stop();
         }
@@ -194,12 +182,7 @@ function exprReadsAccessor(
         if (path.node.computed) return;
         const o = path.node.object;
         const pr = path.node.property;
-        if (
-          t.isIdentifier(o) &&
-          o.name === accessor &&
-          t.isIdentifier(pr) &&
-          pr.name === name
-        ) {
+        if (t.isIdentifier(o) && o.name === accessor && t.isIdentifier(pr) && pr.name === name) {
           found = true;
           path.stop();
         }
@@ -234,12 +217,7 @@ function rewriteSelfReadsToParam(
         if (path.node.computed) return;
         const o = path.node.object;
         const pr = path.node.property;
-        if (
-          t.isIdentifier(o) &&
-          o.name === accessor &&
-          t.isIdentifier(pr) &&
-          pr.name === name
-        ) {
+        if (t.isIdentifier(o) && o.name === accessor && t.isIdentifier(pr) && pr.name === name) {
           path.replaceWith(t.identifier(paramName));
           path.skip();
         }
@@ -248,12 +226,7 @@ function rewriteSelfReadsToParam(
         if (path.node.computed) return;
         const o = path.node.object;
         const pr = path.node.property;
-        if (
-          t.isIdentifier(o) &&
-          o.name === accessor &&
-          t.isIdentifier(pr) &&
-          pr.name === name
-        ) {
+        if (t.isIdentifier(o) && o.name === accessor && t.isIdentifier(pr) && pr.name === name) {
           path.replaceWith(t.identifier(paramName));
           path.skip();
         }
@@ -431,12 +404,7 @@ function inlineDerivedLocalDataWrites(
         if (!t.isIdentifier(obj) || obj.name !== '$data') return;
         if (!t.isIdentifier(prop) || !dataNames.has(prop.name)) return;
 
-        const inlinable = resolveInlinableDerivedLocal(
-          path,
-          node.right,
-          prop.name,
-          modelProps,
-        );
+        const inlinable = resolveInlinableDerivedLocal(path, node.right, prop.name, modelProps);
         if (!inlinable) return;
 
         // Clone the un-lowered initializer (still contains `$data.<key>`) BEFORE
@@ -564,10 +532,7 @@ function normalizeModelAccessor(program: File): void {
  * valid, and `getHoistableModuleLetNames` needs the pre-hoist shape).
  * Mutates `program` in place.
  */
-export function deconflictDeclareThenAssignRef(
-  program: File,
-  ir: IRComponent,
-): void {
+export function deconflictDeclareThenAssignRef(program: File, ir: IRComponent): void {
   const refNames = new Set(ir.refs.map((r) => r.name));
   if (refNames.size === 0) return;
 
@@ -593,10 +558,7 @@ export function deconflictDeclareThenAssignRef(
       // the program (signal 1) OR that this let is independently reachable
       // from a hook/watcher/$expose/template-called helper — i.e. would be
       // hoisted regardless (signal 2, Phase 73 item #9).
-      if (
-        subtreeReads(program.program, '$refs', name) ||
-        hoistableLetNames.has(name)
-      ) {
+      if (subtreeReads(program.program, '$refs', name) || hoistableLetNames.has(name)) {
         targets.add(name);
       }
     }
@@ -717,9 +679,7 @@ function immutableArrayValue(
         t.spreadElement(slice(t.numericLiteral(0), t.cloneNode(start, true))),
         ...items,
         t.spreadElement(
-          slice(
-            t.binaryExpression('+', t.cloneNode(start, true), t.cloneNode(deleteCount, true)),
-          ),
+          slice(t.binaryExpression('+', t.cloneNode(start, true), t.cloneNode(deleteCount, true))),
         ),
       ]);
     }
@@ -742,7 +702,10 @@ function immutableArrayValue(
 function detectCoveredNestedAssign(
   path: NodePath<t.AssignmentExpression>,
   dataNames: ReadonlySet<string>,
-): { kind: 'member'; key: string; field: string } | { kind: 'index'; key: string; index: t.Expression } | null {
+):
+  | { kind: 'member'; key: string; field: string }
+  | { kind: 'index'; key: string; index: t.Expression }
+  | null {
   const node = path.node;
   if (node.operator !== '=') return null;
   if (!path.parentPath?.isExpressionStatement()) return null;
@@ -803,10 +766,7 @@ function detectCoveredArrayMutation(
  * `node.right` of a setter-replaced AssignmentExpression still gets walked
  * so `$props.step` references inside it are rewritten to `props.step`).
  */
-export function rewriteRozieIdentifiers(
-  program: File,
-  ir: IRComponent,
-): RewriteScriptResult {
+export function rewriteRozieIdentifiers(program: File, ir: IRComponent): RewriteScriptResult {
   const diagnostics: Diagnostic[] = [];
 
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
@@ -996,12 +956,7 @@ export function rewriteRozieIdentifiers(
 
       if (obj.name === '$data') {
         if (!dataNames.has(prop.name)) return;
-        const setterCall = buildSetterCall(
-          prop.name,
-          node.operator,
-          node.right,
-          '$data',
-        );
+        const setterCall = buildSetterCall(prop.name, node.operator, node.right, '$data');
         path.replaceWith(setterCall);
         // No path.skip() — let traversal descend into the new arrow body so
         // `$props.step` references inside `prev + $props.step` get rewritten,
@@ -1013,12 +968,7 @@ export function rewriteRozieIdentifiers(
 
       if (obj.name === '$props') {
         if (!modelProps.has(prop.name)) return;
-        const setterCall = buildSetterCall(
-          prop.name,
-          node.operator,
-          node.right,
-          '$props',
-        );
+        const setterCall = buildSetterCall(prop.name, node.operator, node.right, '$props');
         path.replaceWith(setterCall);
         return;
       }
@@ -1105,9 +1055,7 @@ export function rewriteRozieIdentifiers(
         const params = (parentPath.node as { params: t.Node[] }).params;
         if (params.includes(path.node)) return;
       }
-      path.replaceWith(
-        t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')),
-      );
+      path.replaceWith(t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')));
       // Do NOT path.skip() — let the visitor re-visit the synthesised
       // MemberExpression so the `$refs.X` handler downstream lowers it to
       // the target-native ref.
@@ -1164,9 +1112,7 @@ export function rewriteRozieIdentifiers(
         // 260520-w18 bug class 1. See refLowersToNonNull's doc comment.
         if (refLowersToNonNull(path)) {
           path.replaceWith(
-            t.tsNonNullExpression(
-              t.memberExpression(newObj, t.identifier('current')),
-            ),
+            t.tsNonNullExpression(t.memberExpression(newObj, t.identifier('current'))),
           );
           return;
         }
@@ -1262,9 +1208,7 @@ export function rewriteRozieIdentifiers(
         // mirrors the MemberExpression branch above for `$refs.foo?.bar`.
         if (refLowersToNonNull(path)) {
           path.replaceWith(
-            t.tsNonNullExpression(
-              t.memberExpression(newObj, t.identifier('current')),
-            ),
+            t.tsNonNullExpression(t.memberExpression(newObj, t.identifier('current'))),
           );
           return;
         }
@@ -1290,10 +1234,9 @@ export function rewriteRozieIdentifiers(
         const mkPrev = (): t.Expression => t.identifier('prev');
         const value = immutableArrayValue(mkPrev, arrayMut.method, arrayMut.args);
         if (value !== null) {
-          const setterCall = t.callExpression(
-            t.identifier('set' + capitalize(arrayMut.key)),
-            [t.arrowFunctionExpression([t.identifier('prev')], value)],
-          );
+          const setterCall = t.callExpression(t.identifier('set' + capitalize(arrayMut.key)), [
+            t.arrowFunctionExpression([t.identifier('prev')], value),
+          ]);
           path.replaceWith(setterCall);
           return;
         }
@@ -1371,9 +1314,7 @@ export function rewriteRozieIdentifiers(
       const eventName = firstArg.value;
       const propName = toReactEventPropName(eventName);
       // Filter out JSXNamespacedName which can never appear here (TS narrowing).
-      const restArgs = args
-        .slice(1)
-        .filter((a) => !t.isJSXNamespacedName(a)) as Array<
+      const restArgs = args.slice(1).filter((a) => !t.isJSXNamespacedName(a)) as Array<
         t.Expression | t.SpreadElement | t.ArgumentPlaceholder
       >;
       // Plan 04-04 lint-clean fix — `props.onClose?.()` (OptionalCallExpression
@@ -1383,10 +1324,7 @@ export function rewriteRozieIdentifiers(
       // match, so the lint rule warns "missing dependency: props". Workaround:
       // emit a logical-AND guard `props.onClose && props.onClose(...)` which
       // uses MemberExpression on both sides — matches deps[] entry exactly.
-      const memberExpr = t.memberExpression(
-        t.identifier('props'),
-        t.identifier(propName),
-      );
+      const memberExpr = t.memberExpression(t.identifier('props'), t.identifier(propName));
       const replacement = t.logicalExpression(
         '&&',
         memberExpr,

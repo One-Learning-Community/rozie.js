@@ -30,13 +30,13 @@
  */
 import * as t from '@babel/types';
 import type {
-  IRComponent,
   AttributeBinding,
+  Diagnostic,
+  IRComponent,
   ListenerSpreadIR,
-} from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import type { ModifierRegistry } from '@rozie/core';
+  ModifierRegistry,
+} from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import type { ScriptInjection } from './emitTemplateEvent.js';
 
@@ -270,11 +270,7 @@ function isProvablyNonNullishAttr(expr: t.Expression): boolean {
  * with no native Vue equivalent — its presence forces the whole `r-model`
  * attribute to be hand-emitted (`:value` + `@input`/`@change`).
  */
-const VUE_NATIVE_MODEL_MODIFIERS: ReadonlySet<string> = new Set([
-  'lazy',
-  'number',
-  'trim',
-]);
+const VUE_NATIVE_MODEL_MODIFIERS: ReadonlySet<string> = new Set(['lazy', 'number', 'trim']);
 
 /**
  * Phase 12 — partition a resolved `r-model` modifier list into the pieces the
@@ -321,10 +317,7 @@ function partitionVueModelModifiers(
  * a later iteration. `$` is a JS identifier character, so the lookbehind
  * excludes both `\w` and `$` and the lookahead excludes `\w`.
  */
-function substituteValuePlaceholder(
-  fragment: string,
-  replacement: string,
-): string {
+function substituteValuePlaceholder(fragment: string, replacement: string): string {
   return fragment.replace(/(?<![\w$])\$v(?!\w)/g, `(${replacement})`);
 }
 
@@ -334,10 +327,7 @@ function substituteValuePlaceholder(
  * substitute `$v` with the current expression text and chain. Empty list ⇒ the
  * input string is returned unchanged.
  */
-function applyValueTransformsString(
-  valueAccess: string,
-  valueTransforms: string[],
-): string {
+function applyValueTransformsString(valueAccess: string, valueTransforms: string[]): string {
   let current = valueAccess;
   for (const fragment of valueTransforms) {
     current = substituteValuePlaceholder(fragment, current);
@@ -352,7 +342,9 @@ function applyValueTransformsString(
 function staticSegmentLiteral(text: string): string {
   // Escape backticks/single-quotes as needed; safest approach: JSON.stringify
   // gives a double-quoted JS literal. We use single quotes for visual clarity.
-  return JSON.stringify(text).replace(/^"(.*)"$/, "'$1'").replace(/\\"/g, '"');
+  return JSON.stringify(text)
+    .replace(/^"(.*)"$/, "'$1'")
+    .replace(/\\"/g, '"');
 }
 
 /**
@@ -368,8 +360,7 @@ function staticSegmentLiteral(text: string): string {
  */
 function renderInterpolatedTemplateLiteralSafe(
   segments: Array<
-    | { kind: 'static'; text: string }
-    | { kind: 'binding'; expression: t.Expression; deps: unknown }
+    { kind: 'static'; text: string } | { kind: 'binding'; expression: t.Expression; deps: unknown }
   >,
   ir: IRComponent,
 ): string {
@@ -377,10 +368,7 @@ function renderInterpolatedTemplateLiteralSafe(
   for (const seg of segments) {
     if (seg.kind === 'static') {
       // Escape backslash, backtick, and `${` sequences in static text.
-      out += seg.text
-        .replace(/\\/g, '\\\\')
-        .replace(/`/g, '\\`')
-        .replace(/\$\{/g, '\\${');
+      out += seg.text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
     } else {
       out += '${' + rewriteTemplateExpression(seg.expression, ir) + '}';
     }
@@ -488,9 +476,7 @@ function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
     // binding has kind='binding', not kind='spreadBinding', so a real
     // `spreadBinding` never lands here. Unreachable — mirrors the
     // `twoWayBinding` guard above.
-    throw new Error(
-      `Vue target: spreadBinding not valid in class/style array context (Phase 14).`,
-    );
+    throw new Error(`Vue target: spreadBinding not valid in class/style array context (Phase 14).`);
   }
   // interpolated
   return '`' + renderInterpolatedTemplateLiteralSafe(attr.segments, ir) + '`';
@@ -525,10 +511,7 @@ function emitSpread(
    *  class/style is extracted upstream — emit only the `rest`. */
   hasExplicitClassOrStyle: boolean,
 ): string {
-  if (
-    hasExplicitClassOrStyle &&
-    t.isObjectExpression(attr.expression)
-  ) {
+  if (hasExplicitClassOrStyle && t.isObjectExpression(attr.expression)) {
     // R6 — LITERAL spread with class/style extracted into the merge path; only
     // spread the remaining keys.
     const { rest } = splitClassStyleFromVueLiteral(attr.expression);
@@ -584,7 +567,12 @@ function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string {
   }
 
   // Special r-model directive (Phase 2 lowerer keeps it as binding name=`r-model`).
-  const name = attr.kind !== 'static' && attr.name === 'r-model' ? 'v-model' : attr.kind === 'static' ? attr.name : attr.name;
+  const name =
+    attr.kind !== 'static' && attr.name === 'r-model'
+      ? 'v-model'
+      : attr.kind === 'static'
+        ? attr.name
+        : attr.name;
 
   if (attr.kind === 'static') {
     // r-* directives in static form would not appear; pass through.
@@ -614,14 +602,14 @@ function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string {
     if (attr.name === 'r-model') {
       const expr = rewriteTemplateExpression(attr.expression, ir);
       // Phase 12 — the resolved `r-model` modifier chain.
-      const { nativeSuffixes, valueTransforms, isLazy, hasCustom } =
-        partitionVueModelModifiers(attr.modifiers);
+      const { nativeSuffixes, valueTransforms, isLazy, hasCustom } = partitionVueModelModifiers(
+        attr.modifiers,
+      );
       if (!hasCustom) {
         // No custom modifier — every modifier (if any) is a Vue native
         // built-in. Append them as `.`-separated `v-model` suffixes. Bare
         // `r-model` (empty list) stays exactly `v-model="${expr}"`.
-        const suffix =
-          nativeSuffixes.length > 0 ? `.${nativeSuffixes.join('.')}` : '';
+        const suffix = nativeSuffixes.length > 0 ? `.${nativeSuffixes.join('.')}` : '';
         return `v-model${suffix}="${expr}"`;
       }
       // A custom model modifier is present — Vue has no native equivalent, so
@@ -650,10 +638,7 @@ function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string {
           hint: 'Use a custom r-model modifier on an <input>, or coerce the value inside the bound state instead.',
         });
       }
-      const committedValue = applyValueTransformsString(
-        '$event.target.value',
-        valueTransforms,
-      );
+      const committedValue = applyValueTransformsString('$event.target.value', valueTransforms);
       const eventName = isLazy ? 'change' : 'input';
       return `:value="${expr}" @${eventName}="${expr} = ${committedValue}"`;
     }
@@ -670,10 +655,7 @@ function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string {
     // wrap calls/general-members/identifiers). Wrap as `(expr) ?? undefined`
     // unless the shape is provably-non-nullish (TS2869 guard). Parenthesize so a
     // top-level `||`/`&&` adjacent to `??` stays well-formed.
-    if (
-      NULLABLE_DOM_ATTR_SLOTS.has(name.toLowerCase()) &&
-      !isProvablyNonNullishAttr(normalized)
-    ) {
+    if (NULLABLE_DOM_ATTR_SLOTS.has(name.toLowerCase()) && !isProvablyNonNullishAttr(normalized)) {
       return `:${name}="(${expr}) ?? undefined"`;
     }
     return `:${name}="${expr}"`;
@@ -734,10 +716,7 @@ function isListenersIdentifier(expr: t.Expression): boolean {
  * automatically (Vue divergence from React/Solid; no runtime `mergeListeners`
  * helper for Vue).
  */
-export function emitListenerSpread(
-  spread: ListenerSpreadIR,
-  ctx: EmitAttrCtx,
-): string {
+export function emitListenerSpread(spread: ListenerSpreadIR, ctx: EmitAttrCtx): string {
   if (isListenersIdentifier(spread.expression)) {
     // D-19 — bare $listeners; Vue 3 folds listeners into $attrs (no
     // separate $listeners instance property). The attribute-side
@@ -797,10 +776,7 @@ function emitClassOrStyleArrayMerge(
  * order in the output where possible; class/style merges are emitted in the
  * position of the FIRST class/style attr in the source.
  */
-export function emitMergedAttributes(
-  attrs: AttributeBinding[],
-  ctx: EmitAttrCtx,
-): string {
+export function emitMergedAttributes(attrs: AttributeBinding[], ctx: EmitAttrCtx): string {
   if (attrs.length === 0) return '';
 
   const buckets = bucket(attrs);
@@ -905,9 +881,7 @@ export function emitMergedAttributes(
  * (emitTemplateAttribute.ts:965-975); the returned `{ expression }` shape is
  * what the Vue emit branch consumes.
  */
-export function findRHtml(
-  attrs: AttributeBinding[],
-): { expression: t.Expression } | null {
+export function findRHtml(attrs: AttributeBinding[]): { expression: t.Expression } | null {
   for (const a of attrs) {
     // Phase 14 — `spreadBinding` is the name-less kind; skip before `.name`.
     if (a.kind === 'spreadBinding') continue;

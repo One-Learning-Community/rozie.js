@@ -30,10 +30,10 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { SlotDecl } from '../../../../core/src/ir/types.js';
+import type { SlotDecl } from '@rozie/core';
+import { renderRecordKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
-import { renderRecordKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 
 // WR-05 fix (79-REVIEW-FIX): re-export so existing `import { renderRecordKey }
 // from './refineSlotTypes.js'` call sites (emitSlotFiller.ts,
@@ -131,7 +131,6 @@ export function isRecordOnlySlotDecl(slot: SlotDecl): boolean {
 export function hasKeyedFillIntake(slots: SlotDecl[]): boolean {
   return slots.length > 0;
 }
-
 
 /**
  * Build the per-slot interface + @ContentChild field declarations.

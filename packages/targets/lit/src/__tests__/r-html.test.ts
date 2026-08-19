@@ -5,11 +5,9 @@
 // `unsafeHtmlUsed` flag), and the `r-html` attribute is stripped from the open
 // tag so no literal `r-html=` leaks (Pitfall 2). An r-html element with
 // children raises ROZ833 (severity error).
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+
+import { createDefaultRegistry, lowerToIR, parse, RozieErrorCode } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 function compileLit(source: string): {
@@ -84,9 +82,7 @@ describe('Lit r-html → unsafeHTML element content (Phase 24 req 2)', () => {
 
   it('Test 2: the module imports unsafeHTML from lit/directives/unsafe-html.js', () => {
     const { code } = compileLit(RHTML_SOURCE);
-    expect(code).toContain(
-      "import { unsafeHTML } from 'lit/directives/unsafe-html.js';",
-    );
+    expect(code).toContain("import { unsafeHTML } from 'lit/directives/unsafe-html.js';");
   });
 
   it('Test 3: no literal r-html= survives in the output (stripped from the open tag — Pitfall 2)', () => {
@@ -96,9 +92,7 @@ describe('Lit r-html → unsafeHTML element content (Phase 24 req 2)', () => {
 
   it('Test 4: r-html with children pushes ROZ833, severity error', () => {
     const { diagnostics } = compileLit(RHTML_WITH_CHILDREN_SOURCE);
-    const diag = diagnostics.find(
-      (d) => d.code === RozieErrorCode.TARGET_LIT_RHTML_WITH_CHILDREN,
-    );
+    const diag = diagnostics.find((d) => d.code === RozieErrorCode.TARGET_LIT_RHTML_WITH_CHILDREN);
     expect(diag).toBeDefined();
     expect(diag!.severity).toBe('error');
   });

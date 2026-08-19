@@ -13,16 +13,14 @@
 //
 // The static CVA class shape (methods/members/decorator) is Plan 02 — covered
 // by cva-emit.test.ts.
-import { describe, expect, it } from 'vitest';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+
 import { readFileSync } from 'node:fs';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { emitAngular, type EmitAngularOptions } from '../emitAngular.js';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { Diagnostic, IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { type EmitAngularOptions, emitAngular } from '../emitAngular.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CVA_FIXTURES = resolve(__dirname, 'cva-fixtures');
@@ -91,9 +89,7 @@ describe('emitAngular CVA — Task 1: __rozieCvaOnChange at write sites', () => 
   it('emits a SequenceExpression for an expression-context model write', () => {
     // ok ? ($model.value = v) : null
     //   → ok ? (this.value.set(v), this.__rozieCvaOnChange(v)) : null
-    expect(code).toMatch(
-      /\(this\.value\.set\(v\),\s*this\.__rozieCvaOnChange\(v\)\)/,
-    );
+    expect(code).toMatch(/\(this\.value\.set\(v\),\s*this\.__rozieCvaOnChange\(v\)\)/);
   });
 
   it('injects __rozieCvaOnChange at the template handler write site', () => {
@@ -110,10 +106,7 @@ describe('emitAngular CVA — Task 1: __rozieCvaOnChange at write sites', () => 
 
 describe('emitAngular CVA — Task 1: non-CVA components are untouched', () => {
   it('a multi-model component never injects __rozieCvaOnChange', () => {
-    const { code } = compileAngular(
-      fixture('MultiModelProbe'),
-      'MultiModelProbe.rozie',
-    );
+    const { code } = compileAngular(fixture('MultiModelProbe'), 'MultiModelProbe.rozie');
     expect(code).not.toContain('__rozieCvaOnChange');
   });
 
@@ -178,9 +171,7 @@ describe('emitAngular CVA — CR-01: view→model bridge on the two-way r-model 
     // (valueChange)="value.set($event); __rozieCvaOnChange($event)"
     expect(code).toContain('value.set($event)');
     expect(code).toContain('__rozieCvaOnChange($event)');
-    expect(code).toMatch(
-      /\(valueChange\)="value\.set\(\$event\); __rozieCvaOnChange\(\$event\)"/,
-    );
+    expect(code).toMatch(/\(valueChange\)="value\.set\(\$event\); __rozieCvaOnChange\(\$event\)"/);
   });
 
   it('consumer-side r-model:value= on the CVA prop emits NO notify under cva:false', () => {
@@ -303,9 +294,7 @@ $onMount(seed)
       /ngAfterViewInit[\s\S]*this\.disabled\(\)\s*\|\|\s*this\.__rozieCvaDisabled\(\)/,
     );
     // The seed write also bridges to the form.
-    expect(seedCode).toContain(
-      "this.value.set('seeded'), this.__rozieCvaOnChange('seeded')",
-    );
+    expect(seedCode).toContain("this.value.set('seeded'), this.__rozieCvaOnChange('seeded')");
   });
 });
 
@@ -338,11 +327,9 @@ describe('emitAngular CVA — Task 3: ROZ125 multi-model info', () => {
   // blames the model count for the missing accessor) is misleading and must NOT
   // fire; the model count is no longer the reason no CVA exists.
   it('a ≥2-model component with cva:false fires NO ROZ125', () => {
-    const { diagnostics } = compileAngular(
-      fixture('MultiModelProbe'),
-      'MultiModelProbe.rozie',
-      { cva: false },
-    );
+    const { diagnostics } = compileAngular(fixture('MultiModelProbe'), 'MultiModelProbe.rozie', {
+      cva: false,
+    });
     expect(diagnostics.filter((d) => d.code === 'ROZ125')).toHaveLength(0);
   });
 });
@@ -371,10 +358,7 @@ describe('emitAngular CVA — Task 3: ROZ124 expose collision error', () => {
 
 describe('emitAngular CVA — Task 3: ROZ126 no-disabled info', () => {
   it('a single-model CVA component with no disabled prop fires one ROZ126', () => {
-    const { code, diagnostics } = compileAngular(
-      NO_DISABLED_SRC,
-      NO_DISABLED_FILE,
-    );
+    const { code, diagnostics } = compileAngular(NO_DISABLED_SRC, NO_DISABLED_FILE);
     const roz126 = diagnostics.filter((d) => d.code === 'ROZ126');
     expect(roz126).toHaveLength(1);
     expect(roz126[0]!.severity).toBe('info');
@@ -401,17 +385,12 @@ describe('emitAngular CVA — Task 3: zero-model → no CVA diagnostics', () => 
   });
 
   it('compile never throws on any of the three Plan-01 fixtures', () => {
-    expect(() =>
-      compileAngular(fixture('MultiModelProbe'), 'MultiModelProbe.rozie'),
-    ).not.toThrow();
+    expect(() => compileAngular(fixture('MultiModelProbe'), 'MultiModelProbe.rozie')).not.toThrow();
     expect(() =>
       compileAngular(fixture('ExposeCvaCollision'), 'ExposeCvaCollision.rozie'),
     ).not.toThrow();
     expect(() =>
-      compileAngular(
-        fixture('SingleModelNoDisabled'),
-        'SingleModelNoDisabled.rozie',
-      ),
+      compileAngular(fixture('SingleModelNoDisabled'), 'SingleModelNoDisabled.rozie'),
     ).not.toThrow();
   });
 });

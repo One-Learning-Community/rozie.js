@@ -31,13 +31,13 @@
  * They re-render only when the wrapper's script re-invokes them via the
  * cellRenderer callback (FullCalendar's render-flow already does this).
  */
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
 import { portalKey } from '../../../../core/src/ir/types.js';
 import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
-import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
 
 /**
  * Spike 004 — portal-scope `setAttribute` line, or '' when no scopeHash.
@@ -157,9 +157,7 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   // Scope type: `{ arg: unknown; ... }` from portalParamNames, or `unknown`
   // when no names declared.
   const scopeType =
-    paramNames.length > 0
-      ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
-      : 'unknown';
+    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
   // Default portal slot: source is `props.children` (a ReactNode OR a render
   // fn), guarded by `== null` (a JSX node is not a function). Named slots keep
   // the `typeof slot !== 'function'` render-prop guard byte-identically.
@@ -208,9 +206,7 @@ function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
   const { slotName, isDefault } = ids;
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
-    paramNames.length > 0
-      ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
-      : 'unknown';
+    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
   // Default portal slot sources `props.children` (ReactNode or render fn); named
   // slots keep the render-prop function guard byte-identically.
   const guard = isDefault
@@ -312,8 +308,7 @@ export function emitPortals(
   // 'react' import target. Collected manually below in buildShell.
   void collectors.runtime;
 
-  const refDeclLine =
-    'const portalRoots = useRef<Set<Root>>(new Set());';
+  const refDeclLine = 'const portalRoots = useRef<Set<Root>>(new Set());';
 
   // One declaration + one mutation per portal slot:
   //   const _renderEventRef = useRef(props.renderEvent);
@@ -331,10 +326,7 @@ export function emitPortals(
       // Default portal slot indirects React's built-in `props.children` (there
       // is no `render<Pascal>` prop); named slots indirect their render prop.
       const source = isDefault ? 'props.children' : `props.${renderProp}`;
-      return (
-        `const ${refIdent} = useRef(${source});\n` +
-        `${refIdent}.current = ${source};`
-      );
+      return `const ${refIdent} = useRef(${source});\n` + `${refIdent}.current = ${source};`;
     })
     .join('\n');
 
@@ -348,8 +340,7 @@ export function emitPortals(
   const closureBlock = `${interfacePrefix}const portals = {\n${methodLines}\n};`;
 
   const bulkDisposeBlock =
-    'for (const root of portalRoots.current) root.unmount();\n' +
-    'portalRoots.current.clear();';
+    'for (const root of portalRoots.current) root.unmount();\n' + 'portalRoots.current.clear();';
 
   const portalSlotNames = new Set(portals.map((s) => portalKey(s)));
 

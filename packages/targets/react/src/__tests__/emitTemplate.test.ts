@@ -3,20 +3,19 @@
  * Covers: className composition (D-53/D-54/D-55), clsx integration,
  * mustache-in-attribute, slot lowering, r-model, template @event.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { emitTemplate } from '../emit/emitTemplate.js';
+import { emitReact } from '../emitReact.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
-import { emitTemplate } from '../emit/emitTemplate.js';
-import { emitReact } from '../emitReact.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../..');
@@ -261,7 +260,7 @@ describe('Slot lowering — Plan 04-03 Task 2', () => {
     expect(slotPropFields.some((s) => /children\?: ReactNode/.test(s))).toBe(true);
   });
 
-  it('Test 4: named slot, no params (Modal header) → {(props.renderHeader ?? props.slots?.[\'header\'])?.()} (Phase 07.3.2 SC#4 — merge + invoke)', () => {
+  it("Test 4: named slot, no params (Modal header) → {(props.renderHeader ?? props.slots?.['header'])?.()} (Phase 07.3.2 SC#4 — merge + invoke)", () => {
     const ir = lowerInline(`
 <rozie name="X">
 <template>
@@ -304,7 +303,9 @@ describe('Slot lowering — Plan 04-03 Task 2', () => {
     // GUARD merge — Plan 08 contract.
     expect(jsx).toContain("(props.renderHeader ?? props.slots?.['header'])");
     // Sanity — the $props.title side still rewrites to props.title in the guard.
-    expect(jsx).toMatch(/props\.title\s*\|\|\s*\(props\.renderHeader\s*\?\?\s*props\.slots\?\.\['header'\]\)/);
+    expect(jsx).toMatch(
+      /props\.title\s*\|\|\s*\(props\.renderHeader\s*\?\?\s*props\.slots\?\.\['header'\]\)/,
+    );
     // The bare unmerged `|| props.renderHeader)` shape MUST NOT survive.
     expect(jsx).not.toMatch(/\|\|\s*props\.renderHeader\)\s*&&/);
   });
@@ -325,7 +326,9 @@ const toggle = () => {}
     expect(jsx).toContain('props.renderTrigger');
     expect(jsx).toMatch(/open: props\.open/);
     expect(jsx).toContain('toggle');
-    expect(slotPropFields.some((s) => /renderTrigger\?:.*TriggerCtx.*ReactNode/.test(s))).toBe(true);
+    expect(slotPropFields.some((s) => /renderTrigger\?:.*TriggerCtx.*ReactNode/.test(s))).toBe(
+      true,
+    );
     expect(slotCtxInterfaces.some((s) => /interface TriggerCtx/.test(s))).toBe(true);
   });
 });
@@ -339,7 +342,7 @@ describe('Whole-tsx fixture snapshots — Plan 04-03 Task 3 + Plan 04-05 CSS imp
     expect(code).toContain('return (');
     // Phase 25: plain side-effect CSS sibling import (Counter has scoped rules).
     expect(code).toContain("import './Counter.css';");
-    expect(code).not.toContain("import styles from");
+    expect(code).not.toContain('import styles from');
     // Counter has NO :root → no global CSS sibling import.
     expect(code).not.toContain("import './Counter.global.css';");
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'Counter.tsx.snap'));
@@ -383,14 +386,17 @@ describe('Whole-tsx fixture snapshots — Plan 04-03 Task 3 + Plan 04-05 CSS imp
 });
 
 describe('JSX-skeleton fixture snapshots (diff isolation) — Plan 04-03 Task 3', () => {
-  it.each(['Counter', 'SearchInput', 'Dropdown', 'TodoList', 'Modal'])(
-    '%s.jsx-skeleton.snap',
-    async (name) => {
-      const ir = lowerExample(name);
-      const { jsx } = emit(ir);
-      await expect(jsx).toMatchFileSnapshot(resolve(FIXTURES, `${name}.jsx-skeleton.snap`));
-    },
-  );
+  it.each([
+    'Counter',
+    'SearchInput',
+    'Dropdown',
+    'TodoList',
+    'Modal',
+  ])('%s.jsx-skeleton.snap', async (name) => {
+    const ir = lowerExample(name);
+    const { jsx } = emit(ir);
+    await expect(jsx).toMatchFileSnapshot(resolve(FIXTURES, `${name}.jsx-skeleton.snap`));
+  });
 });
 
 describe('SlotDecl IR shape — Phase 4 finalization gate', () => {

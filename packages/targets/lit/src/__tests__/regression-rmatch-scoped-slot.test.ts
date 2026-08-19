@@ -27,12 +27,13 @@
  *   discriminates on a destructured scope param (`columnId`) and interpolates
  *   another (`value`) inside the branches, exercising the identical code path.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse as babelParse } from '@babel/parser';
-import { compile } from '../../../../core/src/index.js';
+import { compile } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../../../..');

@@ -21,9 +21,9 @@
  *
  * V1 reactivity constraint (REQ-5): portal slots are NOT reactive after mount.
  */
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
-import { portalKey } from '../../../../core/src/ir/types.js';
+import type { IRComponent, SlotDecl } from '@rozie/core';
 import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
+import { portalKey } from '../../../../core/src/ir/types.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
 
 /**
@@ -65,9 +65,7 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string, ir: IRComponent): st
   const mergeName = portalSlotMergeName(slot.name, ir);
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
-    paramNames.length > 0
-      ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
-      : 'unknown';
+    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
     `    if (!${mergeName}) return () => {};\n` +
@@ -101,9 +99,7 @@ function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string, ir: IRCompon
   const mergeName = portalSlotMergeName(slot.name, ir);
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
-    paramNames.length > 0
-      ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
-      : 'unknown';
+    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): ReactivePortalHandle => {\n` +
     `    if (!${mergeName}) return { update() {}, dispose() {} };\n` +
@@ -159,9 +155,7 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
   // import and a mount-once-only component is byte-identical (REQ-22).
   const extraImports =
     "import { mount, unmount } from 'svelte';\n" +
-    (hasNonReactive
-      ? "import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';\n"
-      : '') +
+    (hasNonReactive ? "import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';\n" : '') +
     (hasReactive
       ? "import PortalHostReactive from '@rozie/runtime-svelte/PortalHostReactive.svelte';\n"
       : '');

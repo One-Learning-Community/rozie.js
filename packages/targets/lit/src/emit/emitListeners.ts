@@ -24,23 +24,24 @@
  *
  * @experimental — shape may change before v1.0
  */
+
+import * as bt from '@babel/types';
 import type {
+  Diagnostic,
   IRComponent,
   Listener,
   ListenerTarget,
-} from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+  LitEmissionDescriptor,
+  ModifierArg,
+  ModifierRegistry,
+} from '@rozie/core';
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
 import type {
-  LitImportCollector,
   LitDecoratorImportCollector,
+  LitImportCollector,
   RuntimeLitImportCollector,
 } from '../rewrite/collectLitImports.js';
-import type { ModifierRegistry, LitEmissionDescriptor } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import * as bt from '@babel/types';
 
 export interface EmitListenersOpts {
   decorators: LitDecoratorImportCollector;
@@ -149,7 +150,6 @@ function classifyListener(
       klass = 'C';
       wrapper = descriptor.helperName;
       wrapperArgs = descriptor.args;
-      continue;
     }
   }
 
@@ -203,8 +203,7 @@ export function eventTypeFor(event: string): string {
     event === 'contextmenu'
   )
     return 'MouseEvent';
-  if (event === 'keydown' || event === 'keyup' || event === 'keypress')
-    return 'KeyboardEvent';
+  if (event === 'keydown' || event === 'keyup' || event === 'keypress') return 'KeyboardEvent';
   if (event === 'wheel') return 'WheelEvent';
   if (
     event === 'touchstart' ||
@@ -262,7 +261,9 @@ function emitOneListener(
   // from inline expressions. Inline expressions (e.g. `count++`) must be
   // emitted as statements (`count++;`) not calls (`(count++)($event)` — TypeError).
   const isFnLike = isHandlerLike(listener.handler);
-  const userCall = isFnLike ? `((${handlerExpr}) as (...args: any[]) => any)($event);` : `${handlerExpr};`;
+  const userCall = isFnLike
+    ? `((${handlerExpr}) as (...args: any[]) => any)($event);`
+    : `${handlerExpr};`;
   const handlerBody = `($event: ${evtType}) => { ${guardLines.join(' ')} ${userCall} }`;
 
   // Build addEventListener options object (all options are significant for the add call).
@@ -270,7 +271,8 @@ function emitOneListener(
   if (cls.listenerOptions.capture) addOptionFields.push('capture: true');
   if (cls.listenerOptions.passive) addOptionFields.push('passive: true');
   if (cls.listenerOptions.once) addOptionFields.push('once: true');
-  const optionsExpr = addOptionFields.length > 0 ? `{ ${addOptionFields.join(', ')} }` : 'undefined';
+  const optionsExpr =
+    addOptionFields.length > 0 ? `{ ${addOptionFields.join(', ')} }` : 'undefined';
 
   // WR-11 fix: removeEventListener only uses the `capture` flag for matching;
   // `passive` and `once` are ignored by the DOM spec in the remove call.
@@ -290,10 +292,7 @@ function emitOneListener(
       const refs = (cls.outsideArgs ?? [])
         .map((arg) => extractRefName(arg))
         .filter((r): r is string => r !== null)
-        .map(
-          (r) =>
-            `() => this._ref${r.charAt(0).toUpperCase()}${r.slice(1)}`,
-        );
+        .map((r) => `() => this._ref${r.charAt(0).toUpperCase()}${r.slice(1)}`);
       const refsArr = `[${refs.join(', ')}]`;
       const whenFn = whenExpr ? `, () => (${whenExpr})` : '';
       const unsubVar = `_u${index}`;
@@ -320,7 +319,9 @@ function emitOneListener(
         `${target}.addEventListener('${listener.event}', ${handlerVar}, ${optionsExpr});`,
       ];
       if (!skipCleanup) {
-        lines.push(`this._disconnectCleanups.push(() => ${target}.removeEventListener('${listener.event}', ${handlerVar}, ${removeOptionsExpr}));`);
+        lines.push(
+          `this._disconnectCleanups.push(() => ${target}.removeEventListener('${listener.event}', ${handlerVar}, ${removeOptionsExpr}));`,
+        );
       }
       return lines.join('\n');
     }
@@ -334,7 +335,9 @@ function emitOneListener(
         `${target}.addEventListener('${listener.event}', ${handlerVar}, ${optionsExpr});`,
       ];
       if (!skipCleanup) {
-        lines.push(`this._disconnectCleanups.push(() => ${target}.removeEventListener('${listener.event}', ${handlerVar}, ${removeOptionsExpr}));`);
+        lines.push(
+          `this._disconnectCleanups.push(() => ${target}.removeEventListener('${listener.event}', ${handlerVar}, ${removeOptionsExpr}));`,
+        );
       }
       return lines.join('\n');
     }

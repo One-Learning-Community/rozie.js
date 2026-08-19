@@ -36,7 +36,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '@rozie/core';
 
 export type AngularCoreImport =
   | 'Component'

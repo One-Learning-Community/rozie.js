@@ -15,10 +15,11 @@
  * behavior case is isolated from the (still-incomplete, per 79-KNOWN-RED-
  * BASELINE.md) `:name`-inside-`r-for` parser path.
  */
-import { describe, it, expect } from 'vitest';
-import * as t from '@babel/types';
+
 import { parse as babelParse } from '@babel/parser';
-import type { SlotDecl } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { SlotDecl } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { buildSlotTypeBlock } from '../emit/refineSlotTypes.js';
 
 const LOC = { start: 0, end: 0 };
@@ -54,7 +55,12 @@ describe('buildSlotTypeBlock — family type surface (Phase 79 Plan 12 Task 1, R
         namePrefix: 'cell-',
         params: [
           { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: LOC },
-          { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC },
+          {
+            type: 'ParamDecl',
+            name: 'value',
+            valueExpression: t.identifier('value'),
+            sourceLoc: LOC,
+          },
         ],
       }),
     ]);
@@ -67,7 +73,14 @@ describe('buildSlotTypeBlock — family type surface (Phase 79 Plan 12 Task 1, R
   it('a SlotDecl with dynamicNameExpr and NO namePrefix degrades to a GENERIC plain string index signature (not its own param shape)', () => {
     const block = buildSlotTypeBlock([
       dynamicSlot({
-        params: [{ type: 'ParamDecl', name: 'label', valueExpression: t.identifier('label'), sourceLoc: LOC }],
+        params: [
+          {
+            type: 'ParamDecl',
+            name: 'label',
+            valueExpression: t.identifier('label'),
+            sourceLoc: LOC,
+          },
+        ],
       }),
     ]);
     expect(block).not.toContain('default(');
@@ -81,10 +94,28 @@ describe('buildSlotTypeBlock — family type surface (Phase 79 Plan 12 Task 1, R
     expect(block).not.toContain('label');
   });
 
-  it('two no-prefix dynamic-name slots with DIFFERENT param shapes still emit exactly ONE generic catch-all, never either slot\'s own shape', () => {
+  it("two no-prefix dynamic-name slots with DIFFERENT param shapes still emit exactly ONE generic catch-all, never either slot's own shape", () => {
     const block = buildSlotTypeBlock([
-      dynamicSlot({ params: [{ type: 'ParamDecl', name: 'label', valueExpression: t.identifier('label'), sourceLoc: LOC }] }),
-      dynamicSlot({ params: [{ type: 'ParamDecl', name: 'title', valueExpression: t.identifier('title'), sourceLoc: LOC }] }),
+      dynamicSlot({
+        params: [
+          {
+            type: 'ParamDecl',
+            name: 'label',
+            valueExpression: t.identifier('label'),
+            sourceLoc: LOC,
+          },
+        ],
+      }),
+      dynamicSlot({
+        params: [
+          {
+            type: 'ParamDecl',
+            name: 'title',
+            valueExpression: t.identifier('title'),
+            sourceLoc: LOC,
+          },
+        ],
+      }),
     ]);
     const occurrences = block.split('\n').filter((l) => l.includes('[key: string]')).length;
     expect(occurrences).toBe(1);
@@ -116,7 +147,12 @@ describe('buildSlotTypeBlock — family type surface (Phase 79 Plan 12 Task 1, R
         name: 'trigger',
         defaultContent: null,
         params: [
-          { type: 'ParamDecl', name: 'toggle', valueExpression: t.identifier('toggle'), sourceLoc: LOC },
+          {
+            type: 'ParamDecl',
+            name: 'toggle',
+            valueExpression: t.identifier('toggle'),
+            sourceLoc: LOC,
+          },
         ],
         paramTypes: [tsType('(open: boolean) => void')],
         presence: 'always',
@@ -134,7 +170,12 @@ describe('buildSlotTypeBlock — family type surface (Phase 79 Plan 12 Task 1, R
         name: 'trigger',
         defaultContent: null,
         params: [
-          { type: 'ParamDecl', name: 'open', valueExpression: t.identifier('open'), sourceLoc: LOC },
+          {
+            type: 'ParamDecl',
+            name: 'open',
+            valueExpression: t.identifier('open'),
+            sourceLoc: LOC,
+          },
         ],
         presence: 'always',
         nestedSlots: [],
@@ -164,7 +205,9 @@ describe('buildSlotTypeBlock — family type surface (Phase 79 Plan 12 Task 1, R
       dynamicSlot({ namePrefix: 'cell-' }),
       dynamicSlot({ namePrefix: 'cell-' }),
     ]);
-    const occurrences = block.split('\n').filter((l) => l.includes('[key: `cell-${string}`]')).length;
+    const occurrences = block
+      .split('\n')
+      .filter((l) => l.includes('[key: `cell-${string}`]')).length;
     expect(occurrences).toBe(1);
   });
 });

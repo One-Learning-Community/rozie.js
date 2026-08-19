@@ -22,7 +22,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { TemplateSlotInvocationIR, IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent, TemplateSlotInvocationIR } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 export function emitSlotInvocation(
@@ -51,7 +51,9 @@ export function emitSlotInvocation(
     if (dataEntries.length > 0) {
       // Wrap in try/catch so non-JSON-safe values (BigInt, circular, undefined)
       // don't crash the render — CR-02 fix.
-      dataAttrs.push(`data-rozie-params=\${(() => { try { return JSON.stringify({${dataEntries.join(', ')}}); } catch { return '{}'; } })()}`);
+      dataAttrs.push(
+        `data-rozie-params=\${(() => { try { return JSON.stringify({${dataEntries.join(', ')}}); } catch { return '{}'; } })()}`,
+      );
     }
   }
   const dataStr = dataAttrs.length > 0 ? ' ' + dataAttrs.join(' ') : '';

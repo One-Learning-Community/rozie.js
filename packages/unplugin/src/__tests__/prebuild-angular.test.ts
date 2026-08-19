@@ -10,16 +10,22 @@
  *   - HMR re-emit semantics: re-running the helper with unchanged source
  *     skips the write (no-op when content is identical).
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync, mkdirSync, statSync, symlinkSync } from 'node:fs';
+
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import {
-  emitRozieTsToDisk,
-  prebuildAngularRozieFiles,
-} from '../transform.js';
-import { ModifierRegistry } from '@rozie/core';
-import { registerBuiltins } from '../../../core/src/modifiers/registerBuiltins.js';
+import { ModifierRegistry, registerBuiltins } from '@rozie/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { emitRozieTsToDisk, prebuildAngularRozieFiles } from '../transform.js';
 
 function makeRegistry(): ModifierRegistry {
   const r = new ModifierRegistry();
@@ -232,7 +238,7 @@ describe('D-70 cross-rozie shim emission (Phase 06.2 follow-up)', () => {
   it('does NOT clobber a consumer-authored .ts file (no marker line)', () => {
     writeFileSync(join(tmpDir, 'Counter.rozie'), COUNTER_ROZIE);
     writeFileSync(join(tmpDir, 'Modal.rozie'), MODAL_WITH_COMPONENTS);
-    const consumerCounterTs = "// hand-written by consumer\nexport const x = 42;\n";
+    const consumerCounterTs = '// hand-written by consumer\nexport const x = 42;\n';
     writeFileSync(join(tmpDir, 'Counter.ts'), consumerCounterTs);
     emitRozieTsToDisk(join(tmpDir, 'Modal.rozie'), makeRegistry());
     expect(readFileSync(join(tmpDir, 'Counter.ts'), 'utf8')).toBe(consumerCounterTs);
@@ -308,13 +314,13 @@ describe('Quick 260515-1y4: cross-tree prebuild via prebuildExtraRoots', () => {
     try {
       const fooPath = join(outsideRoot, 'Foo.rozie');
       writeFileSync(fooPath, COUNTER_ROZIE.replace('name="Counter"', 'name="Foo"'));
-      expect(() =>
-        emitRozieTsToDisk(fooPath, makeRegistry(), [projectRoot, extraRoot]),
-      ).toThrow(/refusing to emit \.rozie\.ts/);
+      expect(() => emitRozieTsToDisk(fooPath, makeRegistry(), [projectRoot, extraRoot])).toThrow(
+        /refusing to emit \.rozie\.ts/,
+      );
       // Ensure the message includes the offending path so consumers can debug.
-      expect(() =>
-        emitRozieTsToDisk(fooPath, makeRegistry(), [projectRoot, extraRoot]),
-      ).toThrow(new RegExp(fooPath.replace(/\//g, '\\/')));
+      expect(() => emitRozieTsToDisk(fooPath, makeRegistry(), [projectRoot, extraRoot])).toThrow(
+        new RegExp(fooPath.replace(/\//g, '\\/')),
+      );
     } finally {
       rmSync(outsideRoot, { recursive: true, force: true });
     }
@@ -324,14 +330,10 @@ describe('Quick 260515-1y4: cross-tree prebuild via prebuildExtraRoots', () => {
     const insidePath = join(projectRoot, 'Inside.rozie');
     writeFileSync(insidePath, COUNTER_ROZIE.replace('name="Counter"', 'name="Inside"'));
     // Both forms must succeed and produce the same on-disk file.
-    expect(() =>
-      emitRozieTsToDisk(insidePath, makeRegistry(), projectRoot),
-    ).not.toThrow();
+    expect(() => emitRozieTsToDisk(insidePath, makeRegistry(), projectRoot)).not.toThrow();
     const stringForm = readFileSync(insidePath + '.ts', 'utf8');
     rmSync(insidePath + '.ts');
-    expect(() =>
-      emitRozieTsToDisk(insidePath, makeRegistry(), [projectRoot]),
-    ).not.toThrow();
+    expect(() => emitRozieTsToDisk(insidePath, makeRegistry(), [projectRoot])).not.toThrow();
     const arrayForm = readFileSync(insidePath + '.ts', 'utf8');
     expect(arrayForm).toBe(stringForm);
   });
@@ -368,7 +370,9 @@ describe('Quick 260515-1y4: cross-tree prebuild via prebuildExtraRoots', () => {
       expect(existsSync(realRoziePath + '.ts')).toBe(false);
       // The skip should be surfaced as a console.warn with the [@rozie/unplugin] prefix.
       const warnings = warnSpy.mock.calls.map((args) => String(args[0]));
-      expect(warnings.some((m) => m.includes('[@rozie/unplugin]') && m.includes('symlink'))).toBe(true);
+      expect(warnings.some((m) => m.includes('[@rozie/unplugin]') && m.includes('symlink'))).toBe(
+        true,
+      );
     } finally {
       warnSpy.mockRestore();
       rmSync(realExtra, { recursive: true, force: true });

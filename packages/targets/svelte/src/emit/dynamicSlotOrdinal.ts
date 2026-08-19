@@ -28,8 +28,7 @@
  * the two lowering walks resolve `:name` at different points relative to
  * their children recursion and would not agree.
  */
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
-import type { SourceLoc } from '../../../../core/src/ast/types.js';
+import type { IRComponent, SlotDecl, SourceLoc } from '@rozie/core';
 
 /** The local `$derived` binding identifier for the dynamic-name slot at `ordinal` (its index in `ir.slots`). */
 export function dynamicSlotBindingName(ordinal: number): string {

@@ -6,14 +6,13 @@
 // Solid target lowers it to `solid-js/web`'s native `<Portal>`, gated by a
 // `<Show when={container} fallback={tree}>` so a falsy container renders
 // the tree in place (never mounts `<Portal>` at all).
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../emitSolid.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

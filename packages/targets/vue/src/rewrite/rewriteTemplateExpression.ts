@@ -26,11 +26,12 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
+
+import type { GeneratorOptions } from '@babel/generator';
 import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
-import type { GeneratorOptions } from '@babel/generator';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
@@ -38,13 +39,13 @@ type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 // `compact: false` preserves readable spacing inside object/array literals
 // (`{ hovering: hovering }` rather than `{hovering:hovering}`). Template
@@ -53,7 +54,10 @@ const traverse: TraverseFn =
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
 
 function flattenInlineCode(code: string): string {
-  return code.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim();
+  return code
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
 }
 
 /**

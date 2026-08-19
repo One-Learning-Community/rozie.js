@@ -15,16 +15,15 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { StyleSection } from '../../../../core/src/ir/types.js';
+import type { Diagnostic, StyleSection } from '@rozie/core';
 import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 import type {
   LitImportCollector,
   RuntimeLitImportCollector,
 } from '../rewrite/collectLitImports.js';
 import { toKebabCase } from './emitDecorator.js';
 import { scopeCss } from './scopeCss.js';
-import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
 /**
  * Quick task 260520-bu7 — additional repeats of the portal scope attribute
@@ -119,10 +118,7 @@ function stringifyRules(rules: StyleRule[], source: string): string {
  * Verbatim port from solid/emit/emitStyle.ts.
  */
 function escapeCssForTemplateLiteral(css: string): string {
-  return css
-    .replace(/\\/g, '\\\\')
-    .replace(/`/g, '\\`')
-    .replace(/\$\{/g, '\\${');
+  return css.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
 }
 
 /**
@@ -168,9 +164,7 @@ export function emitStyle(
   const engineCss = stringifyRules(engineChildren, source);
 
   const rawScopedCss = stringifyRules(scopedRules, source);
-  const scopedCss = opts.scopeHash
-    ? scopeCss(rawScopedCss, opts.scopeHash)
-    : rawScopedCss;
+  const scopedCss = opts.scopeHash ? scopeCss(rawScopedCss, opts.scopeHash) : rawScopedCss;
   const rootCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : '';
   // injectGlobalStyles sink gets flat :root (D-03) PLUS engine rules (D-04)
   // PLUS — command-palette-portal-overlay phase — the component's OWN
@@ -178,11 +172,9 @@ export function emitStyle(
   // comment). `scopedCss` is already `[data-rozie-s-<hash>]`-qualified, so
   // its global copy matches ONLY this component's own (portalled)
   // elements, never a sibling consumer's shadow-internal ones.
-  const globalParts = [
-    rootCss,
-    engineCss,
-    opts.hasElementPortal === true ? scopedCss : '',
-  ].filter((s) => s.length > 0);
+  const globalParts = [rootCss, engineCss, opts.hasElementPortal === true ? scopedCss : ''].filter(
+    (s) => s.length > 0,
+  );
   const globalCss = globalParts.join('\n');
 
   // Spike 004 — @portal rules emit INTO the same `static styles` css block.
@@ -190,7 +182,12 @@ export function emitStyle(
   // this component's shadow tree, which IS where the engine appends children
   // (via the shadow-DOM-rooted `_ref__rozieRoot` query). The
   // [data-rozie-portal-<NAME>="<hash>"] attribute reaches the engine subtree.
-  const portalCss = rewriteAllPortalBlocks(portalRules, source, opts.scopeHash ?? '', PORTAL_SCOPE_REPEAT);
+  const portalCss = rewriteAllPortalBlocks(
+    portalRules,
+    source,
+    opts.scopeHash ?? '',
+    PORTAL_SCOPE_REPEAT,
+  );
   // The `static styles` sink folds scoped + portal + bare engine rules. The
   // engine rules go in UNSCOPED/bare (NO scopeCss rewrite) — engine DOM inside
   // the shadow tree (e.g. TipTap placeholder) carries no `[data-rozie-s-*]`

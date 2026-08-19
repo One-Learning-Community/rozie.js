@@ -15,8 +15,9 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { SlotDecl } from '../../../../core/src/ir/types.js';
+import type { SlotDecl } from '@rozie/core';
 import { buildSlotTypeFields } from './refineSlotTypes.js';
+
 // Phase 79 Plan 05 (R12/D-03) — re-exported here so any downstream consumer
 // of this "slot-decl-shape" module can gate a record-only slot without a
 // second import of the core predicate. Mirrors the direct-import convention

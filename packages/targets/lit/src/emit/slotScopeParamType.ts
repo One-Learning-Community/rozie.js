@@ -37,10 +37,10 @@
  * @experimental — shape may change before v1.0
  */
 import type { TSType } from '@babel/types';
-import type { ParamDecl, SlotDecl } from '../../../../core/src/ir/types.js';
-import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
-import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import type { ParamDecl, SlotDecl } from '@rozie/core';
 import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 
 /**
  * Synthesize the TS type token for ONE scope param — delegates to the
@@ -48,10 +48,7 @@ import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingle
  * targets: a declared function type lowers to variadic-any; an absent or
  * any other `paramTypes` entry falls to the `any` floor (never `unknown`).
  */
-export function slotScopeParamType(
-  paramTypes: TSType[] | undefined,
-  index: number,
-): string {
+export function slotScopeParamType(paramTypes: TSType[] | undefined, index: number): string {
   return lowerSlotParamType(paramTypes?.[index]);
 }
 
@@ -62,10 +59,7 @@ export function slotScopeParamType(
  * `unknown`-based formatting (`; `-joined, single space inside braces) so
  * non-scope emit stays byte-identical.
  */
-export function slotScopeTypeObject(
-  params: ParamDecl[],
-  paramTypes: TSType[] | undefined,
-): string {
+export function slotScopeTypeObject(params: ParamDecl[], paramTypes: TSType[] | undefined): string {
   return `{ ${params
     .map((p, i) => `${p.name}: ${slotScopeParamType(paramTypes, i)}`)
     .join('; ')} }`;

@@ -9,13 +9,12 @@
 //    verification is for dev mode."
 //
 // Negative tests assert no sanitization strips the call or escapes quotes.
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { fileURLToPath } from 'node:url';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitScript } from '../emit/emitScript.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

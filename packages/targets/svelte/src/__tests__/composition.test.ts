@@ -11,13 +11,12 @@
 // the self-import idiom — `import Self from './Self.svelte';` — NOT the
 // legacy `<svelte:self>` element. Wrapper-composition + self-reference
 // share one code path.
-import { describe, expect, it } from 'vitest';
-import { fileURLToPath } from 'node:url';
+
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSvelte } from '../emitSvelte.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

@@ -27,22 +27,19 @@
  * @experimental — shape may change before v1.0
  */
 import type {
+  Diagnostic,
   IRComponent,
   Listener,
   ListenerTarget,
-} from '../../../../core/src/ir/types.js';
-import type {
   ModifierRegistry,
   ReactEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import {
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
+import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { renderDepArray } from './renderDepArray.js';
 
 export interface EmitListenerNativeResult {
@@ -64,12 +61,21 @@ function eventTypeFor(event: string): string {
     event === 'contextmenu'
   )
     return 'MouseEvent';
-  if (event === 'keydown' || event === 'keyup' || event === 'keypress')
-    return 'KeyboardEvent';
+  if (event === 'keydown' || event === 'keyup' || event === 'keypress') return 'KeyboardEvent';
   if (event === 'wheel') return 'WheelEvent';
-  if (event === 'touchstart' || event === 'touchend' || event === 'touchmove' || event === 'touchcancel')
+  if (
+    event === 'touchstart' ||
+    event === 'touchend' ||
+    event === 'touchmove' ||
+    event === 'touchcancel'
+  )
     return 'TouchEvent';
-  if (event === 'pointerdown' || event === 'pointerup' || event === 'pointermove' || event === 'pointercancel')
+  if (
+    event === 'pointerdown' ||
+    event === 'pointerup' ||
+    event === 'pointermove' ||
+    event === 'pointercancel'
+  )
     return 'PointerEvent';
   if (event === 'focus' || event === 'blur') return 'FocusEvent';
   if (event === 'input') return 'InputEvent';
@@ -116,9 +122,7 @@ function renderTargetExpr(
  */
 function renderOptionsSuffix(opts: Set<string>, kind: 'add' | 'remove'): string {
   if (opts.size === 0) return '';
-  const filtered = kind === 'remove'
-    ? [...opts].filter((o) => o === 'capture')
-    : [...opts];
+  const filtered = kind === 'remove' ? [...opts].filter((o) => o === 'capture') : [...opts];
   if (filtered.length === 0) return '';
   const parts = filtered.sort().map((o) => `${o}: true`);
   return `, { ${parts.join(', ')} }`;
@@ -193,7 +197,6 @@ export function emitListenerNative(
     }
     if (desc.kind === 'inlineGuard') {
       inlineGuards.push(desc.code);
-      continue;
     }
     // helper kind — orchestrator should have routed this away from Native.
     // Skip silently here (Class C will have already emitted the wrapper).
@@ -212,9 +215,8 @@ export function emitListenerNative(
   // the user's signature receives the event arg; for non-Identifier shapes
   // (arrow / call), wrap in ($event) => {...} (Pitfall 5).
   const handlerName = options.wrappedHandlerName ?? '_rozieHandler';
-  const guardBody = inlineGuards.length > 0
-    ? inlineGuards.map((g) => `    ${g}`).join('\n') + '\n'
-    : '';
+  const guardBody =
+    inlineGuards.length > 0 ? inlineGuards.map((g) => `    ${g}`).join('\n') + '\n' : '';
 
   let depsExpressions: string[] = [];
 

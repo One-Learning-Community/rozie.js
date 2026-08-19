@@ -9,13 +9,12 @@
  *   - The stub code is the documented placeholder for now (P2 swaps in real)
  *   - All per-example fixture-snapshot expectations are it.todo (P2-locked)
  */
-import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

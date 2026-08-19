@@ -15,18 +15,17 @@
  * SECURITY (T-14-06): the compile-time literal key walk skips
  * `__proto__`/`constructor`/`prototype` keys.
  */
-import { describe, it, expect } from 'vitest';
+
 import { parseExpression } from '@babel/parser';
-import * as t from '@babel/types';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, AttributeBinding } from '../../../../../core/src/ir/types.js';
+import type * as t from '@babel/types';
+import type { AttributeBinding, IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../../rewrite/collectReactImports.js';
-import { emitAttributes, type EmitAttrCtx } from '../emitTemplateAttribute.js';
+import { type EmitAttrCtx, emitAttributes } from '../emitTemplateAttribute.js';
 
 function emptyIR(): IRComponent {
   const src = `<rozie name="Test">
@@ -101,28 +100,20 @@ describe('emitTemplateAttribute (React) — spreadBinding (Plan 14-03 Task 2)', 
   it('(4) R6 — :class + r-bind LITERAL class merge: both classes render', () => {
     const ir = emptyIR();
     const ctx = freshCtx(ir);
-    const { jsx } = emitAttributes(
-      [classBinding(`'a'`), spread(`{ class: 'b', id: 'x' }`)],
-      ctx,
-    );
+    const { jsx } = emitAttributes([classBinding(`'a'`), spread(`{ class: 'b', id: 'x' }`)], ctx);
     // The literal's `class` is extracted and fed into the class-merge path;
     // only `id` spreads. Both 'a' and 'b' must appear in the className value.
     expect(jsx).toContain('className=');
     expect(jsx).toContain(`'a'`);
     expect(jsx).toContain(`'b'`);
     expect(jsx).toContain(`{...{ id: 'x' }}`);
-    expect(jsx).toMatchInlineSnapshot(
-      `"className={clsx('a', 'b')} {...{ id: 'x' }}"`,
-    );
+    expect(jsx).toMatchInlineSnapshot(`"className={clsx('a', 'b')} {...{ id: 'x' }}"`);
   });
 
   it('(5) R6 reordered — r-bind LITERAL before :class: both classes still render', () => {
     const ir = emptyIR();
     const ctx = freshCtx(ir);
-    const { jsx } = emitAttributes(
-      [spread(`{ class: 'b', id: 'x' }`), classBinding(`'a'`)],
-      ctx,
-    );
+    const { jsx } = emitAttributes([spread(`{ class: 'b', id: 'x' }`), classBinding(`'a'`)], ctx);
     expect(jsx).toContain('className=');
     expect(jsx).toContain(`'a'`);
     expect(jsx).toContain(`'b'`);

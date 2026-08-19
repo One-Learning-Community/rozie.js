@@ -12,9 +12,13 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { TemplateConditionalIR, IRComponent, TemplateNode } from '../../../../core/src/ir/types.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import type {
+  IRComponent,
+  TemplateConditionalIR,
+  IRTemplateNode as TemplateNode,
+} from '@rozie/core';
 import type { LitImportCollector } from '../rewrite/collectLitImports.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 export function emitConditional(
   node: TemplateConditionalIR,

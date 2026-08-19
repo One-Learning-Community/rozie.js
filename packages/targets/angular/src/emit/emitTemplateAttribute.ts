@@ -20,15 +20,7 @@
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
-import type {
-  IRComponent,
-  AttributeBinding,
-  ListenerSpreadIR,
-} from '../../../../core/src/ir/types.js';
-import {
-  rewriteTemplateExpression,
-  hoistTemplateDoubleReadAccessor,
-} from '../rewrite/rewriteTemplateExpression.js';
+import type { AttributeBinding, IRComponent, ListenerSpreadIR } from '@rozie/core';
 // command-palette-portal-overlay phase — `rewriteListenerExpression` is the
 // SCRIPT-context sibling of `rewriteTemplateExpression` (mirrors emitKeynav.ts's
 // identical split): a `r-portal` container expression is spliced into an
@@ -41,6 +33,10 @@ import {
 // about arbitrary user-declared script functions, which is exactly what
 // `classMembers` + `rewriteListenerExpression`'s Identifier visitor solves.
 import { rewriteListenerExpression } from '../rewrite/rewriteListenerExpression.js';
+import {
+  hoistTemplateDoubleReadAccessor,
+  rewriteTemplateExpression,
+} from '../rewrite/rewriteTemplateExpression.js';
 import type { AngularScriptInjection } from './emitTemplateEvent.js';
 
 export interface EmitAttrCtx {
@@ -274,10 +270,7 @@ function renderInterpolatedTemplateLiteral(
   let out = '';
   for (const seg of segments) {
     if (seg.kind === 'static') {
-      out += seg.text
-        .replace(/\\/g, '\\\\')
-        .replace(/`/g, '\\`')
-        .replace(/\$\{/g, '\\${');
+      out += seg.text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
     } else {
       const code = rewriteTemplateExpression(seg.expression, ctx.ir, {
         collisionRenames: ctx.collisionRenames,
@@ -340,10 +333,7 @@ function partitionAngularModelModifiers(
  * a later iteration. `$` is a JS identifier character, so the lookbehind
  * excludes both `\w` and `$` and the lookahead excludes `\w`.
  */
-function substituteValuePlaceholder(
-  fragment: string,
-  replacement: string,
-): string {
+function substituteValuePlaceholder(fragment: string, replacement: string): string {
   return fragment.replace(/(?<![\w$])\$v(?!\w)/g, `(${replacement})`);
 }
 
@@ -353,10 +343,7 @@ function substituteValuePlaceholder(
  * substitute `$v` with the current expression text and chain. Empty list ⇒ the
  * input string is returned unchanged.
  */
-function applyValueTransformsString(
-  valueAccess: string,
-  valueTransforms: string[],
-): string {
+function applyValueTransformsString(valueAccess: string, valueTransforms: string[]): string {
   let current = valueAccess;
   for (const fragment of valueTransforms) {
     current = substituteValuePlaceholder(fragment, current);
@@ -383,8 +370,7 @@ function applyValueTransformsString(
  * exactly the shapes the pure-expression convention forbids (per the memory
  * note's own wording) and exactly what an IIFE-with-block-body needs.
  */
-const IMPURE_FRAGMENT_MARKER =
-  /=>|(?:^|[^.\w$])function\b|(?:^|[;{]\s*)(?:const|let|var|return)\b/;
+const IMPURE_FRAGMENT_MARKER = /=>|(?:^|[^.\w$])function\b|(?:^|[;{]\s*)(?:const|let|var|return)\b/;
 
 /**
  * When any resolved `valueTransforms` fragment is impure (see
@@ -445,23 +431,14 @@ function hoistValueTransformIfImpure(
  * inlined the same logic; extracted here for parity. Behaviour preserved
  * byte-for-byte — the existing form-input snapshot lock is unaffected.
  */
-function resolveSignalNameForLValue(
-  expr: t.Expression,
-  ir: IRComponent,
-): string | null {
+function resolveSignalNameForLValue(expr: t.Expression, ir: IRComponent): string | null {
   if (expr.type !== 'MemberExpression') return null;
   const me = expr;
-  if (
-    me.computed ||
-    me.property.type !== 'Identifier' ||
-    me.object.type !== 'Identifier'
-  ) {
+  if (me.computed || me.property.type !== 'Identifier' || me.object.type !== 'Identifier') {
     return null;
   }
   const dataNames = new Set(ir.state.map((s) => s.name));
-  const modelProps = new Set(
-    ir.props.filter((p) => p.isModel).map((p) => p.name),
-  );
+  const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   if (me.object.name === '$data' && dataNames.has(me.property.name)) {
     return me.property.name;
   }
@@ -484,11 +461,7 @@ function resolveSignalNameForLValue(
  * Falls back to the normal `rewriteTemplateExpression` path when no double-read
  * accessor is present — reference examples are byte-stable.
  */
-function lowerBoundAttrExpression(
-  expr: t.Expression,
-  ctx: EmitAttrCtx,
-  attrName: string,
-): string {
+function lowerBoundAttrExpression(expr: t.Expression, ctx: EmitAttrCtx, attrName: string): string {
   if (ctx.scriptInjections !== undefined) {
     const taken = new Set(ctx.scriptInjections.map((si) => si.name));
     const hoist = hoistTemplateDoubleReadAccessor(expr, ctx.ir, attrName, taken, {
@@ -667,8 +640,7 @@ function isProvablyStringStyleExpression(expr: t.Expression): boolean {
     // narrow to Expression before recursing.
     if (!t.isExpression(expr.left)) return false;
     return (
-      isProvablyStringStyleExpression(expr.left) ||
-      isProvablyStringStyleExpression(expr.right)
+      isProvablyStringStyleExpression(expr.left) || isProvablyStringStyleExpression(expr.right)
     );
   }
   if (t.isConditionalExpression(expr)) {
@@ -754,9 +726,7 @@ function extractLiteralClassStyleFromAngularSpread(
   if (!t.isObjectExpression(attr.expression)) {
     return { classValue: null, styleValue: null };
   }
-  const { classValue, styleValue } = splitClassStyleFromAngularLiteral(
-    attr.expression,
-  );
+  const { classValue, styleValue } = splitClassStyleFromAngularLiteral(attr.expression);
   return { classValue, styleValue };
 }
 
@@ -966,19 +936,14 @@ function emitSpreadBinding(
     exprText = `this.${HOST_ATTRS_GETTER_NAME}()`;
   } else {
     let exprNode: t.Expression;
-    if (
-      hasExplicitClassOrStyle &&
-      t.isObjectExpression(attr.expression)
-    ) {
+    if (hasExplicitClassOrStyle && t.isObjectExpression(attr.expression)) {
       const { rest } = splitClassStyleFromAngularLiteral(attr.expression);
       exprNode = rest;
     } else if (t.isObjectExpression(attr.expression)) {
       // LITERAL spread without an explicit class/style sibling — apply the
       // T-14-11 pollution guard, then re-attach scrubbed class/style so they
       // flow through the spread (no merge target exists). Mirrors Vue/Svelte.
-      const { rest, classValue, styleValue } = splitClassStyleFromAngularLiteral(
-        attr.expression,
-      );
+      const { rest, classValue, styleValue } = splitClassStyleFromAngularLiteral(attr.expression);
       const restProps = [...rest.properties];
       if (classValue !== null) {
         restProps.push(t.objectProperty(t.identifier('class'), classValue));
@@ -1112,8 +1077,7 @@ function listenersRendererFieldDecl(): string {
  * string check (not factored into a separate field — keeps the spread
  * self-contained for snapshot legibility).
  */
-const LISTENERS_FORBIDDEN_KEYS_GUARD =
-  `if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;`;
+const LISTENERS_FORBIDDEN_KEYS_GUARD = `if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;`;
 
 /**
  * Plan 15-05 / D-13 — emit the per-element machinery for ONE dynamic
@@ -1153,10 +1117,7 @@ const LISTENERS_FORBIDDEN_KEYS_GUARD =
  * from a consumer that wrote React-shape names by inheriting from a parent
  * component's $listeners cluster).
  */
-function emitListenerSpread(
-  spread: ListenerSpreadIR,
-  ctx: EmitAttrCtx,
-): string {
+function emitListenerSpread(spread: ListenerSpreadIR, ctx: EmitAttrCtx): string {
   const counter = ctx.injectionCounter ?? { next: 0 };
   const idx = counter.next++;
   const refName = `rozieListenersTarget_${idx}`;
@@ -1597,19 +1558,14 @@ export function emitSingleAttr(
         // expression; `.lazy` swaps the bound event from `(ngModelChange)` to
         // `(change)` (D-08). Both are empty/absent for bare `r-model`, so its
         // emit stays byte-identical to pre-phase.
-        const { valueTransforms, isLazy } = partitionAngularModelModifiers(
-          attr.modifiers,
-        );
+        const { valueTransforms, isLazy } = partitionAngularModelModifiers(attr.modifiers);
         // `(ngModelChange)` receives the value directly; the native `(change)`
         // DOM event (used for `.lazy`) carries an Event, so the value access
         // differs. The `$v` placeholder is substituted with the appropriate
         // access expression and the resolved transforms are chained in D-07
         // list order.
         const valueAccess = isLazy ? '$event.target.value' : '$event';
-        const committedValueRaw = applyValueTransformsString(
-          valueAccess,
-          valueTransforms,
-        );
+        const committedValueRaw = applyValueTransformsString(valueAccess, valueTransforms);
         // Item #7 sub-shape (i) — hoist to a generated method when the
         // resolved transform chain is impure (see hoistValueTransformIfImpure);
         // a no-op passthrough of committedValueRaw for the pure/no-transform
@@ -1702,9 +1658,7 @@ export function emitSingleAttr(
       // computed with the original `bindingName` (its only effect is the
       // hoisted double-read accessor name), so the expression stays identical.
       if (ctx.hasDisplayWrap) ctx.hasDisplayWrap.value = true;
-      const attrDropName = bindingName.startsWith('attr.')
-        ? bindingName
-        : `attr.${attr.name}`;
+      const attrDropName = bindingName.startsWith('attr.') ? bindingName : `attr.${attr.name}`;
       return `[${attrDropName}]="rozieAttr(${expr})"`;
     }
     // Quick 260802-v1v seam 3 (Angular half) — a RAW read of a
@@ -1723,9 +1677,7 @@ export function emitSingleAttr(
       shouldWrapAttrBinding(attr.name, attr.expression, ctx, elementTagName)
     ) {
       if (ctx.hasDisplayWrap) ctx.hasDisplayWrap.value = true;
-      const attrDropName = bindingName.startsWith('attr.')
-        ? bindingName
-        : `attr.${attr.name}`;
+      const attrDropName = bindingName.startsWith('attr.') ? bindingName : `attr.${attr.name}`;
       return `[${attrDropName}]="rozieAttr(${expr})"`;
     }
     // Quick task 260711-tgk — additive carve-out: a `:style` binding whose
@@ -1735,10 +1687,7 @@ export function emitSingleAttr(
     // isProvablyStringStyleExpression for the full rationale and the
     // sole-style-contributor reachability guarantee. Object-valued and
     // non-provably-string `:style` fall through unchanged to [style]=.
-    if (
-      attr.name === 'style' &&
-      isProvablyStringStyleExpression(attr.expression)
-    ) {
+    if (attr.name === 'style' && isProvablyStringStyleExpression(attr.expression)) {
       return `[attr.style]="${expr}"`;
     }
     return `[${bindingName}]="${expr}"`;
@@ -2003,9 +1952,7 @@ export function emitAttributes(
 }
 
 /** Detect r-html attribute on an element. */
-export function findRHtml(
-  attrs: AttributeBinding[],
-): { expression: t.Expression } | null {
+export function findRHtml(attrs: AttributeBinding[]): { expression: t.Expression } | null {
   for (const a of attrs) {
     // Phase 14 — `spreadBinding` is the name-less kind; skip before `.name`.
     if (a.kind === 'spreadBinding') continue;
@@ -2016,9 +1963,7 @@ export function findRHtml(
 }
 
 /** Detect r-show attribute. Returns the expression node or null. */
-export function findRShow(
-  attrs: AttributeBinding[],
-): { expression: t.Expression } | null {
+export function findRShow(attrs: AttributeBinding[]): { expression: t.Expression } | null {
   for (const a of attrs) {
     // Phase 14 — `spreadBinding` is the name-less kind; skip before `.name`.
     if (a.kind === 'spreadBinding') continue;

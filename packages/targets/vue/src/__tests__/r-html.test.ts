@@ -5,15 +5,12 @@
 // binding must be stripped from the attribute set BEFORE the open tag is
 // built so no literal `r-html=`/`:r-html=` leaks (Pitfall 2). An r-html
 // element with children raises ROZ421 (severity error).
-import { describe, expect, it } from 'vitest';
-import * as t from '@babel/types';
+
 import { parseExpression } from '@babel/parser';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import type {
-  IRComponent,
-  TemplateNode,
-} from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent, IRTemplateNode as TemplateNode } from '@rozie/core';
+import { createDefaultRegistry, RozieErrorCode } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitTemplate } from '../emit/emitTemplate.js';
 
 const LOC = { start: 0, end: 0 };
@@ -98,13 +95,9 @@ describe('Vue r-html → v-html (Phase 24 req 1)', () => {
 
   it('Test 3: r-html with children raises ROZ421, severity error', () => {
     const ir = emptyIR();
-    ir.template = rHtmlElement([
-      { type: 'TemplateStaticText', text: 'child', sourceLoc: LOC },
-    ]);
+    ir.template = rHtmlElement([{ type: 'TemplateStaticText', text: 'child', sourceLoc: LOC }]);
     const { diagnostics } = emitTemplate(ir, registry);
-    const diag = diagnostics.find(
-      (d) => d.code === RozieErrorCode.TARGET_VUE_RHTML_WITH_CHILDREN,
-    );
+    const diag = diagnostics.find((d) => d.code === RozieErrorCode.TARGET_VUE_RHTML_WITH_CHILDREN);
     expect(diag).toBeDefined();
     expect(diag!.severity).toBe('error');
   });
@@ -151,9 +144,7 @@ describe('Vue r-html → v-html (Phase 24 req 1)', () => {
     ir.template = componentEl;
     const { template, diagnostics } = emitTemplate(ir, registry);
     expect(
-      diagnostics.some(
-        (d) => d.code === RozieErrorCode.TARGET_VUE_RHTML_WITH_CHILDREN,
-      ),
+      diagnostics.some((d) => d.code === RozieErrorCode.TARGET_VUE_RHTML_WITH_CHILDREN),
       'ROZ421 false-fired on a slotFiller-only component tag',
     ).toBe(false);
     // The element still emits via the slotFillers path with v-html attached.
@@ -173,10 +164,8 @@ describe('Vue r-html → v-html (Phase 24 req 1)', () => {
     const { template, diagnostics } = emitTemplate(ir, registry);
     expect(template).toContain('<div>plain</div>');
     expect(template).not.toContain('v-html');
-    expect(
-      diagnostics.some(
-        (d) => d.code === RozieErrorCode.TARGET_VUE_RHTML_WITH_CHILDREN,
-      ),
-    ).toBe(false);
+    expect(diagnostics.some((d) => d.code === RozieErrorCode.TARGET_VUE_RHTML_WITH_CHILDREN)).toBe(
+      false,
+    );
   });
 });

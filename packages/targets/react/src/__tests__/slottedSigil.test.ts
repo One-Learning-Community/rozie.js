@@ -6,10 +6,10 @@
 // `$reconcileAfterDomMutation`). Additionally, React must never let the
 // sigil leak into a `useEffect` dependency array — see renderDepArray.ts /
 // emitScript.ts's explicit drop-the-scope handling.
-import { describe, it, expect } from 'vitest';
-import { compile } from '../../../../core/src/compile.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+
+import type { Diagnostic } from '@rozie/core';
+import { compile, RozieErrorCode } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 
 const UNKNOWN_REF_CODES: ReadonlySet<string> = new Set([
   RozieErrorCode.UNKNOWN_PROPS_REF,

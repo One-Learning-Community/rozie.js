@@ -15,10 +15,9 @@
  *   (6) bare $listeners (D-19 exempt) → {...$listeners}
  *   (7) bare $listeners + @click (R6 + D-19) → mergeListeners(..., $listeners)
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../../emitSolid.js';
 
 function compile(rozieSrc: string): string {

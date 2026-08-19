@@ -23,14 +23,13 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _traverse from '@babel/traverse';
+
 import type { NodePath } from '@babel/traverse';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import _traverse from '@babel/traverse';
+import * as t from '@babel/types';
+import type { Diagnostic, IRComponent } from '@rozie/core';
+import { isInTypePosition, RozieErrorCode } from '@rozie/core';
 import { portalKey } from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import {
   deconflictGeneratedSymbols,
   type GeneratedSymbolGroup,
@@ -39,8 +38,8 @@ import {
   SVELTE_EMITTER_NAMES,
   SVELTE_RUNTIME_IMPORTS,
 } from '../../../../core/src/rewrite/reservedNames.js';
-import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import { portalSlotMergeName } from '../emit/portalSlotMergeName.js';
+import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 /**
  * Normalize an emit name to a Svelte 5 callback-prop identifier.
@@ -63,7 +62,7 @@ type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 /**
  * Decide whether a `$refs.X` / `$el` access should lower to a non-null
@@ -120,11 +119,7 @@ function refLowersToNonNull(
       p = p.parentPath;
       continue;
     }
-    if (
-      t.isObjectExpression(n) ||
-      t.isArrayExpression(n) ||
-      t.isSpreadElement(n)
-    ) {
+    if (t.isObjectExpression(n) || t.isArrayExpression(n) || t.isSpreadElement(n)) {
       child = n;
       p = p.parentPath;
       continue;
@@ -240,10 +235,7 @@ export function rewriteRozieIdentifiers(
   // true` restricts the rename to a PROGRAM/setup-scope binding so a NESTED param
   // / function-local that legally shadows the name (the over-application class the
   // Vue leg (61-07) fixed) is never touched. `$expose` verbs stay protected.
-  const svelteBindingNames = new Set<string>([
-    ...SVELTE_EMITTER_NAMES,
-    ...SVELTE_RUNTIME_IMPORTS,
-  ]);
+  const svelteBindingNames = new Set<string>([...SVELTE_EMITTER_NAMES, ...SVELTE_RUNTIME_IMPORTS]);
   const svelteGroups: GeneratedSymbolGroup[] = [
     { names: propNames, trigger: { kind: 'accessor', accessor: '$props' } },
     { names: refNames, trigger: { kind: 'accessor', accessor: '$refs' } },
@@ -275,7 +267,8 @@ export function rewriteRozieIdentifiers(
       if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
       if (
         (parentPath.isMemberExpression() || parentPath.isOptionalMemberExpression()) &&
-        (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property === path.node &&
+        (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property ===
+          path.node &&
         !(parentPath.node as t.MemberExpression | t.OptionalMemberExpression).computed
       ) {
         return;
@@ -291,9 +284,7 @@ export function rewriteRozieIdentifiers(
         const params = (parentPath.node as { params: t.Node[] }).params;
         if (params.includes(path.node)) return;
       }
-      path.replaceWith(
-        t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')),
-      );
+      path.replaceWith(t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')));
       // Do NOT path.skip() — let the visitor re-visit the synthesised
       // MemberExpression so the `$refs.X` handler downstream lowers it to
       // the Svelte-side ref accessor.
@@ -485,10 +476,7 @@ export function rewriteRozieIdentifiers(
         if (args.length !== 1) return;
         const arg = args[0]!;
         if (!t.isExpression(arg)) return;
-        path.node.callee = t.memberExpression(
-          t.identifier('$state'),
-          t.identifier('snapshot'),
-        );
+        path.node.callee = t.memberExpression(t.identifier('$state'), t.identifier('snapshot'));
         // Do NOT path.skip() — the argument may contain $props.X / $data.X
         // reads that still need rewriting.
         return;
@@ -507,10 +495,7 @@ export function rewriteRozieIdentifiers(
         if (args.length !== 1) return;
         const arg = args[0]!;
         if (!t.isExpression(arg)) return;
-        path.node.callee = t.memberExpression(
-          t.identifier('$state'),
-          t.identifier('snapshot'),
-        );
+        path.node.callee = t.memberExpression(t.identifier('$state'), t.identifier('snapshot'));
         // Do NOT path.skip() — the argument may contain $props.X / $data.X
         // reads that still need rewriting.
         return;
@@ -546,10 +531,7 @@ export function rewriteRozieIdentifiers(
         // ($el.querySelectorAll(sel)?.[idx]) as HTMLElement | undefined
         const indexedAccess = t.optionalMemberExpression(
           t.callExpression(
-            t.memberExpression(
-              t.identifier('$el'),
-              t.identifier('querySelectorAll'),
-            ),
+            t.memberExpression(t.identifier('$el'), t.identifier('querySelectorAll')),
             [selArg],
           ),
           idxArg,
@@ -558,10 +540,7 @@ export function rewriteRozieIdentifiers(
         );
         const asHtmlElement = t.tsAsExpression(
           indexedAccess,
-          t.tsUnionType([
-            t.tsTypeReference(t.identifier('HTMLElement')),
-            t.tsUndefinedKeyword(),
-          ]),
+          t.tsUnionType([t.tsTypeReference(t.identifier('HTMLElement')), t.tsUndefinedKeyword()]),
         );
         // (... as HTMLElement | undefined)?.focus?.()
         const focusCall = t.optionalCallExpression(
@@ -575,9 +554,7 @@ export function rewriteRozieIdentifiers(
           /* optional */ true,
         );
         const arrow = t.arrowFunctionExpression([], focusCall);
-        path.replaceWith(
-          t.callExpression(t.identifier('queueMicrotask'), [arrow]),
-        );
+        path.replaceWith(t.callExpression(t.identifier('queueMicrotask'), [arrow]));
         return;
       }
 

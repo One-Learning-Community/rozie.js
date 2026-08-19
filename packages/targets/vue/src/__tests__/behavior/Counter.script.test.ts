@@ -16,13 +16,12 @@
 // Full mount via @vue/test-utils + happy-dom is deferred to Plan 06 because
 // emitVue still emits placeholder template/style — a real mount would fail
 // without the template lower from Plan 03.
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import { fileURLToPath } from 'node:url';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitScript } from '../../emit/emitScript.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -54,15 +53,15 @@ describe('Counter behavioral floor — script-side substring completeness', () =
 
     // From plan must_haves[].truths:
     expect(script).toContain("defineModel<number>('value', { default: 0 })"); // D-31 model
-    expect(script).toContain('withDefaults(');                                  // D-31 non-model
-    expect(script).toContain('defineProps<{');                                   // D-31 non-model
+    expect(script).toContain('withDefaults('); // D-31 non-model
+    expect(script).toContain('defineProps<{'); // D-31 non-model
     expect(script).toMatch(/step\?:\s*number/);
     expect(script).toMatch(/min\?:\s*number/);
     expect(script).toMatch(/max\?:\s*number/);
     expect(script).toContain('-Infinity');
     expect(script).toContain('Infinity');
-    expect(script).toContain('const hovering = ref(false);');                    // D-32 per-decl ref
-    expect(script).toMatch(/const canIncrement\s*=\s*computed\(/);               // D-34 computed 1:1
+    expect(script).toContain('const hovering = ref(false);'); // D-32 per-decl ref
+    expect(script).toMatch(/const canIncrement\s*=\s*computed\(/); // D-34 computed 1:1
     expect(script).toMatch(/const canDecrement\s*=\s*computed\(/);
   });
 

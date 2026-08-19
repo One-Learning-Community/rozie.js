@@ -4,10 +4,10 @@
 // descendant of the component — so `$slotted.<name>` is a COMPILE-TIME
 // CONSTANT `[]` on this target (mirrors the 5-no-ops/1-real shape of
 // `$reconcileAfterDomMutation`).
-import { describe, it, expect } from 'vitest';
-import { compile } from '../../../../core/src/compile.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+
+import type { Diagnostic } from '@rozie/core';
+import { compile, RozieErrorCode } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 
 const UNKNOWN_REF_CODES: ReadonlySet<string> = new Set([
   RozieErrorCode.UNKNOWN_PROPS_REF,

@@ -14,15 +14,10 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type {
-  IRComponent,
-  Listener,
-} from '../../../../core/src/ir/types.js';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import type { Diagnostic, IRComponent, Listener, ModifierArg } from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
+import type { RuntimeReactImportCollector } from '../rewrite/collectReactImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { RuntimeReactImportCollector } from '../rewrite/collectReactImports.js';
 
 export interface EmitListenerOutsideClickResult {
   code: string;

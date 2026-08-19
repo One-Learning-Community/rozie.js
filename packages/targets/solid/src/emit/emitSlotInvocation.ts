@@ -37,17 +37,13 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type {
-  TemplateSlotInvocationIR,
-  IRComponent,
-  SlotDecl,
-} from '../../../../core/src/ir/types.js';
-import type { EmitNodeCtx } from './emitTemplateNode.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import type { IRComponent, SlotDecl, TemplateSlotInvocationIR } from '@rozie/core';
+import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import type { EmitNodeCtx } from './emitTemplateNode.js';
 // Late-import to avoid circular reference; both modules initialize independently.
 import * as _emitTemplateNodeModule from './emitTemplateNode.js';
-import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 
 /**
  * Escape a single-quoted string-literal key body: backslash first (so a
@@ -76,7 +72,10 @@ function buildParamObj(
 ): string {
   if (args.length === 0) return '{}';
   const parts = args.map((a) => {
-    const code = rewriteTemplateExpression(a.expression, ir, { invokeAccessors, loopValueBindings });
+    const code = rewriteTemplateExpression(a.expression, ir, {
+      invokeAccessors,
+      loopValueBindings,
+    });
     if (code === a.name) return a.name;
     return `${a.name}: ${code}`;
   });
@@ -103,10 +102,7 @@ function renderInvocationFallback(
       return single.slice(1, -1);
     }
     const trimmed = single.trim();
-    if (
-      realChildren[0]!.type === 'TemplateStaticText' &&
-      !trimmed.startsWith('<')
-    ) {
+    if (realChildren[0]!.type === 'TemplateStaticText' && !trimmed.startsWith('<')) {
       return JSON.stringify(trimmed);
     }
     return single;
@@ -114,10 +110,7 @@ function renderInvocationFallback(
   return `<>${parts.join('')}</>`;
 }
 
-export function emitSlotInvocation(
-  node: TemplateSlotInvocationIR,
-  ctx: EmitNodeCtx,
-): string {
+export function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNodeCtx): string {
   // Portal-slot primitive (Spike 003) — skip template emit. Portal slots are
   // render()ed into foreign engine containers from script via `$portals.<name>(...)`.
   if (node.isPortal) return '';
@@ -165,7 +158,12 @@ export function emitSlotInvocation(
       });
       const dynFieldRef = `_props.slots?.[${dynKeyExpr}]`;
       if (node.args.length > 0) {
-        const paramObj = buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
+        const paramObj = buildParamObj(
+          node.args,
+          ctx.ir,
+          ctx.invokeAccessors,
+          ctx.loopValueBindings,
+        );
         if (hasInvocationFallback) {
           return `{${dynFieldRef}?.(${paramObj}) ?? ${invocationFallback}}`;
         }
@@ -196,7 +194,10 @@ export function emitSlotInvocation(
   // Named slot — build the prop field name with Slot suffix.
   const slotFieldName = slotName + 'Slot';
   const hasParams = slot ? slot.params.length > 0 : false;
-  const paramObj = slot && hasParams ? buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings) : null;
+  const paramObj =
+    slot && hasParams
+      ? buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings)
+      : null;
 
   // Phase 07.3.2 — merge static slot prop with the consumer-side dynamic
   // `slots?:` map (D-SV-16 cross-target port of commit 6060408,

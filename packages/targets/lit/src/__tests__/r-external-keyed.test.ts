@@ -22,10 +22,9 @@
  * `keyed` import, no seq field, no `keyed(…)` wrap) so dist-parity
  * fixtures don't drift.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 function compile(source: string): string {
@@ -64,9 +63,7 @@ const SRC_UNMARKED = `<rozie name="Unmarked">
 describe('r-external — Lit emit gates the keyed wrapper', () => {
   it('imports the `keyed` directive when the template uses `r-external`', () => {
     const code = compile(SRC_MARKED);
-    expect(code).toContain(
-      "import { keyed } from 'lit/directives/keyed.js';",
-    );
+    expect(code).toContain("import { keyed } from 'lit/directives/keyed.js';");
   });
 
   it('declares the `_rozieReconcileSeq` counter when `r-external` is used', () => {
@@ -74,7 +71,7 @@ describe('r-external — Lit emit gates the keyed wrapper', () => {
     expect(code).toContain('_rozieReconcileSeq = 0;');
   });
 
-  it('wraps the marked element\'s children in `keyed(this._rozieReconcileSeq ?? 0, html`…`)`', () => {
+  it("wraps the marked element's children in `keyed(this._rozieReconcileSeq ?? 0, html`…`)`", () => {
     const code = compile(SRC_MARKED);
     // The wrap interpolates the seq counter and embeds an inner html
     // template around the marked element's children. The exact whitespace
@@ -97,9 +94,7 @@ describe('r-external — Lit emit gates the keyed wrapper', () => {
 
   it('omits the keyed import + seq field + wrap when no element uses `r-external`', () => {
     const code = compile(SRC_UNMARKED);
-    expect(code).not.toContain(
-      "import { keyed } from 'lit/directives/keyed.js';",
-    );
+    expect(code).not.toContain("import { keyed } from 'lit/directives/keyed.js';");
     expect(code).not.toContain('_rozieReconcileSeq');
     expect(code).not.toContain('keyed(');
   });

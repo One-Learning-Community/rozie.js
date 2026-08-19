@@ -39,7 +39,7 @@
  *
  * Returns a `Set<string>` of the names that WOULD collide for this component.
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '@rozie/core';
 import {
   VUE_EMITTER_BINDINGS,
   VUE_IMPORT_NAMES,
@@ -60,8 +60,15 @@ function subtreeReadsSlots(node: unknown, seen: WeakSet<object> = new WeakSet())
     if (obj?.type === 'Identifier' && obj.name === '$slots') return true;
   }
   for (const key of Object.keys(n)) {
-    if (key === 'type' || key === 'loc' || key === 'start' || key === 'end' ||
-        key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments') {
+    if (
+      key === 'type' ||
+      key === 'loc' ||
+      key === 'start' ||
+      key === 'end' ||
+      key === 'leadingComments' ||
+      key === 'trailingComments' ||
+      key === 'innerComments'
+    ) {
       continue;
     }
     const v = n[key];

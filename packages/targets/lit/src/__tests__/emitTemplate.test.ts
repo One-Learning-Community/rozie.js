@@ -11,13 +11,12 @@
  *   r-if/r-else             → inline ternary with `nothing` sentinel
  *   composition <Foo/>      → <rozie-foo></rozie-foo>
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -195,9 +194,7 @@ describe('dispatchEvent translation (Phase 07.3.1 D-LIT-17)', () => {
 `;
     const code = compileConsumer(source, 'MemberChainConsumer');
     // The dispatchEvent shape MUST NOT appear for the non-bare handler.
-    expect(code).not.toMatch(
-      /dispatchEvent\(new CustomEvent\('rozie-header-close'/,
-    );
+    expect(code).not.toMatch(/dispatchEvent\(new CustomEvent\('rozie-header-close'/);
     // The Plan 03 late-binding wrap MUST appear because the handler still
     // contains a `this._<X>Ctx?.` reference somewhere in its body.
     expect(code).toMatch(/\(\$event\) => \(.*this\._headerCtx\?\.close/);
@@ -295,7 +292,9 @@ describe('multi-root slot-fill spread (Phase 07.3.1 D-LIT-18)', () => {
     // attribute-order-tolerant.
     expect(code).toMatch(/<h2[^>]*slot="header"[^>]*>Title<\/h2>/);
     // The <button> must exist with @click + slot="header" spread (D-LIT-18).
-    expect(code).toMatch(/<button[^>]*@click=\$\{\(\$event\)\s*=>[^>]*slot="header"[^>]*>×<\/button>/);
+    expect(code).toMatch(
+      /<button[^>]*@click=\$\{\(\$event\)\s*=>[^>]*slot="header"[^>]*>×<\/button>/,
+    );
     // And the @click handler must dispatch the rozie-header-close event.
     expect(code).toMatch(/dispatchEvent\(new CustomEvent\('rozie-header-close'/);
     expect(code).toMatch(/bubbles:\s*true/);
@@ -453,8 +452,7 @@ describe('<template r-for> multi-root loop body — Phase 50', () => {
     const registry = createDefaultRegistry();
     const { ir } = lowerToIR(ast, { modifierRegistry: registry });
     if (!ir) throw new Error('lowerToIR() returned null');
-    return emitLit(ir, { filename: `${name}.rozie`, source, modifierRegistry: registry })
-      .code;
+    return emitLit(ir, { filename: `${name}.rozie`, source, modifierRegistry: registry }).code;
   }
 
   // A `<template r-for>` lifts its children into a TemplateLoop body. Lit's

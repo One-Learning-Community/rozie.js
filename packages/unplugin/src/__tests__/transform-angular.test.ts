@@ -11,18 +11,18 @@
  *   5. Cross-check: unplugin path output is byte-identical to the
  *      packages/targets/angular/fixtures/Counter.ts.snap fixture.
  */
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
-import { readFileSync, existsSync, readdirSync, unlinkSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+
+import { existsSync, readdirSync, readFileSync, unlinkSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ModifierRegistry, registerBuiltins } from '@rozie/core';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  createResolveIdHook,
   createLoadHook,
+  createResolveIdHook,
   createTransformHook,
   transformIncludeRozie,
 } from '../transform.js';
-import { ModifierRegistry } from '@rozie/core';
-import { registerBuiltins } from '../../../core/src/modifiers/registerBuiltins.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../..');

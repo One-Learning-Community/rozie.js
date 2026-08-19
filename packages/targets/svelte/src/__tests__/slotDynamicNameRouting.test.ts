@@ -29,12 +29,11 @@
  * rationale) — Task 3's cold-gate compile assertion covers the real
  * cross-file `compile()` round trip.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import type { IRComponent, SlotFillerDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSvelte } from '../emitSvelte.js';
-import type { IRComponent, SlotFillerDecl } from '../../../../core/src/ir/types.js';
 
 function lowerInline(rozie: string): IRComponent {
   const result = parse(rozie, { filename: 'inline.rozie' });
@@ -163,7 +162,9 @@ describe('Svelte producer — runtime-keyed dispatch for a dynamic-name slot (R3
     // The bug: this used to appear as a top-level `const __rozieDynSlot0 =
     // $derived(snippets?.[`cell-${column.key}`]);` line in <script>, which
     // ReferenceErrors at runtime because `column` isn't in scope there.
-    expect(code).not.toMatch(/const __rozieDynSlot\d+ = \$derived\(snippets\?\.\[`cell-\$\{column\.key\}`\]\);/);
+    expect(code).not.toMatch(
+      /const __rozieDynSlot\d+ = \$derived\(snippets\?\.\[`cell-\$\{column\.key\}`\]\);/,
+    );
     expect(code).not.toContain('__rozieDynSlot0');
     // The fix: the record lookup is inlined directly at the render site,
     // inside the {#each} block where `column` IS in scope.

@@ -9,16 +9,15 @@
  * `slots?:` field types as the generic `Record<string, (ctx: any) =>
  * JSX.Element>` regardless of any derivable family prefix (R6's bug).
  */
-import { describe, it, expect } from 'vitest';
-import * as t from '@babel/types';
+
 import { parse as babelParse } from '@babel/parser';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import * as t from '@babel/types';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../../emitSolid.js';
-import { emitSlotDecl } from '../emitSlotDecl.js';
 import { buildSlotsRecordType } from '../emitPropsInterface.js';
-import type { IRComponent, SlotDecl } from '../../../../../core/src/ir/types.js';
+import { emitSlotDecl } from '../emitSlotDecl.js';
 
 const LOC = { start: 0, end: 0 };
 
@@ -56,7 +55,15 @@ function lowerInline(rozie: string): IRComponent {
 describe('buildSlotsRecordType — family type surface (R6, Solid)', () => {
   it('no dynamic-name slot at all → the pre-phase generic Record, byte-identical', () => {
     const type = buildSlotsRecordType([
-      { type: 'SlotDecl', name: 'header', defaultContent: null, params: [], presence: 'always', nestedSlots: [], sourceLoc: LOC },
+      {
+        type: 'SlotDecl',
+        name: 'header',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
     ]);
     expect(type).toBe('Record<string, (ctx: any) => JSX.Element>');
   });
@@ -67,7 +74,12 @@ describe('buildSlotsRecordType — family type surface (R6, Solid)', () => {
         namePrefix: 'cell-',
         params: [
           { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: LOC },
-          { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC },
+          {
+            type: 'ParamDecl',
+            name: 'value',
+            valueExpression: t.identifier('value'),
+            sourceLoc: LOC,
+          },
         ],
       }),
     ]);
@@ -91,7 +103,14 @@ describe('buildSlotsRecordType — family type surface (R6, Solid)', () => {
     const type = buildSlotsRecordType([
       dynamicSlot({
         namePrefix: 'trigger-',
-        params: [{ type: 'ParamDecl', name: 'toggle', valueExpression: t.identifier('toggle'), sourceLoc: LOC }],
+        params: [
+          {
+            type: 'ParamDecl',
+            name: 'toggle',
+            valueExpression: t.identifier('toggle'),
+            sourceLoc: LOC,
+          },
+        ],
         paramTypes: [tsType('(open: boolean) => void')],
       }),
     ]);
@@ -104,7 +123,14 @@ describe('buildSlotsRecordType — family type surface (R6, Solid)', () => {
         type: 'SlotDecl',
         name: 'cell-total',
         defaultContent: null,
-        params: [{ type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC }],
+        params: [
+          {
+            type: 'ParamDecl',
+            name: 'value',
+            valueExpression: t.identifier('value'),
+            sourceLoc: LOC,
+          },
+        ],
         presence: 'always',
         nestedSlots: [],
         sourceLoc: LOC,
@@ -113,11 +139,18 @@ describe('buildSlotsRecordType — family type surface (R6, Solid)', () => {
         namePrefix: 'cell-',
         params: [
           { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: LOC },
-          { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC },
+          {
+            type: 'ParamDecl',
+            name: 'value',
+            valueExpression: t.identifier('value'),
+            sourceLoc: LOC,
+          },
         ],
       }),
     ]);
-    expect(type).toMatch(/'cell-total'\?: \(\(ctx: \{ value: any \}\) => JSX\.Element\) \| undefined;/);
+    expect(type).toMatch(
+      /'cell-total'\?: \(\(ctx: \{ value: any \}\) => JSX\.Element\) \| undefined;/,
+    );
   });
 });
 

@@ -26,35 +26,39 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
+
+import type { GeneratorOptions } from '@babel/generator';
 import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
-import type { GeneratorOptions } from '@babel/generator';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import { sanitizeEventName } from './sanitizeEventName.js';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
+import { hasKeyedFillIntake } from '../emit/refineSlotTypes.js';
+import { buildSlotsMerge } from './buildSlotsMerge.js';
+import { collectComponentRefTypes } from './componentRefs.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import { collectUserMethodNames } from './rewriteScript.js';
-import { collectComponentRefTypes } from './componentRefs.js';
-import { buildSlotsMerge } from './buildSlotsMerge.js';
-import { hasKeyedFillIntake } from '../emit/refineSlotTypes.js';
+import { sanitizeEventName } from './sanitizeEventName.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
 
 function flattenInlineCode(code: string): string {
-  return code.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim();
+  return code
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
 }
 
 // Phase 80 Plan 14 (D-10) — the local two-tier `buildSlotsMerge` that used
@@ -74,10 +78,7 @@ function buildTemplateSetterCall(
   rhs: t.Expression,
   compoundOpMap: Record<string, t.BinaryExpression['operator']>,
 ): t.CallExpression {
-  const setterCallee = t.memberExpression(
-    t.identifier(signalName),
-    t.identifier('set'),
-  );
+  const setterCallee = t.memberExpression(t.identifier(signalName), t.identifier('set'));
   if (operator === '=') {
     return t.callExpression(setterCallee, [rhs]);
   }
@@ -198,9 +199,7 @@ export function rewriteTemplateExpression(
   const cvaModelProp = opts.cvaModelProp ?? null;
   const cvaMergeDisabled = opts.cvaMergeDisabled ?? false;
   const mkRef = (name: string): t.Expression =>
-    prefixThis
-      ? t.memberExpression(t.thisExpression(), t.identifier(name))
-      : t.identifier(name);
+    prefixThis ? t.memberExpression(t.thisExpression(), t.identifier(name)) : t.identifier(name);
 
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
@@ -245,9 +244,7 @@ export function rewriteTemplateExpression(
   const helperIdentifiers: ReadonlySet<string> =
     prefixThis && scriptProgram
       ? new Set(
-          [...collectUserMethodNames(scriptProgram)].filter(
-            (name) => !signalIdentifiers.has(name),
-          ),
+          [...collectUserMethodNames(scriptProgram)].filter((name) => !signalIdentifiers.has(name)),
         )
       : new Set();
 
@@ -307,8 +304,18 @@ export function rewriteTemplateExpression(
   });
 
   const COMPOUND_OP_MAP: Record<string, t.BinaryExpression['operator']> = {
-    '+=': '+', '-=': '-', '*=': '*', '/=': '/', '%=': '%', '**=': '**',
-    '<<=': '<<', '>>=': '>>', '>>>=': '>>>', '&=': '&', '|=': '|', '^=': '^',
+    '+=': '+',
+    '-=': '-',
+    '*=': '*',
+    '/=': '/',
+    '%=': '%',
+    '**=': '**',
+    '<<=': '<<',
+    '>>=': '>>',
+    '>>>=': '>>>',
+    '&=': '&',
+    '|=': '|',
+    '^=': '^',
   };
 
   traverse(wrapper, {
@@ -325,7 +332,12 @@ export function rewriteTemplateExpression(
       // $data.X = Y → X.set(Y) — but template binding can also be
       // `$props.X = Y` for model:true props.
       if (obj.name === '$data' && dataNames.has(prop.name)) {
-        const setterCall = buildTemplateSetterCall(prop.name, node.operator, node.right, COMPOUND_OP_MAP);
+        const setterCall = buildTemplateSetterCall(
+          prop.name,
+          node.operator,
+          node.right,
+          COMPOUND_OP_MAP,
+        );
         preserveSetterTarget(setterCall);
         path.replaceWith(setterCall);
         // Do NOT path.skip(): the RHS's own `$data`/`$props`/`$refs` reads must
@@ -335,7 +347,12 @@ export function rewriteTemplateExpression(
         return;
       }
       if (obj.name === '$props' && modelProps.has(prop.name)) {
-        const setterCall = buildTemplateSetterCall(prop.name, node.operator, node.right, COMPOUND_OP_MAP);
+        const setterCall = buildTemplateSetterCall(
+          prop.name,
+          node.operator,
+          node.right,
+          COMPOUND_OP_MAP,
+        );
         // Phase 23 — Task 1: a TEMPLATE model write to the single CVA prop
         // (`@input="$model.value = x"`) also notifies the form via
         // `__rozieCvaOnChange(<newValue>)`. Template event bindings run in the
@@ -394,10 +411,7 @@ export function rewriteTemplateExpression(
                   '||',
                   read,
                   t.callExpression(
-                    t.memberExpression(
-                      t.thisExpression(),
-                      t.identifier('__rozieCvaDisabled'),
-                    ),
+                    t.memberExpression(t.thisExpression(), t.identifier('__rozieCvaDisabled')),
                     [],
                   ),
                 ),
@@ -425,12 +439,7 @@ export function rewriteTemplateExpression(
         path.replaceWith(
           componentRefNames.has(prop.name)
             ? refCall
-            : t.optionalMemberExpression(
-                refCall,
-                t.identifier('nativeElement'),
-                false,
-                true,
-              ),
+            : t.optionalMemberExpression(refCall, t.identifier('nativeElement'), false, true),
         );
         path.skip();
         return;
@@ -487,12 +496,7 @@ export function rewriteTemplateExpression(
         path.replaceWith(
           componentRefNames.has(prop.name)
             ? refCall
-            : t.optionalMemberExpression(
-                refCall,
-                t.identifier('nativeElement'),
-                false,
-                true,
-              ),
+            : t.optionalMemberExpression(refCall, t.identifier('nativeElement'), false, true),
         );
         path.skip();
         return;
@@ -600,8 +604,7 @@ export function rewriteTemplateExpression(
         const isCallee =
           (t.isCallExpression(parent) || t.isOptionalCallExpression(parent)) &&
           parent.callee === path.node;
-        const isAssignLeft =
-          t.isAssignmentExpression(parent) && parent.left === path.node;
+        const isAssignLeft = t.isAssignmentExpression(parent) && parent.left === path.node;
         if (isCallee || isAssignLeft) {
           // Already a call/assignment — no wrap.
           return;
@@ -689,10 +692,7 @@ export interface TemplateAccessorHoist {
  * matched `$props.X` (no rewritable children for this purpose). Mirrors the
  * `collectInScope` walker in rewriteScript.ts:hoistDoubleReadAccessors.
  */
-function collectTemplateAccessorReads(
-  node: t.Node,
-  found: Map<string, number>,
-): void {
+function collectTemplateAccessorReads(node: t.Node, found: Map<string, number>): void {
   if (
     t.isFunctionDeclaration(node) ||
     t.isFunctionExpression(node) ||
@@ -775,9 +775,7 @@ function replaceTemplateAccessorReads(
     } else if (child && typeof child === 'object' && 'type' in child) {
       const cn = child as t.Node;
       if (isMatch(cn)) {
-        (node as unknown as Record<string, unknown>)[key] = t.identifier(
-          localName,
-        );
+        (node as unknown as Record<string, unknown>)[key] = t.identifier(localName);
       } else {
         replaceTemplateAccessorReads(cn, accessor, name, localName);
       }
@@ -865,12 +863,8 @@ export function hoistTemplateDoubleReadAccessor(
 
   // Verify each double-read accessor names a declared signal — guards against
   // hoisting an unknown `$props.X` the rewrite would not lower anyway.
-  const modelProps = new Set(
-    ir.props.filter((p) => p.isModel).map((p) => p.name),
-  );
-  const nonModelProps = new Set(
-    ir.props.filter((p) => !p.isModel).map((p) => p.name),
-  );
+  const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
+  const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
   const dataNames = new Set(ir.state.map((s) => s.name));
   const knownDoubleRead = doubleRead.filter((d) =>
     d.accessor === '$props'
@@ -895,10 +889,7 @@ export function hoistTemplateDoubleReadAccessor(
   const lowerOpts: RewriteTemplateOpts = { ...opts, prefixThis: true };
   const declLines = knownDoubleRead.map(({ accessor, name }) => {
     const localName = `__${name}`;
-    const initExpr = t.memberExpression(
-      t.identifier(accessor),
-      t.identifier(name),
-    );
+    const initExpr = t.memberExpression(t.identifier(accessor), t.identifier(name));
     const loweredInit = rewriteTemplateExpression(initExpr, ir, lowerOpts);
     return `const ${localName} = ${loweredInit};`;
   });
@@ -1029,11 +1020,9 @@ export function hoistNonPureTemplateExpression(
     n++;
   }
 
-  const decl = [
-    `protected get ${memberName}() {`,
-    `    return ${loweredReturn};`,
-    `  }`,
-  ].join('\n');
+  const decl = [`protected get ${memberName}() {`, `    return ${loweredReturn};`, `  }`].join(
+    '\n',
+  );
 
   return { memberName, decl };
 }

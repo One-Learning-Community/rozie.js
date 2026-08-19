@@ -31,19 +31,16 @@
  */
 import * as t from '@babel/types';
 import type {
+  Diagnostic,
   IRComponent,
   Listener,
-} from '../../../../core/src/ir/types.js';
-import type {
+  ModifierArg,
   ModifierRegistry,
   SvelteEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
 import { svelteCallbackPropName } from '../rewrite/rewriteScript.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import type { SvelteScriptInjection } from './emitScript.js';
 
 export interface EmitEventCtx {
@@ -79,9 +76,7 @@ export interface EmitEventCtx {
  *   hyphenated in practice).
  */
 export function svelteEventAttrName(eventName: string, isComponent: boolean): string {
-  return isComponent
-    ? svelteCallbackPropName(eventName)
-    : `on${eventName.toLowerCase()}`;
+  return isComponent ? svelteCallbackPropName(eventName) : `on${eventName.toLowerCase()}`;
 }
 
 export interface EmitTemplateEventResult {
@@ -223,10 +218,7 @@ function classifyHandler(node: t.Expression): 'identifier' | 'callable' | 'state
   return 'statement';
 }
 
-export function emitTemplateEvent(
-  listener: Listener,
-  ctx: EmitEventCtx,
-): EmitTemplateEventResult {
+export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTemplateEventResult {
   const diagnostics: Diagnostic[] = [];
   const counter = ctx.injectionCounter ?? { next: 0 };
   const eventName = listener.event;

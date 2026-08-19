@@ -56,15 +56,15 @@
 import * as t from '@babel/types';
 import type {
   IRComponent,
-  TemplateNode,
-  TemplateSlotInvocationIR,
   SlotDecl,
-} from '../../../../core/src/ir/types.js';
+  IRTemplateNode as TemplateNode,
+  TemplateSlotInvocationIR,
+} from '@rozie/core';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
-import { slotFieldName, renderRecordKey, hasKeyedFillIntake } from './refineSlotTypes.js';
-import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import type { AngularScriptInjection } from './emitTemplateEvent.js';
+import { hasKeyedFillIntake, renderRecordKey, slotFieldName } from './refineSlotTypes.js';
 
 export interface EmitSlotInvocationCtx {
   ir: IRComponent;
@@ -161,10 +161,7 @@ function renderContextLiteral(
  * factory. Uses the same `_<slotName>_ctx_<N>` suffixing pattern as
  * `_guarded<Handler>` / `_merged_<event>_<N>` synthesized methods elsewhere.
  */
-function makeSlotCtxHelperName(
-  slotName: string,
-  counter: { next: number },
-): string {
+function makeSlotCtxHelperName(slotName: string, counter: { next: number }): string {
   const base = slotName === '' ? 'defaultSlot' : slotName;
   const N = counter.next++;
   return `_${base}_ctx${N === 0 ? '' : `_${N}`}`;
@@ -255,7 +252,13 @@ function buildSlotCtxHelper(
       collisionRenames,
       loopBindings: loopParamSet,
     });
-    const exprClass = applyThisPrefixing(exprTemplate, ir, collisionRenames, loopParamSet, classMembers);
+    const exprClass = applyThisPrefixing(
+      exprTemplate,
+      ir,
+      collisionRenames,
+      loopParamSet,
+      classMembers,
+    );
     namedFields.push(`${a.name}: ${exprClass}`);
   }
   const implicitFields = node.args
@@ -264,7 +267,13 @@ function buildSlotCtxHelper(
         collisionRenames,
         loopBindings: loopParamSet,
       });
-      const exprClass = applyThisPrefixing(exprTemplate, ir, collisionRenames, loopParamSet, classMembers);
+      const exprClass = applyThisPrefixing(
+        exprTemplate,
+        ir,
+        collisionRenames,
+        loopParamSet,
+        classMembers,
+      );
       return `${a.name}: ${exprClass}`;
     })
     .join(', ');
@@ -311,9 +320,7 @@ export function emitSlotInvocation(
     // expressions in `context: {...}` bindings. When ANY arg expression
     // contains one, emit a parameterized class-body helper field and
     // reference it via plain method call from the template.
-    const hasArrowInArgs = node.args.some((a) =>
-      containsFunctionExpression(a.expression),
-    );
+    const hasArrowInArgs = node.args.some((a) => containsFunctionExpression(a.expression));
 
     if (hasArrowInArgs && ctx.scriptInjections && ctx.injectionCounter) {
       const loopBindingsList = Array.from(ctx.loopBindings ?? []);
@@ -332,12 +339,7 @@ export function emitSlotInvocation(
       // No arrows present (or no inject channel available — defensive
       // fallback for callers that don't plumb scriptInjections, e.g., the
       // per-block emitTemplate.test.ts harness): inline literal context.
-      const ctxLiteral = renderContextLiteral(
-        node,
-        ctx.ir,
-        ctx.collisionRenames,
-        ctx.loopBindings,
-      );
+      const ctxLiteral = renderContextLiteral(node, ctx.ir, ctx.collisionRenames, ctx.loopBindings);
       ctxSuffix = ctxLiteral ? `; context: ${ctxLiteral}` : '';
     }
   }

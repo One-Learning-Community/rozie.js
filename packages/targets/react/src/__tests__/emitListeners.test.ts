@@ -6,18 +6,16 @@
  * Listener.deps from Phase 2's ReactiveDepGraph spreads DIRECTLY into
  * useEffect deps[] arrays.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import type { IRComponent, SignalRef } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { emitListeners } from '../emit/emitListeners.js';
+import { renderDepArray, renderSignalRef } from '../emit/renderDepArray.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
-import { emitListeners } from '../emit/emitListeners.js';
-import { renderDepArray, renderSignalRef } from '../emit/renderDepArray.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import type { SignalRef } from '../../../../core/src/reactivity/signalRef.js';
 
 function lowerInline(rozie: string): IRComponent {
   const result = parse(rozie, { filename: 'inline.rozie' });
@@ -39,9 +37,21 @@ const STUB_IR: IRComponent = {
   lifecycle: [],
   watchers: [],
   listeners: [],
-  setupBody: { type: 'SetupBody', scriptProgram: { type: 'File', program: { type: 'Program', body: [], directives: [], sourceType: 'module' } } as any, annotations: [] },
+  setupBody: {
+    type: 'SetupBody',
+    scriptProgram: {
+      type: 'File',
+      program: { type: 'Program', body: [], directives: [], sourceType: 'module' },
+    } as any,
+    annotations: [],
+  },
   template: null,
-  styles: { type: 'StyleSection', sections: [], hasRootEscape: false, sourceLoc: { start: 0, end: 0 } } as any,
+  styles: {
+    type: 'StyleSection',
+    sections: [],
+    hasRootEscape: false,
+    sourceLoc: { start: 0, end: 0 },
+  } as any,
   sourceLoc: { start: 0, end: 0 },
 };
 
@@ -49,8 +59,25 @@ describe('renderDepArray (Plan 04-04 Task 2)', () => {
   it('Test 1 — basic mixed deps alphabetized', () => {
     const ir: IRComponent = {
       ...STUB_IR,
-      props: [{ type: 'PropDecl', name: 'open', typeAnnotation: { kind: 'literal', value: 'boolean' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } }],
-      state: [{ type: 'StateDecl', name: 'count', initializer: { type: 'NumericLiteral', value: 0 } as any, sourceLoc: { start: 0, end: 0 } }],
+      props: [
+        {
+          type: 'PropDecl',
+          name: 'open',
+          typeAnnotation: { kind: 'literal', value: 'boolean' },
+          defaultValue: null,
+          isModel: false,
+          required: false,
+          sourceLoc: { start: 0, end: 0 },
+        },
+      ],
+      state: [
+        {
+          type: 'StateDecl',
+          name: 'count',
+          initializer: { type: 'NumericLiteral', value: 0 } as any,
+          sourceLoc: { start: 0, end: 0 },
+        },
+      ],
     };
     const deps: SignalRef[] = [
       { scope: 'props', path: ['open'] },
@@ -62,7 +89,17 @@ describe('renderDepArray (Plan 04-04 Task 2)', () => {
   it('Test 2 — model:true prop reads bare local', () => {
     const ir: IRComponent = {
       ...STUB_IR,
-      props: [{ type: 'PropDecl', name: 'value', typeAnnotation: { kind: 'literal', value: 'number' }, defaultValue: null, isModel: true, required: false, sourceLoc: { start: 0, end: 0 } }],
+      props: [
+        {
+          type: 'PropDecl',
+          name: 'value',
+          typeAnnotation: { kind: 'literal', value: 'number' },
+          defaultValue: null,
+          isModel: true,
+          required: false,
+          sourceLoc: { start: 0, end: 0 },
+        },
+      ],
     };
     const deps: SignalRef[] = [{ scope: 'props', path: ['value'] }];
     expect(renderDepArray(deps, ir)).toBe('[value]');
@@ -93,7 +130,17 @@ describe('renderDepArray (Plan 04-04 Task 2)', () => {
     ];
     const ir: IRComponent = {
       ...STUB_IR,
-      props: [{ type: 'PropDecl', name: 'x', typeAnnotation: { kind: 'literal', value: 'number' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } }],
+      props: [
+        {
+          type: 'PropDecl',
+          name: 'x',
+          typeAnnotation: { kind: 'literal', value: 'number' },
+          defaultValue: null,
+          isModel: false,
+          required: false,
+          sourceLoc: { start: 0, end: 0 },
+        },
+      ],
     };
     expect(renderDepArray(deps, ir)).toBe('[props.x]');
   });
@@ -169,9 +216,13 @@ const reposition = () => {}
 `);
     const { code, scriptInjections, collectors } = emit(ir);
     expect(scriptInjections.length).toBe(1);
-    expect(scriptInjections[0]!).toMatch(/const _rozieThrottledLReposition = useThrottledCallback\(reposition,/);
+    expect(scriptInjections[0]!).toMatch(
+      /const _rozieThrottledLReposition = useThrottledCallback\(reposition,/,
+    );
     expect(scriptInjections[0]!).toMatch(/, 100\);$/);
-    expect(code).toMatch(/window\.addEventListener\('resize', _rozieThrottledLReposition, \{ passive: true \}/);
+    expect(code).toMatch(
+      /window\.addEventListener\('resize', _rozieThrottledLReposition, \{ passive: true \}/,
+    );
     expect(collectors.runtime.has('useThrottledCallback')).toBe(true);
   });
 

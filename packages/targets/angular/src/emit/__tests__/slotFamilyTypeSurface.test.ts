@@ -14,15 +14,14 @@
  * FAMILY ctx interface (keyed by the family's PascalCased prefix, mirroring
  * Lit's `pascalCaseFragment` convention) and folds it into the guard's union.
  */
-import { describe, it, expect } from 'vitest';
-import * as t from '@babel/types';
+
 import { parse as babelParse } from '@babel/parser';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import * as t from '@babel/types';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../../emitAngular.js';
 import { buildFamilyCtxDecls, buildNgTemplateContextGuard } from '../refineSlotTypes.js';
-import type { IRComponent, SlotDecl } from '../../../../../core/src/ir/types.js';
 
 const LOC = { start: 0, end: 0 };
 
@@ -64,7 +63,12 @@ describe('buildFamilyCtxDecls — family ctx interface (R6, Angular)', () => {
         namePrefix: 'cell-',
         params: [
           { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: LOC },
-          { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC },
+          {
+            type: 'ParamDecl',
+            name: 'value',
+            valueExpression: t.identifier('value'),
+            sourceLoc: LOC,
+          },
         ],
       }),
     ]);
@@ -89,7 +93,14 @@ describe('buildFamilyCtxDecls — family ctx interface (R6, Angular)', () => {
     const decls = buildFamilyCtxDecls([
       dynamicSlot({
         namePrefix: 'trigger-',
-        params: [{ type: 'ParamDecl', name: 'toggle', valueExpression: t.identifier('toggle'), sourceLoc: LOC }],
+        params: [
+          {
+            type: 'ParamDecl',
+            name: 'toggle',
+            valueExpression: t.identifier('toggle'),
+            sourceLoc: LOC,
+          },
+        ],
         paramTypes: [tsType('(open: boolean) => void')],
       }),
     ]);
@@ -108,7 +119,15 @@ describe('buildFamilyCtxDecls — family ctx interface (R6, Angular)', () => {
 describe('buildNgTemplateContextGuard — family coverage (R6)', () => {
   it('the guard union includes the family Ctx name alongside a coexisting static slot', () => {
     const guard = buildNgTemplateContextGuard('MixedFamily', [
-      { type: 'SlotDecl', name: 'header', defaultContent: null, params: [], presence: 'always', nestedSlots: [], sourceLoc: LOC },
+      {
+        type: 'SlotDecl',
+        name: 'header',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
       dynamicSlot({ namePrefix: 'cell-' }),
     ]);
     expect(guard).not.toBeNull();

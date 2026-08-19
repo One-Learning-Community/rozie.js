@@ -21,10 +21,9 @@
  * and an explicit ROZ723 diagnostic when a hoisted early-return guard references
  * the loop variable (the residual a class-field arrow truly cannot express).
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../../emitAngular.js';
 
 function emit(src: string) {
@@ -53,9 +52,7 @@ const onPick = (id) => { console.log(id); };
 </script>
 </rozie>`);
     // Inline statement chain — no class-field wrapper.
-    expect(r.code).toContain(
-      '(click)="$event.stopPropagation(); onPick(header.id)"',
-    );
+    expect(r.code).toContain('(click)="$event.stopPropagation(); onPick(header.id)"');
     // No hoisted wrapper for a side-effect-only guard.
     expect(r.code).not.toMatch(/_guarded\w*\s*=\s*\(\$event/);
     // No undefined-target miss.
@@ -91,9 +88,7 @@ const save = (id) => {};
 const go = () => {};
 </script>
 </rozie>`);
-    expect(r.code).toContain(
-      '(click)="$event.stopPropagation(); $event.preventDefault(); go()"',
-    );
+    expect(r.code).toContain('(click)="$event.stopPropagation(); $event.preventDefault(); go()"');
   });
 
   it('early-return guard (.self) keeps the hoist and this-prefixes a top-level user fn', () => {

@@ -4,11 +4,10 @@
 // keyed reconciler (`*ngFor; trackBy`) MOVES the existing DOM element on
 // reorder, so focus survives natively; the sigil lowers to `void 0` (no-op)
 // on Angular per the SPEC R4 lowering table.
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+
+import type { Diagnostic } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../emitAngular.js';
 
 const SOURCE = `<rozie name="RestoreFocusProbe">
@@ -33,9 +32,7 @@ function compileProbe(): { code: string; diagnostics: Diagnostic[] } {
     filename: 'RestoreFocusProbe.rozie',
   });
   if (!ast) {
-    throw new Error(
-      `parse() returned null AST: ${parseDiags.map((d) => d.message).join(', ')}`,
-    );
+    throw new Error(`parse() returned null AST: ${parseDiags.map((d) => d.message).join(', ')}`);
   }
   const registry = createDefaultRegistry();
   const { ir, diagnostics: lowerDiags } = lowerToIR(ast, {

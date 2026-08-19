@@ -45,7 +45,7 @@
  * same-named STATIC slots still key identically and still trip the gate —
  * the pre-existing behaviour this gate was written for is preserved exactly.
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '@rozie/core';
 import { slotIdentityKey } from './slotIdentityKey.js';
 
 export function shouldDistributeSlots(ir: IRComponent): boolean {

@@ -18,12 +18,13 @@
  *   $snapshot(x)  → x ; $el → this._ref__rozieRoot
  *   bare method/computed name → this.name (with parent-position + shadowing skips)
  */
-import { describe, expect, it } from 'vitest';
-import * as t from '@babel/types';
+
 import _generate from '@babel/generator';
 import { parse as babelParse } from '@babel/parser';
 import type { File } from '@babel/types';
-import type { IRComponent, SlotDecl, ParamDecl } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent, ParamDecl, SlotDecl } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import {
   collectMethodNamesFromProgram,
   renderExpression,
@@ -36,7 +37,7 @@ type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 function buildSlotDecl(name: string, params: ParamDecl[] = []): SlotDecl {
   return {
@@ -160,9 +161,7 @@ describe('collectMethodNamesFromProgram', () => {
       props: [prop('value', true)],
       slots: [buildSlotDecl('header')],
     });
-    const file = parseFile(
-      'const count = 1; const total = 2; const value = 4; const header = 5;',
-    );
+    const file = parseFile('const count = 1; const total = 2; const value = 4; const header = 5;');
     const names = collectMethodNamesFromProgram(file, ir);
     expect(names.size).toBe(0);
   });

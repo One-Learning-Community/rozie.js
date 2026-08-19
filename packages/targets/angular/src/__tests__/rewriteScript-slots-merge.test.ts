@@ -7,15 +7,16 @@
  *
  * Closes Angular row of F-07.3.2-05-A.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '@babel/parser';
-import _generate from '@babel/generator';
-import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
 
-const generate = (typeof _generate === 'function'
-  ? _generate
-  : (_generate as any).default) as typeof _generate;
+import _generate from '@babel/generator';
+import { parse } from '@babel/parser';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
+
+const generate = (
+  typeof _generate === 'function' ? _generate : (_generate as any).default
+) as typeof _generate;
 
 const sloc = { start: 0, end: 0 } as unknown as SlotDecl['sourceLoc'];
 

@@ -26,13 +26,12 @@
  * the data fields rename to `slots$local` / `emit$local` and the generated
  * bindings are intact.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitVue } from '../../emitVue.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -54,10 +53,7 @@ function countTopLevelConst(code: string, name: string): number {
 }
 
 describe('Vue internal-kind ↔ generated-binding deconfliction (61-07, SC-2)', () => {
-  const FIXTURE = readFileSync(
-    resolve(FIXTURES, 'VueDataBindingShadow.rozie'),
-    'utf8',
-  );
+  const FIXTURE = readFileSync(resolve(FIXTURES, 'VueDataBindingShadow.rozie'), 'utf8');
 
   it('fixture parses + lowers + emits', () => {
     expect(() => compileVue(FIXTURE, 'VueDataBindingShadow.rozie')).not.toThrow();
@@ -150,7 +146,7 @@ const greeting = () => $data.label;
   it('emits no $local rename for a non-colliding component', () => {
     const code = compileVue(CLEAN, 'VueClean.rozie');
     expect(code).not.toContain('$local');
-    expect(code).toContain("const count = ref(0);");
+    expect(code).toContain('const count = ref(0);');
     expect(code).toContain("const label = ref('hi');");
   });
 

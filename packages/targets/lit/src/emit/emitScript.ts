@@ -12,45 +12,46 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
-import type { GeneratorOptions } from '@babel/generator';
+
 import type { EncodedSourceMap } from '@ampproject/remapping';
+import type { GeneratorOptions } from '@babel/generator';
+import _generate from '@babel/generator';
+import * as t from '@babel/types';
 import type {
+  Diagnostic,
   IRComponent,
+  LifecycleHook,
   PropDecl,
   PropTypeAnnotation,
-  LifecycleHook,
   WatchHook,
-} from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
+} from '@rozie/core';
+import { buildPropJsdoc } from '@rozie/core';
+import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import {
   isPublishedSpecifier,
   rewriteRozieImport,
 } from '../../../../core/src/codegen/rewriteRozieImport.js';
 import type {
-  LitImportCollector,
+  LitContextImport,
+  LitContextImportCollector,
   LitDecoratorImportCollector,
+  LitImportCollector,
   PreactSignalsImportCollector,
   RuntimeLitImportCollector,
-  LitContextImportCollector,
-  LitContextImport,
 } from '../rewrite/collectLitImports.js';
-import { rewriteScript, collectMethodNamesFromProgram } from '../rewrite/rewriteScript.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
+import { collectMethodNamesFromProgram, rewriteScript } from '../rewrite/rewriteScript.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { emitContext } from './emitContext.js';
 import { toKebabCase } from './emitDecorator.js';
 import { emitPortals } from './emitPortals.js';
-import { emitContext } from './emitContext.js';
-import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
 
@@ -141,13 +142,20 @@ export interface EmitScriptResult {
 function renderType(t: PropTypeAnnotation): string {
   if (t.kind === 'identifier') {
     switch (t.name) {
-      case 'Number': return 'Number';
-      case 'String': return 'String';
-      case 'Boolean': return 'Boolean';
-      case 'Array': return 'Array';
-      case 'Object': return 'Object';
-      case 'Function': return 'Function';
-      default: return 'Object';
+      case 'Number':
+        return 'Number';
+      case 'String':
+        return 'String';
+      case 'Boolean':
+        return 'Boolean';
+      case 'Array':
+        return 'Array';
+      case 'Object':
+        return 'Object';
+      case 'Function':
+        return 'Function';
+      default:
+        return 'Object';
     }
   }
   if (t.kind === 'union') {
@@ -160,30 +168,37 @@ function renderType(t: PropTypeAnnotation): string {
 function renderTsType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {
     switch (ann.name) {
-      case 'Number': return 'number';
-      case 'String': return 'string';
-      case 'Boolean': return 'boolean';
+      case 'Number':
+        return 'number';
+      case 'String':
+        return 'string';
+      case 'Boolean':
+        return 'boolean';
       // Use `any[]` / `any` (not `unknown[]` / `object` / `Record<string, any>`)
       // so user-authored template expressions like `item.X` typecheck without
       // requiring an inner-element type annotation in the rozie source. Lit's
       // `repeat()` infers its element T from the iterable; with `Record<string,
       // any>` it widens to `unknown` and downstream `(child) => child.id` access
       // fails. `any` keeps the iteration ergonomic.
-      case 'Array': return 'any[]';
-      case 'Object': return 'any';
+      case 'Array':
+        return 'any[]';
+      case 'Object':
+        return 'any';
       // Converge on React's permissive `any` precedent (see
       // renderPropsInterface.ts core comment) — `unknown`'s return type is not
       // assignable to a strict typed function param (e.g. `CommandScorer<T>`),
       // producing TS2345. `| null` is retained: a Function prop has no
       // synthesizable zero value (see `zeroValueFor`), so Lit's field default
       // is `null` and the declared type must admit it.
-      case 'Function': return '((...args: any[]) => any) | null';
+      case 'Function':
+        return '((...args: any[]) => any) | null';
       // A non-builtin identifier is a bare type name referencing a type alias
       // / interface declared in the component's `<script lang="ts">` block
       // (those declarations are module-hoisted on this class-based target).
       // Pass it through verbatim — exactly as the other five targets do — so
       // the consumer's type-checker sees the real type instead of `unknown`.
-      default: return ann.name;
+      default:
+        return ann.name;
     }
   }
   if (ann.kind === 'union') {
@@ -415,12 +430,18 @@ function renderDefault(expr: t.Expression | null, ann: PropTypeAnnotation): stri
   // Fallback default per type.
   if (ann.kind === 'identifier') {
     switch (ann.name) {
-      case 'Number': return '0';
-      case 'String': return "''";
-      case 'Boolean': return 'false';
-      case 'Array': return '[]';
-      case 'Object': return '{}';
-      case 'Function': return 'null';
+      case 'Number':
+        return '0';
+      case 'String':
+        return "''";
+      case 'Boolean':
+        return 'false';
+      case 'Array':
+        return '[]';
+      case 'Object':
+        return '{}';
+      case 'Function':
+        return 'null';
     }
   }
   return 'undefined';
@@ -548,7 +569,12 @@ function emitStateField(stateName: string, init: t.Expression, ir: IRComponent):
   return `  private _${stateName} = signal${typeArg}(${initText});`;
 }
 
-function emitRefField(refName: string, elementTag: string, composedType?: string, hasElementPortal?: boolean): string {
+function emitRefField(
+  refName: string,
+  elementTag: string,
+  composedType?: string,
+  hasElementPortal?: boolean,
+): string {
   // @query targets refs by data-rozie-ref="<name>" (Plan 06.4-02 inference).
   // The selector pinned by data attribute keeps shadow-DOM scoping correct.
   // Mark with definite-assignment in case the consumer hasn't yet rendered.
@@ -675,8 +701,7 @@ function inlineHookBody(arg: t.Expression): { body: string; cleanup: string } {
           // `$onMount(() => { …; return undefined })` repro).
           const isNoCleanupReturn =
             (t.isIdentifier(last.argument) &&
-              (last.argument.name === 'undefined' ||
-                last.argument.name === 'null')) ||
+              (last.argument.name === 'undefined' || last.argument.name === 'null')) ||
             t.isNullLiteral(last.argument);
           if (isNoCleanupReturn) {
             stmts.pop();
@@ -995,22 +1020,15 @@ function classBodyFromStatements(
         ) {
           const arrow = computedCall.arguments[0]!;
           if (t.isArrowFunctionExpression(arrow) || t.isFunctionExpression(arrow)) {
-            const cast = computeTsCastWrapText(
-              decl.init,
-              (node) => generate(node, GEN_OPTS).code,
-            );
+            const cast = computeTsCastWrapText(decl.init, (node) => generate(node, GEN_OPTS).code);
             if (t.isExpression(arrow.body)) {
               methodChunks.push(
                 `  get ${name}() { return ${cast.prefix}${renderExpression(arrow.body)}${cast.suffix}; }`,
               );
             } else if (t.isBlockStatement(arrow.body)) {
-              const bodyCode = arrow.body.body
-                .map((s) => generate(s, GEN_OPTS).code)
-                .join('\n');
+              const bodyCode = arrow.body.body.map((s) => generate(s, GEN_OPTS).code).join('\n');
               if (cast.prefix === '' && cast.suffix === '') {
-                methodChunks.push(
-                  `  get ${name}() {\n${indent(bodyCode, 4)}\n  }`,
-                );
+                methodChunks.push(`  get ${name}() {\n${indent(bodyCode, 4)}\n  }`);
               } else {
                 // Cast-typed block-bodied computed — no single "return value"
                 // to splice the cast onto without re-walking every return
@@ -1026,10 +1044,7 @@ function classBodyFromStatements(
         }
 
         // Arrow functions become field-arrows (preserve `this` binding semantics)
-        if (
-          t.isArrowFunctionExpression(decl.init) ||
-          t.isFunctionExpression(decl.init)
-        ) {
+        if (t.isArrowFunctionExpression(decl.init) || t.isFunctionExpression(decl.init)) {
           // Render as `name = (args) => body;` (preserves arrow lexical this).
           // WR-01 ROOT CAUSE 2: a declarator type annotation
           // (`const f: (e: MouseEvent) => void = …`) must survive onto the
@@ -1139,8 +1154,7 @@ function lifecycleHookBody(
     // `this.reset()();` (double-call), which both fails at runtime and TDZs on
     // the inner reference because lifecycle bodies run before user arrows are
     // initialised on the class.
-    const isCallableRef =
-      t.isIdentifier(hook.setup) || t.isMemberExpression(hook.setup);
+    const isCallableRef = t.isIdentifier(hook.setup) || t.isMemberExpression(hook.setup);
     const cloned = t.cloneNode(hook.setup, true, false);
     const stmt = isCallableRef
       ? t.expressionStatement(t.callExpression(cloned, []))
@@ -1167,10 +1181,7 @@ function lifecycleHookBody(
   return { body, cleanup };
 }
 
-export function emitScript(
-  ir: IRComponent,
-  opts: EmitScriptOpts,
-): EmitScriptResult {
+export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptResult {
   const diagnostics: Diagnostic[] = [];
 
   // Decorator imports we always need.
@@ -1295,12 +1306,8 @@ export function emitScript(
   // byte-identical.
   const userImports =
     composedTypeImportsBlock +
-    (userImportNodes.length > 0
-      ? generate(t.program(userImportNodes), GEN_OPTS).code + '\n'
-      : '');
-  const hoistedTypeDecls = hoistedTypeNodes.map(
-    (decl) => generate(decl, GEN_OPTS).code,
-  );
+    (userImportNodes.length > 0 ? generate(t.program(userImportNodes), GEN_OPTS).code + '\n' : '');
+  const hoistedTypeDecls = hoistedTypeNodes.map((decl) => generate(decl, GEN_OPTS).code);
 
   // 3. Partition the rewritten program into class-level vs lifecycle.
   const partition = partitionScript(rewritten.file);
@@ -1397,13 +1404,8 @@ export function emitScript(
     // Model props are signal-backed (createLitControllableProperty), so a
     // $watch over one must take the effect() route, not the dead
     // changedProperties route — see classifyWatcherRoute.
-    const modelPropNames = new Set(
-      ir.props.filter((p) => p.isModel).map((p) => p.name),
-    );
-    const watcherCount = Math.min(
-      partition.watcherHooks.length,
-      ir.watchers.length,
-    );
+    const modelPropNames = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
+    const watcherCount = Math.min(partition.watcherHooks.length, ir.watchers.length);
     for (let i = 0; i < watcherCount; i++) {
       const w = partition.watcherHooks[i]!;
       const irWatcher = ir.watchers[i]!;
@@ -1423,14 +1425,12 @@ export function emitScript(
       });
       const getterStmt = getterRewritten.file.program.body[0]!;
       const cbStmt = cbRewritten.file.program.body[0]!;
-      const getterCode =
-        t.isExpressionStatement(getterStmt)
-          ? generate(getterStmt.expression, GEN_OPTS).code
-          : '() => {}';
-      const cbCode =
-        t.isExpressionStatement(cbStmt)
-          ? generate(cbStmt.expression, GEN_OPTS).code
-          : '() => {}';
+      const getterCode = t.isExpressionStatement(getterStmt)
+        ? generate(getterStmt.expression, GEN_OPTS).code
+        : '() => {}';
+      const cbCode = t.isExpressionStatement(cbStmt)
+        ? generate(cbStmt.expression, GEN_OPTS).code
+        : '() => {}';
       // Bind the getter's evaluated value as the callback's first argument so
       // user-authored `(v) => ...` params actually receive the new value at
       // invocation time. Without this the param is bound to `undefined`.
@@ -1640,8 +1640,7 @@ export function emitScript(
   if (portalsEmit.hasPortals) mountSegments.push(portalsEmit.closureBlock);
   if (freeStatements.trim()) mountSegments.push(freeStatements);
   if (cleanupPushes.length > 0) mountSegments.push(cleanupPushes.join('\n'));
-  if (watcherCleanupPushes.length > 0)
-    mountSegments.push(watcherCleanupPushes.join('\n'));
+  if (watcherCleanupPushes.length > 0) mountSegments.push(watcherCleanupPushes.join('\n'));
   // Phase 36 (R10 / Pattern 5) — reactive context `setValue` effect
   // registrations join the firstUpdated cleanup-push region: they subscribe to
   // the provided value's signal reads at first paint and tear down on disconnect
@@ -1660,8 +1659,7 @@ export function emitScript(
   // run only AFTER firstUpdated (Lit's lifecycle ordering), so the initial
   // mount uses firstUpdated for setup and `updated()` for reactive sync.
   const updatedSegments: string[] = [];
-  if (watcherUpdatedBranches.length > 0)
-    updatedSegments.push(watcherUpdatedBranches.join('\n'));
+  if (watcherUpdatedBranches.length > 0) updatedSegments.push(watcherUpdatedBranches.join('\n'));
   if (updateBodies.length > 0) updatedSegments.push(updateBodies.join('\n\n'));
 
   return {

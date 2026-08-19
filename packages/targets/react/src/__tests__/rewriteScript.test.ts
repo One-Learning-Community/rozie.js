@@ -16,18 +16,16 @@
 // emitScript consumes them STRUCTURALLY from ir.lifecycle.
 //
 // console.log calls survive byte-identical (DX-03 trust-erosion floor).
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import * as t from '@babel/types';
+import { fileURLToPath } from 'node:url';
 import _generate from '@babel/generator';
 import { parse as babelParse } from '@babel/parser';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { Diagnostic, IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 
@@ -35,7 +33,7 @@ type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../..');
@@ -241,7 +239,16 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
     // case below). A depth-3 write stays NON-COVERED → ROZ521 + AST unchanged.
     const src = `$data.todo.meta.title = 'x';\n`;
     const program = babelParse(src, { sourceType: 'module' });
-    const syntheticIR: Partial<IRComponent> & { props: IRComponent['props']; state: IRComponent['state']; refs: IRComponent['refs']; computed: IRComponent['computed']; emits: IRComponent['emits']; lifecycle: IRComponent['lifecycle']; listeners: IRComponent['listeners']; slots: IRComponent['slots'] } = {
+    const syntheticIR: Partial<IRComponent> & {
+      props: IRComponent['props'];
+      state: IRComponent['state'];
+      refs: IRComponent['refs'];
+      computed: IRComponent['computed'];
+      emits: IRComponent['emits'];
+      lifecycle: IRComponent['lifecycle'];
+      listeners: IRComponent['listeners'];
+      slots: IRComponent['slots'];
+    } = {
       type: 'IRComponent',
       name: 'Synthetic',
       props: [],
@@ -277,7 +284,16 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
     // quick 260718-uvq — CW-MEMBER covered subset: reactive immutable-replace.
     const src = `$data.todo.title = 'x';\n`;
     const program = babelParse(src, { sourceType: 'module' });
-    const syntheticIR: Partial<IRComponent> & { props: IRComponent['props']; state: IRComponent['state']; refs: IRComponent['refs']; computed: IRComponent['computed']; emits: IRComponent['emits']; lifecycle: IRComponent['lifecycle']; listeners: IRComponent['listeners']; slots: IRComponent['slots'] } = {
+    const syntheticIR: Partial<IRComponent> & {
+      props: IRComponent['props'];
+      state: IRComponent['state'];
+      refs: IRComponent['refs'];
+      computed: IRComponent['computed'];
+      emits: IRComponent['emits'];
+      lifecycle: IRComponent['lifecycle'];
+      listeners: IRComponent['listeners'];
+      slots: IRComponent['slots'];
+    } = {
       type: 'IRComponent',
       name: 'Synthetic',
       props: [],
@@ -312,9 +328,14 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
     const src = `const visible = $slots.header && open;\n`;
     const program = babelParse(src, { sourceType: 'module' });
     const syntheticIR: Partial<IRComponent> & {
-      props: IRComponent['props']; state: IRComponent['state']; refs: IRComponent['refs'];
-      computed: IRComponent['computed']; emits: IRComponent['emits']; lifecycle: IRComponent['lifecycle'];
-      listeners: IRComponent['listeners']; slots: IRComponent['slots'];
+      props: IRComponent['props'];
+      state: IRComponent['state'];
+      refs: IRComponent['refs'];
+      computed: IRComponent['computed'];
+      emits: IRComponent['emits'];
+      lifecycle: IRComponent['lifecycle'];
+      listeners: IRComponent['listeners'];
+      slots: IRComponent['slots'];
     } = {
       type: 'IRComponent',
       name: 'Synthetic',
@@ -355,9 +376,14 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
     const src = `const x = $slots.nonexistent;\n`;
     const program = babelParse(src, { sourceType: 'module' });
     const syntheticIR: Partial<IRComponent> & {
-      props: IRComponent['props']; state: IRComponent['state']; refs: IRComponent['refs'];
-      computed: IRComponent['computed']; emits: IRComponent['emits']; lifecycle: IRComponent['lifecycle'];
-      listeners: IRComponent['listeners']; slots: IRComponent['slots'];
+      props: IRComponent['props'];
+      state: IRComponent['state'];
+      refs: IRComponent['refs'];
+      computed: IRComponent['computed'];
+      emits: IRComponent['emits'];
+      lifecycle: IRComponent['lifecycle'];
+      listeners: IRComponent['listeners'];
+      slots: IRComponent['slots'];
     } = {
       type: 'IRComponent',
       name: 'Synthetic',
@@ -380,7 +406,16 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
     // Synthetic: $emit('hyphen-name', x) — produces invalid JS if naively rewritten.
     const src = `$emit('hyphen-name', 1);\n`;
     const program = babelParse(src, { sourceType: 'module' });
-    const syntheticIR: Partial<IRComponent> & { props: IRComponent['props']; state: IRComponent['state']; refs: IRComponent['refs']; computed: IRComponent['computed']; emits: IRComponent['emits']; lifecycle: IRComponent['lifecycle']; listeners: IRComponent['listeners']; slots: IRComponent['slots'] } = {
+    const syntheticIR: Partial<IRComponent> & {
+      props: IRComponent['props'];
+      state: IRComponent['state'];
+      refs: IRComponent['refs'];
+      computed: IRComponent['computed'];
+      emits: IRComponent['emits'];
+      lifecycle: IRComponent['lifecycle'];
+      listeners: IRComponent['listeners'];
+      slots: IRComponent['slots'];
+    } = {
       type: 'IRComponent',
       name: 'Synthetic',
       props: [],
@@ -393,9 +428,7 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
       listeners: [],
     };
     // Does not throw; the emit should sanitize / convert / diagnose.
-    expect(() =>
-      rewriteRozieIdentifiers(program, syntheticIR as IRComponent),
-    ).not.toThrow();
+    expect(() => rewriteRozieIdentifiers(program, syntheticIR as IRComponent)).not.toThrow();
   });
 });
 

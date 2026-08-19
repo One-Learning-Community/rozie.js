@@ -11,11 +11,10 @@
  * proves a component with NO `r-keynav` directive is completely untouched
  * (SPEC §11: "no corpus rebless").
  */
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { parse } from '../../../../core/src/parse.js';
 import { emitAngular } from '../emitAngular.js';
 
 function compile(src: string, filename: string): IRComponent {
@@ -509,13 +508,17 @@ describe('Angular r-keynav emitter — multi-root, grid, page, explicit index (P
     expect(code).toContain(
       "private __rozieKeynavGroupId1 = 'rozie-keynav-' + Math.random().toString(36).slice(2);",
     );
-    expect(code).toContain("private __rozieKeynavRootRef = viewChild<ElementRef<HTMLElement>>('__rozieKeynavRootRef');");
-    expect(code).toContain("private __rozieKeynavRootRef1 = viewChild<ElementRef<HTMLElement>>('__rozieKeynavRootRef1');");
+    expect(code).toContain(
+      "private __rozieKeynavRootRef = viewChild<ElementRef<HTMLElement>>('__rozieKeynavRootRef');",
+    );
+    expect(code).toContain(
+      "private __rozieKeynavRootRef1 = viewChild<ElementRef<HTMLElement>>('__rozieKeynavRootRef1');",
+    );
     expect(code).toContain('this.__rozieKeynavController = createKeynavStateMachine({');
     expect(code).toContain('this.__rozieKeynavController1 = createKeynavStateMachine({');
   });
 
-  it('multi-root: the injected Renderer2 field is declared exactly ONCE and shared by every group\'s delegation block', () => {
+  it("multi-root: the injected Renderer2 field is declared exactly ONCE and shared by every group's delegation block", () => {
     const { code } = emitTwoRoot();
     const rendererFieldCount = (
       code.match(/private __rozieKeynavRenderer = inject\(Renderer2\);/g) ?? []
@@ -540,10 +543,14 @@ describe('Angular r-keynav emitter — multi-root, grid, page, explicit index (P
     // identical escaping convention.
     // Group 0 (rows) — bare group-id/active identifiers.
     expect(code).toContain('[id]="\\`\\${__rozieKeynavGroupId}-item-\\${$index}\\`"');
-    expect(code).toContain('[attr.data-rozie-keynav-active]="rowActive() === $index ? \'\' : undefined"');
+    expect(code).toContain(
+      '[attr.data-rozie-keynav-active]="rowActive() === $index ? \'\' : undefined"',
+    );
     // Group 1 (cells) — suffixed group-id/active identifiers.
     expect(code).toContain('[id]="\\`\\${__rozieKeynavGroupId1}-item-\\${$index}\\`"');
-    expect(code).toContain('[attr.data-rozie-keynav-active]="cellActive() === $index ? \'\' : undefined"');
+    expect(code).toContain(
+      '[attr.data-rozie-keynav-active]="cellActive() === $index ? \'\' : undefined"',
+    );
   });
 
   it('multi-root: each root mints its OWN viewChild()-backed template ref, scoping Renderer2.listen naturally via DOM structure (no shared-delegation containment marker needed)', () => {
@@ -601,10 +608,12 @@ describe('Angular r-keynav emitter — multi-root, grid, page, explicit index (P
     );
     expect(code).toContain('this.__rozieKeynavRafId = requestAnimationFrame(() => {');
     expect(code).toContain('if (this.active() !== __rozieKeynavActive) return;');
-    expect(code).toContain('if (this.__rozieKeynavRafId !== null) cancelAnimationFrame(this.__rozieKeynavRafId);');
+    expect(code).toContain(
+      'if (this.__rozieKeynavRafId !== null) cancelAnimationFrame(this.__rozieKeynavRafId);',
+    );
   });
 
-  it("after-view-init active sync: the generated class calls this.__rozieKeynavSyncActive() explicitly at the end of ngAfterViewInit, in addition to the constructor effect() (71-11 lesson)", () => {
+  it('after-view-init active sync: the generated class calls this.__rozieKeynavSyncActive() explicitly at the end of ngAfterViewInit, in addition to the constructor effect() (71-11 lesson)', () => {
     const { code } = emitMenu();
     const afterViewInitMatch = code.match(/ngAfterViewInit\(\) \{([\s\S]*?)\n {2}\}/);
     expect(afterViewInitMatch).not.toBeNull();
@@ -612,7 +621,7 @@ describe('Angular r-keynav emitter — multi-root, grid, page, explicit index (P
     expect(code).toContain('effect(() => {\n      this.__rozieKeynavSyncActive();\n    });');
   });
 
-  it('BYTE-IDENTITY (non-grid single root): every pre-existing Phase-71 assertion string is still a literal substring of the menu fixture\'s emit', () => {
+  it("BYTE-IDENTITY (non-grid single root): every pre-existing Phase-71 assertion string is still a literal substring of the menu fixture's emit", () => {
     const { code } = emitMenu();
     expect(code).toContain(
       "}, { focusModel: 'tabindex', orientation: 'vertical', loop: true, typeahead: false, skipDisabled: true });",
@@ -683,9 +692,7 @@ describe('Angular r-keynav emitter — conditional-root re-attach (Plan 77-10)',
 
   it('the attach method identity-diffs the freshly-read root and detaches before re-attaching to a different one', () => {
     const { code } = emitConditionalRoot();
-    expect(code).toContain(
-      'if (__rozieKeynavRootEl === this.__rozieKeynavAttachedRoot) return;',
-    );
+    expect(code).toContain('if (__rozieKeynavRootEl === this.__rozieKeynavAttachedRoot) return;');
     const detachGuardIndex = code.indexOf(
       'if (this.__rozieKeynavDetach) { this.__rozieKeynavDetach(); this.__rozieKeynavDetach = null; }',
     );
@@ -726,8 +733,9 @@ describe('Angular r-keynav emitter — conditional-root re-attach (Plan 77-10)',
   it('the T-71-09-01 marker-validation guards survive verbatim in the new attach method (both pointerdown and focusin paths)', () => {
     const { code } = emitConditionalRoot();
     const guardOccurrences = (
-      code.match(/if \(!Number\.isInteger\(__rozieKeynavIdx\) \|\| __rozieKeynavIdx < 0\) return;/g) ??
-      []
+      code.match(
+        /if \(!Number\.isInteger\(__rozieKeynavIdx\) \|\| __rozieKeynavIdx < 0\) return;/g,
+      ) ?? []
     ).length;
     expect(guardOccurrences).toBe(2);
   });
@@ -743,13 +751,16 @@ describe('Angular r-keynav emitter — strict-containment focus guard (Plan 2608
   it('imports focusIsWithinScope from @rozie/runtime-keynav-core', () => {
     const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
     const { code } = emitAngular(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
-    expect(code).toMatch(/import \{[^}]*\bfocusIsWithinScope\b[^}]*\} from '@rozie\/runtime-keynav-core';/);
+    expect(code).toMatch(
+      /import \{[^}]*\bfocusIsWithinScope\b[^}]*\} from '@rozie\/runtime-keynav-core';/,
+    );
   });
 
   it('emits exactly ONE shared inject(ElementRef) host-anchor field, group index 0 only', () => {
     const ir = compile(TWO_ROOT_SRC, 'KeynavTwoGroups.rozie');
     const { code } = emitAngular(ir, { filename: 'KeynavTwoGroups.rozie', source: TWO_ROOT_SRC });
-    const hostFieldMatches = code.match(/private __rozieKeynavHostEl = inject\(ElementRef\);/g) ?? [];
+    const hostFieldMatches =
+      code.match(/private __rozieKeynavHostEl = inject\(ElementRef\);/g) ?? [];
     expect(hostFieldMatches.length).toBe(1);
   });
 

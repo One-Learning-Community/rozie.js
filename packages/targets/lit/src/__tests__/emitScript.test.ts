@@ -9,13 +9,12 @@
  *   - Model-prop synthesis: createLitControllableProperty + getter/setter + change-event
  *   - $props/$data/$refs/$emit/$el rewrite in <script> AST
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -149,7 +148,9 @@ describe('emitScript — Lit class-body assembly', () => {
     // property binding lands here and must establish controlled mode; routing
     // it through `write` left a property-bound two-way parent permanently
     // uncontrolled (dual-copy desync).
-    expect(code).toContain('set value(v: number) { this._valueControllable.notifyPropertyWrite(v); }');
+    expect(code).toContain(
+      'set value(v: number) { this._valueControllable.notifyPropertyWrite(v); }',
+    );
   });
 
   it('rewrites $props.X (model) compound write → controllable.write functional updater', () => {
@@ -224,7 +225,11 @@ $onMount(() => reset())
     const { ast } = parse(src, { filename: 'MountConcise.rozie' });
     const registry = createDefaultRegistry();
     const { ir } = lowerToIR(ast!, { modifierRegistry: registry });
-    const code = emitLit(ir!, { filename: 'MountConcise.rozie', source: src, modifierRegistry: registry }).code;
+    const code = emitLit(ir!, {
+      filename: 'MountConcise.rozie',
+      source: src,
+      modifierRegistry: registry,
+    }).code;
     expect(code).toMatch(/firstUpdated\(\):\s*void\s*\{\s*this\.reset\(\);\s*\}/);
     expect(code).not.toContain('this.reset()()');
   });
@@ -245,7 +250,11 @@ $onMount(reset)
     const { ast } = parse(src, { filename: 'MountIdentifier.rozie' });
     const registry = createDefaultRegistry();
     const { ir } = lowerToIR(ast!, { modifierRegistry: registry });
-    const code = emitLit(ir!, { filename: 'MountIdentifier.rozie', source: src, modifierRegistry: registry }).code;
+    const code = emitLit(ir!, {
+      filename: 'MountIdentifier.rozie',
+      source: src,
+      modifierRegistry: registry,
+    }).code;
     expect(code).toMatch(/firstUpdated\(\):\s*void\s*\{\s*this\.reset\(\);\s*\}/);
   });
 
@@ -278,14 +287,18 @@ $watch(() => $props.open, () => { if ($props.open) reposition() })
       modifierRegistry: registry,
     }).code;
     // updated() override with the prop-name branch.
-    expect(code).toMatch(/updated\(changedProperties:[\s\S]+?\):\s*void\s*\{[\s\S]*?changedProperties\.has\('open'\)/);
+    expect(code).toMatch(
+      /updated\(changedProperties:[\s\S]+?\):\s*void\s*\{[\s\S]*?changedProperties\.has\('open'\)/,
+    );
     // 260602-9lw — the props route is LAZY by default. The gate is our own
     // `__rozieFirstUpdateDone` class field, NOT `this.hasUpdated`:
     // ReactiveElement sets `hasUpdated = true` BEFORE invoking updated() on
     // the first cycle (reactive-element.js:943-946), so hasUpdated cannot
     // skip the mount fire (code-review CR-01).
     expect(code).toMatch(/private __rozieFirstUpdateDone = false;/);
-    expect(code).toMatch(/if \(this\.__rozieFirstUpdateDone && \(changedProperties\.has\('open'\)\)\)/);
+    expect(code).toMatch(
+      /if \(this\.__rozieFirstUpdateDone && \(changedProperties\.has\('open'\)\)\)/,
+    );
     // The flag flips at the END of the watcher segment of updated().
     expect(code).toMatch(/this\.__rozieFirstUpdateDone = true;/);
     // The broken hasUpdated gate must never come back.
@@ -332,7 +345,9 @@ $watch(() => $data.count, (v) => { onChange(v) })
     // first-run flag (`this.__rozieWatchInitial_N`) is read/written INSIDE
     // `untracked(...)` and the callback is skipped on the first run.
     expect(code).toMatch(/private __rozieWatchInitial_0 = true;/);
-    expect(code).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); untracked\(\(\) => \{ if \(this\.__rozieWatchInitial_0\) \{ this\.__rozieWatchInitial_0 = false; return; \} \([\s\S]+?\)\([\s\S]*?\); \}\); \}\)/);
+    expect(code).toMatch(
+      /effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); untracked\(\(\) => \{ if \(this\.__rozieWatchInitial_0\) \{ this\.__rozieWatchInitial_0 = false; return; \} \([\s\S]+?\)\([\s\S]*?\); \}\); \}\)/,
+    );
     expect(code).toMatch(/import \{[^}]*\buntracked\b[^}]*\} from '@lit-labs\/preact-signals'/);
   });
 });

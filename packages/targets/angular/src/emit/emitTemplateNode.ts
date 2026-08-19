@@ -17,28 +17,49 @@
  * @experimental — shape may change before v1.0
  */
 import type {
+  AttributeBinding,
+  Diagnostic,
   IRComponent,
-  TemplateNode,
-  TemplateElementIR,
-  TemplateConditionalIR,
-  TemplateMatchIR,
-  TemplateLoopIR,
-  TemplateSlotInvocationIR,
-  TemplateInterpolationIR,
-  TemplateStaticTextIR,
-  TemplateFragmentIR,
   Listener,
   ListenerSpreadIR,
-  AttributeBinding,
+  ModifierRegistry,
   SlotFillerDecl,
-} from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+  TemplateConditionalIR,
+  TemplateElementIR,
+  TemplateFragmentIR,
+  TemplateInterpolationIR,
+  TemplateLoopIR,
+  TemplateMatchIR,
+  IRTemplateNode as TemplateNode,
+  TemplateSlotInvocationIR,
+  TemplateStaticTextIR,
+} from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
+// Phase 79 Plan 05 (R12/D-03) — a non-identifier, non-default slot name (e.g.
+// `#cell-status`) is routed through the SAME `emitDynamicSlotFiller` /
+// `[templates]`-getter mechanism as an `isDynamic` fill (see the dispatch
+// loop below); this is the per-module direct import (T-79-08).
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import {
-  rewriteTemplateExpression,
   hoistNonPureTemplateExpression,
+  rewriteTemplateExpression,
 } from '../rewrite/rewriteTemplateExpression.js';
+import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
+import { emitConditional } from './emitConditional.js';
+import { toKebabCase } from './emitDecorator.js';
+// Phase 71 Plan 09 (r-keynav, Angular — highest blast radius), extended
+// Phase 77 Plan 05 (multi-root) — inline controller emitter wiring (see
+// emitKeynav.ts's module doc comment).
+import {
+  type KeynavEmitPlan,
+  keynavItemAttrs,
+  keynavRootAttrs,
+  stripKeynavSyntheticEvents,
+} from './emitKeynav.js';
+// Phase 07.2 Plan 03 — consumer-side slot-fill emit for component-tag elements.
+// Phase 07.2 Plan 04 — R5 dynamic-name dispatch via emitDynamicSlotFiller.
+import { type EmitSlotFillerCtx, emitDynamicSlotFiller, emitSlotFiller } from './emitSlotFiller.js';
+import { emitSlotInvocation } from './emitSlotInvocation.js';
 import {
   emitAttributes,
   emitListenerSpread,
@@ -47,35 +68,10 @@ import {
   findRShow,
 } from './emitTemplateAttribute.js';
 import {
+  type AngularScriptInjection,
   emitTemplateEvent,
   resolveEventBindingName,
-  type AngularScriptInjection,
 } from './emitTemplateEvent.js';
-import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
-import { emitSlotInvocation } from './emitSlotInvocation.js';
-import { emitConditional } from './emitConditional.js';
-import { toKebabCase } from './emitDecorator.js';
-// Phase 07.2 Plan 03 — consumer-side slot-fill emit for component-tag elements.
-// Phase 07.2 Plan 04 — R5 dynamic-name dispatch via emitDynamicSlotFiller.
-import {
-  emitSlotFiller,
-  emitDynamicSlotFiller,
-  type EmitSlotFillerCtx,
-} from './emitSlotFiller.js';
-// Phase 79 Plan 05 (R12/D-03) — a non-identifier, non-default slot name (e.g.
-// `#cell-status`) is routed through the SAME `emitDynamicSlotFiller` /
-// `[templates]`-getter mechanism as an `isDynamic` fill (see the dispatch
-// loop below); this is the per-module direct import (T-79-08).
-import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
-// Phase 71 Plan 09 (r-keynav, Angular — highest blast radius), extended
-// Phase 77 Plan 05 (multi-root) — inline controller emitter wiring (see
-// emitKeynav.ts's module doc comment).
-import {
-  keynavItemAttrs,
-  keynavRootAttrs,
-  stripKeynavSyntheticEvents,
-  type KeynavEmitPlan,
-} from './emitKeynav.js';
 
 /**
  * Phase 06.2 P2: resolve a TemplateElement's emitted tag name. For
@@ -97,8 +93,19 @@ function resolveAngularTagName(node: TemplateElementIR): string {
 
 /** HTML void elements. */
 const VOID_ELEMENTS = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
-  'source', 'track', 'wbr',
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'source',
+  'track',
+  'wbr',
 ]);
 
 export interface EmitNodeCtx {
@@ -252,10 +259,7 @@ function listenerFromLiteralKey(
   };
 }
 
-function emitInterpolation(
-  node: TemplateInterpolationIR,
-  ctx: EmitNodeCtx,
-): string {
+function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): string {
   // Emitter-hardening item #7 sub-shape (ii) — an inline arrow/function
   // literal anywhere in the interpolated expression (e.g.
   // `{{ items().find((x) => x > 1) }}`) is illegal in Angular's template
@@ -306,10 +310,7 @@ function emitInterpolation(
   return `{{ ${expr} }}`;
 }
 
-function emitFragment(
-  node: TemplateFragmentIR,
-  ctx: EmitNodeCtx,
-): string {
+function emitFragment(node: TemplateFragmentIR, ctx: EmitNodeCtx): string {
   return node.children.map((c) => emitNode(c, ctx)).join('');
 }
 
@@ -372,9 +373,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     if (n.type !== 'TemplateElement') return n;
     return {
       ...n,
-      attributes: n.attributes.filter(
-        (a) => !(a.kind === 'binding' && a.name === 'key'),
-      ),
+      attributes: n.attributes.filter((a) => !(a.kind === 'binding' && a.name === 'key')),
     };
   };
 
@@ -507,32 +506,22 @@ function emitEvents(
       // handler) would match the `\b(\w+)\(\)` shape on `stopPropagation()` and
       // get mangled into `$event.this.stopPropagation()`. The lookbehind rejects
       // any identifier preceded by `.` (member access) or `$`/word-char.
-      inner = inner.replace(
-        /(?<![\w$.])([a-zA-Z_$][\w$]*)\(\$event\)/g,
-        (_match, fn: string) => {
-          if (fn === 'this') return _match;
-          // The collision-renamed user methods already carry `_` prefix from
-          // rewriteScript — keep that as-is, just add `this.`.
-          return `this.${fn}($event)`;
-        },
-      );
-      inner = inner.replace(
-        /(?<![\w$.])([a-zA-Z_$][\w$]*)\(\)/g,
-        (_match, fn: string) => {
-          if (fn === 'this') return _match;
-          return `this.${fn}()`;
-        },
-      );
+      inner = inner.replace(/(?<![\w$.])([a-zA-Z_$][\w$]*)\(\$event\)/g, (_match, fn: string) => {
+        if (fn === 'this') return _match;
+        // The collision-renamed user methods already carry `_` prefix from
+        // rewriteScript — keep that as-is, just add `this.`.
+        return `this.${fn}($event)`;
+      });
+      inner = inner.replace(/(?<![\w$.])([a-zA-Z_$][\w$]*)\(\)/g, (_match, fn: string) => {
+        if (fn === 'this') return _match;
+        return `this.${fn}()`;
+      });
       // Wrapper signature is `($event: any) => {...}` so user-side `$event`
       // references resolve naturally — no rewrite needed.
       guardLines.push(`  ${inner};`);
     }
 
-    const decl = [
-      `private ${wrapperName} = ($event: any) => {`,
-      ...guardLines,
-      `};`,
-    ].join('\n');
+    const decl = [`private ${wrapperName} = ($event: any) => {`, ...guardLines, `};`].join('\n');
     ctx.scriptInjections.push({ name: wrapperName, decl });
 
     out.push(`(${eventName})="${wrapperName}($event)"`);
@@ -637,9 +626,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   if (node.remountKeyExpression) {
     node = {
       ...node,
-      attributes: node.attributes.filter(
-        (a) => !(a.kind === 'binding' && a.name === 'key'),
-      ),
+      attributes: node.attributes.filter((a) => !(a.kind === 'binding' && a.name === 'key')),
     };
   }
 
@@ -647,41 +634,41 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   // long form) for FormsModule wiring. r-model on form-input always lowers to one of
   // these in emitTemplateAttribute → r-model presence on form-input tag triggers it.
   for (const a of node.attributes) {
-    if (
-      a.kind === 'binding' &&
-      a.name === 'r-model' &&
-      isFormInputTag(node.tagName)
-    ) {
+    if (a.kind === 'binding' && a.name === 'r-model' && isFormInputTag(node.tagName)) {
       ctx.hasNgModel.value = true;
       break;
     }
   }
 
-  const attrText = emitAttributes(node.attributes, {
-    ir: ctx.ir,
-    collisionRenames: ctx.collisionRenames,
-    loopBindings: ctx.loopBindings,
-    elementTagKind: node.tagKind,
-    // Quick task 260520-w18 follow-up — thread the class-body injection sink so
-    // a template attr expression with a double-read accessor can synthesise a
-    // single-read getter member (strictTemplates double-signal-call narrowing).
-    scriptInjections: ctx.scriptInjections,
-    // Plan 14-05 — thread the shared injection counter (used by template-event
-    // debounce/throttle wrappers) so the `rozieSpread_<N>` ref/effect-field
-    // names never collide with same-component event wrappers.
-    injectionCounter: ctx.injectionCounter,
-    // Plan 14-05 — flag that emitAngular reads to add inject/Renderer2/
-    // ElementRef/effect/viewChild to the @angular/core import line.
-    hasSpreadBinding: ctx.hasSpreadBinding,
-    // Phase 26 — thread the display-wrap flag so a wrapped attribute / class
-    // interpolation flips it (same flag the text path uses), gating Task 2's
-    // inline fn + class-method synthesis.
-    hasDisplayWrap: ctx.hasDisplayWrap,
-    // Phase 23 — Task 2: thread the CVA gate so a bound `:disabled` read
-    // OR-merges `this.__rozieCvaDisabled()`.
-    cvaModelProp: ctx.cvaModelProp,
-    cvaMergeDisabled: ctx.cvaMergeDisabled,
-  }, node.tagName);
+  const attrText = emitAttributes(
+    node.attributes,
+    {
+      ir: ctx.ir,
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+      elementTagKind: node.tagKind,
+      // Quick task 260520-w18 follow-up — thread the class-body injection sink so
+      // a template attr expression with a double-read accessor can synthesise a
+      // single-read getter member (strictTemplates double-signal-call narrowing).
+      scriptInjections: ctx.scriptInjections,
+      // Plan 14-05 — thread the shared injection counter (used by template-event
+      // debounce/throttle wrappers) so the `rozieSpread_<N>` ref/effect-field
+      // names never collide with same-component event wrappers.
+      injectionCounter: ctx.injectionCounter,
+      // Plan 14-05 — flag that emitAngular reads to add inject/Renderer2/
+      // ElementRef/effect/viewChild to the @angular/core import line.
+      hasSpreadBinding: ctx.hasSpreadBinding,
+      // Phase 26 — thread the display-wrap flag so a wrapped attribute / class
+      // interpolation flips it (same flag the text path uses), gating Task 2's
+      // inline fn + class-method synthesis.
+      hasDisplayWrap: ctx.hasDisplayWrap,
+      // Phase 23 — Task 2: thread the CVA gate so a bound `:disabled` read
+      // OR-merges `this.__rozieCvaDisabled()`.
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
+    },
+    node.tagName,
+  );
 
   // Plan 15-05 — partition `node.listenerSpreads` into literal-key entries
   // (synthesized into virtual Listeners spliced alongside `node.events` so
@@ -1007,9 +994,7 @@ function astReferencesIdentifier(node: unknown, name: string): boolean {
 function hoistTempIsReferenced(node: TemplateMatchIR): boolean {
   if (node.tempName === undefined) return false;
   const tempName = node.tempName;
-  return node.branches.some(
-    (b) => b.test !== null && astReferencesIdentifier(b.test, tempName),
-  );
+  return node.branches.some((b) => b.test !== null && astReferencesIdentifier(b.test, tempName));
 }
 
 /**

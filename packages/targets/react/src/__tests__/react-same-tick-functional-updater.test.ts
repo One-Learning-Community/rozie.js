@@ -18,15 +18,14 @@
 //
 // Mirrors rewriteScript.test.ts's harness: parse → lowerToIR (createDefaultRegistry)
 // → cloneScriptProgram → rewriteRozieIdentifiers → generate.
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import _generate from '@babel/generator';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 
@@ -34,7 +33,7 @@ type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = resolve(__dirname, 'fixtures');

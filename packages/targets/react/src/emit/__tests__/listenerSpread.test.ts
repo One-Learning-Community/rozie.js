@@ -28,13 +28,12 @@
  * emits `{...mergeListeners({ onClick: ($event) => { f1($event); } },
  * $listeners)}` — D-19 keeps $listeners unwrapped, R6 keeps both firing.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../../emitReact.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -177,8 +176,8 @@ const f1 = () => undefined;
     expect(jsx).toContain('normalizeListeners(someObj)');
     expect(jsx).toContain('onClick:');
     // The runtime imports MUST be collected.
-    expect(code).toContain("mergeListeners");
-    expect(code).toContain("normalizeListeners");
+    expect(code).toContain('mergeListeners');
+    expect(code).toContain('normalizeListeners');
   });
 
   it('(6) bare $listeners (D-19 exempt): r-on="$listeners" → {...attrs}', () => {

@@ -11,24 +11,19 @@
 //
 // The dynamic write-site/disabled-read hookup + diagnostics are Plan 03; the
 // config gate default-OFF wiring is Plan 04 — out of scope here.
-import { describe, expect, it } from 'vitest';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+
 import { readFileSync } from 'node:fs';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import { emitAngular, type EmitAngularOptions } from '../emitAngular.js';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { type EmitAngularOptions, emitAngular } from '../emitAngular.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CVA_FIXTURES = resolve(__dirname, 'cva-fixtures');
 
-function compileAngular(
-  src: string,
-  filename: string,
-  opts: EmitAngularOptions = {},
-): string {
+function compileAngular(src: string, filename: string, opts: EmitAngularOptions = {}): string {
   const result = parse(src, { filename });
   if (!result.ast) {
     throw new Error(
@@ -104,10 +99,7 @@ describe('emitAngular CVA — Task 2: methods + members (single-model)', () => {
   // window). The emitted accessor guards the write so writeValue(null) is a
   // no-op that reads nothing.
   it('writeValue guards (no signal re-read) for a required-no-default model prop', () => {
-    const reqCode = compileAngular(
-      fixture('SingleModelRequired'),
-      'SingleModelRequired.rozie',
-    );
+    const reqCode = compileAngular(fixture('SingleModelRequired'), 'SingleModelRequired.rozie');
     // The required-no-default shape emits the guard, not a `?? this.value()`
     // re-read of the not-yet-bound required signal.
     expect(reqCode).toContain('if (v != null) this.value.set(v);');
@@ -140,15 +132,11 @@ describe('emitAngular CVA — Task 3: decorator providers + host (single-model)'
   });
 
   it('imports NG_VALUE_ACCESSOR from @angular/forms', () => {
-    expect(code).toMatch(
-      /import \{[^}]*\bNG_VALUE_ACCESSOR\b[^}]*\} from '@angular\/forms';/,
-    );
+    expect(code).toMatch(/import \{[^}]*\bNG_VALUE_ACCESSOR\b[^}]*\} from '@angular\/forms';/);
   });
 
   it('imports forwardRef from @angular/core', () => {
-    expect(code).toMatch(
-      /import \{[^}]*\bforwardRef\b[^}]*\} from '@angular\/core';/,
-    );
+    expect(code).toMatch(/import \{[^}]*\bforwardRef\b[^}]*\} from '@angular\/core';/);
   });
 });
 

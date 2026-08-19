@@ -17,14 +17,13 @@
 //   R1 — `$classSelector('grip')` compiles with no error diagnostic.
 //   R2 — emitted output contains the literal `".grip"` / `".panel"` for BOTH
 //        the `<script>`-position call AND the `:attr`-position call.
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import type { Diagnostic } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSvelte } from '../emitSvelte.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -36,9 +35,7 @@ function compileProbe(): { code: string; diagnostics: Diagnostic[] } {
   const source = readFileSync(resolve(ROOT, `examples/${filename}`), 'utf8');
   const { ast, diagnostics: parseDiags } = parse(source, { filename });
   if (!ast) {
-    throw new Error(
-      `parse() returned null AST: ${parseDiags.map((d) => d.message).join(', ')}`,
-    );
+    throw new Error(`parse() returned null AST: ${parseDiags.map((d) => d.message).join(', ')}`);
   }
   const registry = createDefaultRegistry();
   const { ir, diagnostics: lowerDiags } = lowerToIR(ast, {

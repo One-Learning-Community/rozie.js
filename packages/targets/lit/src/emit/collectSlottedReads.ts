@@ -28,10 +28,11 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _traverse from '@babel/traverse';
+
 import type { NodePath } from '@babel/traverse';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import _traverse from '@babel/traverse';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern) — mirrors every
 // other traverse-consuming module in this codebase.
@@ -39,7 +40,7 @@ type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 const SLOTTED_SIGIL = '$slotted';
 

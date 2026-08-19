@@ -16,14 +16,13 @@
  * (fixture A = two `anchorEl` declarations; fixture B = `let nextId = 0` left in
  * the render body, un-hoisted). Task 2 flips them to the fixed assertions.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../../emitReact.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -131,7 +130,7 @@ describe('Phase 61-05 risk D + Plan 09 — synthesized-internal program-scope-on
     // redeclares the synthesized fallthrough `const attrs = props as Record<…>`
     // → renamed to `attrs$local`. The synthesized one keeps the bare name.
     expect(code).toContain('attrs$local');
-    expect(code).toContain("const attrs$local = {");
+    expect(code).toContain('const attrs$local = {');
     // The synthesized fallthrough binding keeps the bare `attrs` name.
     expect(code).toContain('const attrs = props as Record');
 

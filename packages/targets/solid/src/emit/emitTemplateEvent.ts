@@ -23,20 +23,20 @@
  */
 import * as t from '@babel/types';
 import type {
+  Diagnostic,
   IRComponent,
   Listener,
-} from '../../../../core/src/ir/types.js';
-import type {
+  ModifierArg,
   ModifierRegistry,
   SolidEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
 import { domElementType } from '../../../../core/src/codegen/domElementType.js';
+import type {
+  RuntimeSolidImportCollector,
+  SolidImportCollector,
+} from '../rewrite/collectSolidImports.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 export interface EmitEventCtx {
   ir: IRComponent;
@@ -88,9 +88,7 @@ export interface EmitEventCtx {
    * `renderHandler` into `rewriteTemplateExpression`'s rewrite, matching every
    * other expression-attribute path.
    */
-  scopeAccessorParams?:
-    | { accessorIdent: string; params: ReadonlyMap<string, string> }
-    | undefined;
+  scopeAccessorParams?: { accessorIdent: string; params: ReadonlyMap<string, string> } | undefined;
 }
 
 export interface EmitTemplateEventResult {
@@ -227,10 +225,7 @@ function eventNameToJsxProp(eventName: string): string {
  * param flows into each inner typed handler. A component tag (no `elementTag`)
  * keeps the bare event type (byte-identical to NEW-3).
  */
-export function solidEventParamType(
-  eventOrProp: string,
-  elementTag: string | undefined,
-): string {
+export function solidEventParamType(eventOrProp: string, elementTag: string | undefined): string {
   const eventType = domEventType(eventOrProp);
   return elementTag !== undefined
     ? `${eventType} & { currentTarget: ${domElementType(elementTag)}; target: Element }`
@@ -251,10 +246,7 @@ export function solidEventParamType(
  * component handler is left unannotated and TS infers the param from the prop.
  * (Native-element behavior is byte-identical to before.)
  */
-export function solidEventParam(
-  eventOrProp: string,
-  elementTag: string | undefined,
-): string {
+export function solidEventParam(eventOrProp: string, elementTag: string | undefined): string {
   return elementTag !== undefined
     ? `$event: ${solidEventParamType(eventOrProp, elementTag)}`
     : '$event';
@@ -264,7 +256,8 @@ export function domEventType(eventOrProp: string): string {
   const s = eventOrProp.replace(/^on/, '').toLowerCase();
   if (s.startsWith('key')) return 'KeyboardEvent';
   if (/^(click|dblclick|mouse|contextmenu|auxclick)/.test(s)) return 'MouseEvent';
-  if (s.startsWith('pointer') || s === 'gotpointercapture' || s === 'lostpointercapture') return 'PointerEvent';
+  if (s.startsWith('pointer') || s === 'gotpointercapture' || s === 'lostpointercapture')
+    return 'PointerEvent';
   if (s.startsWith('touch')) return 'TouchEvent';
   if (s.startsWith('wheel')) return 'WheelEvent';
   if (s.startsWith('drag') || s === 'drop') return 'DragEvent';
@@ -306,8 +299,7 @@ function makeWrapName(
 ): string {
   const baseName = t.isIdentifier(handler) ? handler.name : `handler${counter.next}`;
   const cap = baseName.charAt(0).toUpperCase() + baseName.slice(1);
-  const prefix =
-    helperName === 'createDebouncedHandler' ? '_rozieDebounced' : '_rozieThrottled';
+  const prefix = helperName === 'createDebouncedHandler' ? '_rozieDebounced' : '_rozieThrottled';
   const N = counter.next++;
   return N === 0 ? `${prefix}${cap}` : `${prefix}${cap}_${N}`;
 }
@@ -317,9 +309,7 @@ function renderHandler(
   ir: IRComponent,
   invokeAccessors?: ReadonlySet<string> | undefined,
   loopValueBindings?: ReadonlySet<string> | undefined,
-  scopeAccessorParams?:
-    | { accessorIdent: string; params: ReadonlyMap<string, string> }
-    | undefined,
+  scopeAccessorParams?: { accessorIdent: string; params: ReadonlyMap<string, string> } | undefined,
 ): string {
   // Phase 16 R2 / D-03 — thread the loop-accessor unwrap set into the
   // template-expression rewriter. The set is sourced from `EmitEventCtx`
@@ -337,7 +327,11 @@ function renderHandler(
   // handler (`@click="applyNext(setLink)"`, `@click="unsetLink()"`) lowers to
   // `_rozieScope().<prop>` like every other attribute-expression path, instead
   // of emitting a bare (undefined, or accidentally-global) identifier.
-  return rewriteTemplateExpression(handler, ir, { invokeAccessors, loopValueBindings, scopeAccessorParams });
+  return rewriteTemplateExpression(handler, ir, {
+    invokeAccessors,
+    loopValueBindings,
+    scopeAccessorParams,
+  });
 }
 
 /**
@@ -372,10 +366,7 @@ function classifyHandler(node: t.Expression): 'identifier' | 'callable' | 'state
 /**
  * Emit a single template @event listener as a JSX attribute for Solid.
  */
-export function emitTemplateEvent(
-  listener: Listener,
-  ctx: EmitEventCtx,
-): EmitTemplateEventResult {
+export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTemplateEventResult {
   const diagnostics: Diagnostic[] = [];
   const eventName = listener.event;
   const jsxName = eventNameToJsxProp(eventName);
@@ -456,10 +447,19 @@ export function emitTemplateEvent(
     }
 
     // Debounce/throttle helper on template @event — emit a wrapper const to script injections.
-    if (desc.helperName === 'createDebouncedHandler' || desc.helperName === 'createThrottledHandler') {
+    if (
+      desc.helperName === 'createDebouncedHandler' ||
+      desc.helperName === 'createThrottledHandler'
+    ) {
       const solidHelper = desc.helperName;
       ctx.collectors.runtime.add(solidHelper);
-      const originalHandlerCode = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams);
+      const originalHandlerCode = renderHandler(
+        listener.handler,
+        ctx.ir,
+        ctx.invokeAccessors,
+        ctx.loopValueBindings,
+        ctx.scopeAccessorParams,
+      );
       // Spike-012 NEW-2 — a statement-kind handler (`@input.debounce(300)="bump()"`)
       // must be wrapped in a thunk so the FUNCTION is debounced, not its invoked
       // `void` result (TS2345).
@@ -499,7 +499,13 @@ export function emitTemplateEvent(
     // Pure helper-wrap: reference the wrapper name directly.
     handlerExpr = handlerRef;
   } else if (inlineGuards.length === 0) {
-    const code = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams);
+    const code = renderHandler(
+      listener.handler,
+      ctx.ir,
+      ctx.invokeAccessors,
+      ctx.loopValueBindings,
+      ctx.scopeAccessorParams,
+    );
     if (handlerKind === 'identifier') {
       handlerExpr = code;
     } else if (handlerKind === 'callable') {
@@ -532,7 +538,13 @@ export function emitTemplateEvent(
       // Optional-call so optional callback props don't TS2722.
       handlerInvocation = `(${renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams)})?.($event)`;
     } else {
-      handlerInvocation = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams);
+      handlerInvocation = renderHandler(
+        listener.handler,
+        ctx.ir,
+        ctx.invokeAccessors,
+        ctx.loopValueBindings,
+        ctx.scopeAccessorParams,
+      );
     }
     handlerExpr = `(${eventParam}) => { ${guardLines} ${handlerInvocation}; }`;
   }

@@ -37,7 +37,7 @@
  * identical to the pre-lift output for the same input (behavior-preserving —
  * Angular leaf output must stay byte-identical, CONTEXT P1).
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '@rozie/core';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 
 export function collectComponentRefTypes(ir: IRComponent): Map<string, string> {

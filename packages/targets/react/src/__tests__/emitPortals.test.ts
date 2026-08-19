@@ -5,15 +5,14 @@
  * the portal-emitting body (`buildSlotMethod`, `setAttrLine`, `pascalCase`,
  * `rendererRefLines`, closure/dispose blocks) is exercised here directly.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as t from '@babel/types';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitPortals } from '../emit/emitPortals.js';
 import {
   ReactImportCollector,
@@ -143,10 +142,7 @@ describe('emitPortals — React', () => {
     );
     expect(withParams.closureBlock).toContain('{ item: unknown }');
 
-    const noParams = emitPortals(
-      buildMinimalIR({ slots: [portalSlot('item')] }),
-      newCollectors(),
-    );
+    const noParams = emitPortals(buildMinimalIR({ slots: [portalSlot('item')] }), newCollectors());
     expect(noParams.closureBlock).toContain('scope: unknown');
   });
 
@@ -188,7 +184,7 @@ describe('emitPortals — React', () => {
     expect(result.closureBlock).not.toContain('ReactivePortalHandle');
     expect(result.closureBlock).not.toContain('renderScope');
     expect(result.closureBlock).toContain('): (() => void) => {');
-    expect(result.closureBlock).toContain('if (typeof slot !== \'function\') return () => {};');
+    expect(result.closureBlock).toContain("if (typeof slot !== 'function') return () => {};");
     expect(result.closureBlock).toContain('flushSync(() => root.render(slot(scope)));');
     expect(result.closureBlock).toContain('return () => {');
   });
@@ -218,7 +214,9 @@ describe('emitPortals — React', () => {
     expect(result.closureBlock).toContain('interface ReactivePortalHandle');
     expect(result.closureBlock).toContain('default: (container');
     expect(result.closureBlock).toContain('ReactivePortalHandle => {');
-    expect(result.closureBlock).toContain('if (slot == null) return { update() {}, dispose() {} };');
+    expect(result.closureBlock).toContain(
+      'if (slot == null) return { update() {}, dispose() {} };',
+    );
     expect(result.portalSlotNames).toEqual(new Set(['default']));
   });
 

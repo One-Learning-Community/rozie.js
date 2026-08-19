@@ -21,8 +21,8 @@
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
-import type { IRComponent, PropTypeAnnotation } from '../../../../core/src/ir/types.js';
-import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
+import type { IRComponent, PropTypeAnnotation } from '@rozie/core';
+import { buildPropJsdoc } from '@rozie/core';
 import { buildSlotsRecordType } from './refineSlotTypes.js';
 
 /**
@@ -110,10 +110,7 @@ export function toPascalCase(eventName: string): string {
   return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
 }
 
-export function emitPropsInterface(
-  ir: IRComponent,
-  slotPropFields?: string[],
-): string {
+export function emitPropsInterface(ir: IRComponent, slotPropFields?: string[]): string {
   const fields: string[] = [];
 
   // Props (split by isModel).
@@ -175,7 +172,9 @@ export function emitPropsInterface(
     for (const s of ir.slots) {
       if (s.name === '') {
         // default slot → children
-        fields.push(`  children?: import('react').ReactNode | ((ctx: unknown) => import('react').ReactNode);`);
+        fields.push(
+          `  children?: import('react').ReactNode | ((ctx: unknown) => import('react').ReactNode);`,
+        );
       } else {
         fields.push(`  render${capitalize(s.name)}?: (ctx: unknown) => import('react').ReactNode;`);
       }

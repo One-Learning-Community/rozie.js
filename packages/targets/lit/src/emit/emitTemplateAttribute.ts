@@ -15,11 +15,7 @@
  * @experimental — shape may change before v1.0
  */
 import * as bt from '@babel/types';
-import type {
-  AttributeBinding,
-  IRComponent,
-  ListenerSpreadIR,
-} from '../../../../core/src/ir/types.js';
+import type { AttributeBinding, IRComponent, ListenerSpreadIR } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { kebabize, resolveLitSetterText } from './resolveLitSetterText.js';
 
@@ -131,9 +127,7 @@ export function emitTemplateAttribute(
     if (
       attr.name === 'style' &&
       bt.isObjectExpression(attr.expression) &&
-      attr.expression.properties.every(
-        (p) => bt.isObjectProperty(p) && !p.computed,
-      )
+      attr.expression.properties.every((p) => bt.isObjectProperty(p) && !p.computed)
     ) {
       const expr = rewriteTemplateExpression(attr.expression, ir);
       if (state) state.styleMapUsed = true;
@@ -143,10 +137,7 @@ export function emitTemplateAttribute(
     if (BOOLEAN_ATTRS.has(attr.name)) {
       return `?${attr.name}=\${${expr}}`;
     }
-    if (
-      (attr.name === 'value' || attr.name === 'checked') &&
-      FORM_INPUT_TAGS.has(tagName)
-    ) {
+    if ((attr.name === 'value' || attr.name === 'checked') && FORM_INPUT_TAGS.has(tagName)) {
       return `.${attr.name}=\${${expr}}`;
     }
     // Phase 26 (D-06/SPEC-4) — wrap a non-primitive default attribute binding

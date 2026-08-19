@@ -26,10 +26,9 @@
  * `$slots.header` to the SAME renamed identifier the merge decl + render site
  * use, so the helper's script-side presence check is no longer shadowed.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSvelte } from '../../emitSvelte.js';
 
 function compileSvelte(src: string, filename = 'Test.rozie'): string {
@@ -66,9 +65,7 @@ describe('script/param-scope slot shadow — script-side $slots.X coherence (Cla
     const code = compileSvelte(HEADER_PARAM_SHADOW_SCRIPT_READ);
 
     // (a) merge decl renamed.
-    expect(code).toContain(
-      'const header$$slot = $derived(__headerProp ?? snippets?.header);',
-    );
+    expect(code).toContain('const header$$slot = $derived(__headerProp ?? snippets?.header);');
     // (b) render site renamed, consistent with (a).
     expect(code).toContain('{#if header$$slot}');
     expect(code).toContain('{@render header$$slot()}');

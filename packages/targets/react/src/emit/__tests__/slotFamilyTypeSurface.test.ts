@@ -16,16 +16,15 @@
  * the full `emitReact()` integration level (byte-identity for a no-dynamic
  * component; family/no-prefix/coexistence shapes for a dynamic one).
  */
-import { describe, it, expect } from 'vitest';
-import * as t from '@babel/types';
+
 import { parse as babelParse } from '@babel/parser';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import * as t from '@babel/types';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../../emitReact.js';
-import { refineSlotTypes, buildSlotsRecordType } from '../refineSlotTypes.js';
 import { emitSlotDecl } from '../emitSlotDecl.js';
-import type { IRComponent, SlotDecl } from '../../../../../core/src/ir/types.js';
+import { buildSlotsRecordType, refineSlotTypes } from '../refineSlotTypes.js';
 
 const LOC = { start: 0, end: 0 };
 
@@ -67,7 +66,12 @@ describe('refineSlotTypes ctxInterface — paramTypes flow (D-13)', () => {
       name: 'trigger',
       defaultContent: null,
       params: [
-        { type: 'ParamDecl', name: 'toggle', valueExpression: t.identifier('toggle'), sourceLoc: LOC },
+        {
+          type: 'ParamDecl',
+          name: 'toggle',
+          valueExpression: t.identifier('toggle'),
+          sourceLoc: LOC,
+        },
       ],
       paramTypes: [tsType('(open: boolean) => void')],
       presence: 'always',
@@ -98,7 +102,17 @@ describe('refineSlotTypes ctxInterface — paramTypes flow (D-13)', () => {
 describe('buildSlotsRecordType — family type surface (R6)', () => {
   it('no dynamic-name slot at all → the pre-phase generic Record, byte-identical', () => {
     const type = buildSlotsRecordType(
-      [{ type: 'SlotDecl', name: 'header', defaultContent: null, params: [], presence: 'always', nestedSlots: [], sourceLoc: LOC }],
+      [
+        {
+          type: 'SlotDecl',
+          name: 'header',
+          defaultContent: null,
+          params: [],
+          presence: 'always',
+          nestedSlots: [],
+          sourceLoc: LOC,
+        },
+      ],
       "import('react').ReactNode",
     );
     expect(type).toBe("Record<string, () => import('react').ReactNode>");
@@ -110,8 +124,18 @@ describe('buildSlotsRecordType — family type surface (R6)', () => {
         dynamicSlot({
           namePrefix: 'cell-',
           params: [
-            { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: LOC },
-            { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC },
+            {
+              type: 'ParamDecl',
+              name: 'row',
+              valueExpression: t.identifier('row'),
+              sourceLoc: LOC,
+            },
+            {
+              type: 'ParamDecl',
+              name: 'value',
+              valueExpression: t.identifier('value'),
+              sourceLoc: LOC,
+            },
           ],
         }),
       ],
@@ -146,7 +170,14 @@ describe('buildSlotsRecordType — family type surface (R6)', () => {
           type: 'SlotDecl',
           name: 'cell-total',
           defaultContent: null,
-          params: [{ type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC }],
+          params: [
+            {
+              type: 'ParamDecl',
+              name: 'value',
+              valueExpression: t.identifier('value'),
+              sourceLoc: LOC,
+            },
+          ],
           presence: 'always',
           nestedSlots: [],
           sourceLoc: LOC,
@@ -154,14 +185,26 @@ describe('buildSlotsRecordType — family type surface (R6)', () => {
         dynamicSlot({
           namePrefix: 'cell-',
           params: [
-            { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: LOC },
-            { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC },
+            {
+              type: 'ParamDecl',
+              name: 'row',
+              valueExpression: t.identifier('row'),
+              sourceLoc: LOC,
+            },
+            {
+              type: 'ParamDecl',
+              name: 'value',
+              valueExpression: t.identifier('value'),
+              sourceLoc: LOC,
+            },
           ],
         }),
       ],
       'ReactNode',
     );
-    expect(type).toMatch(/'cell-total'\?: \(\(params: \{ value: any \}\) => ReactNode\) \| undefined;/);
+    expect(type).toMatch(
+      /'cell-total'\?: \(\(params: \{ value: any \}\) => ReactNode\) \| undefined;/,
+    );
   });
 });
 

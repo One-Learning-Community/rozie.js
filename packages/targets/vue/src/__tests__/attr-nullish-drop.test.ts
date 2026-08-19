@@ -21,11 +21,10 @@
  *   - Negative + ternary-regression assertions already reflect current behavior
  *     (they pass pre-fix and must keep passing post-fix).
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitTemplate } from '../emit/emitTemplate.js';
 
 const REGISTRY = createDefaultRegistry();

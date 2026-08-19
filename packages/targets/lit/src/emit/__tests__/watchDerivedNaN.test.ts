@@ -12,10 +12,9 @@
  * suppresses the re-fire. Fix: `!Object.is(__watchVal, this.<prevField>)`
  * in both Lit branches.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../../emitLit.js';
 
 function irFor(rozieSrc: string) {

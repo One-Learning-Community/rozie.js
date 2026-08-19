@@ -26,17 +26,17 @@
  * @experimental — shape may change before v1.0
  */
 
-import { unlinkSync } from 'node:fs';
+import { readFileSync, unlinkSync } from 'node:fs';
+import { ModifierRegistry, registerBuiltins } from '@rozie/core';
 import { createUnplugin as createUnpluginV3 } from 'unplugin';
-import { ModifierRegistry } from '@rozie/core';
-import { registerBuiltins } from '../../core/src/modifiers/registerBuiltins.js';
+import { emitSidecar } from './emitSidecar.js';
 import {
-  validateOptions,
-  assertReactPeerDeps,
-  assertSveltePeerDeps,
   assertAngularPeerDeps,
+  assertReactPeerDeps,
   assertSolidPeerDeps,
+  assertSveltePeerDeps,
   type RozieOptions,
+  validateOptions,
 } from './options.js';
 import {
   createLoadHook,
@@ -47,11 +47,9 @@ import {
   transformIncludeRozie,
   walkRozieFiles,
 } from './transform.js';
-import { emitSidecar } from './emitSidecar.js';
-import { readFileSync } from 'node:fs';
 
-export type { RozieOptions };
 export { validateOptions } from './options.js';
+export type { RozieOptions };
 
 /**
  * The createUnplugin v3 factory. Per D-48, exposes `.vite`, `.rollup`,
@@ -296,7 +294,12 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
               plugins: [
                 {
                   name: 'rozie:dep-scan-skip',
-                  setup(build: { onResolve: (opts: { filter: RegExp }, cb: (args: { path: string }) => { path: string; external: true }) => void }) {
+                  setup(build: {
+                    onResolve: (
+                      opts: { filter: RegExp },
+                      cb: (args: { path: string }) => { path: string; external: true },
+                    ) => void;
+                  }) {
                     build.onResolve({ filter: /\.rozie$/ }, (args) => ({
                       path: args.path,
                       external: true,
@@ -335,7 +338,12 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
         // `tests/visual-regression/` needs to walk `<repo>/examples/`).
         // Phase 23 — forward the CVA opt-out into the disk-prebuild leg so it
         // stays byte-identical to the Vite-runtime leg (Pitfall 2).
-        prebuildAngularRozieFiles(root, registry, options.prebuildExtraRoots ?? [], options.angular?.cva);
+        prebuildAngularRozieFiles(
+          root,
+          registry,
+          options.prebuildExtraRoots ?? [],
+          options.angular?.cva,
+        );
       },
       // When a .rozie file changes on disk, Vite's HMR lookup finds no module
       // graph entry for it (the graph entry is the synthetic .rozie.vue/.tsx id).
@@ -387,7 +395,11 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
             const msg = err instanceof Error ? err.message : String(err);
             // biome-ignore lint/suspicious/noConsole: HMR-time diagnostic
             console.warn(`[@rozie/unplugin] HMR re-emit failed for ${file}: ${msg}`);
-            try { unlinkSync(file + '.ts'); } catch { /* already absent */ }
+            try {
+              unlinkSync(file + '.ts');
+            } catch {
+              /* already absent */
+            }
           }
         }
         let candidates: string[];
@@ -429,11 +441,7 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
         // (React already invalidates its `.module.css` / `.global.css`
         // sidecars via the `candidates` list above; Solid emits styles inline
         // in the component module, so the component-module HMR carries them.)
-        if (
-          options.target === 'vue' ||
-          options.target === 'svelte' ||
-          options.target === 'lit'
-        ) {
+        if (options.target === 'vue' || options.target === 'svelte' || options.target === 'lit') {
           const styleMods = new Set<unknown>();
           const isStyleSubModule = (id: string): boolean =>
             id.includes('type=style') ||
@@ -441,8 +449,7 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
             /[?&]vue&type=style/.test(id) ||
             /[?&]svelte&type=style/.test(id);
           for (const m of mods) {
-            const imported: Iterable<{ id?: string | null }> =
-              m.importedModules ?? [];
+            const imported: Iterable<{ id?: string | null }> = m.importedModules ?? [];
             for (const dep of imported) {
               if (dep?.id && isStyleSubModule(dep.id)) styleMods.add(dep);
             }

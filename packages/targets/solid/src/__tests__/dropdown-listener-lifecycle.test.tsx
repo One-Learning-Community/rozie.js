@@ -23,9 +23,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { parse } from '@rozie/core';
+import { lowerToIR } from '@rozie/core';
+import { createDefaultRegistry } from '@rozie/core';
 import { emitSolid } from '../emitSolid.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

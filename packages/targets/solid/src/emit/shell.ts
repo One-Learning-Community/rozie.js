@@ -14,9 +14,10 @@
  *
  * @experimental — shape may change before v1.0
  */
-import MagicString from 'magic-string';
+
 import type { EncodedSourceMap } from '@ampproject/remapping';
-import type { BlockMap } from '../../../../core/src/ast/types.js';
+import type { BlockMap } from '@rozie/core';
+import MagicString from 'magic-string';
 
 export interface SolidShellParts {
   componentName: string;
@@ -200,10 +201,8 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   const moduleParts: string[] = [];
 
   if (parts.solidImports.length > 0) moduleParts.push(parts.solidImports);
-  if (parts.portalImport && parts.portalImport.length > 0)
-    moduleParts.push(parts.portalImport);
-  if (parts.keyedImport && parts.keyedImport.length > 0)
-    moduleParts.push(parts.keyedImport);
+  if (parts.portalImport && parts.portalImport.length > 0) moduleParts.push(parts.portalImport);
+  if (parts.keyedImport && parts.keyedImport.length > 0) moduleParts.push(parts.keyedImport);
   if (parts.runtimeImports.length > 0) moduleParts.push(parts.runtimeImports);
   // Phase 06.2 P2 (D-118): user-component imports.
   if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
@@ -376,8 +375,7 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   ms.overwrite(anchorStart, anchorEnd, moduleSource);
 
   if (anchorStart > 0) ms.remove(0, anchorStart);
-  if (anchorEnd < parts.rozieSource.length)
-    ms.remove(anchorEnd, parts.rozieSource.length);
+  if (anchorEnd < parts.rozieSource.length) ms.remove(anchorEnd, parts.rozieSource.length);
 
   return { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: parts.scriptMap ?? null };
 }

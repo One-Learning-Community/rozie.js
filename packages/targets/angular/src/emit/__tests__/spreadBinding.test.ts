@@ -33,19 +33,16 @@
  * Imports: emitAngular must add `inject`, `Renderer2`, `ElementRef`, `effect`,
  * `viewChild` to `@angular/core` when at least one spreadBinding is emitted.
  */
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../../core/src/ir/types.js';
 import { emitAngular } from '../../emitAngular.js';
 
 function compileAngular(src: string, filename = 'Test.rozie'): string {
   const result = parse(src, { filename });
   if (!result.ast) {
-    throw new Error(
-      `parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`,
-    );
+    throw new Error(`parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`);
   }
   const lowered = lowerToIR(result.ast, {
     modifierRegistry: createDefaultRegistry(),
@@ -176,9 +173,7 @@ describe('emitAngular — spreadBinding (Plan 14-05 Task 2 / D-01)', () => {
 </template>
 </rozie>`);
     // The applyAttrs callback signature accepts null/undefined.
-    expect(code).toMatch(
-      /\(el: HTMLElement, obj: Record<string, unknown> \| null \| undefined\)/,
-    );
+    expect(code).toMatch(/\(el: HTMLElement, obj: Record<string, unknown> \| null \| undefined\)/);
     // `safeObj` is the nullish-coalesced binding actually iterated.
     expect(code).toContain('const safeObj: Record<string, unknown> = obj ?? {};');
   });

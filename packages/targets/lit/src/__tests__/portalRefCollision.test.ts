@@ -11,11 +11,10 @@
 // Fix: the portal marker uses a DISTINCT attribute name
 // (`data-rozie-portal-ref`), so it can never collide with an author `ref=`
 // by construction, and the controller query targets that distinct name.
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { emitLit } from '../emitLit.js';
 
 function compile(src: string): string {
@@ -60,6 +59,8 @@ describe('emitLit — ref= + r-portal collision (Finding 5 / R1)', () => {
 
     // The controller query targets the distinct portal attribute (UNCACHED —
     // the SEV-1 sentinel design; a cached query would miss close→reopen).
-    expect(code).toMatch(/@query\('\[data-rozie-portal-ref="__roziePortal0"\]'\) private __roziePortal0!/);
+    expect(code).toMatch(
+      /@query\('\[data-rozie-portal-ref="__roziePortal0"\]'\) private __roziePortal0!/,
+    );
   });
 });

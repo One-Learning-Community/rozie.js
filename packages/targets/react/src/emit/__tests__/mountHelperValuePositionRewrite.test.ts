@@ -18,10 +18,9 @@
  * helper generalizing that file's `bareCallCount` to non-call value
  * positions.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../../emitReact.js';
 
 function compile(rozieSrc: string): string {
@@ -90,7 +89,9 @@ function mountEffect(emitted: string): EmittedEffect {
     (e) => e.deps === '[]' && !isPureCleanupOnlyEffectBody(e.body),
   );
   if (mounts.length !== 1) {
-    throw new Error(`expected exactly one []-dep mount-setup effect, got ${mounts.length}:\n${emitted}`);
+    throw new Error(
+      `expected exactly one []-dep mount-setup effect, got ${mounts.length}:\n${emitted}`,
+    );
   }
   return mounts[0]!;
 }
@@ -151,7 +152,9 @@ $onMount(() => {
     // the arrow wrapper (`() => { ... }`), so check ordering by index rather
     // than assume the wrapper decl is the literal first character.
     const declAt = mount.body.indexOf('const _onTickStable');
-    const registerAt = mount.body.indexOf("document.addEventListener('pointerdown', _onTickStable)");
+    const registerAt = mount.body.indexOf(
+      "document.addEventListener('pointerdown', _onTickStable)",
+    );
     expect(declAt).toBeGreaterThan(-1);
     expect(declAt).toBeLessThan(registerAt);
   });

@@ -17,10 +17,11 @@
  * Negatives: $emit() with zero args untouched; $emit(nonStringLiteral)
  * untouched; unknown slot name untouched.
  */
-import { describe, expect, it } from 'vitest';
-import * as t from '@babel/types';
+
 import { parseExpression } from '@babel/parser';
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 function buildSlotDecl(name: string): SlotDecl {

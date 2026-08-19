@@ -8,14 +8,13 @@
 // the signals-era lifecycle. NO `import.meta.url`, NO inline template
 // arrow (both break analogjs AOT — memory project_angular_aot_no_import_
 // meta_url / project_angular_aot_no_template_arrow).
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../emitAngular.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -66,9 +65,7 @@ describe('emitAngular — PortalOverlay (command-palette-portal-overlay Task 3, 
     expect(code).toMatch(/if \(el\.parentNode !== target\) \{/);
     // Resurrect guard: a never-moved, disconnected node (block-removed) must
     // NOT be appended back into a newly-truthy container.
-    expect(code).toMatch(
-      /if \(!this\.__roziePortalMoved\.has\(el\) && !el\.isConnected\) return;/,
-    );
+    expect(code).toMatch(/if \(!this\.__roziePortalMoved\.has\(el\) && !el\.isConnected\) return;/);
 
     // AOT bans (memory project_angular_aot_no_import_meta_url /
     // project_angular_aot_no_template_arrow).

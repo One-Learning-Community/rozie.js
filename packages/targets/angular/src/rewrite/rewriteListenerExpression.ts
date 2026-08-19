@@ -13,33 +13,37 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
+
+import type { GeneratorOptions } from '@babel/generator';
 import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
-import type { GeneratorOptions } from '@babel/generator';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import { sanitizeEventName } from './sanitizeEventName.js';
-import { collectComponentRefTypes } from './componentRefs.js';
-import { buildSlotsMerge } from './buildSlotsMerge.js';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
 import { hasKeyedFillIntake } from '../emit/refineSlotTypes.js';
+import { buildSlotsMerge } from './buildSlotsMerge.js';
+import { collectComponentRefTypes } from './componentRefs.js';
+import { sanitizeEventName } from './sanitizeEventName.js';
 
 // CJS interop normalization.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
 
 function flattenInlineCode(code: string): string {
-  return code.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim();
+  return code
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
 }
 
 /**
@@ -200,21 +204,14 @@ export function rewriteListenerExpression(
   const emits = new Set(ir.emits.map((e) => sanitizeEventName(e)));
 
   // signalIdentifiers: bare ID -> needs `()` invocation when read.
-  const signalIdentifiers = opts.signalMembers ?? new Set<string>([
-    ...modelProps,
-    ...nonModelProps,
-    ...dataNames,
-    ...refNames,
-    ...computedNames,
-  ]);
+  const signalIdentifiers =
+    opts.signalMembers ??
+    new Set<string>([...modelProps, ...nonModelProps, ...dataNames, ...refNames, ...computedNames]);
 
   // All class members for `this.` prefix. Includes user method names if
   // provided (otherwise just signals + emits + slot fields).
-  const classMembers = opts.classMembers ?? new Set<string>([
-    ...signalIdentifiers,
-    ...emits,
-    ...slotNames,
-  ]);
+  const classMembers =
+    opts.classMembers ?? new Set<string>([...signalIdentifiers, ...emits, ...slotNames]);
 
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
@@ -281,9 +278,7 @@ export function rewriteListenerExpression(
         // (listener handler bodies can place a write inside a ternary/arrow).
         if (prop.name === cvaModelProp) {
           const newValue = buildListenerCvaNewValue(prop.name, node.operator, node.right);
-          path.replaceWith(
-            t.sequenceExpression([setterCall, buildListenerCvaOnChange(newValue)]),
-          );
+          path.replaceWith(t.sequenceExpression([setterCall, buildListenerCvaOnChange(newValue)]));
           return;
         }
         path.replaceWith(setterCall);
@@ -319,9 +314,7 @@ export function rewriteListenerExpression(
       if (isModel && prop.name === cvaModelProp) {
         const newValue = buildListenerCvaNewValue(prop.name, op, t.numericLiteral(1));
         path.replaceWith(setterCall);
-        path.parentPath.insertAfter(
-          t.expressionStatement(buildListenerCvaOnChange(newValue)),
-        );
+        path.parentPath.insertAfter(t.expressionStatement(buildListenerCvaOnChange(newValue)));
         return;
       }
       path.replaceWith(setterCall);
@@ -350,10 +343,7 @@ export function rewriteListenerExpression(
                   '||',
                   read,
                   t.callExpression(
-                    t.memberExpression(
-                      t.thisExpression(),
-                      t.identifier('__rozieCvaDisabled'),
-                    ),
+                    t.memberExpression(t.thisExpression(), t.identifier('__rozieCvaDisabled')),
                     [],
                   ),
                 ),
@@ -369,10 +359,7 @@ export function rewriteListenerExpression(
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
         path.replaceWith(
-          t.callExpression(
-            t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
-            [],
-          ),
+          t.callExpression(t.memberExpression(t.thisExpression(), t.identifier(prop.name)), []),
         );
         path.skip();
         return;
@@ -389,12 +376,7 @@ export function rewriteListenerExpression(
         path.replaceWith(
           componentRefNames.has(prop.name)
             ? refCall
-            : t.optionalMemberExpression(
-                refCall,
-                t.identifier('nativeElement'),
-                false,
-                true,
-              ),
+            : t.optionalMemberExpression(refCall, t.identifier('nativeElement'), false, true),
         );
         path.skip();
         return;
@@ -441,10 +423,7 @@ export function rewriteListenerExpression(
       if (obj.name === '$props') {
         if (modelProps.has(prop.name) || nonModelProps.has(prop.name)) {
           path.replaceWith(
-            t.callExpression(
-              t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
-              [],
-            ),
+            t.callExpression(t.memberExpression(t.thisExpression(), t.identifier(prop.name)), []),
           );
           path.skip();
         }
@@ -452,10 +431,7 @@ export function rewriteListenerExpression(
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
         path.replaceWith(
-          t.callExpression(
-            t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
-            [],
-          ),
+          t.callExpression(t.memberExpression(t.thisExpression(), t.identifier(prop.name)), []),
         );
         path.skip();
         return;
@@ -469,12 +445,7 @@ export function rewriteListenerExpression(
         path.replaceWith(
           componentRefNames.has(prop.name)
             ? refCall
-            : t.optionalMemberExpression(
-                refCall,
-                t.identifier('nativeElement'),
-                false,
-                true,
-              ),
+            : t.optionalMemberExpression(refCall, t.identifier('nativeElement'), false, true),
         );
         path.skip();
         return;
@@ -544,9 +515,14 @@ export function rewriteListenerExpression(
       }
       // Skip Rozie magic ids.
       if (
-        name === '$props' || name === '$data' || name === '$refs' ||
-        name === '$slots' || name === '$emit' || name === '$onMount' ||
-        name === '$onUnmount' || name === '$onUpdate'
+        name === '$props' ||
+        name === '$data' ||
+        name === '$refs' ||
+        name === '$slots' ||
+        name === '$emit' ||
+        name === '$onMount' ||
+        name === '$onUnmount' ||
+        name === '$onUpdate'
       ) {
         return;
       }
@@ -560,18 +536,14 @@ export function rewriteListenerExpression(
       const isCallee =
         (t.isCallExpression(parent) || t.isOptionalCallExpression(parent)) &&
         parent.callee === path.node;
-      const isAssignLeft =
-        t.isAssignmentExpression(parent) && parent.left === path.node;
+      const isAssignLeft = t.isAssignmentExpression(parent) && parent.left === path.node;
 
       if (isAssignLeft && signalIdentifiers.has(name)) {
         // Don't rewrite — defer signal LHS handling.
         return;
       }
 
-      const memberExpr = t.memberExpression(
-        t.thisExpression(),
-        t.identifier(renamedName),
-      );
+      const memberExpr = t.memberExpression(t.thisExpression(), t.identifier(renamedName));
 
       if (isCallee || !signalIdentifiers.has(name)) {
         path.replaceWith(memberExpr);

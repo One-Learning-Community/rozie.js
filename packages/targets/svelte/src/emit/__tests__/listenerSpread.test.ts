@@ -40,10 +40,9 @@
  *     `onclick={...} use:applyListeners={__rozieAttrs}` — DOM-level
  *     addEventListener stacking handles all-fire.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSvelte } from '../../emitSvelte.js';
 
 function compile(rozieSrc: string): string {
@@ -92,7 +91,7 @@ const fn = () => undefined;
     expect(markup).toContain('onclick={fn}');
     // No runtime helper for the literal path.
     expect(markup).not.toContain('use:applyListeners');
-    expect(code).not.toContain("import { applyListeners }");
+    expect(code).not.toContain('import { applyListeners }');
   });
 
   it('(2) literal-with-merge: @click + r-on literal → R6 source-order dispatcher', () => {

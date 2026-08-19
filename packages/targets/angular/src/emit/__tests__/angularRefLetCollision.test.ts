@@ -32,18 +32,24 @@
  * confirmed to build green on all 6 targets, INCLUDING Angular
  * (`pnpm --filter @rozie-ui/chartjs-angular build` → ng-packagr success).
  */
-import { describe, expect, it } from 'vitest';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+
 import { readFileSync } from 'node:fs';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../../core/src/ir/types.js';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../../emitAngular.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FIXTURE = resolve(__dirname, '..', '..', '__tests__', 'fixtures', 'AngularRefLetCollision.rozie');
+const FIXTURE = resolve(
+  __dirname,
+  '..',
+  '..',
+  '__tests__',
+  'fixtures',
+  'AngularRefLetCollision.rozie',
+);
 
 function compileAngular(src: string, filename: string): string {
   const result = parse(src, { filename });

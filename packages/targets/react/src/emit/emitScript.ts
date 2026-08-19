@@ -23,58 +23,59 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
-import _traverse from '@babel/traverse';
-import type { NodePath } from '@babel/traverse';
-import type { GeneratorOptions } from '@babel/generator';
+
 import type { EncodedSourceMap } from '@ampproject/remapping';
+import type { GeneratorOptions } from '@babel/generator';
+import _generate from '@babel/generator';
+import type { NodePath } from '@babel/traverse';
+import _traverse from '@babel/traverse';
+import * as t from '@babel/types';
 import type {
+  ComputedDecl,
+  Diagnostic,
   IRComponent,
+  LifecycleHook,
   PropDecl,
   PropTypeAnnotation,
-  ComputedDecl,
   RefDecl,
-  StateDecl,
-  LifecycleHook,
   SetupBody,
-} from '../../../../core/src/ir/types.js';
-import type { SignalRef } from '../../../../core/src/reactivity/signalRef.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
+  SignalRef,
+  StateDecl,
+} from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
+import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { isMutableLiteralFactoryDefault } from '../../../../core/src/codegen/propDefaultFactory.js';
+import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
-import { partitionUserImports } from '../rewrite/partitionUserImports.js';
-import {
-  rewriteRozieIdentifiers,
-  deconflictDeclareThenAssignRef,
-} from '../rewrite/rewriteScript.js';
-import { hoistModuleLet } from '../rewrite/hoistModuleLet.js';
-import {
+import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
-import { computeHelperBodyDeps } from './computeHelperDeps.js';
-import { renderDepArray as renderDepArrayWithIR } from './renderDepArray.js';
-import { emitPortals } from './emitPortals.js';
-import { emitContext } from './emitContext.js';
-import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
+import { hoistModuleLet } from '../rewrite/hoistModuleLet.js';
+import { partitionUserImports } from '../rewrite/partitionUserImports.js';
+import {
+  deconflictDeclareThenAssignRef,
+  rewriteRozieIdentifiers,
+} from '../rewrite/rewriteScript.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { computeHelperBodyDeps } from './computeHelperDeps.js';
+import { emitContext } from './emitContext.js';
+import { emitPortals } from './emitPortals.js';
 import { toPascalCase } from './emitPropsInterface.js';
+import { renderDepArray as renderDepArrayWithIR } from './renderDepArray.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 // Phase 06.1 P2: GEN_OPTS gains sourceMaps:true + sourceFileName so each
 // @babel/generator call emits a per-expression child map anchored to the
@@ -470,9 +471,7 @@ function tryWrapEscapingHelperUseCallback(
     // emit the per-helper prefix for the names NOT hoisted. When NO names are
     // hoisted (the common single-emit-site case), this is byte-identical to the
     // pre-fix path.
-    const perHelperNames = [...renameMap.keys()]
-      .filter((n) => !hoistedPropNames.has(n))
-      .sort();
+    const perHelperNames = [...renameMap.keys()].filter((n) => !hoistedPropNames.has(n)).sort();
     if (perHelperNames.length > 0) {
       const renamedPairs = perHelperNames.map((n) => `${n}: ${renameMap.get(n)}`);
       destructurePrefix = `const { ${renamedPairs.join(', ')} } = props;\n  `;
@@ -493,12 +492,15 @@ function tryWrapEscapingHelperUseCallback(
     if (depsLiteral === '[]') {
       depsLiteral = '[]';
     } else {
-      const items = depsLiteral.slice(1, -1).split(', ').map((tok) => {
-        for (const [orig, renamed] of renameMap) {
-          if (tok === `props.${orig}`) return renamed;
-        }
-        return tok;
-      });
+      const items = depsLiteral
+        .slice(1, -1)
+        .split(', ')
+        .map((tok) => {
+          for (const [orig, renamed] of renameMap) {
+            if (tok === `props.${orig}`) return renamed;
+          }
+          return tok;
+        });
       const unique = [...new Set(items)].sort();
       depsLiteral = `[${unique.join(', ')}]`;
     }
@@ -600,9 +602,20 @@ function tryWrapEscapingConstUseMemo(
  */
 const MUTATING_INSTANCE_METHODS = new Set<string>([
   // Set / Map
-  'add', 'set', 'delete', 'clear',
+  'add',
+  'set',
+  'delete',
+  'clear',
   // Array
-  'push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'fill', 'copyWithin',
+  'push',
+  'pop',
+  'shift',
+  'unshift',
+  'splice',
+  'sort',
+  'reverse',
+  'fill',
+  'copyWithin',
 ]);
 
 /** A `new X()`, `[...]`, or `{...}` initializer — a freshly-built mutable instance. */
@@ -769,7 +782,9 @@ function collectPropsCallsToDestructure(body: t.Node): Set<string> {
   const wrapped: t.BlockStatement = t.isBlockStatement(body)
     ? body
     : t.blockStatement([t.expressionStatement(body as t.Expression)]);
-  const file = t.file(t.program([t.functionDeclaration(t.identifier('__h'), [], wrapped, false, false)]));
+  const file = t.file(
+    t.program([t.functionDeclaration(t.identifier('__h'), [], wrapped, false, false)]),
+  );
 
   traverse(file, {
     CallExpression(path) {
@@ -813,10 +828,7 @@ function escapingHelperDestructureNames(
  * with a bare Identifier of the mapped name. Returns a CLONED node (input
  * is not mutated).
  */
-function rewritePropsToBareLocals(
-  node: t.Node,
-  renameMap: Map<string, string>,
-): t.Node {
+function rewritePropsToBareLocals(node: t.Node, renameMap: Map<string, string>): t.Node {
   const cloned = t.cloneNode(node, true, false);
   const file = t.file(t.program([t.expressionStatement(cloned as t.Expression)]));
 
@@ -1181,9 +1193,13 @@ function tryHoistArrowToFunction(stmt: t.Statement): t.Statement | null {
     ? init.body
     : t.blockStatement([t.returnStatement(init.body)]);
 
-  const params = init.params.filter((p): p is t.Identifier | t.Pattern | t.RestElement =>
-    t.isIdentifier(p) || t.isRestElement(p) || t.isAssignmentPattern(p) ||
-    t.isObjectPattern(p) || t.isArrayPattern(p),
+  const params = init.params.filter(
+    (p): p is t.Identifier | t.Pattern | t.RestElement =>
+      t.isIdentifier(p) ||
+      t.isRestElement(p) ||
+      t.isAssignmentPattern(p) ||
+      t.isObjectPattern(p) ||
+      t.isArrayPattern(p),
   );
 
   // Phase 09 rebuild-site audit (Pattern 4 / Pitfall 3): `params` is passed by
@@ -1511,11 +1527,7 @@ function pairClonedLifecycle(
     if (!t.isCallExpression(expr)) continue;
     const callee = expr.callee;
     if (!t.isIdentifier(callee)) continue;
-    if (
-      callee.name !== '$onMount' &&
-      callee.name !== '$onUnmount' &&
-      callee.name !== '$onUpdate'
-    ) {
+    if (callee.name !== '$onMount' && callee.name !== '$onUnmount' && callee.name !== '$onUpdate') {
       continue;
     }
     const arg = expr.arguments[0];
@@ -1574,8 +1586,7 @@ function pairClonedLifecycle(
             (lastStmt.argument === null ||
               lastStmt.argument === undefined ||
               (t.isIdentifier(lastStmt.argument) &&
-                (lastStmt.argument.name === 'undefined' ||
-                  lastStmt.argument.name === 'null')) ||
+                (lastStmt.argument.name === 'undefined' || lastStmt.argument.name === 'null')) ||
               t.isNullLiteral(lastStmt.argument));
           if (isNoCleanupReturn && lastStmt && t.isReturnStatement(lastStmt)) {
             // Strip the dead return so it doesn't show up in residual emit.
@@ -1655,10 +1666,7 @@ function pairClonedWatchers(
     if (!t.isIdentifier(callee) || callee.name !== '$watch') continue;
     const getter = expr.arguments[0];
     const callback = expr.arguments[1];
-    if (
-      !getter ||
-      (!t.isArrowFunctionExpression(getter) && !t.isFunctionExpression(getter))
-    ) {
+    if (!getter || (!t.isArrowFunctionExpression(getter) && !t.isFunctionExpression(getter))) {
       continue;
     }
     if (
@@ -1890,8 +1898,7 @@ export function emitScript(
     bodyStmts,
   } = partitionUserImports(cloned);
   cloned.program.body = bodyStmts;
-  const userImports =
-    userImportNodes.length > 0 ? genImportsBlock(userImportNodes) + '\n' : '';
+  const userImports = userImportNodes.length > 0 ? genImportsBlock(userImportNodes) + '\n' : '';
   const hoistedTypeDecls = hoistedTypeNodes.map((decl) => genCode(decl));
 
   // 1c. Phase 61 Plan 05 risk A — declare-then-assign ref shadow. Rename a
@@ -1964,10 +1971,7 @@ export function emitScript(
     }
     const stateLocalNames = new Set(ir.state.map((s) => s.name));
     // First pass: collect candidate top-level `setX(arg)` calls per state key.
-    const candidatesByState = new Map<
-      string,
-      { index: number; arg: t.Expression }[]
-    >();
+    const candidatesByState = new Map<string, { index: number; arg: t.Expression }[]>();
     for (let i = 0; i < cloned.program.body.length; i++) {
       if (lifecyclePairing.consumedIndices.has(i)) continue; // GATE 1
       if (watcherPairing.consumedIndices.has(i)) continue; // GATE 1
@@ -2180,10 +2184,7 @@ export function emitScript(
     for (const name of allHelperNames) {
       const body = helperBodyByName.get(name);
       if (!body) continue;
-      const deps = renderDepArrayWithIR(
-        computeHelperBodyDeps(body, ir, allHelperNames, name),
-        ir,
-      );
+      const deps = renderDepArrayWithIR(computeHelperBodyDeps(body, ir, allHelperNames, name), ir);
       if (deps === '[]') continue;
       if (reservedNames.has(name)) continue;
       if (reservedRefIdents.has(`_${name}Ref`)) continue;
@@ -2535,7 +2536,8 @@ export function emitScript(
             (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
             parent.property === p.node &&
             !parent.computed
-          ) return;
+          )
+            return;
           if (t.isObjectProperty(parent) && parent.key === p.node && !parent.shorthand) return;
           if (t.isVariableDeclarator(parent) && parent.id === p.node) return;
           if (t.isFunctionDeclaration(parent) && parent.id === p.node) return;
@@ -2597,7 +2599,13 @@ export function emitScript(
       // OWN body's discovery.
       const setupModel = new Set<string>();
       const setupNonModel = new Set<string>();
-      findRefsInBody(setupBodyForRewrite, setupModel, setupNonModel, bareNamesForHook, memberNamesForHook);
+      findRefsInBody(
+        setupBodyForRewrite,
+        setupModel,
+        setupNonModel,
+        bareNamesForHook,
+        memberNamesForHook,
+      );
 
       // Walk cleanup too (engine wrappers sometimes read props from cleanup
       // for teardown sequencing).
@@ -2611,7 +2619,13 @@ export function emitScript(
           cleanupBodyForRewrite = cleanupCloned;
         }
         if (cleanupBodyForRewrite) {
-          findRefsInBody(cleanupBodyForRewrite, cleanupModel, cleanupNonModel, bareNamesForHook, memberNamesForHook);
+          findRefsInBody(
+            cleanupBodyForRewrite,
+            cleanupModel,
+            cleanupNonModel,
+            bareNamesForHook,
+            memberNamesForHook,
+          );
         }
       }
 
@@ -2687,50 +2701,54 @@ export function emitScript(
         (helperSetup?.rewritten.size ?? 0) > 0 ||
         (helperSetup?.wrapped.size ?? 0) > 0
       ) {
-      // The helper pass mutated the SAME body node in place (its callee slots),
-      // so the prop rewrite below runs over the already-indirected body and
-      // both changes land in ONE rebuilt arrow.
-      const rewrittenInner =
-        setupModel.size > 0 || setupNonModel.size > 0
-          ? rewriteWatchedPropReads(
-              helperSetup ? helperSetup.node : setupBodyForRewrite,
-              localModel,
-              localNonModel,
-            )
-          : helperSetup!.node;
-      // Phase 09 rebuild-site audit (Pattern 4 / Pitfall 3): both the arrow
-      // and function-expression rebuilds below reuse `setupCloned.params` /
-      // `cleanupCloned.params` by reference — every param `typeAnnotation`
-      // survives. `t.arrowFunctionExpression` / `t.functionExpression` do NOT
-      // carry `returnType` / `typeParameters`; the locked Phase 09 TS surface
-      // excludes both, so the drop is in scope and intentional.
-      let newSetupCloned: t.Expression | t.BlockStatement;
-      if (t.isArrowFunctionExpression(setupCloned)) {
-        newSetupCloned = t.arrowFunctionExpression(
-          setupCloned.params,
-          rewrittenInner,
-          setupCloned.async,
-        );
-      } else if (t.isFunctionExpression(setupCloned)) {
-        newSetupCloned = t.functionExpression(
-          setupCloned.id,
-          setupCloned.params,
-          t.isBlockStatement(rewrittenInner)
-            ? rewrittenInner
-            : t.blockStatement([t.returnStatement(rewrittenInner)]),
-          setupCloned.generator ?? false,
-          setupCloned.async ?? false,
-        );
-      } else {
-        newSetupCloned = rewrittenInner;
-      }
-      rewrittenSetupByIdx.set(idx, newSetupCloned);
+        // The helper pass mutated the SAME body node in place (its callee slots),
+        // so the prop rewrite below runs over the already-indirected body and
+        // both changes land in ONE rebuilt arrow.
+        const rewrittenInner =
+          setupModel.size > 0 || setupNonModel.size > 0
+            ? rewriteWatchedPropReads(
+                helperSetup ? helperSetup.node : setupBodyForRewrite,
+                localModel,
+                localNonModel,
+              )
+            : helperSetup!.node;
+        // Phase 09 rebuild-site audit (Pattern 4 / Pitfall 3): both the arrow
+        // and function-expression rebuilds below reuse `setupCloned.params` /
+        // `cleanupCloned.params` by reference — every param `typeAnnotation`
+        // survives. `t.arrowFunctionExpression` / `t.functionExpression` do NOT
+        // carry `returnType` / `typeParameters`; the locked Phase 09 TS surface
+        // excludes both, so the drop is in scope and intentional.
+        let newSetupCloned: t.Expression | t.BlockStatement;
+        if (t.isArrowFunctionExpression(setupCloned)) {
+          newSetupCloned = t.arrowFunctionExpression(
+            setupCloned.params,
+            rewrittenInner,
+            setupCloned.async,
+          );
+        } else if (t.isFunctionExpression(setupCloned)) {
+          newSetupCloned = t.functionExpression(
+            setupCloned.id,
+            setupCloned.params,
+            t.isBlockStatement(rewrittenInner)
+              ? rewrittenInner
+              : t.blockStatement([t.returnStatement(rewrittenInner)]),
+            setupCloned.generator ?? false,
+            setupCloned.async ?? false,
+          );
+        } else {
+          newSetupCloned = rewrittenInner;
+        }
+        rewrittenSetupByIdx.set(idx, newSetupCloned);
       }
 
       // Quick 260803-swj seam 2 (follow-up) — same per-body gate for cleanup.
       const helperCleanup =
         helperRewriteActive && cleanupBodyForRewrite
-          ? rewriteMountHelperCalls(cleanupBodyForRewrite, eligibleMountHelpers, wrappableForThisHook)
+          ? rewriteMountHelperCalls(
+              cleanupBodyForRewrite,
+              eligibleMountHelpers,
+              wrappableForThisHook,
+            )
           : null;
       if (helperCleanup) {
         for (const n of helperCleanup.rewritten) actuallyRewrittenMountHelpers.add(n);
@@ -2850,9 +2868,7 @@ export function emitScript(
   // (matches Vue 3's withDefaults factory-default behavior). The previous
   // inline `(<factory>)()` form re-invoked the factory on every render,
   // breaking referential equality across renders.
-  const defaultedNonModelProps = ir.props.filter(
-    (p) => !p.isModel && p.defaultValue !== null,
-  );
+  const defaultedNonModelProps = ir.props.filter((p) => !p.isModel && p.defaultValue !== null);
   let propsDefaultsBlock = '';
   if (defaultedNonModelProps.length > 0) {
     // Step 1 — for FACTORY defaults, emit `const __default<X> = useRef(() =>
@@ -2877,9 +2893,7 @@ export function emitScript(
         // The setter is dropped because the cached value never changes.
         // useRef(() => factory()) would NOT work — useRef stores its first
         // arg verbatim (the factory function), not its invocation result.
-        hookLines.push(
-          `const ${cachedName} = useState(() => (${raw})())[0];`,
-        );
+        hookLines.push(`const ${cachedName} = useState(() => (${raw})())[0];`);
       }
     }
     const defaultLines = defaultedNonModelProps.map((p) => {
@@ -2932,16 +2946,12 @@ export function emitScript(
         return `${p.name}: ${widened}`;
       })
       .join('; ');
-    const mergedType =
-      `Omit<${ir.name}Props, ${defaultedNames.join(' | ')}> & { ${requiredOverride} }`;
+    const mergedType = `Omit<${ir.name}Props, ${defaultedNames.join(' | ')}> & { ${requiredOverride} }`;
     // Spread first so user-supplied values come through, then explicit
     // `X: _props.X ?? <default>` lines override any missing/undefined values
     // with the declared default.
     propsDefaultsBlock =
-      `const props: ${mergedType} = {\n` +
-      `  ..._props,\n` +
-      `${defaultLines.join('\n')}\n` +
-      `};`;
+      `const props: ${mergedType} = {\n` + `  ..._props,\n` + `${defaultLines.join('\n')}\n` + `};`;
     hookLines.push(propsDefaultsBlock);
   }
 
@@ -3029,9 +3039,7 @@ export function emitScript(
       // attribute. (Includes the `ir.props.length === 0 && ir.emits.length > 0`
       // case that previously fell into the IIFE branch and emitted invalid
       // empty-destructure / empty-void code.)
-      hookLines.push(
-        `const attrs = ${propsParam} as Record<string, unknown>;`,
-      );
+      hookLines.push(`const attrs = ${propsParam} as Record<string, unknown>;`);
     } else {
       // Wrap the destructure in an IIFE so the destructured prop locals are
       // scoped inside the IIFE — otherwise a declared prop name collides with
@@ -3052,7 +3060,6 @@ export function emitScript(
       );
     }
   }
-
 
   // 5a-bis. Portal-slot stable-renderer refs (Spike 003 FullCalendar React fix).
   //
@@ -3112,8 +3119,7 @@ export function emitScript(
     } else {
       const raw = genCode(p.defaultValue);
       const needsParens =
-        t.isArrowFunctionExpression(p.defaultValue) ||
-        t.isFunctionExpression(p.defaultValue);
+        t.isArrowFunctionExpression(p.defaultValue) || t.isFunctionExpression(p.defaultValue);
       dflt = needsParens ? `(${raw})` : raw;
       // Arrow factory case: emit `(props.defaultValue ?? <factoryArrow>)()` so
       // the default callable is invoked and we get the actual value (Vue's
@@ -3187,8 +3193,7 @@ export function emitScript(
     for (const name of sortedNonModelRefs) {
       collectors.react.add('useRef');
       hookLines.push(
-        `const _${name}Ref = useRef(props.${name});\n` +
-          `_${name}Ref.current = props.${name};`,
+        `const _${name}Ref = useRef(props.${name});\n` + `_${name}Ref.current = props.${name};`,
       );
     }
     for (const name of sortedModelRefs) {
@@ -3199,10 +3204,7 @@ export function emitScript(
         continue;
       }
       collectors.react.add('useRef');
-      hookLines.push(
-        `const _${name}Ref = useRef(${name});\n` +
-          `_${name}Ref.current = ${name};`,
-      );
+      hookLines.push(`const _${name}Ref = useRef(${name});\n` + `_${name}Ref.current = ${name};`);
     }
   }
 
@@ -3226,10 +3228,7 @@ export function emitScript(
       stateTypeArg = '<any[]>';
     } else if (t.isNullLiteral(s.initializer)) {
       stateTypeArg = '<any>';
-    } else if (
-      t.isObjectExpression(s.initializer) &&
-      s.initializer.properties.length === 0
-    ) {
+    } else if (t.isObjectExpression(s.initializer) && s.initializer.properties.length === 0) {
       // Class 2 (Phase 65-02) — an empty-object `<data>` default
       // (`rowSelectionDefault: {}`) types as `useState<{}>({})`, so a later
       // string-key index (`bag[id]`) fails TS7053 ("no index signature on type
@@ -3274,10 +3273,7 @@ export function emitScript(
   // the model-prop refs: `const _<X>Ref = useRef(<X>); _<X>Ref.current = <X>;`.
   for (const name of deferredStateRefNames.sort()) {
     collectors.react.add('useRef');
-    hookLines.push(
-      `const _${name}Ref = useRef(${name});\n` +
-        `_${name}Ref.current = ${name};`,
-    );
+    hookLines.push(`const _${name}Ref = useRef(${name});\n` + `_${name}Ref.current = ${name};`);
   }
 
   // 5d. useRef for each RefDecl. Element type guessed from elementTag.
@@ -3295,9 +3291,7 @@ export function emitScript(
     collectors.react.add('useRef');
     const componentLocalName = componentRefs.get(r.name);
     if (componentLocalName !== undefined) {
-      hookLines.push(
-        `const ${r.name} = useRef<${componentLocalName}Handle | null>(null);`,
-      );
+      hookLines.push(`const ${r.name} = useRef<${componentLocalName}Handle | null>(null);`);
       continue;
     }
     let domType = 'HTMLElement';
@@ -3505,18 +3499,13 @@ export function emitScript(
     // in the template, not the lifecycle hook body), so the slot filter
     // doesn't disturb general code paths.
     const filteredSetupDeps = lh.setupDeps.filter((d) => {
-      if (
-        d.scope === 'slots' &&
-        d.path.length > 0 &&
-        portalsEmit.portalSlotNames.has(d.path[0]!)
-      ) {
+      if (d.scope === 'slots' && d.path.length > 0 && portalsEmit.portalSlotNames.has(d.path[0]!)) {
         return false;
       }
       if (
         d.scope === 'props' &&
         d.path.length > 0 &&
-        (
-          actuallyRewrittenModelProps.has(d.path[0]!) ||
+        (actuallyRewrittenModelProps.has(d.path[0]!) ||
           actuallyRewrittenNonModelProps.has(d.path[0]!) ||
           // Quick 260803-swj seam 2 — mount-SCOPED, unlike its two siblings.
           // A mount hook's `depsArr` is `[]` regardless of this filter, so the
@@ -3529,8 +3518,7 @@ export function emitScript(
           // failure. Omitting this disjunct fails the gate one way (unused
           // directive); applying it component-wide fails it the other (missing
           // dep on an $onUpdate hook). The gate is self-checking.
-          (lh.phase === 'mount' && mountOnlyRewrittenNonModelProps.has(d.path[0]!))
-        )
+          (lh.phase === 'mount' && mountOnlyRewrittenNonModelProps.has(d.path[0]!)))
       ) {
         return false;
       }
@@ -3573,10 +3561,8 @@ export function emitScript(
     // ingredients, not subscription sources. Reconciliation of post-mount
     // prop changes is owned by the sibling $watch hooks, never the mount
     // useEffect. So: mount → `[]`; update → keep the computed deps.
-    const depsArr =
-      lh.phase === 'mount' ? '[]' : renderDepArray(filteredSetupDeps, modelProps);
-    const injectPortalsHere =
-      portalsEmit.hasPortals && !portalsInjected && lh.phase === 'mount';
+    const depsArr = lh.phase === 'mount' ? '[]' : renderDepArray(filteredSetupDeps, modelProps);
+    const injectPortalsHere = portalsEmit.hasPortals && !portalsInjected && lh.phase === 'mount';
     if (injectPortalsHere) portalsInjected = true;
 
     // Build the useEffect callback body.
@@ -3822,9 +3808,7 @@ export function emitScript(
     const firstParam = cbParams[0];
     const renderedGetter = renderGetterExpression(paired?.getterCloned ?? wh.getter);
     const paramBinding =
-      firstParam &&
-      t.isIdentifier(firstParam) &&
-      renderedGetter !== firstParam.name
+      firstParam && t.isIdentifier(firstParam) && renderedGetter !== firstParam.name
         ? `const ${firstParam.name} = ${renderedGetter};\n  `
         : '';
 
@@ -3898,22 +3882,13 @@ export function emitScript(
     // refs correctly gets no directive.
     const getterDepKeys = new Set(
       wh.getterDeps.map((d) =>
-        d.scope === 'closure'
-          ? `closure::${d.identifier}`
-          : `${d.scope}::${d.path.join('.')}`,
+        d.scope === 'closure' ? `closure::${d.identifier}` : `${d.scope}::${d.path.join('.')}`,
       ),
     );
-    const callbackBodyDeps = computeHelperBodyDeps(
-      cbCloned,
-      ir,
-      allHelperNames,
-      '',
-    );
+    const callbackBodyDeps = computeHelperBodyDeps(cbCloned, ir, allHelperNames, '');
     const watcherNeedsDisable = callbackBodyDeps.some((d) => {
       const key =
-        d.scope === 'closure'
-          ? `closure::${d.identifier}`
-          : `${d.scope}::${d.path.join('.')}`;
+        d.scope === 'closure' ? `closure::${d.identifier}` : `${d.scope}::${d.path.join('.')}`;
       return !getterDepKeys.has(key);
     });
     // 260602-9lw — `$watch` is now LAZY by default on all six targets (REVERSES
@@ -3940,9 +3915,7 @@ export function emitScript(
         `useEffect(() => {\n  ${effectBody}\n}, ${depsArr}); // eslint-disable-line react-hooks/exhaustive-deps`,
       );
     } else {
-      lifecycleEffectLines.push(
-        `useEffect(() => {\n  ${effectBody}\n}, ${depsArr});`,
-      );
+      lifecycleEffectLines.push(`useEffect(() => {\n  ${effectBody}\n}, ${depsArr});`);
     }
   });
 
@@ -4051,9 +4024,7 @@ export function emitScript(
     }
   }
   const hoistedPropNames = new Set<string>(
-    [...propDestructureCounts.entries()]
-      .filter(([, count]) => count >= 2)
-      .map(([n]) => n),
+    [...propDestructureCounts.entries()].filter(([, count]) => count >= 2).map(([n]) => n),
   );
 
   const userArrowsLines: string[] = [];
@@ -4162,11 +4133,7 @@ export function emitScript(
     // Runs FIRST so a binder that is BOTH escaping and mutated gets the stable
     // `[]` identity (cross-render mutable state must never be re-created),
     // rather than the reactive-deps `[...]` from tryWrapEscapingConstUseMemo.
-    const mutMemoWrapped = tryWrapMutatedInstanceUseMemo(
-      stmt,
-      mutatedInstanceNames,
-      collectors,
-    );
+    const mutMemoWrapped = tryWrapMutatedInstanceUseMemo(stmt, mutatedInstanceNames, collectors);
     if (mutMemoWrapped) {
       userArrowsLines.push(mutMemoWrapped);
       // String output (like the other wraps) — excluded from mappableStmts.
@@ -4232,10 +4199,10 @@ export function emitScript(
   let scriptMap: EncodedSourceMap | null = null;
   const sourceFileName = collectors.filename;
   if (mappableStmts.length > 0 && sourceFileName !== undefined) {
-    const genResult = generate(
-      t.file(t.program(mappableStmts)),
-      { ...GEN_OPTS_MAP, sourceFileName },
-    );
+    const genResult = generate(t.file(t.program(mappableStmts)), {
+      ...GEN_OPTS_MAP,
+      sourceFileName,
+    });
     if (genResult.map) {
       scriptMap = genResult.map as EncodedSourceMap;
     }
@@ -4245,9 +4212,7 @@ export function emitScript(
   // React hookSection entries can span multiple lines (e.g., useControllableState
   // block with 4 sub-lines, propsDefaultsBlock with 5 sub-lines). The shell
   // needs the actual line count to compute userCodeLineOffset correctly.
-  const hookSectionLines = hookSection.length > 0
-    ? hookSection.split('\n').length
-    : 0;
+  const hookSectionLines = hookSection.length > 0 ? hookSection.split('\n').length : 0;
 
   return {
     hasPortals: portalsEmit.hasPortals,

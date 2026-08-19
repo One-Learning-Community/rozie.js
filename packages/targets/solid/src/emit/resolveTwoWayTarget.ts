@@ -49,7 +49,7 @@
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '@rozie/core';
 
 function capitalize(name: string): string {
   if (name.length === 0) return name;
@@ -67,10 +67,7 @@ function getMemberRoot(
 ): { rootName: string; firstMemberName: string | null } | null {
   let current: t.Expression = expr;
   let firstMemberName: string | null = null;
-  while (
-    t.isMemberExpression(current) ||
-    t.isOptionalMemberExpression(current)
-  ) {
+  while (t.isMemberExpression(current) || t.isOptionalMemberExpression(current)) {
     if (current.computed) return null;
     if (!t.isIdentifier(current.property)) return null;
     firstMemberName = current.property.name;

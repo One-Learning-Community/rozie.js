@@ -23,66 +23,78 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
+
 import type { GeneratorOptions } from '@babel/generator';
+import _generate from '@babel/generator';
+import * as t from '@babel/types';
 import type {
-  IRComponent,
-  TemplateNode,
-  TemplateElementIR,
-  TemplateConditionalIR,
-  TemplateMatchIR,
-  TemplateLoopIR,
-  TemplateInterpolationIR,
-  TemplateStaticTextIR,
-  TemplateFragmentIR,
   AttributeBinding,
+  Diagnostic,
+  IRComponent,
   Listener,
   ListenerSpreadIR,
-} from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+  ModifierRegistry,
+  TemplateConditionalIR,
+  TemplateElementIR,
+  TemplateFragmentIR,
+  TemplateInterpolationIR,
+  TemplateLoopIR,
+  TemplateMatchIR,
+  IRTemplateNode as TemplateNode,
+  TemplateStaticTextIR,
+} from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
 import { jsxBoundaryText } from '../../../../core/src/emit/jsxBoundaryWhitespace.js';
-import {
+import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import {
-  emitAttributes,
-  emitListenerSpread,
-  emitListenerSpreadAsMergePartial,
-} from './emitTemplateAttribute.js';
 import { emitConditional } from './emitConditional.js';
-import { emitTemplateEvent, resolveJsxEventPropName } from './emitTemplateEvent.js';
-import { emitRModel } from './emitRModel.js';
-import { emitSlotInvocation } from './emitSlotInvocation.js';
-// Phase 07.2 — consumer-side slot-fill emission for component-tag elements.
-import { emitSlotFiller, emitDynamicSlotsProp } from './emitSlotFiller.js';
 // Phase 71 (r-keynav) — REFERENCE emitter wiring (see emitKeynav.ts doc comment).
 import {
+  type KeynavEmitPlan,
+  type KeynavFocusScopeRef,
   keynavFocusScopeAttrs,
   keynavItemAttrs,
   keynavRootAttrs,
   loopBodyHasKeynavItem,
   stripKeynavSyntheticEvents,
-  type KeynavEmitPlan,
-  type KeynavFocusScopeRef,
 } from './emitKeynav.js';
+import { emitRModel } from './emitRModel.js';
+// Phase 07.2 — consumer-side slot-fill emission for component-tag elements.
+import { emitDynamicSlotsProp, emitSlotFiller } from './emitSlotFiller.js';
+import { emitSlotInvocation } from './emitSlotInvocation.js';
+import {
+  emitAttributes,
+  emitListenerSpread,
+  emitListenerSpreadAsMergePartial,
+} from './emitTemplateAttribute.js';
+import { emitTemplateEvent, resolveJsxEventPropName } from './emitTemplateEvent.js';
 import { stripBalancedMustache } from './unwrapMustache.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
 
 const VOID_ELEMENTS = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
-  'source', 'track', 'wbr',
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'source',
+  'track',
+  'wbr',
 ]);
 
 export interface EmitNodeCtx {
@@ -236,14 +248,10 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   // sake. `loopBodyHasKeynavItem` deliberately does not recurse into a
   // NESTED r-for, so this synthesis never fires for an unrelated outer loop.
   const needsKeynavIndex =
-    (ctx.keynav ?? []).length > 0 &&
-    node.indexAlias === null &&
-    loopBodyHasKeynavItem(node.body);
+    (ctx.keynav ?? []).length > 0 && node.indexAlias === null && loopBodyHasKeynavItem(node.body);
   const indexAlias = node.indexAlias ?? (needsKeynavIndex ? '__rozieKeynavIndex' : null);
   const aliasStr = indexAlias ? `(${node.itemAlias}, ${indexAlias})` : `(${node.itemAlias})`;
-  const keyCode = node.keyExpression
-    ? rewriteTemplateExpression(node.keyExpression, ctx.ir)
-    : null;
+  const keyCode = node.keyExpression ? rewriteTemplateExpression(node.keyExpression, ctx.ir) : null;
 
   // Inject the key into the next element via pendingKey. `keynavItemIndexAlias`
   // is scoped to THIS loop's body subtree only — a nested loop's own
@@ -640,10 +648,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
     const dynamicSlotsAttr = emitDynamicSlotsProp(node.slotFillers, childCtx);
     if (dynamicSlotsAttr !== null) fillerAttrs.push(dynamicSlotsAttr);
 
-    const headWithFills = [
-      ...headParts.filter(Boolean),
-      ...fillerAttrs,
-    ].join(' ');
+    const headWithFills = [...headParts.filter(Boolean), ...fillerAttrs].join(' ');
     const headOutFills = headWithFills.length > 0 ? ' ' + headWithFills : '';
     // Component tags with slot fills self-close — body content is wholly
     // represented by the slot-prop assignments above.
@@ -768,9 +773,7 @@ function elementHasBareAttrsSpread(node: TemplateElementIR): boolean {
   return false;
 }
 
-function dedupListenersAgainstAttrs(
-  node: TemplateElementIR,
-): TemplateElementIR {
+function dedupListenersAgainstAttrs(node: TemplateElementIR): TemplateElementIR {
   if (node.listenerSpreads.length === 0) return node;
   if (!elementHasBareAttrsSpread(node)) return node;
   const filtered = node.listenerSpreads.filter((s) => !isBareListenersSpread(s));
@@ -929,13 +932,9 @@ function emitElementListeners(
       continue;
     }
     const branches = items.map((it) =>
-      /^[A-Za-z_$][\w$]*$/.test(it.body)
-        ? `${it.body}($event);`
-        : `(${it.body})($event);`,
+      /^[A-Za-z_$][\w$]*$/.test(it.body) ? `${it.body}($event);` : `(${it.body})($event);`,
     );
-    eventsPartialEntries.push(
-      `${name}: ($event) => { ${branches.join(' ')} }`,
-    );
+    eventsPartialEntries.push(`${name}: ($event) => { ${branches.join(' ')} }`);
   }
 
   // 3. Build the mergeListeners argument list. Source-order traversal of
@@ -1115,9 +1114,7 @@ function delegateMatchToConditional(node: TemplateMatchIR, ctx: EmitNodeCtx): st
     // discriminant temp once. `node.discriminant` is routed through the SAME
     // `rewriteTemplateExpression` the folded branch tests use, so magic
     // accessors (`$data.x()`) are rewritten identically.
-    const inner = ladder.startsWith('{') && ladder.endsWith('}')
-      ? ladder.slice(1, -1)
-      : ladder;
+    const inner = ladder.startsWith('{') && ladder.endsWith('}') ? ladder.slice(1, -1) : ladder;
     const discriminantCode = rewriteTemplateExpression(node.discriminant, ctx.ir);
     ladder = `{(() => { const ${node.tempName} = ${discriminantCode}; return ${inner}; })()}`;
   }
@@ -1166,4 +1163,4 @@ export function emitNode(node: TemplateNode, ctx: EmitNodeCtx): string {
 }
 
 // Re-export generator / GEN_OPTS so other emit/* modules can share them.
-export { generate, GEN_OPTS };
+export { GEN_OPTS, generate };

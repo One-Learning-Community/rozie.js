@@ -19,11 +19,12 @@
 // §slots-X-merge describe block locks the contract at the rewriter layer so
 // future drift fails at the unit-test level rather than only manifesting as
 // runtime D-04 destructure crashes.
-import { describe, expect, it } from 'vitest';
+
 import { parseExpression as babelParseExpression } from '@babel/parser';
 import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 
 function makeIR(overrides: Partial<IRComponent> = {}): IRComponent {
   // Minimal IRComponent skeleton — fields not exercised by the rewriter are
@@ -109,7 +110,14 @@ describe('§slots-X-merge — $slots.X rewrites to merged dynamic-fallback form 
 
   it('Test 5: $data.X / $props.X / $refs.X handlers continue to work (cross-handler non-regression)', () => {
     const ir = makeIR({
-      state: [{ type: 'StateDecl', name: 'count', initializer: t.numericLiteral(0), sourceLoc: { start: 0, end: 0 } } as any],
+      state: [
+        {
+          type: 'StateDecl',
+          name: 'count',
+          initializer: t.numericLiteral(0),
+          sourceLoc: { start: 0, end: 0 },
+        } as any,
+      ],
       refs: [{ type: 'RefDecl', name: 'inputEl', sourceLoc: { start: 0, end: 0 } } as any],
       props: [
         { type: 'PropDecl', name: 'step', isModel: false, sourceLoc: { start: 0, end: 0 } } as any,
@@ -120,9 +128,7 @@ describe('§slots-X-merge — $slots.X rewrites to merged dynamic-fallback form 
     expect(rewrite('$props.step', ir)).toBe('props.step');
     expect(rewrite('$refs.inputEl', ir)).toBe('inputEl.current');
     // And the merge shape still applies to slots side-by-side.
-    expect(rewrite('$slots.header', ir)).toBe(
-      "(props.renderHeader ?? props.slots?.['header'])",
-    );
+    expect(rewrite('$slots.header', ir)).toBe("(props.renderHeader ?? props.slots?.['header'])");
   });
 });
 
@@ -143,7 +149,12 @@ function nonModelProp(name: string): any {
   return { type: 'PropDecl', name, isModel: false, sourceLoc: { start: 0, end: 0 } };
 }
 function stateDecl(name: string): any {
-  return { type: 'StateDecl', name, initializer: t.numericLiteral(0), sourceLoc: { start: 0, end: 0 } };
+  return {
+    type: 'StateDecl',
+    name,
+    initializer: t.numericLiteral(0),
+    sourceLoc: { start: 0, end: 0 },
+  };
 }
 function refDecl(name: string): any {
   return { type: 'RefDecl', name, sourceLoc: { start: 0, end: 0 } };
@@ -321,9 +332,7 @@ describe('rewriteTemplateExpression — CallExpression $emit', () => {
 
   it("$emit('value-change', x) → props.onValueChange?.(x) (kebab → camelCase)", () => {
     const ir = makeIR();
-    expect(rewrite("$emit('value-change', x)", ir)).toBe(
-      'props.onValueChange?.(x)',
-    );
+    expect(rewrite("$emit('value-change', x)", ir)).toBe('props.onValueChange?.(x)');
   });
 
   it("$emit('snake_event') → props.onSnakeEvent?.()", () => {
@@ -369,9 +378,7 @@ describe('rewriteTemplateExpression — nesting & passthrough', () => {
       props: [nonModelProp('disabled')],
       state: [stateDecl('count')],
     });
-    expect(rewrite('$props.disabled ? 0 : $data.count', ir)).toBe(
-      'props.disabled ? 0 : count',
-    );
+    expect(rewrite('$props.disabled ? 0 : $data.count', ir)).toBe('props.disabled ? 0 : count');
   });
 
   it('rewrites sigils nested inside a logical expression', () => {

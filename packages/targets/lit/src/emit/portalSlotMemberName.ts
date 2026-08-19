@@ -30,7 +30,7 @@
  * the empty name (the closure object KEY is the effective portalKey `default`,
  * computed by the caller via `portalKey()`).
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '@rozie/core';
 
 /**
  * Return the Lit class-member identifier for a portal/scoped slot's

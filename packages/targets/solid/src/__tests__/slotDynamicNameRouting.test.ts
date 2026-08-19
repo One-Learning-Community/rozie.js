@@ -17,12 +17,11 @@
  * rationale) — Task 3's cold-gate compile assertion covers the real
  * cross-file `compile()` round trip.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import type { IRComponent, SlotFillerDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../emitSolid.js';
-import type { IRComponent, SlotFillerDecl } from '../../../../core/src/ir/types.js';
 
 function lowerInline(rozie: string): IRComponent {
   const result = parse(rozie, { filename: 'inline.rozie' });

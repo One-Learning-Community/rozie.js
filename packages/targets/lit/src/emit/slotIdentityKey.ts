@@ -51,7 +51,7 @@
  * ever produce a `SlotDecl.name` containing a NUL character, so this prefix
  * can never collide with a real static slot's identity key.
  */
-import type { SlotDecl } from '../../../../core/src/ir/types.js';
+import type { SlotDecl } from '@rozie/core';
 
 // WR-01 (quick task 260817-buk) — React (`findSlotDecl` in
 // packages/targets/react/src/emit/emitSlotInvocation.ts) and Svelte

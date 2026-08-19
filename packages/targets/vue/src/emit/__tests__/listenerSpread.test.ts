@@ -33,10 +33,9 @@
  *   - Bare `$listeners` + `@click="f1"`: `@click="f1" v-on="$listeners"` —
  *     DOM-level addEventListener stacking handles all-fire.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitVue } from '../../emitVue.js';
 
 function compile(rozieSrc: string): string {
@@ -176,7 +175,7 @@ const f1 = () => undefined;
     // statically knowable) and NO runtime mergeListeners helper (Vue
     // divergence from React/Solid).
     expect(tmpl).not.toContain('mergeListeners');
-    expect(code).toContain("normalizeListeners");
+    expect(code).toContain('normalizeListeners');
   });
 
   it('(6) bare $listeners (D-19 exempt): r-on="$listeners" → no-op (Vue 3 folds listeners into $attrs)', () => {
@@ -198,7 +197,7 @@ const f1 = () => undefined;
     expect(tmpl).not.toContain('v-on="$listeners"');
     expect(tmpl).not.toContain('normalizeListeners');
     // NO runtime helper imported.
-    expect(code).not.toContain("import { normalizeListeners }");
+    expect(code).not.toContain('import { normalizeListeners }');
   });
 
   it('(7) bare $listeners + @click (R6 + D-19): explicit @click stays; $listeners suppressed', () => {

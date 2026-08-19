@@ -24,10 +24,9 @@
  * Distinct from the pre-existing ROZ127 hard error (slot name == a declared
  * `<props>` key) — that collision is NEVER a rename target for this detector.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { findRForSlotNameCollisions } from '../../../../../core/src/ir/findRForSlotNameCollisions.js';
 
 function lower(rozieSrc: string) {

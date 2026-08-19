@@ -19,13 +19,12 @@
  * components stay byte-identical (verified against the unchanged corpus by the
  * snapshot + dist-parity suites).
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../../emitSolid.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -45,10 +44,7 @@ function compileSolid(source: string, filename: string): string {
 
 describe('Solid reserved-name deconfliction — <data> shadowing a solid-js import', () => {
   it('`<data children>` in a default-slot component renames to `children$local`, import intact', () => {
-    const source = readFileSync(
-      resolve(FIXTURES, 'SolidDataImportShadow.rozie'),
-      'utf8',
-    );
+    const source = readFileSync(resolve(FIXTURES, 'SolidDataImportShadow.rozie'), 'utf8');
     const code = compileSolid(source, 'SolidDataImportShadow.rozie');
 
     // The default slot forces `import { children } from 'solid-js'` +

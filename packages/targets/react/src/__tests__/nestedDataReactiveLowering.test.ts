@@ -17,10 +17,9 @@
 // LAST (core task), the covered subset would produce empty `.code` through
 // `compile()` at this point. The direct-emit path observes the emitter's real
 // output (the IR survives ROZ207 — it is a diagnostic, not IR-nulling).
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../emitReact.js';
 
 function rozie(data: string, scriptBody: string): string {

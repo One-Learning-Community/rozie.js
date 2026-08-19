@@ -1,16 +1,74 @@
 // @rozie/core — public API
 // @experimental — shape may change before v1.0 (per D-09)
 
-// The public parse() entrypoint and result type — Plan 04 Task 4 / D-09 / D-10.
-export { parse } from './parse.js';
-export type { ParseResult } from './parse.js';
-
+// TS-type-position ancestor guard — Phase 9 WR-02. Shared by core's dep
+// analyzer and every per-target `rewriteScript` so a `<script lang="ts">`
+// type-reference identifier colliding with a runtime name is never rewritten
+// inside a type annotation.
+// @experimental — shape may change before v1.0
+export { isInTypePosition } from './ast/typePosition.js';
+// AST contract types (Plan 01 + Plan 03 + Plan 04 — concrete shapes).
+export type {
+  BlockEntry,
+  BlockMap,
+  DataAST,
+  ListenerEntry,
+  ListenersAST,
+  PropsAST,
+  RozieAST,
+  ScriptAST,
+  SourceLoc,
+  StyleAST,
+  StyleRule,
+  TemplateAST,
+  TemplateAttr,
+  TemplateElement,
+  TemplateInterpolation,
+  TemplateNode,
+  TemplateText,
+} from './ast/types.js';
+// Phase 58 (SC-2/SC-3) — the shared, deterministic per-prop JSDoc-block
+// builder. The single anti-drift source consumed by renderPropsInterface (the
+// .d.ts surface ×6) AND the five trivial in-source targets (React/Solid/Svelte/
+// Angular/Lit). Returns '' for a docless prop (SC-5 byte-identity gate).
+// @experimental — shape may change before v1.0
+export { buildPropJsdoc, hasPropJsdoc } from './codegen/buildPropJsdoc.js';
+// Phase 59 (SC-1/SC-4) — the shared per-prop Markdown-table-cell renderer +
+// the family-agnostic props-table generator. The single anti-drift source
+// consumed by every family README props table (readme.mjs) AND the docs-site
+// API props table (props-codegen.ts). renderPropDescription returns '' for a
+// docless prop (inert path); renderPropsTable renders any family's IR with no
+// data-table literals.
+// @experimental — shape may change before v1.0
+export {
+  escapeTableCell,
+  renderPropDescription,
+  renderPropsTable,
+} from './codegen/renderPropDescription.js';
+export type { RenderPropsInterfaceOptions } from './codegen/renderPropsInterface.js';
+// Codegen — Phase 22 Plan 22-02. The framework-AGNOSTIC props-interface body
+// renderer + its prop→TS-type and slot-param-inference helpers. Hoisted out of
+// React's emitTypes.ts so the five Wave-2 per-target type renderers (Vue /
+// Svelte / Solid / Angular / Lit) share ONE non-drifting source for the
+// prop/event/slot type mapping. The React-specific slot-children token
+// (`ReactNode`) is parameterized via `slotChildrenType`.
+// @experimental — shape may change before v1.0
+export {
+  inferParamType,
+  renderPropsInterface,
+  renderPropType,
+} from './codegen/renderPropsInterface.js';
+export type { CompileOptions, CompileResult, CompileTarget } from './compile.js';
 // Phase 6 — public compile() entrypoint (DIST-01 / D-80).
 // Single source of truth for `.rozie` → per-target compilation. Consumed by
 // @rozie/unplugin, @rozie/babel-plugin, and @rozie/cli. Per D-81: never throws.
 export { compile } from './compile.js';
-export type { CompileOptions, CompileResult, CompileTarget } from './compile.js';
+export { RozieErrorCode } from './diagnostics/codes.js';
 
+// Diagnostics surface — locked Diagnostic shape, central code registry, renderer.
+export type { Diagnostic, DiagnosticSeverity } from './diagnostics/Diagnostic.js';
+export { renderDiagnostic } from './diagnostics/frame.js';
+export type { IRCacheOptions } from './ir/cache.js';
 // Phase 07.2 IR cache + producer resolver. `compile()` already accepts these as
 // `opts.irCache` / `opts.resolver` to amortize producer parse+lower across many
 // compile() calls (the JSDoc names "@rozie/unplugin" as the motivating consumer).
@@ -21,55 +79,48 @@ export type { CompileOptions, CompileResult, CompileTarget } from './compile.js'
 // shared cache is byte-identical to per-call construction (RESEARCH Pitfall 2).
 // @experimental — shape may change before v1.0
 export { IRCache } from './ir/cache.js';
-export type { IRCacheOptions } from './ir/cache.js';
-export { ProducerResolver } from './resolver/index.js';
-export type { ResolverOptions } from './resolver/index.js';
-
-// AST contract types (Plan 01 + Plan 03 + Plan 04 — concrete shapes).
-export type {
-  SourceLoc,
-  BlockMap,
-  BlockEntry,
-  RozieAST,
-  PropsAST,
-  DataAST,
-  ScriptAST,
-  ListenersAST,
-  ListenerEntry,
-  TemplateAST,
-  TemplateNode,
-  TemplateElement,
-  TemplateAttr,
-  TemplateText,
-  TemplateInterpolation,
-  StyleAST,
-  StyleRule,
-} from './ast/types.js';
-
-// Diagnostics surface — locked Diagnostic shape, central code registry, renderer.
-export type { Diagnostic, DiagnosticSeverity } from './diagnostics/Diagnostic.js';
-export { RozieErrorCode } from './diagnostics/codes.js';
-export { renderDiagnostic } from './diagnostics/frame.js';
-
-// Modifier chain types (populated on listener entries + template event attrs).
-export type {
-  ModifierChain,
-  ModifierArg,
-} from './modifier-grammar/parseModifierChain.js';
-
+export type { LowerOptions, LowerResult } from './ir/lower.js';
+// lowerToIR — Phase 2 Plan 02-05 coordinator.
+// @experimental — shape may change before v1.0
+export { lowerToIR } from './ir/lower.js';
+// Quick 260819-9tc — `threadParamTypes` and `validateTwoWayBindings` are
+// compiler passes that `@rozie/unplugin` already depends on. They were the last
+// two symbols the plugin still had to reach through a relative
+// `../../core/src/**` path, and because their signatures take core's public
+// `IRCache`, that relative import re-created the very type-identity split this
+// barrel exists to prevent (a `core/src/ir/cache` IRCache parameter rejecting a
+// `core/dist/index` IRCache argument). Re-exported here so every consumer of
+// the plugin's raw-`src` type exports resolves ONE nominal identity without
+// needing its own `@rozie/core` `paths` pin.
+export { threadParamTypes } from './ir/threadParamTypes.js';
 // IR types — Phase 2 Plan 02-05 (D-18 SlotDecl, D-19 LifecycleHook, D-20 Listener LOCKED).
 // @experimental — shape may change before v1.0
 export type {
+  AttributeBinding,
+  ComputedDecl,
   IRComponent,
+  IRNodeId,
+  LifecycleHook,
+  Listener,
+  // Phase 15 R2 — `r-on="<expr>"` lowering produces this on
+  // `TemplateElementIR.listenerSpreads`; per-target emitters (and downstream
+  // plugin authors) consume the shape via the public barrel.
+  ListenerSpreadIR,
+  ListenerTarget,
+  ParamDecl,
   PropDecl,
   // Phase 58 (SC-1) — structured prop documentation lowered onto PropDecl.docs;
   // re-exported so the shared buildPropJsdoc helper + per-family README codegen
   // consume it via the package specifier, not a relative ../../core/src path.
   PropDocs,
   PropTypeAnnotation,
-  StateDecl,
-  ComputedDecl,
   RefDecl,
+  // Phase 12 (WR-02) — the resolved r-model modifier shape carried on the
+  // `modifiers` field of an exported `AttributeBinding`; a third-party plugin
+  // inspecting that field needs this type from the public barrel.
+  ResolvedModelModifier,
+  SetupAnnotation,
+  SetupBody,
   SlotDecl,
   // Phase 07.2 Plan 01 — consumer-side slot-fill IR shape (R2 acceptance).
   // Re-exported via the @rozie/core barrel per Phase 07.1 / MODX-01 self-reference
@@ -77,141 +128,25 @@ export type {
   // ../../core/src/ir/types.js path. Failing this re-creates the .d.ts divergence
   // bug 07.1 fixed.
   SlotFillerDecl,
-  ParamDecl,
-  LifecycleHook,
-  // Phase 12 (WR-02) — `WatchHook` appears on `IRComponent.watchers` (an
-  // exported type) but was never itself re-exported; a plugin author
-  // type-annotating that field had to reach the internal `ir/types.js` path.
-  WatchHook,
-  Listener,
-  ListenerTarget,
-  SetupBody,
-  SetupAnnotation,
-  TemplateNode as IRTemplateNode,
-  TemplateElementIR,
-  // Phase 15 R2 — `r-on="<expr>"` lowering produces this on
-  // `TemplateElementIR.listenerSpreads`; per-target emitters (and downstream
-  // plugin authors) consume the shape via the public barrel.
-  ListenerSpreadIR,
-  AttributeBinding,
-  // Phase 12 (WR-02) — the resolved r-model modifier shape carried on the
-  // `modifiers` field of an exported `AttributeBinding`; a third-party plugin
-  // inspecting that field needs this type from the public barrel.
-  ResolvedModelModifier,
+  StateDecl,
+  StyleSection,
   TemplateConditionalIR,
+  TemplateElementIR,
+  TemplateFragmentIR,
+  TemplateInterpolationIR,
   TemplateLoopIR,
   // Phase 12 (WR-02) — `TemplateMatchIR` is a member of the exported
   // `TemplateNode` union but was never itself re-exported.
   TemplateMatchIR,
+  TemplateNode as IRTemplateNode,
   TemplateSlotInvocationIR,
-  TemplateFragmentIR,
-  TemplateInterpolationIR,
   TemplateStaticTextIR,
-  StyleSection,
-  IRNodeId,
+  // Phase 12 (WR-02) — `WatchHook` appears on `IRComponent.watchers` (an
+  // exported type) but was never itself re-exported; a plugin author
+  // type-annotating that field had to reach the internal `ir/types.js` path.
+  WatchHook,
 } from './ir/types.js';
-
-// Reactivity types — Phase 2 Plan 02-03.
-// @experimental — shape may change before v1.0
-export type { SignalRef } from './reactivity/signalRef.js';
-export type { ReactiveDepGraph } from './reactivity/ReactiveDepGraph.js';
-
-// TS-type-position ancestor guard — Phase 9 WR-02. Shared by core's dep
-// analyzer and every per-target `rewriteScript` so a `<script lang="ts">`
-// type-reference identifier colliding with a runtime name is never rewritten
-// inside a type annotation.
-// @experimental — shape may change before v1.0
-export { isInTypePosition } from './ast/typePosition.js';
-
-// Modifier registry public surface — Phase 2 Plan 02-04.
-// SemVer-stable per D-22b — Phase 4 React emitter is the dogfooding consumer.
-export { ModifierRegistry } from './modifiers/ModifierRegistry.js';
-// Phase 12 / D-01 — narrowing predicates for the discriminated `ModifierImpl`
-// union. Event-context consumers (`<listeners>` / `@event` emitters) and the
-// r-model lowering path use these to narrow a flat-registry lookup before
-// touching kind-specific fields.
-export { isEventModifier, isModelModifier } from './modifiers/ModifierRegistry.js';
-export type {
-  ModifierImpl,
-  // Phase 12 / D-01 — `ModifierImpl` is now the discriminated union
-  // `EventModifierImpl | ModelModifierImpl`; the model-modifier public types
-  // are exported so third-party plugins (the `.phone` dogfood, Plan 05) can
-  // author against the `@rozie/core` barrel exclusively.
-  EventModifierImpl,
-  ModelModifierImpl,
-  ModelModifierDescriptor,
-  ModifierPipelineEntry,
-  ModifierContext,
-  VueEmissionDescriptor,
-  ReactEmissionDescriptor,
-  // Phase 07.1 — Solid/Lit descriptors added; Svelte/Angular backfilled.
-  // Open Question 1: the barrel was inconsistent — Phase 5 added the
-  // Svelte/Angular descriptor types to ModifierRegistry.ts but never
-  // re-exported them, so a third-party author could not
-  // `import { SvelteEmissionDescriptor } from '@rozie/core'`. Backfilled here
-  // alongside the new Solid/Lit types so the 6-target surface is consistent.
-  SvelteEmissionDescriptor,
-  AngularEmissionDescriptor,
-  SolidEmissionDescriptor,
-  LitEmissionDescriptor,
-} from './modifiers/ModifierRegistry.js';
-export { registerModifier } from './modifiers/registerModifier.js';
-export { registerBuiltins, createDefaultRegistry } from './modifiers/registerBuiltins.js';
-
-// lowerToIR — Phase 2 Plan 02-05 coordinator.
-// @experimental — shape may change before v1.0
-export { lowerToIR } from './ir/lower.js';
-export type { LowerOptions, LowerResult } from './ir/lower.js';
-
-// Codegen — Phase 22 Plan 22-02. The framework-AGNOSTIC props-interface body
-// renderer + its prop→TS-type and slot-param-inference helpers. Hoisted out of
-// React's emitTypes.ts so the five Wave-2 per-target type renderers (Vue /
-// Svelte / Solid / Angular / Lit) share ONE non-drifting source for the
-// prop/event/slot type mapping. The React-specific slot-children token
-// (`ReactNode`) is parameterized via `slotChildrenType`.
-// @experimental — shape may change before v1.0
-export {
-  renderPropsInterface,
-  renderPropType,
-  inferParamType,
-} from './codegen/renderPropsInterface.js';
-export type { RenderPropsInterfaceOptions } from './codegen/renderPropsInterface.js';
-
-// Phase 58 (SC-2/SC-3) — the shared, deterministic per-prop JSDoc-block
-// builder. The single anti-drift source consumed by renderPropsInterface (the
-// .d.ts surface ×6) AND the five trivial in-source targets (React/Solid/Svelte/
-// Angular/Lit). Returns '' for a docless prop (SC-5 byte-identity gate).
-// @experimental — shape may change before v1.0
-export { buildPropJsdoc, hasPropJsdoc } from './codegen/buildPropJsdoc.js';
-
-// Phase 59 (SC-1/SC-4) — the shared per-prop Markdown-table-cell renderer +
-// the family-agnostic props-table generator. The single anti-drift source
-// consumed by every family README props table (readme.mjs) AND the docs-site
-// API props table (props-codegen.ts). renderPropDescription returns '' for a
-// docless prop (inert path); renderPropsTable renders any family's IR with no
-// data-table literals.
-// @experimental — shape may change before v1.0
-export {
-  renderPropDescription,
-  escapeTableCell,
-  renderPropsTable,
-} from './codegen/renderPropDescription.js';
-
-// Optional-`sass` resolver — Phase 10 Plan 01. `loadSass()` synchronously
-// resolves the optional `sass` peer dependency for the `<style lang="scss">`
-// branch of parseStyle (Plan 10-03); returns `null` when `sass` is absent.
-// @experimental — shape may change before v1.0
-export { loadSass } from './parsers/resolveSass.js';
-export type { SassModule } from './parsers/resolveSass.js';
-
-// Published-primitive manifest contract — Phase 75 Plan 01 (D-01..D-04).
-// buildManifest(ir) is a pure IR→manifest serializer (D-03); parseManifest(json)
-// validates schemaVersion FIRST and fails closed on any mismatch or malformed
-// input (D-04), deserializing into a threadParamTypes/validateTwoWayBindings-
-// consumable producer surface. Consumed by the cross-package resolution wiring
-// (Plan 02) and the combobox published-composition emission (Plan 03).
-// @experimental — shape may change before v1.0
-export { buildManifest, parseManifest, MANIFEST_SCHEMA_VERSION } from './manifest/index.js';
+export { validateTwoWayBindings } from './ir/validateTwoWayBindings.js';
 export type {
   ManifestError,
   ParseManifestOptions,
@@ -223,3 +158,68 @@ export type {
   RozieManifestSlot,
   RozieManifestSlotParam,
 } from './manifest/index.js';
+// Published-primitive manifest contract — Phase 75 Plan 01 (D-01..D-04).
+// buildManifest(ir) is a pure IR→manifest serializer (D-03); parseManifest(json)
+// validates schemaVersion FIRST and fails closed on any mismatch or malformed
+// input (D-04), deserializing into a threadParamTypes/validateTwoWayBindings-
+// consumable producer surface. Consumed by the cross-package resolution wiring
+// (Plan 02) and the combobox published-composition emission (Plan 03).
+// @experimental — shape may change before v1.0
+export { buildManifest, MANIFEST_SCHEMA_VERSION, parseManifest } from './manifest/index.js';
+// Modifier chain types (populated on listener entries + template event attrs).
+export type {
+  ModifierArg,
+  ModifierChain,
+} from './modifier-grammar/parseModifierChain.js';
+export type {
+  AngularEmissionDescriptor,
+  // Phase 12 / D-01 — `ModifierImpl` is now the discriminated union
+  // `EventModifierImpl | ModelModifierImpl`; the model-modifier public types
+  // are exported so third-party plugins (the `.phone` dogfood, Plan 05) can
+  // author against the `@rozie/core` barrel exclusively.
+  EventModifierImpl,
+  LitEmissionDescriptor,
+  ModelModifierDescriptor,
+  ModelModifierImpl,
+  ModifierContext,
+  ModifierImpl,
+  ModifierPipelineEntry,
+  ReactEmissionDescriptor,
+  SolidEmissionDescriptor,
+  // Phase 07.1 — Solid/Lit descriptors added; Svelte/Angular backfilled.
+  // Open Question 1: the barrel was inconsistent — Phase 5 added the
+  // Svelte/Angular descriptor types to ModifierRegistry.ts but never
+  // re-exported them, so a third-party author could not
+  // `import { SvelteEmissionDescriptor } from '@rozie/core'`. Backfilled here
+  // alongside the new Solid/Lit types so the 6-target surface is consistent.
+  SvelteEmissionDescriptor,
+  VueEmissionDescriptor,
+} from './modifiers/ModifierRegistry.js';
+// Modifier registry public surface — Phase 2 Plan 02-04.
+// SemVer-stable per D-22b — Phase 4 React emitter is the dogfooding consumer.
+// Phase 12 / D-01 — narrowing predicates for the discriminated `ModifierImpl`
+// union. Event-context consumers (`<listeners>` / `@event` emitters) and the
+// r-model lowering path use these to narrow a flat-registry lookup before
+// touching kind-specific fields.
+export {
+  isEventModifier,
+  isModelModifier,
+  ModifierRegistry,
+} from './modifiers/ModifierRegistry.js';
+export { createDefaultRegistry, registerBuiltins } from './modifiers/registerBuiltins.js';
+export { registerModifier } from './modifiers/registerModifier.js';
+export type { ParseResult } from './parse.js';
+// The public parse() entrypoint and result type — Plan 04 Task 4 / D-09 / D-10.
+export { parse } from './parse.js';
+export type { SassModule } from './parsers/resolveSass.js';
+// Optional-`sass` resolver — Phase 10 Plan 01. `loadSass()` synchronously
+// resolves the optional `sass` peer dependency for the `<style lang="scss">`
+// branch of parseStyle (Plan 10-03); returns `null` when `sass` is absent.
+// @experimental — shape may change before v1.0
+export { loadSass } from './parsers/resolveSass.js';
+export type { ReactiveDepGraph } from './reactivity/ReactiveDepGraph.js';
+// Reactivity types — Phase 2 Plan 02-03.
+// @experimental — shape may change before v1.0
+export type { SignalRef } from './reactivity/signalRef.js';
+export type { ResolverOptions } from './resolver/index.js';
+export { ProducerResolver } from './resolver/index.js';

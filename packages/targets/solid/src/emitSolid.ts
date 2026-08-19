@@ -18,36 +18,36 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { BlockMap } from '../../../core/src/ast/types.js';
+import type { BlockMap, Diagnostic, IRComponent, ModifierRegistry } from '@rozie/core';
+import { createDefaultRegistry } from '@rozie/core';
 import type { SourceMap } from 'magic-string';
-import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
-import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
-import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import { buildPartialLineOffsets } from '../../../core/src/codegen/composeMaps.js';
 import { resolveComponentRefs } from '../../../core/src/codegen/resolveComponentRefs.js';
+import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
 import { synthesizeHandleType } from '../../../core/src/codegen/synthesizeHandleType.js';
 import { deconflictSolidGeneratedNames } from '../../../core/src/rewrite/deconflict.js';
 import {
   SOLID_EMITTER_LOCALS,
   SOLID_IMPORT_NAMES,
 } from '../../../core/src/rewrite/reservedNames.js';
-import {
-  deconflictSolidRefSuffix,
-  collectSolidTopLevelBindingNames,
-} from './rewrite/deconflictRefSuffix.js';
-import { SolidImportCollector, RuntimeSolidImportCollector } from './rewrite/collectSolidImports.js';
-import { emitScript } from './emit/emitScript.js';
-import { emitTemplate } from './emit/emitTemplate.js';
+import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { emitListeners } from './emit/emitListeners.js';
-import { emitSlotDecl } from './emit/emitSlotDecl.js';
 import { emitPropsInterface, toPascalCase } from './emit/emitPropsInterface.js';
+import { emitScript } from './emit/emitScript.js';
+import { emitSlotDecl } from './emit/emitSlotDecl.js';
 import { emitStyle } from './emit/emitStyle.js';
-import { buildShell } from './emit/shell.js';
-import { composeSourceMap } from './sourcemap/compose.js';
-import { buildPartialLineOffsets } from '../../../core/src/codegen/composeMaps.js';
+import { emitTemplate } from './emit/emitTemplate.js';
 import { computeScopeHash, scopeAttrName } from './emit/scopeHash.js';
+import { buildShell } from './emit/shell.js';
+import {
+  RuntimeSolidImportCollector,
+  SolidImportCollector,
+} from './rewrite/collectSolidImports.js';
+import {
+  collectSolidTopLevelBindingNames,
+  deconflictSolidRefSuffix,
+} from './rewrite/deconflictRefSuffix.js';
+import { composeSourceMap } from './sourcemap/compose.js';
 
 export interface EmitSolidOptions {
   filename?: string;
@@ -84,10 +84,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   // names (collision-solid §4). Public-contract names (props + $expose verbs) are
   // never renamed. Only-on-collision: a non-colliding name is byte-identical.
   {
-    const solidReserved = new Set<string>([
-      ...SOLID_EMITTER_LOCALS,
-      ...SOLID_IMPORT_NAMES,
-    ]);
+    const solidReserved = new Set<string>([...SOLID_EMITTER_LOCALS, ...SOLID_IMPORT_NAMES]);
     const protectedNames = new Set<string>([
       ...(ir.expose ?? []).map((e) => e.name),
       ...ir.props.map((p) => p.name),
@@ -108,10 +105,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   // (not-yet-cloned) script Program — per-target clone/rewrite happens later,
   // inside `rewriteScript`. Only-on-collision: the non-colliding corpus (the
   // entire existing example set) stays byte-identical.
-  deconflictSolidRefSuffix(
-    ir,
-    collectSolidTopLevelBindingNames(ir.setupBody.scriptProgram),
-  );
+  deconflictSolidRefSuffix(ir, collectSolidTopLevelBindingNames(ir.setupBody.scriptProgram));
 
   // 1. Resolve registry + blockOffsets.
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
@@ -170,18 +164,18 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   const componentImportLines: string[] = components
     .filter((decl) => {
       // Filter self-references: Solid's named function declaration handles self-ref natively.
-      const localName = 'localName' in decl
-        ? (decl as { localName: string }).localName
-        : (decl as { name: string }).name;
+      const localName =
+        'localName' in decl
+          ? (decl as { localName: string }).localName
+          : (decl as { name: string }).name;
       return localName !== ir.name;
     })
     .map((decl) => {
-      const localName = 'localName' in decl
-        ? (decl as { localName: string }).localName
-        : (decl as { name: string }).name;
-      const importPath = 'importPath' in decl
-        ? (decl as { importPath: string }).importPath
-        : '';
+      const localName =
+        'localName' in decl
+          ? (decl as { localName: string }).localName
+          : (decl as { name: string }).name;
+      const importPath = 'importPath' in decl ? (decl as { importPath: string }).importPath : '';
       const rewritten = rewriteRozieImport(importPath, 'solid');
       if (refdComponentNames.has(localName)) {
         return `import ${localName}, { type ${localName}Handle } from '${rewritten}';`;
@@ -237,7 +231,11 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     registry,
     { scopeAttr },
   );
-  const listenersResult = emitListeners(ir, { solid: solidImports, runtime: runtimeImports }, registry);
+  const listenersResult = emitListeners(
+    ir,
+    { solid: solidImports, runtime: runtimeImports },
+    registry,
+  );
   const styleResult = emitStyle(
     ir.name,
     ir.styles ?? { scopedRules: [], rootRules: [] },
@@ -394,4 +392,3 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
 
   return { code: shell.ms.toString(), map: finalMap, diagnostics };
 }
-

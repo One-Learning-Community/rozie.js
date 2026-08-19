@@ -14,20 +14,19 @@
 //
 // All 5 emitted .ts files must parse cleanly via TypeScript's parser
 // (Pitfall 6 mitigation).
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 // Default import (not `import * as ts`) — TypeScript ≤5.4 wraps its CJS module
 // under `default` for ESM consumers, while TS ≥5.5 also exposes flat names.
 // Default import grabs the flat module on both shapes, so this stays portable
 // across the TS 5.4↔5.5 namespace-flattening boundary regardless of which TS
 // version the workspace ends up resolving.
 import ts from 'typescript';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../emitAngular.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -74,11 +73,11 @@ describe('emitAngular — Plan 05-04a smoke tests (TypeScript parses emitted out
       // parseDiagnostics array. Ensure none.
       // @ts-expect-error — parseDiagnostics is non-public but stable.
       const diagnostics: readonly ts.Diagnostic[] = sourceFile.parseDiagnostics ?? [];
-      const parseErrors = diagnostics.filter(
-        (d) => d.category === ts.DiagnosticCategory.Error,
-      );
+      const parseErrors = diagnostics.filter((d) => d.category === ts.DiagnosticCategory.Error);
       if (parseErrors.length > 0) {
-        const messages = parseErrors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'));
+        const messages = parseErrors.map((d) =>
+          ts.flattenDiagnosticMessageText(d.messageText, '\n'),
+        );
         throw new Error(`${name}.ts parse errors:\n${messages.join('\n')}`);
       }
       expect(parseErrors).toEqual([]);
@@ -178,7 +177,7 @@ describe('emitAngular — substring invariants (Plan 05-04a Task 3 acceptance cr
       // Heuristic: find inject() inside arrow bodies that are NOT effect() callbacks.
       // For v1 simplicity, assert that any `inject(` occurrence appears ONLY
       // after `constructor() {` opening — easy proxy.
-      const ctorMatch = code.match(/constructor\(\) \{([\s\S]*?)\n  \}/);
+      const ctorMatch = code.match(/constructor\(\) \{([\s\S]*?)\n {2}\}/);
       const ctorBody = ctorMatch?.[1] ?? '';
       const allInjects = (code.match(/inject\(/g) ?? []).length;
       // Field initializers can also contain inject — match `=\s*inject\(`.

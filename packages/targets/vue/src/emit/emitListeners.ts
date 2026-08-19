@@ -37,24 +37,18 @@
  * @experimental — shape may change before v1.0
  */
 import type {
+  Diagnostic,
   IRComponent,
   Listener,
   ListenerTarget,
-} from '../../../../core/src/ir/types.js';
-import type {
-  ModifierRegistry,
+  ModifierArg,
   ModifierPipelineEntry,
+  ModifierRegistry,
   VueEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
+import { RuntimeVueImportCollector, VueImportCollector } from '../rewrite/collectVueImports.js';
 import { rewriteScriptExpression } from '../rewrite/rewriteListenerExpression.js';
-import {
-  VueImportCollector,
-  RuntimeVueImportCollector,
-} from '../rewrite/collectVueImports.js';
 import { emitOutsideClickCall } from './emitListenerCollapsedOutsideClick.js';
 
 /**
@@ -82,7 +76,7 @@ const NATIVE_KEY_GUARDS: Record<string, string> = {
   pageUp: "if ($event.key !== 'PageUp') return;",
   pageDown: "if ($event.key !== 'PageDown') return;",
   // Mouse-button: middle = button 1
-  middle: "if ($event.button !== 1) return;",
+  middle: 'if ($event.button !== 1) return;',
 };
 
 /** Map common DOM events → TypeScript event types for the handler signature. */
@@ -205,10 +199,7 @@ interface ClassifyOpts {
   event: string;
 }
 
-function classifyListener(
-  pipeline: ModifierPipelineEntry[],
-  opts: ClassifyOpts,
-): ListenerClass {
+function classifyListener(pipeline: ModifierPipelineEntry[], opts: ClassifyOpts): ListenerClass {
   const nativeKeyGuards: string[] = [];
   const listenerOpts = new Set<string>();
   let outsideArgs: ModifierArg[] | null = null;
@@ -275,7 +266,6 @@ function classifyListener(
     }
     if (descriptor.helperName === 'debounce' || descriptor.helperName === 'throttle') {
       wrapHelper = { name: descriptor.helperName, args: descriptor.args };
-      continue;
     }
   }
 
@@ -320,9 +310,7 @@ function renderListener(
 
   // Build `if (!(when)) return;` guard if when is non-null.
   const whenGuard =
-    listener.when === null
-      ? ''
-      : `if (!(${rewriteScriptExpression(listener.when, ir)})) return;`;
+    listener.when === null ? '' : `if (!(${rewriteScriptExpression(listener.when, ir)})) return;`;
 
   // Render the handler invocation. For Identifier handlers, call as `name(e)`
   // when wraps aren't applied (so the user's handler signature receives the
@@ -331,14 +319,13 @@ function renderListener(
   // and we hand `e` to the wrapped fn).
   const userHandlerCode = rewriteScriptExpression(listener.handler, ir);
 
-  const guards = classification.kind === 'A'
-    ? classification.nativeKeyGuards
-    : classification.helperName /* C */
+  const guards =
+    classification.kind === 'A'
       ? classification.nativeKeyGuards
-      : [];
-  const guardLines = guards.length > 0
-    ? guards.map((g) => `    ${g}`).join('\n') + '\n'
-    : '';
+      : classification.helperName /* C */
+        ? classification.nativeKeyGuards
+        : [];
+  const guardLines = guards.length > 0 ? guards.map((g) => `    ${g}`).join('\n') + '\n' : '';
 
   const listenerOptsForCalls =
     classification.kind === 'A'

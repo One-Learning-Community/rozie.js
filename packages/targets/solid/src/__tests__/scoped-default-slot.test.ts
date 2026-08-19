@@ -19,9 +19,9 @@
  * Co-fixed with Vue's emitSlotFiller default-shorthand carve-out (same
  * SortableListDemo regression).
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
+
+import { lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../emitSolid.js';
 
 describe('emitSolid — default-slot scoped-param invocation', () => {

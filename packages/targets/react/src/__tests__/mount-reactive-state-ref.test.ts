@@ -25,16 +25,15 @@
  * re-creates its closures on state change) is the negative control: it is NOT
  * rewritten.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitScript } from '../emit/emitScript.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 
 function lower(src: string): IRComponent {
   const result = parse(src, { filename: 'inline.rozie' });
@@ -81,9 +80,7 @@ $onMount(() => {
     const { hookSection, lifecycleEffectsSection } = emit(SRC);
 
     // A synced ref is declared AFTER the useControllableState destructure.
-    expect(hookSection).toContain(
-      'const _itemsRef = useRef(items);\n_itemsRef.current = items;',
-    );
+    expect(hookSection).toContain('const _itemsRef = useRef(items);\n_itemsRef.current = items;');
     const refIdx = hookSection.indexOf('const _itemsRef = useRef(items);');
     const ucsIdx = hookSection.indexOf('useControllableState({');
     expect(ucsIdx).toBeGreaterThanOrEqual(0);
@@ -122,9 +119,7 @@ $onMount(() => {
     // The synced ref for a `<data>`/useState name must land AFTER the useState
     // declaration it references — emitting it before would be a TDZ
     // ReferenceError at render.
-    expect(hookSection).toContain(
-      'const _rowsRef = useRef(rows);\n_rowsRef.current = rows;',
-    );
+    expect(hookSection).toContain('const _rowsRef = useRef(rows);\n_rowsRef.current = rows;');
     const useStateIdx = hookSection.indexOf('const [rows, setRows] = useState');
     const refIdx = hookSection.indexOf('const _rowsRef = useRef(rows);');
     expect(useStateIdx).toBeGreaterThanOrEqual(0);

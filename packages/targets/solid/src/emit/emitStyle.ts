@@ -39,11 +39,10 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { StyleSection } from '../../../../core/src/ir/types.js';
+import type { Diagnostic, StyleSection } from '@rozie/core';
 import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { scopeCss } from './scopeCss.js';
 import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
+import { scopeCss } from './scopeCss.js';
 
 /**
  * Quick task 260520-bu7 — additional repeats of the portal scope attribute
@@ -101,10 +100,7 @@ function stringifyRules(rules: StyleRule[], source: string): string {
  *   - ${ → \${
  */
 function escapeCssForTemplateLiteral(css: string): string {
-  return css
-    .replace(/\\/g, '\\\\')
-    .replace(/`/g, '\\`')
-    .replace(/\$\{/g, '\\${');
+  return css.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
 }
 
 /**
@@ -139,9 +135,10 @@ export function emitStyle(
   const engineChildren = engineRules.flatMap((r) => r.children ?? []);
 
   const rawScopedCss = stringifyRules(scopedRules, source);
-  const scopedCss = scopeHash.length > 0 && rawScopedCss.length > 0
-    ? scopeCss(rawScopedCss, scopeHash)
-    : rawScopedCss;
+  const scopedCss =
+    scopeHash.length > 0 && rawScopedCss.length > 0
+      ? scopeCss(rawScopedCss, scopeHash)
+      : rawScopedCss;
   const rootCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : '';
   const engineCss = stringifyRules(engineChildren, source);
   const globalParts = [rootCss, engineCss].filter((s) => s.length > 0);

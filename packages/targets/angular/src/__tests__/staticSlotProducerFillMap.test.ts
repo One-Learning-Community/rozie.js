@@ -36,15 +36,14 @@
  *
  * Ambient ROOT-relative fixture read pattern per classSelector.test.ts.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../emitAngular.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../../../..');
@@ -68,19 +67,14 @@ function compileAngular(src: string, filename: string): string {
 /** The real fixture every ConsumerStaticProducer* .rozie file (Plan 09) targets. */
 function compileStaticIdentifierOnlyProducer(): string {
   const filename = 'ProducerIdentifierOnly.rozie';
-  const src = readFileSync(
-    resolve(ROOT, `tests/angular-runtime/fixtures/${filename}`),
-    'utf8',
-  );
+  const src = readFileSync(resolve(ROOT, `tests/angular-runtime/fixtures/${filename}`), 'utf8');
   return compileAngular(src, filename);
 }
 
 describe('Angular producer — static-identifier-only producer must still collect a keyed fill (Plan 09 RED, D-09)', () => {
   it('DESIRED POST-FIX: emits the content query member (__rozieFills over RozieSlot)', () => {
     const code = compileStaticIdentifierOnlyProducer();
-    expect(code).toContain(
-      '__rozieFills = contentChildren(RozieSlot, { descendants: true });',
-    );
+    expect(code).toContain('__rozieFills = contentChildren(RozieSlot, { descendants: true });');
   });
 
   it('DESIRED POST-FIX: emits the fill-map computed member (__rozieFillMap)', () => {

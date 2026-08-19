@@ -10,18 +10,19 @@
  * proves a component with NO `r-keynav` directive is completely untouched
  * (SPEC §11: "no corpus rebless").
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../emitReact.js';
 
 function compile(src: string, filename: string): IRComponent {
   const parsed = parse(src, { filename });
-  if (!parsed.ast) throw new Error(`parse failed for ${filename}: ${JSON.stringify(parsed.diagnostics)}`);
+  if (!parsed.ast)
+    throw new Error(`parse failed for ${filename}: ${JSON.stringify(parsed.diagnostics)}`);
   const lowered = lowerToIR(parsed.ast, { modifierRegistry: createDefaultRegistry() });
-  if (!lowered.ir) throw new Error(`lower failed for ${filename}: ${JSON.stringify(lowered.diagnostics)}`);
+  if (!lowered.ir)
+    throw new Error(`lower failed for ${filename}: ${JSON.stringify(lowered.diagnostics)}`);
   return lowered.ir;
 }
 
@@ -143,7 +144,9 @@ describe('React r-keynav emitter (Plan 71-04 Task 2)', () => {
     const ir = compile(COMBOBOX_SRC, 'KeynavCombobox.rozie');
     const { code } = emitReact(ir, { filename: 'KeynavCombobox.rozie', source: COMBOBOX_SRC });
     expect(code).toContain('aria-activedescendant=');
-    expect(code).toMatch(/aria-activedescendant=\{active >= 0 \? `\$\{__rozieKeynavGroupId\}-item-\$\{active\}` : undefined\}/);
+    expect(code).toMatch(
+      /aria-activedescendant=\{active >= 0 \? `\$\{__rozieKeynavGroupId\}-item-\$\{active\}` : undefined\}/,
+    );
   });
 
   it('SEAM: aria — menu (tabindex model) does NOT emit aria-activedescendant', () => {
@@ -367,16 +370,12 @@ describe('React r-keynav emitter — multi-root, grid, page, explicit index (Pla
     const ir = compile(TWO_ROOT_SRC, 'KeynavTwoGroups.rozie');
     const { code } = emitReact(ir, { filename: 'KeynavTwoGroups.rozie', source: TWO_ROOT_SRC });
     // Group 0 (rows) — bare group-id/active identifiers.
-    expect(code).toMatch(
-      /id=\{`\$\{__rozieKeynavGroupId\}-item-\$\{__rozieKeynavIndex\}`\}/,
-    );
+    expect(code).toMatch(/id=\{`\$\{__rozieKeynavGroupId\}-item-\$\{__rozieKeynavIndex\}`\}/);
     expect(code).toMatch(/data-rozie-keynav-active=\{rowActive === __rozieKeynavIndex/);
     // Group 1 (cells) — suffixed group-id/active identifiers, and a
     // suffixed loop index alias (the compiler-synthesized index is scoped
     // per-loop, so the SECOND loop gets its own alias name).
-    expect(code).toMatch(
-      /id=\{`\$\{__rozieKeynavGroupId1\}-item-\$\{__rozieKeynavIndex\d*\}`\}/,
-    );
+    expect(code).toMatch(/id=\{`\$\{__rozieKeynavGroupId1\}-item-\$\{__rozieKeynavIndex\d*\}`\}/);
     expect(code).toMatch(/data-rozie-keynav-active=\{cellActive === __rozieKeynavIndex\d*/);
   });
 
@@ -417,7 +416,10 @@ describe('React r-keynav emitter — multi-root, grid, page, explicit index (Pla
 
   it("explicit item index: an item's own index expression overrides a NESTED inner loop's index alias in all four attributes", () => {
     const ir = compile(EXPLICIT_INDEX_SRC, 'KeynavExplicitIndex.rozie');
-    const { code } = emitReact(ir, { filename: 'KeynavExplicitIndex.rozie', source: EXPLICIT_INDEX_SRC });
+    const { code } = emitReact(ir, {
+      filename: 'KeynavExplicitIndex.rozie',
+      source: EXPLICIT_INDEX_SRC,
+    });
     expect(code).toMatch(/id=\{`\$\{__rozieKeynavGroupId\}-item-\$\{w \* 7 \+ d\}`\}/);
     expect(code).toMatch(/data-rozie-keynav-item=\{w \* 7 \+ d\}/);
     expect(code).toMatch(/data-rozie-keynav-active=\{active === w \* 7 \+ d \? '' : undefined\}/);
@@ -437,12 +439,15 @@ describe('React r-keynav emitter — multi-root, grid, page, explicit index (Pla
     // real PUBLISHED leaf with its own `tsc --noEmit` gate — surfaced it as
     // TS2322 (`source` is not a valid <div> DOM prop).
     const ir = compile(EXPLICIT_INDEX_SRC, 'KeynavExplicitIndex.rozie');
-    const { code } = emitReact(ir, { filename: 'KeynavExplicitIndex.rozie', source: EXPLICIT_INDEX_SRC });
+    const { code } = emitReact(ir, {
+      filename: 'KeynavExplicitIndex.rozie',
+      source: EXPLICIT_INDEX_SRC,
+    });
     expect(code).not.toMatch(/<div role="grid"[^>]*\bsource=/);
     expect(code).toContain('getSource: () => (flatDays).map((day) => ({ label: day.label })),');
   });
 
-  it('77-07: the minted root ref is typed by the root element\'s OWN tag (HTMLDivElement here), not a bare HTMLElement', () => {
+  it("77-07: the minted root ref is typed by the root element's OWN tag (HTMLDivElement here), not a bare HTMLElement", () => {
     // Was a BYTE-IDENTITY assertion through Plan 77-06 — `useRef<HTMLElement
     // | null>` for EVERY minted keynav root regardless of its actual tag.
     // 77-07 (the date-picker drill retrofit) is the first real PUBLISHED
@@ -592,7 +597,9 @@ describe('React r-keynav emitter — strict-containment focus scope (Plan 260806
       filename: 'KeynavWithHeading.rozie',
       source: SCOPE_WITH_HEADING_SRC,
     });
-    expect(code).toContain('const __rozieKeynavScopeRef0 = useRef<HTMLButtonElement | null>(null);');
+    expect(code).toContain(
+      'const __rozieKeynavScopeRef0 = useRef<HTMLButtonElement | null>(null);',
+    );
     expect(code).toMatch(/<button type="button" ref=\{__rozieKeynavScopeRef0\}[^>]*>/);
     expect(code).toContain(
       'getFocusScope: () => [__rozieKeynavScopeRef0.current, __rozieKeynavRootRef.current],',

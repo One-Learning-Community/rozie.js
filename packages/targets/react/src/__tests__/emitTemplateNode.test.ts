@@ -3,16 +3,15 @@
  * Covers: TemplateStaticText, TemplateInterpolation, TemplateFragment,
  * TemplateLoop, r-show, r-html, r-text.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { emitTemplate } from '../emit/emitTemplate.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
-import { emitTemplate } from '../emit/emitTemplate.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 
 function lowerInline(rozie: string): IRComponent {
   const result = parse(rozie, { filename: 'inline.rozie' });

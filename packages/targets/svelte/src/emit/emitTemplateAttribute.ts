@@ -24,13 +24,9 @@
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
-import type {
-  IRComponent,
-  AttributeBinding,
-  ListenerSpreadIR,
-} from '../../../../core/src/ir/types.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import type { AttributeBinding, IRComponent, ListenerSpreadIR } from '@rozie/core';
 import { svelteCallbackPropName } from '../rewrite/rewriteScript.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 export interface EmitAttrCtx {
   ir: IRComponent;
@@ -106,11 +102,7 @@ const FORM_INPUT_VALUE_ATTRS: ReadonlySet<string> = new Set(['value', 'checked']
  * prop bindings and form-input value/checked props are exempt (twin of React's
  * `shouldWrapAttrBinding`). `inputType` is only set for `<input>` hosts.
  */
-function shouldWrapSvelteAttrBinding(
-  name: string,
-  expr: t.Expression,
-  ctx: EmitAttrCtx,
-): boolean {
+function shouldWrapSvelteAttrBinding(name: string, expr: t.Expression, ctx: EmitAttrCtx): boolean {
   if (ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self') return false;
   // CR-02 — Boolean HTML attrs are not display text; wrapping feeds a string
   // into a boolean prop (TS2322 + "false"-is-truthy flip) and diverges from
@@ -309,10 +301,7 @@ function partitionSvelteModelModifiers(
  * a later iteration. `$` is a JS identifier character, so the lookbehind
  * excludes both `\w` and `$` and the lookahead excludes `\w`.
  */
-function substituteValuePlaceholder(
-  fragment: string,
-  replacement: string,
-): string {
+function substituteValuePlaceholder(fragment: string, replacement: string): string {
   return fragment.replace(/(?<![\w$])\$v(?!\w)/g, `(${replacement})`);
 }
 
@@ -322,10 +311,7 @@ function substituteValuePlaceholder(
  * substitute `$v` with the current expression text and chain. Empty list ⇒ the
  * input string is returned unchanged.
  */
-function applyValueTransformsString(
-  valueAccess: string,
-  valueTransforms: string[],
-): string {
+function applyValueTransformsString(valueAccess: string, valueTransforms: string[]): string {
   let current = valueAccess;
   for (const fragment of valueTransforms) {
     current = substituteValuePlaceholder(fragment, current);
@@ -359,9 +345,7 @@ function kebabizeStyleKey(key: string): string {
  * NumericLiteral (rare — `123` style keys). Returns null for shapes we
  * cannot safely lower (computed keys, spreads, methods).
  */
-function objectPropertyKeyAsString(
-  prop: t.ObjectProperty,
-): string | null {
+function objectPropertyKeyAsString(prop: t.ObjectProperty): string | null {
   if (prop.computed) return null;
   if (t.isIdentifier(prop.key)) return prop.key.name;
   if (t.isStringLiteral(prop.key)) return prop.key.value;
@@ -529,9 +513,7 @@ function extractLiteralClassStyleFromSpread(
   if (!t.isObjectExpression(attr.expression)) {
     return { classValue: null, styleValue: null };
   }
-  const { classValue, styleValue } = splitClassStyleFromSvelteLiteral(
-    attr.expression,
-  );
+  const { classValue, styleValue } = splitClassStyleFromSvelteLiteral(attr.expression);
   return { classValue, styleValue };
 }
 
@@ -594,10 +576,7 @@ function renderInterpolatedTemplateLiteral(
   for (const seg of segments) {
     if (seg.kind === 'static') {
       // Escape backslash, backtick, and `${` sequences in static text.
-      out += seg.text
-        .replace(/\\/g, '\\\\')
-        .replace(/`/g, '\\`')
-        .replace(/\$\{/g, '\\${');
+      out += seg.text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
     } else {
       // Phase 26 (D-06/SPEC-4) — wrap a non-primitive interpolated segment.
       const segCode = rewriteTemplateExpression(seg.expression, ir);
@@ -640,10 +619,7 @@ function emitSpread(
    *  class/style is extracted upstream — emit only the `rest`. */
   hasExplicitClassOrStyle: boolean,
 ): string {
-  if (
-    hasExplicitClassOrStyle &&
-    t.isObjectExpression(attr.expression)
-  ) {
+  if (hasExplicitClassOrStyle && t.isObjectExpression(attr.expression)) {
     // R6 — LITERAL spread with class/style extracted into the merge path; only
     // spread the remaining keys.
     const { rest } = splitClassStyleFromSvelteLiteral(attr.expression);
@@ -654,9 +630,7 @@ function emitSpread(
     // LITERAL spread without an explicit class/style sibling — still apply the
     // T-14-06 pollution guard so a `__proto__`/`constructor`/`prototype`
     // literal key never reaches the emitted object.
-    const { rest, classValue, styleValue } = splitClassStyleFromSvelteLiteral(
-      attr.expression,
-    );
+    const { rest, classValue, styleValue } = splitClassStyleFromSvelteLiteral(attr.expression);
     const restProps = [...rest.properties];
     if (classValue !== null) {
       restProps.push(t.objectProperty(t.identifier('class'), classValue));
@@ -681,10 +655,7 @@ function emitSpread(
  * Returns null when the attribute should be dropped (e.g., r-html which
  * gets emitted later as a child node).
  */
-export function emitSingleAttr(
-  attr: AttributeBinding,
-  ctx: EmitAttrCtx,
-): string | null {
+export function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string | null {
   // r-html is handled at the element level, not as an attribute.
   if (attr.kind !== 'spreadBinding' && attr.name === 'r-html') return null;
 
@@ -966,10 +937,7 @@ function attrToArraySegment(
  *     `class={['counter', { hovering: x }]}`
  * Svelte 5.16+ accepts both array AND object forms in `class={...}` (clsx-like).
  */
-export function emitAttributes(
-  attrs: AttributeBinding[],
-  ctx: EmitAttrCtx,
-): string {
+export function emitAttributes(attrs: AttributeBinding[], ctx: EmitAttrCtx): string {
   if (attrs.length === 0) return '';
 
   // Spike 004 (Svelte subset) — a literal-object `:style="{...}"` lowers to
@@ -978,9 +946,7 @@ export function emitAttributes(
   // doesn't try to coalesce it with a sibling static-string `style=` (which
   // would re-introduce the `[object Object]` serialization path).
   const isLiteralStyleObjectBinding = (a: AttributeBinding): boolean =>
-    a.kind === 'binding' &&
-    a.name === 'style' &&
-    t.isObjectExpression(a.expression);
+    a.kind === 'binding' && a.name === 'style' && t.isObjectExpression(a.expression);
 
   // Group by name to detect class/style merges. Phase 14 — `spreadBinding`
   // is the name-less kind: it never participates in class/style merging, so
@@ -1047,8 +1013,7 @@ export function emitAttributes(
     const readExpr = opaqueSpreadClassReadExpr(a, ctx.ir);
     if (readExpr !== null) opaqueSpreadClassReads.push(readExpr);
   }
-  const needsOpaqueSpreadClassMerge =
-    hasExplicitClass && opaqueSpreadClassReads.length > 0;
+  const needsOpaqueSpreadClassMerge = hasExplicitClass && opaqueSpreadClassReads.length > 0;
 
   const out: string[] = [];
   const consumed = new WeakSet<AttributeBinding>();
@@ -1084,8 +1049,7 @@ export function emitAttributes(
 
     if (a.name === 'class' || a.name === 'style') {
       const literalMap = a.name === 'class' ? literalClassBindings : literalStyleBindings;
-      const hasOpaqueMerge =
-        a.name === 'class' && needsOpaqueSpreadClassMerge;
+      const hasOpaqueMerge = a.name === 'class' && needsOpaqueSpreadClassMerge;
       const totalCount = (counts.get(a.name) ?? 0) + literalMap.size;
       if (totalCount > 1 || hasOpaqueMerge) {
         // Walk the FULL attrs list in source order, picking out the
@@ -1207,9 +1171,7 @@ export function emitListenerSpread(
  * to emit `{@html expr}` as the element's content + raise ROZ620 if children
  * coexist).
  */
-export function findRHtml(
-  attrs: AttributeBinding[],
-): { expression: t.Expression } | null {
+export function findRHtml(attrs: AttributeBinding[]): { expression: t.Expression } | null {
   for (const a of attrs) {
     // Phase 14 — `spreadBinding` is the name-less kind; skip before `.name`.
     if (a.kind === 'spreadBinding') continue;

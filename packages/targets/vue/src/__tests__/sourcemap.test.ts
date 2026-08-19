@@ -10,16 +10,15 @@
 // is verified by Plan 06's Playwright e2e — Plan 05 verifies the in-memory
 // SourceMapConsumer can read the map and resolve at least one position back
 // to the .rozie source.
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import MagicString from 'magic-string';
 import { SourceMapConsumer } from 'source-map-js';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { describe, expect, it } from 'vitest';
 import { emitVue } from '../emitVue.js';
 import { composeSourceMap } from '../sourcemap/compose.js';
 
@@ -160,7 +159,8 @@ describe('emitVue source map integration (Pitfall 2)', () => {
 
     // Derive the expected source line at runtime so the test survives edits.
     // `console.log("hello from rozie")` appears on the first line of <script>.
-    const consoleLine = src.split('\n').findIndex((l) => /console\.log\("hello from rozie"\)/.test(l)) + 1;
+    const consoleLine =
+      src.split('\n').findIndex((l) => /console\.log\("hello from rozie"\)/.test(l)) + 1;
     const scriptEndLine = src.split('\n').findIndex((l) => /<\/script>/.test(l)) + 1;
     expect(consoleLine).toBeGreaterThan(0);
     expect(scriptEndLine).toBeGreaterThan(0);

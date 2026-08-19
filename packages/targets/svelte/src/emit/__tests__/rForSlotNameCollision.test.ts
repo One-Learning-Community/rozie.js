@@ -15,10 +15,9 @@
  * exactly as-authored. CONDITIONAL: only colliding slots are renamed, so
  * non-colliding components emit byte-identical Svelte.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { findRForSlotNameCollisions } from '../../../../../core/src/ir/findRForSlotNameCollisions.js';
 import { emitSvelte } from '../../emitSvelte.js';
 

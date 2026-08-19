@@ -59,20 +59,16 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type {
-  TemplateSlotInvocationIR,
-  IRComponent,
-  SlotDecl,
-} from '../../../../core/src/ir/types.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { refineSlotTypes, renderRecordKey } from './refineSlotTypes.js';
+import type { IRComponent, SlotDecl, TemplateSlotInvocationIR } from '@rozie/core';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
 // Late-import via a getter to avoid circular import errors during ES module
 // initialization. emitTemplateNode imports this module at top-level; we need
 // the inverse only inside function bodies (which run after both modules have
 // fully initialized).
 import * as _emitTemplateNodeModule from './emitTemplateNode.js';
+import { refineSlotTypes, renderRecordKey } from './refineSlotTypes.js';
 
 /**
  * Locate the `SlotDecl` matching `node` — the invocation actually being
@@ -133,10 +129,7 @@ function findSlotDecl(node: TemplateSlotInvocationIR, ir: IRComponent): SlotDecl
  *
  * Shorthand collapse: when arg.name === renderedExpression, emit `{ item }` form.
  */
-function buildParamObj(
-  args: TemplateSlotInvocationIR['args'],
-  ir: IRComponent,
-): string {
+function buildParamObj(args: TemplateSlotInvocationIR['args'], ir: IRComponent): string {
   if (args.length === 0) return '{}';
   const parts = args.map((a) => {
     const code = rewriteTemplateExpression(a.expression, ir);
@@ -166,11 +159,7 @@ function renderInlineFallback(slot: SlotDecl, ir: IRComponent): string {
  *
  * Recursively emits the defaultContent body via the same emitNode pipeline.
  */
-function liftDefaultFn(
-  slot: SlotDecl,
-  fnName: string,
-  ctx: EmitNodeCtx,
-): string {
+function liftDefaultFn(slot: SlotDecl, fnName: string, ctx: EmitNodeCtx): string {
   // We need to emit the defaultContent through the standard emitNode pipeline.
   // To avoid an import cycle (emitTemplateNode imports this module), we use
   // a late-bound emitter via a function reference that emitTemplateNode passes
@@ -193,9 +182,10 @@ function liftDefaultFn(
   }
 
   // Build the param-extraction line
-  const paramExtract = slot.params.length > 0
-    ? `const { ${slot.params.map((p) => p.name).join(', ')} } = ctx;\n  `
-    : '';
+  const paramExtract =
+    slot.params.length > 0
+      ? `const { ${slot.params.map((p) => p.name).join(', ')} } = ctx;\n  `
+      : '';
 
   // Wrap bodyJsx in `(...)` if it isn't already an expression
   const isExpr = bodyJsx.startsWith('{') && bodyJsx.endsWith('}');
@@ -230,10 +220,7 @@ function renderInvocationFallback(
     // Bare text from emitStaticText needs string-literal wrap when used as a JS
     // expression (e.g. right-hand side of `??`).
     const trimmed = single.trim();
-    if (
-      realChildren[0]!.type === 'TemplateStaticText' &&
-      !trimmed.startsWith('<')
-    ) {
+    if (realChildren[0]!.type === 'TemplateStaticText' && !trimmed.startsWith('<')) {
       return JSON.stringify(trimmed);
     }
     return single;
@@ -242,10 +229,7 @@ function renderInvocationFallback(
   return `<>${parts.join('')}</>`;
 }
 
-export function emitSlotInvocation(
-  node: TemplateSlotInvocationIR,
-  ctx: EmitNodeCtx,
-): string {
+export function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNodeCtx): string {
   // Portal-slot primitive (Spike 003) — portal slots are invoked from script
   // via `$portals.<name>(...)`, NOT from the rendered template tree. Skip
   // emission entirely. The slot still appears in ir.slots so its render-prop
@@ -299,8 +283,7 @@ export function emitSlotInvocation(
   // key via a by-name SlotDecl lookup would risk sourcing the WRONG slot's
   // expression. The invocation node always carries its own expression.
   const isRecordOnly =
-    node.dynamicNameExpr !== undefined ||
-    (slot.name !== '' && !isSlotNameIdentifier(slot.name));
+    node.dynamicNameExpr !== undefined || (slot.name !== '' && !isSlotNameIdentifier(slot.name));
   const recordKeyText = node.dynamicNameExpr
     ? rewriteTemplateExpression(node.dynamicNameExpr, ctx.ir)
     : renderRecordKey(slot.name);

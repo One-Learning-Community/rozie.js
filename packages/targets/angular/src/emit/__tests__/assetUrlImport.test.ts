@@ -18,20 +18,16 @@
  * The rewrite fires ONLY when arg2 is EXACTLY `import.meta.url` AND arg1 is a static
  * string literal; a dynamic/non-literal first arg is left byte-untouched.
  */
+
+import type { IRComponent } from '@rozie/core';
+import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
-import { compile } from '../../../../../core/src/compile.js';
-import type { IRComponent } from '../../../../../core/src/ir/types.js';
 import { emitAngular } from '../../emitAngular.js';
 
 function compileAngular(src: string, filename = 'Test.rozie'): string {
   const result = parse(src, { filename });
   if (!result.ast) {
-    throw new Error(
-      `parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`,
-    );
+    throw new Error(`parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`);
   }
   const lowered = lowerToIR(result.ast, {
     modifierRegistry: createDefaultRegistry(),

@@ -9,17 +9,18 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
-import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
+import type { Diagnostic, IRComponent, ModifierRegistry } from '@rozie/core';
+import type {
+  RuntimeSolidImportCollector,
+  SolidImportCollector,
+} from '../rewrite/collectSolidImports.js';
 import {
   buildKeynavFocusScopeInjections,
   buildKeynavScriptInjections,
   resolveKeynavFocusScopeRefs,
   resolveKeynavPlans,
 } from './emitKeynav.js';
+import { type EmitNodeCtx, emitNode } from './emitTemplateNode.js';
 
 export interface EmitTemplateResult {
   jsx: string;

@@ -10,9 +10,10 @@
  * The fix escapes backslashes, backticks, and `${` inside the template and
  * styles bodies before injecting them into the decorator's backtick literal.
  */
-import { describe, it, expect } from 'vitest';
+
+import type { IRComponent } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitDecorator } from '../emit/emitDecorator.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 
 const STUB_IR = { name: 'Stub' } as unknown as IRComponent;
 

@@ -4,14 +4,13 @@
  * Asserts that a user-authored residual statement in the emitted Counter.svelte
  * resolves to its exact .rozie source line via SourceMapConsumer.originalPositionFor.
  */
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { SourceMapConsumer } from 'source-map-js';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { describe, expect, it } from 'vitest';
 import { emitSvelte } from '../emitSvelte.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

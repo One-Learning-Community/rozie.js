@@ -28,14 +28,18 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent, TemplateNode, PropDecl } from '../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { BlockMap } from '../../../core/src/ast/types.js';
-import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
-import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
-import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import type {
+  BlockMap,
+  Diagnostic,
+  IRComponent,
+  ModifierRegistry,
+  PropDecl,
+  IRTemplateNode as TemplateNode,
+} from '@rozie/core';
+import { createDefaultRegistry } from '@rozie/core';
 import { computeScopeHash } from '../../../core/src/codegen/portalCss.js';
+import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 
 /**
  * Phase 06.2 P2 — recursive walk over the IR template detecting any
@@ -82,39 +86,37 @@ function templateContainsSelfReference(node: TemplateNode | null): boolean {
       return false;
   }
 }
-import * as t from '@babel/types';
+
 import type { File } from '@babel/types';
+import * as t from '@babel/types';
 import type { SourceMap } from 'magic-string';
-import { emitScript } from './emit/emitScript.js';
-import { INLINE_ROZIE_TOKEN_FN } from './emit/emitContext.js';
-import { emitTemplate } from './emit/emitTemplate.js';
-import { emitListeners } from './emit/emitListeners.js';
-import { emitStyle } from './emit/emitStyle.js';
-import { emitDecorator, registerDecoratorImports } from './emit/emitDecorator.js';
-import { buildShell } from './emit/shell.js';
-import { composeSourceMap } from './sourcemap/compose.js';
 import { buildPartialLineOffsets } from '../../../core/src/codegen/composeMaps.js';
-import { cloneScriptProgram } from './rewrite/cloneProgram.js';
 import {
-  rewriteRozieIdentifiers,
-  collectUserMethodNames,
-} from './rewrite/rewriteScript.js';
-import { sanitizeEventName } from './rewrite/sanitizeEventName.js';
+  deconflictRefsAgainstUserBindings,
+  deconflictReservedComputedInjectNames,
+  deconflictReservedDataRefNames,
+  reservedClassMembers,
+} from '../../../core/src/rewrite/deconflict.js';
 import {
   cvaDiagnostics as computeCvaDiagnostics,
   hasBooleanDisabledProp,
 } from './cvaDiagnostics.js';
-import {
-  reservedClassMembers,
-  deconflictReservedComputedInjectNames,
-  deconflictReservedDataRefNames,
-  deconflictRefsAgainstUserBindings,
-} from '../../../core/src/rewrite/deconflict.js';
+import { INLINE_ROZIE_TOKEN_FN } from './emit/emitContext.js';
+import { emitDecorator, registerDecoratorImports } from './emit/emitDecorator.js';
 // Phase 71 Plan 09 (r-keynav, Angular — highest blast radius), extended
 // Phase 77 Plan 05 (multi-root) — resolved ONCE here and threaded through
 // both emitScript (class-body wiring) and emitTemplate (declarative
 // attribute stamping). See emitKeynav.ts's module doc comment.
 import { resolveKeynavPlans } from './emit/emitKeynav.js';
+import { emitListeners } from './emit/emitListeners.js';
+import { emitScript } from './emit/emitScript.js';
+import { emitStyle } from './emit/emitStyle.js';
+import { emitTemplate } from './emit/emitTemplate.js';
+import { buildShell } from './emit/shell.js';
+import { cloneScriptProgram } from './rewrite/cloneProgram.js';
+import { collectUserMethodNames, rewriteRozieIdentifiers } from './rewrite/rewriteScript.js';
+import { sanitizeEventName } from './rewrite/sanitizeEventName.js';
+import { composeSourceMap } from './sourcemap/compose.js';
 
 /**
  * Bug 5: build a handler-name → parameter-count map from the (un-rewritten)
@@ -130,10 +132,7 @@ function buildHandlerArityMap(program: File): Map<string, number> {
     if (t.isVariableDeclaration(stmt)) {
       for (const d of stmt.declarations) {
         if (!t.isIdentifier(d.id) || !d.init) continue;
-        if (
-          t.isArrowFunctionExpression(d.init) ||
-          t.isFunctionExpression(d.init)
-        ) {
+        if (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init)) {
           arity.set(d.id.name, d.init.params.length);
         }
       }
@@ -413,8 +412,7 @@ const INLINE_DISPLAY_FN = [
  * `rozieDisplay(expr)` against `this`; this method forwards to the inlined
  * module-scope `__rozieDisplay`. Gated on `tmplResult.hasDisplayWrap`.
  */
-const DISPLAY_CLASS_METHOD =
-  'rozieDisplay(v: unknown): string { return __rozieDisplay(v); }';
+const DISPLAY_CLASS_METHOD = 'rozieDisplay(v: unknown): string { return __rozieDisplay(v); }';
 
 /**
  * 260608-sya — inline module-scope `__rozieAttr` for the WHOLE-VALUE
@@ -438,8 +436,7 @@ const INLINE_ATTR_FN = [
  * against `this`; this forwards to the inlined module-scope `__rozieAttr`.
  * Gated on `tmplResult.hasDisplayWrap` (the attr swap flips it).
  */
-const ATTR_CLASS_METHOD =
-  'rozieAttr(v: unknown): string | null { return __rozieAttr(v); }';
+const ATTR_CLASS_METHOD = 'rozieAttr(v: unknown): string | null { return __rozieAttr(v); }';
 
 /**
  * Quick task 260717-uvk — self-contained class method for an array-form
@@ -491,10 +488,7 @@ const MERGE_STYLE_CLASS_METHOD = [
   '}',
 ].join('\n');
 
-export function emitAngular(
-  ir: IRComponent,
-  opts: EmitAngularOptions = {},
-): EmitAngularResult {
+export function emitAngular(ir: IRComponent, opts: EmitAngularOptions = {}): EmitAngularResult {
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
 
   // ─── Phase 61 Plan 04 (cross-target-name-collision) — STEP 0: IR-LEVEL
@@ -515,8 +509,7 @@ export function emitAngular(
   //     Public-contract names (props / $expose verbs) are NEVER renamed (D-02).
   {
     const cvaEnabledForGate = opts.cva ?? true;
-    const singleModel =
-      cvaEnabledForGate && ir.props.filter((p) => p.isModel).length === 1;
+    const singleModel = cvaEnabledForGate && ir.props.filter((p) => p.isModel).length === 1;
     const reserved = reservedClassMembers('angular', { singleModel });
     const protectedNames = new Set<string>([
       ...(ir.expose ?? []).map((e) => e.name),
@@ -573,8 +566,7 @@ export function emitAngular(
   //                                ROZ125 for the ≥2 case)
   const cvaEnabled = opts.cva ?? true;
   const modelProps = ir.props.filter((p) => p.isModel);
-  const cvaModelProp =
-    cvaEnabled && modelProps.length === 1 ? modelProps[0]! : null;
+  const cvaModelProp = cvaEnabled && modelProps.length === 1 ? modelProps[0]! : null;
   // Phase 23 Plan 03 — populate the reserved slot with ROZ124 (collision error),
   // ROZ125 (≥2-model info), and ROZ126 (no-disabled info). Computed from the IR +
   // the single resolved gate; never throws (D-08). Flows through the diagnostics
@@ -624,8 +616,7 @@ export function emitAngular(
   // string with a boolean is truthy-broken (`'no' || false` is `'no'`), so
   // setDisabledState(false) could never re-enable the control. The shared
   // `hasBooleanDisabledProp` helper keeps this gate in lockstep with ROZ126.
-  const cvaMergeDisabled =
-    cvaModelProp !== null && hasBooleanDisabledProp(ir.props);
+  const cvaMergeDisabled = cvaModelProp !== null && hasBooleanDisabledProp(ir.props);
   const tmplResult = emitTemplate(ir, registry, {
     collisionRenames,
     handlerArity,
@@ -652,9 +643,10 @@ export function emitAngular(
   );
 
   // 4. Style emission.
-  const styleResult = opts.source !== undefined
-    ? emitStyle(ir.styles, opts.source, portalScopeHash)
-    : { stylesArrayBody: '', portalStylesEntry: '', diagnostics: [] as Diagnostic[] };
+  const styleResult =
+    opts.source !== undefined
+      ? emitStyle(ir.styles, opts.source, portalScopeHash)
+      : { stylesArrayBody: '', portalStylesEntry: '', diagnostics: [] as Diagnostic[] };
 
   // 5. Register conditional imports based on template features.
   const imports = scriptResult.imports;
@@ -836,8 +828,7 @@ export function emitAngular(
   // declares" check uses a literal-substring match against the emitted shape;
   // both emitScript's L895 emit and this synthesised emit use the same
   // canonical text so the dedupe is exact.
-  const HOIST_DESTROY_REF_LINE =
-    'private __rozieDestroyRef = inject(DestroyRef);';
+  const HOIST_DESTROY_REF_LINE = 'private __rozieDestroyRef = inject(DestroyRef);';
   const destroyRefAlreadyEmitted = classBody.includes(HOIST_DESTROY_REF_LINE);
   const destroyRefSynthesised: string[] = [];
   if (tmplResult.needsDestroyRefField && !destroyRefAlreadyEmitted) {
@@ -918,13 +909,7 @@ export function emitAngular(
       );
     } else {
       // No constructor — synthesize one.
-      const synthesized = [
-        `constructor() {`,
-        rendererSetup,
-        ``,
-        listenerBlock,
-        `}`,
-      ].join('\n');
+      const synthesized = [`constructor() {`, rendererSetup, ``, listenerBlock, `}`].join('\n');
       // Append after field declarations (before any computed/method/guard sections).
       // Heuristic: append at end of fields section. Simplest — prepend before
       // first non-field block (computed/method/guard). For v1, prepend after
@@ -966,9 +951,7 @@ export function emitAngular(
       return `import { ${decl.localName} } from '${rewritten}';`;
     });
   const componentImportsBlock =
-    componentImportsLines.length > 0
-      ? componentImportsLines.join('\n') + '\n'
-      : '';
+    componentImportsLines.length > 0 ? componentImportsLines.join('\n') + '\n' : '';
 
   // Phase 26 (D-01-correction/D-02) — when any interpolation wrapped, append the
   // inlined module-scope `function __rozieDisplay(v)` to the module-scope decls
@@ -992,7 +975,12 @@ export function emitAngular(
     ? [...baseModuleDecls, INLINE_ROZIE_TOKEN_FN]
     : baseModuleDecls;
 
-  const { ms, scriptOutputOffset, scriptMap: shellScriptMap, userCodeLineOffset } = buildShell({
+  const {
+    ms,
+    scriptOutputOffset,
+    scriptMap: shellScriptMap,
+    userCodeLineOffset,
+  } = buildShell({
     // Phase 71 (r-keynav) — the ONLY non-`@angular/*` runtime import Angular
     // emits (`@rozie/runtime-keynav-core`'s `createKeynavStateMachine`[,
     // `normalizeClassTokens`]); empty string for the overwhelming majority of

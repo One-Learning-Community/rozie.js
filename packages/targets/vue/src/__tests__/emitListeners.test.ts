@@ -15,19 +15,15 @@
 // Whole-script snapshots are owned here for SearchInput / Dropdown / TodoList —
 // composing emitScript output (Plan 02) + scriptInjections from emitTemplate
 // (Plan 03 — debounce wrap on SearchInput) + emitListeners output (Plan 04).
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import * as t from '@babel/types';
+import { fileURLToPath } from 'node:url';
 import { parseExpression } from '@babel/parser';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type {
-  IRComponent,
-  Listener,
-} from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent, Listener } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitListeners } from '../emit/emitListeners.js';
 import { emitVue } from '../emitVue.js';
 
@@ -66,7 +62,14 @@ function emptyIR(): IRComponent {
     listeners: [],
     setupBody: { type: 'SetupBody', scriptProgram: t.file(t.program([])), annotations: [] },
     template: null,
-    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: LOC },
+    styles: {
+      type: 'StyleSection',
+      scopedRules: [],
+      rootRules: [],
+      portalRules: [],
+      engineRules: [],
+      sourceLoc: LOC,
+    },
     sourceLoc: LOC,
   };
 }
@@ -95,7 +98,9 @@ describe('emitListeners — Dropdown end-to-end', () => {
   it('Test 3: emits throttled-handler wrap + watchEffect for resize.throttle(100).passive', () => {
     const { code } = emitListeners(dropdown.listeners, dropdown, registry);
     expect(code).toContain('const throttledLReposition = throttle(reposition, 100);');
-    expect(code).toContain("window.addEventListener('resize', throttledLReposition, { passive: true });");
+    expect(code).toContain(
+      "window.addEventListener('resize', throttledLReposition, { passive: true });",
+    );
     expect(code).toContain("window.removeEventListener('resize', throttledLReposition");
   });
 
@@ -118,7 +123,7 @@ describe('emitListeners — Dropdown end-to-end', () => {
     expect(set).not.toContain('debounce');
   });
 
-  it('Test 5: vueImports.use(\'watchEffect\') is called for native-emit listeners', () => {
+  it("Test 5: vueImports.use('watchEffect') is called for native-emit listeners", () => {
     const { vueImports } = emitListeners(dropdown.listeners, dropdown, registry);
     expect(vueImports.has('watchEffect')).toBe(true);
   });
@@ -190,7 +195,7 @@ describe('emitListeners — synthetic IR coverage', () => {
     expect(code).toContain('onCleanup(() =>');
   });
 
-  it('Test 9: filters out listeners with source=\'template-event\' — only listeners-block entries are emitted', () => {
+  it("Test 9: filters out listeners with source='template-event' — only listeners-block entries are emitted", () => {
     const ir = emptyIR();
     const tmplListener: Listener = {
       type: 'Listener',

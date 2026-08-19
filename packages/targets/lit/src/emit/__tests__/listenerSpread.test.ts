@@ -46,10 +46,9 @@
  * `Directive` — Pitfall 7 / A2 LOCKED). The Plan 15-07 Lit teardown e2e
  * probe asserts the contract end-to-end.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../../emitLit.js';
 
 function compile(rozieSrc: string): string {
@@ -182,10 +181,14 @@ const someObj = {};
     expect(body).toMatchSnapshot();
     expect(body).toContain('rozieListeners(');
     // Shell threads the import line — exactly once.
-    expect(code).toMatch(/import\s*\{[^}]*\brozieListeners\b[^}]*\}\s*from\s*'@rozie\/runtime-lit'/);
+    expect(code).toMatch(
+      /import\s*\{[^}]*\brozieListeners\b[^}]*\}\s*from\s*'@rozie\/runtime-lit'/,
+    );
     expect(
-      (code.match(/import\s*\{[^}]*\brozieListeners\b[^}]*\}\s*from\s*'@rozie\/runtime-lit'/g) ?? [])
-        .length,
+      (
+        code.match(/import\s*\{[^}]*\brozieListeners\b[^}]*\}\s*from\s*'@rozie\/runtime-lit'/g) ??
+        []
+      ).length,
     ).toBe(1);
   });
 

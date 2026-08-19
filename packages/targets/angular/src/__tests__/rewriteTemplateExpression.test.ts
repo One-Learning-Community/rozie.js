@@ -8,10 +8,11 @@
  *
  * Closes Angular row of F-07.3.2-05-A from Plan 05 SUMMARY.
  */
-import { describe, it, expect } from 'vitest';
+
 import { parseExpression } from '@babel/parser';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
 
 const sloc = { start: 0, end: 0 } as unknown as SlotDecl['sourceLoc'];
 
@@ -27,7 +28,9 @@ function makeSlot(name: string, presence: 'always' | 'conditional' = 'conditiona
   };
 }
 
-function makeIR(opts: { slots?: SlotDecl[]; props?: IRComponent['props']; state?: IRComponent['state'] } = {}): IRComponent {
+function makeIR(
+  opts: { slots?: SlotDecl[]; props?: IRComponent['props']; state?: IRComponent['state'] } = {},
+): IRComponent {
   return {
     name: 'TestComp',
     props: opts.props ?? [],
@@ -136,7 +139,12 @@ describe('rewriteTemplateExpression — $refs on a composed-component ref (findi
       { type: 'RefDecl', name: 'tbl', elementTag: 'DataTable', sourceLoc: sloc },
     ];
     (ir as unknown as { components: unknown[] }).components = [
-      { type: 'ComponentDecl', localName: 'DataTable', importPath: './DataTable.rozie', sourceLoc: sloc },
+      {
+        type: 'ComponentDecl',
+        localName: 'DataTable',
+        importPath: './DataTable.rozie',
+        sourceLoc: sloc,
+      },
     ];
     const expr = parseExpression('$refs.tbl');
     const out = rewriteTemplateExpression(expr, ir);
@@ -149,7 +157,12 @@ describe('rewriteTemplateExpression — $refs on a composed-component ref (findi
       { type: 'RefDecl', name: 'tbl', elementTag: 'DataTable', sourceLoc: sloc },
     ];
     (ir as unknown as { components: unknown[] }).components = [
-      { type: 'ComponentDecl', localName: 'DataTable', importPath: './DataTable.rozie', sourceLoc: sloc },
+      {
+        type: 'ComponentDecl',
+        localName: 'DataTable',
+        importPath: './DataTable.rozie',
+        sourceLoc: sloc,
+      },
     ];
     const expr = parseExpression('$refs.tbl.expandAll()');
     const out = rewriteTemplateExpression(expr, ir);

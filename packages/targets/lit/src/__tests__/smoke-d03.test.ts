@@ -23,10 +23,9 @@
  * intended to lock as a snapshot fixture; the per-package snap-locked
  * fixtures are producer-only (examples/{Modal,Dropdown,TodoList}.rozie).
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 const CONSUMER_SOURCE = `<rozie name="TestConsumer">
@@ -103,7 +102,9 @@ describe('Phase 07.3.1 Blocker #3 (D-03) — Lit consumer-side scoped slot fill 
     // Phase 07.6 — data-rozie-s-<hash> scope stamp precedes slot=.
     expect(code).toMatch(/<h2[^>]*slot="header"[^>]*>Title<\/h2>/);
     // Button exists with @click + slot="header" spread (D-LIT-18).
-    expect(code).toMatch(/<button[^>]*@click=\$\{\(\$event\)\s*=>[^>]*slot="header"[^>]*>×<\/button>/);
+    expect(code).toMatch(
+      /<button[^>]*@click=\$\{\(\$event\)\s*=>[^>]*slot="header"[^>]*>×<\/button>/,
+    );
     // Dispatch shape + event name asserted independently.
     expect(code).toMatch(/dispatchEvent\(new CustomEvent\('rozie-header-close'/);
     expect(code).toMatch(/bubbles:\s*true/);
@@ -128,7 +129,7 @@ describe('Phase 07.3.1 Blocker #3 (D-03) — Lit consumer-side scoped slot fill 
     const code = compileConsumer();
     // The reset MUST appear inside disconnectedCallback after the
     // _disconnectCleanups drain.
-    const disconnectMatch = code.match(/disconnectedCallback\(\): void \{[\s\S]*?\n  \}/);
+    const disconnectMatch = code.match(/disconnectedCallback\(\): void \{[\s\S]*?\n {2}\}/);
     expect(disconnectMatch).not.toBeNull();
     expect(disconnectMatch![0]).toContain('this._slotCtxWired_header = false;');
     // Must come AFTER `_disconnectCleanups = [];`

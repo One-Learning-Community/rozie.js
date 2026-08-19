@@ -27,19 +27,19 @@
  * @experimental — shape may change before v1.0
  */
 import type {
+  Diagnostic,
   IRComponent,
   Listener,
   ListenerTarget,
-} from '../../../../core/src/ir/types.js';
-import type {
   ModifierRegistry,
   SolidEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
+import type {
+  RuntimeSolidImportCollector,
+  SolidImportCollector,
+} from '../rewrite/collectSolidImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 
 export interface EmitListenerNativeResult {
   code: string;
@@ -59,12 +59,21 @@ function eventTypeFor(event: string): string {
     event === 'contextmenu'
   )
     return 'MouseEvent';
-  if (event === 'keydown' || event === 'keyup' || event === 'keypress')
-    return 'KeyboardEvent';
+  if (event === 'keydown' || event === 'keyup' || event === 'keypress') return 'KeyboardEvent';
   if (event === 'wheel') return 'WheelEvent';
-  if (event === 'touchstart' || event === 'touchend' || event === 'touchmove' || event === 'touchcancel')
+  if (
+    event === 'touchstart' ||
+    event === 'touchend' ||
+    event === 'touchmove' ||
+    event === 'touchcancel'
+  )
     return 'TouchEvent';
-  if (event === 'pointerdown' || event === 'pointerup' || event === 'pointermove' || event === 'pointercancel')
+  if (
+    event === 'pointerdown' ||
+    event === 'pointerup' ||
+    event === 'pointermove' ||
+    event === 'pointercancel'
+  )
     return 'PointerEvent';
   if (event === 'focus' || event === 'blur') return 'FocusEvent';
   if (event === 'input') return 'InputEvent';
@@ -152,7 +161,6 @@ export function emitListenerNative(
     }
     if (desc.kind === 'inlineGuard') {
       inlineGuards.push(desc.code);
-      continue;
     }
     // helper kind: WR-01 — `classifyListener` now inspects EVERY non-listenerOption
     // pipeline entry (not just `wrap`-kind), so any listener whose pipeline
@@ -177,9 +185,8 @@ export function emitListenerNative(
     : '';
 
   const handlerName = options.wrappedHandlerName ?? '_rozieHandler';
-  const guardBody = inlineGuards.length > 0
-    ? inlineGuards.map((g) => `    ${g}`).join('\n') + '\n'
-    : '';
+  const guardBody =
+    inlineGuards.length > 0 ? inlineGuards.map((g) => `    ${g}`).join('\n') + '\n' : '';
 
   let handlerDecl: string;
   let handlerRef: string;
@@ -200,9 +207,7 @@ export function emitListenerNative(
     // `() => void` (TS2554: Expected 0 arguments but got 1). Inline expressions
     // (e.g. arrow functions already declared with an `e` param) receive `e`
     // to preserve the intended semantics.
-    const invocation = handlerIsBareIdentifier
-      ? `${userHandlerCode}();`
-      : `(${userHandlerCode});`;
+    const invocation = handlerIsBareIdentifier ? `${userHandlerCode}();` : `(${userHandlerCode});`;
     handlerDecl = `  const ${handlerName} = ($event: ${evtType}) => {\n${guardBody}    ${invocation}\n  };\n`;
     handlerRef = handlerName;
   }

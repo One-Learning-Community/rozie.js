@@ -25,19 +25,15 @@
  * no `Object.fromEntries` over attacker keys). The compile-time literal
  * key walk drops `__proto__`/`constructor`/`prototype` keys.
  */
-import { describe, it, expect } from 'vitest';
+
 import { parseExpression } from '@babel/parser';
-import * as t from '@babel/types';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
-import type {
-  IRComponent,
-  AttributeBinding,
-} from '../../../../../core/src/ir/types.js';
+import type * as t from '@babel/types';
+import type { AttributeBinding, IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import {
-  emitTemplateAttribute,
   type EmitTemplateAttributeState,
+  emitTemplateAttribute,
 } from '../emitTemplateAttribute.js';
 
 function emptyIR(): IRComponent {
@@ -67,19 +63,12 @@ function freshState(): EmitTemplateAttributeState {
 }
 
 describe('emitTemplateAttribute (Lit) — spreadBinding (Plan 14-05 Task 1)', () => {
-  it('(1) plain LITERAL spread → `${rozieSpread({ id: \'x\', title: \'t\' })}` with HTML keys verbatim', () => {
+  it("(1) plain LITERAL spread → `${rozieSpread({ id: 'x', title: 't' })}` with HTML keys verbatim", () => {
     const ir = emptyIR();
     const state = freshState();
-    const out = emitTemplateAttribute(
-      spread(`{ id: 'x', title: 't' }`),
-      ir,
-      'button',
-      state,
-    );
+    const out = emitTemplateAttribute(spread(`{ id: 'x', title: 't' }`), ir, 'button', state);
     // HTML attribute names — no remap (no `class→className`).
-    expect(out).toMatchInlineSnapshot(
-      `"\${rozieSpread({ id: 'x', title: 't' })}"`,
-    );
+    expect(out).toMatchInlineSnapshot(`"\${rozieSpread({ id: 'x', title: 't' })}"`);
     expect(out).toContain('rozieSpread(');
     expect(out).not.toContain('className');
     expect(out).not.toContain('htmlFor');

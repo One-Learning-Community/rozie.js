@@ -66,10 +66,10 @@
  * below which needs the r-for / reprojection / widened-collision checks.
  */
 import * as t from '@babel/types';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import { findRForSlotNameCollisions } from '../../../../core/src/ir/findRForSlotNameCollisions.js';
-import { findReprojectionSlotNameCollisions } from '../../../../core/src/ir/findReprojectionSlotNameCollisions.js';
+import type { IRComponent } from '@rozie/core';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { findReprojectionSlotNameCollisions } from '../../../../core/src/ir/findReprojectionSlotNameCollisions.js';
+import { findRForSlotNameCollisions } from '../../../../core/src/ir/findRForSlotNameCollisions.js';
 
 /**
  * Sanitize a non-identifier slot name into a safe, collision-proof local

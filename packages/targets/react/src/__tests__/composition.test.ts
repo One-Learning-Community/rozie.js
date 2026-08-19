@@ -7,13 +7,12 @@
 //     (NO extension — TS resolver picks up `.tsx` from dist)
 //   - CardHeader (leaf, no <components>) — no new imports
 //   - Modal-with-Counter (wrapper) — `import Counter from './Counter';`
-import { describe, expect, it } from 'vitest';
-import { fileURLToPath } from 'node:url';
+
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../emitReact.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

@@ -12,24 +12,19 @@
 // These assertions are authored to the POST-fix shape and confirmed RED before
 // the Task-2 emitter change (the pre-fix output carries the duplicate
 // `writeValue` member + the prop-shadowed `this.offset()` import reference).
-import { describe, expect, it } from 'vitest';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+
 import { readFileSync } from 'node:fs';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../../core/src/ir/types.js';
-import { emitAngular, type EmitAngularOptions } from '../../emitAngular.js';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { type EmitAngularOptions, emitAngular } from '../../emitAngular.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = resolve(__dirname, '..', '..', '__tests__', 'fixtures');
 
-function compileAngular(
-  src: string,
-  filename: string,
-  opts: EmitAngularOptions = {},
-): string {
+function compileAngular(src: string, filename: string, opts: EmitAngularOptions = {}): string {
   const result = parse(src, { filename });
   if (!result.ast) {
     throw new Error(

@@ -8,10 +8,11 @@
  * the whole expression — broken for non-identifier shapes like template
  * literals.
  */
-import { describe, it, expect } from 'vitest';
+
 import { parseExpression } from '@babel/parser';
+import type { IRComponent } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 
 function makeIR(): IRComponent {
   return {

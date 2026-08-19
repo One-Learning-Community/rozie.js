@@ -61,16 +61,13 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative as pathRelative } from 'node:path';
-import { parse } from '../../core/src/parse.js';
-import { lowerToIR } from '../../core/src/ir/lower.js';
-import { ModifierRegistry } from '@rozie/core';
-import { registerBuiltins } from '../../core/src/modifiers/registerBuiltins.js';
-import { emitReactTypes } from '../../targets/react/src/emit/emitTypes.js';
-import { emitVueTypes } from '../../targets/vue/src/emit/emitTypes.js';
-import { emitSvelteTypes } from '../../targets/svelte/src/emit/emitTypes.js';
-import { emitSolidTypes } from '../../targets/solid/src/emit/emitTypes.js';
-import { emitLitTypes } from '../../targets/lit/src/emit/emitTypes.js';
+import { lowerToIR, ModifierRegistry, parse, registerBuiltins } from '@rozie/core';
 import { emitAngularTypes } from '../../targets/angular/src/emit/emitTypes.js';
+import { emitLitTypes } from '../../targets/lit/src/emit/emitTypes.js';
+import { emitReactTypes } from '../../targets/react/src/emit/emitTypes.js';
+import { emitSolidTypes } from '../../targets/solid/src/emit/emitTypes.js';
+import { emitSvelteTypes } from '../../targets/svelte/src/emit/emitTypes.js';
+import { emitVueTypes } from '../../targets/vue/src/emit/emitTypes.js';
 import type { TargetValue } from './options.js';
 
 /**

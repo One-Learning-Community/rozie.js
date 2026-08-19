@@ -5,18 +5,17 @@
  * Drives the per-block fixture snapshots Counter.script.snap, SearchInput.script.snap,
  * and Modal.script.snap.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { fileURLToPath } from 'node:url';
 import type {
   IRComponent,
-  TemplateNode,
+  IRTemplateNode as TemplateNode,
   TemplateSlotInvocationIR,
-} from '../../../../core/src/ir/types.js';
+} from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitScript } from '../emit/emitScript.js';
 import { emitSlotInvocation } from '../emit/emitSlotInvocation.js';
 
@@ -230,11 +229,7 @@ describe('emitScript — per-block snapshot fixtures', () => {
   it('Counter.script.snap', async () => {
     const ir = loadIR('Counter');
     const { classBody, interfaceDecls, imports } = emitScript(ir);
-    const out = [
-      imports.render(),
-      interfaceDecls.join('\n\n'),
-      classBody,
-    ]
+    const out = [imports.render(), interfaceDecls.join('\n\n'), classBody]
       .filter((s) => s.trim().length > 0)
       .join('\n\n');
     await expect(out).toMatchFileSnapshot(resolve(FIXTURES, 'Counter.script.snap'));
@@ -243,11 +238,7 @@ describe('emitScript — per-block snapshot fixtures', () => {
   it('SearchInput.script.snap', async () => {
     const ir = loadIR('SearchInput');
     const { classBody, interfaceDecls, imports } = emitScript(ir);
-    const out = [
-      imports.render(),
-      interfaceDecls.join('\n\n'),
-      classBody,
-    ]
+    const out = [imports.render(), interfaceDecls.join('\n\n'), classBody]
       .filter((s) => s.trim().length > 0)
       .join('\n\n');
     await expect(out).toMatchFileSnapshot(resolve(FIXTURES, 'SearchInput.script.snap'));
@@ -256,11 +247,7 @@ describe('emitScript — per-block snapshot fixtures', () => {
   it('Modal.script.snap', async () => {
     const ir = loadIR('Modal');
     const { classBody, interfaceDecls, imports } = emitScript(ir);
-    const out = [
-      imports.render(),
-      interfaceDecls.join('\n\n'),
-      classBody,
-    ]
+    const out = [imports.render(), interfaceDecls.join('\n\n'), classBody]
       .filter((s) => s.trim().length > 0)
       .join('\n\n');
     await expect(out).toMatchFileSnapshot(resolve(FIXTURES, 'Modal.script.snap'));
@@ -424,7 +411,7 @@ describe('emitSlotInvocation — §templates-merge binding (Phase 07.3.2 D-02 st
   // Nothing was deleted; the inverse transform (removing the
   // `__rozieFillMap()[...] ?? ` segment) reproduces the old bytes exactly —
   // see tests/angular-runtime/prohibitions.test.ts's inverse-transform gate.
-  it('Modal header-slot binding merges `(headerTpl ?? __rozieFillMap()[\'header\'] ?? templates()?.[\'header\'])` at *ngTemplateOutlet (inline form per A7 signal call)', () => {
+  it("Modal header-slot binding merges `(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])` at *ngTemplateOutlet (inline form per A7 signal call)", () => {
     const ir = loadIR('Modal');
     const out = emitSlotInvocation(makeSlotInvocation('header'), makeCtx(ir));
     // Inline form (Pitfall 3 not triggered) — matches the canonical D-SV-16
@@ -435,7 +422,7 @@ describe('emitSlotInvocation — §templates-merge binding (Phase 07.3.2 D-02 st
     );
   });
 
-  it('Modal footer-slot binding merges `(footerTpl ?? __rozieFillMap()[\'footer\'] ?? templates()?.[\'footer\'])` at *ngTemplateOutlet', () => {
+  it("Modal footer-slot binding merges `(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])` at *ngTemplateOutlet", () => {
     const ir = loadIR('Modal');
     const out = emitSlotInvocation(makeSlotInvocation('footer'), makeCtx(ir));
     expect(out).toContain(
@@ -443,7 +430,7 @@ describe('emitSlotInvocation — §templates-merge binding (Phase 07.3.2 D-02 st
     );
   });
 
-  it('Modal default-slot binding uses synthetic `defaultSlot` key (refineSlotTypes.ts:24): `(defaultTpl ?? __rozieFillMap()[\'defaultSlot\'] ?? templates()?.[\'defaultSlot\'])`', () => {
+  it("Modal default-slot binding uses synthetic `defaultSlot` key (refineSlotTypes.ts:24): `(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])`", () => {
     const ir = loadIR('Modal');
     const out = emitSlotInvocation(makeSlotInvocation(''), makeCtx(ir));
     // tplField for default slot is `defaultTpl` (slotFieldName('') === 'defaultTpl');

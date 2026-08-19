@@ -33,11 +33,12 @@
  * covers the producer's three-step dispatch order in `emitTemplate.ts`'s
  * `emitSlot()`.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compile } from '../../../../../core/src/compile.js';
+import { compile } from '@rozie/core';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DYNAMIC_SLOTS_DIR = resolve(HERE, '../../../../../../examples');
@@ -146,9 +147,7 @@ describe('Task 2 — emitTemplate: ONE accumulated rozieSlots object literal per
     // accumulated `.rozieSlots=` binding (cell-status/cell-score/cell-total/
     // dynamic) AND the ordinary `.headerCell=` named-property binding
     // (Behaviour 4) — on the SAME open tag.
-    const openTagMatch = /<rozie-dynamic-slots\b[\s\S]*?<\/rozie-dynamic-slots>/.exec(
-      consumerCode,
-    );
+    const openTagMatch = /<rozie-dynamic-slots\b[\s\S]*?<\/rozie-dynamic-slots>/.exec(consumerCode);
     expect(openTagMatch).not.toBeNull();
     const tag = openTagMatch![0]!;
     expect(tag).toContain('.rozieSlots=${{');

@@ -23,11 +23,11 @@
  *
  * @experimental — shape may change before v1.0
  */
+
+import type { Diagnostic, StyleSection } from '@rozie/core';
 import postcss from 'postcss';
 import selectorParser from 'postcss-selector-parser';
-import type { StyleSection } from '../../../../core/src/ir/types.js';
 import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
 /**
@@ -188,25 +188,27 @@ function wrapBareNgDeep(css: string): string {
 
 function stringifyRules(rules: StyleRule[], source: string): string {
   if (rules.length === 0) return '';
-  return rules
-    .map((r) => source.slice(r.loc.start, r.loc.end))
-    // Phase 17 (SPEC-R1 non-Lit arm / SPEC-R4a): `::part(name)` is a
-    // cross-shadow-DOM mechanism that only has meaning on Lit. Drop any rule
-    // whose slice contains `::part(` BEFORE the `:deep(` lowering branch — so a
-    // ::part rule is never passed to `lowerDeepToNgDeep` and is filtered out of
-    // the array entirely (not mapped to '', which would leak a stray empty
-    // line). Silent no-op — no diagnostic. Independent of the `:deep` path
-    // (SPEC-R5). Match only the selector portion (before the first `{`) so a
-    // `::part(` in a declaration value or comment cannot false-drop a rule.
-    .filter((slice) => !slice.split('{', 1)[0]!.includes('::part('))
-    .map((slice) => {
-      // Quick task 260526-mk4 — Angular `:deep(X)` → `::ng-deep X` lowering.
-      // Byte-slice preservation is the floor (Risk 5); we only invoke the
-      // postcss reparse when the slice actually contains `:deep(`, paying the
-      // reformat cost only for rules that need it.
-      return slice.includes(':deep(') ? lowerDeepToNgDeep(slice) : slice;
-    })
-    .join('\n');
+  return (
+    rules
+      .map((r) => source.slice(r.loc.start, r.loc.end))
+      // Phase 17 (SPEC-R1 non-Lit arm / SPEC-R4a): `::part(name)` is a
+      // cross-shadow-DOM mechanism that only has meaning on Lit. Drop any rule
+      // whose slice contains `::part(` BEFORE the `:deep(` lowering branch — so a
+      // ::part rule is never passed to `lowerDeepToNgDeep` and is filtered out of
+      // the array entirely (not mapped to '', which would leak a stray empty
+      // line). Silent no-op — no diagnostic. Independent of the `:deep` path
+      // (SPEC-R5). Match only the selector portion (before the first `{`) so a
+      // `::part(` in a declaration value or comment cannot false-drop a rule.
+      .filter((slice) => !slice.split('{', 1)[0]!.includes('::part('))
+      .map((slice) => {
+        // Quick task 260526-mk4 — Angular `:deep(X)` → `::ng-deep X` lowering.
+        // Byte-slice preservation is the floor (Risk 5); we only invoke the
+        // postcss reparse when the slice actually contains `:deep(`, paying the
+        // reformat cost only for rules that need it.
+        return slice.includes(':deep(') ? lowerDeepToNgDeep(slice) : slice;
+      })
+      .join('\n')
+  );
 }
 
 /**
@@ -257,9 +259,7 @@ function expandDeepDistribution(root: selectorParser.Root): void {
       );
       if (distIdx === -1) continue;
       const pseudo = sel.nodes[distIdx] as selectorParser.Pseudo;
-      const inners = pseudo.nodes.filter(
-        (n) => n.type === 'selector',
-      ) as selectorParser.Selector[];
+      const inners = pseudo.nodes.filter((n) => n.type === 'selector') as selectorParser.Selector[];
       const expanded: selectorParser.Selector[] = inners.map((inner) => {
         const cloned = sel.clone({}) as selectorParser.Selector;
         const clonedPseudo = cloned.nodes[distIdx] as selectorParser.Pseudo;
@@ -284,11 +284,7 @@ function expandDeepDistribution(root: selectorParser.Root): void {
 function rewriteDeepInSelector(selector: selectorParser.Selector): void {
   for (let i = selector.nodes.length - 1; i >= 0; i--) {
     const node = selector.nodes[i];
-    if (
-      !node ||
-      node.type !== 'pseudo' ||
-      (node as selectorParser.Pseudo).value !== ':deep'
-    ) {
+    if (!node || node.type !== 'pseudo' || (node as selectorParser.Pseudo).value !== ':deep') {
       continue;
     }
     const pseudo = node as selectorParser.Pseudo;

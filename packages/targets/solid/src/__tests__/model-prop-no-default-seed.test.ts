@@ -20,10 +20,9 @@
  * The per-target lint/tsc gate on examples/typed/PropsRequired.rozie is the
  * end-to-end backstop; these tests pin the emit shapes directly.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../emitSolid.js';
 
 function compileSolid(src: string): string {

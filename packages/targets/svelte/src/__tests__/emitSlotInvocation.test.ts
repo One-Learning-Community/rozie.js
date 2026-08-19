@@ -9,17 +9,12 @@
 // Modeled on sibling `emitTemplate.test.ts` describe/it layout. Tests the
 // pure `emitSlotInvocation` function with hand-built IR nodes — no SFC parse
 // step required, so failures point directly at the emitter not at the lowerer.
-import { describe, expect, it } from 'vitest';
+
 import * as t from '@babel/types';
+import type { IRComponent, SlotDecl, TemplateSlotInvocationIR } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import type { EmitSlotInvocationCtx } from '../emit/emitSlotInvocation.js';
 import { emitSlotInvocation } from '../emit/emitSlotInvocation.js';
-import type {
-  EmitSlotInvocationCtx,
-} from '../emit/emitSlotInvocation.js';
-import type {
-  IRComponent,
-  SlotDecl,
-  TemplateSlotInvocationIR,
-} from '../../../../core/src/ir/types.js';
 
 /**
  * Minimal mock IR — only `slots` is read by emitSlotInvocation (decl lookup
@@ -40,7 +35,15 @@ function makeCtx(slots: SlotDecl[] = []): EmitSlotInvocationCtx {
     watchers: [],
     listeners: [],
     template: null,
-    styles: { content: '', scoped: false, escapeHatchSelectors: [], sourceLoc: { start: { line: 1, column: 0, offset: 0 }, end: { line: 1, column: 0, offset: 0 } } },
+    styles: {
+      content: '',
+      scoped: false,
+      escapeHatchSelectors: [],
+      sourceLoc: {
+        start: { line: 1, column: 0, offset: 0 },
+        end: { line: 1, column: 0, offset: 0 },
+      },
+    },
     components: [],
   } as unknown as IRComponent;
   return {
@@ -56,7 +59,10 @@ function makeSlotDecl(name: string, paramNames: string[]): SlotDecl {
     defaultContent: null,
     params: paramNames.map((n) => ({
       name: n,
-      sourceLoc: { start: { line: 1, column: 0, offset: 0 }, end: { line: 1, column: 0, offset: 0 } },
+      sourceLoc: {
+        start: { line: 1, column: 0, offset: 0 },
+        end: { line: 1, column: 0, offset: 0 },
+      },
     })),
     sourceLoc: { start: { line: 1, column: 0, offset: 0 }, end: { line: 1, column: 0, offset: 0 } },
   } as unknown as SlotDecl;
@@ -82,9 +88,7 @@ function makeInvocation(
 
 describe('emitSlotInvocation (Phase 07.3.1 Blocker #2 D-02)', () => {
   it('emits object-shape snippet args for single-arg scoped slot', () => {
-    const node = makeInvocation('header', [
-      { name: 'close', expression: t.identifier('close') },
-    ]);
+    const node = makeInvocation('header', [{ name: 'close', expression: t.identifier('close') }]);
     const ctx = makeCtx([makeSlotDecl('header', ['close'])]);
     const out = emitSlotInvocation(node, ctx);
     expect(out).toContain('{@render header?.({ close })}');
@@ -116,11 +120,7 @@ describe('emitSlotInvocation (Phase 07.3.1 Blocker #2 D-02)', () => {
     const node = makeInvocation('header', [
       {
         name: 'remaining',
-        expression: t.binaryExpression(
-          '-',
-          t.identifier('total'),
-          t.identifier('done'),
-        ),
+        expression: t.binaryExpression('-', t.identifier('total'), t.identifier('done')),
       },
     ]);
     const ctx = makeCtx([makeSlotDecl('header', ['remaining'])]);

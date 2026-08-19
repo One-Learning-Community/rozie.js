@@ -44,63 +44,63 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
-import type { GeneratorOptions } from '@babel/generator';
+
 import type { EncodedSourceMap } from '@ampproject/remapping';
+import type { GeneratorOptions } from '@babel/generator';
+import _generate from '@babel/generator';
+import * as t from '@babel/types';
 import type {
+  ComputedDecl,
+  Diagnostic,
   IRComponent,
   PropDecl,
   PropTypeAnnotation,
-  ComputedDecl,
   RefDecl,
   StateDecl,
-} from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
+} from '@rozie/core';
+import { buildPropJsdoc, RozieErrorCode } from '@rozie/core';
+import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
+import {
+  deconflictReservedImportBindings,
+  reservedClassMembers,
+} from '../../../../core/src/rewrite/deconflict.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
+import {
+  type AngularImportCollector,
+  collectAngularImports,
+} from '../rewrite/collectAngularImports.js';
+import { collectComponentRefTypes } from '../rewrite/componentRefs.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { rewriteAngularAssetImports } from '../rewrite/rewriteAssetUrl.js';
 import {
-  rewriteRozieIdentifiers,
   hoistDoubleReadAccessors,
   hoistPolymorphicModelGuards,
   normalizeModelAccessor,
+  rewriteRozieIdentifiers,
 } from '../rewrite/rewriteScript.js';
-import { angularOutputBinding } from '../rewrite/sanitizeEventName.js';
-import { collectComponentRefTypes } from '../rewrite/componentRefs.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import {
-  reservedClassMembers,
-  deconflictReservedImportBindings,
-} from '../../../../core/src/rewrite/deconflict.js';
-import {
-  AngularImportCollector,
-  collectAngularImports,
-} from '../rewrite/collectAngularImports.js';
-import {
-  buildEligibleSlotDecls,
-  buildNgTemplateContextGuard,
-  buildFamilyCtxDecls,
-  isRecordOnlySlotDecl,
-  hasKeyedFillIntake,
-  eligibleSlotFieldNames,
-} from './refineSlotTypes.js';
-import { emitPortals } from './emitPortals.js';
+import { angularOutputBinding } from '../rewrite/sanitizeEventName.js';
 import { emitContext } from './emitContext.js';
 // Phase 71 Plan 09 (r-keynav, Angular — highest blast radius), extended
 // Phase 77 Plan 05 (multi-root) — inline controller class-body wiring (see
 // emitKeynav.ts's module doc comment).
 import { buildKeynavClassEmission, type KeynavEmitPlan } from './emitKeynav.js';
-import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { emitPortals } from './emitPortals.js';
+import {
+  buildEligibleSlotDecls,
+  buildFamilyCtxDecls,
+  buildNgTemplateContextGuard,
+  eligibleSlotFieldNames,
+  hasKeyedFillIntake,
+  isRecordOnlySlotDecl,
+} from './refineSlotTypes.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 // Phase 06.1 P2: GEN_OPTS gains sourceMaps:true + sourceFileName so each
 // @babel/generator call emits a per-expression child map anchored to the
@@ -228,20 +228,15 @@ function renderComputedArrow(
  * AssignmentPattern (default-valued params), RestElement, and patterns by
  * annotating the outermost binding node.
  */
-function annotateUntypedParams(
-  params: Array<t.Identifier | t.Pattern | t.RestElement>,
-): void {
-  const anyAnnotation = (): t.TSTypeAnnotation =>
-    t.tsTypeAnnotation(t.tsAnyKeyword());
+function annotateUntypedParams(params: Array<t.Identifier | t.Pattern | t.RestElement>): void {
+  const anyAnnotation = (): t.TSTypeAnnotation => t.tsTypeAnnotation(t.tsAnyKeyword());
   for (const param of params) {
     if (t.isIdentifier(param)) {
       if (!param.typeAnnotation) param.typeAnnotation = anyAnnotation();
     } else if (t.isAssignmentPattern(param)) {
       const left = param.left;
       if (
-        (t.isIdentifier(left) ||
-          t.isObjectPattern(left) ||
-          t.isArrayPattern(left)) &&
+        (t.isIdentifier(left) || t.isObjectPattern(left) || t.isArrayPattern(left)) &&
         !left.typeAnnotation
       ) {
         left.typeAnnotation = anyAnnotation();
@@ -345,16 +340,12 @@ function renderDefault(prop: PropDecl): string {
   // Arrow factory like `() => []` should be invoked: `(() => [])()`.
   if (
     t.isArrowFunctionExpression(prop.defaultValue) &&
-    (t.isArrayExpression(prop.defaultValue.body) ||
-      t.isObjectExpression(prop.defaultValue.body))
+    (t.isArrayExpression(prop.defaultValue.body) || t.isObjectExpression(prop.defaultValue.body))
   ) {
     return `(${raw})()`;
   }
   // Wrap arrow/function-expression defaults in parens to avoid `??` precedence issues.
-  if (
-    t.isArrowFunctionExpression(prop.defaultValue) ||
-    t.isFunctionExpression(prop.defaultValue)
-  ) {
+  if (t.isArrowFunctionExpression(prop.defaultValue) || t.isFunctionExpression(prop.defaultValue)) {
     return `(${raw})`;
   }
   return raw;
@@ -538,11 +529,7 @@ function pairClonedLifecycle(
     if (!t.isCallExpression(expr)) continue;
     const callee = expr.callee;
     if (!t.isIdentifier(callee)) continue;
-    if (
-      callee.name !== '$onMount' &&
-      callee.name !== '$onUnmount' &&
-      callee.name !== '$onUpdate'
-    ) {
+    if (callee.name !== '$onMount' && callee.name !== '$onUnmount' && callee.name !== '$onUpdate') {
       continue;
     }
     const arg = expr.arguments[0];
@@ -577,8 +564,7 @@ function pairClonedLifecycle(
       if (
         cleanupCloned === null &&
         lh.phase === 'mount' &&
-        (t.isArrowFunctionExpression(setupCloned) ||
-          t.isFunctionExpression(setupCloned))
+        (t.isArrowFunctionExpression(setupCloned) || t.isFunctionExpression(setupCloned))
       ) {
         const fnBody = setupCloned.body;
         if (t.isBlockStatement(fnBody) && !setupCloned.async) {
@@ -910,10 +896,7 @@ function watchCallIsImmediate(expr: t.CallExpression): boolean {
   return false;
 }
 
-export function emitScript(
-  ir: IRComponent,
-  opts: EmitScriptOptions = {},
-): EmitScriptResult {
+export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitScriptResult {
   // Phase 06.1 P2 (D-103): wire opts.filename through GEN_OPTS.sourceFileName.
   void opts.filename;
   const diagnostics: Diagnostic[] = [];
@@ -985,8 +968,7 @@ export function emitScript(
     valueImportNames,
   } = partitionUserImports(cloned);
   cloned.program.body = bodyStmts;
-  const userImports =
-    userImportNodes.length > 0 ? genImportsBlock(userImportNodes) + '\n' : '';
+  const userImports = userImportNodes.length > 0 ? genImportsBlock(userImportNodes) + '\n' : '';
 
   // 1b-bis. Phase 18 (Req 2) — normalize the producer-side two-way-write sigil
   //     `$model.X` → `$props.X` at the EARLIEST point, BEFORE the double-read
@@ -1169,10 +1151,7 @@ export function emitScript(
     // types permissively enough (Record<string, never>); only the null
     // case needs widening here. PropDefaultCoercion.rozie is the canary.
     let signalTypeArg = '';
-    if (
-      t.isArrayExpression(s.initializer) &&
-      s.initializer.elements.length === 0
-    ) {
+    if (t.isArrayExpression(s.initializer) && s.initializer.elements.length === 0) {
       signalTypeArg = '<any[]>';
     } else if (t.isNullLiteral(s.initializer)) {
       signalTypeArg = '<any>';
@@ -1333,9 +1312,7 @@ export function emitScript(
   // otherwise touch a single line inside it.
   const acceptsKeyedFill = hasKeyedFillIntake(ir.slots);
   if (acceptsKeyedFill) {
-    fieldLines.push(
-      '__rozieFills = contentChildren(RozieSlot, { descendants: true });',
-    );
+    fieldLines.push('__rozieFills = contentChildren(RozieSlot, { descendants: true });');
     fieldLines.push(
       [
         '__rozieFillMap = computed(() => {',
@@ -1417,9 +1394,7 @@ export function emitScript(
   // retimed counting-guard path). See the diagnostics-gate comment above.
   const eligibleFieldNames = eligibleSlotFieldNames(ir.slots);
   if (hasRecordOnlySlot) {
-    fieldLines.push(
-      '__rozieProjectedTpls = contentChildren(TemplateRef, { descendants: true });',
-    );
+    fieldLines.push('__rozieProjectedTpls = contentChildren(TemplateRef, { descendants: true });');
     fieldLines.push('__rozieSlotWarned = false;');
   }
 
@@ -1633,8 +1608,7 @@ export function emitScript(
     if (keynavEmission.needsDestroyRefField) {
       lifecycleNeedsDestroyRefField = true;
     }
-    keynavRuntimeImportLine =
-      `import { ${keynavEmission.runtimeImports.join(', ')} } from '@rozie/runtime-keynav-core';\n`;
+    keynavRuntimeImportLine = `import { ${keynavEmission.runtimeImports.join(', ')} } from '@rozie/runtime-keynav-core';\n`;
   }
 
   // When at least one mount hook with paired cleanup landed in ngAfterViewInit,
@@ -1674,10 +1648,7 @@ export function emitScript(
     ) {
       continue;
     }
-    if (
-      !cbArg ||
-      (!t.isArrowFunctionExpression(cbArg) && !t.isFunctionExpression(cbArg))
-    ) {
+    if (!cbArg || (!t.isArrowFunctionExpression(cbArg) && !t.isFunctionExpression(cbArg))) {
       continue;
     }
     watcherConsumedIndices.add(i);
@@ -1693,9 +1664,7 @@ export function emitScript(
     // tsc flags TS2554 "Expected 0 arguments, but got 1". Conditional bind keeps
     // both `(v) => ...` and `() => ...` shapes type-clean. Matches Solid + Lit.
     const cbParamCount =
-      t.isArrowFunctionExpression(cbArg) || t.isFunctionExpression(cbArg)
-        ? cbArg.params.length
-        : 0;
+      t.isArrowFunctionExpression(cbArg) || t.isFunctionExpression(cbArg) ? cbArg.params.length : 0;
     const callArg = cbParamCount > 0 ? '__watchVal' : '';
     const idx = watchIdx++;
     const immediate = watchCallIsImmediate(expr);
@@ -1797,10 +1766,7 @@ export function emitScript(
           residualStmts.push(stmt);
           break;
         }
-        if (
-          t.isArrowFunctionExpression(d.init) ||
-          t.isFunctionExpression(d.init)
-        ) {
+        if (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init)) {
           // Emit as class-level arrow field. WR-01 ROOT CAUSE 2: a declarator
           // type annotation (`const f: (e: MouseEvent) => void = …`) must
           // survive onto the class field — `${d.id.name} = …` alone drops it.
@@ -1838,11 +1804,7 @@ export function emitScript(
       // un-typed params with `: any` so the lifted field typechecks under
       // `strict`.
       annotateUntypedParams(stmt.params);
-      const arrow = t.arrowFunctionExpression(
-        stmt.params,
-        stmt.body,
-        stmt.async ?? false,
-      );
+      const arrow = t.arrowFunctionExpression(stmt.params, stmt.body, stmt.async ?? false);
       // Phase 9 Plan 09-04 (RESEARCH Pitfall 3) — `t.arrowFunctionExpression`
       // does NOT carry over a `FunctionDeclaration`'s author `returnType` /
       // `typeParameters`. For a `<script lang="ts">` `function describe(x):
@@ -2013,10 +1975,10 @@ export function emitScript(
   let scriptMap: EncodedSourceMap | null = null;
   if (residualStmts.length > 0 && opts.filename !== undefined) {
     const sourceFileName = opts.filename;
-    const genResult = generate(
-      t.file(t.program(residualStmts)),
-      { ...GEN_OPTS_MAP, sourceFileName },
-    );
+    const genResult = generate(t.file(t.program(residualStmts)), {
+      ...GEN_OPTS_MAP,
+      sourceFileName,
+    });
     if (genResult.map) {
       scriptMap = genResult.map as EncodedSourceMap;
     }
@@ -2032,8 +1994,7 @@ export function emitScript(
   // The class body text before the constructor body content looks like:
   //   <field1>\n<field2>\n...<fieldN>\n\nconstructor() {\n
   // fieldLineCount lines + 1 blank (if fields > 0) + 1 for constructor header
-  const preambleSectionLines =
-    fieldLineCount + (fieldLineCount > 0 ? 1 : 0) + 1;
+  const preambleSectionLines = fieldLineCount + (fieldLineCount > 0 ? 1 : 0) + 1;
 
   return {
     portalTemplateAppend: portalsEmit.templateAppend,

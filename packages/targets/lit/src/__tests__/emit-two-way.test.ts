@@ -15,18 +15,13 @@
  *   4. ($event: CustomEvent) type annotation MUST be present (Lit @event landmine)
  *   5. kebabize unit test cases (open/closeOnEscape/aBC)
  */
-import { describe, expect, it } from 'vitest';
-import * as t from '@babel/types';
+
 import { parseExpression } from '@babel/parser';
-import type {
-  AttributeBinding,
-  IRComponent,
-} from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { AttributeBinding, IRComponent } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitTemplateAttribute } from '../emit/emitTemplateAttribute.js';
-import {
-  resolveLitSetterText,
-  kebabize,
-} from '../emit/resolveLitSetterText.js';
+import { kebabize, resolveLitSetterText } from '../emit/resolveLitSetterText.js';
 
 const LOC = { start: 0, end: 0 };
 
@@ -188,9 +183,7 @@ describe('Lit emit — resolveLitSetterText helper', () => {
       initializer: t.booleanLiteral(false),
       sourceLoc: LOC,
     });
-    expect(resolveLitSetterText(parseExpression('$data.open1'), ir)).toBe(
-      'this._open1.value',
-    );
+    expect(resolveLitSetterText(parseExpression('$data.open1'), ir)).toBe('this._open1.value');
   });
 
   it('$props.X (model:true) → `this.X` (@property setter)', () => {
@@ -204,8 +197,6 @@ describe('Lit emit — resolveLitSetterText helper', () => {
       required: false,
       sourceLoc: LOC,
     });
-    expect(resolveLitSetterText(parseExpression('$props.open'), ir)).toBe(
-      'this.open',
-    );
+    expect(resolveLitSetterText(parseExpression('$props.open'), ir)).toBe('this.open');
   });
 });

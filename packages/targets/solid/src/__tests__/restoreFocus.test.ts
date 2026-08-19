@@ -9,11 +9,10 @@
 // The lowering uses a synthesised `$el` Identifier that Solid's
 // rewriteScript Identifier handler then rewrites to `$refs.__rozieRoot` →
 // Solid's callback-ref form synthesised by `lowerRootElementRef`.
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+
+import type { Diagnostic } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../emitSolid.js';
 
 const SOURCE = `<rozie name="RestoreFocusProbe">
@@ -38,9 +37,7 @@ function compileProbe(): { code: string; diagnostics: Diagnostic[] } {
     filename: 'RestoreFocusProbe.rozie',
   });
   if (!ast) {
-    throw new Error(
-      `parse() returned null AST: ${parseDiags.map((d) => d.message).join(', ')}`,
-    );
+    throw new Error(`parse() returned null AST: ${parseDiags.map((d) => d.message).join(', ')}`);
   }
   const registry = createDefaultRegistry();
   const { ir, diagnostics: lowerDiags } = lowerToIR(ast, {

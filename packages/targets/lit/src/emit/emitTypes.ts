@@ -52,11 +52,11 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '@rozie/core';
+import { renderPropsInterface } from '@rozie/core';
 // `synthesizeHandleType` is not yet in the `@rozie/core` barrel (22-02-SUMMARY
 // "Next Phase Readiness") — import it relatively as React/Vue's emitTypes.ts do.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
-import { renderPropsInterface } from '@rozie/core';
 // Reuse the SAME tag-deriving helper the runtime `@customElement` decorator
 // uses so the HTMLElementTagNameMap key cannot drift from the registration.
 import { emitTagName } from './emitDecorator.js';
@@ -96,14 +96,9 @@ function exposeMemberLines(handleInterface: string): string[] {
  *
  * @public — consumed by the Wave-3 unplugin sidecar emit + CLI fallback.
  */
-export function emitLitTypes(
-  ir: IRComponent,
-  opts: EmitLitTypesOptions = {},
-): string {
+export function emitLitTypes(ir: IRComponent, opts: EmitLitTypesOptions = {}): string {
   const exposed = (ir.expose ?? []).length > 0;
-  const handleInterface = exposed
-    ? synthesizeHandleType(ir, `${ir.name}Handle`)
-    : null;
+  const handleInterface = exposed ? synthesizeHandleType(ir, `${ir.name}Handle`) : null;
 
   const lines: string[] = [];
   // Type-only LitElement import — the element class extends it in the .d.ts.

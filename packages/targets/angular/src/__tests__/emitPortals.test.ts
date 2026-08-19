@@ -5,15 +5,14 @@
  * the portal-emitting body (`buildSlotMethod`, `setAttrLine`, fieldDecls,
  * closure + destroyRegister blocks) is exercised here directly.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as t from '@babel/types';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitPortals } from '../emit/emitPortals.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -132,9 +131,7 @@ describe('emitPortals — Angular', () => {
   });
 
   it('portalParamNames present vs absent → scopeType branch', () => {
-    const withParams = emitPortals(
-      buildMinimalIR({ slots: [portalSlot('item', ['item'])] }),
-    );
+    const withParams = emitPortals(buildMinimalIR({ slots: [portalSlot('item', ['item'])] }));
     expect(withParams.closureBlock).toContain('{ item: unknown }');
 
     const noParams = emitPortals(buildMinimalIR({ slots: [portalSlot('item')] }));

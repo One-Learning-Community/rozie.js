@@ -11,18 +11,17 @@
  *
  * Drives `emitAttributes` directly (mirrors `emitTemplateAttribute-style.test.ts`).
  */
-import { describe, it, expect } from 'vitest';
+
 import { parseExpression } from '@babel/parser';
-import * as t from '@babel/types';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, AttributeBinding } from '../../../../core/src/ir/types.js';
+import type * as t from '@babel/types';
+import type { AttributeBinding, IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { type EmitAttrCtx, emitAttributes } from '../emit/emitTemplateAttribute.js';
 import {
-  SolidImportCollector,
   RuntimeSolidImportCollector,
+  SolidImportCollector,
 } from '../rewrite/collectSolidImports.js';
-import { emitAttributes, type EmitAttrCtx } from '../emit/emitTemplateAttribute.js';
 
 function emptyIR(): IRComponent {
   const src = `<rozie name="Test">
@@ -100,21 +99,15 @@ describe('emitTemplateAttribute (Solid) — boolean-enumerated ARIA nullish-drop
   it('NO-REGRESS: aria-expanded (the original member) still drops via `?? undefined`', () => {
     const ir = emptyIR();
     const ctx = freshCtx(ir);
-    const { jsx } = emitAttributes(
-      [ariaBinding('aria-expanded', 'grouped ? !!open : null')],
-      ctx,
-    );
+    const { jsx } = emitAttributes([ariaBinding('aria-expanded', 'grouped ? !!open : null')], ctx);
     expect(jsx).toContain('?? undefined');
     expect(ctx.collectors.runtime.has('rozieAttr')).toBe(false);
   });
 
-  it('NO-REGRESS: a NON-nullish string form `cond ? \'true\' : \'false\'` stays on the rozieAttr path', () => {
+  it("NO-REGRESS: a NON-nullish string form `cond ? 'true' : 'false'` stays on the rozieAttr path", () => {
     const ir = emptyIR();
     const ctx = freshCtx(ir);
-    const { jsx } = emitAttributes(
-      [ariaBinding('aria-selected', "cond ? 'true' : 'false'")],
-      ctx,
-    );
+    const { jsx } = emitAttributes([ariaBinding('aria-selected', "cond ? 'true' : 'false'")], ctx);
     expect(jsx).toContain('rozieAttr');
     expect(jsx).not.toContain('?? undefined');
   });

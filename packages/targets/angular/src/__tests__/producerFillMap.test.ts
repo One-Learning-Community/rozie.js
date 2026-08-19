@@ -14,17 +14,16 @@
  * See 80-04-PLAN.md for the full behavior contract and 80-CONTEXT.md D-06
  * for why an empty-string fill key normalizes to `'defaultSlot'`.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { emitAngular } from '../emitAngular.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import {
-  hasKeyedFillIntake,
-  eligibleSlotFieldNames,
   buildEligibleSlotDecls,
+  eligibleSlotFieldNames,
+  hasKeyedFillIntake,
 } from '../emit/refineSlotTypes.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { emitAngular } from '../emitAngular.js';
 
 function lowerAngular(src: string, filename: string): IRComponent {
   const result = parse(src, { filename });
@@ -185,9 +184,7 @@ describe('Angular producer — keyed-fill intake predicate (Task 1, D-09)', () =
 describe('Angular producer — content-collected fill map (Task 1)', () => {
   it('a producer with at least one key-fillable slot emits __rozieFills, __rozieFillMap, and the RozieSlot runtime import', () => {
     const code = compileAngular(RECORD_ONLY_PRODUCER, 'Cell.rozie');
-    expect(code).toContain(
-      '__rozieFills = contentChildren(RozieSlot, { descendants: true });',
-    );
+    expect(code).toContain('__rozieFills = contentChildren(RozieSlot, { descendants: true });');
     expect(code).toContain('__rozieFillMap = computed(() => {');
     expect(code).toContain("import { RozieSlot } from '@rozie/runtime-angular';");
   });
@@ -204,9 +201,7 @@ describe('Angular producer — content-collected fill map (Task 1)', () => {
   // deleted, to keep the boundary (no slots at all) visible one test down.
   it('a producer with only identifier-named static slots ALSO emits __rozieFills, __rozieFillMap, and the RozieSlot runtime import (D-09 widened gate)', () => {
     const code = compileAngular(IDENTIFIER_ONLY_PRODUCER, 'X.rozie');
-    expect(code).toContain(
-      '__rozieFills = contentChildren(RozieSlot, { descendants: true });',
-    );
+    expect(code).toContain('__rozieFills = contentChildren(RozieSlot, { descendants: true });');
     expect(code).toContain('__rozieFillMap = computed(() => {');
     expect(code).toContain("import { RozieSlot } from '@rozie/runtime-angular';");
     // The `templates` input is still present and unchanged.
@@ -269,9 +264,7 @@ describe('Angular producer — dev-mode-only diagnostics effect (Task 2)', () =>
     // Isolate the diagnostics effect body text and confirm the guard
     // (globalThis-read, structurally-typed, no ambient declare needed)
     // appears BEFORE every console. call inside it.
-    const effectMatch = code.match(
-      /effect\(\(\) => \{[\s\S]*?ngDevMode[\s\S]*?\}\);/,
-    );
+    const effectMatch = code.match(/effect\(\(\) => \{[\s\S]*?ngDevMode[\s\S]*?\}\);/);
     expect(effectMatch).not.toBeNull();
     const effectBody = effectMatch![0];
     expect(effectBody).toContain('globalThis as { ngDevMode?: unknown }');
@@ -427,9 +420,7 @@ describe('Angular producer — retimed mixed-producer empty-fill-map guard (2608
   it('REGRESSION FENCE — RECORD_ONLY_PRODUCER emits NO ngAfterContentInit lifecycle method and keeps the existing bare comparison inside the effect, verbatim', () => {
     const code = compileAngular(RECORD_ONLY_PRODUCER, 'Cell.rozie');
     expect(code).not.toContain('ngAfterContentInit');
-    expect(code).toContain(
-      'if (fills.length === 0 && this.__rozieProjectedTpls().length > 0) {',
-    );
+    expect(code).toContain('if (fills.length === 0 && this.__rozieProjectedTpls().length > 0) {');
   });
 
   it('IDENTIFIER_ONLY_PRODUCER and NO_SLOT_PRODUCER emit neither diagnostics nor the new lifecycle method — unchanged from today', () => {
@@ -444,7 +435,7 @@ describe('Angular producer — retimed mixed-producer empty-fill-map guard (2608
     expect(noSlotCode).not.toContain('ngAfterContentInit');
   });
 
-  it('every console. call in MIXED_PRODUCER\'s output is preceded, within its own enclosing emitted region, by the dev-mode guard, and no ambient global declaration is emitted — generalized across BOTH the effect and ngAfterContentInit regions', () => {
+  it("every console. call in MIXED_PRODUCER's output is preceded, within its own enclosing emitted region, by the dev-mode guard, and no ambient global declaration is emitted — generalized across BOTH the effect and ngAfterContentInit regions", () => {
     const code = compileAngular(MIXED_PRODUCER, 'Mixed.rozie');
     const guardText = 'globalThis as { ngDevMode?: unknown }';
     const guardIdxs = [...code.matchAll(/globalThis as \{ ngDevMode\?: unknown \}/g)].map(
@@ -463,7 +454,7 @@ describe('Angular producer — retimed mixed-producer empty-fill-map guard (2608
     expect(code).not.toContain('declare global');
   });
 
-  it("DRIFT FENCE — eligibleSlotFieldNames(slots) equals the field names buildEligibleSlotDecls(slots) actually produced, across identifier, duplicate identifier, non-identifier, dynamic-name, and default-slot shapes", () => {
+  it('DRIFT FENCE — eligibleSlotFieldNames(slots) equals the field names buildEligibleSlotDecls(slots) actually produced, across identifier, duplicate identifier, non-identifier, dynamic-name, and default-slot shapes', () => {
     const ir = lowerAngular(ALL_SLOT_SHAPES_PRODUCER, 'AllShapes.rozie');
     const names = eligibleSlotFieldNames(ir.slots);
     const decls = buildEligibleSlotDecls(ir.slots);

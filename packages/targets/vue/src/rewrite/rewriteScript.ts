@@ -29,27 +29,26 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _traverse from '@babel/traverse';
+
 import type { NodePath } from '@babel/traverse';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import _traverse from '@babel/traverse';
+import * as t from '@babel/types';
+import type { Diagnostic, IRComponent } from '@rozie/core';
+import { isInTypePosition, RozieErrorCode } from '@rozie/core';
 import { portalKey } from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import {
   deconflictGeneratedSymbols,
   type GeneratedSymbolGroup,
 } from '../../../../core/src/rewrite/deconflict.js';
-import { vueGeneratedBindingNames } from './vueGeneratedNames.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
+import { vueGeneratedBindingNames } from './vueGeneratedNames.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 /**
  * Decide whether a `$refs.X` / `$el` access should lower to a non-null
@@ -105,11 +104,7 @@ function refLowersToNonNull(
       p = p.parentPath;
       continue;
     }
-    if (
-      t.isObjectExpression(n) ||
-      t.isArrayExpression(n) ||
-      t.isSpreadElement(n)
-    ) {
+    if (t.isObjectExpression(n) || t.isArrayExpression(n) || t.isSpreadElement(n)) {
       child = n;
       p = p.parentPath;
       continue;
@@ -372,9 +367,7 @@ export function rewriteRozieIdentifiers(
         // 260520-w18 bug class 1. See refLowersToNonNull's doc comment.
         if (refLowersToNonNull(path)) {
           path.replaceWith(
-            t.tsNonNullExpression(
-              t.memberExpression(newObj, t.identifier('value')),
-            ),
+            t.tsNonNullExpression(t.memberExpression(newObj, t.identifier('value'))),
           );
           return;
         }
@@ -442,10 +435,7 @@ export function rewriteRozieIdentifiers(
         if (refLowersToNonNull(path)) {
           path.replaceWith(
             t.tsNonNullExpression(
-              t.memberExpression(
-                t.identifier(prop.name + 'Ref'),
-                t.identifier('value'),
-              ),
+              t.memberExpression(t.identifier(prop.name + 'Ref'), t.identifier('value')),
             ),
           );
           return;
@@ -513,9 +503,7 @@ export function rewriteRozieIdentifiers(
           const arg = args[0]!;
           if (t.isExpression(arg)) {
             usesDeepClone = true;
-            path.replaceWith(
-              t.callExpression(t.identifier('rozieDeepClone'), [arg]),
-            );
+            path.replaceWith(t.callExpression(t.identifier('rozieDeepClone'), [arg]));
             // Do NOT path.skip() — the arg may contain $props.X / $data.X reads
             // (e.g. $clone($data.graph)) that still need rewriting to .value form.
           }
@@ -600,9 +588,7 @@ export function rewriteRozieIdentifiers(
           const params = (parentPath.node as { params: t.Node[] }).params;
           if (params.includes(path.node)) return;
         }
-        path.replaceWith(
-          t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')),
-        );
+        path.replaceWith(t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')));
         // Do NOT path.skip() — let the visitor re-visit the synthesised
         // MemberExpression so the `$refs.X` handler downstream lowers it to
         // the Vue-side templateRef accessor.

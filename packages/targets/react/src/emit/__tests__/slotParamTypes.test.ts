@@ -45,12 +45,11 @@
  * the house rule ([[feedback_no_cosmetic_tsc_on_emitted_bodies]] draws
  * the line at emitted BODIES, not public types).
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
-import { emitReactTypes } from '../emitTypes.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../../emitReact.js';
+import { emitReactTypes } from '../emitTypes.js';
 
 const EMBLA_SHAPED_SRC = `<rozie name="Probe">
 <props>

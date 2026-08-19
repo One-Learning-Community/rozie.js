@@ -21,14 +21,12 @@
  * emitStyle is deliberately left UNCHANGED (no host rule in the styles array);
  * the rule is injected by emitDecorator, which knows the component selector.
  */
-import { describe, it, expect } from 'vitest';
+
+import type { IRComponent, PropDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitDecorator } from '../emitDecorator.js';
 import { emitStyle } from '../emitStyle.js';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../../core/src/ir/types.js';
-import type { PropDecl } from '../../../../../core/src/ir/types.js';
 
 const STUB_IR = { name: 'Stub' } as unknown as IRComponent;
 
@@ -99,7 +97,8 @@ describe('Angular emitDecorator — default host display:contents parity', () =>
   });
 
   it('emitStyle does NOT inject a host-display rule (parity lives in the decorator)', () => {
-    const src = '<rozie name="X">\n<template><div /></template>\n<style>.a { color: red; }</style>\n</rozie>';
+    const src =
+      '<rozie name="X">\n<template><div /></template>\n<style>.a { color: red; }</style>\n</rozie>';
     const result = parse(src, { filename: 'probe.rozie' });
     if (!result.ast) throw new Error('parse() returned null AST');
     const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });

@@ -12,11 +12,9 @@
 // prefix for the hoisted names). Single-emit-site components stay byte-identical
 // (no hoist when nothing is shared).
 
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { emitScript } from '../emit/emitScript.js';
 import {
   ReactImportCollector,
@@ -47,10 +45,7 @@ function countDestructureDecls(code: string, propName: string): number {
   // Match the destructured pair `onOpenChange: _rozieProp_onOpenChange` inside a
   // `const { ... } = props;` — counting the renamed-local appearances on the LHS
   // of a destructure (i.e. in a `const { ... } = props` line).
-  const re = new RegExp(
-    `const\\s*\\{[^}]*_rozieProp_${propName}[^}]*\\}\\s*=\\s*props`,
-    'g',
-  );
+  const re = new RegExp(`const\\s*\\{[^}]*_rozieProp_${propName}[^}]*\\}\\s*=\\s*props`, 'g');
   const m = code.match(re);
   return m ? m.length : 0;
 }

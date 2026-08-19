@@ -22,15 +22,14 @@
  *    unknown>` regardless of any derivable family prefix. `buildRozieSlotsRecordType`
  *    adds one template-literal-keyed member per distinct `namePrefix`.
  */
-import { describe, it, expect } from 'vitest';
-import * as t from '@babel/types';
+
 import { parse as babelParse } from '@babel/parser';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import * as t from '@babel/types';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../../emitLit.js';
-import { slotScopeParamType, buildRozieSlotsRecordType } from '../slotScopeParamType.js';
-import type { IRComponent, SlotDecl } from '../../../../../core/src/ir/types.js';
+import { buildRozieSlotsRecordType, slotScopeParamType } from '../slotScopeParamType.js';
 
 const LOC = { start: 0, end: 0 };
 
@@ -86,7 +85,15 @@ describe('slotScopeParamType — D-13 unification with the shared lowerSlotParam
 describe('buildRozieSlotsRecordType — family type surface (R6, Lit)', () => {
   it('no dynamic-name slot at all → the pre-phase generic Record, byte-identical', () => {
     const type = buildRozieSlotsRecordType([
-      { type: 'SlotDecl', name: 'header', defaultContent: null, params: [], presence: 'always', nestedSlots: [], sourceLoc: LOC },
+      {
+        type: 'SlotDecl',
+        name: 'header',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
     ]);
     expect(type).toBe('Record<string, (scope: any) => unknown>');
   });
@@ -97,7 +104,12 @@ describe('buildRozieSlotsRecordType — family type surface (R6, Lit)', () => {
         namePrefix: 'cell-',
         params: [
           { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: LOC },
-          { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC },
+          {
+            type: 'ParamDecl',
+            name: 'value',
+            valueExpression: t.identifier('value'),
+            sourceLoc: LOC,
+          },
         ],
       }),
     ]);
@@ -116,7 +128,14 @@ describe('buildRozieSlotsRecordType — family type surface (R6, Lit)', () => {
     const type = buildRozieSlotsRecordType([
       dynamicSlot({
         namePrefix: 'trigger-',
-        params: [{ type: 'ParamDecl', name: 'toggle', valueExpression: t.identifier('toggle'), sourceLoc: LOC }],
+        params: [
+          {
+            type: 'ParamDecl',
+            name: 'toggle',
+            valueExpression: t.identifier('toggle'),
+            sourceLoc: LOC,
+          },
+        ],
         paramTypes: [tsType('(open: boolean) => void')],
       }),
     ]);
@@ -129,7 +148,14 @@ describe('buildRozieSlotsRecordType — family type surface (R6, Lit)', () => {
         type: 'SlotDecl',
         name: 'cell-total',
         defaultContent: null,
-        params: [{ type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC }],
+        params: [
+          {
+            type: 'ParamDecl',
+            name: 'value',
+            valueExpression: t.identifier('value'),
+            sourceLoc: LOC,
+          },
+        ],
         presence: 'always',
         nestedSlots: [],
         sourceLoc: LOC,
@@ -138,7 +164,12 @@ describe('buildRozieSlotsRecordType — family type surface (R6, Lit)', () => {
         namePrefix: 'cell-',
         params: [
           { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: LOC },
-          { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC },
+          {
+            type: 'ParamDecl',
+            name: 'value',
+            valueExpression: t.identifier('value'),
+            sourceLoc: LOC,
+          },
         ],
       }),
     ]);
@@ -158,7 +189,11 @@ describe('emitLit — end-to-end family type surface (R6)', () => {
 </template>
 </rozie>
 `);
-    const { code } = emitLit(ir, { filename: 'CellFamily.rozie', source: '', modifierRegistry: createDefaultRegistry() });
+    const { code } = emitLit(ir, {
+      filename: 'CellFamily.rozie',
+      source: '',
+      modifierRegistry: createDefaultRegistry(),
+    });
     expect(code).toContain('[key: `cell-${string}`]:');
     expect(code).toContain('row: any');
   });

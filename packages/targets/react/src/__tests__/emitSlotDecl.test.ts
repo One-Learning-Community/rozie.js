@@ -7,14 +7,13 @@
  * no-params named-slot `?.()` invocation) and the Plan 01 + Plan 04
  * composition contract `(props.renderX ?? props.slots?.['x'])?.()`.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { emitReact } from '../emitReact.js';
+
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSlotDecl } from '../emit/emitSlotDecl.js';
 import { refineSlotTypes } from '../emit/refineSlotTypes.js';
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import { emitReact } from '../emitReact.js';
 
 function lowerInline(rozie: string): IRComponent {
   const result = parse(rozie, { filename: 'inline.rozie' });
@@ -52,7 +51,12 @@ describe('refineSlotTypes — Plan 04-03 Task 2', () => {
       name: '',
       defaultContent: null,
       params: [
-        { type: 'ParamDecl', name: 'item', valueExpression: { type: 'Identifier', name: 'item' } as never, sourceLoc: { start: 0, end: 0 } },
+        {
+          type: 'ParamDecl',
+          name: 'item',
+          valueExpression: { type: 'Identifier', name: 'item' } as never,
+          sourceLoc: { start: 0, end: 0 },
+        },
       ],
       presence: 'always',
       nestedSlots: [],
@@ -91,8 +95,18 @@ describe('refineSlotTypes — Plan 04-03 Task 2', () => {
       name: 'trigger',
       defaultContent: null,
       params: [
-        { type: 'ParamDecl', name: 'open', valueExpression: { type: 'Identifier', name: 'open' } as never, sourceLoc: { start: 0, end: 0 } },
-        { type: 'ParamDecl', name: 'toggle', valueExpression: { type: 'Identifier', name: 'toggle' } as never, sourceLoc: { start: 0, end: 0 } },
+        {
+          type: 'ParamDecl',
+          name: 'open',
+          valueExpression: { type: 'Identifier', name: 'open' } as never,
+          sourceLoc: { start: 0, end: 0 },
+        },
+        {
+          type: 'ParamDecl',
+          name: 'toggle',
+          valueExpression: { type: 'Identifier', name: 'toggle' } as never,
+          sourceLoc: { start: 0, end: 0 },
+        },
       ],
       presence: 'always',
       nestedSlots: [],
@@ -135,8 +149,16 @@ describe('emitSlotDecl — Plan 04-03 Task 2', () => {
 </rozie>
 `);
     const result = emitSlotDecl(ir);
-    expect(result.slotPropFields.some((s) => s.includes('renderTrigger?: (ctx: TriggerCtx) => ReactNode'))).toBe(true);
-    expect(result.slotCtxInterfaces.some((s) => /interface TriggerCtx \{ open: any; toggle: any; \}/.test(s))).toBe(true);
+    expect(
+      result.slotPropFields.some((s) =>
+        s.includes('renderTrigger?: (ctx: TriggerCtx) => ReactNode'),
+      ),
+    ).toBe(true);
+    expect(
+      result.slotCtxInterfaces.some((s) =>
+        /interface TriggerCtx \{ open: any; toggle: any; \}/.test(s),
+      ),
+    ).toBe(true);
   });
 });
 
@@ -205,7 +227,12 @@ describe('refineSlotTypes / emitSlotInvocation — §invoke-named-slot (Phase 07
       name: 'trigger',
       defaultContent: null,
       params: [
-        { type: 'ParamDecl', name: 'open', valueExpression: { type: 'Identifier', name: 'open' } as never, sourceLoc: { start: 0, end: 0 } },
+        {
+          type: 'ParamDecl',
+          name: 'open',
+          valueExpression: { type: 'Identifier', name: 'open' } as never,
+          sourceLoc: { start: 0, end: 0 },
+        },
       ],
       presence: 'always',
       nestedSlots: [],
@@ -236,7 +263,7 @@ describe('refineSlotTypes / emitSlotInvocation — §invoke-named-slot (Phase 07
     expect(code).toContain("(props.renderHeader ?? props.slots?.['header'])?.()");
   });
 
-  it('emit composition with Plan 01 merge: WrapperModal-style brand-slot produces `(props.renderBrand ?? props.slots?.[\\\'brand\\\'])?.()` (locks cross-plan contract)', () => {
+  it("emit composition with Plan 01 merge: WrapperModal-style brand-slot produces `(props.renderBrand ?? props.slots?.[\\'brand\\'])?.()` (locks cross-plan contract)", () => {
     // This test runs a WrapperModal-shaped IR (no-params named #brand slot
     // re-projected through a wrapper) through the full emitter pipeline
     // and asserts the exact composed emit string contains BOTH the Plan 01

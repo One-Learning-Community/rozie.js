@@ -34,34 +34,35 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
-import type { GeneratorOptions } from '@babel/generator';
+
 import type { EncodedSourceMap } from '@ampproject/remapping';
+import type { GeneratorOptions } from '@babel/generator';
+import _generate from '@babel/generator';
+import * as t from '@babel/types';
 import type {
+  ComputedDecl,
+  Diagnostic,
   IRComponent,
   PropDecl,
   PropTypeAnnotation,
-  ComputedDecl,
-} from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { buildPropJsdoc, hasPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
+} from '@rozie/core';
+import { buildPropJsdoc, hasPropJsdoc } from '@rozie/core';
+import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
-import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 import { VueImportCollector } from '../rewrite/collectVueImports.js';
+import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
+import { emitPortals } from './emitPortals.js';
 import { buildSlotTypeBlock } from './refineSlotTypes.js';
-import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 // Phase 06.1 P2: GEN_OPTS gains sourceMaps:true + sourceFileName so each
 // @babel/generator call emits a per-expression child map anchored to the
@@ -253,9 +254,7 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
       const prevTrail = prev.trailingComments;
       const curLead = cur.leadingComments;
       if (prevTrail && prevTrail.length > 0 && curLead && curLead.length > 0) {
-        const deduped = prevTrail.filter(
-          (c) => !curLead.some((lc) => isSameSourceComment(c, lc)),
-        );
+        const deduped = prevTrail.filter((c) => !curLead.some((lc) => isSameSourceComment(c, lc)));
         prev.trailingComments = deduped.length > 0 ? deduped : null;
       }
       continue;
@@ -272,7 +271,13 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
     // (within-partial pairs already share their objects and are handled below). A
     // LEADING CommentLine renders own-line with no same-line collision (unlike the
     // TRAILING-seam clone below), so the shared comment objects can be reused as-is.
-    if (curSpliced && !prevSpliced && (!lead || lead.length === 0) && prevTrail && prevTrail.length > 0) {
+    if (
+      curSpliced &&
+      !prevSpliced &&
+      (!lead || lead.length === 0) &&
+      prevTrail &&
+      prevTrail.length > 0
+    ) {
       cur.leadingComments = [...prevTrail];
       // Quick task 260718-uvn — the boundary comment now lives on BOTH prev.trailing
       // AND the mirrored cur.leading → artificially doubled. Post-260714-orv the inline
@@ -282,9 +287,7 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
       // copy on cur.leading. (Every mirrored comment is the same object, so all are
       // dropped; an independent prev-trailing comment, if any, would survive.)
       const newLead = cur.leadingComments;
-      const deduped = prevTrail.filter(
-        (c) => !newLead.some((lc) => isSameSourceComment(c, lc)),
-      );
+      const deduped = prevTrail.filter((c) => !newLead.some((lc) => isSameSourceComment(c, lc)));
       prev.trailingComments = deduped.length > 0 ? deduped : null;
       continue;
     }
@@ -304,7 +307,12 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
     // and the after-side branch are untouched; a SURVIVING predecessor (plain `let`/`const`,
     // e.g. `let expandedTouched` above `groupingActiveDefault`) leaves the seam UNSTAMPED → the
     // mirror still doubles, matching ITS inline oracle (data-table baseline + HostK unchanged).
-    if (curSpliced && (curExtra as { __rozieLeadingSeamPrevStripped?: boolean } | undefined)?.__rozieLeadingSeamPrevStripped === true) continue;
+    if (
+      curSpliced &&
+      (curExtra as { __rozieLeadingSeamPrevStripped?: boolean } | undefined)
+        ?.__rozieLeadingSeamPrevStripped === true
+    )
+      continue;
     const lastLead = lead[lead.length - 1];
     // Identity guard (Pitfall 2 / A4): a node can be simultaneously the spliced
     // successor of one seam and the spliced predecessor of the next. If the comment
@@ -354,8 +362,7 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
         (c) => !(cur.leadingComments ?? []).some((lc) => isSameSourceComment(c, lc)),
       );
       const afterGap = (curExtra as { __rozieAfterGap?: number } | undefined)?.__rozieAfterGap;
-      const anchorLine =
-        (prev.loc?.end.line ?? 0) + (typeof afterGap === 'number' ? afterGap : 1);
+      const anchorLine = (prev.loc?.end.line ?? 0) + (typeof afterGap === 'number' ? afterGap : 1);
       // Phase 56-R11 (after-side INTER-COMMENT-BLOCK seam): when CUR (the host successor)
       // carries MORE THAN ONE leading comment block — `[comment A][blank][comment B]` (the
       // real 56-09 Wave-9 P9 `gridKeydownHandlers` / P12 `fillDrag` after-sides, two
@@ -507,8 +514,7 @@ function hasExplicitNullDefault(prop: PropDecl): boolean {
  */
 function renderPropField(p: PropDecl): string {
   let baseType = renderType(p.typeAnnotation);
-  const needsNull =
-    hasExplicitNullDefault(p) && !/\|\s*null$/.test(baseType.trimEnd());
+  const needsNull = hasExplicitNullDefault(p) && !/\|\s*null$/.test(baseType.trimEnd());
   // Quick task 260623-kks — `{ type: null, default: null }` (an untyped
   // object-passthrough prop) lowers to `{ kind: 'identifier', name: 'unknown' }`,
   // so `renderType` returns the literal string `'unknown'`. Widening that to
@@ -604,15 +610,9 @@ function renderPropsTypeBody(
   return `{\n${memberLines.join('\n')}\n${closeIndent}}`;
 }
 
-function emitPropsDecl(
-  ir: IRComponent,
-  genericParams?: readonly string[],
-): string {
+function emitPropsDecl(ir: IRComponent, genericParams?: readonly string[]): string {
   const nonModel = ir.props.filter((p) => !p.isModel);
-  const generics =
-    genericParams && genericParams.length > 0
-      ? `<${genericParams.join(', ')}>`
-      : '';
+  const generics = genericParams && genericParams.length > 0 ? `<${genericParams.join(', ')}>` : '';
 
   if (nonModel.length === 0) {
     // Generic components with NO non-model props still need a typed
@@ -651,10 +651,7 @@ function emitPropsDecl(
     // at the 2-space class/interface-body indent.
     const interfaceLine = `interface ${ir.name}Props${generics} ${renderPropsTypeBody(nonModel, fields, '')}`;
     if (defaultsEntries.length === 0) {
-      return (
-        `${interfaceLine}\n` +
-        `const props = defineProps<${ir.name}Props${generics}>();`
-      );
+      return `${interfaceLine}\n` + `const props = defineProps<${ir.name}Props${generics}>();`;
     }
     return (
       `${interfaceLine}\n` +
@@ -720,9 +717,7 @@ function emitDefineModels(ir: IRComponent): string[] {
         `${jsdoc}const ${p.name} = defineModel<${tsType}>('${p.name}', { required: true });`,
       );
     } else {
-      lines.push(
-        `${jsdoc}const ${p.name} = defineModel<${tsType}>('${p.name}');`,
-      );
+      lines.push(`${jsdoc}const ${p.name} = defineModel<${tsType}>('${p.name}');`);
     }
   }
   return lines;
@@ -844,9 +839,7 @@ function emitTemplateRefs(ir: IRComponent, imports: VueImportCollector): string[
     imports.use('ref');
     const componentLocalName = componentRefs.get(r.name);
     if (componentLocalName !== undefined) {
-      lines.push(
-        `const ${r.name}Ref = ref<InstanceType<typeof ${componentLocalName}>>();`,
-      );
+      lines.push(`const ${r.name}Ref = ref<InstanceType<typeof ${componentLocalName}>>();`);
       continue;
     }
     let domType = 'HTMLElement';
@@ -1033,10 +1026,7 @@ function emitWatcherHooks(
     ) {
       continue;
     }
-    if (
-      !cbArg ||
-      (!t.isArrowFunctionExpression(cbArg) && !t.isFunctionExpression(cbArg))
-    ) {
+    if (!cbArg || (!t.isArrowFunctionExpression(cbArg) && !t.isFunctionExpression(cbArg))) {
       continue;
     }
     imports.use('watch');
@@ -1100,11 +1090,7 @@ function emitLifecycleHooks(
     const expr = unwrapTsCast(stmt.expression);
     if (!t.isCallExpression(expr) || !t.isIdentifier(expr.callee)) continue;
     const calleeName = expr.callee.name;
-    if (
-      calleeName !== '$onMount' &&
-      calleeName !== '$onUnmount' &&
-      calleeName !== '$onUpdate'
-    ) {
+    if (calleeName !== '$onMount' && calleeName !== '$onUnmount' && calleeName !== '$onUpdate') {
       continue;
     }
 
@@ -1213,14 +1199,12 @@ function emitLifecycleHooks(
         // are passed whole to `genCode`, so their param annotations survive
         // too. Vue has no `t.functionDeclaration` / `t.arrowFunctionExpression`
         // rebuild of a USER function — no annotation-dropping site exists.
-        const setupBlock = t.isBlockStatement(setupBody) ? setupBody : t.blockStatement([t.expressionStatement(setupBody)]);
+        const setupBlock = t.isBlockStatement(setupBody)
+          ? setupBody
+          : t.blockStatement([t.expressionStatement(setupBody)]);
         // Append assignment to _cleanup_N.
         const assign = t.expressionStatement(
-          t.assignmentExpression(
-            '=',
-            t.identifier(`_cleanup_${N}`),
-            cleanupExpr,
-          ),
+          t.assignmentExpression('=', t.identifier(`_cleanup_${N}`), cleanupExpr),
         );
         const newBlock = t.blockStatement([...setupBlock.body, assign]);
 
@@ -1408,10 +1392,7 @@ export interface EmitScriptResult {
   diagnostics: Diagnostic[];
 }
 
-export function emitScript(
-  ir: IRComponent,
-  opts: EmitScriptOptions = {},
-): EmitScriptResult {
+export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitScriptResult {
   const diagnostics: Diagnostic[] = [];
 
   // 1. Clone Program (NEVER mutate ir.setupBody.scriptProgram).
@@ -1477,8 +1458,10 @@ export function emitScript(
   // Quick plan 260515-u2b — $watch emission. Walks the same cloned program
   // and emits one `watch(getter, cb);` per top-level $watch call. Returns the
   // additional consumed indices so emitResidualScriptBody skips them.
-  const { lines: watcherLines, consumedIndices: watcherConsumed } =
-    emitWatcherHooks(cloned, imports);
+  const { lines: watcherLines, consumedIndices: watcherConsumed } = emitWatcherHooks(
+    cloned,
+    imports,
+  );
   for (const idx of watcherConsumed) consumedIndices.add(idx);
 
   // Phase 21 (REQ-4) — `defineExpose({...})` macro. Emitted LAST in the
@@ -1487,7 +1470,10 @@ export function emitScript(
   // referenced function is already in scope. '' when ir.expose is empty.
   const exposeLine = emitDefineExposeCall(ir);
 
-  const { code: residualCode, stmts: residualStmts } = emitResidualScriptBody(cloned, consumedIndices);
+  const { code: residualCode, stmts: residualStmts } = emitResidualScriptBody(
+    cloned,
+    consumedIndices,
+  );
 
   // 4. Assemble in canonical order with blank-line separators between sections.
   const preambleSections: string[] = [];
@@ -1517,9 +1503,10 @@ export function emitScript(
   //   - 2nd '\n' creates a blank separator line
   // So lines before residual = (newlines_in_preambleText + 1 lines) + 1 blank = N + 2.
   const preambleText = preambleSections.join('\n\n');
-  const preambleSectionLines = preambleText.length > 0
-    ? (preambleText.match(/\n/g) ?? []).length + 2  // +2: last preamble line + blank separator
-    : 0;
+  const preambleSectionLines =
+    preambleText.length > 0
+      ? (preambleText.match(/\n/g) ?? []).length + 2 // +2: last preamble line + blank separator
+      : 0;
 
   // Residual body BEFORE lifecycle hooks — `onMounted(lockScroll)` references
   // `lockScroll` which is a `const` declared in the residual body. Emitting
@@ -1559,10 +1546,10 @@ export function emitScript(
   // map references the correct .vue output line numbers.
   let scriptMap: EncodedSourceMap | null = null;
   if (residualStmts.length > 0 && opts.filename) {
-    const genResult = generate(
-      t.file(t.program(residualStmts)),
-      { ...GEN_OPTS_MAP, sourceFileName: opts.filename },
-    );
+    const genResult = generate(t.file(t.program(residualStmts)), {
+      ...GEN_OPTS_MAP,
+      sourceFileName: opts.filename,
+    });
     if (genResult.map) {
       scriptMap = genResult.map as EncodedSourceMap;
     }

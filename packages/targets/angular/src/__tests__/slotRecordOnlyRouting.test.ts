@@ -12,12 +12,11 @@
  * pre-phase merged form — that is the core byte-identity guarantee (AC-22)
  * this whole phase is built on.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../emitAngular.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 
 function compileAngular(src: string, filename: string): string {
   const result = parse(src, { filename });
@@ -99,8 +98,12 @@ describe('Angular producer — non-identifier slot name record-only routing (R12
 `,
       'X.rozie',
     );
-    expect(code).toContain("*ngTemplateOutlet=\"(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])\"");
-    expect(code).toContain("@ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;");
+    expect(code).toContain(
+      "*ngTemplateOutlet=\"(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])\"",
+    );
+    expect(code).toContain(
+      "@ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;",
+    );
   });
 
   it('a component declaring BOTH cell-status and header emits record-only for the first and a three-tier merge for the second, in IR order (Phase 80 rebless)', () => {
@@ -126,7 +129,9 @@ describe('Angular producer — non-identifier slot name record-only routing (R12
     // against tests/dist-parity/fixtures/DynamicSlots.angular.ts's
     // `headerCellTpl` chain in this same rebless pass.
     const cellIdx = code.indexOf("__rozieFillMap()['cell-status'] ?? templates()?.['cell-status']");
-    const headerIdx = code.indexOf("(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])");
+    const headerIdx = code.indexOf(
+      "(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])",
+    );
     expect(cellIdx).toBeGreaterThan(-1);
     expect(headerIdx).toBeGreaterThan(-1);
     expect(cellIdx).toBeLessThan(headerIdx);

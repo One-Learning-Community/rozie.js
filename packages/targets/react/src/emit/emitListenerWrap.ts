@@ -24,21 +24,15 @@
  *
  * @experimental — shape may change before v1.0
  */
+import type { Diagnostic, IRComponent, Listener, ModifierArg, ModifierRegistry } from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
 import type {
-  IRComponent,
-  Listener,
-} from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
-import { renderDepArray } from './renderDepArray.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { emitListenerNative } from './emitListenerNative.js';
+import { renderDepArray } from './renderDepArray.js';
 
 export interface EmitListenerWrapResult {
   scriptInjection: string;

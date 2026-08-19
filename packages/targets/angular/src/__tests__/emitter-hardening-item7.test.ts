@@ -26,16 +26,15 @@
  * literal (the overwhelming majority — every reference example) is
  * byte-identical to pre-fix.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseExpression } from '@babel/parser';
-import { compile, createDefaultRegistry, registerModifier } from '../../../../core/src/index.js';
-import type { IRComponent, PropDecl } from '../../../../core/src/ir/types.js';
+import type { IRComponent, PropDecl } from '@rozie/core';
+import { compile, createDefaultRegistry, lowerToIR, parse, registerModifier } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../emitAngular.js';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
 import { hoistNonPureTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -114,12 +113,7 @@ describe('item #7 sub-shape (ii) — inline template arrow, unit-level hoist hel
   it('hoistNonPureTemplateExpression disambiguates against taken names', () => {
     const ir = makeIR([{ name: 'items' }]);
     const expr = parseExpression('$props.items.find((x) => x > 1)');
-    const hoist = hoistNonPureTemplateExpression(
-      expr,
-      ir,
-      'interp_0',
-      new Set(['__interp_0']),
-    );
+    const hoist = hoistNonPureTemplateExpression(expr, ir, 'interp_0', new Set(['__interp_0']));
     expect(hoist!.memberName).toBe('__interp_0_2');
   });
 });
@@ -176,8 +170,7 @@ describe('item #7 sub-shape (i) — impure r-model valueTransform', () => {
       resolve() {
         return {
           descriptor: {
-            valueTransform:
-              '((__v) => { const __n = __v.trim(); return __n.toUpperCase(); })($v)',
+            valueTransform: '((__v) => { const __n = __v.trim(); return __n.toUpperCase(); })($v)',
           },
           diagnostics: [],
         };

@@ -25,17 +25,14 @@
  */
 import * as t from '@babel/types';
 import type {
+  Diagnostic,
   IRComponent,
   Listener,
-} from '../../../../core/src/ir/types.js';
-import type {
+  ModifierArg,
   ModifierRegistry,
   VueEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 export interface EmitEventCtx {
@@ -66,7 +63,16 @@ export interface ScriptInjection {
    * `@rozie/runtime-vue` member alongside the existing helpers.
    */
   import:
-    | { from: '@rozie/runtime-vue'; name: 'debounce' | 'throttle' | 'useOutsideClick' | 'normalizeListeners' | 'rozieDeepClone' | 'useKeynav' }
+    | {
+        from: '@rozie/runtime-vue';
+        name:
+          | 'debounce'
+          | 'throttle'
+          | 'useOutsideClick'
+          | 'normalizeListeners'
+          | 'rozieDeepClone'
+          | 'useKeynav';
+      }
     | { from: 'vue'; name: 'computed' };
   /** Full `const wrapName = helper(handler, ...args);` declaration. */
   decl: string;
@@ -181,14 +187,11 @@ function isNullableFunctionPropRef(handler: t.Expression, ir: IRComponent): bool
   );
 }
 
-export function emitTemplateEvent(
-  listener: Listener,
-  ctx: EmitEventCtx,
-): EmitTemplateEventResult {
+export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTemplateEventResult {
   const diagnostics: Diagnostic[] = [];
   const counter = ctx.injectionCounter ?? { next: 0 };
 
-  let eventName = listener.event;
+  const eventName = listener.event;
   const modifierTokens: string[] = [];
   /**
    * Plan 04-06 SemVer-additive amendment — third-party modifier inlineGuard

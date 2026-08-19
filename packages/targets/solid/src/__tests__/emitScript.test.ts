@@ -9,18 +9,20 @@
  * the Props interface) and the per-slot merge expression at the invocation
  * site (D-02 static-wins, Pitfall 2 reactive-tracking).
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as t from '@babel/types';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitScript } from '../emit/emitScript.js';
 import { emitSolid } from '../emitSolid.js';
+import {
+  RuntimeSolidImportCollector,
+  SolidImportCollector,
+} from '../rewrite/collectSolidImports.js';
 
 /** Build a minimal IRComponent with one StateDecl. */
 function buildMinimalIR(overrides: Partial<IRComponent> = {}): IRComponent {
@@ -43,7 +45,14 @@ function buildMinimalIR(overrides: Partial<IRComponent> = {}): IRComponent {
     lifecycle: [],
     watchers: [],
     listeners: [],
-    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+    styles: {
+      type: 'StyleSection',
+      scopedRules: [],
+      rootRules: [],
+      portalRules: [],
+      engineRules: [],
+      sourceLoc: { start: 0, end: 0 },
+    },
     components: [],
     setupBody: {
       type: 'SetupBody',
@@ -103,7 +112,9 @@ $watch(() => $props.open, (v) => { console.log(v) })
     // `on(deps, fn, { defer: true })` runs `deps` once to establish tracking but
     // skips `fn` on the first run; the new value arrives as `fn`'s first param
     // `v`, which is bound into the user callback when it declares a param.
-    expect(result.hookSection).toMatch(/createEffect\(on\(\(\) => \(\(\) =>[\s\S]*?\)\(\), \(v\) => untrack\(\(\) => \((?:v|\(v: any\)) => \{[\s\S]*?\}\)\(v\)\), \{ defer: true \}\)\);/);
+    expect(result.hookSection).toMatch(
+      /createEffect\(on\(\(\) => \(\(\) =>[\s\S]*?\)\(\), \(v\) => untrack\(\(\) => \((?:v|\(v: any\)) => \{[\s\S]*?\}\)\(v\)\), \{ defer: true \}\)\);/,
+    );
     expect(solidImports.has('createEffect')).toBe(true);
     expect(solidImports.has('untrack')).toBe(true);
     expect(solidImports.has('on')).toBe(true);
@@ -131,7 +142,9 @@ $watch(() => $props.open, () => { console.log('fired') })
     //
     // 260602-9lw — lazy-by-default: `on(..., (v) => untrack(() => (cb)()), { defer: true })`.
     // The 0-param callback drops `v` from the inner call (TS2554-safe).
-    expect(result.hookSection).toMatch(/createEffect\(on\(\(\) => \(\(\) =>[\s\S]*?\)\(\), \(v\) => untrack\(\(\) => \(\(\) => \{[\s\S]*?\}\)\(\)\), \{ defer: true \}\)\);/);
+    expect(result.hookSection).toMatch(
+      /createEffect\(on\(\(\) => \(\(\) =>[\s\S]*?\)\(\), \(v\) => untrack\(\(\) => \(\(\) => \{[\s\S]*?\}\)\(\)\), \{ defer: true \}\)\);/,
+    );
     expect(result.hookSection).not.toContain(`)(__watchVal)`);
     // The inner user-callback IIFE takes NO argument (0-param callback): the
     // emitted inner call is `)()` not `)(v)`.
@@ -275,7 +288,9 @@ describe('emitSlotInvocation — §slots-merge invocation (Phase 07.3.2 D-02 sta
     const code = compileSolid('Dropdown');
     expect(code).toContain("(_props.triggerSlot ?? _props.slots?.['trigger'])?.(");
     // Sanity-check the param object is preserved through the merge:
-    expect(code).toMatch(/\(_props\.triggerSlot \?\? _props\.slots\?\.\['trigger'\]\)\?\.\(\{ open: open\(\), toggle \}\)/);
+    expect(code).toMatch(
+      /\(_props\.triggerSlot \?\? _props\.slots\?\.\['trigger'\]\)\?\.\(\{ open: open\(\), toggle \}\)/,
+    );
   });
 
   it('merge expression stays INSIDE JSX {...} braces — never hoisted to a local const (Pitfall 2 / Assumption A2)', () => {
@@ -315,7 +330,10 @@ describe('emitSlotInvocation — §slots-merge invocation (Phase 07.3.2 D-02 sta
       const closes = (prefix.match(/\}/g) ?? []).length;
       // There must be at least one unmatched `{` open on this line before
       // the merge — meaning we're inside a JSX expression brace.
-      expect(opens, `Pitfall 2: merge at offset ${idx} is not enclosed by JSX braces on the same line:\n${prefix}`).toBeGreaterThan(closes);
+      expect(
+        opens,
+        `Pitfall 2: merge at offset ${idx} is not enclosed by JSX braces on the same line:\n${prefix}`,
+      ).toBeGreaterThan(closes);
     }
   });
 });

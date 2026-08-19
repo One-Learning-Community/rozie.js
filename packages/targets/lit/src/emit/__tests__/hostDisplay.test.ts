@@ -7,15 +7,11 @@
  * specificity, later source order). Applies even to style-LESS components (their
  * host still defaults to display:inline without it).
  */
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import { LitImportCollector, RuntimeLitImportCollector } from '../../rewrite/collectLitImports.js';
 import { emitStyle } from '../emitStyle.js';
-import {
-  LitImportCollector,
-  RuntimeLitImportCollector,
-} from '../../rewrite/collectLitImports.js';
 
 function staticStyles(rozieSource: string): string {
   const result = parse(rozieSource, { filename: 'probe.rozie' });

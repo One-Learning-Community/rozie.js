@@ -33,19 +33,16 @@
  * @experimental — shape may change before v1.0
  */
 import type {
+  Diagnostic,
   IRComponent,
   Listener,
   ListenerTarget,
-} from '../../../../core/src/ir/types.js';
-import type {
-  ModifierRegistry,
+  ModifierArg,
   ModifierPipelineEntry,
+  ModifierRegistry,
   SvelteEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
 import { rewriteListenerExpression } from '../rewrite/rewriteListenerExpression.js';
 import type { SvelteScriptInjection } from './emitScript.js';
 
@@ -68,7 +65,7 @@ const NATIVE_KEY_GUARDS: Record<string, string> = {
   end: "if ($event.key !== 'End') return;",
   pageUp: "if ($event.key !== 'PageUp') return;",
   pageDown: "if ($event.key !== 'PageDown') return;",
-  middle: "if ($event.button !== 1) return;",
+  middle: 'if ($event.button !== 1) return;',
 };
 
 /** Map common DOM events → TypeScript event types for the handler signature. */
@@ -82,11 +79,9 @@ function eventTypeFor(event: string): string {
     event === 'mouseleave'
   )
     return 'MouseEvent';
-  if (event === 'keydown' || event === 'keyup' || event === 'keypress')
-    return 'KeyboardEvent';
+  if (event === 'keydown' || event === 'keyup' || event === 'keypress') return 'KeyboardEvent';
   if (event === 'wheel') return 'WheelEvent';
-  if (event === 'touchstart' || event === 'touchend' || event === 'touchmove')
-    return 'TouchEvent';
+  if (event === 'touchstart' || event === 'touchend' || event === 'touchmove') return 'TouchEvent';
   if (event === 'pointerdown' || event === 'pointerup' || event === 'pointermove')
     return 'PointerEvent';
   if (event === 'focus' || event === 'blur') return 'FocusEvent';
@@ -97,7 +92,11 @@ function eventTypeFor(event: string): string {
 }
 
 /** Render the addEventListener target expression. */
-function renderTargetExpr(target: ListenerTarget, diagnostics: Diagnostic[], loc: { start: number; end: number }): string {
+function renderTargetExpr(
+  target: ListenerTarget,
+  diagnostics: Diagnostic[],
+  loc: { start: number; end: number },
+): string {
   if (target.kind === 'global') return target.name;
   if (target.kind === 'ref') return target.refName;
   // self / $el — Plan 02a doesn't add an automatic root ref. Emit ROZ621
@@ -119,9 +118,7 @@ function renderTargetExpr(target: ListenerTarget, diagnostics: Diagnostic[], loc
  * svelte-check / strict TS overload resolution).
  */
 function renderOptionsSuffix(opts: Set<string>, forRemove = false): string {
-  const filtered = forRemove
-    ? new Set([...opts].filter((o) => o === 'capture'))
-    : opts;
+  const filtered = forRemove ? new Set([...opts].filter((o) => o === 'capture')) : opts;
   if (filtered.size === 0) return '';
   const parts = [...filtered].sort().map((o) => `${o}: true`);
   return `, { ${parts.join(', ')} }`;
@@ -213,10 +210,7 @@ interface ClassifyOpts {
   event: string;
 }
 
-function classifyListener(
-  pipeline: ModifierPipelineEntry[],
-  opts: ClassifyOpts,
-): ListenerClass {
+function classifyListener(pipeline: ModifierPipelineEntry[], opts: ClassifyOpts): ListenerClass {
   const nativeKeyGuards: string[] = [];
   const listenerOpts = new Set<string>();
   let outsideArgs: ModifierArg[] | null = null;
@@ -273,7 +267,6 @@ function classifyListener(
     }
     if (descriptor.helperName === 'debounce' || descriptor.helperName === 'throttle') {
       wrapHelper = { name: descriptor.helperName, args: descriptor.args };
-      continue;
     }
   }
 
@@ -322,13 +315,15 @@ function renderListener(
       .map((refName) => `${refName}?.contains(target)`)
       .join(' || ');
 
-    const containsGuard = refChecks.length > 0
-      ? `    const target = $event.target as Node;\n    if (${refChecks}) return;\n`
-      : '';
+    const containsGuard =
+      refChecks.length > 0
+        ? `    const target = $event.target as Node;\n    if (${refChecks}) return;\n`
+        : '';
 
-    const guardLines = classification.nativeKeyGuards.length > 0
-      ? classification.nativeKeyGuards.map((g) => `    ${g}`).join('\n') + '\n'
-      : '';
+    const guardLines =
+      classification.nativeKeyGuards.length > 0
+        ? classification.nativeKeyGuards.map((g) => `    ${g}`).join('\n') + '\n'
+        : '';
 
     const invocation = handlerIsBareIdentifier
       ? `    ${userHandlerCode}();`
@@ -402,17 +397,17 @@ function renderListener(
 
     return [
       `$effect(() => {`,
-      whenGuard +
-        `  ${targetExpr}.addEventListener('${listener.event}', ${wrapName}${optsObj});`,
+      whenGuard + `  ${targetExpr}.addEventListener('${listener.event}', ${wrapName}${optsObj});`,
       `  return () => ${targetExpr}.removeEventListener('${listener.event}', ${wrapName}${removeOptsObj});`,
       `});`,
     ].join('\n');
   }
 
   // Class A: pure-native + listenerOption flags + key-filter inlineGuards.
-  const guardLines = classification.nativeKeyGuards.length > 0
-    ? classification.nativeKeyGuards.map((g) => `    ${g}`).join('\n') + '\n'
-    : '';
+  const guardLines =
+    classification.nativeKeyGuards.length > 0
+      ? classification.nativeKeyGuards.map((g) => `    ${g}`).join('\n') + '\n'
+      : '';
   const invocation = handlerIsBareIdentifier
     ? `    ${userHandlerCode}();`
     : `    (${userHandlerCode})($event);`;
@@ -421,8 +416,7 @@ function renderListener(
 
   return [
     `$effect(() => {`,
-    whenGuard +
-      `  const handler = ($event: ${evtType}) => {\n${guardLines}${invocation}\n  };`,
+    whenGuard + `  const handler = ($event: ${evtType}) => {\n${guardLines}${invocation}\n  };`,
     `  ${targetExpr}.addEventListener('${listener.event}', handler${optsObj});`,
     `  return () => ${targetExpr}.removeEventListener('${listener.event}', handler${removeOptsObj});`,
     `});`,

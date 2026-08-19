@@ -17,55 +17,48 @@
  * @experimental — shape may change before v1.0
  */
 import type {
+  Diagnostic,
   IRComponent,
-  TemplateNode,
-  TemplateElementIR,
-  TemplateConditionalIR,
-  TemplateMatchIR,
-  TemplateLoopIR,
-  TemplateSlotInvocationIR,
-  TemplateInterpolationIR,
-  TemplateStaticTextIR,
-  TemplateFragmentIR,
   Listener,
   ListenerSpreadIR,
-} from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+  ModifierRegistry,
+  TemplateConditionalIR,
+  TemplateElementIR,
+  TemplateFragmentIR,
+  TemplateInterpolationIR,
+  TemplateLoopIR,
+  TemplateMatchIR,
+  IRTemplateNode as TemplateNode,
+  TemplateSlotInvocationIR,
+  TemplateStaticTextIR,
+} from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
+import {
+  collectTopLevelScriptBindings,
+  findRForLoopVarShadows,
+} from '../../../../core/src/ir/findRForLoopVarShadows.js';
 import {
   rewriteTemplateExpression,
   type ScopeRename,
 } from '../rewrite/rewriteTemplateExpression.js';
-import {
-  findRForLoopVarShadows,
-  collectTopLevelScriptBindings,
-} from '../../../../core/src/ir/findRForLoopVarShadows.js';
-import {
-  emitAttributes,
-  emitListenerSpread,
-  findRHtml,
-} from './emitTemplateAttribute.js';
-import { emitTemplateEvent, svelteEventAttrName } from './emitTemplateEvent.js';
-import { emitSlotInvocation } from './emitSlotInvocation.js';
-// Phase 07.2 — consumer-side slot-fill emission for component-tag elements.
-import {
-  emitSlotFiller,
-  emitDynamicSnippetsProp,
-} from './emitSlotFiller.js';
-import type { SvelteScriptInjection } from './emitScript.js';
 // Phase 71 (r-keynav) — Svelte target-pair (Plan 71-06), extended Phase 77
 // (Plan 04) — modeled on the React/Vue references (see emitKeynav.ts's
 // module doc comment).
 import {
+  type KeynavEmitPlan,
+  type KeynavFocusScopeRef,
   keynavFocusScopeAttrs,
   keynavItemAttrs,
   keynavRootAttrs,
   loopBodyHasKeynavItem,
   stripKeynavSyntheticEvents,
-  type KeynavEmitPlan,
-  type KeynavFocusScopeRef,
 } from './emitKeynav.js';
+import type { SvelteScriptInjection } from './emitScript.js';
+// Phase 07.2 — consumer-side slot-fill emission for component-tag elements.
+import { emitDynamicSnippetsProp, emitSlotFiller } from './emitSlotFiller.js';
+import { emitSlotInvocation } from './emitSlotInvocation.js';
+import { emitAttributes, emitListenerSpread, findRHtml } from './emitTemplateAttribute.js';
+import { emitTemplateEvent, svelteEventAttrName } from './emitTemplateEvent.js';
 
 /**
  * HTML void elements (no closing tag, self-close `/>`).
@@ -216,10 +209,7 @@ function emitChildrenJoined(children: readonly TemplateNode[], ctx: EmitNodeCtx)
     .join('');
 }
 
-function emitInterpolation(
-  node: TemplateInterpolationIR,
-  ctx: EmitNodeCtx,
-): string {
+function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): string {
   const expr = rewriteTemplateExpression(node.expression, ctx.ir, ctxRenames(ctx));
   // Phase 26 (D-06/D-07) — gate on the IR-precomputed wrap decision. A
   // non-primitive value renders portable JSON (`[object Object]` divergence
@@ -233,10 +223,7 @@ function emitInterpolation(
   return `{${expr}}`;
 }
 
-function emitFragment(
-  node: TemplateFragmentIR,
-  ctx: EmitNodeCtx,
-): string {
+function emitFragment(node: TemplateFragmentIR, ctx: EmitNodeCtx): string {
   return emitChildrenJoined(node.children, ctx);
 }
 
@@ -244,10 +231,7 @@ function emitFragment(
  * Emit a TemplateConditional as `{#if a}...{:else if b}...{:else}...{/if}`
  * Phase 2 collapses r-if + r-else-if + r-else into branches[].
  */
-function emitConditional(
-  node: TemplateConditionalIR,
-  ctx: EmitNodeCtx,
-): string {
+function emitConditional(node: TemplateConditionalIR, ctx: EmitNodeCtx): string {
   const parts: string[] = [];
   for (let i = 0; i < node.branches.length; i++) {
     const branch = node.branches[i]!;
@@ -314,9 +298,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   // `loopBodyHasKeynavItem` deliberately does not recurse into a NESTED
   // r-for, so this synthesis never fires for an unrelated outer loop.
   const needsKeynavIndex =
-    (ctx.keynav ?? []).length > 0 &&
-    node.indexAlias === null &&
-    loopBodyHasKeynavItem(node.body);
+    (ctx.keynav ?? []).length > 0 && node.indexAlias === null && loopBodyHasKeynavItem(node.body);
   const sourceIndexAlias = node.indexAlias ?? (needsKeynavIndex ? '__rozieKeynavIndex' : null);
 
   // Loop-var declaration + key are INSIDE the loop scope → rename the var.
@@ -345,9 +327,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     if (n.type !== 'TemplateElement') return n;
     return {
       ...n,
-      attributes: n.attributes.filter(
-        (a) => !(a.kind === 'binding' && a.name === 'key'),
-      ),
+      attributes: n.attributes.filter((a) => !(a.kind === 'binding' && a.name === 'key')),
     };
   };
 
@@ -536,9 +516,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   if (node.remountKeyExpression) {
     node = {
       ...node,
-      attributes: node.attributes.filter(
-        (a) => !(a.kind === 'binding' && a.name === 'key'),
-      ),
+      attributes: node.attributes.filter((a) => !(a.kind === 'binding' && a.name === 'key')),
     };
   }
   // 260519 linechart-watch-recreate step 5 — resolve the host's static `type`
@@ -737,9 +715,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
     const fillerCtx: import('./emitSlotFiller.js').EmitSlotFillerCtx = {
       ir: ctx.ir,
       emitChildren,
-      ...(ctx.enclosingLoopVars !== undefined
-        ? { enclosingLoopVars: ctx.enclosingLoopVars }
-        : {}),
+      ...(ctx.enclosingLoopVars !== undefined ? { enclosingLoopVars: ctx.enclosingLoopVars } : {}),
     };
 
     const fillerParts: string[] = [];
@@ -758,8 +734,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
     // the component tag's body alongside the static-name snippet blocks
     // (Svelte 5 evaluates snippet declarations in the surrounding scope and
     // makes them referenceable by identifier).
-    const headWithSnippets =
-      dyn.prop !== null ? `${head} ${dyn.prop}` : head;
+    const headWithSnippets = dyn.prop !== null ? `${head} ${dyn.prop}` : head;
     const allBodyParts = [...fillerParts, ...dyn.snippetBlocks];
 
     const inner = allBodyParts.join('');
@@ -811,9 +786,7 @@ function astReferencesIdentifier(node: unknown, name: string): boolean {
 function hoistTempIsReferenced(node: TemplateMatchIR): boolean {
   if (node.tempName === undefined) return false;
   const tempName = node.tempName;
-  return node.branches.some(
-    (b) => b.test !== null && astReferencesIdentifier(b.test, tempName),
-  );
+  return node.branches.some((b) => b.test !== null && astReferencesIdentifier(b.test, tempName));
 }
 
 /**

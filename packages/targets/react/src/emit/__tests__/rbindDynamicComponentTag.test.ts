@@ -37,10 +37,9 @@
  *
  * Harness copied verbatim from `rbindComponentKeyMap.test.ts` (4cy).
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../../emitReact.js';
 
 function compile(rozieSrc: string): string {
@@ -131,9 +130,7 @@ describe('emitTemplateAttribute (React) — r-bind DYNAMIC spreads must bypass t
     // an element mixing both tag kinds must import both. A component that has
     // no dynamic component-tag spread keeps a byte-identical import line.
     const emitted = compile(TWO_TAG_SRC);
-    const importLine = emitted
-      .split('\n')
-      .find((l) => l.includes("from '@rozie/runtime-react'"));
+    const importLine = emitted.split('\n').find((l) => l.includes("from '@rozie/runtime-react'"));
     expect(importLine).toBeDefined();
     expect(importLine).toContain('normalizeAttrs');
     expect(importLine).toContain('normalizeComponentAttrs');
@@ -146,7 +143,9 @@ describe('emitTemplateAttribute (React) — r-bind DYNAMIC spreads must bypass t
     // rendered expression nor the html branch, so a real DOM element keeps the
     // runtime alias table it has always had. Green BEFORE and AFTER the fix —
     // this inline snapshot was written during the RED run and must not move.
-    expect(input).toMatchInlineSnapshot(`"<input {...normalizeAttrs(someObj)} data-rozie-s-8fd6d49e="" />"`);
+    expect(input).toMatchInlineSnapshot(
+      `"<input {...normalizeAttrs(someObj)} data-rozie-s-8fd6d49e="" />"`,
+    );
   });
 
   it('GREEN GUARD-3 (D-04) — `$attrs` on a component tag stays an UNWRAPPED spread', () => {
@@ -201,6 +200,8 @@ describe('emitTemplateAttribute (React) — r-bind DYNAMIC spreads must bypass t
     expect(child2).toContain('normalizeAttrs(someObj).className');
     expect(child2).toContain('clsx(');
 
-    expect(child2).toMatchInlineSnapshot(`"<Child2 {...normalizeComponentAttrs(someObj)} className={clsx(\`\${"x"}\`, (normalizeAttrs(someObj).className as string | undefined))} data-rozie-s-8fd6d49e="" />"`);
+    expect(child2).toMatchInlineSnapshot(
+      `"<Child2 {...normalizeComponentAttrs(someObj)} className={clsx(\`\${"x"}\`, (normalizeAttrs(someObj).className as string | undefined))} data-rozie-s-8fd6d49e="" />"`,
+    );
   });
 });

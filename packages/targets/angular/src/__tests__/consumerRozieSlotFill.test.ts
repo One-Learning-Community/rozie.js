@@ -16,14 +16,13 @@
  * (`emitTemplateNode.ts`) and the decorator/import wiring
  * (`emitDecorator.ts`/`emitAngular.ts`) are both updated.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import type { IRComponent, SlotFillerDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { type EmitSlotFillerCtx, emitDynamicSlotFiller } from '../emit/emitSlotFiller.js';
+import { type EmitNodeCtx, emitNode } from '../emit/emitTemplateNode.js';
 import { emitAngular } from '../emitAngular.js';
-import { emitDynamicSlotFiller, type EmitSlotFillerCtx } from '../emit/emitSlotFiller.js';
-import { emitNode, type EmitNodeCtx } from '../emit/emitTemplateNode.js';
-import type { IRComponent, SlotFillerDecl } from '../../../../core/src/ir/types.js';
 
 function lowerInline(rozie: string): IRComponent {
   const result = parse(rozie, { filename: 'inline.rozie' });
@@ -97,7 +96,9 @@ describe('Task 1 — emitDynamicSlotFiller emits a keyed [rozieSlot] marker decl
     expect(filler).not.toBeNull();
     const emission = emitDynamicSlotFiller(filler!, fillerCtxFor(ir));
     expect(emission).not.toBeNull();
-    expect(emission!.template.startsWith('<ng-template [rozieSlot]="dynName()" let-value="value">')).toBe(true);
+    expect(
+      emission!.template.startsWith('<ng-template [rozieSlot]="dynName()" let-value="value">'),
+    ).toBe(true);
     expect(emission!.template.endsWith('</ng-template>')).toBe(true);
     expect(emission!.template).toContain('value');
     expect(emission!.keyExpr).toBe('dynName()');
@@ -124,7 +125,11 @@ describe('Task 1 — emitDynamicSlotFiller emits a keyed [rozieSlot] marker decl
     expect(filler).not.toBeNull();
     const emission = emitDynamicSlotFiller(filler!, fillerCtxFor(ir));
     expect(emission).not.toBeNull();
-    expect(emission!.template.startsWith("<ng-template [rozieSlot]=\"'cell-status'\" let-value=\"value\">")).toBe(true);
+    expect(
+      emission!.template.startsWith(
+        '<ng-template [rozieSlot]="\'cell-status\'" let-value="value">',
+      ),
+    ).toBe(true);
     expect(emission!.template.endsWith('</ng-template>')).toBe(true);
     expect(emission!.keyExpr).toBe("'cell-status'");
   });
@@ -149,7 +154,9 @@ describe('Task 1 — emitDynamicSlotFiller emits a keyed [rozieSlot] marker decl
     filler!.matchedFamily = true;
     const emission = emitDynamicSlotFiller(filler!, fillerCtxFor(ir));
     expect(emission).not.toBeNull();
-    expect(emission!.template.startsWith("<ng-template [rozieSlot]=\"'cellStatus'\" let-value=\"value\">")).toBe(true);
+    expect(
+      emission!.template.startsWith('<ng-template [rozieSlot]="\'cellStatus\'" let-value="value">'),
+    ).toBe(true);
     expect(emission!.template.endsWith('</ng-template>')).toBe(true);
     expect(emission!.keyExpr).toBe("'cellStatus'");
   });

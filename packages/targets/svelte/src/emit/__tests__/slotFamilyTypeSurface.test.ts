@@ -23,15 +23,14 @@
  * for the dedup half of this task; the family-type-surface work below (R6)
  * is still required and IS this task's real remaining scope.
  */
-import { describe, it, expect } from 'vitest';
-import * as t from '@babel/types';
+
 import { parse as babelParse } from '@babel/parser';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import * as t from '@babel/types';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSvelte } from '../../emitSvelte.js';
 import { buildSlotTypeFields, buildSnippetsRecordType } from '../refineSlotTypes.js';
-import type { IRComponent, SlotDecl } from '../../../../../core/src/ir/types.js';
 
 const LOC = { start: 0, end: 0 };
 
@@ -77,7 +76,15 @@ describe('NOT REPRODUCED — distinctSlotsByName does not collapse two dynamic-n
     const withDefault = buildSlotTypeFields([
       dynamicSlot({}),
       dynamicSlot({}),
-      { type: 'SlotDecl', name: '', defaultContent: null, params: [], presence: 'always', nestedSlots: [], sourceLoc: LOC },
+      {
+        type: 'SlotDecl',
+        name: '',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
     ]);
     expect(withDefault).toEqual(['  children?: Snippet;']);
   });
@@ -86,7 +93,15 @@ describe('NOT REPRODUCED — distinctSlotsByName does not collapse two dynamic-n
 describe('buildSnippetsRecordType — family type surface (R6, Svelte)', () => {
   it('no dynamic-name/record-only slot at all → the pre-phase generic Record, byte-identical', () => {
     const type = buildSnippetsRecordType([
-      { type: 'SlotDecl', name: 'header', defaultContent: null, params: [], presence: 'always', nestedSlots: [], sourceLoc: LOC },
+      {
+        type: 'SlotDecl',
+        name: 'header',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
     ]);
     expect(type).toBe('Record<string, any>');
   });
@@ -97,7 +112,12 @@ describe('buildSnippetsRecordType — family type surface (R6, Svelte)', () => {
         namePrefix: 'cell-',
         params: [
           { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: LOC },
-          { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC },
+          {
+            type: 'ParamDecl',
+            name: 'value',
+            valueExpression: t.identifier('value'),
+            sourceLoc: LOC,
+          },
         ],
       }),
     ]);
@@ -117,7 +137,15 @@ describe('buildSnippetsRecordType — family type surface (R6, Svelte)', () => {
 
   it('a static record-only (non-identifier) slot coexists with an overlapping family — BOTH members appear', () => {
     const type = buildSnippetsRecordType([
-      { type: 'SlotDecl', name: 'cell-total', defaultContent: null, params: [], presence: 'always', nestedSlots: [], sourceLoc: LOC },
+      {
+        type: 'SlotDecl',
+        name: 'cell-total',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
       dynamicSlot({ namePrefix: 'cell-' }),
     ]);
     expect(type).toContain("'cell-total'?:");
@@ -128,7 +156,14 @@ describe('buildSnippetsRecordType — family type surface (R6, Svelte)', () => {
     const type = buildSnippetsRecordType([
       dynamicSlot({
         namePrefix: 'trigger-',
-        params: [{ type: 'ParamDecl', name: 'toggle', valueExpression: t.identifier('toggle'), sourceLoc: LOC }],
+        params: [
+          {
+            type: 'ParamDecl',
+            name: 'toggle',
+            valueExpression: t.identifier('toggle'),
+            sourceLoc: LOC,
+          },
+        ],
         paramTypes: [tsType('(open: boolean) => void')],
       }),
     ]);

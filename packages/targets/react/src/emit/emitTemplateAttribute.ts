@@ -26,19 +26,20 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
+
 import type { GeneratorOptions } from '@babel/generator';
-import postcss from 'postcss';
+import _generate from '@babel/generator';
+import * as t from '@babel/types';
 import type {
-  IRComponent,
   AttributeBinding,
+  Diagnostic,
+  IRComponent,
   ListenerSpreadIR,
   RefDecl,
-} from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import {
+} from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
+import postcss from 'postcss';
+import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
@@ -50,12 +51,15 @@ type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
 
 function flattenInlineCode(code: string): string {
-  return code.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim();
+  return code
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
 }
 
 export interface EmitAttrCtx {
@@ -463,10 +467,7 @@ function escapeJsxAttrLiteral(s: string): string {
  * Render a Babel Expression for embedding inside a JSX expression container.
  * Same as rewriteTemplateExpression but the caller decides on the wrapping.
  */
-function renderExpr(
-  expr: t.Expression,
-  ir: IRComponent,
-): string {
+function renderExpr(expr: t.Expression, ir: IRComponent): string {
   return rewriteTemplateExpression(expr, ir);
 }
 
@@ -716,10 +717,7 @@ function splitClassStyleFromLiteral(obj: t.ObjectExpression): {
  *   { hovering: $data.hovering }  →  { hovering: hovering }
  *   { 'foo-bar': x }              →  { "foo-bar": x }
  */
-function renderObjectFormForClsx(
-  expr: t.ObjectExpression,
-  ir: IRComponent,
-): string {
+function renderObjectFormForClsx(expr: t.ObjectExpression, ir: IRComponent): string {
   const propStrings: string[] = [];
   for (const prop of expr.properties) {
     if (!t.isObjectProperty(prop)) {
@@ -753,9 +751,7 @@ function renderObjectFormForClsx(
     // clsx object emits the plain key (quoted if non-identifier) directly
     // (`{ active: cond }`), never a `[styles.active]: cond` lookup. Attribute
     // scoping (`[data-rozie-s-HASH]`) is the sole isolation layer.
-    const keyOut = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyText)
-      ? keyText
-      : JSON.stringify(keyText);
+    const keyOut = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyText) ? keyText : JSON.stringify(keyText);
     propStrings.push(`${keyOut}: ${valueText}`);
   }
   return `{ ${propStrings.join(', ')} }`;
@@ -788,10 +784,7 @@ function renderStaticClassLookup(className: string, _ir: IRComponent): string {
  *   - 1 interpolated      → backtick template literal (plain tokens)
  *   - mixed (static + bind/etc.) → clsx(...)
  */
-function composeClassName(
-  attrs: AttributeBinding[],
-  ctx: EmitAttrCtx,
-): string {
+function composeClassName(attrs: AttributeBinding[], ctx: EmitAttrCtx): string {
   const ir = ctx.ir;
 
   // Inline interpolated-segment shape (matches AttributeBinding's
@@ -833,9 +826,7 @@ function composeClassName(
       // Phase 14 — `spreadBinding` is the name-less kind: `bucket()` skips it
       // so it never reaches a `class` merge. Unreachable; mirrors the
       // `twoWayBinding` guard above.
-      throw new Error(
-        `React target: spreadBinding not valid in class array context (Phase 14).`,
-      );
+      throw new Error(`React target: spreadBinding not valid in class array context (Phase 14).`);
     } else {
       // interpolated
       segments.push({ kind: 'interpolated', segments: a.segments as InterpolatedSeg[] });
@@ -923,12 +914,14 @@ function composeClassName(
       clsxArgs.push(renderExpr(s.expr, ir));
     } else {
       // interpolated → render as a backtick template literal
-      const interpSegs = (s as unknown as {
-        segments: Array<
-          | { kind: 'static'; text: string }
-          | { kind: 'binding'; expression: t.Expression; deps: unknown; wrapForDisplay?: boolean }
-        >;
-      }).segments;
+      const interpSegs = (
+        s as unknown as {
+          segments: Array<
+            | { kind: 'static'; text: string }
+            | { kind: 'binding'; expression: t.Expression; deps: unknown; wrapForDisplay?: boolean }
+          >;
+        }
+      ).segments;
       clsxArgs.push(renderInterpolatedClass(interpSegs, ctx));
     }
   }
@@ -949,12 +942,9 @@ function composeClassName(
  */
 function decomposeStaticClassExpr(
   expr: t.Expression,
-):
-  | Array<
-      | { kind: 'static'; text: string }
-      | { kind: 'binding'; expression: t.Expression; deps: unknown }
-    >
-  | null {
+): Array<
+  { kind: 'static'; text: string } | { kind: 'binding'; expression: t.Expression; deps: unknown }
+> | null {
   if (t.isStringLiteral(expr)) {
     return [{ kind: 'static', text: expr.value }];
   }
@@ -1064,10 +1054,7 @@ function renderInterpolatedClass(
       .map((p) => {
         if (p.kind === 'static') {
           // Backtick-escape: \, `, and ${
-          return p.text
-            .replace(/\\/g, '\\\\')
-            .replace(/`/g, '\\`')
-            .replace(/\$\{/g, '\\${');
+          return p.text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
         }
         return '${' + p.code + '}';
       })
@@ -1407,10 +1394,7 @@ function emitNonClassAttribute(
   let lit = '';
   for (const seg of attr.segments) {
     if (seg.kind === 'static') {
-      lit += seg.text
-        .replace(/\\/g, '\\\\')
-        .replace(/`/g, '\\`')
-        .replace(/\$\{/g, '\\${');
+      lit += seg.text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
     } else {
       // Phase 26 (D-06/SPEC-4) — per-segment wrap. A non-primitive interpolated
       // into an attribute string renders portable JSON instead of `[object
@@ -1492,8 +1476,7 @@ function emitSpread(
   // `FORBIDDEN_KEYS` strip, so the gate selects a sibling helper that strips
   // identically (shared const) rather than un-wrapping. D-02: the component
   // helper STILL maps `class`→`className` — see `rbindKeyToJsxName` above.
-  const isComponentTag =
-    ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self';
+  const isComponentTag = ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self';
   const helper = isComponentTag ? 'normalizeComponentAttrs' : 'normalizeAttrs';
   ctx.collectors.runtime.add(helper);
   return `{...${helper}(${renderExpr(attr.expression, ctx.ir)})}`;
@@ -1532,10 +1515,7 @@ function isListenersIdentifier(expr: t.Expression): boolean {
  *                                          + `normalizeListeners` runtime
  *                                          import collected
  */
-export function emitListenerSpread(
-  spread: ListenerSpreadIR,
-  ctx: EmitAttrCtx,
-): string {
+export function emitListenerSpread(spread: ListenerSpreadIR, ctx: EmitAttrCtx): string {
   if (isListenersIdentifier(spread.expression)) {
     // D-19 — $listeners spread, no key normalization.
     return `{...${renderExpr(spread.expression, ctx.ir)}}`;
@@ -1665,10 +1645,7 @@ function opaqueSpreadClassReadExpr(
  *
  * Skips attributes that are CONSUMED upstream (r-* directives, @event, :key).
  */
-export function emitAttributes(
-  attrs: AttributeBinding[],
-  ctx: EmitAttrCtx,
-): EmitAttributesResult {
+export function emitAttributes(attrs: AttributeBinding[], ctx: EmitAttrCtx): EmitAttributesResult {
   const diagnostics: Diagnostic[] = [];
   if (attrs.length === 0) return { jsx: '', diagnostics };
 

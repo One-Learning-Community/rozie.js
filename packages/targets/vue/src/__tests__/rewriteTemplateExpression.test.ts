@@ -17,10 +17,11 @@
  *   $slots.X             → $slots.X     (Vue's $slots proxy passthrough)
  *   unknown $props.X     → $props.X     (untouched — ROZ100 warned upstream)
  */
-import { describe, expect, it } from 'vitest';
-import * as t from '@babel/types';
+
 import { parseExpression } from '@babel/parser';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 function buildIR(overrides: Partial<IRComponent> = {}): IRComponent {

@@ -34,16 +34,18 @@
  * `compile()` path threads it for real.
  */
 
-import type { EventModifierImpl, ModifierRegistry } from '@rozie/core';
+import type {
+  Diagnostic,
+  EventModifierImpl,
+  IRComponent,
+  ModifierRegistry,
+  IRTemplateNode as TemplateNode,
+} from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import type { IRComponent, TemplateNode } from '../../../../core/src/ir/types.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { parse } from '../../../../core/src/parse.js';
+import { resolveEventBindingName } from '../emit/emitTemplateEvent.js';
 import { emitAngular } from '../emitAngular.js';
 import { angularOutputBinding, sanitizeEventName } from '../rewrite/sanitizeEventName.js';
-import { resolveEventBindingName } from '../emit/emitTemplateEvent.js';
 
 /**
  * Walk `ir.template` and set `producerEmits` on EVERY component/self tag —
@@ -52,10 +54,7 @@ import { resolveEventBindingName } from '../emit/emitTemplateEvent.js';
  * composed tag without needing the full resolver+cache+manifest machinery
  * `threadProducerEmits.test.ts` already exercises.
  */
-function withProducerEmits(
-  template: TemplateNode | null,
-  producerEmits: readonly string[],
-): void {
+function withProducerEmits(template: TemplateNode | null, producerEmits: readonly string[]): void {
   if (template === null) return;
   if (template.type === 'TemplateElement') {
     if (template.tagKind === 'component' || template.tagKind === 'self') {
@@ -244,9 +243,7 @@ describe('emitAngular — native/custom ELEMENT listeners stay hyphenated (anti-
     // because producerEmits is always absent for html tags".
     expect(resolveEventBindingName('sort-change', 'html', undefined)).toBe('sort-change');
     expect(resolveEventBindingName('sort-change', 'html', ['sort-change'])).toBe('sort-change');
-    expect(resolveEventBindingName('sort-change', undefined, ['sort-change'])).toBe(
-      'sort-change',
-    );
+    expect(resolveEventBindingName('sort-change', undefined, ['sort-change'])).toBe('sort-change');
   });
 });
 

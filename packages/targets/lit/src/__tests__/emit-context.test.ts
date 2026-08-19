@@ -16,11 +16,10 @@
 //   - ContextConsumer(subscribe:true) + an emitted NULL-GUARD at the read site (REQ-30 — the
 //     documented async edge; the value is undefined until the context-request round-trip resolves)
 //   - R12 / D-5 empty-case byte-identity: no $provide/$inject → ZERO @lit/context text.
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 function lower(src: string, filename: string): IRComponent {
@@ -100,7 +99,9 @@ const NO_CONTEXT_SRC = `<rozie name="Plain">
 describe('Lit emit — cross-component context ($provide / $inject)', () => {
   it('provider: $provide → createContext(Symbol.for) + ContextProvider, $provide stripped', () => {
     const { code, diagnostics } = compile(PROVIDER_SRC, 'ThemeProvider.rozie');
-    expect((diagnostics as { severity?: string }[]).filter((d) => d.severity === 'error')).toHaveLength(0);
+    expect(
+      (diagnostics as { severity?: string }[]).filter((d) => d.severity === 'error'),
+    ).toHaveLength(0);
     // Module-scope createContext over the Symbol.for global-registry key (D-1).
     // CR-01: the protocol key is JSON-serialized (double-quoted) for escaping safety.
     expect(code).toContain('const __rozieCtx_theme = createContext(Symbol.for("rozie:theme"));');
@@ -142,9 +143,13 @@ describe('Lit emit — cross-component context ($provide / $inject)', () => {
 
   it('consumer: const theme = $inject("theme") → ContextConsumer + null-guarded getter (REQ-30)', () => {
     const { code, diagnostics } = compile(CONSUMER_SRC, 'ThemeButton.rozie');
-    expect((diagnostics as { severity?: string }[]).filter((d) => d.severity === 'error')).toHaveLength(0);
+    expect(
+      (diagnostics as { severity?: string }[]).filter((d) => d.severity === 'error'),
+    ).toHaveLength(0);
     expect(code).toContain('const __rozieCtx_theme = createContext(Symbol.for("rozie:theme"));');
-    expect(code).toContain('new ContextConsumer(this, { context: __rozieCtx_theme, subscribe: true });');
+    expect(code).toContain(
+      'new ContextConsumer(this, { context: __rozieCtx_theme, subscribe: true });',
+    );
     expect(code).toMatch(/import \{[^}]*\bContextConsumer\b[^}]*\} from '@lit\/context';/);
     // REQ-30 null-guard: the read accessor returns `.value` (already T | undefined).
     expect(code).toContain('private get theme() { return this.__rozieCtxConsumer_theme.value; }');
@@ -153,13 +158,15 @@ describe('Lit emit — cross-component context ($provide / $inject)', () => {
 
   it('consumer with fallback: $inject("theme", fb) → null-guarded getter `.value ?? fb` (REQ-30)', () => {
     const { code } = compile(CONSUMER_FALLBACK_SRC, 'ThemeButtonFallback.rozie');
-    expect(code).toContain('new ContextConsumer(this, { context: __rozieCtx_theme, subscribe: true });');
+    expect(code).toContain(
+      'new ContextConsumer(this, { context: __rozieCtx_theme, subscribe: true });',
+    );
     // Fallback form of the null-guard.
     expect(code).toContain('this.__rozieCtxConsumer_theme.value ??');
     expect(code).toContain("color: 'gray'");
   });
 
-  it("CR-01 — a key containing an apostrophe is JSON-escaped (valid source + matching provider/consumer Symbol.for token)", () => {
+  it('CR-01 — a key containing an apostrophe is JSON-escaped (valid source + matching provider/consumer Symbol.for token)', () => {
     const APOSTROPHE_PROVIDE = `<rozie name="AposProvider">
 <data>
 { color: 'red' }
@@ -209,15 +216,15 @@ $provide('a-b', { get color() { return $data.color; } });
     expect(code).toContain('Symbol.for("rozie:a.b")');
     expect(code).toContain('Symbol.for("rozie:a-b")');
     // The two context consts must NOT share a name (no duplicate member).
-    const ctxConsts = [
-      ...code.matchAll(/const (__rozieCtx_[A-Za-z0-9_$]+) = createContext/g),
-    ].map((m) => m[1]);
+    const ctxConsts = [...code.matchAll(/const (__rozieCtx_[A-Za-z0-9_$]+) = createContext/g)].map(
+      (m) => m[1],
+    );
     expect(ctxConsts).toHaveLength(2);
     expect(new Set(ctxConsts).size).toBe(2);
     // And the provider controller fields are distinct too.
-    const providerFields = [
-      ...code.matchAll(/private (__rozieCtxProvider_[A-Za-z0-9_$]+) =/g),
-    ].map((m) => m[1]);
+    const providerFields = [...code.matchAll(/private (__rozieCtxProvider_[A-Za-z0-9_$]+) =/g)].map(
+      (m) => m[1],
+    );
     expect(providerFields).toHaveLength(2);
     expect(new Set(providerFields).size).toBe(2);
   });

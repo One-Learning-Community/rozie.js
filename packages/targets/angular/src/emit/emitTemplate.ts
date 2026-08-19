@@ -17,12 +17,10 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
-import type { AngularScriptInjection } from './emitTemplateEvent.js';
+import type { Diagnostic, IRComponent, ModifierRegistry } from '@rozie/core';
 import type { KeynavEmitPlan } from './emitKeynav.js';
+import type { AngularScriptInjection } from './emitTemplateEvent.js';
+import { type EmitNodeCtx, emitNode } from './emitTemplateNode.js';
 
 export interface EmitTemplateOpts {
   /** Collision-renames from rewriteScript (e.g., `close` → `_close`). */

@@ -19,14 +19,14 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _traverse from '@babel/traverse';
+
 import type { NodePath } from '@babel/traverse';
+import _traverse from '@babel/traverse';
 import type { File } from '@babel/types';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { Diagnostic, IRComponent } from '@rozie/core';
+import { isInTypePosition } from '@rozie/core';
 import { portalKey } from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import {
   deconflictGeneratedSymbols,
   deconflictReservedClassFields,
@@ -36,15 +36,15 @@ import {
   SOLID_EMITTER_LOCALS,
   SOLID_IMPORT_NAMES,
 } from '../../../../core/src/rewrite/reservedNames.js';
-import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import { renderType } from '../emit/emitPropsInterface.js';
+import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 /**
  * 260712-a09 (Pattern D) — options threaded into `rewriteRozieIdentifiers` /
@@ -82,19 +82,25 @@ function capitalize(name: string): string {
 
 /** Map of compound-assignment operator → matching binary operator. */
 const COMPOUND_OP_MAP: Record<string, t.BinaryExpression['operator']> = {
-  '+=': '+', '-=': '-', '*=': '*', '/=': '/', '%=': '%', '**=': '**',
-  '<<=': '<<', '>>=': '>>', '>>>=': '>>>', '&=': '&', '|=': '|', '^=': '^',
+  '+=': '+',
+  '-=': '-',
+  '*=': '*',
+  '/=': '/',
+  '%=': '%',
+  '**=': '**',
+  '<<=': '<<',
+  '>>=': '>>',
+  '>>>=': '>>>',
+  '&=': '&',
+  '|=': '|',
+  '^=': '^',
 };
 
 /**
  * Build a signal setter call for assignment. For simple `=` emit `setX(rhs)`;
  * for compound operators emit `setX(prev => prev OP rhs)` (functional updater).
  */
-function buildSetterCall(
-  varName: string,
-  operator: string,
-  rhs: t.Expression,
-): t.CallExpression {
+function buildSetterCall(varName: string, operator: string, rhs: t.Expression): t.CallExpression {
   const setterName = 'set' + capitalize(varName);
   if (operator === '=') {
     return t.callExpression(t.identifier(setterName), [rhs]);
@@ -109,10 +115,9 @@ function buildSetterCall(
   // the rhs contains reactive values (e.g. local.step from splitProps) inside an arrow
   // that is not a tracked scope. Using the current getter value directly avoids this
   // and is equivalent in Solid's synchronous execution model.
-  return t.callExpression(
-    t.identifier(setterName),
-    [t.binaryExpression(binOp, t.callExpression(t.identifier(varName), []), rhs)],
-  );
+  return t.callExpression(t.identifier(setterName), [
+    t.binaryExpression(binOp, t.callExpression(t.identifier(varName), []), rhs),
+  ]);
 }
 
 /**
@@ -187,9 +192,7 @@ function immutableArrayValue(
         t.spreadElement(slice(t.numericLiteral(0), t.cloneNode(start, true))),
         ...items,
         t.spreadElement(
-          slice(
-            t.binaryExpression('+', t.cloneNode(start, true), t.cloneNode(deleteCount, true)),
-          ),
+          slice(t.binaryExpression('+', t.cloneNode(start, true), t.cloneNode(deleteCount, true))),
         ),
       ]);
     }
@@ -612,9 +615,7 @@ export function rewriteRozieIdentifiers(
   // below: ONLY a read of one of THESE prop names, in THAT exact shape, gets
   // the `?? undefined` splice-site coercion.
   const nullWidenedNonModelProps = new Set(
-    ir.props
-      .filter((p) => !p.isModel && t.isNullLiteral(p.defaultValue))
-      .map((p) => p.name),
+    ir.props.filter((p) => !p.isModel && t.isNullLiteral(p.defaultValue)).map((p) => p.name),
   );
   // Model props whose declared `type` resolves to `unknown` (i.e. `type: null`)
   // — their `createControllableSignal<unknown>` accessor returns `unknown`. A
@@ -776,9 +777,7 @@ export function rewriteRozieIdentifiers(
           const params = (parentPath.node as { params: t.Node[] }).params;
           if (params.includes(path.node)) return;
         }
-        path.replaceWith(
-          t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')),
-        );
+        path.replaceWith(t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')));
         // Do NOT path.skip() — let the visitor re-visit the synthesised
         // MemberExpression so the `$refs.X` handler downstream lowers it to
         // the Solid-side ref accessor.
@@ -795,13 +794,27 @@ export function rewriteRozieIdentifiers(
       // Skip: optional call expression callee
       if (parentPath.isOptionalCallExpression() && parentPath.node.callee === path.node) return;
       // Skip: property key (non-computed) in member expression
-      if (parentPath.isMemberExpression() && parentPath.node.property === path.node && !parentPath.node.computed) return;
+      if (
+        parentPath.isMemberExpression() &&
+        parentPath.node.property === path.node &&
+        !parentPath.node.computed
+      )
+        return;
       // Skip: property key in object expression
-      if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) return;
+      if (
+        parentPath.isObjectProperty() &&
+        parentPath.node.key === path.node &&
+        !parentPath.node.computed
+      )
+        return;
       // Skip: variable declaration (const canIncrement = createMemo(...)) — the definition itself
       if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
       // Skip: function parameter (e.g. (canIncrement) => ...)
-      if (parentPath.isFunction() && (parentPath.node as { params: unknown[] }).params.includes(path.node)) return;
+      if (
+        parentPath.isFunction() &&
+        (parentPath.node as { params: unknown[] }).params.includes(path.node)
+      )
+        return;
 
       path.replaceWith(t.callExpression(t.identifier(name), []));
       path.skip();
@@ -818,16 +831,12 @@ export function rewriteRozieIdentifiers(
       // CW-INDEX). Getter-read immutable form, no `prev =>` arrow (solid lint).
       const covered = detectCoveredNestedAssign(path, dataNames);
       if (covered !== null) {
-        const mkPrev = (): t.Expression =>
-          t.callExpression(t.identifier(covered.key), []);
+        const mkPrev = (): t.Expression => t.callExpression(t.identifier(covered.key), []);
         const value =
           covered.kind === 'member'
             ? immutableMemberValue(mkPrev, covered.field, node.right)
             : immutableIndexValue(mkPrev, covered.index, node.right);
-        const setterCall = t.callExpression(
-          t.identifier('set' + capitalize(covered.key)),
-          [value],
-        );
+        const setterCall = t.callExpression(t.identifier('set' + capitalize(covered.key)), [value]);
         path.replaceWith(setterCall);
         // No skip — descend so `$data.Y` reads inside the rhs still lower.
         return;
@@ -897,10 +906,7 @@ export function rewriteRozieIdentifiers(
         if (modelProps.has(property.name)) {
           // Model prop: createControllableSignal returns [Accessor<T>, Setter<T>]
           // The accessor is the signal name itself; call it: value()
-          let accessorCall: t.Expression = t.callExpression(
-            t.identifier(property.name),
-            [],
-          );
+          let accessorCall: t.Expression = t.callExpression(t.identifier(property.name), []);
           // An `unknown`-typed model accessor read used as the OBJECT of a
           // member access (`$props.value.length`, `$props.value[0]`) is TS2339
           // on `unknown`. Defeat it with a pure `(value() as any)` assertion,
@@ -934,7 +940,10 @@ export function rewriteRozieIdentifiers(
             nullWidenedNonModelProps.has(property.name) &&
             isNullWidenedPropObjectLiteralCallArgTarget(path, solidSetters)
           ) {
-            const localRead = t.memberExpression(t.identifier('local'), t.identifier(property.name));
+            const localRead = t.memberExpression(
+              t.identifier('local'),
+              t.identifier(property.name),
+            );
             path.replaceWith(t.logicalExpression('??', localRead, t.identifier('undefined')));
             path.skip();
             return;
@@ -999,8 +1008,7 @@ export function rewriteRozieIdentifiers(
         // `$refs.dialogEl?.focus()` is the author opting INTO optionality.
         const isMemberAccessOnRef =
           path.parentPath?.isMemberExpression({ object: path.node }) ||
-          (path.parentPath?.isCallExpression() &&
-            path.parentPath.node.callee === path.node);
+          (path.parentPath?.isCallExpression() && path.parentPath.node.callee === path.node);
         if (property.name === '__rozieRoot' || isDirectCallArg || isMemberAccessOnRef) {
           path.replaceWith(t.tsNonNullExpression(refIdent));
         } else {
@@ -1062,8 +1070,7 @@ export function rewriteRozieIdentifiers(
       // (CW-ARRAY). `$data.<key>.push(x)` → `setKey([...key(), x])`, etc.
       const arrayMut = detectCoveredArrayMutation(path, dataNames);
       if (arrayMut !== null) {
-        const mkPrev = (): t.Expression =>
-          t.callExpression(t.identifier(arrayMut.key), []);
+        const mkPrev = (): t.Expression => t.callExpression(t.identifier(arrayMut.key), []);
         const value = immutableArrayValue(mkPrev, arrayMut.method, arrayMut.args);
         if (value !== null) {
           path.replaceWith(
@@ -1136,10 +1143,7 @@ export function rewriteRozieIdentifiers(
         if (!t.isExpression(selArg) || !t.isExpression(idxArg)) return;
         const indexedAccess = t.optionalMemberExpression(
           t.callExpression(
-            t.memberExpression(
-              t.identifier('$el'),
-              t.identifier('querySelectorAll'),
-            ),
+            t.memberExpression(t.identifier('$el'), t.identifier('querySelectorAll')),
             [selArg],
           ),
           idxArg,
@@ -1148,10 +1152,7 @@ export function rewriteRozieIdentifiers(
         );
         const asHtmlElement = t.tsAsExpression(
           indexedAccess,
-          t.tsUnionType([
-            t.tsTypeReference(t.identifier('HTMLElement')),
-            t.tsUndefinedKeyword(),
-          ]),
+          t.tsUnionType([t.tsTypeReference(t.identifier('HTMLElement')), t.tsUndefinedKeyword()]),
         );
         const focusCall = t.optionalCallExpression(
           t.optionalMemberExpression(
@@ -1164,9 +1165,7 @@ export function rewriteRozieIdentifiers(
           /* optional */ true,
         );
         const arrow = t.arrowFunctionExpression([], focusCall);
-        path.replaceWith(
-          t.callExpression(t.identifier('queueMicrotask'), [arrow]),
-        );
+        path.replaceWith(t.callExpression(t.identifier('queueMicrotask'), [arrow]));
         return;
       }
 
@@ -1187,7 +1186,9 @@ export function rewriteRozieIdentifiers(
 
       const eventName = eventArg.value;
       const propName = toSolidEventPropName(eventName);
-      const restArgs = args.slice(1) as Array<t.Expression | t.SpreadElement | t.ArgumentPlaceholder>;
+      const restArgs = args.slice(1) as Array<
+        t.Expression | t.SpreadElement | t.ArgumentPlaceholder
+      >;
 
       path.replaceWith(
         t.optionalCallExpression(

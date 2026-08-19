@@ -37,10 +37,9 @@
  *
  * Harness copied verbatim from `rbindComponentKeyMap.test.ts:40-85` (4cy).
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../../emitSolid.js';
 
 function compile(rozieSrc: string): string {
@@ -128,7 +127,9 @@ describe('emitTemplateAttribute (Solid) — r-bind DYNAMIC spreads must bypass t
     // rendered expression nor the html branch, so a real DOM element keeps the
     // runtime alias table it has always had. Green BEFORE and AFTER the fix —
     // this inline snapshot was written during the RED run and must not move.
-    expect(input).toMatchInlineSnapshot(`"<input {...normalizeAttrs(someObj)} data-rozie-s-8fd6d49e="" />"`);
+    expect(input).toMatchInlineSnapshot(
+      `"<input {...normalizeAttrs(someObj)} data-rozie-s-8fd6d49e="" />"`,
+    );
   });
 
   it('RED-2 — the runtime import line carries BOTH helpers for this source', () => {
@@ -141,9 +142,7 @@ describe('emitTemplateAttribute (Solid) — r-bind DYNAMIC spreads must bypass t
     // an element mixing both tag kinds must import both. A component that has
     // no dynamic component-tag spread keeps a byte-identical import line.
     const emitted = compile(TWO_TAG_SRC);
-    const importLine = emitted
-      .split('\n')
-      .find((l) => l.includes("from '@rozie/runtime-solid'"));
+    const importLine = emitted.split('\n').find((l) => l.includes("from '@rozie/runtime-solid'"));
     expect(importLine).toBeDefined();
     expect(importLine).toContain('normalizeAttrs');
     expect(importLine).toContain('normalizeComponentAttrs');

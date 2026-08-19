@@ -10,14 +10,13 @@
 //  6. Mustache-in-attribute → template literal: class={`card card--${variant}`}
 //  7. r-html → {@html expr}; ROZ620 if same element has children
 //  8. Slot WITHOUT defaultContent → bare {@render trigger?.(...)} shorthand
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitTemplate } from '../emit/emitTemplate.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -157,9 +156,7 @@ describe('emitTemplate — per-block fixture snapshots (Plan 05-02a Task 2)', ()
   for (const name of TEMPLATE_FIXTURE_NAMES) {
     it(`${name}.template.snap`, async () => {
       const { template } = emitTemplate(lowerExample(name), REGISTRY);
-      await expect(template).toMatchFileSnapshot(
-        resolve(FIXTURES, `${name}.template.snap`),
-      );
+      await expect(template).toMatchFileSnapshot(resolve(FIXTURES, `${name}.template.snap`));
     });
   }
 });

@@ -30,12 +30,12 @@
  * @experimental — shape may change before v1.0
  */
 
-import { RozieErrorCode } from '../../core/src/diagnostics/codes.js';
-import { detectReactPlugin, canResolveReact } from './react-detect.js';
-import { detectSveltePlugin, canResolveSvelte } from './svelte-detect.js';
-import { detectAnalogjs, canResolveAngularCore, detectViteMajor } from './analogjs-detect.js';
-import { detectSolidPlugin, canResolveSolidJs } from './solid-detect.js';
+import { RozieErrorCode } from '@rozie/core';
+import { canResolveAngularCore, detectAnalogjs, detectViteMajor } from './analogjs-detect.js';
 import { canResolveLit, canResolvePreactSignals } from './lit-detect.js';
+import { canResolveReact, detectReactPlugin } from './react-detect.js';
+import { canResolveSolidJs, detectSolidPlugin } from './solid-detect.js';
+import { canResolveSvelte, detectSveltePlugin } from './svelte-detect.js';
 
 export interface RozieOptions {
   /**
@@ -100,7 +100,14 @@ export interface RozieOptions {
 export type TargetValue = RozieOptions['target'];
 
 /** All targets the registry knows about (validation allowlist). */
-export const ALL_TARGETS: readonly TargetValue[] = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
+export const ALL_TARGETS: readonly TargetValue[] = [
+  'vue',
+  'react',
+  'svelte',
+  'angular',
+  'solid',
+  'lit',
+] as const;
 
 /** Targets actually shipped in Phase 3. (Kept for diagnostic message clarity.) */
 export const SUPPORTED_TARGETS_PHASE_3: readonly TargetValue[] = ['vue'] as const;
@@ -116,7 +123,14 @@ export const SUPPORTED_TARGETS_PHASE_3: readonly TargetValue[] = ['vue'] as cons
  * The constant is kept for diagnostic-message clarity; future phases may
  * add new optional targets that initially raise ROZ402 again.
  */
-export const SUPPORTED_TARGETS_PHASE_5: readonly TargetValue[] = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
+export const SUPPORTED_TARGETS_PHASE_5: readonly TargetValue[] = [
+  'vue',
+  'react',
+  'svelte',
+  'angular',
+  'solid',
+  'lit',
+] as const;
 
 interface RozieError extends Error {
   code: string;

@@ -39,13 +39,13 @@
  */
 import type {
   IRComponent,
-  TemplateNode,
-  TemplateSlotInvocationIR,
   SlotDecl,
-} from '../../../../core/src/ir/types.js';
+  IRTemplateNode as TemplateNode,
+  TemplateSlotInvocationIR,
+} from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { portalSlotMergeName } from './portalSlotMergeName.js';
 import { dynamicSlotBindingName, findDynamicSlotOrdinal } from './dynamicSlotOrdinal.js';
+import { portalSlotMergeName } from './portalSlotMergeName.js';
 
 export interface EmitSlotInvocationCtx {
   ir: IRComponent;
@@ -117,9 +117,7 @@ export function emitSlotInvocation(
   // identical '' sentinel. Computed ONCE and reused below for the matching
   // SlotDecl lookup too, so the two never disagree.
   const dynamicOrdinal =
-    node.dynamicNameExpr !== undefined
-      ? findDynamicSlotOrdinal(ctx.ir, node.sourceLoc)
-      : -1;
+    node.dynamicNameExpr !== undefined ? findDynamicSlotOrdinal(ctx.ir, node.sourceLoc) : -1;
   // Phase 79 Plan 15 (bug fix) — a producer `<slot :name="expr">` declared
   // INSIDE an `r-for` (SlotDecl.inLoop === true, e.g. Table.rozie's per-column
   // `cell-${column.key}` family) has a `dynamicNameExpr` that reads the LOOP

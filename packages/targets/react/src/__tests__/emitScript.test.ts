@@ -1,17 +1,16 @@
 // Plan 04-02 Task 2 — emitScript + emitPropsInterface + emitReact behavior +
 // 3 whole-tsx file-snapshot fixtures (Counter, SearchInput, Modal).
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import { emitReact } from '../emitReact.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitPropsInterface } from '../emit/emitPropsInterface.js';
-import { emitReactTypes } from '../emit/emitTypes.js';
 import { emitScript } from '../emit/emitScript.js';
+import { emitReactTypes } from '../emit/emitTypes.js';
+import { emitReact } from '../emitReact.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
@@ -54,7 +53,9 @@ describe('emitScript — behavior', () => {
     expect(hookSection).toMatch(/onValueChange:\s*props\.onValueChange/);
 
     // useState for hovering
-    expect(hookSection).toMatch(/const\s*\[\s*hovering\s*,\s*setHovering\s*\]\s*=\s*useState\(\s*false\s*\)/);
+    expect(hookSection).toMatch(
+      /const\s*\[\s*hovering\s*,\s*setHovering\s*\]\s*=\s*useState\(\s*false\s*\)/,
+    );
 
     // useMemo for canIncrement/canDecrement
     expect(hookSection).toMatch(/const canIncrement\s*=\s*useMemo\(/);
@@ -488,7 +489,7 @@ describe('emitReact — whole-tsx fixture snapshots', () => {
 // props.slots?.['x'])` at every slot invocation. D-02 static-wins, D-05
 // non-slotted components stay byte-equivalent (Counter has no slots field).
 describe('emitPropsInterface / emitReactTypes — §slots-merge intake (Phase 07.3.2 D-SV-16 port)', () => {
-  it('Modal (slotted) inline Props interface contains slots?: Record<string, () => import(\'react\').ReactNode>', () => {
+  it("Modal (slotted) inline Props interface contains slots?: Record<string, () => import('react').ReactNode>", () => {
     const ir = lowerExample('Modal');
     const ifaceText = emitPropsInterface(ir);
     expect(ifaceText).toContain('interface ModalProps');
@@ -496,7 +497,9 @@ describe('emitPropsInterface / emitReactTypes — §slots-merge intake (Phase 07
     // named-slot invocation `?.()` at emitSlotInvocation.ts:302. Prior Plan 01
     // wrote `(ctx: any) =>` which contradicts the call site and crashes
     // consumers who destructure ctx.
-    expect(ifaceText).toMatch(/slots\?:\s*Record<string,\s*\(\)\s*=>\s*import\('react'\)\.ReactNode>/);
+    expect(ifaceText).toMatch(
+      /slots\?:\s*Record<string,\s*\(\)\s*=>\s*import\('react'\)\.ReactNode>/,
+    );
     expect(ifaceText).not.toContain('(ctx: any) =>');
   });
 
@@ -508,7 +511,9 @@ describe('emitPropsInterface / emitReactTypes — §slots-merge intake (Phase 07
     // import('react').ReactNode — contrast with inline Props interface.
     expect(dtsText).toMatch(/slots\?:\s*Record<string,\s*\(\)\s*=>\s*ReactNode>/);
     // Ensure the .d.ts side does NOT use the import('react') verbose form.
-    expect(dtsText).not.toMatch(/slots\?:\s*Record<string,\s*\(\)\s*=>\s*import\('react'\)\.ReactNode>/);
+    expect(dtsText).not.toMatch(
+      /slots\?:\s*Record<string,\s*\(\)\s*=>\s*import\('react'\)\.ReactNode>/,
+    );
     // Phase 07.3.2 Plan 07 (CR-01) — old one-arg form must be gone.
     expect(dtsText).not.toContain('(ctx: any) =>');
   });
@@ -571,7 +576,7 @@ describe('emitPropsInterface / emitReactTypes — §slots-merge-cr01 value type 
 });
 
 describe('emitSlotInvocation — §slots-merge invocation (Phase 07.3.2 D-02 static-wins)', () => {
-  it('header-slot invocation merges (props.renderHeader ?? props.slots?.[\'header\']) at invocation site', () => {
+  it("header-slot invocation merges (props.renderHeader ?? props.slots?.['header']) at invocation site", () => {
     // Whole-Modal emit ensures the merged fieldRef expression appears at every
     // invocation site. D-02 static-wins: static prop LEFT of `??`, dynamic
     // slots map RIGHT.
@@ -583,7 +588,7 @@ describe('emitSlotInvocation — §slots-merge invocation (Phase 07.3.2 D-02 sta
     expect(code).toContain("(props.renderFooter ?? props.slots?.['footer'])");
   });
 
-  it('default-slot invocation uses empty-string sentinel: (props.children ?? props.slots?.[\'\']) (D-18 invariant)', () => {
+  it("default-slot invocation uses empty-string sentinel: (props.children ?? props.slots?.['']) (D-18 invariant)", () => {
     const ir = lowerExample('Modal');
     const source = readFileSync(resolve(EXAMPLES, 'Modal.rozie'), 'utf8');
     const { code } = emitReact(ir, { filename: 'Modal.rozie', source });
@@ -664,8 +669,12 @@ describe('emitReact — $expose forwardRef framing (Phase 21 Plan 02, REQ-5, D-0
     expect(code).toContain('const _rozieExposeRef = useRef({ reset, focus });');
     expect(code).toContain('_rozieExposeRef.current = { reset, focus };');
     expect(code).toContain('useImperativeHandle(ref, () => ({');
-    expect(code).toContain('reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args)');
-    expect(code).toContain('focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args)');
+    expect(code).toContain(
+      'reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args)',
+    );
+    expect(code).toContain(
+      'focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args)',
+    );
     expect(code).toContain('}), []);');
 
     // inline interface adjacent to the props interface.
@@ -677,26 +686,39 @@ describe('emitReact — $expose forwardRef framing (Phase 21 Plan 02, REQ-5, D-0
 
   it('forwardRef + useImperativeHandle imports from `react` appear only when exposed', () => {
     const exposed = lowerInline(EXPOSE_PROBE_SRC, 'ExposeProbe');
-    const exposedOut = emitReact(exposed, { filename: 'ExposeProbe.rozie', source: EXPOSE_PROBE_SRC }).code;
+    const exposedOut = emitReact(exposed, {
+      filename: 'ExposeProbe.rozie',
+      source: EXPOSE_PROBE_SRC,
+    }).code;
     expect(exposedOut).toMatch(/import \{[^}]*\bforwardRef\b[^}]*\} from 'react';/);
     expect(exposedOut).toMatch(/import \{[^}]*\buseImperativeHandle\b[^}]*\} from 'react';/);
 
     const plain = lowerInline(NO_EXPOSE_SRC, 'ExposeProbe');
-    const plainOut = emitReact(plain, { filename: 'ExposeProbe.rozie', source: NO_EXPOSE_SRC }).code;
+    const plainOut = emitReact(plain, {
+      filename: 'ExposeProbe.rozie',
+      source: NO_EXPOSE_SRC,
+    }).code;
     expect(plainOut).not.toContain('forwardRef');
     expect(plainOut).not.toContain('useImperativeHandle');
   });
 
   it('typed <script lang="ts"> exposed methods carry their author signatures in the inline handle interface', () => {
     const ir = lowerInline(EXPOSE_PROBE_TS_SRC, 'ExposeProbeTs');
-    const { code } = emitReact(ir, { filename: 'ExposeProbeTs.rozie', source: EXPOSE_PROBE_TS_SRC });
+    const { code } = emitReact(ir, {
+      filename: 'ExposeProbeTs.rozie',
+      source: EXPOSE_PROBE_TS_SRC,
+    });
     expect(code).toContain('interface ExposeProbeTsHandle {');
     expect(code).toContain('reset(): void;');
     expect(code).toContain('setText(next: string): void;');
     // 260618-ao9 — dispatch-wrapper handle (was `({ reset, setText }), []`).
     expect(code).toContain('const _rozieExposeRef = useRef({ reset, setText });');
-    expect(code).toContain('reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args)');
-    expect(code).toContain('setText: (...args: Parameters<typeof setText>): ReturnType<typeof setText> => _rozieExposeRef.current.setText(...args)');
+    expect(code).toContain(
+      'reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args)',
+    );
+    expect(code).toContain(
+      'setText: (...args: Parameters<typeof setText>): ReturnType<typeof setText> => _rozieExposeRef.current.setText(...args)',
+    );
   });
 
   it('byte-identity: a non-$expose source emits the EXACT plain function shape (no forwardRef, no Handle, no useImperativeHandle)', () => {
@@ -705,7 +727,9 @@ describe('emitReact — $expose forwardRef framing (Phase 21 Plan 02, REQ-5, D-0
     const { code } = emitReact(ir, { filename: 'ExposeProbe.rozie', source: NO_EXPOSE_SRC });
 
     // The current canonical plain shape is preserved verbatim.
-    expect(code).toContain('export default function ExposeProbe(props: ExposeProbeProps): JSX.Element {');
+    expect(code).toContain(
+      'export default function ExposeProbe(props: ExposeProbeProps): JSX.Element {',
+    );
     expect(code).not.toContain('forwardRef');
     expect(code).not.toContain('useImperativeHandle');
     expect(code).not.toContain('Handle');
@@ -716,7 +740,9 @@ describe('emitReact — $expose forwardRef framing (Phase 21 Plan 02, REQ-5, D-0
     const ir = lowerInline(NO_EXPOSE_SRC, 'ExposeProbe');
     // No `source` → buildShellLegacy path. Must also stay byte-identical.
     const { code } = emitReact(ir, {});
-    expect(code).toContain('export default function ExposeProbe(props: ExposeProbeProps): JSX.Element {');
+    expect(code).toContain(
+      'export default function ExposeProbe(props: ExposeProbeProps): JSX.Element {',
+    );
     expect(code).not.toContain('forwardRef');
     expect(code).not.toContain('useImperativeHandle');
   });
@@ -725,11 +751,15 @@ describe('emitReact — $expose forwardRef framing (Phase 21 Plan 02, REQ-5, D-0
     const ir = lowerInline(EXPOSE_PROBE_SRC, 'ExposeProbe');
     // No `source` → buildShellLegacy path. Must still carry the forwardRef framing.
     const { code } = emitReact(ir, {});
-    expect(code).toContain('const ExposeProbe = forwardRef<ExposeProbeHandle, ExposeProbeProps>(function ExposeProbe(props: ExposeProbeProps, ref): JSX.Element {');
+    expect(code).toContain(
+      'const ExposeProbe = forwardRef<ExposeProbeHandle, ExposeProbeProps>(function ExposeProbe(props: ExposeProbeProps, ref): JSX.Element {',
+    );
     expect(code).toContain('export default ExposeProbe;');
     // 260618-ao9 — dispatch-wrapper handle on the legacy path too.
     expect(code).toContain('const _rozieExposeRef = useRef({ reset, focus });');
-    expect(code).toContain('reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args)');
+    expect(code).toContain(
+      'reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args)',
+    );
   });
 });
 
@@ -809,9 +839,7 @@ $data.draft = $props.value != null ? String($props.value) : ''
     const ir = lowerInline(src, 'Seed');
     const { hookSection, userArrowsSection } = emit(ir);
     // Folded into the lazy initializer (props.value reads are render-safe).
-    expect(hookSection).toContain(
-      "useState(() => props.value != null ? String(props.value) : '')",
-    );
+    expect(hookSection).toContain("useState(() => props.value != null ? String(props.value) : '')");
     // The redundant render-body setter is dropped.
     expect(userArrowsSection).not.toContain('setDraft(');
   });
@@ -830,9 +858,7 @@ const clearDraft = () => {
 </rozie>`;
     const ir = lowerInline(src, 'SeedHandler');
     const { hookSection, userArrowsSection } = emit(ir);
-    expect(hookSection).toContain(
-      "useState(() => props.value != null ? String(props.value) : '')",
-    );
+    expect(hookSection).toContain("useState(() => props.value != null ? String(props.value) : '')");
     // The in-handler reset survives — only the top-level seed folds.
     expect(userArrowsSection).toContain("setDraft('')");
   });

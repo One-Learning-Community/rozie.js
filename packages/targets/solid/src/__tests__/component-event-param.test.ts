@@ -11,10 +11,9 @@
 // and `($event: Event) => void` is NOT assignable to `(...args: unknown[]) => void`
 // under `strictFunctionTypes` (param contravariance) → TS2322. The fix: leave the
 // component-tag handler param unannotated and let TS infer it from the prop.
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../emitSolid.js';
 
 function compile(src: string): string {

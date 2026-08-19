@@ -22,9 +22,10 @@
  *
  * @experimental — shape may change before v1.0
  */
-import MagicString from 'magic-string';
+
 import type { EncodedSourceMap } from '@ampproject/remapping';
-import type { BlockMap } from '../../../../core/src/ast/types.js';
+import type { BlockMap } from '@rozie/core';
+import MagicString from 'magic-string';
 
 export interface ShellParts {
   /** Body of `<template>...</template>` — already produced by emitTemplate. */
@@ -171,9 +172,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   // D-85 Vue full: thread genericParams into the script-setup attribute list.
   const scriptGeneric = parts.scriptGeneric ?? null;
   const genericAttr =
-    scriptGeneric !== null && scriptGeneric.length > 0
-      ? ` generic="${scriptGeneric}"`
-      : '';
+    scriptGeneric !== null && scriptGeneric.length > 0 ? ` generic="${scriptGeneric}"` : '';
   // Phase 09 (`<script lang="ts">` support): the `<script setup>` tag is
   // emitted with `lang="ts"` UNCONDITIONALLY — Vue's emitted output is always
   // TypeScript (`defineProps<T>()` macros, typed refs) regardless of whether
@@ -262,11 +261,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
       // No emitted style output — remove the source style range entirely.
       ms.remove(blocks.style.loc.start, blocks.style.loc.end);
     } else {
-      ms.overwrite(
-        blocks.style.loc.start,
-        blocks.style.loc.end,
-        `\n${styleParts.join('\n\n')}\n`,
-      );
+      ms.overwrite(blocks.style.loc.start, blocks.style.loc.end, `\n${styleParts.join('\n\n')}\n`);
     }
   }
 
@@ -286,8 +281,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   if (componentsAnchored && blocks.components) {
     keptRanges.push([blocks.components.loc.start, blocks.components.loc.end]);
   }
-  if (blocks.style)
-    keptRanges.push([blocks.style.loc.start, blocks.style.loc.end]);
+  if (blocks.style) keptRanges.push([blocks.style.loc.start, blocks.style.loc.end]);
   keptRanges.sort((a, b) => a[0] - b[0]);
 
   let cursor = 0;
@@ -295,8 +289,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     if (cursor < start) ms.remove(cursor, start);
     cursor = end;
   }
-  if (cursor < parts.rozieSource.length)
-    ms.remove(cursor, parts.rozieSource.length);
+  if (cursor < parts.rozieSource.length) ms.remove(cursor, parts.rozieSource.length);
 
   // STEP 3: reorder for idiomatic Vue SFC output (template → script → style).
   // The .rozie source typically has script BEFORE template; Vue convention
@@ -304,11 +297,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   // hoist the template chunk to before the script chunk, preserving the
   // per-block sourcemap mappings populated by overwrite().
   if (blocks.template.loc.start > blocks.script.loc.start) {
-    ms.move(
-      blocks.template.loc.start,
-      blocks.template.loc.end,
-      blocks.script.loc.start,
-    );
+    ms.move(blocks.template.loc.start, blocks.template.loc.end, blocks.script.loc.start);
   }
   void componentsAnchored;
 
@@ -318,17 +307,15 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   // user-authored residual statements begin within the .vue output.
   const fullOutput = ms.toString();
   const scriptIdx = fullOutput.indexOf(scriptOpenFraming);
-  const scriptOutputOffset =
-    scriptIdx >= 0 ? scriptIdx + scriptOpenFraming.length : 0;
+  const scriptOutputOffset = scriptIdx >= 0 ? scriptIdx + scriptOpenFraming.length : 0;
 
   // Lines before the script body = everything up through `<script setup ...>\n`
   // (template block + blank line + script open tag), plus the prelude lines
   // inside <script setup> (scriptPrelude lines from buildScriptPrelude) plus
   // the preamble lines from emitScript (imports, defineProps, state, etc.).
   // Each '\n' in `scriptPrelude` is a line break inside the script header.
-  const scriptPreludeNewlines = scriptPrelude.length > 0
-    ? (scriptPrelude.match(/\n/g) ?? []).length
-    : 0;
+  const scriptPreludeNewlines =
+    scriptPrelude.length > 0 ? (scriptPrelude.match(/\n/g) ?? []).length : 0;
   const preambleSectionLines = parts.preambleSectionLines ?? 0;
 
   let userCodeLineOffset = 0;
@@ -356,9 +343,7 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   ms.append('\n</template>\n\n');
   const scriptGeneric = parts.scriptGeneric ?? null;
   const genericAttr =
-    scriptGeneric !== null && scriptGeneric.length > 0
-      ? ` generic="${scriptGeneric}"`
-      : '';
+    scriptGeneric !== null && scriptGeneric.length > 0 ? ` generic="${scriptGeneric}"` : '';
   ms.append(`<script setup lang="ts"${genericAttr}>\n`);
   // Phase 06.2 P2: composition prelude (component imports + defineOptions).
   const scriptPrelude = buildScriptPrelude(parts);

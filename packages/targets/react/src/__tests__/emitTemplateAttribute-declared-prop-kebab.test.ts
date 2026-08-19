@@ -16,18 +16,17 @@
  * drives `emitAttributes` directly with a hand-built `EmitAttrCtx` so
  * `producerProps` can be injected without running `threadParamTypes`.
  */
-import { describe, it, expect } from 'vitest';
+
 import { parseExpression } from '@babel/parser';
-import * as t from '@babel/types';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, AttributeBinding } from '../../../../core/src/ir/types.js';
+import type * as t from '@babel/types';
+import type { AttributeBinding, IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { type EmitAttrCtx, emitAttributes } from '../emit/emitTemplateAttribute.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
-import { emitAttributes, type EmitAttrCtx } from '../emit/emitTemplateAttribute.js';
 
 function emptyIR(): IRComponent {
   const src = `<rozie name="Test">
@@ -114,7 +113,7 @@ describe('emitTemplateAttribute (React) — declared-prop kebab resolution (2608
     expect(plain.jsx).not.toContain('ariaLabel=');
   });
 
-  it('C4 (byte-identity, unresolved callee): component with NO declared-prop list → hyphenated name preserved (fallback is today\'s behavior)', () => {
+  it("C4 (byte-identity, unresolved callee): component with NO declared-prop list → hyphenated name preserved (fallback is today's behavior)", () => {
     const ir = emptyIR();
     const { jsx } = emitAttributes(
       [attrBinding('aria-label', 'label')],

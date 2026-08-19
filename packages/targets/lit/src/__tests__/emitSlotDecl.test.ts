@@ -9,15 +9,14 @@
  *   - NO @queryAssignedNodes — that variant returns whitespace text-nodes and
  *     produces false-positive presence detection.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { emitLit } from '../emitLit.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSlotDecl } from '../emit/emitSlotDecl.js';
+import { emitLit } from '../emitLit.js';
 import { LitDecoratorImportCollector } from '../rewrite/collectLitImports.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -58,9 +57,7 @@ describe('emitSlotDecl — D-LIT-14 correction', () => {
 
   it('slotchange wiring updates _hasSlot<X> from _slot<X>Elements.length', () => {
     const code = compile('Modal');
-    expect(code).toContain(
-      "this._hasSlotHeader = this._slotHeaderElements.length > 0",
-    );
+    expect(code).toContain('this._hasSlotHeader = this._slotHeaderElements.length > 0');
     expect(code).toContain("slotEl.addEventListener('slotchange', update)");
   });
 
@@ -107,7 +104,14 @@ describe('emitSlotDecl — D-LIT-14 correction', () => {
         listeners: [],
         setupBody: { type: 'SetupBody', scriptProgram: null as never, annotations: [] },
         template: null,
-        styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+        styles: {
+          type: 'StyleSection',
+          scopedRules: [],
+          rootRules: [],
+          portalRules: [],
+          engineRules: [],
+          sourceLoc: { start: 0, end: 0 },
+        },
         components: [],
         sourceLoc: { start: 0, end: 0 },
       },
@@ -119,9 +123,7 @@ describe('emitSlotDecl — D-LIT-14 correction', () => {
     expect(result.fields).toContain('@property({ attribute: false }) nowIndicatorSlot?:');
     // The bare-name slot-bridge @property MUST NOT be emitted (it would
     // duplicate the boolean prop's @property).
-    expect(result.fields).not.toMatch(
-      /@property\(\{ attribute: false \}\) nowIndicator\?:/,
-    );
+    expect(result.fields).not.toMatch(/@property\(\{ attribute: false \}\) nowIndicator\?:/);
   });
 
   it('emitSlotDecl() unit: portal-slot name NOT colliding with a prop → bare `@property <name>` (byte-identical, no suffix)', () => {
@@ -151,7 +153,14 @@ describe('emitSlotDecl — D-LIT-14 correction', () => {
         listeners: [],
         setupBody: { type: 'SetupBody', scriptProgram: null as never, annotations: [] },
         template: null,
-        styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+        styles: {
+          type: 'StyleSection',
+          scopedRules: [],
+          rootRules: [],
+          portalRules: [],
+          engineRules: [],
+          sourceLoc: { start: 0, end: 0 },
+        },
         components: [],
         sourceLoc: { start: 0, end: 0 },
       },
@@ -177,7 +186,14 @@ describe('emitSlotDecl — D-LIT-14 correction', () => {
         listeners: [],
         setupBody: { type: 'SetupBody', scriptProgram: null as never, annotations: [] },
         template: null,
-        styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+        styles: {
+          type: 'StyleSection',
+          scopedRules: [],
+          rootRules: [],
+          portalRules: [],
+          engineRules: [],
+          sourceLoc: { start: 0, end: 0 },
+        },
         components: [],
         sourceLoc: { start: 0, end: 0 },
       },
@@ -200,9 +216,7 @@ describe('emitSlotDecl — D-LIT-14 correction', () => {
  * `_hasSlotHeader` permanently false → wrapper stays hidden forever.
  */
 describe('pre-seed lines (Phase 07.3.1 D-LIT-15)', () => {
-  function makeIRWithSlots(
-    slotDefs: Array<{ name: string; params?: Array<{ name: string }> }>,
-  ) {
+  function makeIRWithSlots(slotDefs: Array<{ name: string; params?: Array<{ name: string }> }>) {
     return {
       type: 'IRComponent' as const,
       name: 'X',
@@ -244,17 +258,12 @@ describe('pre-seed lines (Phase 07.3.1 D-LIT-15)', () => {
   }
 
   it('emits pre-seed line for each named slot with getAttribute check', () => {
-    const result = emitSlotDecl(
-      makeIRWithSlots([{ name: 'header' }, { name: 'footer' }]),
-      { decorators: new LitDecoratorImportCollector() },
-    );
-    expect(result.preSeedLines).toContain(
-      'this._hasSlotHeader = Array.from(this.children).some',
-    );
+    const result = emitSlotDecl(makeIRWithSlots([{ name: 'header' }, { name: 'footer' }]), {
+      decorators: new LitDecoratorImportCollector(),
+    });
+    expect(result.preSeedLines).toContain('this._hasSlotHeader = Array.from(this.children).some');
     expect(result.preSeedLines).toContain("el.getAttribute('slot') === 'header'");
-    expect(result.preSeedLines).toContain(
-      'this._hasSlotFooter = Array.from(this.children).some',
-    );
+    expect(result.preSeedLines).toContain('this._hasSlotFooter = Array.from(this.children).some');
     expect(result.preSeedLines).toContain("el.getAttribute('slot') === 'footer'");
     // Pre-seed lines for two slots — joined by newline + 4-space indent so
     // they align with the connectedCallback() body in the emitter shell.
@@ -265,9 +274,7 @@ describe('pre-seed lines (Phase 07.3.1 D-LIT-15)', () => {
     const result = emitSlotDecl(makeIRWithSlots([{ name: '' }]), {
       decorators: new LitDecoratorImportCollector(),
     });
-    expect(result.preSeedLines).toContain(
-      'this._hasSlotDefault = Array.from(this.children).some',
-    );
+    expect(result.preSeedLines).toContain('this._hasSlotDefault = Array.from(this.children).some');
     // Default-slot fill check: child must NOT have a `slot` attribute…
     expect(result.preSeedLines).toContain("!el.hasAttribute('slot')");
     // …and must be either non-text OR a text node with non-whitespace content
@@ -292,7 +299,14 @@ describe('pre-seed lines (Phase 07.3.1 D-LIT-15)', () => {
         listeners: [],
         setupBody: { type: 'SetupBody', scriptProgram: null as never, annotations: [] },
         template: null,
-        styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+        styles: {
+          type: 'StyleSection',
+          scopedRules: [],
+          rootRules: [],
+          portalRules: [],
+          engineRules: [],
+          sourceLoc: { start: 0, end: 0 },
+        },
         components: [],
         sourceLoc: { start: 0, end: 0 },
       },
@@ -320,21 +334,15 @@ describe('pre-seed lines (Phase 07.3.1 D-LIT-15)', () => {
   it('Modal fixture: pre-seed lines emitted inside connectedCallback BEFORE super.connectedCallback()', () => {
     const code = compile('Modal');
     // Pre-seed lines present for all three Modal slots.
-    expect(code).toContain(
-      'this._hasSlotHeader = Array.from(this.children).some',
-    );
-    expect(code).toContain(
-      'this._hasSlotDefault = Array.from(this.children).some',
-    );
-    expect(code).toContain(
-      'this._hasSlotFooter = Array.from(this.children).some',
-    );
+    expect(code).toContain('this._hasSlotHeader = Array.from(this.children).some');
+    expect(code).toContain('this._hasSlotDefault = Array.from(this.children).some');
+    expect(code).toContain('this._hasSlotFooter = Array.from(this.children).some');
 
     // Ordering invariant: every pre-seed line must appear BEFORE
     // `super.connectedCallback();` inside the same `connectedCallback()`
     // method body. We slice the emitted module from `connectedCallback(): void {`
     // to the next `}` line and assert pre-seed before super in that slice.
-    const ccMatch = code.match(/connectedCallback\(\): void \{[\s\S]*?\n  \}/);
+    const ccMatch = code.match(/connectedCallback\(\): void \{[\s\S]*?\n {2}\}/);
     expect(ccMatch).not.toBeNull();
     const ccBody = ccMatch![0];
     const preSeedIdx = ccBody.indexOf('Array.from(this.children).some');

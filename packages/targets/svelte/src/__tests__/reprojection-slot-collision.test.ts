@@ -13,17 +13,18 @@
  * Fix (mirrors the r-for `$$slot` auto-rename): the RESOLVER binding is renamed
  * `X$$slot` while the forwarded fill keeps the child-required name `X`.
  */
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { emitSvelte } from '../emitSvelte.js';
 
 function compileSvelte(src: string, filename: string): string {
   const result = parse(src, { filename });
   if (!result.ast) {
-    throw new Error(`parse() null AST for ${filename}: ${result.diagnostics.map((d) => d.code).join(', ')}`);
+    throw new Error(
+      `parse() null AST for ${filename}: ${result.diagnostics.map((d) => d.code).join(', ')}`,
+    );
   }
   const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
   if (!lowered.ir) throw new Error(`lowerToIR() null IR for ${filename}`);
@@ -52,7 +53,9 @@ describe('emitSvelte — re-projected-slot == child-fill-name deconfliction', ()
     const code = compileSvelte(REPROJECT_SAME_NAME, 'Reproject.rozie');
 
     // The resolver $derived merge is renamed to avoid the snippet shadow.
-    expect(code).toMatch(/const option\$\$slot = \$derived\(__optionProp \?\? snippets\?\.option\)/);
+    expect(code).toMatch(
+      /const option\$\$slot = \$derived\(__optionProp \?\? snippets\?\.option\)/,
+    );
 
     // The forwarded fill handed to <Child> KEEPS the child-required name `option`.
     expect(code).toMatch(/\{#snippet option\(/);

@@ -22,18 +22,18 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _traverse from '@babel/traverse';
+
 import type { Scope } from '@babel/traverse';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import type { SignalRef } from '../../../../core/src/reactivity/signalRef.js';
+import _traverse from '@babel/traverse';
+import * as t from '@babel/types';
+import type { IRComponent, SignalRef } from '@rozie/core';
 
 // CJS-ESM interop normalization (matches rewriteTemplateExpression).
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 const STABLE_IDENTIFIERS = new Set(['$emit', '$el']);
 const MAGIC_ACCESSOR_NAMES = new Set(['$props', '$data', '$refs', '$slots']);
@@ -88,13 +88,7 @@ export function computeHelperBodyDeps(
   const wrappedBody: t.BlockStatement = t.isBlockStatement(helperBody)
     ? helperBody
     : t.blockStatement([t.expressionStatement(helperBody as t.Expression)]);
-  const wrappedFn = t.functionDeclaration(
-    t.identifier('__helper'),
-    [],
-    wrappedBody,
-    false,
-    false,
-  );
+  const wrappedFn = t.functionDeclaration(t.identifier('__helper'), [], wrappedBody, false, false);
   const file = t.file(t.program([wrappedFn]));
 
   /**
@@ -229,7 +223,11 @@ export function computeHelperBodyDeps(
       if (name === 'props') return;
 
       // Skip property positions in MemberExpressions (handled above).
-      if (t.isMemberExpression(path.parent) && path.parent.property === path.node && !path.parent.computed) {
+      if (
+        t.isMemberExpression(path.parent) &&
+        path.parent.property === path.node &&
+        !path.parent.computed
+      ) {
         return;
       }
       if (
@@ -268,9 +266,7 @@ export function computeHelperBodyDeps(
         const candidate = name.charAt(3).toLowerCase() + name.slice(4);
         if (dataNames.has(candidate)) return;
         // model-prop setter — record as closure dep (not provably stable to lint)
-        const isModelSetter = ir.props.some(
-          (p) => p.isModel && p.name === candidate,
-        );
+        const isModelSetter = ir.props.some((p) => p.isModel && p.name === candidate);
         if (isModelSetter) {
           push({ scope: 'closure', identifier: name });
           return;

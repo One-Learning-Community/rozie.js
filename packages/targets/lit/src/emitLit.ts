@@ -24,37 +24,40 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent, TemplateNode } from '../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { BlockMap } from '../../../core/src/ast/types.js';
-import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
-import {
-  deconflictReservedComputedInjectNames,
-  reservedClassMembers,
-} from '../../../core/src/rewrite/deconflict.js';
+import type {
+  BlockMap,
+  Diagnostic,
+  IRComponent,
+  ModifierRegistry,
+  IRTemplateNode as TemplateNode,
+} from '@rozie/core';
+import { createDefaultRegistry } from '@rozie/core';
 import {
   isPublishedSpecifier,
   rewriteRozieImport,
 } from '../../../core/src/codegen/rewriteRozieImport.js';
+import {
+  deconflictReservedComputedInjectNames,
+  reservedClassMembers,
+} from '../../../core/src/rewrite/deconflict.js';
+import { collectSlottedReads } from './emit/collectSlottedReads.js';
+import { emitTagName, toKebabCase } from './emit/emitDecorator.js';
+import { emitListeners } from './emit/emitListeners.js';
+import { emitScript } from './emit/emitScript.js';
+import { emitSlotDecl } from './emit/emitSlotDecl.js';
+import { emitStyle } from './emit/emitStyle.js';
+import { emitTemplate } from './emit/emitTemplate.js';
+import { computeScopeHash } from './emit/scopeHash.js';
+import { buildShell } from './emit/shell.js';
+import { shouldDistributeSlots } from './emit/shouldDistributeSlots.js';
 // NOTE: SourceMap import removed (WR-08); EmitLitResult.map is null until Phase 7.
 import {
-  LitImportCollector,
+  LitContextImportCollector,
   LitDecoratorImportCollector,
+  LitImportCollector,
   PreactSignalsImportCollector,
   RuntimeLitImportCollector,
-  LitContextImportCollector,
 } from './rewrite/collectLitImports.js';
-import { emitScript } from './emit/emitScript.js';
-import { emitTemplate } from './emit/emitTemplate.js';
-import { emitListeners } from './emit/emitListeners.js';
-import { emitSlotDecl } from './emit/emitSlotDecl.js';
-import { collectSlottedReads } from './emit/collectSlottedReads.js';
-import { emitStyle } from './emit/emitStyle.js';
-import { buildShell } from './emit/shell.js';
-import { emitTagName, toKebabCase } from './emit/emitDecorator.js';
-import { computeScopeHash } from './emit/scopeHash.js';
-import { shouldDistributeSlots } from './emit/shouldDistributeSlots.js';
 
 export interface EmitLitOptions {
   filename?: string;
@@ -167,10 +170,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   deconflictReservedComputedInjectNames(
     ir,
     reservedClassMembers('lit'),
-    new Set<string>([
-      ...(ir.expose ?? []).map((e) => e.name),
-      ...ir.props.map((p) => p.name),
-    ]),
+    new Set<string>([...(ir.expose ?? []).map((e) => e.name), ...ir.props.map((p) => p.name)]),
   );
 
   // 1. Slot declarations — must come early because emitTemplate may reference slot fields.
@@ -236,11 +236,15 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   diagnostics.push(...scriptResult.diagnostics);
 
   // 4. Listeners emission (returns firstUpdated body + cleanup pushes).
-  const listenersResult = emitListeners(ir, {
-    decorators: decoratorImports,
-    runtime: runtimeImports,
-    lit: litImports,
-  }, registry);
+  const listenersResult = emitListeners(
+    ir,
+    {
+      decorators: decoratorImports,
+      runtime: runtimeImports,
+      lit: litImports,
+    },
+    registry,
+  );
   diagnostics.push(...listenersResult.diagnostics);
 
   // 5. Template emission (returns html`...` body + hostListenerWiring lines).
@@ -341,42 +345,42 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   // skip-Set is now unconditional (it always contains at least
   // 'data-rozie-ref', even for zero-prop components).
   const declaredAttrSkipNames = Array.from(
-    new Set(
-      ['data-rozie-ref', ...ir.props.flatMap((p) => [toKebabCase(p.name), p.name.toLowerCase()])],
-    ),
+    new Set([
+      'data-rozie-ref',
+      ...ir.props.flatMap((p) => [toKebabCase(p.name), p.name.toLowerCase()]),
+    ]),
   ).filter((n) => n.length > 0);
-  const litAttrsGetter =
-    templateResult.rozieSpreadUsed
-      ? [
-          '  /**',
-          '   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the',
-          '   * host custom element\'s attributes on each call so a consumer-side bound',
-          '   * attribute flows through on every render. The `rozieSpread` directive',
-          '   * (D-02) does the cross-render diff downstream.',
-          '   *',
-          '   * Phase 15 follow-up Bug A — declared-prop attribute names are filtered',
-          '   * out so `$attrs` returns "rest after declared props" (semantic parity',
-          '   * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming',
-          '   * forms are folded into the skip set: kebab-case for model props',
-          '   * (explicit `attribute:`) AND lowercased property name (Lit\'s default).',
-          '   *',
-          '   * command-palette-per-level-virtual / portal-through-portal cluster —',
-          '   * `data-rozie-ref` is ALWAYS skipped too (a reserved compiler bookkeeping',
-          '   * attribute, never a consumer prop) so a parent-assigned `ref=` on this',
-          '   * component\'s own host tag can never clobber this component\'s OWN',
-          '   * internal `data-rozie-ref` ref markers via fallthrough re-application.',
-          '   */',
-          '  private get $attrs(): Record<string, string> {',
-          `    const __skip = new Set<string>([${declaredAttrSkipNames.map((n) => `'${n}'`).join(', ')}]);`,
-          '    const out: Record<string, string> = {};',
-          '    for (const a of Array.from(this.attributes)) {',
-          '      if (__skip.has(a.name)) continue;',
-          '      out[a.name] = a.value;',
-          '    }',
-          '    return out;',
-          '  }',
-        ].join('\n')
-      : '';
+  const litAttrsGetter = templateResult.rozieSpreadUsed
+    ? [
+        '  /**',
+        '   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the',
+        "   * host custom element's attributes on each call so a consumer-side bound",
+        '   * attribute flows through on every render. The `rozieSpread` directive',
+        '   * (D-02) does the cross-render diff downstream.',
+        '   *',
+        '   * Phase 15 follow-up Bug A — declared-prop attribute names are filtered',
+        '   * out so `$attrs` returns "rest after declared props" (semantic parity',
+        '   * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming',
+        '   * forms are folded into the skip set: kebab-case for model props',
+        "   * (explicit `attribute:`) AND lowercased property name (Lit's default).",
+        '   *',
+        '   * command-palette-per-level-virtual / portal-through-portal cluster —',
+        '   * `data-rozie-ref` is ALWAYS skipped too (a reserved compiler bookkeeping',
+        '   * attribute, never a consumer prop) so a parent-assigned `ref=` on this',
+        "   * component's own host tag can never clobber this component's OWN",
+        '   * internal `data-rozie-ref` ref markers via fallthrough re-application.',
+        '   */',
+        '  private get $attrs(): Record<string, string> {',
+        `    const __skip = new Set<string>([${declaredAttrSkipNames.map((n) => `'${n}'`).join(', ')}]);`,
+        '    const out: Record<string, string> = {};',
+        '    for (const a of Array.from(this.attributes)) {',
+        '      if (__skip.has(a.name)) continue;',
+        '      out[a.name] = a.value;',
+        '    }',
+        '    return out;',
+        '  }',
+      ].join('\n')
+    : '';
 
   // Phase 15 D-19 — `$listeners` magic-accessor declaration for Lit.
   //
@@ -401,24 +405,23 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   // `r-on="$listeners"`. Dynamic `r-on="someObj"` does NOT trigger the
   // getter (its emit shape is `${rozieListeners(this.someObj)}` — no
   // bare `$listeners` reference).
-  const litListenersGetter =
-    templateResult.rozieListenersUsed
-      ? [
-          '  /**',
-          '   * Phase 15 D-19 — consumer-passed listener cluster placeholder.',
-          '   * Lit attaches event listeners directly on the host element via',
-          '   * `addEventListener` (no per-instance prop rest binding), so the',
-          '   * runtime value is undefined; the `rozieListeners` directive\'s',
-          '   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.',
-          '   * The declaration exists to satisfy `tsc --noEmit` on consumer',
-          '   * projects with strict mode — bare `$listeners` in `render()`',
-          '   * would otherwise raise TS2304 (Cannot find name).',
-          '   */',
-          '  private get $listeners(): Record<string, EventListener> | undefined {',
-          '    return undefined;',
-          '  }',
-        ].join('\n')
-      : '';
+  const litListenersGetter = templateResult.rozieListenersUsed
+    ? [
+        '  /**',
+        '   * Phase 15 D-19 — consumer-passed listener cluster placeholder.',
+        '   * Lit attaches event listeners directly on the host element via',
+        '   * `addEventListener` (no per-instance prop rest binding), so the',
+        "   * runtime value is undefined; the `rozieListeners` directive's",
+        '   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.',
+        '   * The declaration exists to satisfy `tsc --noEmit` on consumer',
+        '   * projects with strict mode — bare `$listeners` in `render()`',
+        '   * would otherwise raise TS2304 (Cannot find name).',
+        '   */',
+        '  private get $listeners(): Record<string, EventListener> | undefined {',
+        '    return undefined;',
+        '  }',
+      ].join('\n')
+    : '';
 
   // 6. Compose class body.
   // Insertion order:
@@ -451,17 +454,16 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   // re-attempt runs FIRST so a successful retry's `requestUpdate()` is
   // observed by user hooks on the very next update cycle.
   const slotFillerUpdatedBody = templateResult.slotFillerUpdatedBody.join('\n');
-  const composedUpdatedBody = [
-    slotFillerUpdatedBody,
-    scriptResult.updateHookBody,
-  ].filter((s) => s.trim().length > 0).join('\n\n');
+  const composedUpdatedBody = [slotFillerUpdatedBody, scriptResult.updateHookBody]
+    .filter((s) => s.trim().length > 0)
+    .join('\n\n');
 
   const classBody = composeClassBody({
     // Quick 260808-iyh (D5) — pushed FIRST (ahead of staticStylesField).
     // Empty string when the gate is closed, which is what keeps every
     // non-gated component byte-identical.
     shadowRootOptionsField: distributeSlots
-      ? '  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: \'manual\' };'
+      ? "  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: 'manual' };"
       : '',
     staticStylesField: styleResult.staticStylesField,
     fieldDecls: scriptResult.fieldDecls,
@@ -484,9 +486,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     slotDistributorFieldDecls: distributeSlots
       ? '  private _rozieSlotDistributor = new RozieSlotDistributor(this);'
       : '',
-    slotFillerClassFields: templateResult.slotFillerClassFields
-      .map((f) => '  ' + f)
-      .join('\n'),
+    slotFillerClassFields: templateResult.slotFillerClassFields.map((f) => '  ' + f).join('\n'),
     slotFields: slotResult.fields,
     cleanupField:
       '  private _disconnectCleanups: Array<() => void> = [];\n' +
@@ -509,9 +509,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // its own `remountKeyExpression`, never this seq counter, so a template
     // using ONLY a component `:key` (no `r-external`) must not declare this
     // unused field.
-    reconcileSeqField: templateResult.reconcileSeqUsed
-      ? '  _rozieReconcileSeq = 0;'
-      : '',
+    reconcileSeqField: templateResult.reconcileSeqUsed ? '  _rozieReconcileSeq = 0;' : '',
     listenerWiringBody: listenerWiring,
     mountHookBody: scriptResult.mountHookBody,
     adoptDocumentStyles: ir.adoptDocumentStyles,
@@ -572,8 +570,12 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // the already-present `lit` dependency — no new package. Threaded the SAME
     // way as `keyed`/`repeat` (concurrency-safe — read off templateResult, no
     // module singleton).
-    templateResult.unsafeHtmlUsed ? `import { unsafeHTML } from 'lit/directives/unsafe-html.js';\n` : '',
-  ].filter((s) => s.length > 0).join('');
+    templateResult.unsafeHtmlUsed
+      ? `import { unsafeHTML } from 'lit/directives/unsafe-html.js';\n`
+      : '',
+  ]
+    .filter((s) => s.length > 0)
+    .join('');
 
   // Phase 9 Plan 09-04 — author-declared `<script lang="ts">` `interface`/`type`
   // declarations (hoisted out of the class body by emitScript) are emitted at
@@ -780,11 +782,7 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   // of leaving the element with zero listeners.
   if (hasListenerWiring) {
     sections.push(
-      [
-        '  private _armListeners(): void {',
-        indent(parts.listenerWiringBody, 4),
-        '  }',
-      ].join('\n'),
+      ['  private _armListeners(): void {', indent(parts.listenerWiringBody, 4), '  }'].join('\n'),
     );
   }
 
@@ -800,7 +798,7 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
       // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first
       // render isn't deadlocked.
       ccParts.push(
-        '    // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn\'t deadlocked.',
+        "    // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.",
       );
       ccParts.push('    ' + parts.slotPreSeedLines);
     }
@@ -813,9 +811,7 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
         '    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }',
       );
     }
-    sections.push(
-      ['  connectedCallback(): void {', ...ccParts, '  }'].join('\n'),
-    );
+    sections.push(['  connectedCallback(): void {', ...ccParts, '  }'].join('\n'));
   }
 
   // firstUpdated(): first-render document-style adoption + listener arming +
@@ -825,16 +821,11 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
     // Item 3 — adopt document stylesheets into the shadow root FIRST, before
     // the engine builds its shadow DOM in the $onMount hook, so the engine
     // chrome is styled the moment it appears.
-    if (parts.adoptDocumentStyles)
-      firstUpdatedParts.push('adoptDocumentStyles(this);');
+    if (parts.adoptDocumentStyles) firstUpdatedParts.push('adoptDocumentStyles(this);');
     if (hasListenerWiring) firstUpdatedParts.push('this._armListeners();');
     if (hasMountHook) firstUpdatedParts.push(parts.mountHookBody);
     sections.push(
-      [
-        '  firstUpdated(): void {',
-        indent(firstUpdatedParts.join('\n\n'), 4),
-        '  }',
-      ].join('\n'),
+      ['  firstUpdated(): void {', indent(firstUpdatedParts.join('\n\n'), 4), '  }'].join('\n'),
     );
   }
 
@@ -886,11 +877,7 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
     '});',
   ];
   sections.push(
-    [
-      '  disconnectedCallback(): void {',
-      indent(disconnectParts.join('\n'), 4),
-      '  }',
-    ].join('\n'),
+    ['  disconnectedCallback(): void {', indent(disconnectParts.join('\n'), 4), '  }'].join('\n'),
   );
 
   if (parts.attributeChangedBody.trim().length > 0) {
@@ -905,13 +892,7 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   }
 
   // render() always present.
-  sections.push(
-    [
-      '  render() {',
-      `    return html\`${parts.renderBody}\`;`,
-      '  }',
-    ].join('\n'),
-  );
+  sections.push(['  render() {', `    return html\`${parts.renderBody}\`;`, '  }'].join('\n'));
 
   if (parts.userMethods.trim().length > 0) {
     sections.push(parts.userMethods);

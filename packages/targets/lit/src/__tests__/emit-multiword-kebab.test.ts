@@ -17,21 +17,22 @@
  * `/[A-Z]/g` rewrite — see that file's byte-equal-contract prose. The
  * listener side (`emitTemplate.ts`) is NOT touched.
  */
-import { describe, expect, it } from 'vitest';
-import * as t from '@babel/types';
+
 import _generate from '@babel/generator';
 import { parse as babelParse } from '@babel/parser';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { kebabize } from '../emit/resolveLitSetterText.js';
 import { rewriteScript } from '../rewrite/rewriteScript.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { kebabize } from '../emit/resolveLitSetterText.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 function buildIR(overrides: Partial<IRComponent> = {}): IRComponent {
   const scriptProgram = t.file(t.program([]));

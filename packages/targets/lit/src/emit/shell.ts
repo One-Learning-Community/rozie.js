@@ -14,9 +14,10 @@
  *
  * @experimental — shape may change before v1.0
  */
-import MagicString from 'magic-string';
+
 import type { EncodedSourceMap } from '@ampproject/remapping';
-import type { BlockMap } from '../../../../core/src/ast/types.js';
+import type { BlockMap } from '@rozie/core';
+import MagicString from 'magic-string';
 
 export interface LitShellParts {
   /** Import lines for `lit`, `lit/decorators.js`, `@lit-labs/preact-signals`, `@rozie/runtime-lit`. */

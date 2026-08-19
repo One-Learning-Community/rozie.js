@@ -22,16 +22,17 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
+
 import type { GeneratorOptions } from '@babel/generator';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import _generate from '@babel/generator';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: true };
 
@@ -80,17 +81,12 @@ export { toKebabCase as kebabize } from './emitDecorator.js';
  *   resolveLitSetterText(parseExpression('$data.user.name'), ir)
  *     → 'this._user.value.name'  (root user is a signal; .name is a deep read)
  */
-export function resolveLitSetterText(
-  expr: t.Expression,
-  ir: IRComponent,
-): string {
+export function resolveLitSetterText(expr: t.Expression, ir: IRComponent): string {
   // Walk to the root of a member-access chain. We need to know whether the
   // root is `$data.X` or `$props.X` to pick the correct setter form.
   // chain = the literal expression we'll emit, but with the root rewritten.
   const dataNames = new Set(ir.state.map((s) => s.name));
-  const modelProps = new Set(
-    ir.props.filter((p) => p.isModel).map((p) => p.name),
-  );
+  const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
 
   // Case 1: $data.X (top-level signal access — most common case).
   //   Output: `this._X.value`
@@ -143,10 +139,7 @@ export function resolveLitSetterText(
     let cursor: t.Expression = cloned;
     // Find the deepest object that is a MemberExpression — its `object`
     // becomes the root.
-    while (
-      t.isMemberExpression(cursor) &&
-      t.isMemberExpression(cursor.object)
-    ) {
+    while (t.isMemberExpression(cursor) && t.isMemberExpression(cursor.object)) {
       cursor = cursor.object;
     }
     // cursor is now the innermost MemberExpression — its `.object` is the
@@ -162,10 +155,7 @@ export function resolveLitSetterText(
       ) {
         // Rewrite: `$data.X` (the innermost ME) → `this._X.value`
         const rewritten = t.memberExpression(
-          t.memberExpression(
-            t.thisExpression(),
-            t.identifier(`_${rootProp.name}`),
-          ),
+          t.memberExpression(t.thisExpression(), t.identifier(`_${rootProp.name}`)),
           t.identifier('value'),
         );
         // Replace cursor.object + cursor.property with rewritten by mutating
@@ -177,10 +167,7 @@ export function resolveLitSetterText(
         // outermost inward.
         const segments: Array<{ prop: t.Identifier; computed: boolean }> = [];
         let walker: t.Expression = expr;
-        while (
-          t.isMemberExpression(walker) &&
-          t.isMemberExpression(walker.object)
-        ) {
+        while (t.isMemberExpression(walker) && t.isMemberExpression(walker.object)) {
           if (!t.isIdentifier(walker.property) || walker.computed) {
             // Computed/bracket access — bail to generic generate-as-is fallback.
             return generate(expr, GEN_OPTS).code;

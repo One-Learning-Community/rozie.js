@@ -5,15 +5,14 @@
  * the portal-emitting body (`buildSlotMethod`, `setAttrLine`, closure +
  * onCleanup block) is exercised here directly.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as t from '@babel/types';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitPortals } from '../emit/emitPortals.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -117,9 +116,7 @@ describe('emitPortals — Solid', () => {
   });
 
   it('portalParamNames present vs absent → scopeType branch', () => {
-    const withParams = emitPortals(
-      buildMinimalIR({ slots: [portalSlot('item', ['item'])] }),
-    );
+    const withParams = emitPortals(buildMinimalIR({ slots: [portalSlot('item', ['item'])] }));
     expect(withParams.setupLines).toContain('{ item: unknown }');
 
     const noParams = emitPortals(buildMinimalIR({ slots: [portalSlot('item')] }));
@@ -168,7 +165,9 @@ describe('emitPortals — Solid', () => {
     expect(result.setupLines).toContain('default: (container');
     expect(result.setupLines).not.toContain("'': (container");
     // Solid sources its built-in children prop for the default slot.
-    expect(result.setupLines).toContain("const slot = _props.children ?? _props.slots?.['default'];");
+    expect(result.setupLines).toContain(
+      "const slot = _props.children ?? _props.slots?.['default'];",
+    );
     expect(result.setupLines).toContain('if (slot == null) return () => {};');
     expect(result.setupLines).toContain("typeof slot === 'function'");
   });

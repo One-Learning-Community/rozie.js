@@ -64,13 +64,13 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-// `synthesizeHandleType` is not yet in the `@rozie/core` barrel (22-02-SUMMARY
-// "Next Phase Readiness") — import it relatively as React/Vue's emitTypes.ts do.
-import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
+import type { IRComponent } from '@rozie/core';
 // The framework-agnostic props body + the single-source prop→TS-type mapping
 // come from `@rozie/core` (Plan 22-02 LOCKED CONTRACT).
 import { renderPropsInterface, renderPropType } from '@rozie/core';
+// `synthesizeHandleType` is not yet in the `@rozie/core` barrel (22-02-SUMMARY
+// "Next Phase Readiness") — import it relatively as React/Vue's emitTypes.ts do.
+import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
 
 /**
  * Options controlling Angular `.d.rozie.ts` emission.
@@ -108,8 +108,7 @@ function classPropMembers(ir: IRComponent): string[] {
     const tsType = renderPropType(prop.typeAnnotation);
     // Required when no default; optional when a default is set (mirrors the
     // shared renderer's gating).
-    const hasDefault =
-      prop.defaultValue !== null && prop.defaultValue !== undefined;
+    const hasDefault = prop.defaultValue !== null && prop.defaultValue !== undefined;
     const optional = hasDefault || prop.isModel ? '?' : '';
     out.push(`  ${prop.name}${optional}: ${tsType};`);
   }
@@ -121,14 +120,9 @@ function classPropMembers(ir: IRComponent): string[] {
  *
  * @public — consumed by the Wave-3 unplugin sidecar emit + CLI fallback.
  */
-export function emitAngularTypes(
-  ir: IRComponent,
-  opts: EmitAngularTypesOptions = {},
-): string {
+export function emitAngularTypes(ir: IRComponent, opts: EmitAngularTypesOptions = {}): string {
   const exposed = (ir.expose ?? []).length > 0;
-  const handleInterface = exposed
-    ? synthesizeHandleType(ir, `${ir.name}Handle`)
-    : null;
+  const handleInterface = exposed ? synthesizeHandleType(ir, `${ir.name}Handle`) : null;
 
   const lines: string[] = [];
 

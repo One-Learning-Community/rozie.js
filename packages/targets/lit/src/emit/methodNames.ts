@@ -1,5 +1,5 @@
 import * as bt from '@babel/types';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '@rozie/core';
 
 export function collectMethodNamesFromIR(ir: IRComponent): Set<string> {
   const names = new Set<string>();
@@ -28,8 +28,7 @@ export function collectMethodNamesFromIR(ir: IRComponent): Set<string> {
           }
           if (
             decl.init &&
-            (bt.isArrowFunctionExpression(decl.init) ||
-              bt.isFunctionExpression(decl.init))
+            (bt.isArrowFunctionExpression(decl.init) || bt.isFunctionExpression(decl.init))
           ) {
             names.add(decl.id.name);
           }

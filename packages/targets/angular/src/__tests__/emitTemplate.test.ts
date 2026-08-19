@@ -5,14 +5,13 @@
  * Drives the per-block fixture snapshots Counter.template.snap, TodoList.template.snap,
  * Modal.template.snap.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { fileURLToPath } from 'node:url';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitTemplate } from '../emit/emitTemplate.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -63,9 +62,15 @@ describe('emitTemplate — TodoList @for + slots + ngTemplateContextGuard', () =
     // static ContentChild ref and the `templates()` fallback — nothing
     // deleted; see the inverse-transform gate in
     // tests/angular-runtime/prohibitions.test.ts.
-    expect(template).toContain(`*ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])`);
-    expect(template).toContain(`*ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])`);
-    expect(template).toContain(`*ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])`);
+    expect(template).toContain(
+      `*ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])`,
+    );
+    expect(template).toContain(
+      `*ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])`,
+    );
+    expect(template).toContain(
+      `*ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])`,
+    );
   });
 
   it('TodoList template is parseable Angular block-syntax template (no *ngIf/*ngFor)', () => {
@@ -102,9 +107,7 @@ describe('emitTemplate — dynamic aria-*/data-* attribute bindings', () => {
   function lowerInline(src: string): IRComponent {
     const result = parse(src, { filename: 'AriaTest.rozie' });
     if (!result.ast) {
-      throw new Error(
-        `parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`,
-      );
+      throw new Error(`parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`);
     }
     const lowered = lowerToIR(result.ast, {
       modifierRegistry: createDefaultRegistry(),
@@ -269,10 +272,7 @@ describe('<template r-for> multi-root loop body — Phase 50', () => {
 `;
 
   it('emits @for (… ; track …) { siblings } with no host DOM wrapper for a 2-root body', () => {
-    const { template, diagnostics } = emitTemplate(
-      lowerInline(MULTI),
-      createDefaultRegistry(),
-    );
+    const { template, diagnostics } = emitTemplate(lowerInline(MULTI), createDefaultRegistry());
     // No ROZ720 — the :key supplies the track expression.
     expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
     expect(template).toMatch(/@for \(row of [^;]*; track row\.id\)/);

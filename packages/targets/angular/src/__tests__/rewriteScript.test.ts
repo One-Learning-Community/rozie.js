@@ -18,29 +18,27 @@
  * Script bodies emit into Angular class context, so IR member references
  * carry the `this.` prefix.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '@babel/parser';
+
 import _generate from '@babel/generator';
+import { parse } from '@babel/parser';
 import type { File } from '@babel/types';
-import {
-  rewriteRozieIdentifiers,
-  hoistDoubleReadAccessors,
-} from '../rewrite/rewriteScript.js';
 import type {
+  ComputedDecl,
   IRComponent,
   PropDecl,
-  StateDecl,
   RefDecl,
-  ComputedDecl,
   SlotDecl,
-} from '../../../../core/src/ir/types.js';
+  StateDecl,
+} from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { hoistDoubleReadAccessors, rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const sloc = { start: 0, end: 0 };
 
@@ -140,9 +138,7 @@ describe('rewriteRozieIdentifiers — MemberExpression sigil rewrites', () => {
 
   it('$props.X (unknown prop name) is left untouched', () => {
     const ir = buildIR({ props: [mkProp('known', true)] });
-    expect(rewrite('const a = $props.mystery;', ir).code).toContain(
-      '$props.mystery',
-    );
+    expect(rewrite('const a = $props.mystery;', ir).code).toContain('$props.mystery');
   });
 
   it('$data.X → this.X()', () => {
@@ -152,9 +148,7 @@ describe('rewriteRozieIdentifiers — MemberExpression sigil rewrites', () => {
 
   it('$data.X (unknown data name) is left untouched', () => {
     const ir = buildIR({ state: [mkState('known')] });
-    expect(rewrite('const a = $data.unknown;', ir).code).toContain(
-      '$data.unknown',
-    );
+    expect(rewrite('const a = $data.unknown;', ir).code).toContain('$data.unknown');
   });
 
   it('computed-member access ($props["x"]) is left untouched', () => {
@@ -164,16 +158,12 @@ describe('rewriteRozieIdentifiers — MemberExpression sigil rewrites', () => {
 
   it('a non-sigil object name passes through', () => {
     const ir = buildIR({ props: [mkProp('value', true)] });
-    expect(rewrite('const a = whatever.value;', ir).code).toContain(
-      'whatever.value',
-    );
+    expect(rewrite('const a = whatever.value;', ir).code).toContain('whatever.value');
   });
 
   it('member expression whose object is not an identifier passes through', () => {
     const ir = buildIR({ state: [mkState('count')] });
-    expect(rewrite('const a = makeIt().count;', ir).code).toContain(
-      'makeIt().count',
-    );
+    expect(rewrite('const a = makeIt().count;', ir).code).toContain('makeIt().count');
   });
 });
 
@@ -186,16 +176,12 @@ describe('rewriteRozieIdentifiers — $refs refLowersToNonNull', () => {
 
   it('$refs.X as object of a non-optional member → this.X()!.nativeElement', () => {
     const ir = buildIR({ refs: [mkRef('dialogEl')] });
-    expect(rewrite('$refs.dialogEl.focus();', ir).code).toContain(
-      'this.dialogEl()!.nativeElement',
-    );
+    expect(rewrite('$refs.dialogEl.focus();', ir).code).toContain('this.dialogEl()!.nativeElement');
   });
 
   it('$refs.X invoked directly as a call callee → this.X()!.nativeElement', () => {
     const ir = buildIR({ refs: [mkRef('cleanup')] });
-    expect(rewrite('$refs.cleanup();', ir).code).toContain(
-      'this.cleanup()!.nativeElement',
-    );
+    expect(rewrite('$refs.cleanup();', ir).code).toContain('this.cleanup()!.nativeElement');
   });
 
   it('$refs.X as a function-call argument → non-null', () => {
@@ -207,16 +193,14 @@ describe('rewriteRozieIdentifiers — $refs refLowersToNonNull', () => {
 
   it('$refs.X nested inside an object literal passed to a constructor → non-null', () => {
     const ir = buildIR({ refs: [mkRef('editorEl')] });
-    expect(
-      rewrite('new Editor({ element: $refs.editorEl });', ir).code,
-    ).toContain('!.nativeElement');
+    expect(rewrite('new Editor({ element: $refs.editorEl });', ir).code).toContain(
+      '!.nativeElement',
+    );
   });
 
   it('$refs.X nested inside an array literal passed to a call → non-null', () => {
     const ir = buildIR({ refs: [mkRef('hostEl')] });
-    expect(rewrite('mountAll([$refs.hostEl]);', ir).code).toContain(
-      '!.nativeElement',
-    );
+    expect(rewrite('mountAll([$refs.hostEl]);', ir).code).toContain('!.nativeElement');
   });
 
   it('$refs.X?.method() (author opted into optionality) stays optional', () => {
@@ -227,9 +211,7 @@ describe('rewriteRozieIdentifiers — $refs refLowersToNonNull', () => {
 
   it('$refs.X (unknown ref name) is left untouched', () => {
     const ir = buildIR({ refs: [mkRef('known')] });
-    expect(rewrite('const a = $refs.unknown;', ir).code).toContain(
-      '$refs.unknown',
-    );
+    expect(rewrite('const a = $refs.unknown;', ir).code).toContain('$refs.unknown');
   });
 });
 
@@ -306,25 +288,19 @@ describe('rewriteRozieIdentifiers — $slots / $portals handlers', () => {
 
   it('$portals.X (matching portal slot) → portals.X', () => {
     const ir = buildIR({ slots: [mkSlot('item', true)] });
-    expect(rewrite('$portals.item(node, scope);', ir).code).toContain(
-      'portals.item(node, scope)',
-    );
+    expect(rewrite('$portals.item(node, scope);', ir).code).toContain('portals.item(node, scope)');
   });
 
   it('$portals.X with no matching portal slot is left untouched', () => {
     const ir = buildIR({ slots: [mkSlot('item', true)] });
-    expect(rewrite('$portals.other(node);', ir).code).toContain(
-      '$portals.other(node)',
-    );
+    expect(rewrite('$portals.other(node);', ir).code).toContain('$portals.other(node)');
   });
 });
 
 describe('rewriteRozieIdentifiers — OptionalMemberExpression sigil branches', () => {
   it('$props?.X (model) → this.X()', () => {
     const ir = buildIR({ props: [mkProp('value', true)] });
-    expect(rewrite('const a = $props?.value;', ir).code).toContain(
-      'this.value()',
-    );
+    expect(rewrite('const a = $props?.value;', ir).code).toContain('this.value()');
   });
 
   it('$props?.X (non-model) → this.X()', () => {
@@ -334,9 +310,7 @@ describe('rewriteRozieIdentifiers — OptionalMemberExpression sigil branches', 
 
   it('$props?.X (unknown prop name) is left untouched', () => {
     const ir = buildIR();
-    expect(rewrite('const a = $props?.mystery;', ir).code).toContain(
-      '$props?.mystery',
-    );
+    expect(rewrite('const a = $props?.mystery;', ir).code).toContain('$props?.mystery');
   });
 
   it('$data?.X → this.X()', () => {
@@ -346,9 +320,7 @@ describe('rewriteRozieIdentifiers — OptionalMemberExpression sigil branches', 
 
   it('$data?.X (unknown data name) is left untouched', () => {
     const ir = buildIR({ state: [mkState('known')] });
-    expect(rewrite('const a = $data?.unknown;', ir).code).toContain(
-      '$data?.unknown',
-    );
+    expect(rewrite('const a = $data?.unknown;', ir).code).toContain('$data?.unknown');
   });
 
   it('$refs?.X → this.X()?.nativeElement', () => {
@@ -360,9 +332,7 @@ describe('rewriteRozieIdentifiers — OptionalMemberExpression sigil branches', 
 
   it('$refs?.X (unknown ref name) is left untouched', () => {
     const ir = buildIR({ refs: [mkRef('known')] });
-    expect(rewrite('const a = $refs?.unknown;', ir).code).toContain(
-      '$refs?.unknown',
-    );
+    expect(rewrite('const a = $refs?.unknown;', ir).code).toContain('$refs?.unknown');
   });
 
   it('computed OptionalMember ($props?.[x]) is left untouched', () => {
@@ -372,16 +342,12 @@ describe('rewriteRozieIdentifiers — OptionalMemberExpression sigil branches', 
 
   it('non-sigil OptionalMember object name is left untouched', () => {
     const ir = buildIR({ props: [mkProp('value', true)] });
-    expect(rewrite('const a = whatever?.value;', ir).code).toContain(
-      'whatever?.value',
-    );
+    expect(rewrite('const a = whatever?.value;', ir).code).toContain('whatever?.value');
   });
 
   it('OptionalMember whose object is not an identifier passes through', () => {
     const ir = buildIR();
-    expect(rewrite('const a = makeIt()?.value;', ir).code).toContain(
-      'makeIt()?.value',
-    );
+    expect(rewrite('const a = makeIt()?.value;', ir).code).toContain('makeIt()?.value');
   });
 });
 
@@ -393,23 +359,17 @@ describe('rewriteRozieIdentifiers — AssignmentExpression model/data setters', 
 
   it('$data.X += v → this.X.set(this.X() + v)', () => {
     const ir = buildIR({ state: [mkState('count')] });
-    expect(rewrite('$data.count += 1;', ir).code).toContain(
-      'this.count.set(this.count() + 1)',
-    );
+    expect(rewrite('$data.count += 1;', ir).code).toContain('this.count.set(this.count() + 1)');
   });
 
   it('$data.X *= v → this.X.set(this.X() * v)', () => {
     const ir = buildIR({ state: [mkState('count')] });
-    expect(rewrite('$data.count *= 2;', ir).code).toContain(
-      'this.count.set(this.count() * 2)',
-    );
+    expect(rewrite('$data.count *= 2;', ir).code).toContain('this.count.set(this.count() * 2)');
   });
 
   it('$props.X = v (model) → this.X.set(v)', () => {
     const ir = buildIR({ props: [mkProp('value', true)] });
-    expect(rewrite('$props.value = 7;', ir).code).toContain(
-      'this.value.set(7)',
-    );
+    expect(rewrite('$props.value = 7;', ir).code).toContain('this.value.set(7)');
   });
 
   // NOTE: a `$props.X = v` write where X is a NON-model prop is illegal user
@@ -421,9 +381,7 @@ describe('rewriteRozieIdentifiers — AssignmentExpression model/data setters', 
 
   it('$data.X = v with an unknown data name passes through', () => {
     const ir = buildIR({ state: [mkState('known')] });
-    expect(rewrite('$data.unknown = 1;', ir).code).toContain(
-      '$data.unknown = 1',
-    );
+    expect(rewrite('$data.unknown = 1;', ir).code).toContain('$data.unknown = 1');
   });
 
   it('assignment whose LHS is not a member expression passes through', () => {
@@ -442,9 +400,7 @@ describe('rewriteRozieIdentifiers — AssignmentExpression model/data setters', 
 
   it('assignment whose LHS member object is not an identifier passes through', () => {
     const ir = buildIR({ state: [mkState('count')] });
-    expect(rewrite('makeIt().count = 1;', ir).code).toContain(
-      'makeIt().count = 1',
-    );
+    expect(rewrite('makeIt().count = 1;', ir).code).toContain('makeIt().count = 1');
   });
 
   it('a $props member assignment with an unknown (non-model) prop name passes through', () => {
@@ -453,9 +409,7 @@ describe('rewriteRozieIdentifiers — AssignmentExpression model/data setters', 
     // prop hits the AssignmentExpression `$props` `!modelProps.has` return arm.
     // The MemberExpression visitor leaves an unknown `$props.X` untouched, so
     // the assignment AST stays valid.
-    expect(rewrite('$props.unknown = 1;', ir).code).toContain(
-      '$props.unknown = 1',
-    );
+    expect(rewrite('$props.unknown = 1;', ir).code).toContain('$props.unknown = 1');
   });
 });
 
@@ -476,16 +430,12 @@ describe('rewriteRozieIdentifiers — UpdateExpression (++/--) on reactive state
 
   it('prefix `++$data.X` → this.X.set(this.X() + 1)  (statement context)', () => {
     const ir = buildIR({ state: [mkState('count')] });
-    expect(rewrite('++$data.count;', ir).code).toContain(
-      'this.count.set(this.count() + 1)',
-    );
+    expect(rewrite('++$data.count;', ir).code).toContain('this.count.set(this.count() + 1)');
   });
 
   it('$props.X++ (model) → this.X.set(this.X() + 1)', () => {
     const ir = buildIR({ props: [mkProp('value', true)] });
-    expect(rewrite('$props.value++;', ir).code).toContain(
-      'this.value.set(this.value() + 1)',
-    );
+    expect(rewrite('$props.value++;', ir).code).toContain('this.value.set(this.value() + 1)');
   });
 
   it('`++` on a plain non-reactive local passes through verbatim', () => {
@@ -502,16 +452,12 @@ describe('rewriteRozieIdentifiers — UpdateExpression (++/--) on reactive state
 describe('rewriteRozieIdentifiers — $emit / $snapshot CallExpression', () => {
   it("$emit('change', x) → this.change.emit(x)", () => {
     const ir = buildIR();
-    expect(rewrite("$emit('change', x);", ir).code).toContain(
-      'this.change.emit(x)',
-    );
+    expect(rewrite("$emit('change', x);", ir).code).toContain('this.change.emit(x)');
   });
 
   it("$emit('file-added', x) → this.fileAdded.emit(x) (kebab sanitized)", () => {
     const ir = buildIR();
-    expect(rewrite("$emit('file-added', x);", ir).code).toContain(
-      'this.fileAdded.emit(x)',
-    );
+    expect(rewrite("$emit('file-added', x);", ir).code).toContain('this.fileAdded.emit(x)');
   });
 
   it('$emit with zero arguments is left untouched', () => {
@@ -521,9 +467,7 @@ describe('rewriteRozieIdentifiers — $emit / $snapshot CallExpression', () => {
 
   it('$emit with a non-string-literal first arg is left untouched', () => {
     const ir = buildIR();
-    expect(rewrite('$emit(dynamicName, x);', ir).code).toContain(
-      '$emit(dynamicName, x)',
-    );
+    expect(rewrite('$emit(dynamicName, x);', ir).code).toContain('$emit(dynamicName, x)');
   });
 
   it('$snapshot(x) → x (identity lowering)', () => {
@@ -540,9 +484,7 @@ describe('rewriteRozieIdentifiers — $emit / $snapshot CallExpression', () => {
 
   it('$snapshot with a spread (non-expression) argument is left untouched', () => {
     const ir = buildIR();
-    expect(rewrite('const c = $snapshot(...x);', ir).code).toContain(
-      '$snapshot(...x)',
-    );
+    expect(rewrite('const c = $snapshot(...x);', ir).code).toContain('$snapshot(...x)');
   });
 
   it('$clone(x) → structuredClone(x) (deep-copy lowering)', () => {
@@ -561,9 +503,7 @@ describe('rewriteRozieIdentifiers — $emit / $snapshot CallExpression', () => {
 
   it('$clone with a spread (non-expression) argument is left untouched', () => {
     const ir = buildIR();
-    expect(rewrite('const c = $clone(...x);', ir).code).toContain(
-      '$clone(...x)',
-    );
+    expect(rewrite('const c = $clone(...x);', ir).code).toContain('$clone(...x)');
   });
 
   it("$clone's argument reactive reads still lower (no path.skip)", () => {
@@ -581,9 +521,7 @@ describe('rewriteRozieIdentifiers — $emit / $snapshot CallExpression', () => {
 describe('rewriteRozieIdentifiers — bare-identifier this. prefix', () => {
   it('a bare $computed name → this.X()', () => {
     const ir = buildIR({ computed: [mkComputed('canIncrement')] });
-    expect(rewrite('if (canIncrement) {}', ir).code).toContain(
-      'this.canIncrement()',
-    );
+    expect(rewrite('if (canIncrement) {}', ir).code).toContain('this.canIncrement()');
   });
 
   it('a bare user-method name in callee position → this.X()', () => {
@@ -601,9 +539,7 @@ describe('rewriteRozieIdentifiers — bare-identifier this. prefix', () => {
 
   it('a bare identifier that is not a class member is left untouched', () => {
     const ir = buildIR();
-    expect(rewrite('if (somethingElse) {}', ir).code).toContain(
-      'somethingElse',
-    );
+    expect(rewrite('if (somethingElse) {}', ir).code).toContain('somethingElse');
   });
 
   it('a non-signal user-method assigned on LHS → this.X = ...', () => {
@@ -648,9 +584,7 @@ describe('rewriteRozieIdentifiers — bare-identifier this. prefix', () => {
 
   it('a class member in a function-declaration parameter position is NOT prefixed', () => {
     const ir = buildIR({ computed: [mkComputed('total')] });
-    expect(rewrite('function f(total) { return total; }', ir).code).toContain(
-      'function f(total)',
-    );
+    expect(rewrite('function f(total) { return total; }', ir).code).toContain('function f(total)');
   });
 
   it('a class member in a function-expression id position is NOT prefixed', () => {
@@ -667,10 +601,7 @@ describe('rewriteRozieIdentifiers — bare-identifier this. prefix', () => {
 
   it('a class member used as a break/continue label is NOT prefixed', () => {
     const ir = buildIR({ computed: [mkComputed('outer')] });
-    const { code } = rewrite(
-      'outer: for (let i = 0; i < 1; i++) { continue outer; }',
-      ir,
-    );
+    const { code } = rewrite('outer: for (let i = 0; i < 1; i++) { continue outer; }', ir);
     expect(code).toContain('continue outer');
   });
 
@@ -733,10 +664,7 @@ describe('rewriteRozieIdentifiers — scope-aware binding guards', () => {
   it('a local let shadowing a class member name is NOT rewritten', () => {
     const ir = buildIR({ computed: [mkComputed('total')] });
     // Inner `let total` shadows the promoted computed; the read points local.
-    const { code } = rewrite(
-      'const f = () => { let total = 1; return total; };',
-      ir,
-    );
+    const { code } = rewrite('const f = () => { let total = 1; return total; };', ir);
     expect(code).not.toContain('this.total');
   });
 
@@ -744,10 +672,7 @@ describe('rewriteRozieIdentifiers — scope-aware binding guards', () => {
     const ir = buildIR({ state: [mkState('editor')] });
     // `({ wrap: { editor } }) => ...` — `editor` is nested two levels deep in
     // a destructuring pattern; isInBindingPosition catches it.
-    const { code } = rewrite(
-      'const f = ({ wrap: { editor } }) => doThing();',
-      ir,
-    );
+    const { code } = rewrite('const f = ({ wrap: { editor } }) => doThing();', ir);
     expect(code).not.toContain('this.editor');
   });
 
@@ -761,10 +686,7 @@ describe('rewriteRozieIdentifiers — scope-aware binding guards', () => {
     const ir = buildIR({ state: [mkState('editor')] });
     // `onUpdate: ({ editor }) => editor` — the grandparent is an ObjectPattern,
     // so the shorthand-handling block returns early without un-shorthanding.
-    const { code } = rewrite(
-      'const o = { onUpdate: ({ editor }) => editor };',
-      ir,
-    );
+    const { code } = rewrite('const o = { onUpdate: ({ editor }) => editor };', ir);
     expect(code).toContain('{ editor }'.replace('{ editor }', 'editor'));
     expect(code).not.toContain('{ editor: this.editor }');
   });
@@ -773,10 +695,7 @@ describe('rewriteRozieIdentifiers — scope-aware binding guards', () => {
     const ir = buildIR();
     // `const fn = () => {}; return { fn }` — `fn` is a user method (non-signal
     // class member); the shorthand expands to `{ fn: this.fn }` (no `()`).
-    const { code } = rewrite(
-      'const fn = () => {}; const r = () => { return { fn }; };',
-      ir,
-    );
+    const { code } = rewrite('const fn = () => {}; const r = () => { return { fn }; };', ir);
     expect(code).toContain('fn: this.fn');
     expect(code).not.toContain('fn: this.fn()');
   });
@@ -794,16 +713,12 @@ describe('rewriteRozieIdentifiers — scope-aware binding guards', () => {
 describe('rewriteRozieIdentifiers — $el free read', () => {
   it('$el free read lowers via $refs.__rozieRoot → this.__rozieRoot()?.nativeElement', () => {
     const ir = buildIR({ refs: [mkRef('__rozieRoot')] });
-    expect(rewrite('const root = $el;', ir).code).toContain(
-      'this.__rozieRoot()',
-    );
+    expect(rewrite('const root = $el;', ir).code).toContain('this.__rozieRoot()');
   });
 
   it('$el flowing into a constructor argument lowers to a non-null access', () => {
     const ir = buildIR({ refs: [mkRef('__rozieRoot')] });
-    expect(rewrite('new SortableJS($el, {});', ir).code).toContain(
-      '!.nativeElement',
-    );
+    expect(rewrite('new SortableJS($el, {});', ir).code).toContain('!.nativeElement');
   });
 
   it('$el as a VariableDeclarator id is NOT rewritten', () => {
@@ -823,25 +738,19 @@ describe('rewriteRozieIdentifiers — $el free read', () => {
 
   it('$el occupying a function-parameter position is NOT rewritten', () => {
     const ir = buildIR({ refs: [mkRef('__rozieRoot')] });
-    expect(rewrite('function handle($el) {}', ir).code).toContain(
-      'function handle($el)',
-    );
+    expect(rewrite('function handle($el) {}', ir).code).toContain('function handle($el)');
   });
 
   it('$el free read inside a function body (NOT a param) DOES lower', () => {
     const ir = buildIR({ refs: [mkRef('__rozieRoot')] });
-    expect(rewrite('const f = () => $el;', ir).code).toContain(
-      'this.__rozieRoot()',
-    );
+    expect(rewrite('const f = () => $el;', ir).code).toContain('this.__rozieRoot()');
   });
 });
 
 describe('rewriteRozieIdentifiers — TS type-position skips', () => {
   it('$data.X inside a `typeof` type query is left intact', () => {
     const ir = buildIR({ state: [mkState('foo')] });
-    expect(rewrite('let x: typeof $data.foo;', ir).code).toContain(
-      'typeof $data.foo',
-    );
+    expect(rewrite('let x: typeof $data.foo;', ir).code).toContain('typeof $data.foo');
   });
 
   it('a class-member identifier inside a type annotation is NOT rewritten', () => {
@@ -871,9 +780,7 @@ describe('hoistDoubleReadAccessors', () => {
   });
 
   it('hoists a double-read $data.X', () => {
-    const program = parseProgram(
-      'function f() { const a = $data.config; return $data.config; }',
-    );
+    const program = parseProgram('function f() { const a = $data.config; return $data.config; }');
     hoistDoubleReadAccessors(program);
     expect(generate(program).code).toContain('const __config = $data.config');
   });
@@ -894,9 +801,7 @@ describe('hoistDoubleReadAccessors', () => {
   });
 
   it('stops descent at nested function boundaries (reads in a callback do not count)', () => {
-    const program = parseProgram(
-      'function f() { const a = $props.x; const cb = () => $props.x; }',
-    );
+    const program = parseProgram('function f() { const a = $props.x; const cb = () => $props.x; }');
     hoistDoubleReadAccessors(program);
     // One read in f, one in the nested arrow — not a double-read in f's scope.
     expect(generate(program).code).not.toContain('const __x');
@@ -910,9 +815,7 @@ describe('hoistDoubleReadAccessors', () => {
   });
 
   it('handles a triple-read accessor (still one hoist)', () => {
-    const program = parseProgram(
-      'function f() { return $props.v + $props.v + $props.v; }',
-    );
+    const program = parseProgram('function f() { return $props.v + $props.v + $props.v; }');
     hoistDoubleReadAccessors(program);
     const code = generate(program).code;
     expect(code).toContain('const __v = $props.v');
@@ -932,9 +835,7 @@ describe('hoistDoubleReadAccessors', () => {
   });
 
   it('hoists a double-read across an arrow-method body block', () => {
-    const program = parseProgram(
-      'const m = { go() { const a = $props.y; return $props.y; } };',
-    );
+    const program = parseProgram('const m = { go() { const a = $props.y; return $props.y; } };');
     hoistDoubleReadAccessors(program);
     expect(generate(program).code).toContain('const __y = $props.y');
   });

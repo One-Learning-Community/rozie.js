@@ -39,10 +39,9 @@
  * Harness (`compile` / `extractEffects` / `mountEffect`) copied verbatim from
  * `mountPropRefRewrite.test.ts:31-88`.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../../emitReact.js';
 
 function compile(rozieSrc: string): string {
@@ -279,7 +278,9 @@ $onMount(() => {
     const code = compile(SRC_VALUE_POS);
     const mount = mountEffect(code);
     const registerMatch = /document\.addEventListener\('pointerdown', (\w+)\)/.exec(mount.body);
-    const unregisterMatch = /document\.removeEventListener\('pointerdown', (\w+)\)/.exec(mount.body);
+    const unregisterMatch = /document\.removeEventListener\('pointerdown', (\w+)\)/.exec(
+      mount.body,
+    );
     expect(registerMatch?.[1]).toBeDefined();
     expect(registerMatch?.[1]).toBe(unregisterMatch?.[1]);
     // And exactly ONE wrapper declaration exists — not one per call site.

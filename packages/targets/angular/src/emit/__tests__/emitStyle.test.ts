@@ -8,10 +8,9 @@
  * unchanged (Risk 5 floor — output preserves source byte-identity for the
  * dominant case).
  */
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
 import { emitStyle } from '../emitStyle.js';
 
 function renderStyles(rozieSource: string): string {
@@ -65,9 +64,7 @@ describe('Angular emitStyle — :deep() lowering to ::ng-deep', () => {
   });
 
   it('mixed: only the :deep rule is rewritten; the plain rule is byte-preserved', () => {
-    const out = renderStyles(
-      BASE('.plain { color: blue; }\n.outer :deep(.inner) { color: red; }'),
-    );
+    const out = renderStyles(BASE('.plain { color: blue; }\n.outer :deep(.inner) { color: red; }'));
     expect(out).toContain('.plain');
     expect(out).toMatch(/\.outer\s+::ng-deep\s+\.inner/);
     expect(out).not.toContain(':deep(');

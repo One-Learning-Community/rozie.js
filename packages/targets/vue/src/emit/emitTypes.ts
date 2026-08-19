@@ -40,15 +40,15 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-// `synthesizeHandleType` is not yet in the `@rozie/core` barrel (22-02-SUMMARY
-// "Next Phase Readiness") — import it relatively as React's emitTypes.ts does.
-import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
+import type { IRComponent } from '@rozie/core';
 // The framework-agnostic props-interface body is rendered by the core-shared
 // `renderPropsInterface` (Plan 22-02 LOCKED CONTRACT) so the per-target type
 // renderers cannot drift from the prop→TS-type mapping. Imported from the
 // `@rozie/core` barrel.
 import { renderPropsInterface } from '@rozie/core';
+// `synthesizeHandleType` is not yet in the `@rozie/core` barrel (22-02-SUMMARY
+// "Next Phase Readiness") — import it relatively as React's emitTypes.ts does.
+import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
 
 /**
  * Options controlling Vue `.d.rozie.ts` emission.
@@ -69,19 +69,12 @@ export interface EmitVueTypesOptions {
  *
  * @public — consumed by the Wave-3 unplugin sidecar emit + CLI fallback.
  */
-export function emitVueTypes(
-  ir: IRComponent,
-  opts: EmitVueTypesOptions = {},
-): string {
+export function emitVueTypes(ir: IRComponent, opts: EmitVueTypesOptions = {}): string {
   const exposed = (ir.expose ?? []).length > 0;
-  const handleInterface = exposed
-    ? synthesizeHandleType(ir, `${ir.name}Handle`)
-    : null;
+  const handleInterface = exposed ? synthesizeHandleType(ir, `${ir.name}Handle`) : null;
 
   const generics =
-    opts.genericParams && opts.genericParams.length > 0
-      ? `<${opts.genericParams.join(', ')}>`
-      : '';
+    opts.genericParams && opts.genericParams.length > 0 ? `<${opts.genericParams.join(', ')}>` : '';
 
   const lines: string[] = [];
   lines.push(`import type { DefineComponent } from 'vue';`);
@@ -100,9 +93,7 @@ export function emitVueTypes(
     lines.push('');
   }
 
-  lines.push(
-    `declare const ${ir.name}: DefineComponent<${ir.name}Props${generics}>;`,
-  );
+  lines.push(`declare const ${ir.name}: DefineComponent<${ir.name}Props${generics}>;`);
   lines.push(`export default ${ir.name};`);
   lines.push('');
   return lines.join('\n');

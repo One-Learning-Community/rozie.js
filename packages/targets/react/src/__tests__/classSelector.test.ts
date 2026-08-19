@@ -16,15 +16,13 @@
 //   R1 — `$classSelector('grip')` compiles with no error diagnostic.
 //   R2 — emitted output lowers to the static `"." + "grip"` selector for BOTH
 //        the `<script>`-position call AND the `:attr`-position call.
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { Diagnostic, IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitReact } from '../emitReact.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -36,9 +34,7 @@ function compileProbe(): { code: string; diagnostics: Diagnostic[] } {
   const source = readFileSync(resolve(ROOT, `examples/${filename}`), 'utf8');
   const { ast, diagnostics: parseDiags } = parse(source, { filename });
   if (!ast) {
-    throw new Error(
-      `parse() returned null AST: ${parseDiags.map((d) => d.message).join(', ')}`,
-    );
+    throw new Error(`parse() returned null AST: ${parseDiags.map((d) => d.message).join(', ')}`);
   }
   const registry = createDefaultRegistry();
   const { ir, diagnostics: lowerDiags } = lowerToIR(ast, {
@@ -62,13 +58,13 @@ function lowerInline(rozie: string): IRComponent {
 }
 
 describe('$classSelector emit (React) — Phase 25 static plain-string lowering', () => {
-  it("R1: ClassSelectorProbe compiles with no error diagnostic", () => {
+  it('R1: ClassSelectorProbe compiles with no error diagnostic', () => {
     const { diagnostics } = compileProbe();
     const errors = diagnostics.filter((d) => d.severity === 'error');
     expect(errors).toEqual([]);
   });
 
-  it("R2: <script>-position $classSelector('grip') lowers to a static \".\" + \"grip\" selector", () => {
+  it('R2: <script>-position $classSelector(\'grip\') lowers to a static "." + "grip" selector', () => {
     const { code } = compileProbe();
     // Phase 25 — React lowers `$classSelector('grip')` to `"." + "grip"`
     // (quote style depends on the babel generator path; accept either).
@@ -80,14 +76,14 @@ describe('$classSelector emit (React) — Phase 25 static plain-string lowering'
     expect(code).not.toContain('$classSelector(');
   });
 
-  it("R2: :attr-position $classSelector('panel') lowers to a static \".\" + \"panel\" selector", () => {
+  it('R2: :attr-position $classSelector(\'panel\') lowers to a static "." + "panel" selector', () => {
     const { code } = compileProbe();
     // The :data-handle binding flows through rewriteTemplateExpression.ts.
     expect(code).toMatch(/(["'])\.\1 \+ (["'])panel\2/);
     expect(code).not.toContain('$classSelector(');
   });
 
-  it("R2: hyphenated class lowers to a plain string literal (no bracket member access)", () => {
+  it('R2: hyphenated class lowers to a plain string literal (no bracket member access)', () => {
     const ir = lowerInline(`
 <rozie name="HyphenProbe">
 <script>
@@ -108,7 +104,7 @@ const sel = $classSelector('my-handle')
     expect(code).not.toContain('$classSelector(');
   });
 
-  it("ROZ968 guard removed: $classSelector on a component compiled WITHOUT opts.source no longer errors", () => {
+  it('ROZ968 guard removed: $classSelector on a component compiled WITHOUT opts.source no longer errors', () => {
     // Phase 25 — `$classSelector` lowers to a static string with NO `styles`
     // dependency, so the obsolete ROZ968 CLASS_SELECTOR_REACT_NO_SOURCE guard
     // is gone. Compiling without `opts.source` must NOT emit any error.

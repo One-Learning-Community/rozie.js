@@ -18,10 +18,9 @@
  *   - an `r-for` cell with a bound `:key="c"` — must still be STRIPPED
  *     (consumed by `repeat()`'s key function), preserving the seam-4 fix.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 function compile(source: string, filename = 'KeyStripProbe.rozie'): string {
@@ -52,7 +51,7 @@ describe('Lit key-strip narrowed to the binding form (Quick 260803-ibt WR-02)', 
     expect(code).toContain('key="license-key"');
   });
 
-  it('a bound r-for :key is still stripped — consumed by repeat()\'s key function, not emitted as a DOM attribute', () => {
+  it("a bound r-for :key is still stripped — consumed by repeat()'s key function, not emitted as a DOM attribute", () => {
     const code = compile(SRC);
     // The loop uses repeat() with the key expression as its second arg;
     // it must NOT also appear as a literal/bound `key=` attribute on the

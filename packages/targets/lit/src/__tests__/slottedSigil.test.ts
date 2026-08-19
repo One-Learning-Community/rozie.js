@@ -18,12 +18,13 @@
  * assigned-elements field — this is what keeps the other 30 slot-bearing Lit
  * leaves byte-identical.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compile } from '../../../../core/src/compile.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import type { Diagnostic } from '@rozie/core';
+import { compile } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../../../..');
@@ -78,7 +79,7 @@ describe('$slotted.<name> — Lit emission shape (EngineQueryDefaultSlot fixture
 
   it('connectedCallback pre-seeds the signal from light-DOM children beside the presence pre-seed', () => {
     const code = compileLit(ENGINE_QUERY_DEFAULT_SLOT, 'EngineQueryDefaultSlot.rozie');
-    const ccMatch = code.match(/connectedCallback\(\): void \{[\s\S]*?\n  \}/);
+    const ccMatch = code.match(/connectedCallback\(\): void \{[\s\S]*?\n {2}\}/);
     expect(ccMatch, code).not.toBeNull();
     const ccBody = ccMatch![0];
     expect(ccBody).toContain('this._hasSlotDefault = Array.from(this.children).some(');

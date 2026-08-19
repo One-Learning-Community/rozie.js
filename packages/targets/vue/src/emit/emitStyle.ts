@@ -27,9 +27,8 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { StyleSection } from '../../../../core/src/ir/types.js';
+import type { Diagnostic, StyleSection } from '@rozie/core';
 import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
 /**

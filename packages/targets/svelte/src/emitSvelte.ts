@@ -25,18 +25,21 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent, TemplateNode } from '../../../core/src/ir/types.js';
-import {
-  deconflictRefsAgainstUserBindings,
-  collectTopLevelFunctionNames,
-} from '../../../core/src/rewrite/deconflict.js';
-import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { BlockMap } from '../../../core/src/ast/types.js';
-import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
-import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
-import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import type {
+  BlockMap,
+  Diagnostic,
+  IRComponent,
+  ModifierRegistry,
+  IRTemplateNode as TemplateNode,
+} from '@rozie/core';
+import { createDefaultRegistry } from '@rozie/core';
 import { computeScopeHash } from '../../../core/src/codegen/portalCss.js';
+import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import {
+  collectTopLevelFunctionNames,
+  deconflictRefsAgainstUserBindings,
+} from '../../../core/src/rewrite/deconflict.js';
+import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 
 /**
  * Phase 06.2 P2 — recursive walk over the IR template detecting any
@@ -83,14 +86,15 @@ function templateContainsSelfReference(node: TemplateNode | null): boolean {
       return false;
   }
 }
+
 import type { SourceMap } from 'magic-string';
-import { emitScript, type SvelteScriptInjection } from './emit/emitScript.js';
-import { emitTemplate } from './emit/emitTemplate.js';
+import { buildPartialLineOffsets } from '../../../core/src/codegen/composeMaps.js';
 import { emitListeners } from './emit/emitListeners.js';
+import { emitScript, type SvelteScriptInjection } from './emit/emitScript.js';
 import { emitStyle } from './emit/emitStyle.js';
+import { emitTemplate } from './emit/emitTemplate.js';
 import { buildShell } from './emit/shell.js';
 import { composeSourceMap } from './sourcemap/compose.js';
-import { buildPartialLineOffsets } from '../../../core/src/codegen/composeMaps.js';
 
 export interface EmitSvelteOptions {
   filename?: string;
@@ -123,16 +127,11 @@ export interface EmitSvelteResult {
  * have one of those two positions. Imports aren't part of the script body
  * (Svelte's $effect / $state / $derived runes are compile-time, no imports).
  */
-function mergeScriptInjections(
-  script: string,
-  injections: SvelteScriptInjection[],
-): string {
+function mergeScriptInjections(script: string, injections: SvelteScriptInjection[]): string {
   if (injections.length === 0) return script;
 
   const topDecls = injections.filter((i) => i.position === 'top').map((i) => i.decl);
-  const bottomDecls = injections
-    .filter((i) => i.position === 'bottom')
-    .map((i) => i.decl);
+  const bottomDecls = injections.filter((i) => i.position === 'bottom').map((i) => i.decl);
 
   const head = topDecls.length > 0 ? topDecls.join('\n\n') + '\n\n' : '';
   const tail = bottomDecls.length > 0 ? '\n\n' + bottomDecls.join('\n\n') : '';
@@ -140,10 +139,7 @@ function mergeScriptInjections(
   return head + script + tail;
 }
 
-export function emitSvelte(
-  ir: IRComponent,
-  opts: EmitSvelteOptions = {},
-): EmitSvelteResult {
+export function emitSvelte(ir: IRComponent, opts: EmitSvelteOptions = {}): EmitSvelteResult {
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
 
   // Spike-012 R3-5 — a `ref="X"` name colliding with a TOP-LEVEL user `function X`
@@ -154,10 +150,7 @@ export function emitSvelte(
   // renameable side is the INTERNAL ref → `<name>Ref` (state local + `$refs.X`
   // rewrite + `bind:this={}` all read the renamed IR). Only-on-collision (function
   // names only) → const/let path + non-colliding corpus stay byte-identical.
-  deconflictRefsAgainstUserBindings(
-    ir,
-    collectTopLevelFunctionNames(ir.setupBody.scriptProgram),
-  );
+  deconflictRefsAgainstUserBindings(ir, collectTopLevelFunctionNames(ir.setupBody.scriptProgram));
 
   // 1. Script-side emission.
   // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap + preambleSectionLines.
@@ -205,9 +198,10 @@ export function emitSvelte(
   } = emitListeners(ir.listeners, ir, registry);
 
   // 4. Style-block emission.
-  const styleResult = opts.source !== undefined
-    ? emitStyle(ir.styles, opts.source, portalScopeHash)
-    : { block: '', diagnostics: [] as Diagnostic[] };
+  const styleResult =
+    opts.source !== undefined
+      ? emitStyle(ir.styles, opts.source, portalScopeHash)
+      : { block: '', diagnostics: [] as Diagnostic[] };
 
   // 5. Compose the script body: scriptBlock + listenerBlock + injections.
   // Listener $effect blocks are appended AFTER the lifecycle $effect blocks
@@ -220,9 +214,7 @@ export function emitSvelte(
   ];
 
   const scriptWithListeners =
-    listenerBlock.length > 0
-      ? scriptBlock.trimEnd() + '\n\n' + listenerBlock
-      : scriptBlock;
+    listenerBlock.length > 0 ? scriptBlock.trimEnd() + '\n\n' + listenerBlock : scriptBlock;
 
   const finalScript = mergeScriptInjections(scriptWithListeners, allInjections);
 
@@ -253,10 +245,7 @@ export function emitSvelte(
   const hasSelfReference = templateContainsSelfReference(ir.template);
   // When tagKind: 'self' appears AND the outer name isn't already in the
   // components table, synthesize the additional self-import line.
-  if (
-    hasSelfReference &&
-    !components.some((c) => c.localName === ir.name)
-  ) {
+  if (hasSelfReference && !components.some((c) => c.localName === ir.name)) {
     componentImportsLines.push(`import ${ir.name} from './${ir.name}.svelte';`);
   }
   // Phase 15 — runtime-helper imports from the template walk. Currently
@@ -266,16 +255,17 @@ export function emitSvelte(
   // `componentImportsBlock` prepended to the script body by `buildShell`.
   if (tmplRuntimeImports.size > 0) {
     const sorted = [...tmplRuntimeImports].sort();
-    componentImportsLines.push(
-      `import { ${sorted.join(', ')} } from '@rozie/runtime-svelte';`,
-    );
+    componentImportsLines.push(`import { ${sorted.join(', ')} } from '@rozie/runtime-svelte';`);
   }
   const componentImportsBlock =
-    componentImportsLines.length > 0
-      ? componentImportsLines.join('\n') + '\n'
-      : '';
+    componentImportsLines.length > 0 ? componentImportsLines.join('\n') + '\n' : '';
 
-  const { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: shellScriptMap } = buildShell({
+  const {
+    ms,
+    scriptOutputOffset,
+    userCodeLineOffset,
+    scriptMap: shellScriptMap,
+  } = buildShell({
     script: finalScript,
     template,
     styleBlock: styleResult.block,
@@ -306,11 +296,6 @@ export function emitSvelte(
   return {
     code,
     map,
-    diagnostics: [
-      ...scriptDiags,
-      ...tmplDiags,
-      ...listenerDiags,
-      ...styleResult.diagnostics,
-    ],
+    diagnostics: [...scriptDiags, ...tmplDiags, ...listenerDiags, ...styleResult.diagnostics],
   };
 }

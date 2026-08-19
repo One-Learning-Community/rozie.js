@@ -73,10 +73,11 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _generate from '@babel/generator';
+
 import type { GeneratorOptions } from '@babel/generator';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import _generate from '@babel/generator';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
 // CJS interop normalization for @babel/generator default export (mirrors emitScript).
@@ -84,7 +85,7 @@ type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
 
@@ -383,10 +384,7 @@ function collectSignalTouches(valueExpr: t.Expression): string[] {
  *                          + inject fallbacks pick up `$data`/`$props`/`$refs`
  *                          → `this.*` rewrites).
  */
-export function emitContext(
-  ir: IRComponent,
-  rewrittenProgram: t.File,
-): LitContextEmit {
+export function emitContext(ir: IRComponent, rewrittenProgram: t.File): LitContextEmit {
   // R12 / D-5 empty-gate — byte-identical-when-empty for all existing fixtures.
   // The `?? []` tolerates legacy hand-built IRComponent test literals that
   // predate the Phase 36 `provides`/`injects` fields (the real parse→lower

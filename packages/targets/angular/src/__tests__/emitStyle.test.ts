@@ -13,10 +13,9 @@
  * it is never passed to `lowerDeepToNgDeep` and never joined — no stray empty
  * line). The drop is independent of the `:deep` path (SPEC-R5).
  */
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
 import { emitStyle } from '../emit/emitStyle.js';
 
 function compileStyle(css: string): ReturnType<typeof emitStyle> {

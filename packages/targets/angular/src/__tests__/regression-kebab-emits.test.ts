@@ -12,16 +12,15 @@
  *   compile() diagnostics — it never bundles or PARSES the emitted code.
  *   That is the coverage gap this spec closes.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse as babelParse } from '@babel/parser';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitAngular } from '../emitAngular.js';
-import { sanitizeEventName, isValidIdentifier } from '../rewrite/sanitizeEventName.js';
+import { isValidIdentifier, sanitizeEventName } from '../rewrite/sanitizeEventName.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../../../..');
@@ -31,8 +30,7 @@ function compile(name: string): string {
   const { ast } = parse(source, { filename: `${name}.rozie` });
   const registry = createDefaultRegistry();
   const { ir } = lowerToIR(ast!, { modifierRegistry: registry });
-  return emitAngular(ir!, { filename: `${name}.rozie`, source, modifierRegistry: registry })
-    .code;
+  return emitAngular(ir!, { filename: `${name}.rozie`, source, modifierRegistry: registry }).code;
 }
 
 describe('Bug 2 — sanitizeEventName unit behaviour', () => {
@@ -81,7 +79,7 @@ describe('Bug 2 — Angular kebab-case output() field emit', () => {
     const code = compile('Uppy');
     // `complete` is already a valid identifier — byte-identical, no alias.
     expect(code).toMatch(/\bcomplete = output<unknown>\(\);/);
-    expect(code).not.toContain("complete = output<unknown>({ alias:");
+    expect(code).not.toContain('complete = output<unknown>({ alias:');
   });
 
   it('Uppy.rozie emit parses cleanly via @babel/parser', () => {
@@ -94,7 +92,7 @@ describe('Bug 2 — Angular kebab-case output() field emit', () => {
     ).not.toThrow();
   });
 
-  it('Modal.rozie ($emit(\'close\')) emits `close = output<void>()` with NO alias (byte-identical)', () => {
+  it("Modal.rozie ($emit('close')) emits `close = output<void>()` with NO alias (byte-identical)", () => {
     const code = compile('Modal');
     // `close` is a valid identifier — must stay byte-identical: no alias arg.
     expect(code).toMatch(/\bclose = output<void>\(\);/);

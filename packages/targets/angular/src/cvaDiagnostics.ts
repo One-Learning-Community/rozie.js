@@ -28,13 +28,8 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type {
-  IRComponent,
-  PropDecl,
-  PropTypeAnnotation,
-} from '../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../core/src/diagnostics/codes.js';
+import type { Diagnostic, IRComponent, PropDecl, PropTypeAnnotation } from '@rozie/core';
+import { RozieErrorCode } from '@rozie/core';
 
 /**
  * WR-05 — true when `ann` resolves to the Boolean type (`{ type: Boolean }`
@@ -57,9 +52,7 @@ function isBooleanType(ann: PropTypeAnnotation): boolean {
  * "exists" and "OR-merges" decisions cannot drift apart.
  */
 export function hasBooleanDisabledProp(props: readonly PropDecl[]): boolean {
-  return props.some(
-    (p) => p.name === 'disabled' && isBooleanType(p.typeAnnotation),
-  );
+  return props.some((p) => p.name === 'disabled' && isBooleanType(p.typeAnnotation));
 }
 
 /**

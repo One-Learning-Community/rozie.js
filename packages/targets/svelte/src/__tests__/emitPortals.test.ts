@@ -5,15 +5,14 @@
  * the portal-emitting body (`buildSlotMethod`, `setAttrLine`, closure +
  * $effect block, extraImports) is exercised here directly.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as t from '@babel/types';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, PropDecl, SlotDecl } from '../../../../core/src/ir/types.js';
+import type { IRComponent, PropDecl, SlotDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitPortals } from '../emit/emitPortals.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -167,9 +166,7 @@ describe('emitPortals — Svelte', () => {
   });
 
   it('portalParamNames present vs absent → scopeType branch', () => {
-    const withParams = emitPortals(
-      buildMinimalIR({ slots: [portalSlot('item', ['item'])] }),
-    );
+    const withParams = emitPortals(buildMinimalIR({ slots: [portalSlot('item', ['item'])] }));
     expect(withParams.setupLines).toContain('{ item: unknown }');
 
     const noParams = emitPortals(buildMinimalIR({ slots: [portalSlot('item')] }));
@@ -191,8 +188,8 @@ describe('emitPortals — Svelte', () => {
     expect(result.setupLines).toContain('dispose: (): void => {');
     // Import is the reactive variant; the mount-once PortalHost is NOT imported
     // when only a reactive slot is present.
-    expect(result.extraImports).toContain("PortalHostReactive.svelte");
-    expect(result.extraImports).not.toContain("import PortalHost from");
+    expect(result.extraImports).toContain('PortalHostReactive.svelte');
+    expect(result.extraImports).not.toContain('import PortalHost from');
   });
 
   it('non-reactive portal slot → mount-once () => void body + PortalHost import verbatim', () => {
@@ -204,7 +201,9 @@ describe('emitPortals — Svelte', () => {
     expect(result.setupLines).toContain('): (() => void) => {');
     expect(result.setupLines).toContain('mount(PortalHost, {');
     expect(result.setupLines).toContain('props: { snippet: nodeView, scope }');
-    expect(result.extraImports).toContain("import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';");
+    expect(result.extraImports).toContain(
+      "import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';",
+    );
     expect(result.extraImports).not.toContain('PortalHostReactive');
   });
 

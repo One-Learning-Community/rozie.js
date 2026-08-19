@@ -26,9 +26,9 @@
  *
  * V1 reactivity constraint (REQ-5): portal slots are NOT reactive after mount.
  */
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
-import { portalKey } from '../../../../core/src/ir/types.js';
+import type { IRComponent, SlotDecl } from '@rozie/core';
 import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
+import { portalKey } from '../../../../core/src/ir/types.js';
 
 /**
  * Phase 37 — the Angular `contentChild` template-ref query NAME for a portal
@@ -79,9 +79,7 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   const tplField = angularTplField(slot);
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
-    paramNames.length > 0
-      ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
-      : 'unknown';
+    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
     `    const tpl = this.${tplField}();\n` +
@@ -120,9 +118,7 @@ function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
   const tplField = angularTplField(slot);
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
-    paramNames.length > 0
-      ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
-      : 'unknown';
+    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): ReactivePortalHandle => {\n` +
     `    const tpl = this.${tplField}();\n` +

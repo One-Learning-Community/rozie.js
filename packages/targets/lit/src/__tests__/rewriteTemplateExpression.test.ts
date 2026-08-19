@@ -18,11 +18,12 @@
  * `opts.shadowAliases` names are NOT rewritten (locally-bound, e.g. r-for
  * loop aliases).
  */
-import { describe, expect, it } from 'vitest';
-import * as t from '@babel/types';
-import { parseExpression, parse as babelParse } from '@babel/parser';
+
+import { parse as babelParse, parseExpression } from '@babel/parser';
 import type { File } from '@babel/types';
-import type { IRComponent, SlotDecl, ParamDecl } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent, ParamDecl, SlotDecl } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 function buildSlotDecl(name: string, params: ParamDecl[] = []): SlotDecl {
@@ -193,11 +194,7 @@ describe('rewriteTemplateExpression — Lit sigil matrix', () => {
 
   it('bare computed name → this.<name>', () => {
     const ir = buildIR({ computed: [computed('total')] });
-    const expr = t.logicalExpression(
-      '&&',
-      t.identifier('total'),
-      t.booleanLiteral(true),
-    );
+    const expr = t.logicalExpression('&&', t.identifier('total'), t.booleanLiteral(true));
     expect(rewriteTemplateExpression(expr, ir)).toBe('this.total && true');
   });
 
@@ -307,17 +304,13 @@ describe('rewriteTemplateExpression — shadowAliases opt', () => {
     const ir = buildIR({ computed: [computed('item')] });
     // Without shadowAliases, `item` (a computed name) would become `this.item`.
     const expr = t.memberExpression(t.identifier('item'), t.identifier('id'));
-    expect(
-      rewriteTemplateExpression(expr, ir, { shadowAliases: ['item'] }),
-    ).toBe('item.id');
+    expect(rewriteTemplateExpression(expr, ir, { shadowAliases: ['item'] })).toBe('item.id');
   });
 
   it('a non-shadowed computed name is still rewritten when shadowAliases lists other names', () => {
     const ir = buildIR({ computed: [computed('total')] });
     const expr = t.identifier('total');
-    expect(
-      rewriteTemplateExpression(expr, ir, { shadowAliases: ['item'] }),
-    ).toBe('this.total');
+    expect(rewriteTemplateExpression(expr, ir, { shadowAliases: ['item'] })).toBe('this.total');
   });
 });
 
@@ -330,18 +323,13 @@ describe('rewriteTemplateExpression — computed-name Identifier skips', () => {
 
   it('computed name as a non-computed object-property key is NOT rewritten', () => {
     const ir = buildIR({ computed: [computed('total')] });
-    const expr = t.objectExpression([
-      t.objectProperty(t.identifier('total'), t.numericLiteral(1)),
-    ]);
+    const expr = t.objectExpression([t.objectProperty(t.identifier('total'), t.numericLiteral(1))]);
     expect(rewriteTemplateExpression(expr, ir)).toBe('{ total: 1 }');
   });
 
   it('computed name as a function param keeps the param binding bare', () => {
     const ir = buildIR({ computed: [computed('total')] });
-    const expr = t.arrowFunctionExpression(
-      [t.identifier('total')],
-      t.identifier('total'),
-    );
+    const expr = t.arrowFunctionExpression([t.identifier('total')], t.identifier('total'));
     // The param binding identifier is skipped by the function-param guard;
     // the body reference (a non-binding position) is still rewritten — the
     // template visitor checks parent positions, not lexical scope.

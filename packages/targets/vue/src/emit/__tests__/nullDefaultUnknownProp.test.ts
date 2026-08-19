@@ -22,21 +22,14 @@
  *     produce 0 TS2322 — it already emits `((...args: any[]) => any) | null` and
  *     must stay byte-identical (non-regression leg).
  */
-import { describe, it, expect } from 'vitest';
+
 import { execFileSync } from 'node:child_process';
-import {
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-  symlinkSync,
-  existsSync,
-} from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../../core/src/modifiers/registerBuiltins.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitVue } from '../../emitVue.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -87,11 +80,7 @@ function strictVueTsc(sfc: string, name = 'Probe.vue'): string {
   try {
     writeFileSync(join(tmpDir, name), sfc);
     writeFileSync(join(tmpDir, 'tsconfig.json'), STRICT_TSCONFIG);
-    symlinkSync(
-      join(VUE_TYPECHECK_DIR, 'node_modules'),
-      join(tmpDir, 'node_modules'),
-      'dir',
-    );
+    symlinkSync(join(VUE_TYPECHECK_DIR, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
     try {
       execFileSync(VUE_TSC_BIN, ['--noEmit', '-p', 'tsconfig.json'], {
         cwd: tmpDir,
@@ -143,9 +132,7 @@ describe('Vue emitter — null-default untyped prop (260623-kks)', () => {
     const n = countTS2322(diag);
     if (n !== 0) {
       // Surface the captured diagnostics on failure for fast triage.
-      throw new Error(
-        `Expected 0 TS2322 in strict vue-tsc of the emitted SFC, got ${n}:\n${diag}`,
-      );
+      throw new Error(`Expected 0 TS2322 in strict vue-tsc of the emitted SFC, got ${n}:\n${diag}`);
     }
     expect(n).toBe(0);
   });

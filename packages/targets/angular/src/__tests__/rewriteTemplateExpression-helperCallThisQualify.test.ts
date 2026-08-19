@@ -21,8 +21,9 @@
  * not yet landed; confirmed RED (getter body contained bare `labelText(`,
  * not `this.labelText(`) before the fix.
  */
-import { describe, it, expect } from 'vitest';
-import { compile } from '../../../../core/src/compile.js';
+
+import { compile } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 
 function component(): string {
   return `<rozie name="X">

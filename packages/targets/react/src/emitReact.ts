@@ -35,33 +35,30 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../core/src/ir/types.js';
-import {
-  deconflictRefsAgainstUserBindings,
-  collectTopLevelFunctionNames,
-} from '../../../core/src/rewrite/deconflict.js';
-import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { BlockMap } from '../../../core/src/ast/types.js';
+import type { BlockMap, Diagnostic, IRComponent, ModifierRegistry } from '@rozie/core';
+import { createDefaultRegistry } from '@rozie/core';
 import type { SourceMap } from 'magic-string';
-import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
-import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
-import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
-import { resolveComponentRefs } from '../../../core/src/codegen/resolveComponentRefs.js';
-import { synthesizeHandleType } from '../../../core/src/codegen/synthesizeHandleType.js';
-import { emitScript } from './emit/emitScript.js';
-import { emitPropsInterface } from './emit/emitPropsInterface.js';
-import { emitTemplate } from './emit/emitTemplate.js';
-import { emitListeners } from './emit/emitListeners.js';
-import { emitStyle } from './emit/emitStyle.js';
-import { buildShell } from './emit/shell.js';
-import { composeSourceMap } from './sourcemap/compose.js';
 import { buildPartialLineOffsets } from '../../../core/src/codegen/composeMaps.js';
+import { resolveComponentRefs } from '../../../core/src/codegen/resolveComponentRefs.js';
+import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import { synthesizeHandleType } from '../../../core/src/codegen/synthesizeHandleType.js';
+import {
+  collectTopLevelFunctionNames,
+  deconflictRefsAgainstUserBindings,
+} from '../../../core/src/rewrite/deconflict.js';
+import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
+import { emitListeners } from './emit/emitListeners.js';
+import { emitPropsInterface } from './emit/emitPropsInterface.js';
+import { emitScript } from './emit/emitScript.js';
+import { emitStyle } from './emit/emitStyle.js';
+import { emitTemplate } from './emit/emitTemplate.js';
 import { computeScopeHash, scopeAttrName } from './emit/scopeHash.js';
+import { buildShell } from './emit/shell.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from './rewrite/collectReactImports.js';
+import { composeSourceMap } from './sourcemap/compose.js';
 
 export interface EmitReactOptions {
   filename?: string;
@@ -87,10 +84,7 @@ export interface EmitReactResult {
   diagnostics: Diagnostic[];
 }
 
-export function emitReact(
-  ir: IRComponent,
-  opts: EmitReactOptions = {},
-): EmitReactResult {
+export function emitReact(ir: IRComponent, opts: EmitReactOptions = {}): EmitReactResult {
   const reactImports = new ReactImportCollector();
   const runtimeImports = new RuntimeReactImportCollector();
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
@@ -113,10 +107,7 @@ export function emitReact(
   // `$refs.X` rewrite + JSX `ref={}` all read the renamed IR). Only-on-collision
   // (function names only), so the const/let path + the non-colliding corpus stay
   // byte-identical. Runs on this target's OWN fresh IR before any emit reads a ref.
-  deconflictRefsAgainstUserBindings(
-    ir,
-    collectTopLevelFunctionNames(ir.setupBody.scriptProgram),
-  );
+  deconflictRefsAgainstUserBindings(ir, collectTopLevelFunctionNames(ir.setupBody.scriptProgram));
 
   // Spike 004 — reuse the per-component `scopeHash` for the `@portal` closure
   // setAttribute so it matches the emitted `@portal` CSS selectors.
@@ -147,12 +138,9 @@ export function emitReact(
   // Threads scopeAttr through to emitTemplateNode so every HTML host element
   // emits the matching attribute. Component tags (tagKind 'component'/'self')
   // skip the attribute — their own bundles carry their own scope.
-  const tmpl = emitTemplate(
-    ir,
-    { react: reactImports, runtime: runtimeImports },
-    registry,
-    { scopeAttr },
-  );
+  const tmpl = emitTemplate(ir, { react: reactImports, runtime: runtimeImports }, registry, {
+    scopeAttr,
+  });
 
   // Portal-slot primitive (Spike 003) — when the script emit synthesized a
   // portals closure, the shell needs the matching react-dom/client import.
@@ -172,24 +160,20 @@ export function emitReact(
   const portalImport =
     (hasPortals
       ? "import { createRoot, type Root } from 'react-dom/client';\nimport { flushSync } from 'react-dom';\n"
-      : '') +
-    (tmpl.hasElementPortal ? "import { createPortal } from 'react-dom';\n" : '');
+      : '') + (tmpl.hasElementPortal ? "import { createPortal } from 'react-dom';\n" : '');
 
   // Plan 04-04: emit <listeners>-block entries (4-class A/B/C/D classifier).
-  const listeners = emitListeners(
-    ir,
-    { react: reactImports, runtime: runtimeImports },
-    registry,
-  );
+  const listeners = emitListeners(ir, { react: reactImports, runtime: runtimeImports }, registry);
 
   // Plan 04-05: emit styles per D-53 + D-54. emitStyle requires the original
   // `.rozie` source text to slice rule bodies by absolute byte offset (the
   // IR's StyleSection only carries StyleRule.loc, not cssText). When
   // opts.source is missing, skip style emission entirely so back-compat with
   // older callers (Plan 04-02 tests) is preserved.
-  const styleResult = opts.source !== undefined
-    ? emitStyle(ir.styles, opts.source, scopeHash)
-    : { moduleCss: '', globalCss: null as string | null, diagnostics: [] };
+  const styleResult =
+    opts.source !== undefined
+      ? emitStyle(ir.styles, opts.source, scopeHash)
+      : { moduleCss: '', globalCss: null as string | null, diagnostics: [] };
   const moduleCss = styleResult.moduleCss;
   const globalCss = styleResult.globalCss;
   const styleDiags = styleResult.diagnostics;
@@ -202,9 +186,7 @@ export function emitReact(
     propsInterface.includes('ReactNode') ||
     tmpl.slotCtxInterfaces.some((s) => s.includes('ReactNode')) ||
     tmpl.scriptInjections.some((s) => s.includes('ReactNode'));
-  const reactTypeImports = referencesReactNode
-    ? "import type { ReactNode } from 'react';\n"
-    : '';
+  const reactTypeImports = referencesReactNode ? "import type { ReactNode } from 'react';\n" : '';
 
   // Phase 25 — synthesize the scoped CSS sibling import as a PLAIN side-effect
   // import (`import './X.css';`), NOT a CSS-Modules default import. React class
@@ -213,10 +195,8 @@ export function emitReact(
   // other five targets. `$classSelector` lowers to a static `"." + "x"` string
   // with no `styles` dependency, so the obsolete ROZ968 (no-`source`) guard is
   // gone — a `$classSelector` call is now safe on every emit path.
-  const cssModuleImport =
-    moduleCss.length > 0 ? `import './${ir.name}.css';` : null;
-  const globalCssImport =
-    globalCss !== null ? `import './${ir.name}.global.css';` : null;
+  const cssModuleImport = moduleCss.length > 0 ? `import './${ir.name}.css';` : null;
+  const globalCssImport = globalCss !== null ? `import './${ir.name}.global.css';` : null;
 
   // Plan 04-04 composition order (Wave 0 spike Variant A):
   //   hookSection (state hooks)
@@ -271,9 +251,7 @@ export function emitReact(
       return `import ${decl.localName} from '${rewritten}';`;
     });
   const componentImportsBlock =
-    componentImportsLines.length > 0
-      ? componentImportsLines.join('\n') + '\n'
-      : '';
+    componentImportsLines.length > 0 ? componentImportsLines.join('\n') + '\n' : '';
 
   // Phase 21 ($expose, REQ-5 / REQ-10, D-03) — branch STRICTLY on
   // ir.expose.length. When empty, none of these parts are passed and the shell
@@ -337,7 +315,12 @@ export function emitReact(
     imperativeHandleBlock = `${refInit}\n${refSync}\n${handleLine}`;
   }
 
-  const { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: shellScriptMap } = buildShell({
+  const {
+    ms,
+    scriptOutputOffset,
+    userCodeLineOffset,
+    scriptMap: shellScriptMap,
+  } = buildShell({
     componentName: ir.name,
     propsInterface,
     reactImports: reactImports.render(),
@@ -389,12 +372,7 @@ export function emitReact(
     code,
     css: moduleCss,
     map,
-    diagnostics: [
-      ...scriptDiags,
-      ...tmpl.diagnostics,
-      ...listeners.diagnostics,
-      ...styleDiags,
-    ],
+    diagnostics: [...scriptDiags, ...tmpl.diagnostics, ...listeners.diagnostics, ...styleDiags],
   };
   if (globalCss !== null) {
     result.globalCss = globalCss;

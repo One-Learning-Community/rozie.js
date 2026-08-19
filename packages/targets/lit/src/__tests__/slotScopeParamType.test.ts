@@ -10,13 +10,12 @@
  * mirroring React's refineSlotTypes) instead of `unknown`. The render-callback
  * RETURN type `=> unknown` is intentionally left unchanged.
  */
-import { describe, it, expect } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitLit } from '../emitLit.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -40,16 +39,12 @@ describe('slotScopeParamType — Lit scope params synthesize `any`, not `unknown
 
   it('Dropdown: producer @property scope-param types are `any`; render return type `=> unknown` unchanged', () => {
     const code = compile('Dropdown');
-    expect(code).toContain(
-      'trigger?: (scope: { open: any; toggle: any }) => unknown',
-    );
+    expect(code).toContain('trigger?: (scope: { open: any; toggle: any }) => unknown');
   });
 
   it('Dropdown: default-slot @property scope-param type is `any`', () => {
     const code = compile('Dropdown');
-    expect(code).toContain(
-      '__rozieDefaultSlot__?: (scope: { close: any }) => unknown',
-    );
+    expect(code).toContain('__rozieDefaultSlot__?: (scope: { close: any }) => unknown');
   });
 
   it('Dropdown: no emitted `scope: { ... }` object has any `unknown`-typed inner member', () => {

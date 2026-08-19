@@ -13,18 +13,17 @@
  *
  * @experimental
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { emitTemplate } from '../emit/emitTemplate.js';
+import { resolveTwoWayTarget } from '../emit/resolveTwoWayTarget.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
-import { emitTemplate } from '../emit/emitTemplate.js';
-import { resolveTwoWayTarget } from '../emit/resolveTwoWayTarget.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import * as t from '@babel/types';
 
 function lowerInline(rozie: string): IRComponent {
   const result = parse(rozie, { filename: 'inline.rozie' });
@@ -118,10 +117,7 @@ describe('resolveTwoWayTarget helper — Phase 07.3 Plan 07.3-06', () => {
   it('resolves $data.X → { local: X, setter: setX } for useState-backed state', () => {
     const ir = makeIRWithState('open1');
     // Build $data.open1
-    const expr = t.memberExpression(
-      t.identifier('$data'),
-      t.identifier('open1'),
-    );
+    const expr = t.memberExpression(t.identifier('$data'), t.identifier('open1'));
     const result = resolveTwoWayTarget(expr, ir);
     expect(result).toEqual({ local: 'open1', setter: 'setOpen1' });
   });
@@ -137,20 +133,14 @@ describe('resolveTwoWayTarget helper — Phase 07.3 Plan 07.3-06', () => {
     // function body (it lives on `props.onOpenChange`).
     const ir = makeIRWithModelProp('open');
     // Build $props.open
-    const expr = t.memberExpression(
-      t.identifier('$props'),
-      t.identifier('open'),
-    );
+    const expr = t.memberExpression(t.identifier('$props'), t.identifier('open'));
     const result = resolveTwoWayTarget(expr, ir);
     expect(result).toEqual({ local: 'open', setter: 'setOpen' });
   });
 
   it('camelCase propName capitalized correctly in setter', () => {
     const ir = makeIRWithState('flag');
-    const expr = t.memberExpression(
-      t.identifier('$data'),
-      t.identifier('flag'),
-    );
+    const expr = t.memberExpression(t.identifier('$data'), t.identifier('flag'));
     const result = resolveTwoWayTarget(expr, ir);
     expect(result).toEqual({ local: 'flag', setter: 'setFlag' });
   });

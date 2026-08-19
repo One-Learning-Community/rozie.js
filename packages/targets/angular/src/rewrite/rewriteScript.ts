@@ -35,36 +35,33 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import _traverse from '@babel/traverse';
+
 import type { NodePath } from '@babel/traverse';
+import _traverse from '@babel/traverse';
 import type { File } from '@babel/types';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { Diagnostic, IRComponent } from '@rozie/core';
+import { isInTypePosition } from '@rozie/core';
 import { portalKey } from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import {
   deconflictReservedClassFields,
   reservedClassMembers,
 } from '../../../../core/src/rewrite/deconflict.js';
-import {
-  hasShadowingBinding,
-  isInBindingPosition,
-} from './scopeAwareSkip.js';
+import { hasBooleanDisabledProp } from '../cvaDiagnostics.js';
+import { hasKeyedFillIntake } from '../emit/refineSlotTypes.js';
+import { buildSlotsMerge } from './buildSlotsMerge.js';
+import { collectComponentRefTypes } from './componentRefs.js';
+import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import { redirectNestedThis } from './redirectNestedThis.js';
 import { sanitizeEventName } from './sanitizeEventName.js';
-import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
-import { hasBooleanDisabledProp } from '../cvaDiagnostics.js';
-import { collectComponentRefTypes } from './componentRefs.js';
-import { buildSlotsMerge } from './buildSlotsMerge.js';
-import { hasKeyedFillIntake } from '../emit/refineSlotTypes.js';
+import { hasShadowingBinding, isInBindingPosition } from './scopeAwareSkip.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 /**
  * Decide whether a `$refs.X` access should lower to a non-null assertion
@@ -114,11 +111,7 @@ function refLowersToNonNull(path: NodePath<t.MemberExpression>): boolean {
       p = p.parentPath;
       continue;
     }
-    if (
-      t.isObjectExpression(n) ||
-      t.isArrayExpression(n) ||
-      t.isSpreadElement(n)
-    ) {
+    if (t.isObjectExpression(n) || t.isArrayExpression(n) || t.isSpreadElement(n)) {
       child = n;
       p = p.parentPath;
       continue;
@@ -318,9 +311,7 @@ function immutableArrayValue(
         t.spreadElement(slice(t.numericLiteral(0), t.cloneNode(start, true))),
         ...items,
         t.spreadElement(
-          slice(
-            t.binaryExpression('+', t.cloneNode(start, true), t.cloneNode(deleteCount, true)),
-          ),
+          slice(t.binaryExpression('+', t.cloneNode(start, true), t.cloneNode(deleteCount, true))),
         ),
       ]);
     }
@@ -330,18 +321,12 @@ function immutableArrayValue(
 }
 
 /** `this.<key>.update(<param> => <value>)`. */
-function buildAngularUpdateCall(
-  key: string,
-  param: string,
-  value: t.Expression,
-): t.CallExpression {
+function buildAngularUpdateCall(key: string, param: string, value: t.Expression): t.CallExpression {
   const updateCallee = t.memberExpression(
     t.memberExpression(t.thisExpression(), t.identifier(key)),
     t.identifier('update'),
   );
-  return t.callExpression(updateCallee, [
-    t.arrowFunctionExpression([t.identifier(param)], value),
-  ]);
+  return t.callExpression(updateCallee, [t.arrowFunctionExpression([t.identifier(param)], value)]);
 }
 
 /**
@@ -460,10 +445,7 @@ export function collectUserMethodNames(program: File): Set<string> {
 export function hoistDoubleReadAccessors(program: File): void {
   // Walk one function body's OWN scope (not nested functions) collecting
   // read-only $props.X / $data.X MemberExpressions, keyed by `$accessor.name`.
-  function collectInScope(
-    node: t.Node,
-    found: Map<string, t.MemberExpression[]>,
-  ): void {
+  function collectInScope(node: t.Node, found: Map<string, t.MemberExpression[]>): void {
     // Stop at nested function boundaries — their reads belong to a different
     // (possibly later-running) scope.
     if (
@@ -509,11 +491,7 @@ export function hoistDoubleReadAccessors(program: File): void {
 
   // True when the given MemberExpression is the LHS of an AssignmentExpression
   // anywhere in the body — model writes / `$data.X = …` must NOT be hoisted.
-  function isAssignedAnywhere(
-    node: t.Node,
-    accessor: string,
-    name: string,
-  ): boolean {
+  function isAssignedAnywhere(node: t.Node, accessor: string, name: string): boolean {
     let assigned = false;
     function walk(n: t.Node): void {
       if (assigned) return;
@@ -549,12 +527,7 @@ export function hoistDoubleReadAccessors(program: File): void {
 
   // Replace every occurrence of `$accessor.name` in `body` (own scope only)
   // with `Identifier(localName)`.
-  function replaceInScope(
-    node: t.Node,
-    accessor: string,
-    name: string,
-    localName: string,
-  ): void {
+  function replaceInScope(node: t.Node, accessor: string, name: string, localName: string): void {
     if (
       t.isFunctionDeclaration(node) ||
       t.isFunctionExpression(node) ||
@@ -599,9 +572,7 @@ export function hoistDoubleReadAccessors(program: File): void {
           t.isIdentifier(cn.property) &&
           cn.property.name === name
         ) {
-          (node as unknown as Record<string, unknown>)[key] = t.identifier(
-            localName,
-          );
+          (node as unknown as Record<string, unknown>)[key] = t.identifier(localName);
         } else {
           replaceInScope(cn, accessor, name, localName);
         }
@@ -631,10 +602,7 @@ export function hoistDoubleReadAccessors(program: File): void {
         t.variableDeclaration('const', [
           t.variableDeclarator(
             t.identifier(localName),
-            t.memberExpression(
-              t.identifier(accessor),
-              t.identifier(name),
-            ),
+            t.memberExpression(t.identifier(accessor), t.identifier(name)),
           ),
         ]),
       );
@@ -762,7 +730,10 @@ function matchesPolymorphicModelGuard(
  * (identical downstream lowering to the DatePicker hand-authored workaround
  * this replaces).
  */
-export function hoistPolymorphicModelGuards(cloned: File, polymorphicModelProps: Set<string>): void {
+export function hoistPolymorphicModelGuards(
+  cloned: File,
+  polymorphicModelProps: Set<string>,
+): void {
   if (polymorphicModelProps.size === 0) return;
 
   traverse(cloned, {
@@ -918,8 +889,7 @@ export function rewriteRozieIdentifiers(
   // (the merge would be truthy-broken — `'no' || false` is `'no'`). The shared
   // `hasBooleanDisabledProp` helper keeps this in lockstep with the
   // emitAngular-level gate and ROZ126.
-  const cvaMergeDisabled =
-    cvaModelProp !== null && hasBooleanDisabledProp(ir.props);
+  const cvaMergeDisabled = cvaModelProp !== null && hasBooleanDisabledProp(ir.props);
   const dataNames = new Set(ir.state.map((s) => s.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   // refs-lowering-cross-target Finding 2: refs on a CHILD COMPONENT lower to the
@@ -1046,10 +1016,7 @@ export function rewriteRozieIdentifiers(
     // VariableDeclarator id position: `const X = ...` — declaration, skip.
     if (t.isVariableDeclarator(parent) && parent.id === node) return false;
     // FunctionDeclaration/ArrowFunctionExpression id — declaration.
-    if (
-      (t.isFunctionDeclaration(parent) || t.isFunctionExpression(parent)) &&
-      parent.id === node
-    ) {
+    if ((t.isFunctionDeclaration(parent) || t.isFunctionExpression(parent)) && parent.id === node) {
       return false;
     }
     // Parameter position.
@@ -1153,9 +1120,7 @@ export function rewriteRozieIdentifiers(
         // onChange arg is the resolved post-write value, NOT the live signal.
         if (prop.name === cvaModelProp) {
           const newValue = buildCvaNewValueExpr(prop.name, node.operator, node.right);
-          path.replaceWith(
-            t.sequenceExpression([setterCall, buildCvaOnChangeCall(newValue)]),
-          );
+          path.replaceWith(t.sequenceExpression([setterCall, buildCvaOnChangeCall(newValue)]));
           return;
         }
         path.replaceWith(setterCall);
@@ -1227,10 +1192,7 @@ export function rewriteRozieIdentifiers(
           const propDecl = propByName.get(prop.name);
           const synthId = t.identifier(prop.name);
           if (propDecl) synthId.loc = propDecl.sourceLoc as any;
-          const synthCall = t.callExpression(
-            t.memberExpression(t.thisExpression(), synthId),
-            [],
-          );
+          const synthCall = t.callExpression(t.memberExpression(t.thisExpression(), synthId), []);
           if (propDecl) synthCall.loc = propDecl.sourceLoc as any;
           // Phase 23 — Task 2: the disabled OR-merge. On a CVA component
           // declaring a `disabled` prop, every internal `$props.disabled` read
@@ -1244,10 +1206,7 @@ export function rewriteRozieIdentifiers(
                 '||',
                 synthCall,
                 t.callExpression(
-                  t.memberExpression(
-                    t.thisExpression(),
-                    t.identifier('__rozieCvaDisabled'),
-                  ),
+                  t.memberExpression(t.thisExpression(), t.identifier('__rozieCvaDisabled')),
                   [],
                 ),
               ),
@@ -1267,10 +1226,7 @@ export function rewriteRozieIdentifiers(
         const stateDecl = stateByName.get(prop.name);
         const synthId = t.identifier(prop.name);
         if (stateDecl) synthId.loc = stateDecl.sourceLoc as any;
-        const synthCall = t.callExpression(
-          t.memberExpression(t.thisExpression(), synthId),
-          [],
-        );
+        const synthCall = t.callExpression(t.memberExpression(t.thisExpression(), synthId), []);
         if (stateDecl) synthCall.loc = stateDecl.sourceLoc as any;
         path.replaceWith(synthCall);
         return;
@@ -1281,10 +1237,7 @@ export function rewriteRozieIdentifiers(
         const refDecl = refByName.get(prop.name);
         const synthId = t.identifier(prop.name);
         if (refDecl) synthId.loc = refDecl.sourceLoc as any;
-        const refCall = t.callExpression(
-          t.memberExpression(t.thisExpression(), synthId),
-          [],
-        );
+        const refCall = t.callExpression(t.memberExpression(t.thisExpression(), synthId), []);
         // refs-lowering-cross-target Finding 2: a ref on a CHILD COMPONENT
         // resolves to the COMPONENT INSTANCE (`this.foo()` — Angular's view-query
         // default read for a template-ref var on a component element), which
@@ -1300,22 +1253,14 @@ export function rewriteRozieIdentifiers(
           path.replaceWith(
             isComponentRef
               ? t.tsNonNullExpression(refCall)
-              : t.memberExpression(
-                  t.tsNonNullExpression(refCall),
-                  t.identifier('nativeElement'),
-                ),
+              : t.memberExpression(t.tsNonNullExpression(refCall), t.identifier('nativeElement')),
           );
           return;
         }
         path.replaceWith(
           isComponentRef
             ? refCall
-            : t.optionalMemberExpression(
-                refCall,
-                t.identifier('nativeElement'),
-                false,
-                true,
-              ),
+            : t.optionalMemberExpression(refCall, t.identifier('nativeElement'), false, true),
         );
         return;
       }
@@ -1377,10 +1322,7 @@ export function rewriteRozieIdentifiers(
       if (obj.name === '$props') {
         if (modelProps.has(prop.name) || nonModelProps.has(prop.name)) {
           path.replaceWith(
-            t.callExpression(
-              t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
-              [],
-            ),
+            t.callExpression(t.memberExpression(t.thisExpression(), t.identifier(prop.name)), []),
           );
           return;
         }
@@ -1388,10 +1330,7 @@ export function rewriteRozieIdentifiers(
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
         path.replaceWith(
-          t.callExpression(
-            t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
-            [],
-          ),
+          t.callExpression(t.memberExpression(t.thisExpression(), t.identifier(prop.name)), []),
         );
         return;
       }
@@ -1405,12 +1344,7 @@ export function rewriteRozieIdentifiers(
         path.replaceWith(
           componentRefNames.has(prop.name)
             ? refCall
-            : t.optionalMemberExpression(
-                refCall,
-                t.identifier('nativeElement'),
-                false,
-                true,
-              ),
+            : t.optionalMemberExpression(refCall, t.identifier('nativeElement'), false, true),
         );
         return;
       }
@@ -1468,9 +1402,7 @@ export function rewriteRozieIdentifiers(
         if (args.length === 1) {
           const arg = args[0]!;
           if (t.isExpression(arg)) {
-            path.replaceWith(
-              t.callExpression(t.identifier('structuredClone'), [arg]),
-            );
+            path.replaceWith(t.callExpression(t.identifier('structuredClone'), [arg]));
           }
         }
         return;
@@ -1585,9 +1517,7 @@ export function rewriteRozieIdentifiers(
           const params = (parentPath.node as { params: t.Node[] }).params;
           if (params.includes(path.node)) return;
         }
-        path.replaceWith(
-          t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')),
-        );
+        path.replaceWith(t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')));
         // Do NOT path.skip() — let the visitor re-visit the synthesised
         // MemberExpression so the `$refs.X` handler downstream lowers it.
         return;
@@ -1634,14 +1564,9 @@ export function rewriteRozieIdentifiers(
           if (t.isObjectExpression(grandparent)) {
             if (!classMembers.has(name) && !collisionRenames.has(name)) return;
             const renamed = collisionRenames.get(name) ?? name;
-            const memberRef = t.memberExpression(
-              t.thisExpression(),
-              t.identifier(renamed),
-            );
+            const memberRef = t.memberExpression(t.thisExpression(), t.identifier(renamed));
             p.shorthand = false;
-            p.value = signalMembers.has(name)
-              ? t.callExpression(memberRef, [])
-              : memberRef;
+            p.value = signalMembers.has(name) ? t.callExpression(memberRef, []) : memberRef;
             path.skip();
             return;
           }
@@ -1662,7 +1587,12 @@ export function rewriteRozieIdentifiers(
       if (name === '$props' || name === '$data' || name === '$refs' || name === '$slots') {
         return;
       }
-      if (name === '$emit' || name === '$onMount' || name === '$onUnmount' || name === '$onUpdate') {
+      if (
+        name === '$emit' ||
+        name === '$onMount' ||
+        name === '$onUnmount' ||
+        name === '$onUpdate'
+      ) {
         return;
       }
 
@@ -1703,8 +1633,7 @@ export function rewriteRozieIdentifiers(
       const isCallee =
         (t.isCallExpression(parent) || t.isOptionalCallExpression(parent)) &&
         parent.callee === path.node;
-      const isAssignLeft =
-        t.isAssignmentExpression(parent) && parent.left === path.node;
+      const isAssignLeft = t.isAssignmentExpression(parent) && parent.left === path.node;
 
       if (isAssignLeft && signalMembers.has(name)) {
         // Bare `signalName = X` would need `.set(X)` semantics. The structural
@@ -1714,10 +1643,7 @@ export function rewriteRozieIdentifiers(
         return;
       }
 
-      const memberExpr = t.memberExpression(
-        t.thisExpression(),
-        t.identifier(renamedName),
-      );
+      const memberExpr = t.memberExpression(t.thisExpression(), t.identifier(renamedName));
 
       if (isAssignLeft) {
         // Non-signal class member assignment: `savedBodyOverflow = X`

@@ -7,13 +7,13 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { TemplateNode, IRComponent } from '../../../../core/src/ir/types.js';
-import { emitTemplate, type EmitTemplateOpts } from './emitTemplate.js';
+import type { IRComponent, IRTemplateNode as TemplateNode } from '@rozie/core';
 import {
-  LitImportCollector,
   LitDecoratorImportCollector,
+  LitImportCollector,
   RuntimeLitImportCollector,
 } from '../rewrite/collectLitImports.js';
+import { type EmitTemplateOpts, emitTemplate } from './emitTemplate.js';
 
 export function emitTemplateNode(
   node: TemplateNode,

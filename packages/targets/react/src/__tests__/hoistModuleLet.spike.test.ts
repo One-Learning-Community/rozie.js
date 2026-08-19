@@ -19,21 +19,20 @@
  *   - (a) or (b) → SHIP AUTO-HOIST + emit ROZ522
  *   - (c) → SHIP ROZ523 hard error
  */
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import * as t from '@babel/types';
+import { fileURLToPath } from 'node:url';
 import _traverse from '@babel/traverse';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import * as t from '@babel/types';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../..');
@@ -49,7 +48,11 @@ describe('hoistModuleLet — Wave 0 spike on Modal.rozie', () => {
     const program = ir.setupBody.scriptProgram;
 
     // 1. Find the top-level `let savedBodyOverflow = ''` declaration.
-    const moduleLets: Array<{ name: string; init: t.Expression | null | undefined; index: number }> = [];
+    const moduleLets: Array<{
+      name: string;
+      init: t.Expression | null | undefined;
+      index: number;
+    }> = [];
     program.program.body.forEach((stmt, idx) => {
       if (t.isVariableDeclaration(stmt) && stmt.kind === 'let') {
         for (const d of stmt.declarations) {
@@ -83,9 +86,11 @@ describe('hoistModuleLet — Wave 0 spike on Modal.rozie', () => {
                 if (
                   path.node.name === 'savedBodyOverflow' &&
                   // Skip property positions
-                  !(t.isMemberExpression(path.parent) &&
+                  !(
+                    t.isMemberExpression(path.parent) &&
                     path.parent.property === path.node &&
-                    !path.parent.computed)
+                    !path.parent.computed
+                  )
                 ) {
                   refs.add(path.node.name);
                 }
@@ -103,9 +108,11 @@ describe('hoistModuleLet — Wave 0 spike on Modal.rozie', () => {
           Identifier(path) {
             if (
               path.node.name === 'savedBodyOverflow' &&
-              !(t.isMemberExpression(path.parent) &&
+              !(
+                t.isMemberExpression(path.parent) &&
                 path.parent.property === path.node &&
-                !path.parent.computed)
+                !path.parent.computed
+              )
             ) {
               refs.add(path.node.name);
             }
@@ -130,9 +137,11 @@ describe('hoistModuleLet — Wave 0 spike on Modal.rozie', () => {
           Identifier(path) {
             if (
               path.node.name === 'savedBodyOverflow' &&
-              !(t.isMemberExpression(path.parent) &&
+              !(
+                t.isMemberExpression(path.parent) &&
                 path.parent.property === path.node &&
-                !path.parent.computed)
+                !path.parent.computed
+              )
             ) {
               directRef = true;
             }

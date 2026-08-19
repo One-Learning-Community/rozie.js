@@ -22,17 +22,14 @@
  */
 import * as t from '@babel/types';
 import type {
+  AngularEmissionDescriptor,
+  Diagnostic,
   IRComponent,
   Listener,
-} from '../../../../core/src/ir/types.js';
-import type {
+  ModifierArg,
   ModifierRegistry,
-  AngularEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier } from '@rozie/core';
-import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { angularOutputBinding, sanitizeEventName } from '../rewrite/sanitizeEventName.js';
 
@@ -301,10 +298,7 @@ function classifyHandler(node: t.Expression): 'identifier' | 'callable' | 'state
   return 'statement';
 }
 
-export function emitTemplateEvent(
-  listener: Listener,
-  ctx: EmitEventCtx,
-): EmitTemplateEventResult {
+export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTemplateEventResult {
   const diagnostics: Diagnostic[] = [];
   const counter = ctx.injectionCounter ?? { next: 0 };
   const eventName = listener.event;
@@ -462,13 +456,8 @@ export function emitTemplateEvent(
     // `handlerKind: 'identifier'` but their original `listener.handler` is
     // not a bare Identifier, so `originalName` is undefined and the arg is
     // kept (the IIFE wrapper takes `...args`).
-    const originalName = t.isIdentifier(listener.handler)
-      ? listener.handler.name
-      : undefined;
-    const arity =
-      originalName !== undefined
-        ? ctx.handlerArity?.get(originalName)
-        : undefined;
+    const originalName = t.isIdentifier(listener.handler) ? listener.handler.name : undefined;
+    const arity = originalName !== undefined ? ctx.handlerArity?.get(originalName) : undefined;
     attrValue = arity === 0 ? `${handlerRef}()` : `${handlerRef}($event)`;
   } else if (inlineGuards.length === 0 && handlerKind === 'statement') {
     // Statement-form handler — splice as-is (e.g., `closeOnBackdrop && close()`).
@@ -495,13 +484,8 @@ export function emitTemplateEvent(
     const guardChain = inlineGuards.join(' ');
     let invocation: string;
     if (handlerKind === 'identifier') {
-      const originalName = t.isIdentifier(listener.handler)
-        ? listener.handler.name
-        : undefined;
-      const arity =
-        originalName !== undefined
-          ? ctx.handlerArity?.get(originalName)
-          : undefined;
+      const originalName = t.isIdentifier(listener.handler) ? listener.handler.name : undefined;
+      const arity = originalName !== undefined ? ctx.handlerArity?.get(originalName) : undefined;
       invocation = arity === 0 ? `${handlerRef}()` : `${handlerRef}($event)`;
     } else if (handlerKind === 'callable') {
       invocation = `(${handlerRef})($event)`;
@@ -565,18 +549,12 @@ export function emitTemplateEvent(
       // handler name in the arity map and drop the arg when arity is 0.
       // Only applies when the handler was an authored Identifier — debounce/
       // throttle wrap names (also `handlerKind: 'identifier'`) take `...args`.
-      const originalName = t.isIdentifier(listener.handler)
-        ? listener.handler.name
-        : undefined;
-      const arity =
-        originalName !== undefined
-          ? ctx.handlerArity?.get(originalName)
-          : undefined;
+      const originalName = t.isIdentifier(listener.handler) ? listener.handler.name : undefined;
+      const arity = originalName !== undefined ? ctx.handlerArity?.get(originalName) : undefined;
       // The bare handlerRef may be a top-level user fn (not in the old member
       // set) — `thisPrefixed` already routed it through `this.`; use it as the
       // callee so a non-colliding `onBare` becomes `this.onBare`.
-      innerInvocation =
-        arity === 0 ? `${thisPrefixed}()` : `${thisPrefixed}($event)`;
+      innerInvocation = arity === 0 ? `${thisPrefixed}()` : `${thisPrefixed}($event)`;
     } else if (handlerKind === 'callable') {
       innerInvocation = `(${thisPrefixed})($event)`;
     } else {
@@ -598,11 +576,7 @@ export function emitTemplateEvent(
   // source, event: eventName, ... })` call) deliberately used the AUTHORED
   // `eventName` verbatim; the resolution below applies ONLY to the final
   // binding-string composition.
-  const boundEventName = resolveEventBindingName(
-    eventName,
-    ctx.elementTagKind,
-    ctx.producerEmits,
-  );
+  const boundEventName = resolveEventBindingName(eventName, ctx.elementTagKind, ctx.producerEmits);
   const eventAttr = `(${boundEventName})="${attrValue}"`;
 
   const result: EmitTemplateEventResult = { eventAttr, diagnostics };

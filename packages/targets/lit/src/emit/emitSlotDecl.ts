@@ -25,17 +25,20 @@
  * @experimental — shape may change before v1.0
  */
 import * as bt from '@babel/types';
-import type { IRComponent, SlotDecl, ParamDecl } from '../../../../core/src/ir/types.js';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import type { Diagnostic, IRComponent, ParamDecl, SlotDecl } from '@rozie/core';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import type {
   LitDecoratorImportCollector,
   PreactSignalsImportCollector,
 } from '../rewrite/collectLitImports.js';
 import { collectMethodNamesFromIR } from './methodNames.js';
 import { portalSlotMemberName } from './portalSlotMemberName.js';
-import { slotIdentityKey, slotFieldSuffix } from './slotIdentityKey.js';
-import { slotScopeParamType, slotScopeTypeObject, buildRozieSlotsRecordType } from './slotScopeParamType.js';
-import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { slotFieldSuffix, slotIdentityKey } from './slotIdentityKey.js';
+import {
+  buildRozieSlotsRecordType,
+  slotScopeParamType,
+  slotScopeTypeObject,
+} from './slotScopeParamType.js';
 
 export interface EmitSlotDeclOpts {
   decorators: LitDecoratorImportCollector;
@@ -126,10 +129,7 @@ function emitOneSlot(
   const stateField = `  @state() private _hasSlot${suffix} = false;`;
 
   // @queryAssignedElements decorator — D-LIT-14 correction.
-  const opts =
-    slot.name === ''
-      ? '{ flatten: true }'
-      : `{ slot: '${slot.name}', flatten: true }`;
+  const opts = slot.name === '' ? '{ flatten: true }' : `{ slot: '${slot.name}', flatten: true }`;
   const queryField = `  @queryAssignedElements(${opts}) private _slot${suffix}Elements!: Element[];`;
 
   // quick 260807-cor (D4) — gate: this slot's assigned-elements field/write/
@@ -286,9 +286,7 @@ function emitOneSlot(
     const propertyFieldName =
       slot.name === '' ? '__rozieDefaultSlot__' : portalSlotMemberName(slot.name, ir);
     const scopeType =
-      slot.params.length > 0
-        ? slotScopeTypeObject(slot.params, slot.paramTypes)
-        : 'unknown';
+      slot.params.length > 0 ? slotScopeTypeObject(slot.params, slot.paramTypes) : 'unknown';
     propertyField = `  @property({ attribute: false }) ${propertyFieldName}?: (scope: ${scopeType}) => unknown;`;
   }
 
@@ -297,10 +295,7 @@ function emitOneSlot(
     .join('\n');
 }
 
-export function emitSlotDecl(
-  ir: IRComponent,
-  opts: EmitSlotDeclOpts,
-): EmitSlotDeclResult {
+export function emitSlotDecl(ir: IRComponent, opts: EmitSlotDeclOpts): EmitSlotDeclResult {
   const diagnostics: Diagnostic[] = [];
   const slottedReads = opts.slottedReads ?? new Set<string>();
   const slots = ir.slots ?? [];

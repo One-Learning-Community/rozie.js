@@ -22,11 +22,12 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
+
+import type { GeneratorOptions } from '@babel/generator';
 import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
-import type { GeneratorOptions } from '@babel/generator';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 // CJS interop normalization.
@@ -34,13 +35,13 @@ type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
+    : (_traverse as unknown as { default: TraverseFn }).default;
 
 // jsescOption.quotes='single' aligns generator string-literal output with the
 // canonical merge shape emitted by `emitSlotInvocation.ts:139` (string
@@ -54,7 +55,10 @@ const GEN_OPTS: GeneratorOptions = {
 };
 
 function flattenInlineCode(code: string): string {
-  return code.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim();
+  return code
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
 }
 
 function capitalize(name: string): string {
@@ -72,15 +76,21 @@ function toSolidEventPropName(eventName: string): string {
 
 /** Map of compound-assignment operator → matching binary operator. */
 const COMPOUND_OP_MAP: Record<string, t.BinaryExpression['operator']> = {
-  '+=': '+', '-=': '-', '*=': '*', '/=': '/', '%=': '%', '**=': '**',
-  '<<=': '<<', '>>=': '>>', '>>>=': '>>>', '&=': '&', '|=': '|', '^=': '^',
+  '+=': '+',
+  '-=': '-',
+  '*=': '*',
+  '/=': '/',
+  '%=': '%',
+  '**=': '**',
+  '<<=': '<<',
+  '>>=': '>>',
+  '>>>=': '>>>',
+  '&=': '&',
+  '|=': '|',
+  '^=': '^',
 };
 
-function buildSetterCall(
-  stateName: string,
-  operator: string,
-  rhs: t.Expression,
-): t.CallExpression {
+function buildSetterCall(stateName: string, operator: string, rhs: t.Expression): t.CallExpression {
   const setterName = 'set' + capitalize(stateName);
   if (operator === '=') {
     return t.callExpression(t.identifier(setterName), [rhs]);
@@ -127,9 +137,7 @@ export interface RewriteTemplateOpts {
    * undefined is the universal back-compat path (mount-once portals + every
    * non-portal scoped slot keep the destructured-value shape).
    */
-  scopeAccessorParams?:
-    | { accessorIdent: string; params: ReadonlyMap<string, string> }
-    | undefined;
+  scopeAccessorParams?: { accessorIdent: string; params: ReadonlyMap<string, string> } | undefined;
   /**
    * Spike-012 NEW-4 — identifiers bound to a RAW loop VALUE by an enclosing
    * keyless `<For>` (the item alias). Under `<For>` the item callback param is a
@@ -224,9 +232,7 @@ export function rewriteTemplateExpression(
           // createControllableSignal returns [Accessor<T>, Setter<T>]
           // In template expressions, we call the accessor: value()
           // Replace $props.value with a call expression: value()
-          path.replaceWith(
-            t.callExpression(t.identifier(prop.name), []),
-          );
+          path.replaceWith(t.callExpression(t.identifier(prop.name), []));
           path.skip();
           return;
         }
@@ -242,9 +248,7 @@ export function rewriteTemplateExpression(
 
       if (obj.name === '$data' && dataNames.has(prop.name)) {
         // Signal getter: foo()
-        path.replaceWith(
-          t.callExpression(t.identifier(prop.name), []),
-        );
+        path.replaceWith(t.callExpression(t.identifier(prop.name), []));
         path.skip();
         return;
       }
@@ -357,8 +361,7 @@ export function rewriteTemplateExpression(
             // Skip property keys / shorthand keys — only VALUE positions rewrite.
             const parentNode = parentPath.node;
             const isMemberProp =
-              (t.isMemberExpression(parentNode) ||
-                t.isOptionalMemberExpression(parentNode)) &&
+              (t.isMemberExpression(parentNode) || t.isOptionalMemberExpression(parentNode)) &&
               parentNode.property === path.node &&
               !parentNode.computed;
             const isObjectKey =
@@ -432,9 +435,18 @@ export function rewriteTemplateExpression(
       // Skip: already being called → `remaining()`
       if (parentPath.isCallExpression() && parentPath.node.callee === path.node) return;
       // Skip: property key in member expression → `obj.remaining`
-      if (parentPath.isMemberExpression() && parentPath.node.property === path.node && !parentPath.node.computed) return;
+      if (
+        parentPath.isMemberExpression() &&
+        parentPath.node.property === path.node &&
+        !parentPath.node.computed
+      )
+        return;
       // Skip: object property key in shorthand or non-computed form
-      if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) {
+      if (
+        parentPath.isObjectProperty() &&
+        parentPath.node.key === path.node &&
+        !parentPath.node.computed
+      ) {
         // Shorthand `{ index }` would otherwise lose its value half on rewrite;
         // expand to `{ index: index() }` to keep the rewrite well-formed.
         if (parentPath.node.shorthand) {
@@ -471,9 +483,7 @@ export function rewriteTemplateExpression(
 
       const eventName = firstArg.value;
       const propName = toSolidEventPropName(eventName);
-      const restArgs = args
-        .slice(1)
-        .filter((a) => !t.isJSXNamespacedName(a)) as Array<
+      const restArgs = args.slice(1).filter((a) => !t.isJSXNamespacedName(a)) as Array<
         t.Expression | t.SpreadElement | t.ArgumentPlaceholder
       >;
       const replacement = t.optionalCallExpression(

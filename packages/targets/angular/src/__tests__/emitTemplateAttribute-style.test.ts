@@ -20,16 +20,16 @@
  * StringLiteral `+` a both-string-branch Conditional) is provably a string,
  * so it now takes the `[attr.style]=` path — updated below to match.
  */
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitTemplate } from '../emit/emitTemplate.js';
 
 function lowerInline(src: string): IRComponent {
   const result = parse(src, { filename: 'Test.rozie' });
-  if (!result.ast) throw new Error(`parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`);
+  if (!result.ast)
+    throw new Error(`parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`);
   const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
   if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
   return lowered.ir;

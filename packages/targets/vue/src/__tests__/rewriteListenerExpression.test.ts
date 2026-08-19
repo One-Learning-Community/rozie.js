@@ -22,10 +22,11 @@
  * (declarator id, member property, object shorthand key, function param,
  * function-declaration id) must NOT get `.value`.
  */
-import { describe, expect, it } from 'vitest';
-import * as t from '@babel/types';
+
 import { parseExpression } from '@babel/parser';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { rewriteScriptExpression } from '../rewrite/rewriteListenerExpression.js';
 
 function buildIR(overrides: Partial<IRComponent> = {}): IRComponent {
@@ -127,11 +128,7 @@ describe('rewriteScriptExpression — SCRIPT-context sigil matrix', () => {
   it('bare computed identifier → name.value', () => {
     const ir = buildIR({ computed: [computed('canIncrement')] });
     // A bare identifier expression in a logical guard position.
-    const expr = t.logicalExpression(
-      '&&',
-      t.identifier('canIncrement'),
-      t.booleanLiteral(true),
-    );
+    const expr = t.logicalExpression('&&', t.identifier('canIncrement'), t.booleanLiteral(true));
     expect(rewriteScriptExpression(expr, ir)).toBe('canIncrement.value && true');
   });
 

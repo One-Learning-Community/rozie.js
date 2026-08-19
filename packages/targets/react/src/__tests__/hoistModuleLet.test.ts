@@ -4,17 +4,16 @@
 // is reachable via `lockScroll`/`unlockScroll` (top-level helpers passed
 // directly to $onMount/$onUnmount as Identifiers) — category (b) ONE-LEVEL
 // HELPER → AUTO-HOIST.
-import { describe, expect, it } from 'vitest';
+
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import * as t from '@babel/types';
+import { fileURLToPath } from 'node:url';
 import _generate from '@babel/generator';
 import { parse as babelParse } from '@babel/parser';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, TemplateElementIR } from '../../../../core/src/ir/types.js';
+import * as t from '@babel/types';
+import type { IRComponent, TemplateElementIR } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { hoistModuleLet } from '../rewrite/hoistModuleLet.js';
 
@@ -22,7 +21,7 @@ type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
   typeof _generate === 'function'
     ? (_generate as GenerateFn)
-    : ((_generate as unknown as { default: GenerateFn }).default);
+    : (_generate as unknown as { default: GenerateFn }).default;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../..');
@@ -63,9 +62,7 @@ describe('hoistModuleLet', () => {
       (s) =>
         t.isVariableDeclaration(s) &&
         s.kind === 'let' &&
-        s.declarations.some(
-          (d) => t.isIdentifier(d.id) && d.id.name === 'savedBodyOverflow',
-        ),
+        s.declarations.some((d) => t.isIdentifier(d.id) && d.id.name === 'savedBodyOverflow'),
     );
     expect(stillHasLet).toBe(false);
 
@@ -111,7 +108,14 @@ $onMount(helper);
       listeners: [],
       setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
       template: null,
-      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      styles: {
+        type: 'StyleSection',
+        scopedRules: [],
+        rootRules: [],
+        portalRules: [],
+        engineRules: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
       sourceLoc: { start: 0, end: 0 },
     };
     const { hoisted, diagnostics } = hoistModuleLet(program, syntheticIR);
@@ -170,7 +174,14 @@ $onMount(setup);
       listeners: [],
       setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
       template: null,
-      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      styles: {
+        type: 'StyleSection',
+        scopedRules: [],
+        rootRules: [],
+        portalRules: [],
+        engineRules: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
       sourceLoc: { start: 0, end: 0 },
     };
     // Must not throw on the shorthand-in-ObjectPattern.
@@ -230,7 +241,14 @@ $onMount(setup);
       listeners: [],
       setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
       template: null,
-      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      styles: {
+        type: 'StyleSection',
+        scopedRules: [],
+        rootRules: [],
+        portalRules: [],
+        engineRules: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
       sourceLoc: { start: 0, end: 0 },
     };
     const { hoisted } = hoistModuleLet(program, syntheticIR);
@@ -277,7 +295,14 @@ $onMount(helperB);
       listeners: [],
       setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
       template: null,
-      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      styles: {
+        type: 'StyleSection',
+        scopedRules: [],
+        rootRules: [],
+        portalRules: [],
+        engineRules: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
       sourceLoc: { start: 0, end: 0 },
     };
     const { hoisted } = hoistModuleLet(program, syntheticIR);
@@ -336,7 +361,14 @@ const keyFor = (item) => {
       listeners: [],
       setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
       template: templateEl,
-      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      styles: {
+        type: 'StyleSection',
+        scopedRules: [],
+        rootRules: [],
+        portalRules: [],
+        engineRules: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
       sourceLoc: { start: 0, end: 0 },
     } as IRComponent;
     const { hoisted } = hoistModuleLet(program, syntheticIR);
@@ -372,7 +404,14 @@ const keyFor = (item) => {
       listeners: [],
       setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
       template: null,
-      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      styles: {
+        type: 'StyleSection',
+        scopedRules: [],
+        rootRules: [],
+        portalRules: [],
+        engineRules: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
       sourceLoc: { start: 0, end: 0 },
     } as IRComponent;
     const { hoisted } = hoistModuleLet(program, syntheticIR);
@@ -431,7 +470,14 @@ const bump = () => {
       listeners: [clickListener],
       setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
       template: templateEl,
-      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      styles: {
+        type: 'StyleSection',
+        scopedRules: [],
+        rootRules: [],
+        portalRules: [],
+        engineRules: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
       sourceLoc: { start: 0, end: 0 },
     } as IRComponent;
     const { hoisted } = hoistModuleLet(program, syntheticIR);
@@ -478,7 +524,14 @@ const bump = () => {
       listeners: [docListener],
       setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
       template: null,
-      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      styles: {
+        type: 'StyleSection',
+        scopedRules: [],
+        rootRules: [],
+        portalRules: [],
+        engineRules: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
       sourceLoc: { start: 0, end: 0 },
     } as IRComponent;
     const { hoisted } = hoistModuleLet(program, syntheticIR);

@@ -33,24 +33,25 @@
  *
  * Ambient ROOT-relative fixture read pattern per staticSlotProducerFillMap.test.ts.
  */
-import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { emitAngular } from '../emitAngular.js';
-import { parseExpression, parse as babelParse } from '@babel/parser';
-import _generate from '@babel/generator';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
-import { rewriteListenerExpression } from '../rewrite/rewriteListenerExpression.js';
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
 
-const generate = (typeof _generate === 'function'
-  ? _generate
-  : (_generate as unknown as { default: typeof _generate }).default) as typeof _generate;
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import _generate from '@babel/generator';
+import { parse as babelParse, parseExpression } from '@babel/parser';
+import type { IRComponent, SlotDecl } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
+import { emitAngular } from '../emitAngular.js';
+import { rewriteListenerExpression } from '../rewrite/rewriteListenerExpression.js';
+import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+
+const generate = (
+  typeof _generate === 'function'
+    ? _generate
+    : (_generate as unknown as { default: typeof _generate }).default
+) as typeof _generate;
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../../../..');
@@ -74,10 +75,7 @@ function compileAngular(src: string, filename: string): string {
 /** The real fixture Task 1's two gated-consumer fixtures target. */
 function compileGatedProducer(): string {
   const filename = 'ProducerGatedStaticSlots.rozie';
-  const src = readFileSync(
-    resolve(ROOT, `tests/angular-runtime/fixtures/${filename}`),
-    'utf8',
-  );
+  const src = readFileSync(resolve(ROOT, `tests/angular-runtime/fixtures/${filename}`), 'utf8');
   return compileAngular(src, filename);
 }
 

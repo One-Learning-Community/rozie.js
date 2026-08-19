@@ -5,10 +5,9 @@
 // newline between text and an element vanished on Solid while the HTML-templating
 // targets collapse it to one space. The emitter restores that boundary space as
 // an explicit {" "} JSX child. See the React twin for the full rationale.
-import { describe, it, expect } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { describe, expect, it } from 'vitest';
 import { emitSolid } from '../emitSolid.js';
 
 function compile(src: string): string {

@@ -29,11 +29,10 @@
 // this instance's own `RoziePortalController`(s) — always in sync, no
 // caching/staleness risk. Components with NO `r-portal` element (the
 // overwhelming majority) stay byte-identical to the plain `@query` field.
+
+import type { IRComponent } from '@rozie/core';
+import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
-import { parse } from '../../../../core/src/parse.js';
-import { lowerToIR } from '../../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { emitLit } from '../emitLit.js';
 
 function compile(src: string): string {
@@ -89,15 +88,23 @@ describe('emitLit — author refs survive r-portal relocation (BUG A)', () => {
     const code = compile(SRC_WITH_PORTAL);
     // The RAW uncached @query field still exists (the fresh-probe fast path),
     // renamed off the public `_refPanel` name so the getter below can own it.
-    expect(code).toMatch(/@query\('\[data-rozie-ref="panel"\]'\) private __rozieRawRefPanel!: HTMLElement;/);
+    expect(code).toMatch(
+      /@query\('\[data-rozie-ref="panel"\]'\) private __rozieRawRefPanel!: HTMLElement;/,
+    );
     // The PUBLIC-shaped accessor (`_refPanel`, what every call site reads) is
     // now a GETTER, not a plain field — delegating to the runtime helper.
     expect(code).toMatch(/private get _refPanel\(\): HTMLElement \{/);
-    expect(code).toMatch(/rozieResolvePortalledRef\(this, '\[data-rozie-ref="panel"\]', this\.__rozieRawRefPanel\)/);
+    expect(code).toMatch(
+      /rozieResolvePortalledRef\(this, '\[data-rozie-ref="panel"\]', this\.__rozieRawRefPanel\)/,
+    );
     // The runtime import is registered.
-    expect(code).toMatch(/import \{[^}]*rozieResolvePortalledRef[^}]*\} from '@rozie\/runtime-lit';/);
+    expect(code).toMatch(
+      /import \{[^}]*rozieResolvePortalledRef[^}]*\} from '@rozie\/runtime-lit';/,
+    );
     // The original bare-field shape must NOT appear for this ref.
-    expect(code).not.toMatch(/@query\('\[data-rozie-ref="panel"\]'\) private _refPanel!: HTMLElement;/);
+    expect(code).not.toMatch(
+      /@query\('\[data-rozie-ref="panel"\]'\) private _refPanel!: HTMLElement;/,
+    );
   });
 
   it('a ref inside a component with NO r-portal element stays the plain, byte-identical uncached @query field', () => {

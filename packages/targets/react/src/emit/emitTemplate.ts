@@ -17,21 +17,19 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '@rozie/core';
-import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import {
+import type { Diagnostic, IRComponent, ModifierRegistry } from '@rozie/core';
+import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
-import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
-import { emitSlotDecl } from './emitSlotDecl.js';
 import {
   buildKeynavFocusScopeInjections,
   buildKeynavScriptInjections,
   resolveKeynavFocusScopeRefs,
   resolveKeynavPlans,
 } from './emitKeynav.js';
+import { emitSlotDecl } from './emitSlotDecl.js';
+import { type EmitNodeCtx, emitNode } from './emitTemplateNode.js';
 
 export interface EmitTemplateResult {
   jsx: string;
