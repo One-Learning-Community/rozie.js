@@ -125,11 +125,16 @@ export class DynamicSlots {
         }
         seen.add(k);
       }
-      if (fills.length === 0 && this.__rozieProjectedTpls().length > 0) {
-        this.__rozieSlotWarned = true;
-        console.warn('[ROZ750] DynamicSlots: projected template content was found but no keyed fills were collected — did you forget to add RozieSlot to the consumer\'s imports: array?');
-      }
     });
+  }
+
+  ngAfterContentInit() {
+    if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;
+    const claimedByStaticRefs = [this.headerCellTpl].filter((t) => t != null).length;
+    if (this.__rozieFills().length === 0 && this.__rozieProjectedTpls().length > claimedByStaticRefs) {
+      this.__rozieSlotWarned = true;
+      console.warn('[ROZ750] DynamicSlots: projected template content was found but no keyed fills were collected — did you forget to add RozieSlot to the consumer\'s imports: array?');
+    }
   }
 
   static ngTemplateContextGuard(
