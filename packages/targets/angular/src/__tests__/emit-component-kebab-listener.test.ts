@@ -34,7 +34,7 @@
  * `compile()` path threads it for real.
  */
 
-import type { EventModifierImpl, ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import type { EventModifierImpl, ModifierRegistry } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { lowerToIR } from '../../../../core/src/ir/lower.js';

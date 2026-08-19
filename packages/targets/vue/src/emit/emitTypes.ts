@@ -48,7 +48,8 @@ import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHan
 // `renderPropsInterface` (Plan 22-02 LOCKED CONTRACT) so the per-target type
 // renderers cannot drift from the prop→TS-type mapping. Imported from the
 // `@rozie/core` barrel.
-import { renderPropsInterface } from '../../../../core/src/codegen/renderPropsInterface.js';
+import { renderPropsInterface } from '@rozie/core';
+
 /**
  * Options controlling Vue `.d.rozie.ts` emission.
  *

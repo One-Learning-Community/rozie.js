@@ -59,7 +59,11 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { SlotFillerDecl, IRComponent, TemplateNode } from '../../../../core/src/ir/types.js';
+import type {
+  SlotFillerDecl,
+  IRComponent,
+  IRTemplateNode as TemplateNode,
+} from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { renderRecordKey } from './refineSlotTypes.js';

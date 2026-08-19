@@ -8,7 +8,8 @@
  * on a non-dialog element keeps the byte-identical `HTMLElement | null` default.
  */
 import { describe, it, expect } from 'vitest';
-import { compile } from '../../../../core/src/compile.js';
+import { compile } from '@rozie/core';
+
 const DIALOG_SRC = `
 <rozie name="DialogRef">
 <script lang="ts">

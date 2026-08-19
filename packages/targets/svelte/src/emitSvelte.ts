@@ -31,7 +31,7 @@ import {
   collectTopLevelFunctionNames,
 } from '../../../core/src/rewrite/deconflict.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
-import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
+import type { ModifierRegistry } from '@rozie/core';
 import type { BlockMap } from '../../../core/src/ast/types.js';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';

@@ -28,7 +28,7 @@
 
 import { unlinkSync } from 'node:fs';
 import { createUnplugin as createUnpluginV3 } from 'unplugin';
-import { ModifierRegistry } from '../../core/src/modifiers/ModifierRegistry.js';
+import { ModifierRegistry } from '@rozie/core';
 import { registerBuiltins } from '../../core/src/modifiers/registerBuiltins.js';
 import {
   validateOptions,

@@ -15,7 +15,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { unplugin } from '../index.js';
 import { createTransformHook, transformIncludeRozie, createLoadHook, createResolveIdHook } from '../transform.js';
-import { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
+import { ModifierRegistry } from '@rozie/core';
 import { registerBuiltins } from '../../../core/src/modifiers/registerBuiltins.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

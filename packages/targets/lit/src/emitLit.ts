@@ -26,7 +26,7 @@
  */
 import type { IRComponent, TemplateNode } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
-import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
+import type { ModifierRegistry } from '@rozie/core';
 import type { BlockMap } from '../../../core/src/ast/types.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import {

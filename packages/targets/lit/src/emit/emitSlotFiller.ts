@@ -67,7 +67,11 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { SlotFillerDecl, IRComponent, TemplateNode } from '../../../../core/src/ir/types.js';
+import type {
+  SlotFillerDecl,
+  IRComponent,
+  IRTemplateNode as TemplateNode,
+} from '@rozie/core';
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';

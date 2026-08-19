@@ -12,9 +12,8 @@ import { describe, expect, it } from 'vitest';
 import { parse } from '../../../../core/src/parse.js';
 import { lowerToIR } from '../../../../core/src/ir/lower.js';
 import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
-import { registerBuiltins } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { ModelModifierImpl } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import { ModifierRegistry, registerBuiltins } from '@rozie/core';
+import type { ModelModifierImpl } from '@rozie/core';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { emitTemplate } from '../emit/emitTemplate.js';
 

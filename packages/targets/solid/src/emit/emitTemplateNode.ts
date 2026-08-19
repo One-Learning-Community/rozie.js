@@ -39,7 +39,7 @@ import type {
   Listener,
   ListenerSpreadIR,
 } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';

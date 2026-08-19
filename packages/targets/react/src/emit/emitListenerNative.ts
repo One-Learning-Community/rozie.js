@@ -31,8 +31,11 @@ import type {
   Listener,
   ListenerTarget,
 } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry, ReactEmissionDescriptor } from '../../../../core/src/modifiers/ModifierRegistry.js';
-import { isEventModifier } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import type {
+  ModifierRegistry,
+  ReactEmissionDescriptor,
+} from '@rozie/core';
+import { isEventModifier } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';

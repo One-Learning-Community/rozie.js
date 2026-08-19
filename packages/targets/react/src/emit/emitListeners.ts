@@ -35,8 +35,12 @@ import type {
   IRComponent,
   Listener,
 } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry, ModifierPipelineEntry, ReactEmissionDescriptor } from '../../../../core/src/modifiers/ModifierRegistry.js';
-import { isEventModifier } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import type {
+  ModifierRegistry,
+  ModifierPipelineEntry,
+  ReactEmissionDescriptor,
+} from '@rozie/core';
+import { isEventModifier } from '@rozie/core';
 import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import {

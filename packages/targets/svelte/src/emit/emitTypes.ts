@@ -46,7 +46,8 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 // `synthesizeHandleType` is not yet in the `@rozie/core` barrel — import it
 // relatively as React's emitTypes.ts does.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
-import { renderPropsInterface } from '../../../../core/src/codegen/renderPropsInterface.js';
+import { renderPropsInterface } from '@rozie/core';
+
 /**
  * Options controlling Svelte `.d.rozie.ts` emission.
  *
