@@ -42,7 +42,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      # fetch-depth: 0 is REQUIRED, not incidental — same reason as
+      # angular-matrix.yml. `rozie-angular-runtime-tests#typecheck` dependsOn
+      # its own `test` (turbo.json; that vitest run is what emits the gitignored
+      # `.rozie.ts` disk-cache its fixtures resolve through), and that suite
+      # includes `prohibitions.test.ts`, whose byte-identity gates read pre-fix
+      # fixture bytes straight out of git history via
+      # `git show <BASELINE_COMMIT>:<path>`. Under actions/checkout's default
+      # depth-1 shallow clone that object is not present and every one of those
+      # gates dies with
+      #   fatal: path '…' exists on disk, but not in '<sha>'
+      # Do not drop this without first removing the test's git-history
+      # dependency.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v6
 
