@@ -2,8 +2,27 @@ name: Vue 3.4 + 3.5 Matrix
 
 # Phase 3 Plan 06 / D-27: verify the emitted .vue output works against both
 # the Vue 3.4 floor (the version that introduced `defineModel` — PROJECT.md
-# constraint) AND the latest Vue 3.5.x. Sequential steps rather than a real
-# matrix per RESEARCH OQ5 — over-engineering for v1.
+# constraint) AND the latest Vue 3.5.x.
+#
+# STRUCTURE (quick 260819-mqx). This workflow used to be ONE job that ran the
+# cross-target gates and then both Vue legs sequentially. That made it the
+# longest-running matrix workflow while carrying the SHORTEST timeout, and on
+# 2026-08-19 it silently ate itself three times: killed at 20m20s / 20m22s /
+# 20m24s against `timeout-minutes: 20`, always mid "Install Playwright
+# Chromium", so BOTH legs were skipped every time. A timed-out job reports as
+# `cancelled`, so it read as an infra blip and went undiagnosed while Vue sat
+# unverified against the whole Phase 80 backlog (quick 260819-i06).
+#
+# It is now two jobs, matching every other matrix workflow in this repo:
+#   vue-gates  — the cross-target gates, once
+#   vue-matrix — a REAL matrix over the Vue versions, legs in parallel
+#
+# The two jobs are deliberately NOT chained with `needs:`. Chaining would save
+# runner minutes, but it is exactly the shape that hid a real bug today: the
+# `integration-build` job in angular-matrix.yml is `needs: [angular-matrix]`,
+# angular-matrix was red, so a genuine `vite build` failure sat masked behind a
+# skip for the entire backlog and only surfaced once the upstream job was
+# fixed. Independent jobs surface both classes of failure in the same run.
 
 on:
   push:
@@ -12,24 +31,17 @@ on:
     branches: [main]
 
 jobs:
-  vue-matrix:
+  # ---------------------------------------------------------------------------
+  # Cross-target gates. These live in THIS workflow (rather than a per-target
+  # matrix) because its trigger has NO path filter — it runs on every PR to
+  # main regardless of which files changed, which is the property each of these
+  # gates needs. Runs once; not per Vue version, since none of them depend on
+  # the demo's Vue version.
+  # ---------------------------------------------------------------------------
+  vue-gates:
+    name: Cross-target gates (no path filter — runs on every PR)
     runs-on: ubuntu-latest
-    # 20 was too low and was silently eating this workflow. Three separate runs
-    # on 2026-08-19 were killed at 20m20s / 20m22s / 20m24s — always mid
-    # "Install Playwright Chromium", so BOTH the 3.4 and 3.5 legs were skipped
-    # and the workflow reported `cancelled`, which reads like an infra blip or a
-    # concurrency collision rather than a timeout. Successful runs had crept
-    # from ~11m to 17m23s as this job accumulated gates (strict-conformance,
-    # event-name contract, Vue-leaf) on top of the build + unit tests, and the
-    # Phase 80 backlog pushed it over.
-    #
-    # Note this job is also the odd one out structurally: every other matrix
-    # workflow fans its version legs out as parallel matrix jobs, while this one
-    # runs 3.4 and 3.5 sequentially inside a single job — which is why its wall
-    # clock is the longest while its timeout was the shortest (others are
-    # 25-30). Splitting it into a real matrix is the better long-term fix; this
-    # raises the ceiling to unblock verification without that refactor.
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -60,45 +72,36 @@ jobs:
       # Phase 22 / REQ-6: `turbo run build` includes `vue-vite-demo#build`
       # (`vite build`), whose @rozie/unplugin `buildStart` hook emits the
       # per-module `<Name>.d.rozie.ts` sidecars. Sidecars are gitignored (REQ-7),
-      # absent on a fresh checkout — this step generates them BEFORE the per-Vue
-      # "install + typecheck + build + e2e" steps below (each of which runs
-      # `vue-vite-demo run typecheck`), closing the cold-checkout race. Vue
-      # honors the sidecar under the `moduleResolution: bundler` default (no
-      # `allowArbitraryExtensions` flag needed — SPIKE-FINDINGS).
-      - name: Build all packages (generates .d.rozie.ts sidecars before typecheck — REQ-6)
+      # absent on a fresh checkout — so this step must precede the WR-03 check
+      # below (and the per-version typecheck in the vue-matrix job, which does
+      # its own build for the same reason).
+      - name: Build all packages (generates .d.rozie.ts sidecars — REQ-6)
         run: pnpm turbo run build
 
-      # Quick task 260711-v2l: cross-target strict-tsc leaf baseline. Runs here
-      # (not in a per-target matrix) because this workflow's trigger has NO path
-      # filter — it runs on EVERY PR to main, unlike the path-gated per-target
-      # matrices — making it the right home for a gate that must catch
-      # React/Solid/Lit family regressions regardless of which files changed.
-      # Placed AFTER the build above (every leaf's dist + node_modules must
-      # exist — the harness copies each leaf's committed src/ into a tmpdir with
-      # symlinked LEAF node_modules and a pinned tsc).
+      # Quick task 260711-v2l: cross-target strict-tsc leaf baseline. Placed
+      # AFTER the build above (every leaf's dist + node_modules must exist — the
+      # harness copies each leaf's committed src/ into a tmpdir with symlinked
+      # LEAF node_modules and a pinned tsc). Catches React/Solid/Lit family
+      # regressions regardless of which files changed.
       - name: Strict-conformance gate — cross-target strict-tsc leaf baseline
         run: pnpm --filter @rozie/strict-conformance test
 
-      # quick task 260811-sdd. Lives here (not a per-target matrix) for the
-      # SAME reason as the strict-conformance gate immediately above: this
-      # workflow's trigger has NO path filter, so it runs on EVERY PR to
-      # main regardless of which files changed — and an event-name
-      # asymmetry between a child's dispatch name and a consumer's listener
-      # name is BY DEFINITION a cross-target concern (any of the six targets
-      # can drift independently). Placed AFTER `pnpm turbo run build` above
-      # because the suite compiles fixtures through the BUILT `@rozie/core`
-      # dist, matching composed-ref-conformance/slot-matrix precedent. The
-      # gate is compile-only (regex extraction over compiler output — no
-      # tsc/vue-tsc/svelte-check subprocess), seconds not minutes, which is
-      # exactly why it can afford to run on every PR (unlike
-      # composed-ref-conformance's real-checker legs — see
-      # .planning/todos/pending/composed-ref-conformance-not-ci-wired.md for
-      # why THAT suite stays off every-PR CI). Red here is REAL: a failing
-      # leg means a consumer's listener is silently dead on that target —
-      # the exact class of both 82918527 (Lit) and 9d651e12 (Angular). The
-      # suite also runs under `turbo run test` (root `pnpm test` and
-      # `scripts/ci-prepush.sh`) by virtue of being a workspace package;
-      # this step is the CI guarantee, the turbo path is the local one.
+      # quick task 260811-sdd. An event-name asymmetry between a child's
+      # dispatch name and a consumer's listener name is BY DEFINITION a
+      # cross-target concern (any of the six targets can drift independently).
+      # Placed AFTER `pnpm turbo run build` because the suite compiles fixtures
+      # through the BUILT `@rozie/core` dist, matching
+      # composed-ref-conformance/slot-matrix precedent. The gate is compile-only
+      # (regex extraction over compiler output — no tsc/vue-tsc/svelte-check
+      # subprocess), seconds not minutes, which is exactly why it can afford to
+      # run on every PR (unlike composed-ref-conformance's real-checker legs —
+      # see .planning/todos/pending/composed-ref-conformance-not-ci-wired.md for
+      # why THAT suite stays off every-PR CI). Red here is REAL: a failing leg
+      # means a consumer's listener is silently dead on that target — the exact
+      # class of both 82918527 (Lit) and 9d651e12 (Angular). The suite also runs
+      # under `turbo run test` (root `pnpm test` and `scripts/ci-prepush.sh`) by
+      # virtue of being a workspace package; this step is the CI guarantee, the
+      # turbo path is the local one.
       - name: Event-name contract gate — cross-target $emit ↔ listener-name agreement
         run: pnpm --filter @rozie/event-contract-conformance test
 
@@ -119,8 +122,7 @@ jobs:
       # WR-03: after the build has generated every in-root sidecar, a `.rozie`
       # with NO sidecar means buildStart silently failed to emit it (the
       # consumer's tsc would fall back to the wildcard and type-lie). With
-      # --require-complete that becomes a hard CI failure. Runs after the build
-      # above and before the per-version typecheck steps below.
+      # --require-complete that becomes a hard CI failure.
       - name: Verify every demo .rozie has a fresh sidecar (WR-03)
         run: node scripts/check-sidecar-staleness.mjs --require-complete
 
@@ -131,31 +133,75 @@ jobs:
           pnpm exec vitest run --root packages/runtime/vue
           pnpm exec vitest run --root packages/unplugin
 
+  # ---------------------------------------------------------------------------
+  # The actual version matrix. One job per Vue version, in parallel.
+  # ---------------------------------------------------------------------------
+  vue-matrix:
+    name: Vue ${{ matrix.vue-version }} — typecheck + build + e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.4 is the PROJECT.md floor (introduced `defineModel`); 3.5 is latest.
+        vue-version: ['3.4', '3.5']
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Keyed per leg. `github.job` is identical across matrix legs, so without
+      # the version in the key both legs would write the same cache entry and
+      # race; the shared prefix in restore-keys still lets a leg warm from
+      # whatever ran before it.
+      - name: Cache turbo build output
+        uses: actions/cache@v6
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-vue-${{ matrix.vue-version }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-vue-${{ matrix.vue-version }}-
+            ${{ runner.os }}-turbo-
+
+      # REQ-6 again: this job needs the `.d.rozie.ts` sidecars too, and jobs do
+      # not share a filesystem — so each leg builds for itself. The turbo cache
+      # above is what keeps that from being a full rebuild every time. Same
+      # shape as the angular-matrix legs.
+      - name: Build all packages (generates .d.rozie.ts sidecars before typecheck — REQ-6)
+        run: pnpm turbo run build
+
       - name: Install Playwright Chromium
         run: pnpm --filter vue-vite-demo exec playwright install --with-deps chromium
 
-      # ---- Vue 3.4 floor ----
-      - name: Vue 3.4 — install + typecheck + build + e2e
+      - name: Pin Vue ${{ matrix.vue-version }}
         run: |
-          pnpm --filter vue-vite-demo add vue@~3.4.0 --save-exact
+          pnpm --filter vue-vite-demo add vue@~${{ matrix.vue-version }}.0 --save-exact
           pnpm install --no-frozen-lockfile
-          pnpm --filter vue-vite-demo run typecheck
-          pnpm --filter vue-vite-demo run build
-          pnpm --filter vue-vite-demo exec playwright test
 
-      # ---- Vue 3.5 latest ----
-      - name: Vue 3.5 — install + typecheck + build + e2e
-        run: |
-          pnpm --filter vue-vite-demo add vue@~3.5.0 --save-exact
-          pnpm install --no-frozen-lockfile
-          pnpm --filter vue-vite-demo run typecheck
-          pnpm --filter vue-vite-demo run build
-          pnpm --filter vue-vite-demo exec playwright test
+      - name: Typecheck demo
+        run: pnpm --filter vue-vite-demo run typecheck
 
+      - name: Build demo
+        run: pnpm --filter vue-vite-demo run build
+
+      - name: Run Playwright e2e tests
+        run: pnpm --filter vue-vite-demo exec playwright test
+
+      # Artifact names must be unique per leg — upload-artifact@v7 errors on a
+      # duplicate name rather than merging, so a bare `playwright-report` would
+      # fail whichever leg uploaded second.
       - name: Upload Playwright HTML report on failure
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-vue-${{ matrix.vue-version }}
           path: examples/consumers/vue-vite/playwright-report
           retention-days: 7

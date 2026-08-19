@@ -1,0 +1,70 @@
+name: Typecheck (repo-wide)
+
+# quick 260819-mqx.
+#
+# WHY THIS EXISTS. Until now NO hosted workflow ran `turbo run typecheck` at
+# all. Every matrix workflow typechecks only its OWN demo
+# (`pnpm --filter <demo> run typecheck`), and the repo-wide sweep lived solely
+# in the local pre-push path. That left every other package's `typecheck` task
+# — 300+ of them, including all the @rozie-ui leaves and the integration
+# projects — unverified by CI.
+#
+# It was not theoretical. `tests/integration/angular-analogjs` carried a real
+# TS2739 (`TemplateRef` nominal identity split across two @angular/core copies)
+# that its own CI job could not see, because that job gates on `vite build`
+# plus a selector grep — and @analogjs/vite-plugin-angular's build does NOT
+# fail on TS semantic errors. The project HAD a `typecheck` script the whole
+# time; nothing ever ran it. See quick 260819-i06.
+#
+# Deliberately a standalone workflow rather than another step bolted onto
+# vue-matrix's gate job: that job had already accreted enough to blow its own
+# timeout, and splitting it is the sibling half of this same task. A dedicated
+# workflow also gives an independent red/green signal instead of hiding inside
+# a longer job.
+#
+# NO path filter, on purpose. A type regression can be introduced by a change
+# anywhere — an emitter tweak, a .d.ts shape change, a dependency bump — so
+# gating this on paths would reproduce the blind spot it exists to close.
+#
+# Cost: measured at 43s warm (314/314 tasks) on top of the build it depends on.
+# `typecheck` declares `dependsOn: ["^build", "sync"]` in turbo.json, so the
+# build is what dominates; the turbo cache below is what keeps that bounded.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck:
+    name: turbo run typecheck (all packages)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache turbo build output
+        uses: actions/cache@v6
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.job }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.job }}-
+            ${{ runner.os }}-turbo-
+
+      # `--continue` so one failing package reports every other failure in the
+      # same run instead of stopping at the first. The step still fails: turbo
+      # exits non-zero when any task failed.
+      - name: Typecheck every package
+        run: pnpm turbo run typecheck --continue
