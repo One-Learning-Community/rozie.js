@@ -1,4 +1,5 @@
 {
+  "//": "The `@angular/core` `paths` entry is a module-IDENTITY pin, not error suppression. Angular 21 turned `TemplateRef` from an abstract, private-free class into a CONCRETE class with two `private` fields (`_declarationLView`, `_declarationTContainer`). TypeScript compares private members NOMINALLY, so two `TemplateRef` declarations coming from two different `@angular/core` *instances* are incompatible (TS2739) even when the versions match. `@rozie/runtime-angular` must carry an `@angular/core` devDependency to build via ng-packagr, so pnpm materialises a second instance at `packages/runtime/angular/node_modules/@angular/core` — and that is what its built `.d.ts` resolves to once tsc follows the workspace symlink realpath. This project is on Angular 21, that one on 19, and `RozieSlot.templateRef` then crosses the boundary. Matching the VERSION is NOT enough: pnpm keys instances by peer context, and this store already holds two distinct copies of 21.2.13 (zone.js 0.14.10 vs 0.15.1), which is why building runtime-angular against 21 would not reliably fix it. A real published consumer never sees this — it resolves `@angular/core` as an unmet peer from its OWN tree, exactly one instance — so pinning here restores representative behaviour rather than hiding a shipped defect. The Angular 19 matrix leg is immune structurally (v19 `TemplateRef` is abstract and private-free), and a `paths` pin can only collapse identities, never introduce one. See .planning/quick/260819-i06-*/PLAN.md.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ES2022",
@@ -10,7 +11,11 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "lib": ["ES2022", "DOM"],
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@angular/core": ["./node_modules/@angular/core"]
+    }
   },
   "include": ["src/**/*.ts"]
 }
