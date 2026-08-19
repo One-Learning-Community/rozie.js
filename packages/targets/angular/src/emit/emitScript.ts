@@ -20,12 +20,17 @@
  *        ...$onUpdate hooks (effect(() => ...))
  *        ...listener effect blocks (Plan 05-04a Task 3)
  *      }
- *   3. ngAfterViewInit() {                     // mount-phase lifecycle lands here
+ *   3. ngAfterContentInit() {                  // Quick task 260818-okc — MIXED
+ *        ...the retimed empty-fill-map diagnostics guard (only for a producer
+ *        with at least one @ContentChild-eligible slot AND at least one
+ *        record-only slot; see refineSlotTypes.ts's eligibleSlotFieldNames)
+ *      }
+ *   4. ngAfterViewInit() {                     // mount-phase lifecycle lands here
  *        ...$onMount setup bodies (viewChild() signals are populated post-init)
  *        ...this.__rozieDestroyRef.onDestroy(<cleanup>) for paired mount+cleanup
  *      }
- *   4. computed properties (`name = computed(() => ...)`)
- *   5. method/arrow declarations from user's <script> body — emitted at class
+ *   5. computed properties (`name = computed(() => ...)`)
+ *   6. method/arrow declarations from user's <script> body — emitted at class
  *      level (NOT in constructor) so they're invokable as `this.name(...)`.
  *
  * Pitfall 8 mitigation: `inject(Renderer2)` / `inject(DestroyRef)` calls live
@@ -79,6 +84,7 @@ import {
   buildFamilyCtxDecls,
   isRecordOnlySlotDecl,
   hasKeyedFillIntake,
+  eligibleSlotFieldNames,
 } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
@@ -1359,10 +1365,41 @@ export function emitScript(
   // ever silently dropped, while the empty-fill-map warning is only
   // meaningful for a producer whose slots can ONLY be filled through the
   // map — firing it on a producer receiving ordinary static
-  // `@ContentChild`-satisfied fills would be noise, not a diagnostic (this
-  // is also a pre-existing false-positive class on MIXED producers, tracked
-  // separately in deferred-items.md and deliberately not widened further by
-  // this plan).
+  // `@ContentChild`-satisfied fills would be noise, not a diagnostic.
+  //
+  // Quick task 260818-okc (deferred-items.md item 6, candidate D) — a
+  // MIXED producer (at least one `@ContentChild`-eligible slot AND at
+  // least one record-only slot) previously false-positived here: the
+  // constructor `effect()` below reads `this.<field>Tpl` (a plain decorator
+  // field, not a signal) to decide whether a static fill was already
+  // collected, but that field races Angular's own content-query refresh —
+  // empirically falsified under real ngtsc AOT at commit `275c1d64`
+  // (candidate A). The fix does NOT widen the diagnostics gate itself
+  // (`isRecordOnlySlotDecl` stays the gate that governs `@ContentChild`
+  // field generation, per-slot context interfaces, AND whether diagnostics
+  // are emitted at all — Plan 80-10 already rejected widening this onto the
+  // intake gate, a strictly larger false-positive population). Instead, for
+  // a producer whose `eligibleSlotFieldNames` is non-empty (a MIXED
+  // producer), the empty-fill-map branch moves OUT of the constructor
+  // effect (which keeps only duplicate-key detection) and INTO a new
+  // `ngAfterContentInit()` lifecycle method, using the COUNTING form
+  // (`projected > claimedByStaticRefs`, not a plainer "every ref empty"
+  // form — the plainer form would false-negative on a consumer who fills
+  // one identifier slot correctly AND forgets `RozieSlot` on another).
+  // Confirmed empirically (retimedDiagnostics.probe.test.ts, 260818-okc
+  // Task 1): at `ngAfterContentInit`, the decorator ref IS populated and the
+  // projected-template count is correct at that same instant. Three
+  // accepted residuals, deliberately not fixed here: (1) late-arriving fills
+  // — a consumer `@if` flipping true after `ngAfterContentInit` runs (once,
+  // per mount) loses coverage a per-cycle hook like `ngAfterContentChecked`
+  // would have kept; on a mixed producer today's behavior on that shape is
+  // already a false positive, so this narrows noise more than signal, but
+  // it IS a narrowing; (2) a consumer wrapping a static fill in a structural
+  // directive may not be captured by the decorator query while the
+  // diagnostics query still counts it — pre-existing, not a regression;
+  // (3) the one-shot `__rozieSlotWarned` flag stays shared between the
+  // effect and the retimed method, so whichever fires first suppresses the
+  // other — the existing "first warning wins" contract, unchanged.
   //
   // A SECOND content query over bare `TemplateRef` (not the `RozieSlot`
   // directive) is the chosen detection mechanism for "consumer projected
@@ -1374,6 +1411,11 @@ export function emitScript(
   // boolean also gates the dev-mode-only diagnostics effect pushed further
   // down once `lifecycleConstructorLines` exists.
   const hasRecordOnlySlot = ir.slots.some(isRecordOnlySlotDecl);
+  // Quick task 260818-okc — the field names `eligibleSlotFieldNames` mints
+  // for THIS producer's slots. Empty means "record-only, or no diagnostics
+  // at all" (byte-identical path); non-empty means "mixed producer" (the
+  // retimed counting-guard path). See the diagnostics-gate comment above.
+  const eligibleFieldNames = eligibleSlotFieldNames(ir.slots);
   if (hasRecordOnlySlot) {
     fieldLines.push(
       '__rozieProjectedTpls = contentChildren(TemplateRef, { descendants: true });',
@@ -1397,6 +1439,10 @@ export function emitScript(
   //    See renderLifecycleHook for the bucketing rationale.
   const lifecycleConstructorLines: string[] = [];
   const lifecycleAfterViewInitLines: string[] = [];
+  // Quick task 260818-okc — the retimed empty-fill-map guard for a MIXED
+  // producer lands here, emitted as `ngAfterContentInit()` (see the
+  // diagnostics-gate comment above `hasRecordOnlySlot`/`eligibleFieldNames`).
+  const lifecycleAfterContentInitLines: string[] = [];
   let lifecycleNeedsDestroyRefField = false;
   for (const hook of lifecyclePairing.perHook) {
     const rendered = renderLifecycleHook(
@@ -1447,29 +1493,77 @@ export function emitScript(
     imports.add('effect');
     const dupCode = RozieErrorCode.RUNTIME_ANGULAR_DUPLICATE_SLOT_KEY_WARNING;
     const compName = ir.name;
-    lifecycleConstructorLines.push(
-      [
-        'effect(() => {',
-        '  if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;',
-        '  const fills = this.__rozieFills();',
-        '  const seen = new Set<string>();',
-        '  for (const f of fills) {',
-        '    const k = f.rozieSlot();',
-        '    if (k == null) continue;',
-        '    if (seen.has(k)) {',
-        '      this.__rozieSlotWarned = true;',
-        `      console.warn('[${dupCode}] ${compName}: duplicate keyed fill "' + k + '" — the last fill (in content-query order) wins.');`,
-        '      return;',
-        '    }',
-        '    seen.add(k);',
-        '  }',
-        '  if (fills.length === 0 && this.__rozieProjectedTpls().length > 0) {',
-        '    this.__rozieSlotWarned = true;',
-        `    console.warn('[${dupCode}] ${compName}: projected template content was found but no keyed fills were collected — did you forget to add RozieSlot to the consumer\\'s imports: array?');`,
-        '  }',
-        '});',
-      ].join('\n'),
-    );
+    // Quick task 260818-okc — the empty-fill-map warning's message text is
+    // built ONCE and read by whichever region emits it (the effect for a
+    // record-only producer, the retimed `ngAfterContentInit()` method for a
+    // mixed one), so the two texts cannot drift independently.
+    const emptyFillMapMessageText = `[${dupCode}] ${compName}: projected template content was found but no keyed fills were collected — did you forget to add RozieSlot to the consumer\\'s imports: array?`;
+
+    if (eligibleFieldNames.length === 0) {
+      // EMPTY — record-only producer (or none at all). The path every
+      // producer shipping today takes. Push the current effect text
+      // UNCHANGED, character for character — must be byte-identical.
+      lifecycleConstructorLines.push(
+        [
+          'effect(() => {',
+          '  if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;',
+          '  const fills = this.__rozieFills();',
+          '  const seen = new Set<string>();',
+          '  for (const f of fills) {',
+          '    const k = f.rozieSlot();',
+          '    if (k == null) continue;',
+          '    if (seen.has(k)) {',
+          '      this.__rozieSlotWarned = true;',
+          `      console.warn('[${dupCode}] ${compName}: duplicate keyed fill "' + k + '" — the last fill (in content-query order) wins.');`,
+          '      return;',
+          '    }',
+          '    seen.add(k);',
+          '  }',
+          '  if (fills.length === 0 && this.__rozieProjectedTpls().length > 0) {',
+          '    this.__rozieSlotWarned = true;',
+          `    console.warn('${emptyFillMapMessageText}');`,
+          '  }',
+          '});',
+        ].join('\n'),
+      );
+    } else {
+      // NON-EMPTY — a MIXED producer (quick task 260818-okc, candidate D).
+      // The effect keeps ONLY duplicate-key detection; the empty-fill-map
+      // branch moves to `ngAfterContentInit()`, retimed past the point
+      // Angular populates the decorator `@ContentChild` refs (see the
+      // diagnostics-gate comment above `hasRecordOnlySlot`).
+      lifecycleConstructorLines.push(
+        [
+          'effect(() => {',
+          '  if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;',
+          '  const fills = this.__rozieFills();',
+          '  const seen = new Set<string>();',
+          '  for (const f of fills) {',
+          '    const k = f.rozieSlot();',
+          '    if (k == null) continue;',
+          '    if (seen.has(k)) {',
+          '      this.__rozieSlotWarned = true;',
+          `      console.warn('[${dupCode}] ${compName}: duplicate keyed fill "' + k + '" — the last fill (in content-query order) wins.');`,
+          '      return;',
+          '    }',
+          '    seen.add(k);',
+          '  }',
+          '});',
+        ].join('\n'),
+      );
+
+      const claimedRefsExpr = `[${eligibleFieldNames.map((f) => `this.${f}`).join(', ')}].filter((t) => t != null).length`;
+      lifecycleAfterContentInitLines.push(
+        [
+          'if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;',
+          `const claimedByStaticRefs = ${claimedRefsExpr};`,
+          'if (this.__rozieFills().length === 0 && this.__rozieProjectedTpls().length > claimedByStaticRefs) {',
+          '  this.__rozieSlotWarned = true;',
+          `  console.warn('${emptyFillMapMessageText}');`,
+          '}',
+        ].join('\n'),
+      );
+    }
   }
 
   // Portal-slot primitive (Spike 003) — synthesize portal scaffolding before
@@ -1862,6 +1956,22 @@ export function emitScript(
       )
       .join('\n');
     classBodyParts.push(`constructor() {\n${indented}\n}`);
+  }
+  // Quick task 260818-okc — the retimed empty-fill-map guard for a mixed
+  // producer, emitted BEFORE `ngAfterViewInit()` so the class reads in
+  // lifecycle order. No `implements AfterContentInit` clause — Angular
+  // invokes the hook duck-typed, following the existing `ngAfterViewInit`
+  // precedent (no `implements AfterViewInit` clause either).
+  if (lifecycleAfterContentInitLines.length > 0) {
+    const indented = lifecycleAfterContentInitLines
+      .map((l) =>
+        l
+          .split('\n')
+          .map((line) => (line.length > 0 ? '  ' + line : line))
+          .join('\n'),
+      )
+      .join('\n');
+    classBodyParts.push(`ngAfterContentInit() {\n${indented}\n}`);
   }
   if (lifecycleAfterViewInitLines.length > 0) {
     const indented = lifecycleAfterViewInitLines

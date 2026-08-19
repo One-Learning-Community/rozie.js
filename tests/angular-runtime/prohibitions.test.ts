@@ -13,6 +13,27 @@
  * transform, strictly stronger than the retired gate). Prohibitions 1, 3,
  * and 5 are untouched by this amendment.
  *
+ * Quick task 260818-okc (Task 3) — GENERALIZES prohibition 1's source-level
+ * case's region-discovery, defensively, ahead of a follow-up cold-rebuild
+ * task. `ProducerRecordPath` is a MIXED producer (its plain `<slot>` mints a
+ * `defaultTpl` @ContentChild field alongside its `:name`-bound record-path
+ * slot), so once the emitter fix from 260818-okc lands in a rebuilt
+ * `@rozie/target-angular` dist, this fixture's diagnostics gain a SECOND
+ * dev-mode-guarded region (`ngAfterContentInit()`) alongside the existing
+ * `effect()` — the old single-region form (isolate `effect(() => {` and
+ * require every `console.` index to fall inside it) would fail against that
+ * post-rebuild output, handing a latent breakage to the rebuild task. The
+ * WORDING of prohibition 1 does NOT change (still: zero unguarded console
+ * output in production builds) — only the region-DISCOVERY implementation
+ * generalizes to find every guarded region instead of assuming exactly one.
+ * `tests/angular-runtime`'s `compileAngular` resolves `@rozie/target-angular`
+ * through its export map to STALE dist during this quick task (see the
+ * repo-traps note below), so this file's own test run today still sees the
+ * ONE-region pre-fix shape — the generalized case is written to hold for
+ * both shapes without modification, verified directly against today's
+ * one-region output and reasoned against the post-rebuild two-region output
+ * from the byte-level contract `producerFillMap.test.ts` pins.
+ *
  * Ambient globals (`describe`, `it`, `expect`, `vi`) per setup-vitest.ts —
  * do NOT `import { describe, it, expect } from 'vitest'` here.
  */
@@ -192,13 +213,36 @@ const RECORD_PATH_FIXTURES = [
   'tests/regressions/fixtures/loop-mustache-keyed-slot-rfor/expected.angular.ts',
 ];
 
+/**
+ * Quick task 260818-okc (Task 3) — the GENERALIZED region-discovery helper
+ * for prohibition 1's source-level case. Finds every occurrence of the
+ * shared `ngDevMode` guard text — each occurrence begins a dev-mode-guarded
+ * region, whether that region is an `effect(() => { ... });` arrow body or a
+ * bare `ngAfterContentInit() { ... }` method body (or any future
+ * dev-mode-guarded shape sharing the same guard text). Does not attempt to
+ * locate each region's closing brace: by construction, every `console.` call
+ * this emitter produces is the FIRST guard-protected statement's sibling
+ * inside its own region, and no unguarded `console.` call is ever emitted
+ * between two regions — so "at least one guard occurrence precedes this
+ * console. call, in source order" is a sufficient, shape-agnostic
+ * region-membership test without hardcoding either header text.
+ */
+function findGuardOccurrences(code: string): number[] {
+  const guardText = 'globalThis as { ngDevMode?: unknown }';
+  const idxs: number[] = [];
+  let idx = code.indexOf(guardText);
+  while (idx !== -1) {
+    idxs.push(idx);
+    idx = code.indexOf(guardText, idx + guardText.length);
+  }
+  return idxs;
+}
+
 describe('prohibition 1 — MUST NOT emit console output from compiled components in production builds', () => {
-  it('source-level: every `console.` occurrence in the emitted record-path producer sits inside the dev-mode guard', () => {
+  it('source-level: every `console.` occurrence in the emitted record-path producer sits inside a dev-mode-guarded region, with the guard preceding it in source order — GENERALIZED to discover ALL such regions (was: isolated the single effect() block; see the doc comment above this describe block for why ProducerRecordPath specifically needs this)', () => {
     const code = compileAngular(readFixture('ProducerRecordPath'), 'ProducerRecordPath.rozie');
-    const guardStart = code.indexOf('effect(() => {');
-    expect(guardStart).toBeGreaterThan(-1);
-    const guardEnd = code.indexOf('\n  }', guardStart);
-    expect(guardEnd).toBeGreaterThan(guardStart);
+    const guardIdxs = findGuardOccurrences(code);
+    expect(guardIdxs.length).toBeGreaterThan(0);
 
     const consoleOccurrences: number[] = [];
     let idx = code.indexOf('console.');
@@ -208,8 +252,8 @@ describe('prohibition 1 — MUST NOT emit console output from compiled component
     }
     expect(consoleOccurrences.length).toBeGreaterThan(0);
     for (const occ of consoleOccurrences) {
-      expect(occ).toBeGreaterThan(guardStart);
-      expect(occ).toBeLessThan(guardEnd);
+      const precedingGuards = guardIdxs.filter((g) => g < occ);
+      expect(precedingGuards.length).toBeGreaterThan(0);
     }
   });
 

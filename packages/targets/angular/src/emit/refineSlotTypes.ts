@@ -202,6 +202,42 @@ export function buildEligibleSlotDecls(slots: SlotDecl[]): SlotCtxRendered[] {
 }
 
 /**
+ * Quick task 260818-okc (deferred-items.md item 6, candidate D) — the
+ * NAME-ONLY twin of `buildEligibleSlotDecls` above: same two filters, same
+ * order, but returns just the `@ContentChild` field names instead of the
+ * full interface+field text. The retimed empty-fill-map guard
+ * (`emitScript.ts`'s `ngAfterContentInit()` splice) needs to know WHICH
+ * fields to read at runtime without re-deriving `SlotCtxRendered` text and
+ * re-parsing it back out.
+ *
+ * The two functions must never drift — a field this helper names that
+ * `buildEligibleSlotDecls` does NOT also mint would emit a guard reading a
+ * class field that does not exist (TS2339); a field `buildEligibleSlotDecls`
+ * mints that this helper misses would silently under-count claimed refs.
+ * Do not duplicate the filter logic anywhere else, and do not refactor
+ * `buildEligibleSlotDecls` to call this — leave that function untouched.
+ *
+ * Filter ordering is load-bearing for the SAME reason documented on
+ * `buildEligibleSlotDecls` above (Phase 79 Plan 11): `isRecordOnlySlotDecl`
+ * exclusion MUST run before the dedupe-by-`slot.name` add, because a
+ * `dynamicNameExpr` slot shares the '' default-slot sentinel — a
+ * dedupe-first ordering would let a record-only dynamic-name slot's ''
+ * claim the `seen` set ahead of a genuine default slot, silently dropping
+ * the default slot's real field from the result.
+ */
+export function eligibleSlotFieldNames(slots: SlotDecl[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const slot of slots) {
+    if (isRecordOnlySlotDecl(slot)) continue;
+    if (seen.has(slot.name)) continue;
+    seen.add(slot.name);
+    out.push(slotFieldName(slot.name));
+  }
+  return out;
+}
+
+/**
  * PascalCase a raw prefix fragment for use as a ctx interface name —
  * `'cell-'` -> `'Cell'`, `'user-row-'` -> `'UserRow'`. Mirrors Lit's
  * `pascalCaseFragment` (`slotIdentityKey.ts`, 79-08) so every target derives

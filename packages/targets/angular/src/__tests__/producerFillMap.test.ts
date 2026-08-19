@@ -408,7 +408,7 @@ describe('Angular producer — retimed mixed-producer empty-fill-map guard (2608
 
   it("MIXED_PRODUCER's effect body no longer contains the bare projected-versus-zero comparison, and still contains the duplicate-key branch with its ROZ750 text and component name", () => {
     const code = compileAngular(MIXED_PRODUCER, 'Mixed.rozie');
-    const effectMatch = code.match(/effect\(\(\) => \{[\s\S]*?\n\}\);/);
+    const effectMatch = code.match(/effect\(\(\) => \{[\s\S]*?\n\s*\}\);/);
     expect(effectMatch).not.toBeNull();
     const effectBody = effectMatch![0];
     expect(effectBody).not.toContain('this.__rozieProjectedTpls().length > 0');
