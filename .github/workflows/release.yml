@@ -368,9 +368,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Build ONLY the 9 toolchain packages. We list them explicitly rather than
-      # --filter='@rozie/*' because that glob also matches @rozie/docs and would
-      # drag in the heavy (OOM-prone) VitePress build. The 5 Vue leaves are built
+      # Build ONLY the published toolchain and runtime packages (every @rozie/*
+      # package that is not private, enumerated explicitly below). We list them
+      # explicitly rather than --filter='@rozie/*' because that glob also matches
+      # @rozie/docs and would drag in the heavy (OOM-prone) VitePress build. The
+      # 5 Vue leaves are built
       # separately (the "Build Vue leaves" step below) into a compiled dist/
       # drop-in (Vite lib mode + vue-tsc declaration emit) — they no longer ship
       # raw .vue source only.
@@ -387,6 +389,7 @@ jobs:
           --filter=@rozie/runtime-svelte
           --filter=@rozie/runtime-solid
           --filter=@rozie/runtime-lit
+          --filter=@rozie/runtime-angular
 
       # Append the registry auth line to the existing project .npmrc. The token
       # placeholder is left LITERAL here and expanded by pnpm at publish time
@@ -424,6 +427,7 @@ jobs:
           --filter=@rozie/runtime-svelte
           --filter=@rozie/runtime-solid
           --filter=@rozie/runtime-lit
+          --filter=@rozie/runtime-angular
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -883,6 +887,7 @@ jobs:
           --filter @rozie/runtime-solid
           --filter @rozie/runtime-lit
           --filter @rozie/runtime-keynav-core
+          --filter @rozie/runtime-angular
           --filter @rozie-ui/flatpickr-vue
           --filter @rozie-ui/sortable-list-vue
           --filter @rozie-ui/cropper-vue
