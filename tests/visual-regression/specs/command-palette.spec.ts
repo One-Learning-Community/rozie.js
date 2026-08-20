@@ -249,6 +249,32 @@ async function frameBottomVisible(page: Page): Promise<boolean> {
 }
 
 /**
+ * True iff the deep REAL active element (recursively piercing open shadow
+ * roots — the same `deepActiveElement` walk CommandPalette.rozie itself uses)
+ * has `[data-testid="command-palette-frame"]` as a shadow-piercing ancestor
+ * (walking `parentNode`, crossing shadowRoot -> host boundaries, mirroring
+ * `frameBottomVisible`'s containment walk above). Used by the
+ * escape-after-pop deterministic gate (quick 260820-7hj) to prove focus never
+ * leaves the frame during the `reopenComboboxPopup()` blur -> refocus window.
+ */
+async function activeElementInsideFrame(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    let node: (Element & { shadowRoot?: ShadowRoot | null }) | null = document.activeElement as Element | null;
+    while (node && node.shadowRoot && node.shadowRoot.activeElement) {
+      node = node.shadowRoot.activeElement as Element & { shadowRoot?: ShadowRoot | null };
+    }
+    let cur: (Node & { host?: Element }) | null = node;
+    while (cur) {
+      if (cur instanceof Element && cur.getAttribute && cur.getAttribute('data-testid') === 'command-palette-frame') {
+        return true;
+      }
+      cur = cur.parentNode ?? (cur as unknown as ShadowRoot).host ?? null;
+    }
+    return false;
+  });
+}
+
+/**
  * The trimmed text content of every combobox group-heading element
  * (`.rozie-combobox-group-heading`), in DOM order, RECURSIVELY piercing
  * every open shadow root — cp-adopts-combobox-groups' section-heading proof.
@@ -889,6 +915,146 @@ for (const target of TARGETS) {
     await expect(breadcrumbTitle).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+}
+
+/**
+ * command-palette-escape-after-pop (quick 260820-7hj) — the deterministic
+ * dead-second-Escape regression gate.
+ *
+ * DIAGNOSED mechanism (probe evidence captured on lit + react, quick
+ * 260820-7hj Task 1): `goBack()` ends with `reopenComboboxPopup()`
+ * (CommandPalette.rozie), which SYNCHRONOUSLY `blur()`s the deep active
+ * element (focus lands on `<body>`) and refocuses the search input only
+ * inside a `requestAnimationFrame`. The Escape funnel is a BUBBLE-phase
+ * `@keydown="onPanelKeydown($event)"` on `[data-testid="command-palette-
+ * frame"]` — a keydown dispatched while focus sits on `<body>` never enters
+ * that subtree, so `onPanelKeydown` never runs and Escape #2 is silently
+ * dropped. A captured window-level bubble listener showed Escape #2's
+ * `event.defaultPrevented === false` and `event.composedPath()` = `[body,
+ * html, document, window]` — proof the handler was never reached, not that
+ * it ran and mis-routed.
+ *
+ * This gate FORCES the window instead of racing it (the naked race reproduces
+ * only ~1-in-6 isolated — not a usable regression signal): a wrapped
+ * `requestAnimationFrame` installed via `page.addInitScript` QUEUES callbacks
+ * instead of scheduling them while `window.__rozieRafHold` is true, so the
+ * refocus `reopenComboboxPopup()` schedules after Escape #1 never runs until
+ * the test explicitly releases it — the hole stays open indefinitely, making
+ * the race 100% deterministic rather than probabilistic.
+ *
+ *   - Assertion A (the invariant): immediately after Escape #1 pops the
+ *     level, with the refocus rAF still held, the deep active element must
+ *     be CONTAINED WITHIN the frame — never parked outside it. Pre-fix this
+ *     fails (focus is on `<body>`); the fix keeps focus on `$refs.frame`
+ *     (`tabindex="-1"`) instead of blurring to nothing.
+ *   - Assertion B (the user-visible outcome): Escape #2, pressed inside that
+ *     same forced window, closes the palette (`countOptions` reaches 0) AND
+ *     its `defaultPrevented` is `true` — proving `onPanelKeydown` actually
+ *     ran for that keystroke (so the assertion can't be satisfied by some
+ *     unrelated close path).
+ *
+ * Drives the same second, self-contained `open-home-palette` /
+ * `homeOpen`/`homeQuery` palette as command-palette-default-items above (push
+ * `find-users`, pop with Escape, Escape again) — chosen because its 2-item
+ * pushed level + 3-item root give unambiguous `countOptions` transitions.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`command-palette-escape-after-pop [${target}]: Escape immediately after a level pop still closes the palette`, async ({
+    page,
+  }) => {
+    // Install the holdable-rAF wrapper + a bubble-phase Escape
+    // defaultPrevented log BEFORE any page script runs (the
+    // lit-listener-teardown.spec.ts:67 precedent for page.addInitScript).
+    // The wrapper passes through to the native rAF until the test flips
+    // `window.__rozieRafHold` — framework scheduling elsewhere in the page
+    // (initial mount, unrelated reactivity) is unaffected.
+    await page.addInitScript(() => {
+      const nativeRAF = window.requestAnimationFrame.bind(window);
+      const queue: FrameRequestCallback[] = [];
+      (window as unknown as { __rozieRafHold: boolean }).__rozieRafHold = false;
+      window.requestAnimationFrame = (cb: FrameRequestCallback): number => {
+        if ((window as unknown as { __rozieRafHold: boolean }).__rozieRafHold) {
+          queue.push(cb);
+          return 0;
+        }
+        return nativeRAF(cb);
+      };
+      (window as unknown as { __rozieRafRelease: () => void }).__rozieRafRelease = () => {
+        (window as unknown as { __rozieRafHold: boolean }).__rozieRafHold = false;
+        const pending = queue.splice(0, queue.length);
+        for (const cb of pending) nativeRAF(cb);
+      };
+
+      const escapeDefaultPrevented: boolean[] = [];
+      (window as unknown as { __escapeDefaultPrevented: boolean[] }).__escapeDefaultPrevented =
+        escapeDefaultPrevented;
+      window.addEventListener(
+        'keydown',
+        (e) => {
+          if (e.key === 'Escape') escapeDefaultPrevented.push(e.defaultPrevented);
+        },
+        false, // bubble phase — mirrors Task 1's discriminator (onPanelKeydown
+        // calls e.preventDefault() unconditionally on Escape; a window bubble
+        // listener runs strictly after the frame's own bubble handler, so
+        // this is a direct yes/no on whether onPanelKeydown ran at all).
+      );
+    });
+
+    await page.goto(`/?example=CommandPaletteBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const openHomeBtn = page.getByTestId('open-home-palette');
+    const breadcrumbTitle = page.getByTestId('command-palette-title');
+
+    // ---- 1. open at root, push a level (find-users): 2 options, breadcrumb ----
+    await openHomeBtn.click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(3);
+    await input.pressSequentially('users', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await page.locator('[role="option"]', { hasText: 'Find users' }).click();
+    await expect(breadcrumbTitle).toHaveText('Find users');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(2);
+
+    // ---- 2. FORCE the window: hold the refocus rAF, then pop with Escape #1 ----
+    await page.evaluate(() => {
+      (window as unknown as { __rozieRafHold: boolean }).__rozieRafHold = true;
+    });
+    await page.keyboard.press('Escape');
+    await expect(breadcrumbTitle).toHaveCount(0);
+
+    // ---- 3. Assertion A: focus must stay inside the frame across the hold ----
+    expect(
+      await activeElementInsideFrame(page),
+      'deep active element must stay inside [data-testid="command-palette-frame"] while the reopenComboboxPopup() refocus rAF is held — a keydown dispatched here must still reach onPanelKeydown',
+    ).toBe(true);
+
+    // ---- 4. Escape #2, still inside the forced window ----
+    await page.keyboard.press('Escape');
+
+    // ---- 5. Assertion B: the handler ran (defaultPrevented===true) and the ----
+    //         palette closes. closePalette() is a synchronous r-if removal —
+    //         it does not depend on the held rAF draining.
+    const prevented = await page.evaluate(
+      () => (window as unknown as { __escapeDefaultPrevented: boolean[] }).__escapeDefaultPrevented,
+    );
+    expect(
+      prevented[1],
+      "Escape #2's keydown must reach onPanelKeydown (defaultPrevented===true) — proves the handler actually routed this keystroke rather than some unrelated close path",
+    ).toBe(true);
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+
+    // ---- 6. release + drain the held rAF queue (harmless post-close no-op) ----
+    await page.evaluate(() => {
+      (window as unknown as { __rozieRafRelease?: () => void }).__rozieRafRelease?.();
+    });
   });
 }
 
