@@ -5,7 +5,7 @@
   "private": false,
   "sideEffects": false,
   "license": "MIT",
-  "description": "The RozieSlot marker directive for keyed slot fills — collects hand-authored <ng-template [rozieSlot]=\"key\"> content via contentChildren into the record-path fill map an emitted Angular producer resolves against.",
+  "description": "Runtime helpers shared by Rozie-emitted Angular components: the RozieSlot marker directive for keyed slot fills, display/attr interpolation helpers, the $provide/$inject context token registry, and the r-bind/$attrs spread attribute applier + host-attribute reader factories.",
   "author": "One Learning Community (https://github.com/One-Learning-Community)",
   "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
   "repository": {
