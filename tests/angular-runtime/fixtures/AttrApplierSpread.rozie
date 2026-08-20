@@ -1,0 +1,28 @@
+<!--
+  AttrApplierSpread.rozie — Quick task 260819-sg9 (Tier 2) Task 2 red-first
+  fixture. A dynamic `r-bind` spread carrying a plain attribute (`id`) AND a
+  `class` key, on an element that also has an author-written static class —
+  proving both the emitted-TEXT shape (the emitter now calls
+  `createRozieAttrApplier(inject(Renderer2))` instead of inlining the IIFE)
+  and the mounted-DOM shape (the merged class survives: both the
+  wrapper-authored `btn` token and the spread's `spread-class` token land on
+  the real element, and `id` sets as a plain attribute) — through the SAME
+  compiled `.rozie` output, not a hand-authored stand-in.
+
+  `inherit-attrs="false"` keeps this fixture to exactly the one
+  author-written spread — no synthesized `$attrs` auto-fallthrough noise.
+-->
+
+<rozie name="AttrApplierSpread" inherit-attrs="false">
+
+<data>
+{
+  extra: { id: 'spread-id', class: 'spread-class' },
+}
+</data>
+
+<template>
+<button class="btn" r-bind="$data.extra">content</button>
+</template>
+
+</rozie>
