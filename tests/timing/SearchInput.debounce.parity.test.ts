@@ -84,6 +84,13 @@ import * as ngCommon from '@angular/common';
 import * as ngForms from '@angular/forms';
 import * as ngTesting from '@angular/core/testing';
 import * as ngBrowserDynamicTesting from '@angular/platform-browser-dynamic/testing';
+// Quick task 260819-sg9 (Tier 2) — the emitted component's default
+// `inherit-attrs` auto-fallthrough spread now imports
+// `createRozieAttrApplier`/`createRozieHostAttrsReader` from
+// `@rozie/runtime-angular` (previously an inlined IIFE, no package import
+// needed). Wire the real package into the eval module map, mirroring the
+// `runtimeVue`/`runtimeReact`/`rozieRuntimeSvelte` pattern below.
+import * as runtimeAngular from '@rozie/runtime-angular';
 import decoratorsPluginDefault from '@babel/plugin-proposal-decorators';
 const decoratorsPlugin = (decoratorsPluginDefault as { default?: unknown }).default
   ?? decoratorsPluginDefault;
@@ -353,6 +360,7 @@ describe('Phase 5 success criterion #4 — @input.debounce(300) parity', () => {
       '@angular/core': ngCore,
       '@angular/common': ngCommon,
       '@angular/forms': ngForms,
+      '@rozie/runtime-angular': runtimeAngular,
     });
     const Component = mod.default;
 

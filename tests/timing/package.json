@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@rozie/core": "workspace:*",
+    "@rozie/runtime-angular": "workspace:*",
     "@rozie/runtime-react": "workspace:*",
     "@rozie/runtime-svelte": "workspace:*",
     "@rozie/runtime-vue": "workspace:*",

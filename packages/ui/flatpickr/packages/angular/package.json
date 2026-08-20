@@ -65,6 +65,7 @@
   "module": "./dist/fesm2022/rozie-ui-flatpickr-angular.mjs",
   "types": "./dist/index.d.ts",
   "dependencies": {
+    "@rozie/runtime-angular": "workspace:*",
     "tslib": "^2"
   },
   "devDependencies": {
