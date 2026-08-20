@@ -1,5 +1,11 @@
 # @rozie-ui/command-palette-react
 
+## 0.4.6
+
+### Patch Changes
+
+- @rozie/runtime-react@0.6.0
+
 ## 0.4.5
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @rozie-ui/chartjs-angular
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [f3266db]
+- Updated dependencies [78d5b5b]
+- Updated dependencies [ae824bd]
+  - @rozie/runtime-angular@0.6.0
+
 ## 0.1.3
 
 ### Patch Changes

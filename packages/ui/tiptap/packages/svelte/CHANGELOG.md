@@ -1,5 +1,11 @@
 # @rozie-ui/tiptap-svelte
 
+## 0.3.1
+
+### Patch Changes
+
+- @rozie/runtime-svelte@0.6.0
+
 ## 0.3.0
 
 ### Minor Changes

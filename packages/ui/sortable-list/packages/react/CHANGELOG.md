@@ -1,5 +1,11 @@
 # @rozie-ui/sortable-list-react
 
+## 0.1.11
+
+### Patch Changes
+
+- @rozie/runtime-react@0.6.0
+
 ## 0.1.10
 
 ### Patch Changes
@@ -10,6 +16,7 @@
   - **`$emit` handler props** (5) — `onAdd`, `onChange`, `onEnd`, `onRemove`, `onStart`. SortableJS callbacks are registered once at mount, so a consumer swapping a drag handler after mount previously kept getting the original called.
   - **Prop reads** (3) — `animation`, `forceFallback`, `options`. The SortableJS instance is constructed inside `$onMount`; these now read current values at construction time.
   - **Helper call** — `resolveGroup()`, so cross-list group resolution runs against current group configuration.
+
 - No API surface change.
 - @rozie/runtime-react@0.2.3
 

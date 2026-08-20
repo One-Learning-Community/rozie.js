@@ -1,5 +1,11 @@
 # @rozie-ui/tiptap-solid
 
+## 0.3.1
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.6.0
+
 ## 0.3.0
 
 ### Minor Changes

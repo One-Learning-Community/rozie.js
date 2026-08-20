@@ -1,5 +1,11 @@
 # @rozie-ui/pdf-react
 
+## 0.2.6
+
+### Patch Changes
+
+- @rozie/runtime-react@0.6.0
+
 ## 0.2.5
 
 ### Patch Changes
@@ -9,6 +15,7 @@
   Two read kinds landed here:
   - **Prop read** — `autoFit`. Changing the fit mode after mount is now seen by the mount-registered fit pass.
   - **Helper call** — `applyFit()`, so the fit is applied against the current viewport/zoom state.
+
 - The mount effect's dependency array is now honest, so the `react-hooks/exhaustive-deps` suppression is no longer emitted.
 - No `$emit` handler prop was affected. No API surface change.
 - @rozie/runtime-react@0.2.3

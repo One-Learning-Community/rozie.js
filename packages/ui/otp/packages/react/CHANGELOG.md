@@ -1,5 +1,11 @@
 # @rozie-ui/otp-react
 
+## 0.1.6
+
+### Patch Changes
+
+- @rozie/runtime-react@0.6.0
+
 ## 0.1.5
 
 ### Patch Changes
@@ -9,6 +15,7 @@
   Two read kinds landed here:
   - **Prop read** — `autoFocus`.
   - **Helper calls** (2) — `firstEmptyIndex()` and `focusIndex()`, so the mount-time focus placement targets the current first-empty cell rather than the one computed at mount.
+
 - The mount effect's dependency array is now honest, so the `react-hooks/exhaustive-deps` suppression is no longer emitted.
 - No `$emit` handler prop was affected. No API surface change.
 - @rozie/runtime-react@0.2.3
@@ -39,6 +46,7 @@
   This release adds behavior-VR coverage (paste distribution, backspace navigation, arrow/Home/End movement, mask rendering, disabled state, filled-cell overwrite) as test-only hardening — no API change. The surface is unchanged: 8 props / 2 events / a 2-verb (`focus`, `clear`) imperative handle.
 
   The `@rozie/runtime-react` dependency now resolves to `0.2.2` (array-form `:style` merge).
+
 - @rozie/runtime-react@0.2.1
 
 ## 0.1.1

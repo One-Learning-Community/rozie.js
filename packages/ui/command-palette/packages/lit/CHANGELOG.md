@@ -1,5 +1,11 @@
 # @rozie-ui/command-palette-lit
 
+## 0.4.4
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.6.0
+
 ## 0.4.3
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/popover-vue
 
+## 0.1.4
+
+### Patch Changes
+
+- @rozie/runtime-vue@0.6.0
+
 ## 0.1.3
 
 ### Patch Changes

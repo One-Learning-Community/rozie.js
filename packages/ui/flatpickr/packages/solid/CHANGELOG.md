@@ -1,5 +1,11 @@
 # @rozie-ui/flatpickr-solid
 
+## 0.1.5
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.6.0
+
 ## 0.1.4
 
 ### Patch Changes

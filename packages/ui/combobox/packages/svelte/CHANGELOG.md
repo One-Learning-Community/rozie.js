@@ -1,5 +1,11 @@
 # @rozie-ui/combobox-svelte
 
+## 0.4.3
+
+### Patch Changes
+
+- @rozie/runtime-svelte@0.6.0
+
 ## 0.4.2
 
 ### Patch Changes

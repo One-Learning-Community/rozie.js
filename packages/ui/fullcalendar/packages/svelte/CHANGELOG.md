@@ -1,5 +1,11 @@
 # @rozie-ui/fullcalendar-svelte
 
+## 0.1.3
+
+### Patch Changes
+
+- @rozie/runtime-svelte@0.6.0
+
 ## 0.1.2
 
 ### Patch Changes

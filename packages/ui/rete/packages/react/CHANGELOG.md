@@ -1,5 +1,11 @@
 # @rozie-ui/rete-react
 
+## 0.1.4
+
+### Patch Changes
+
+- @rozie/runtime-react@0.6.0
+
 ## 0.1.3
 
 ### Patch Changes
@@ -9,6 +15,7 @@
   Only the **`$emit` handler prop** read kind landed here, across 9 of the graph events: `onConnectEnd`, `onConnectionCreated`, `onConnectionRejected`, `onConnectionRemoved`, `onContextMenu`, `onNodeAction`, `onNodeMoved`, `onNodePicked`, `onTranslated`.
 
   The rete editor's pipeline handlers are installed once at mount, so before this fix a consumer that changed any of these handlers after the canvas mounted kept the original identity being called for the life of the editor — the classic symptom being a graph callback that closes over the initial node/connection state and never sees later edits.
+
 - **Release note:** `rete` debuted at `0.1.2` from commit `56340d74` earlier on 2026-08-04. This fix landed in `cc9927f8`, immediately after that debut publish, so `0.1.2` shipped without it. `0.1.3` is the first published `rete-react` build that carries the seam.
 - No prop read or helper call in this component was affected. No API surface change.
 - @rozie/runtime-react@0.2.3

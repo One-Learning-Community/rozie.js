@@ -1,6 +1,6 @@
 {
   "name": "@rozie/runtime-svelte",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "description": "Tree-shakable Svelte 5 runtime helpers for Rozie.js-compiled components: the listener, keynav and portal actions, the Snippet-to-Component portal hosts, and crash-safe interpolation, class and style helpers. Ships source; your build shakes it.",
   "type": "module",
   "sideEffects": false,

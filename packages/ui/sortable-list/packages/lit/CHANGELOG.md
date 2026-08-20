@@ -1,5 +1,11 @@
 # @rozie-ui/sortable-list-lit
 
+## 0.1.11
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.6.0
+
 ## 0.1.10
 
 ### Patch Changes

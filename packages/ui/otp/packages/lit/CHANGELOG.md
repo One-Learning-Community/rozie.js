@@ -1,5 +1,11 @@
 # @rozie-ui/otp-lit
 
+## 0.1.5
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.6.0
+
 ## 0.1.4
 
 ### Patch Changes
@@ -27,6 +33,7 @@
   This release adds behavior-VR coverage (paste distribution, backspace navigation, arrow/Home/End movement, mask rendering, disabled state, filled-cell overwrite) as test-only hardening — no API change. The surface is unchanged: 8 props / 2 events / a 2-verb (`focus`, `clear`) imperative handle.
 
   The `@rozie/runtime-lit` dependency now resolves to `0.2.2` (array-form `:style` merge).
+
 - Updated dependencies [c279a7e]
   - @rozie/runtime-lit@0.2.1
 

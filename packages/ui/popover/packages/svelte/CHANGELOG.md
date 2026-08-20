@@ -1,5 +1,11 @@
 # @rozie-ui/popover-svelte
 
+## 0.1.2
+
+### Patch Changes
+
+- @rozie/runtime-svelte@0.6.0
+
 ## 0.1.1
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@rozie/runtime-solid",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "description": "Tree-shakable Solid runtime helpers for Rozie.js-compiled components: the controllable (model) signal, r-keynav primitive, event-modifier wrappers (debounce/throttle/outside-click/key filters), attribute + listener normalizers, scoped-style injection, crash-safe interpolation, and the $provide/$inject context registry.",
   "type": "module",
   "sideEffects": false,

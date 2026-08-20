@@ -1,5 +1,11 @@
 # @rozie-ui/popover-react
 
+## 0.1.6
+
+### Patch Changes
+
+- @rozie/runtime-react@0.6.0
+
 ## 0.1.5
 
 ### Patch Changes
@@ -9,6 +15,7 @@
   Two read kinds landed here:
   - **Prop read** — `disabled`. Disabling the popover after mount is now observed by the mount-registered tracking setup instead of being pinned to the first render's value.
   - **Helper call** — `startTracking()`, so Floating UI tracking starts against current anchor/placement state.
+
 - No `$emit` handler prop was affected. No API surface change.
 - @rozie/runtime-react@0.2.3
 

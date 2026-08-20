@@ -1,5 +1,11 @@
 # @rozie-ui/tags-vue
 
+## 0.1.3
+
+### Patch Changes
+
+- @rozie/runtime-vue@0.6.0
+
 ## 0.1.2
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/data-table-solid
 
+## 0.2.4
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.6.0
+
 ## 0.2.3
 
 ### Patch Changes

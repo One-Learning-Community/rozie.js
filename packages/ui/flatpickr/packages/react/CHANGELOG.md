@@ -1,5 +1,11 @@
 # @rozie-ui/flatpickr-react
 
+## 0.1.6
+
+### Patch Changes
+
+- @rozie/runtime-react@0.6.0
+
 ## 0.1.5
 
 ### Patch Changes
@@ -9,6 +15,7 @@
   This leaf has the broadest prop surface reaching into `$onMount`, so it takes the largest prop ripple in the wave — 29 synced refs:
   - **Prop reads** (21) — `allowInput`, `altFormat`, `altInput`, `appendTo`, `commitOn`, `enableSeconds`, `enableTime`, `formatDate`, `inline`, `monthSelectorType`, `nextArrow`, `noCalendar`, `options`, `parseDate`, `plugins`, `position`, `prevArrow`, `showMonths`, `staticPosition`, `time24hr`, `weekNumbers`. The flatpickr instance is constructed inside `$onMount`; these now read their current values at construction time rather than the first render's.
   - **`$emit` handler props** (8) — `onChange`, `onClose`, `onDayCreate`, `onMonthChange`, `onOpen`, `onReady`, `onValueUpdate`, `onYearChange`. flatpickr's hooks are registered once at construction, so a consumer that swapped a handler after mount previously kept getting the original called.
+
 - The mount effect's dependency array is now honest, so the `react-hooks/exhaustive-deps` suppression is no longer emitted.
 - No API surface change.
 - @rozie/runtime-react@0.2.3

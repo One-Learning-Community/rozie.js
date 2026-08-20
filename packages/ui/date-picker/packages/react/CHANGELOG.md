@@ -1,5 +1,11 @@
 # @rozie-ui/date-picker-react
 
+## 0.1.9
+
+### Patch Changes
+
+- @rozie/runtime-react@0.6.0
+
 ## 0.1.8
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/data-table-react
 
+## 0.2.7
+
+### Patch Changes
+
+- @rozie/runtime-react@0.6.0
+
 ## 0.2.6
 
 ### Patch Changes
