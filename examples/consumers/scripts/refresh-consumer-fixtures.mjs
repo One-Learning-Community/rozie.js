@@ -267,12 +267,42 @@ async function emitVueSelect() {
   writeFileSync(out, result.code);
 }
 
+/**
+ * Regenerate the `DynamicSlots.*` consumer fixtures by delegating to
+ * `gen-dynamicslots-fixture.mjs`.
+ *
+ * That script owns a SELF-OWNED source (`./fixtures-src/DynamicSlots.rozie`)
+ * which is deliberately a DIFFERENT component from `examples/DynamicSlots.rozie`
+ * — different props, different slot set. So `DynamicSlots` must NOT be added to
+ * `EXAMPLE_INPUTS`: doing so would compile the wrong component over the top of
+ * the Phase 79 Plan 12 R6/AC-10 type-surface fixture. Delegation is the only
+ * correct wiring.
+ *
+ * It was originally authored as a ONE-OFF, wired into nothing, on the reasoning
+ * that a sixth `EXAMPLE_INPUTS` entry carried too large a blast radius. That
+ * reasoning still holds for `EXAMPLE_INPUTS` — but leaving the generator
+ * unwired meant the committed fixtures silently rotted through every subsequent
+ * emitter change (they missed Phase 80's whole `RozieSlot`/`__rozieFillMap`
+ * intake, then quick 260819-qo8's runtime-helper move) while `tsc` stayed green,
+ * because stale emitted output is still self-contained valid TypeScript.
+ * Calling it from here costs one extra compile of one file and closes that hole.
+ *
+ * Note this generator covers SIX targets (it adds solid + lit), whereas
+ * `TARGETS` above is the four inline-typed consumer projects.
+ */
+async function refreshDynamicSlots() {
+  logSection('regenerating DynamicSlots.* via gen-dynamicslots-fixture.mjs (all 6 targets)');
+  const { generateDynamicSlotsFixtures } = await import('./gen-dynamicslots-fixture.mjs');
+  await generateDynamicSlotsFixtures();
+}
+
 async function main() {
   for (const target of TARGETS) {
     await refreshTarget(target);
   }
   await emitReactSelect();
   await emitVueSelect();
+  await refreshDynamicSlots();
   logSection('done');
 }
 

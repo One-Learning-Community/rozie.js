@@ -41,7 +41,7 @@ function pruneReactRuntimeArtifacts(dir) {
   }
 }
 
-async function main() {
+export async function generateDynamicSlotsFixtures() {
   for (const target of TARGETS) {
     const consumerDir = resolve(ROOT, `examples/consumers/${target}-ts`);
     if (!existsSync(consumerDir)) {
@@ -80,7 +80,14 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  process.stderr.write(String(err?.stack ?? err) + '\n');
-  process.exitCode = 1;
-});
+// Run only when invoked directly (`node gen-dynamicslots-fixture.mjs`). When
+// `refresh-consumer-fixtures.mjs` imports this module it awaits the exported
+// function instead, so generation is properly sequenced and a failure REJECTS
+// into that script's own `main().catch` rather than merely setting exitCode
+// after its "done" line has already printed.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  generateDynamicSlotsFixtures().catch((err) => {
+    process.stderr.write(String(err?.stack ?? err) + '\n');
+    process.exitCode = 1;
+  });
+}
