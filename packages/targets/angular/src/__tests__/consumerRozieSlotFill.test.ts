@@ -304,9 +304,17 @@ describe('Task 2 — consumer emits record-path fills as plain children, no View
 });
 
 describe('Task 3 — RozieSlot wired into imports: array and the top-of-file import line, gated on record-path presence (Phase 80 R4)', () => {
+  // Quick task 260819-sg9 (Tier 2) — every fixture below is single-root, so
+  // it also inherits the default `inherit-attrs` auto-fallthrough `$attrs`
+  // spread unless disabled. That spread would legitimately pull in
+  // `createRozieAttrApplier`/`createRozieHostAttrsReader` from
+  // `@rozie/runtime-angular` too — a real, separately-proven seam
+  // (`attrApplierRuntimeImports.test.ts`), not something this
+  // RozieSlot-wiring-focused describe block should assert on.
+  // `inherit-attrs="false"` keeps each fixture scoped to the slot seam.
   it('a consumer emitting a record-path fill lists RozieSlot in imports: and imports it from @rozie/runtime-angular', () => {
     const ir = lowerInline(`
-<rozie name="ConsumerX">
+<rozie name="ConsumerX" inherit-attrs="false">
 <components>{ Cell: "./Cell.rozie" }</components>
 <data>{ dynName: 'header' }</data>
 <template>
@@ -327,7 +335,7 @@ describe('Task 3 — RozieSlot wired into imports: array and the top-of-file imp
 
   it('a zero-slot component imports nothing from @rozie/runtime-angular and has an unchanged imports: array', () => {
     const ir = lowerInline(`
-<rozie name="Plain">
+<rozie name="Plain" inherit-attrs="false">
 <template>
 <div>Hello</div>
 </template>
@@ -340,7 +348,7 @@ describe('Task 3 — RozieSlot wired into imports: array and the top-of-file imp
 
   it('a component with only identifier-named static slots imports nothing from @rozie/runtime-angular either', () => {
     const ir = lowerInline(`
-<rozie name="ConsumerY">
+<rozie name="ConsumerY" inherit-attrs="false">
 <components>{ Cell: "./Cell.rozie" }</components>
 <template>
 <div>

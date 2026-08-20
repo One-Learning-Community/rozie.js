@@ -180,10 +180,15 @@ describe('emitAngular — substring invariants (Plan 05-04a Task 3 acceptance cr
       const ctorMatch = code.match(/constructor\(\) \{([\s\S]*?)\n {2}\}/);
       const ctorBody = ctorMatch?.[1] ?? '';
       const allInjects = (code.match(/inject\(/g) ?? []).length;
-      // Field initializers can also contain inject — match `=\s*inject\(`.
-      // Effect callbacks `effect((onCleanup) => { ...inject... })` are ALSO valid
-      // injection contexts in Angular. Allow them.
-      const fieldInitInjects = (code.match(/=\s*inject\(/g) ?? []).length;
+      // Field initializers can also contain inject — match `=\s*inject\(`,
+      // OR (Quick task 260819-sg9, Tier 2) `inject(...)` nested one call
+      // deep inside a factory invocation in the SAME field initializer,
+      // e.g. `private __rozieApplyAttrs = createRozieAttrApplier(inject(Renderer2));`
+      // — still a field initializer, still a valid injection context, just
+      // no longer the bare `= inject(` shape. Effect callbacks
+      // `effect((onCleanup) => { ...inject... })` are ALSO valid injection
+      // contexts in Angular. Allow them.
+      const fieldInitInjects = (code.match(/=\s*(?:[A-Za-z_$][\w$]*\()?inject\(/g) ?? []).length;
       const ctorInjects = (ctorBody.match(/inject\(/g) ?? []).length;
       // The remaining injects (allInjects - fieldInitInjects - ctorInjects)
       // should be 0. If non-zero, Pitfall 8 is violated.

@@ -731,153 +731,26 @@ function extractLiteralClassStyleFromAngularSpread(
 }
 
 /**
- * Plan 14-05 / D-01 — the SHARED `__rozieApplyAttrs` private class-field IIFE
- * diff helper. One per component (deduplicated via `ctx.scriptInjections`).
- * Diffs `prevKeys` between renders so a key dropped from the object is removed
- * from the DOM (T-14-10 stale-attribute prevention). `inject(Renderer2)` lives
- * in the field initializer (a class-field initializer IS injection context —
- * Phase 05 Pitfall 8 mitigation).
+ * Plan 14-05 / D-01, relocated by Quick task 260819-sg9 (Tier 2) — the
+ * `__rozieApplyAttrs` / `__rozieGetHostAttrs` private class fields used to be
+ * ~85 lines of inlined IIFE body per component (the diff/merge logic itself,
+ * plus the `inject(Renderer2)` / `inject(ElementRef)` calls). Both bodies now
+ * live in `@rozie/runtime-angular` as `createRozieAttrApplier` /
+ * `createRozieHostAttrsReader` — two exported factories that RECEIVE their
+ * Angular dependency as a caller-supplied argument instead of resolving it
+ * themselves (see that package's doc comments for the full merge-semantics
+ * and caller-injects-contract explanation, carried across verbatim).
  *
- * `null` / `false` values trigger `removeAttribute`; everything else routes
- * through `setAttribute(String(v))` — the same contract as the Lit
- * `rozieSpread` directive (cross-target parity).
+ * The emitted field initializer keeps BOTH the `inject()` call and the field
+ * position exactly where they were — only the multi-line body collapses to a
+ * one-line factory call. `APPLY_ATTRS_FIELD_NAME` / `HOST_ATTRS_GETTER_NAME`
+ * are exported so `emitAngular.ts` can gate its `imports.addRuntime(...)`
+ * calls on whether `emitSpreadBinding` actually pushed the corresponding
+ * field decl (not on `hasSpreadBinding`, which is also set on paths where no
+ * decl is pushed at all — see `emitAngular.ts`'s gate comment).
  */
-const APPLY_ATTRS_FIELD_NAME = '__rozieApplyAttrs';
-const HOST_ATTRS_GETTER_NAME = '__rozieGetHostAttrs';
-
-function applyAttrsHelperDecl(): string {
-  // Per-element `prevKeys` snapshot keyed by host Element. A single
-  // closure-scoped `let prevKeys` (the previous shape) was per-COMPONENT,
-  // not per-ELEMENT — two `r-bind` spreads on distinct elements would
-  // cross-contaminate the key-removal diff (CR-02). Mirrors the Lit
-  // `rozieSpread` directive's `WeakMap<Element, string[]>` pattern.
-  //
-  // Null/undefined `obj` is coerced to `{}` so a nullable spread expression
-  // (`r-bind="$data.maybeNull"`) is a clean removeAll-then-no-op rather
-  // than a TypeError on `Object.entries(null)` / `k in null` (CR-04).
-  // Matches the silent-no-op contract of Vue `v-bind="null"`, React
-  // `{...null}`, and Svelte `{...null}`.
-  //
-  // Phase 14.1 / WR-A1 — `class` and `style` are MERGE-keys (R6 always-
-  // merge), not REPLACE-keys. The naive `setAttribute(el, 'class', value)`
-  // / `setAttribute(el, 'style', value)` path used for all other attrs
-  // (a) wipes the wrapper-author's own `class="btn"` / static styles, and
-  // (b) loses to Angular's `[ngClass]` / `ɵɵstyleMap` instructions that
-  // re-apply on every CD cycle AFTER the effect runs. Handle them via
-  // `el.classList.add` (tokenised, additive) and `el.style.setProperty`
-  // with `'important'` priority (beats Angular's non-!important styleMap
-  // re-apply). Track the tokens/properties we applied per element so a
-  // consumer-side drop of `class`/`style` cleanly removes our additions
-  // on the next effect run without touching the wrapper's owned classes
-  // or styles. Other targets achieve the same "consumer wins" semantic
-  // via per-framework merge primitives (React: JSX style-object spread,
-  // Vue: mergeProps style merge, Svelte/Solid/Lit: target-native paths).
-  return [
-    `private ${APPLY_ATTRS_FIELD_NAME} = (() => {`,
-    `  const renderer = inject(Renderer2);`,
-    `  const prevKeysByElement = new WeakMap<HTMLElement, string[]>();`,
-    `  const prevClassTokensByElement = new WeakMap<HTMLElement, string[]>();`,
-    `  const prevStylePropsByElement = new WeakMap<HTMLElement, string[]>();`,
-    `  const parseClassTokens = (value: unknown): string[] => {`,
-    `    if (typeof value !== 'string') return [];`,
-    `    const out: string[] = [];`,
-    `    for (const tok of value.split(/\\s+/)) {`,
-    `      if (tok.length > 0) out.push(tok);`,
-    `    }`,
-    `    return out;`,
-    `  };`,
-    `  const parseStyleDecls = (value: unknown): Array<[string, string]> => {`,
-    `    if (typeof value !== 'string') return [];`,
-    `    const out: Array<[string, string]> = [];`,
-    `    for (const decl of value.split(';')) {`,
-    `      const colon = decl.indexOf(':');`,
-    `      if (colon < 0) continue;`,
-    `      const prop = decl.slice(0, colon).trim();`,
-    `      const val = decl.slice(colon + 1).trim();`,
-    `      if (prop.length > 0) out.push([prop, val]);`,
-    `    }`,
-    `    return out;`,
-    `  };`,
-    `  const applyClassMerge = (el: HTMLElement, value: unknown) => {`,
-    `    const next = parseClassTokens(value);`,
-    `    const prev = prevClassTokensByElement.get(el) ?? [];`,
-    `    const nextSet = new Set(next);`,
-    `    for (const tok of prev) {`,
-    `      if (!nextSet.has(tok)) el.classList.remove(tok);`,
-    `    }`,
-    `    for (const tok of next) el.classList.add(tok);`,
-    `    prevClassTokensByElement.set(el, next);`,
-    `  };`,
-    `  const applyStyleMerge = (el: HTMLElement, value: unknown) => {`,
-    `    const next = parseStyleDecls(value);`,
-    `    const prev = prevStylePropsByElement.get(el) ?? [];`,
-    `    const nextProps = next.map(([p]) => p);`,
-    `    const nextSet = new Set(nextProps);`,
-    `    for (const prop of prev) {`,
-    `      if (!nextSet.has(prop)) el.style.removeProperty(prop);`,
-    `    }`,
-    `    for (const [prop, val] of next) el.style.setProperty(prop, val, 'important');`,
-    `    prevStylePropsByElement.set(el, nextProps);`,
-    `  };`,
-    `  return (el: HTMLElement, obj: Record<string, unknown> | null | undefined) => {`,
-    `    const safeObj: Record<string, unknown> = obj ?? {};`,
-    `    const prevKeys = prevKeysByElement.get(el) ?? [];`,
-    `    for (const k of prevKeys) {`,
-    `      if (k === 'class' || k === 'style') continue;`,
-    `      if (!(k in safeObj)) renderer.removeAttribute(el, k);`,
-    `    }`,
-    `    if (!('class' in safeObj) && prevClassTokensByElement.has(el)) {`,
-    `      applyClassMerge(el, '');`,
-    `    }`,
-    `    if (!('style' in safeObj) && prevStylePropsByElement.has(el)) {`,
-    `      applyStyleMerge(el, '');`,
-    `    }`,
-    `    for (const [k, v] of Object.entries(safeObj)) {`,
-    `      if (k === 'class') {`,
-    `        applyClassMerge(el, v);`,
-    `      } else if (k === 'style') {`,
-    `        applyStyleMerge(el, v);`,
-    `      } else if (v === null || v === false) {`,
-    `        renderer.removeAttribute(el, k);`,
-    `      } else {`,
-    `        renderer.setAttribute(el, k, String(v));`,
-    `      }`,
-    `    }`,
-    `    prevKeysByElement.set(el, Object.keys(safeObj));`,
-    `  };`,
-    `})();`,
-  ].join('\n');
-}
-
-/**
- * Plan 14-05 — synthesised `__rozieGetHostAttrs` helper for the Angular target's
- * `$attrs` lowering. Angular has no native `$attrs` proxy (cf. Vue's
- * template-side `$attrs` magic accessor). The consumer's attributes land on
- * the host custom element (`<rozie-foo id="x">`); auto-fallthrough must
- * re-project them onto the TEMPLATE-ROOT element (CONTEXT.md A1).
- *
- * The helper reads attributes from the host element on each call so a
- * consumer-side dynamic binding (`[id]="someSignal()"`) flows through on the
- * next effect re-run (Angular reflects the binding onto the host DOM
- * attribute; the next `__rozieApplyAttrs` invocation sees the new value).
- *
- * `inject(ElementRef)` lives in a field initializer (injection context per
- * Phase 05 Pitfall 8). The host element is captured ONCE; only the attribute
- * read iterates per call.
- */
-function hostAttrsGetterDecl(): string {
-  return [
-    `private ${HOST_ATTRS_GETTER_NAME} = (() => {`,
-    `  const host = inject(ElementRef);`,
-    `  return () => {`,
-    `    const el = host.nativeElement as HTMLElement;`,
-    `    const out: Record<string, unknown> = {};`,
-    `    for (const a of Array.from(el.attributes)) out[a.name] = a.value;`,
-    `    return out;`,
-    `  };`,
-    `})();`,
-  ].join('\n');
-}
+export const APPLY_ATTRS_FIELD_NAME = '__rozieApplyAttrs';
+export const HOST_ATTRS_GETTER_NAME = '__rozieGetHostAttrs';
 
 /**
  * Plan 14-05 / D-01 — emit the per-element machinery for ONE `spreadBinding`:
@@ -988,7 +861,7 @@ function emitSpreadBinding(
     if (!helperAlreadyPushed) {
       ctx.scriptInjections.push({
         name: APPLY_ATTRS_FIELD_NAME,
-        decl: applyAttrsHelperDecl(),
+        decl: `private ${APPLY_ATTRS_FIELD_NAME} = createRozieAttrApplier(inject(Renderer2));`,
       });
     }
 
@@ -1001,7 +874,7 @@ function emitSpreadBinding(
       if (!hostGetterAlreadyPushed) {
         ctx.scriptInjections.push({
           name: HOST_ATTRS_GETTER_NAME,
-          decl: hostAttrsGetterDecl(),
+          decl: `private ${HOST_ATTRS_GETTER_NAME} = createRozieHostAttrsReader(inject(ElementRef));`,
         });
       }
     }
@@ -1054,11 +927,12 @@ function emitSpreadBinding(
 /**
  * Plan 15-05 / D-13 — the SHARED `__rozieListenersRenderer` private class
  * field that holds the injected `Renderer2`. One per component, mirrors the
- * Phase 14 `applyAttrsHelperDecl` pattern of sharing a single Renderer2
- * injection across multiple per-element effect() bodies. The Phase 14 IIFE
- * carries Renderer2 internally; for listeners we can hoist the field-level
- * inject because the effect() body needs a direct call site for the disposer-
- * returning `renderer.listen(el, event, fn)` form.
+ * Phase 14 shared-applier pattern (the `__rozieApplyAttrs` field, Quick task
+ * 260819-sg9) of sharing a single Renderer2 injection across multiple
+ * per-element effect() bodies. `__rozieApplyAttrs` carries its Renderer2
+ * internally (passed into `createRozieAttrApplier`); for listeners we can
+ * hoist the field-level inject because the effect() body needs a direct call
+ * site for the disposer-returning `renderer.listen(el, event, fn)` form.
  */
 const LISTENERS_RENDERER_FIELD_NAME = '__rozieListenersRenderer';
 
@@ -1256,8 +1130,8 @@ function emitListenerSpread(spread: ListenerSpreadIR, ctx: EmitAttrCtx): string 
 
 /**
  * command-palette-portal-overlay phase — the SHARED (once-per-component)
- * `__roziePortalPlace` helper method. Mirrors `applyAttrsHelperDecl` /
- * `listenersRendererFieldDecl`'s dedup pattern: pushed onto
+ * `__roziePortalPlace` helper method. Mirrors the shared `__rozieApplyAttrs`
+ * field push / `listenersRendererFieldDecl`'s dedup pattern: pushed onto
  * `ctx.scriptInjections` at most once regardless of how many `r-portal`
  * elements the component has.
  *
@@ -1331,8 +1205,8 @@ function portalPlaceMethodDecl(): string {
  *     onto the open tag),
  *   - a `viewChild<ElementRef>('roziePortal_<N>')` private field,
  *   - the SHARED `__roziePortalPlace`/anchors/moved-set fields (once per
- *     component — mirrors `emitSpreadBinding`'s `applyAttrsHelperDecl`
- *     dedup),
+ *     component — mirrors `emitSpreadBinding`'s shared `__rozieApplyAttrs`
+ *     field-push dedup),
  *   - a `private __roziePortal_<N>_effect = effect(() => { ... });` field
  *     initializer that guards `nativeElement` (Pitfall 7 — `viewChild()`
  *     signals return `undefined` until the view is initialized, so a
@@ -1470,11 +1344,15 @@ export function emitSingleAttr(
   // Phase 14 R2 / D-07 / D-01 / Plan 14-05 — the bare-spread `r-bind="<expr>"`
   // form (and the synthesized `$attrs` auto-fallthrough spread). Angular has
   // NO native attribute-object spread; D-01 / 14-RESEARCH Pattern 3 specifies
-  // an `effect()` + `Renderer2` imperative diff helper. The shared
-  // `__rozieApplyAttrs` IIFE inlines per Phase 05 OQ A8/A9 (no
-  // `@rozie/runtime-angular` package); `effect()` lives in a field initializer
-  // and guards `viewChild()?.nativeElement` (Pitfall 7). See
-  // `emitSpreadBinding` for the full mechanism.
+  // an `afterRenderEffect()` + `Renderer2` imperative diff helper. Quick task
+  // 260819-sg9 (Tier 2) moved the shared diff/merge logic itself into
+  // `@rozie/runtime-angular`'s `createRozieAttrApplier` — the emitted field
+  // still performs `inject(Renderer2)` and passes it into the factory (the
+  // `APPLY_ATTRS_FIELD_NAME` push in `emitSpreadBinding` below emits the
+  // one-line call); `effect()` / `afterRenderEffect()` lives in a field
+  // initializer and guards
+  // `viewChild()?.nativeElement` (Pitfall 7). See `emitSpreadBinding` for the
+  // full mechanism.
   if (attr.kind === 'spreadBinding') {
     return emitSpreadBinding(attr, ctx, /* hasExplicitClassOrStyle */ false);
   }

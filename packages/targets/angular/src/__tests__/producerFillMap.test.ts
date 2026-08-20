@@ -186,7 +186,12 @@ describe('Angular producer — content-collected fill map (Task 1)', () => {
     const code = compileAngular(RECORD_ONLY_PRODUCER, 'Cell.rozie');
     expect(code).toContain('__rozieFills = contentChildren(RozieSlot, { descendants: true });');
     expect(code).toContain('__rozieFillMap = computed(() => {');
-    expect(code).toContain("import { RozieSlot } from '@rozie/runtime-angular';");
+    // Quick task 260819-sg9 (Tier 2) — RECORD_ONLY_PRODUCER is single-root
+    // with default `inherit-attrs`, so it also legitimately gains the
+    // separately-proven `createRozieAttrApplier`/`createRozieHostAttrsReader`
+    // specifiers on the same import line (the default auto-fallthrough
+    // `$attrs` spread). Match RozieSlot's presence, not the whole line.
+    expect(code).toMatch(/import \{[^}]*\bRozieSlot\b[^}]*\} from '@rozie\/runtime-angular';/);
   });
 
   // AMENDED — Phase 80 Plan 10 (R3/D-09). Before this plan, an
@@ -203,7 +208,10 @@ describe('Angular producer — content-collected fill map (Task 1)', () => {
     const code = compileAngular(IDENTIFIER_ONLY_PRODUCER, 'X.rozie');
     expect(code).toContain('__rozieFills = contentChildren(RozieSlot, { descendants: true });');
     expect(code).toContain('__rozieFillMap = computed(() => {');
-    expect(code).toContain("import { RozieSlot } from '@rozie/runtime-angular';");
+    // Quick task 260819-sg9 (Tier 2) — see the comment on the sibling case
+    // above; IDENTIFIER_ONLY_PRODUCER is also single-root default
+    // `inherit-attrs`.
+    expect(code).toMatch(/import \{[^}]*\bRozieSlot\b[^}]*\} from '@rozie\/runtime-angular';/);
     // The `templates` input is still present and unchanged.
     expect(code).toContain(
       'templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);',

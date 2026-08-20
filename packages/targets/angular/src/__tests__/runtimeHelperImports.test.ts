@@ -36,7 +36,14 @@ function compileAngular(src: string, filename = 'Test.rozie'): string {
   return code;
 }
 
-const WRAPPING_SRC = `<rozie name="Display">
+// Quick task 260819-sg9 (Tier 2) — \`inherit-attrs="false"\` keeps this
+// fixture's runtime import line scoped to the display/attr seam this test
+// exercises. Without it, the default \`inherit-attrs\` auto-fallthrough
+// synthesizes an \`\$attrs\` spread onto this single-root \`<button>\`, which
+// would ALSO pull in \`createRozieAttrApplier\`/\`createRozieHostAttrsReader\`
+// — a real, separately-proven seam (\`attrApplierRuntimeImports.test.ts\`),
+// not something this display/attr-focused test should assert on.
+const WRAPPING_SRC = `<rozie name="Display" inherit-attrs="false">
 <data>{ obj: {} }</data>
 <template>
 <button>{{ obj }}</button>
@@ -61,7 +68,16 @@ const theme = $inject('theme', { color: 'gray' });
 </template>
 </rozie>`;
 
-const NEITHER_SRC = `<rozie name="Plain">
+// Quick task 260819-sg9 (Tier 2) — \`inherit-attrs="false"\` is now REQUIRED
+// for this to be a genuine "uses none of the runtime package's exports"
+// byte-identity control. Without it, the default auto-fallthrough spread
+// synthesizes onto this single-root \`<button>\` too, and this fixture would
+// legitimately (not spuriously) start referencing
+// \`createRozieAttrApplier\`/\`createRozieHostAttrsReader\` — this seam has its
+// own dedicated boundary fixture (\`examples/ROnProbe.rozie\`, see
+// \`attrApplierRuntimeImports.test.ts\` Seam E); this one stays scoped to
+// display/attr/context/slots.
+const NEITHER_SRC = `<rozie name="Plain" inherit-attrs="false">
 <data>{ count: 0 }</data>
 <template>
 <button @click="$data.count++">{{ $data.count }}</button>
@@ -92,24 +108,20 @@ describe('runtimeHelperImports — Angular emitter imports helpers from @rozie/r
 
     it('still emits both delegating class methods, unchanged', () => {
       const code = compileAngular(WRAPPING_SRC);
-      expect(code).toContain(
-        'rozieDisplay(v: unknown): string { return __rozieDisplay(v); }',
-      );
-      expect(code).toContain(
-        "rozieAttr(v: unknown): string | null { return __rozieAttr(v); }",
-      );
+      expect(code).toContain('rozieDisplay(v: unknown): string { return __rozieDisplay(v); }');
+      expect(code).toContain('rozieAttr(v: unknown): string | null { return __rozieAttr(v); }');
     });
   });
 
   describe('Seam B — $provide/$inject context', () => {
-    it("runtime import line includes rozieToken; no module-scope helper/registry survives", () => {
+    it('runtime import line includes rozieToken; no module-scope helper/registry survives', () => {
       const code = compileAngular(CONTEXT_ONLY_SRC);
       expect(code).toMatch(/import \{[^}]*\brozieToken\b[^}]*\} from '@rozie\/runtime-angular';/);
       expect(code).not.toContain('function rozieToken(');
       expect(code).not.toContain('__rozieTokenRegistry');
     });
 
-    it("@angular/core import line drops InjectionToken but keeps inject", () => {
+    it('@angular/core import line drops InjectionToken but keeps inject', () => {
       const code = compileAngular(CONTEXT_ONLY_SRC);
       const coreImportLine = code
         .split('\n')

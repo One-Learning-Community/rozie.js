@@ -84,7 +84,13 @@ describe('Angular producer — static-identifier-only producer must still collec
 
   it('DESIRED POST-FIX: emits the RozieSlot marker-directive runtime import', () => {
     const code = compileStaticIdentifierOnlyProducer();
-    expect(code).toContain("import { RozieSlot } from '@rozie/runtime-angular';");
+    // Quick task 260819-sg9 (Tier 2) — ProducerIdentifierOnly.rozie is
+    // single-root with default `inherit-attrs`, so it also legitimately
+    // gains the separately-proven `createRozieAttrApplier`/
+    // `createRozieHostAttrsReader` specifiers on the same import line (the
+    // default auto-fallthrough `$attrs` spread). Match RozieSlot's
+    // presence, not the whole line.
+    expect(code).toMatch(/import \{[^}]*\bRozieSlot\b[^}]*\} from '@rozie\/runtime-angular';/);
   });
 
   it("DESIRED POST-FIX: the 'header' slot's outlet resolution expression carries the fill-map tier ahead of the templates lookup", () => {

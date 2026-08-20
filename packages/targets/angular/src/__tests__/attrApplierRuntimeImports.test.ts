@@ -1,8 +1,9 @@
 /**
  * attrApplierRuntimeImports — Quick task 260819-sg9, Task 2.
  *
- * Red-first proof for the two emitter splice sites (`applyAttrsHelperDecl()`
- * / `hostAttrsGetterDecl()` in `emit/emitTemplateAttribute.ts`) being
+ * Red-first proof for the two emitter splice sites in
+ * `emit/emitTemplateAttribute.ts` (the `APPLY_ATTRS_FIELD_NAME` /
+ * `HOST_ATTRS_GETTER_NAME` field decls `emitSpreadBinding` pushes) being
  * replaced by `AngularImportCollector.addRuntime()` calls that resolve
  * against the real `@rozie/runtime-angular` exports `createRozieAttrApplier`
  * / `createRozieHostAttrsReader` (Task 1), instead of inlining an ~85-line

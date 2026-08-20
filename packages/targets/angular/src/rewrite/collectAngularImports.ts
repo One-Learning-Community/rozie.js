@@ -165,8 +165,32 @@ export type AngularCommonImport = 'NgTemplateOutlet' | 'NgClass' | 'NgStyle';
  * `imports.addRuntime('rozieToken')` whenever the component uses `$provide`
  * or `$inject`. Carries NO alias — the emitted call sites already spell it
  * `rozieToken('key')`, matching the exported name exactly.
+ *
+ * `createRozieAttrApplier` / `createRozieHostAttrsReader` — the `r-bind` /
+ * `$attrs` spread applier and host-attribute reader FACTORIES (Tier 2, Quick
+ * task 260819-sg9). Added by `emitAngular` when the corresponding field decl
+ * was pushed onto `tmplResult.scriptInjections` by `emitSpreadBinding`
+ * (`APPLY_ATTRS_FIELD_NAME` / `HOST_ATTRS_GETTER_NAME` —
+ * `emit/emitTemplateAttribute.ts`): `createRozieAttrApplier` for ANY
+ * `r-bind` spread or `$attrs` lowering; `createRozieHostAttrsReader`
+ * additionally, only when the spread IS the `$attrs` lowering (not every
+ * spread needs the host reader — a literal `r-bind` object never does).
+ * Both replace what used to be an inlined private-field IIFE pair that
+ * called `inject(Renderer2)` / `inject(ElementRef)` itself; the emitted
+ * component still performs both `inject()` calls, in the same field
+ * initializer position, and passes the resolved instance into the factory
+ * (`createRozieAttrApplier(inject(Renderer2))`) — the caller-injects
+ * contract that keeps this package from ever resolving an Angular DI token
+ * itself. Carry NO alias — neither name collides with a class member or
+ * `@angular/core` symbol this emitter ever synthesizes.
  */
-export type AngularRuntimeImport = 'RozieSlot' | 'rozieDisplay' | 'rozieAttr' | 'rozieToken';
+export type AngularRuntimeImport =
+  | 'RozieSlot'
+  | 'rozieDisplay'
+  | 'rozieAttr'
+  | 'rozieToken'
+  | 'createRozieAttrApplier'
+  | 'createRozieHostAttrsReader';
 
 /**
  * Local aliases for runtime-import specifiers whose exported name collides

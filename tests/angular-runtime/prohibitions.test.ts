@@ -45,14 +45,15 @@
  * Ambient globals (`describe`, `it`, `expect`, `vi`) per setup-vitest.ts —
  * do NOT `import { describe, it, expect } from 'vitest'` here.
  */
-import { readFileSync } from 'node:fs';
+
 import { execFileSync } from 'node:child_process';
-import { join, dirname, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TestBed } from '@angular/core/testing';
 import { compileAngular } from './compileAngular';
-import { ensureTestBedInit } from './testBedInit';
 import { ConsumerDuplicateRuntimeKeys } from './fixtures/ConsumerDuplicateRuntimeKeys.rozie';
+import { ensureTestBedInit } from './testBedInit';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../..');
@@ -99,7 +100,12 @@ function readAtBaseline(relPath: string): string {
 function listAngularFixtureFiles(): string[] {
   const out = execFileSync(
     'git',
-    ['ls-files', 'tests/dist-parity/fixtures/*.angular.ts', 'tests/slot-matrix/fixtures/*/expected*.angular.ts', 'tests/regressions/fixtures/*/expected.angular.ts'],
+    [
+      'ls-files',
+      'tests/dist-parity/fixtures/*.angular.ts',
+      'tests/slot-matrix/fixtures/*/expected*.angular.ts',
+      'tests/regressions/fixtures/*/expected.angular.ts',
+    ],
     { cwd: REPO_ROOT, encoding: 'utf8' },
   );
   return out.split('\n').filter((l) => l.length > 0);
@@ -285,7 +291,8 @@ function applyInverseTransform(current: string, baseline: string): string {
   const toRemove: string[] = PERMITTED_CORE_ADDITIONS.filter(
     (s) => currentCore.has(s) && !baselineCore.has(s),
   );
-  const toAddBack: string[] = hadToken && !currentCore.has('InjectionToken') ? ['InjectionToken'] : [];
+  const toAddBack: string[] =
+    hadToken && !currentCore.has('InjectionToken') ? ['InjectionToken'] : [];
   if (toRemove.length > 0 || toAddBack.length > 0) {
     out = out.replace(/import \{ ([^}]*) \} from '@angular\/core';/, (_full, names: string) => {
       const kept = names.split(', ').filter((n) => !toRemove.includes(n));
@@ -430,22 +437,50 @@ describe('prohibition 1 — MUST NOT emit console output from compiled component
 // (Plan 07) to a positive control (Plan 12) for exactly this reason — it
 // is no longer on the safe side of the boundary, and pinning it as a
 // negative would silently re-encode the bug this plan fixed.
+// Quick task 260819-sg9 (Tier 2) — AMENDED AGAIN. `createRozieAttrApplier`/
+// `createRozieHostAttrsReader` widened the `@rozie/runtime-angular` import
+// gate beyond slots: ANY component whose single-root template gets the
+// default `inherit-attrs` auto-fallthrough `$attrs` spread now ALSO
+// references the runtime package, regardless of whether it declares slots.
+// `examples/Counter.rozie` is zero-slot but IS single-root with default
+// `inherit-attrs`, so it legitimately gains the spread factories — the
+// prior "SOLE remaining negative boundary" framing no longer holds for
+// Counter. The prohibition's SUBJECT (the SLOT dependency boundary — "output
+// that declares NO slots must not depend on the slot machinery") is
+// untouched; only Counter's role as a package-level control is retired.
+// Split into two boundaries: Counter narrows to the SLOT-machinery-specific
+// assertion (no RozieSlot, no contentChildren), and
+// `examples/ROnProbe.rozie` (`inherit-attrs="false"` + no spread) becomes
+// the PACKAGE-LEVEL boundary — a component using none of the runtime
+// package's exports at all.
 describe('prohibition 2 — AMENDED: MUST NOT make @rozie/runtime-angular a dependency of Angular output that declares NO slots', () => {
-  it('a zero-slot component (examples/Counter.rozie) emits no @rozie/runtime-angular import — the SOLE remaining negative boundary', () => {
+  it('a zero-slot component (examples/Counter.rozie) emits no slot-machinery reference — the SLOT dependency boundary (it now legitimately imports the spread factories via the default $attrs auto-fallthrough, unrelated to slots)', () => {
     const code = compileAngular(readExample('Counter'), 'Counter.rozie');
-    expect(code).not.toContain('@rozie/runtime-angular');
     expect(code).not.toContain('RozieSlot');
+    expect(code).not.toContain('contentChildren(');
+    // Package-level note, not a boundary assertion: Counter DOES reference
+    // @rozie/runtime-angular now (the spread factories), which is why it can
+    // no longer serve as the package-level control below.
+    expect(code).toContain('@rozie/runtime-angular');
   });
 
-  it('POSITIVE CONTROL (inverted from Plan 07\'s negative): a component with only identifier-named static slots (ProducerIdentifierOnly) legitimately DOES import @rozie/runtime-angular under the amended, widened intake gate', () => {
-    const code = compileAngular(readFixture('ProducerIdentifierOnly'), 'ProducerIdentifierOnly.rozie');
-    expect(code).toContain("import { RozieSlot } from '@rozie/runtime-angular';");
+  it('a genuinely no-runtime-package component (examples/ROnProbe.rozie, inherit-attrs="false", no slots, no spread) emits no reference to @rozie/runtime-angular at all — the PACKAGE-LEVEL boundary', () => {
+    const code = compileAngular(readExample('ROnProbe'), 'ROnProbe.rozie');
+    expect(code).not.toContain('@rozie/runtime-angular');
+  });
+
+  it("POSITIVE CONTROL (inverted from Plan 07's negative): a component with only identifier-named static slots (ProducerIdentifierOnly) legitimately DOES import @rozie/runtime-angular under the amended, widened intake gate", () => {
+    const code = compileAngular(
+      readFixture('ProducerIdentifierOnly'),
+      'ProducerIdentifierOnly.rozie',
+    );
+    expect(code).toMatch(/import \{[^}]*\bRozieSlot\b[^}]*\} from '@rozie\/runtime-angular';/);
     expect(code).toContain('contentChildren(RozieSlot');
   });
 
   it('POSITIVE CONTROL: a record-path producer (ProducerRecordPath) DOES import @rozie/runtime-angular — proves the zero-slot negative assertion above is not vacuous', () => {
     const code = compileAngular(readFixture('ProducerRecordPath'), 'ProducerRecordPath.rozie');
-    expect(code).toContain("import { RozieSlot } from '@rozie/runtime-angular';");
+    expect(code).toMatch(/import \{[^}]*\bRozieSlot\b[^}]*\} from '@rozie\/runtime-angular';/);
   });
 });
 
@@ -454,7 +489,9 @@ describe("prohibition 3 — MUST NOT remove, narrow, or silently retype the prod
     const code = compileAngular(readFixture('ProducerRecordPath'), 'ProducerRecordPath.rozie');
     // Read verbatim from emitScript.ts rather than paraphrasing (per Task 3's
     // explicit instruction) — packages/targets/angular/src/emit/emitScript.ts:1271.
-    expect(code).toContain('templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);');
+    expect(code).toContain(
+      'templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);',
+    );
   });
 });
 
@@ -466,15 +503,25 @@ describe('prohibition 4a — RETAINED byte-identical: @ContentChild declaration 
   });
 
   it('the identifier-only producer keeps its exact pre-fix @ContentChild declarations and per-slot context interfaces — what prohibition 4 was really protecting, unaffected by the 4b amendment', () => {
-    const code = compileAngular(readFixture('ProducerIdentifierOnly'), 'ProducerIdentifierOnly.rozie');
-    expect(code).toContain("@ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;");
-    expect(code).toContain("@ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;");
+    const code = compileAngular(
+      readFixture('ProducerIdentifierOnly'),
+      'ProducerIdentifierOnly.rozie',
+    );
+    expect(code).toContain(
+      "@ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;",
+    );
+    expect(code).toContain(
+      "@ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;",
+    );
     expect(code).toMatch(/interface HeaderCtx\b/);
     expect(code).toMatch(/interface FooterCtx\b/);
   });
 
   it('static content-child stays the LEFTMOST operand in the amended three-tier resolution chain (D-02 invariant, unaffected by the 4b amendment)', () => {
-    const code = compileAngular(readFixture('ProducerIdentifierOnly'), 'ProducerIdentifierOnly.rozie');
+    const code = compileAngular(
+      readFixture('ProducerIdentifierOnly'),
+      'ProducerIdentifierOnly.rozie',
+    );
     const match = code.match(
       /\*ngTemplateOutlet="\((\w+Tpl)\s*\?\?\s*__rozieFillMap\(\)\['([^']+)'\]\s*\?\?\s*templates\(\)\?\.\['([^']+)'\]\)/,
     );
@@ -484,7 +531,10 @@ describe('prohibition 4a — RETAINED byte-identical: @ContentChild declaration 
   });
 
   it("a real consumer's plain static named fill (ModalConsumer's Modal 1 #header) still emits the exact pre-fix filler markup — an <ng-template #name> projection, never a [rozieSlot] marker; this fixture is NOT in this plan's own rebless set (verified: it never appears in the 42-file Task 2 commit), so its unchanged form IS the 4a control", () => {
-    const code = readFileSync(join(REPO_ROOT, 'tests/dist-parity/fixtures/ModalConsumer.angular.ts'), 'utf8');
+    const code = readFileSync(
+      join(REPO_ROOT, 'tests/dist-parity/fixtures/ModalConsumer.angular.ts'),
+      'utf8',
+    );
     expect(code).toContain('<ng-template #header let-close="close">');
     expect(code).not.toMatch(/#header[^>]*\[rozieSlot\]/);
   });
@@ -532,21 +582,20 @@ describe('prohibition 4b — AMENDED: the inverse transform reproduces pre-fix b
     expect(overAggressive).not.toBe(baseline);
   });
 
-  it.each(files)(
-    '%s: applying the documented inverse transform to the current content reproduces the baseline content exactly',
-    (relPath) => {
-      const current = readFileSync(join(REPO_ROOT, relPath), 'utf8');
-      const baseline = readAtBaseline(relPath);
-      const transformed = applyInverseTransform(current, baseline);
-      // Fail with the offending path so a regression names itself.
-      if (transformed !== baseline) {
-        throw new Error(
-          `${relPath}: the inverse transform did NOT reproduce the pre-fix baseline — real byte drift beyond the permitted additive-only 4b amendment, at commit ${BASELINE_COMMIT}.`,
-        );
-      }
-      expect(transformed).toBe(baseline);
-    },
-  );
+  it.each(
+    files,
+  )('%s: applying the documented inverse transform to the current content reproduces the baseline content exactly', (relPath) => {
+    const current = readFileSync(join(REPO_ROOT, relPath), 'utf8');
+    const baseline = readAtBaseline(relPath);
+    const transformed = applyInverseTransform(current, baseline);
+    // Fail with the offending path so a regression names itself.
+    if (transformed !== baseline) {
+      throw new Error(
+        `${relPath}: the inverse transform did NOT reproduce the pre-fix baseline — real byte drift beyond the permitted additive-only 4b amendment, at commit ${BASELINE_COMMIT}.`,
+      );
+    }
+    expect(transformed).toBe(baseline);
+  });
 
   it('no-deletion: no tracked fixture has any line present at the baseline and absent from the TRANSFORMED current — "no emitted line may be deleted" (SPEC prohibition #4b amendment text)', () => {
     // Checked against the TRANSFORMED current, not raw current — the raw
@@ -570,7 +619,9 @@ describe('prohibition 4b — AMENDED: the inverse transform reproduces pre-fix b
         .split('\n')
         .filter((line) => line.length > 0 && !transformedLines.has(line));
       if (missing.length > 0) {
-        offenders.push(`${relPath}: missing ${missing.length} baseline line(s), e.g. "${missing[0]}"`);
+        offenders.push(
+          `${relPath}: missing ${missing.length} baseline line(s), e.g. "${missing[0]}"`,
+        );
       }
     }
     if (offenders.length > 0) {
@@ -587,7 +638,9 @@ describe('prohibition 5 — MUST NOT re-bless a fixture without a behavioral ass
   // lives in Plan 07 Task 1's commit message and is reviewed there, not
   // here. This describe block is the machine-checkable HALF: catch a
   // fixture the emitter should have changed but did not (a silent miss).
-  it.each(RECORD_PATH_FIXTURES)('%s differs from the pre-fix baseline commit — a record-path fixture the emitter did not change is a silent miss, not a pass', (relPath) => {
+  it.each(
+    RECORD_PATH_FIXTURES,
+  )('%s differs from the pre-fix baseline commit — a record-path fixture the emitter did not change is a silent miss, not a pass', (relPath) => {
     const current = readFileSync(join(REPO_ROOT, relPath), 'utf8');
     const baseline = readAtBaseline(relPath);
     expect(current).not.toBe(baseline);

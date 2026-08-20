@@ -23,13 +23,14 @@
  * Ambient globals (`describe`, `it`, `expect`) per setup-vitest.ts — do NOT
  * `import { describe, it, expect } from 'vitest'` in this package.
  */
+
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { TestBed } from '@angular/core/testing';
 import { compileAngular } from './compileAngular';
-import { ensureTestBedInit } from './testBedInit';
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { AttrApplierSpread } from './fixtures/AttrApplierSpread.rozie';
+import { ensureTestBedInit } from './testBedInit';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = join(HERE, 'fixtures');

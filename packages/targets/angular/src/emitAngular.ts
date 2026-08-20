@@ -16,15 +16,22 @@
  *   9. composeSourceMap produces a real SourceMap referencing the .rozie source.
  *
  * Per RESEARCH OQ A8/A9 RESOLVED: debounce/throttle/outsideClick stay
- * inline (Tier 2 — `__rozieApplyAttrs`/`__rozieGetHostAttrs`, CVA fields,
- * keynav wiring, listener disposers, `__rozieMergeStyle`, pending a
- * cross-package DI-identity review). Phase 80 reversed the narrower "NO
+ * inline (remaining Tier-2-adjacent duplication — CVA fields, keynav
+ * wiring, listener disposers, `__rozieMergeStyle` — each needs a different
+ * extraction shape than a plain factory, or has zero current uses; see
+ * PROJECT deferred-items). Phase 80 reversed the narrower "NO
  * `@rozie/runtime-angular` imports" half of that decision for the
  * `[rozieSlot]` marker directive — see the `hasDynamicSlotFiller` block
  * below. Quick task 260819-qo8 extended the same reversal to
  * `rozieDisplay`/`rozieAttr`/`rozieToken` (previously inlined at module
- * scope per-emitted-file; now real `@rozie/runtime-angular` exports). See
- * `collectAngularImports.ts`'s `runtimeSymbols` bucket for all four.
+ * scope per-emitted-file; now real `@rozie/runtime-angular` exports). Quick
+ * task 260819-sg9 (Tier 2) extended it again to `__rozieApplyAttrs`/
+ * `__rozieGetHostAttrs` (`createRozieAttrApplier`/`createRozieHostAttrsReader`
+ * — the emitted field still performs its own `inject()` call and passes the
+ * resolved instance into the factory; the factory itself never resolves an
+ * Angular DI token, which is what makes the peer-keyed instance-identity
+ * hazard behind `71dff1d5` structurally unreachable here). See
+ * `collectAngularImports.ts`'s `runtimeSymbols` bucket for all six.
  *
  * Per RESEARCH Pitfall 8: all `inject(Renderer2)` / `inject(DestroyRef)` calls
  * are constructor-body or field initializers — never inside arrow methods.
@@ -116,6 +123,12 @@ import { emitListeners } from './emit/emitListeners.js';
 import { emitScript } from './emit/emitScript.js';
 import { emitStyle } from './emit/emitStyle.js';
 import { emitTemplate } from './emit/emitTemplate.js';
+// Quick task 260819-sg9 (Tier 2) — the field-decl NAME constants
+// `emitSpreadBinding` pushes onto `ctx.scriptInjections`. Used below to gate
+// `imports.addRuntime('createRozieAttrApplier' | 'createRozieHostAttrsReader')`
+// on whether the corresponding decl was actually pushed, not on
+// `hasSpreadBinding` (see the gate's own comment for why).
+import { APPLY_ATTRS_FIELD_NAME, HOST_ATTRS_GETTER_NAME } from './emit/emitTemplateAttribute.js';
 import { buildShell } from './emit/shell.js';
 import { cloneScriptProgram } from './rewrite/cloneProgram.js';
 import { collectUserMethodNames, rewriteRozieIdentifiers } from './rewrite/rewriteScript.js';
@@ -390,11 +403,13 @@ const ATTR_CLASS_METHOD = 'rozieAttr(v: unknown): string | null { return __rozie
  * Quick task 260717-uvk — self-contained class method for an array-form
  * `:style="[a, b]"` binding. `@rozie/runtime-angular` exists (unlike when
  * this comment was first written) but `__rozieMergeStyle` still inlines —
- * it is Tier 2, out of scope for Quick task 260819-qo8's `rozieDisplay`/
- * `rozieAttr`/`rozieToken` move pending its own cross-package review — so
- * the merge logic lives directly in the class as a single method (no
- * free-function indirection needed; unlike `rozieDisplay`/`rozieAttr` it
- * has no shared dependency to delegate to).
+ * it has ZERO current uses (deliberately out of scope for both Quick task
+ * 260819-qo8's `rozieDisplay`/`rozieAttr`/`rozieToken` move and Quick task
+ * 260819-sg9's `__rozieApplyAttrs`/`__rozieGetHostAttrs` move — moving it
+ * would be pure churn with no emitted-file benefit) — so the merge logic
+ * lives directly in the class as a single method (no free-function
+ * indirection needed; unlike `rozieDisplay`/`rozieAttr` it has no shared
+ * dependency to delegate to).
  *
  * Merges its args left-to-right into ONE CSS-declaration string (a later arg
  * overrides an earlier one for the same property — Vue `normalizeStyle`
@@ -683,6 +698,28 @@ export function emitAngular(ir: IRComponent, opts: EmitAngularOptions = {}): Emi
     imports.add('ElementRef');
     imports.add('afterRenderEffect');
     imports.add('viewChild');
+  }
+
+  // Quick task 260819-sg9 (Tier 2) — the `r-bind`/`$attrs` applier and
+  // host-attrs reader now come from `@rozie/runtime-angular`
+  // (`createRozieAttrApplier` / `createRozieHostAttrsReader`) instead of an
+  // inlined IIFE pair. Gate on whether `emitSpreadBinding` actually PUSHED
+  // the corresponding field decl onto `tmplResult.scriptInjections`
+  // (`APPLY_ATTRS_FIELD_NAME` / `HOST_ATTRS_GETTER_NAME`), NOT on
+  // `hasSpreadBinding` — that flag is also set on the standalone/test path
+  // where `ctx.scriptInjections` is undefined and no decl is pushed at all,
+  // so gating on it here would emit an import for a field that does not
+  // exist. The two gates are INDEPENDENT: the applier fires for ANY spread
+  // (literal or `$attrs`); the host reader fires only when the spread IS the
+  // `$attrs` lowering — most tracked fixtures carry both (the default
+  // `inherit-attrs` auto-fallthrough is itself an `$attrs` spread), but a
+  // component that explicitly sets `inherit-attrs="false"` and only ever
+  // writes a literal `r-bind` gets the applier alone.
+  if (tmplResult.scriptInjections.some((si) => si.name === APPLY_ATTRS_FIELD_NAME)) {
+    imports.addRuntime('createRozieAttrApplier');
+  }
+  if (tmplResult.scriptInjections.some((si) => si.name === HOST_ATTRS_GETTER_NAME)) {
+    imports.addRuntime('createRozieHostAttrsReader');
   }
 
   // Plan 15-05 / D-13 — when the template lowered at least one dynamic

@@ -1,37 +1,52 @@
 /**
  * Plan 14-05 Task 2 — Angular `spreadBinding` emitter
- * (effect() + Renderer2 applyAttrs, D-01 / 14-RESEARCH Pattern 3).
+ * (afterRenderEffect() + Renderer2 applyAttrs, D-01 / 14-RESEARCH Pattern 3).
  *
- * Angular has NO native attribute-object spread. D-01 specifies an inline
- * `effect()` + `Renderer2` imperative diff helper. The Phase 05 OQ A8/A9
- * convention forbids a `@rozie/runtime-angular` package, so `applyAttrs` is
- * an INLINED private class-field IIFE — NOT a package import.
+ * Angular has NO native attribute-object spread. D-01 specifies an
+ * `afterRenderEffect()` + `Renderer2` imperative diff helper. Quick task
+ * 260819-sg9 (Tier 2) moved the shared diff/merge logic — what used to be an
+ * INLINED private class-field IIFE — into `@rozie/runtime-angular`'s
+ * `createRozieAttrApplier` / `createRozieHostAttrsReader` factories. The
+ * emitted field initializer still performs its own `inject()` call and
+ * passes the resolved instance INTO the factory
+ * (`createRozieAttrApplier(inject(Renderer2))`); the factory itself never
+ * resolves an Angular DI token. Deep behavioral coverage of the ported
+ * diff/merge logic (per-element WeakMap scoping, null/undefined coercion,
+ * class/style merge semantics) now lives in
+ * `tests/angular-runtime/attrApplierBehavior.test.ts`, exercising the real
+ * runtime package directly — this file stays scoped to the EMITTED SHAPE
+ * (what the emitter's class-field initializers and import line look like).
  *
  * Emit contract:
  *   - A `#rozieSpread_<N>` template-ref attribute on the spread-target element.
  *   - A `viewChild<ElementRef>('rozieSpread_<N>')` class-field reading that
  *     ref (signal-based query — Angular 19+ idiom; same as emitPortals).
- *   - A SHARED `__rozieApplyAttrs` private class-field IIFE diff helper
- *     (one per component; reused across multiple spreadBindings).
- *   - A `private __rozieSpread_<N>_effect = effect(() => { ... });` field
- *     initializer guarding `nativeElement` (Pitfall 7 — `viewChild()?.
+ *   - A SHARED `__rozieApplyAttrs = createRozieAttrApplier(inject(Renderer2));`
+ *     private class field (one per component; reused across multiple
+ *     spreadBindings).
+ *   - A `private __rozieSpread_<N>_effect = afterRenderEffect(() => { ... });`
+ *     field initializer guarding `nativeElement` (Pitfall 7 — `viewChild()?.
  *     nativeElement` may be `undefined` before first render).
  *
  * Cases:
  *   (1) LITERAL spread → template gets `#rozieSpread_<N>` + class-body gets
- *       the viewChild query, applyAttrs IIFE, and effect().
+ *       the viewChild query, the applier factory-call field, and
+ *       afterRenderEffect().
  *   (2) DYNAMIC spread → same shape; expression flows through verbatim.
  *   (3) `$attrs` spread → `applyAttrs` receives the bare `$attrs` Identifier
  *       (Angular's $attrs lowering is target-bespoke; the emitter leaves the
  *       Identifier alone — the shell binding wires it).
- *   (4) Two spreads on the same template → SHARED `__rozieApplyAttrs` IIFE,
- *       distinct `rozieSpread_<N>` refs (N=0,1).
+ *   (4) Two spreads on the same template → SHARED applier field, distinct
+ *       `rozieSpread_<N>` refs (N=0,1).
  *   (5) R6 LITERAL class merge — the literal's `class` key is folded into
  *       Angular's existing class-merge path; only the rest goes through
  *       applyAttrs.
  *
- * Imports: emitAngular must add `inject`, `Renderer2`, `ElementRef`, `effect`,
- * `viewChild` to `@angular/core` when at least one spreadBinding is emitted.
+ * Imports: emitAngular must add `inject`, `Renderer2`, `ElementRef`,
+ * `afterRenderEffect`, `viewChild` to `@angular/core`, and
+ * `createRozieAttrApplier` (plus `createRozieHostAttrsReader` for an
+ * `$attrs` lowering) to `@rozie/runtime-angular`, when at least one
+ * spreadBinding is emitted.
  */
 
 import type { IRComponent } from '@rozie/core';
@@ -66,9 +81,16 @@ describe('emitAngular — spreadBinding (Plan 14-05 Task 2 / D-01)', () => {
     expect(code).toContain('#rozieSpread_');
     // viewChild query field for the ref.
     expect(code).toMatch(/viewChild<ElementRef>\('rozieSpread_/);
-    // Shared applyAttrs IIFE diff helper (NO @rozie/runtime-angular import).
-    expect(code).toContain('__rozieApplyAttrs');
-    expect(code).not.toContain('@rozie/runtime-angular');
+    // Quick task 260819-sg9 (Tier 2) — the shared applier is now a one-line
+    // factory-call field initializer importing from @rozie/runtime-angular
+    // (INVERTED from the pre-Tier-2 "NO @rozie/runtime-angular import"
+    // assertion this test used to make).
+    expect(code).toContain(
+      'private __rozieApplyAttrs = createRozieAttrApplier(inject(Renderer2));',
+    );
+    expect(code).toMatch(
+      /import \{[^}]*\bcreateRozieAttrApplier\b[^}]*\} from '@rozie\/runtime-angular';/,
+    );
     // Phase 14.1 / WR-A1 — afterRenderEffect() (not effect()) so the merged
     // class/style runs AFTER Angular's `[ngClass]`/`ɵɵstyleMap` bindings
     // commit; otherwise styleMap re-fires post-effect and clobbers the
@@ -76,9 +98,12 @@ describe('emitAngular — spreadBinding (Plan 14-05 Task 2 / D-01)', () => {
     // nativeElement (Pitfall 7).
     expect(code).toContain('afterRenderEffect(() =>');
     expect(code).toMatch(/\?\.nativeElement/);
-    // The diff helper sets/removes attributes via Renderer2.
-    expect(code).toContain('Renderer2');
-    expect(code).toMatch(/setAttribute|removeAttribute/);
+    // The diff helper is constructed from an injected Renderer2 — the
+    // set/removeAttribute calls themselves now live in
+    // `@rozie/runtime-angular`'s `createRozieAttrApplier` (Quick task
+    // 260819-sg9, Tier 2), covered directly in
+    // `tests/angular-runtime/attrApplierBehavior.test.ts`.
+    expect(code).toContain('inject(Renderer2)');
     // @angular/core import line carries the new symbols.
     expect(code).toMatch(/import \{[^}]*\binject\b[^}]*\} from '@angular\/core'/);
     expect(code).toMatch(/import \{[^}]*\bRenderer2\b[^}]*\} from '@angular\/core'/);
@@ -138,10 +163,16 @@ describe('emitAngular — spreadBinding (Plan 14-05 Task 2 / D-01)', () => {
     expect(helperDecls).toBe(1);
   });
 
-  it('(4-CR-02) __rozieApplyAttrs keys prevKeys per element (WeakMap), not a shared closure-scoped let', () => {
-    // CR-02 regression: a single closure-scoped `let prevKeys` shared
-    // across sibling spreads would cross-contaminate the key-removal diff
-    // between elements. The fix uses `WeakMap<HTMLElement, string[]>`.
+  it('(4-CR-02) __rozieApplyAttrs is now a factory-call field — per-element WeakMap scoping is a RUNTIME behavior, covered directly against the real package', () => {
+    // CR-02 regression (per-element key-removal diff, not a shared
+    // closure-scoped `let`): the emitter no longer inlines the WeakMap
+    // internals to assert on — that behavior moved to
+    // `@rozie/runtime-angular`'s `createRozieAttrApplier` (Quick task
+    // 260819-sg9, Tier 2). The behavioral proof (two elements driven by one
+    // applier keep independent previous-key state) now lives in
+    // `tests/angular-runtime/attrApplierBehavior.test.ts`, exercising the
+    // real runtime package against real jsdom elements. This test stays
+    // scoped to the EMITTED SHAPE: the factory call, not its internals.
     const code = compileAngular(`<rozie name="Test">
 <template>
   <div>
@@ -150,32 +181,33 @@ describe('emitAngular — spreadBinding (Plan 14-05 Task 2 / D-01)', () => {
   </div>
 </template>
 </rozie>`);
-    // Per-element WeakMap is present, the previous shared `let prevKeys`
-    // module-level state is NOT.
-    expect(code).toContain('prevKeysByElement');
-    expect(code).toContain('WeakMap<HTMLElement, string[]>');
-    expect(code).not.toMatch(/let prevKeys: string\[\] = \[\];/);
-    // The new shape reads via WeakMap.get and writes via WeakMap.set.
-    expect(code).toMatch(/prevKeysByElement\.get\(el\)/);
-    expect(code).toMatch(/prevKeysByElement\.set\(el,/);
+    expect(code).toContain(
+      'private __rozieApplyAttrs = createRozieAttrApplier(inject(Renderer2));',
+    );
+    expect(code).not.toMatch(/prevKeysByElement/);
   });
 
-  it('(4-CR-04) __rozieApplyAttrs coerces null/undefined obj to {} (no TypeError)', () => {
-    // CR-04 regression: a manual `r-bind="$data.maybeNull"` where the
-    // expression resolves to null at runtime previously crashed inside the
-    // IIFE on Object.entries(null) / `k in null` / Object.keys(null). The
-    // fix coerces null/undefined to `{}` so the path becomes a clean
-    // remove-all-prev-keys (matching Vue/React/Svelte v-bind=null semantics).
+  it('(4-CR-04) applyAttrs accepting null/undefined is now a factory-call field — the nullish-coercion behavior is covered directly against the real package', () => {
+    // CR-04 regression (a manual `r-bind="$data.maybeNull"` resolving to
+    // null at runtime must not throw): the emitter no longer inlines the
+    // `(el, obj) => { const safeObj = obj ?? {}; ... }` signature to assert
+    // on — that behavior moved to `@rozie/runtime-angular`'s
+    // `createRozieAttrApplier` (Quick task 260819-sg9, Tier 2). The
+    // behavioral proof ("treats a null/undefined whole object as a clean
+    // remove-all then no-op, never a TypeError") now lives in
+    // `tests/angular-runtime/attrApplierBehavior.test.ts`. This test stays
+    // scoped to the EMITTED SHAPE: the factory call and the dynamic
+    // expression flowing through to it unchanged.
     const code = compileAngular(`<rozie name="Test">
 <data>{ maybe: null }</data>
 <template>
   <button r-bind="$data.maybe"></button>
 </template>
 </rozie>`);
-    // The applyAttrs callback signature accepts null/undefined.
-    expect(code).toMatch(/\(el: HTMLElement, obj: Record<string, unknown> \| null \| undefined\)/);
-    // `safeObj` is the nullish-coalesced binding actually iterated.
-    expect(code).toContain('const safeObj: Record<string, unknown> = obj ?? {};');
+    expect(code).toContain(
+      'private __rozieApplyAttrs = createRozieAttrApplier(inject(Renderer2));',
+    );
+    expect(code).toMatch(/this\.__rozieApplyAttrs\(el, this\.maybe\(\)\)/);
   });
 
   it('(5) R6 LITERAL class merge: explicit :class + literal class merges via Angular class path; only `id` goes through applyAttrs', () => {
