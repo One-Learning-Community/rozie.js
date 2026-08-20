@@ -245,16 +245,57 @@ async function deepNodeCount(page: import('@playwright/test').Page, testId: stri
   );
 }
 
-async function firstCanvas(mount: ReturnType<import('@playwright/test').Page['getByTestId']>, testId: string) {
-  const loc = mount.getByTestId(testId).locator('canvas').first();
-  // Every raw page.mouse coordinate below is computed from boundingBox() and
-  // used with page.mouse.down/move/up (which do NOT auto-scroll, unlike a
-  // locator .click()) — this rig stacks five sections vertically, so a cell
-  // below the fold resolves a real boundingBox() whose y exceeds the
-  // viewport height, and page.mouse silently hits nothing there
-  // (elementFromPoint at that coordinate returns null). Always scroll first.
-  await loc.scrollIntoViewIfNeeded();
-  return loc;
+type CanvasBox = { x: number; y: number; width: number; height: number };
+
+/**
+ * Resolves the first <canvas> under `testId`, scrolls it into view, and
+ * measures its bounding box — retrying the WHOLE resolve->scroll->measure
+ * sequence (not just the measurement) until it yields a usable box.
+ *
+ * wavesurfer.js@7.12.8's renderer calls `document.createElement('canvas')`
+ * on every draw (dist/renderer.js:408) and wipes containers with
+ * `innerHTML = ''` on redraw (lines 464-465, 522-523), so a locator/handle
+ * resolved before a redraw can detach between resolution and use — CI has
+ * hit `locator.scrollIntoViewIfNeeded: Element is not attached to the DOM`
+ * from exactly this race. `.first()` makes it worse: wavesurfer renders
+ * long waveforms as multiple chunked canvases, so the first is the likeliest
+ * to be swapped. Re-resolving the locator fresh on every attempt (rather
+ * than re-querying a handle captured once) sidesteps the detach entirely.
+ *
+ * Every raw page.mouse coordinate used by callers below is computed from
+ * the returned box and driven via page.mouse.down/move/up (which do NOT
+ * auto-scroll, unlike a locator .click()) — this rig stacks five sections
+ * vertically, so a cell below the fold resolves a real boundingBox() whose y
+ * exceeds the viewport height, and page.mouse silently hits nothing there
+ * (elementFromPoint at that coordinate returns null). scrollIntoViewIfNeeded
+ * is therefore load-bearing and must run on every attempt, not just the
+ * first. Callers get the box back directly (not just the locator) so they
+ * cannot reintroduce this staleness by calling .boundingBox() a second time
+ * themselves after this function has already returned.
+ */
+async function firstCanvas(
+  mount: ReturnType<import('@playwright/test').Page['getByTestId']>,
+  testId: string,
+  timeoutMs = 10_000,
+): Promise<{ canvas: ReturnType<typeof mount.locator>; box: CanvasBox }> {
+  const deadline = Date.now() + timeoutMs;
+  let lastError: unknown;
+  for (;;) {
+    try {
+      const loc = mount.getByTestId(testId).locator('canvas').first();
+      await loc.scrollIntoViewIfNeeded();
+      const box = await loc.boundingBox();
+      if (box) return { canvas: loc, box };
+      lastError = new Error('boundingBox() resolved null');
+    } catch (err) {
+      lastError = err;
+    }
+    if (Date.now() >= deadline) break;
+    await mount.page().waitForTimeout(100);
+  }
+  throw new Error(
+    `firstCanvas(${testId}): canvas never stabilised with a usable boundingBox() within ${timeoutMs}ms (last error: ${String(lastError)})`,
+  );
 }
 
 // ─── Leg 1 (G-B): setOptions-reconciled options repaint the canvas ─────────
@@ -365,14 +406,14 @@ for (const target of TARGETS) {
       await mount.getByTestId('main-register-regions').click();
       await page.waitForTimeout(300);
 
-      // Acquired AFTER both state changes settle, never cached across an
+      // Resolved AFTER both state changes settle, never cached across an
       // interaction: wavesurfer replaces its canvas element(s) on certain
       // redraws (observed directly — registering the Regions plugin and
       // toggling minPxPerSec both swap the underlying <canvas> node), so a
       // reference captured before these clicks can go stale mid-gesture.
-      const canvas = await firstCanvas(mount, 'coverage-main-wrap');
-      const box = await canvas.boundingBox();
-      if (!box) throw new Error('main canvas has no bounding box');
+      // firstCanvas retries the whole resolve+measure so the box it returns
+      // is fresh at the moment it is measured, not the moment it is used.
+      const { box } = await firstCanvas(mount, 'coverage-main-wrap');
       // Drag across a wide empty span so it reliably registers as a
       // drag-create gesture rather than a click-to-seek.
       const y = box.y + box.height / 2;
@@ -433,10 +474,8 @@ for (const target of TARGETS) {
       await mount.getByTestId('main-register-regions').click();
       await page.waitForTimeout(300);
 
-      // See Leg 4's comment — acquired fresh after both state changes settle.
-      const canvas = await firstCanvas(mount, 'coverage-main-wrap');
-      const box = await canvas.boundingBox();
-      if (!box) throw new Error('main canvas has no bounding box');
+      // See Leg 4's comment — resolved fresh after both state changes settle.
+      const { box } = await firstCanvas(mount, 'coverage-main-wrap');
       const y = box.y + box.height / 2;
       const x1 = box.x + box.width * 0.2;
       const x2 = box.x + box.width * 0.4;
@@ -661,9 +700,7 @@ for (const target of TARGETS) {
         .poll(() => paintedPixels(page, 'coverage-construct-wrap'), { timeout: 8_000 })
         .toBeGreaterThan(30);
 
-      const canvas = await firstCanvas(mount, 'coverage-construct-wrap');
-      const box = await canvas.boundingBox();
-      if (!box) throw new Error('construct canvas has no bounding box');
+      const { box } = await firstCanvas(mount, 'coverage-construct-wrap');
       const y = box.y + box.height / 2;
 
       // Default (interaction enabled): a click must fire `interaction`.
@@ -685,8 +722,7 @@ for (const target of TARGETS) {
         .poll(() => paintedPixels(page, 'coverage-construct-wrap'), { timeout: 8_000 })
         .toBeGreaterThan(30);
 
-      const box2 = await (await firstCanvas(mount, 'coverage-construct-wrap')).boundingBox();
-      if (!box2) throw new Error('construct canvas has no bounding box after remount');
+      const { box: box2 } = await firstCanvas(mount, 'coverage-construct-wrap');
       const y2 = box2.y + box2.height / 2;
       await page.mouse.click(box2.x + box2.width / 2, y2);
       await page.waitForTimeout(300);
