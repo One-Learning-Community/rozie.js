@@ -65,10 +65,17 @@ jobs:
       - name: Run visual-regression matrix
         run: pnpm --filter @rozie/visual-regression test:visual
 
-      - name: Upload Playwright HTML report on failure
+      # playwright.config.ts sets no `reporter`, so Playwright uses the
+      # default `list` reporter and never writes `playwright-report/` — an
+      # HTML-report upload here would silently upload nothing (v7's
+      # upload-artifact only warns, not fails, on a missing path). The
+      # diagnostics that DO exist on a failure are per-test
+      # `error-context.md` plus `trace.zip` (config: `trace:
+      # 'on-first-retry'`), both written under `test-results/`.
+      - name: Upload Playwright test-results (traces + error context) on failure
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-visual-regression
-          path: tests/visual-regression/playwright-report
+          name: playwright-test-results-visual-regression
+          path: tests/visual-regression/test-results
           retention-days: 7
