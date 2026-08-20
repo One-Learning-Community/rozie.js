@@ -1,31 +1,11 @@
 import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
-import { RozieSlot } from '@rozie/runtime-angular';
+import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
 
 interface ToastCtx {
   $implicit: { toast: any; dismiss: any };
   toast: any;
   dismiss: any;
-}
-
-function __rozieDisplay(v: unknown): string {
-  if (v == null) return '';
-  if (typeof v === 'string') return v;
-  if (typeof v === 'object') {
-    try {
-      return JSON.stringify(v, null, 2);
-    } catch {
-      // Circular structure or a non-serialisable value (BigInt nested in an
-      // object). Degrade to a non-throwing form so the wrap never crashes the
-      // render — that is the entire point of "safe" interpolation (SPEC-1).
-      return String(v);
-    }
-  }
-  return String(v);
-}
-
-function __rozieAttr(v: unknown): string | null {
-  return v == null ? null : __rozieDisplay(v);
 }
 
 @Component({

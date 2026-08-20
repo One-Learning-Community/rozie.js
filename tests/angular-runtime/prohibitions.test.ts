@@ -34,6 +34,14 @@
  * one-region output and reasoned against the post-rebuild two-region output
  * from the byte-level contract `producerFillMap.test.ts` pins.
  *
+ * Quick task 260819-qo8 further EXTENDS prohibition 4b's inverse transform
+ * (see `applyInverseTransform`'s doc comment above its definition) — it
+ * moved the `rozieDisplay`/`rozieAttr`/`rozieToken` helpers from inlined
+ * module-scope declarations to `@rozie/runtime-angular` imports, which is
+ * an ADDITIONAL, orthogonal source of drift from `BASELINE_COMMIT` beyond
+ * Phase 80's record-path-slot work. The wording of prohibitions 1-3 and 5 is
+ * unaffected.
+ *
  * Ambient globals (`describe`, `it`, `expect`, `vi`) per setup-vitest.ts —
  * do NOT `import { describe, it, expect } from 'vitest'` here.
  */
@@ -139,12 +147,80 @@ function listAngularFixtureFiles(): string[] {
  *      literal `__rozieFillMap()[...] ?? ` text to be present — it merely
  *      also consumes an immediately-preceding `this.` when there is one.
  *
- * Nothing outside this enumerated set is touched — a fixture whose drift
- * from baseline is NOT fully explained by these five differences fails the
- * byte-comparison in Task 3's sweep below, which is the intended behavior
- * (a real regression must still be caught, not silently absorbed).
+ * Quick task 260819-qo8 extends this transform with FOUR more permitted
+ * differences (the emitted-file consequence of moving `rozieDisplay`/
+ * `rozieAttr`/`rozieToken` from inlined module-scope declarations to
+ * `@rozie/runtime-angular` imports — see that quick task's SUMMARY):
+ *
+ *   6. `rozieDisplay as __rozieDisplay`, `rozieAttr as __rozieAttr`, and
+ *      `rozieToken` are removed from the `@rozie/runtime-angular` import
+ *      line's specifier list (leaving `RozieSlot` alone if it was also
+ *      present, or removing the whole line if it was not).
+ *   7. `InjectionToken` is restored to the `@angular/core` named-import
+ *      line (present at baseline, absent post-260819-qo8) whenever
+ *      `rozieToken` was removed in step 6.
+ *   8. The module-scope `__rozieDisplay`/`__rozieAttr` function pair (fixed
+ *      known text, `DISPLAY_ATTR_BLOCK` below) is re-inserted immediately
+ *      before `@Component(` whenever step 6 removed the display/attr
+ *      specifiers.
+ *   9. The module-scope `__rozieTokenRegistry`/`rozieToken` const+function
+ *      pair (fixed known text, `TOKEN_BLOCK` below) is re-inserted
+ *      immediately before `@Component(` — AFTER the display/attr pair when
+ *      both apply — whenever step 6 removed the `rozieToken` specifier.
+ *
+ * Nothing outside this enumerated set (five Phase-80 differences + four
+ * 260819-qo8 differences) is touched — a fixture whose drift from baseline
+ * is NOT fully explained by these fails the byte-comparison in Task 3's
+ * sweep below, which is the intended behavior (a real regression must still
+ * be caught, not silently absorbed).
  */
 const PERMITTED_CORE_ADDITIONS = ['computed', 'contentChildren'] as const;
+
+/**
+ * Quick task 260819-qo8 — the runtime-import specifiers that used to be
+ * module-scope declarations and are now removed from
+ * `@rozie/runtime-angular`'s specifier list by the inverse transform (step
+ * 6 above), keyed to the fixed known text re-inserted in their place (steps
+ * 8/9). `DISPLAY_ATTR_BLOCK`/`TOKEN_BLOCK` are read verbatim from the
+ * pre-260819-qo8 emitter (`INLINE_DISPLAY_FN`/`INLINE_ATTR_FN` in
+ * emitAngular.ts and `INLINE_ROZIE_TOKEN_FN` in emitContext.ts, both
+ * deleted by that quick task) — never paraphrased, so a future divergence
+ * in either would show up as a byte mismatch rather than being silently
+ * tolerated.
+ */
+const DISPLAY_ATTR_BLOCK = `function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') {
+    try {
+      return JSON.stringify(v, null, 2);
+    } catch {
+      // Circular structure or a non-serialisable value (BigInt nested in an
+      // object). Degrade to a non-throwing form so the wrap never crashes the
+      // render — that is the entire point of "safe" interpolation (SPEC-1).
+      return String(v);
+    }
+  }
+  return String(v);
+}
+
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
+}`;
+
+const TOKEN_BLOCK = `const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
+  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
+    string,
+    InjectionToken<unknown>
+  >;
+function rozieToken(key: string): InjectionToken<unknown> {
+  let token = __rozieTokenRegistry.get(key);
+  if (!token) {
+    token = new InjectionToken<unknown>('rozie:' + key);
+    __rozieTokenRegistry.set(key, token);
+  }
+  return token;
+}`;
 
 function coreImportSymbols(text: string): Set<string> {
   const m = text.match(/import \{ ([^}]*) \} from '@angular\/core';/);
@@ -168,24 +244,70 @@ const FILL_MAP_MEMBER_BLOCK = `  __rozieFills = contentChildren(RozieSlot, { des
 
 const RUNTIME_IMPORT_LINE = "import { RozieSlot } from '@rozie/runtime-angular';\n";
 
+/** The three specifiers 260819-qo8 added to the runtime import bucket. */
+const QO8_RUNTIME_SPECIFIERS = [
+  'rozieAttr as __rozieAttr',
+  'rozieDisplay as __rozieDisplay',
+  'rozieToken',
+] as const;
+
 function applyInverseTransform(current: string, baseline: string): string {
   let out = current;
 
-  // 1. Core import line — remove only symbols present now, absent at
-  //    baseline, restricted to the small permitted set.
-  const currentCore = coreImportSymbols(current);
+  // 260819-qo8 STEP 6 — strip the specifiers this quick task added to the
+  // @rozie/runtime-angular import line's specifier list (leaving RozieSlot
+  // alone if it was also present, or removing the whole line if not),
+  // tracking which were present so steps 7-9 below know what to restore.
+  const runtimeMatch = out.match(/import \{ ([^}]*) \} from '@rozie\/runtime-angular';\n/);
+  let hadDisplayAttr = false;
+  let hadToken = false;
+  if (runtimeMatch) {
+    const specifiers = runtimeMatch[1].split(', ').map((s) => s.trim());
+    hadDisplayAttr =
+      specifiers.includes('rozieAttr as __rozieAttr') ||
+      specifiers.includes('rozieDisplay as __rozieDisplay');
+    hadToken = specifiers.includes('rozieToken');
+    const kept = specifiers.filter(
+      (s) => !(QO8_RUNTIME_SPECIFIERS as readonly string[]).includes(s),
+    );
+    out = out.replace(
+      runtimeMatch[0],
+      kept.length > 0 ? `import { ${kept.join(', ')} } from '@rozie/runtime-angular';\n` : '',
+    );
+  }
+
+  // 1. Core import line — remove symbols present now, absent at baseline
+  //    (Phase 80's small permitted-addition set), and restore
+  //    `InjectionToken` (260819-qo8 STEP 7 — present at baseline, absent
+  //    post-260819-qo8) whenever `rozieToken` was stripped in step 6.
+  const currentCore = coreImportSymbols(out);
   const baselineCore = coreImportSymbols(baseline);
   const toRemove: string[] = PERMITTED_CORE_ADDITIONS.filter(
     (s) => currentCore.has(s) && !baselineCore.has(s),
   );
-  if (toRemove.length > 0) {
+  const toAddBack: string[] = hadToken && !currentCore.has('InjectionToken') ? ['InjectionToken'] : [];
+  if (toRemove.length > 0 || toAddBack.length > 0) {
     out = out.replace(/import \{ ([^}]*) \} from '@angular\/core';/, (_full, names: string) => {
       const kept = names.split(', ').filter((n) => !toRemove.includes(n));
-      return `import { ${kept.join(', ')} } from '@angular/core';`;
+      return `import { ${[...kept, ...toAddBack].sort().join(', ')} } from '@angular/core';`;
     });
   }
 
-  // 2. Runtime import line removed in full.
+  // 260819-qo8 STEPS 8/9 — re-insert the module-scope function/const blocks
+  // this quick task moved into @rozie/runtime-angular, immediately before
+  // `@Component(` — the exact position the pre-260819-qo8 emitter spliced
+  // them (verified against BASELINE_COMMIT for both a display/attr-only
+  // fixture, AttrNullishDrop, and a token-only fixture, ThemeProvider).
+  // Display/attr comes before token, matching the emitter's original splice
+  // order (`baseModuleDecls`/`moduleDecls` in emitAngular.ts, pre-260819-qo8).
+  const restoreBlocks: string[] = [];
+  if (hadDisplayAttr) restoreBlocks.push(DISPLAY_ATTR_BLOCK);
+  if (hadToken) restoreBlocks.push(TOKEN_BLOCK);
+  if (restoreBlocks.length > 0) {
+    out = out.replace('\n@Component(', `\n${restoreBlocks.join('\n\n')}\n\n@Component(`);
+  }
+
+  // 2. Runtime import line (RozieSlot-only case, Phase 80) removed in full.
   out = out.split(RUNTIME_IMPORT_LINE).join('');
 
   // 3+4. __rozieFills / __rozieFillMap class-field block removed in full.

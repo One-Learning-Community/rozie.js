@@ -1,4 +1,5 @@
-import { Component, DestroyRef, InjectionToken, ViewEncapsulation, effect, inject } from '@angular/core';
+import { Component, DestroyRef, ViewEncapsulation, effect, inject } from '@angular/core';
+import { rozieToken } from '@rozie/runtime-angular';
 
 // registerRichText wires the rich-text command set (formatting, paragraph/heading
 // behavior, node transforms). Ordinary named import — not a `$`-API.
@@ -12,20 +13,6 @@ import { registerRichText } from '@lexical/rich-text';
 // TOP-LEVEL script scope (not mount-local) so the Solid teardown — which the Solid
 // emitter hoists into a sibling onCleanup OUTSIDE the mount closure — can reach it
 // (the ADDING-A-FAMILY cross-phase-scope idiom, per Layer.rozie).
-
-const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
-  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
-    string,
-    InjectionToken<unknown>
-  >;
-function rozieToken(key: string): InjectionToken<unknown> {
-  let token = __rozieTokenRegistry.get(key);
-  if (!token) {
-    token = new InjectionToken<unknown>('rozie:' + key);
-    __rozieTokenRegistry.set(key, token);
-  }
-  return token;
-}
 
 @Component({
   selector: 'rozie-rich-text-plugin',

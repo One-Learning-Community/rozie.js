@@ -1,4 +1,5 @@
-import { Component, DestroyRef, InjectionToken, ViewEncapsulation, effect, inject } from '@angular/core';
+import { Component, DestroyRef, ViewEncapsulation, effect, inject } from '@angular/core';
+import { rozieToken } from '@rozie/runtime-angular';
 
 // NAMESPACE imports (D-05): both the priority constant and the `$`-API come through
 // namespace bindings so no bare `$`-identifier ever reaches the Svelte compiler.
@@ -9,20 +10,6 @@ import * as lexicalLink from '@lexical/link';
 // `const` (ROZ132), then aliases through a null-`let` (typeNeutralize) so `.instance`
 // type-checks on the strict bundled leaves; TOP-LEVEL scope so the hoisted Solid
 // teardown can reach it (see RichTextPlugin header for the full rationale).
-
-const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
-  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
-    string,
-    InjectionToken<unknown>
-  >;
-function rozieToken(key: string): InjectionToken<unknown> {
-  let token = __rozieTokenRegistry.get(key);
-  if (!token) {
-    token = new InjectionToken<unknown>('rozie:' + key);
-    __rozieTokenRegistry.set(key, token);
-  }
-  return token;
-}
 
 @Component({
   selector: 'rozie-link-plugin',

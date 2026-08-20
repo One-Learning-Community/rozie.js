@@ -1312,6 +1312,9 @@ importers:
       '@angular/core':
         specifier: ^19.0.0
         version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../runtime/angular
       '@types/babel__generator':
         specifier: ^7
         version: 7.27.0
@@ -4576,6 +4579,9 @@ importers:
 
   packages/ui/number-field/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -4703,6 +4709,9 @@ importers:
 
   packages/ui/otp/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       tslib:
         specifier: ^2
         version: 2.8.1

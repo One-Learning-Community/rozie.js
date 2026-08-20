@@ -1,39 +1,6 @@
-import { Component, DestroyRef, ElementRef, InjectionToken, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, viewChild } from '@angular/core';
 import { NgClass } from '@angular/common';
-
-function __rozieDisplay(v: unknown): string {
-  if (v == null) return '';
-  if (typeof v === 'string') return v;
-  if (typeof v === 'object') {
-    try {
-      return JSON.stringify(v, null, 2);
-    } catch {
-      // Circular structure or a non-serialisable value (BigInt nested in an
-      // object). Degrade to a non-throwing form so the wrap never crashes the
-      // render — that is the entire point of "safe" interpolation (SPEC-1).
-      return String(v);
-    }
-  }
-  return String(v);
-}
-
-function __rozieAttr(v: unknown): string | null {
-  return v == null ? null : __rozieDisplay(v);
-}
-
-const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
-  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
-    string,
-    InjectionToken<unknown>
-  >;
-function rozieToken(key: string): InjectionToken<unknown> {
-  let token = __rozieTokenRegistry.get(key);
-  if (!token) {
-    token = new InjectionToken<unknown>('rozie:' + key);
-    __rozieTokenRegistry.set(key, token);
-  }
-  return token;
-}
+import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieToken } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-tab',

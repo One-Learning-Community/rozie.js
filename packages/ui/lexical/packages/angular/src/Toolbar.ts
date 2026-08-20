@@ -1,5 +1,6 @@
-import { Component, DestroyRef, ElementRef, InjectionToken, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, signal, viewChild } from '@angular/core';
 import { NgClass } from '@angular/common';
+import { rozieToken } from '@rozie/runtime-angular';
 
 // NAMESPACE imports (D-05): both the `$`-API selection reads AND the command
 // constants come through namespace bindings, so no bare `$`-identifier ever reaches
@@ -14,20 +15,6 @@ import * as lexicalUtils from '@lexical/utils';
 // through a null-`let` (typeNeutralize) so `.instance` type-checks on the strict
 // bundled leaves; TOP-LEVEL scope so the hoisted Solid teardown can reach it (see
 // RichTextPlugin header for the full rationale).
-
-const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
-  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
-    string,
-    InjectionToken<unknown>
-  >;
-function rozieToken(key: string): InjectionToken<unknown> {
-  let token = __rozieTokenRegistry.get(key);
-  if (!token) {
-    token = new InjectionToken<unknown>('rozie:' + key);
-    __rozieTokenRegistry.set(key, token);
-  }
-  return token;
-}
 
 @Component({
   selector: 'rozie-toolbar',

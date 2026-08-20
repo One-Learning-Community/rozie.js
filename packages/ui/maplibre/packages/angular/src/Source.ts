@@ -1,22 +1,8 @@
-import { Component, ContentChild, DestroyRef, InjectionToken, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, forwardRef, inject, input, untracked } from '@angular/core';
+import { Component, ContentChild, DestroyRef, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, forwardRef, inject, input, untracked } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { RozieSlot } from '@rozie/runtime-angular';
+import { RozieSlot, rozieToken } from '@rozie/runtime-angular';
 
 interface DefaultCtx {}
-
-const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
-  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
-    string,
-    InjectionToken<unknown>
-  >;
-function rozieToken(key: string): InjectionToken<unknown> {
-  let token = __rozieTokenRegistry.get(key);
-  if (!token) {
-    token = new InjectionToken<unknown>('rozie:' + key);
-    __rozieTokenRegistry.set(key, token);
-  }
-  return token;
-}
 
 @Component({
   selector: 'rozie-source',

@@ -1,4 +1,5 @@
-import { Component, DestroyRef, InjectionToken, ViewEncapsulation, effect, inject, input } from '@angular/core';
+import { Component, DestroyRef, ViewEncapsulation, effect, inject, input } from '@angular/core';
+import { rozieToken } from '@rozie/runtime-angular';
 
 // registerHistory installs the undo/redo update listener + command handlers;
 // createEmptyHistoryState seeds a fresh (empty) undo/redo stack. Ordinary named
@@ -10,20 +11,6 @@ import { registerHistory, createEmptyHistoryState } from '@lexical/history';
 // (typeNeutralize) so `.instance` type-checks on the strict bundled leaves; the alias
 // is TOP-LEVEL scope so the hoisted Solid teardown can reach it (see RichTextPlugin
 // header for the full rationale).
-
-const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
-  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
-    string,
-    InjectionToken<unknown>
-  >;
-function rozieToken(key: string): InjectionToken<unknown> {
-  let token = __rozieTokenRegistry.get(key);
-  if (!token) {
-    token = new InjectionToken<unknown>('rozie:' + key);
-    __rozieTokenRegistry.set(key, token);
-  }
-  return token;
-}
 
 @Component({
   selector: 'rozie-history-plugin',

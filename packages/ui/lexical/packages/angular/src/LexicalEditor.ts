@@ -1,6 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { RozieSlot } from '@rozie/runtime-angular';
+import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieToken } from '@rozie/runtime-angular';
 
 // D-05 / REQ-37: the namespace-import form is the ONLY cross-target-safe way to
 // use Lexical's `$`-prefixed API. Every `$`-call below is `lexical.$…` (a property
@@ -29,40 +29,6 @@ import { mountDecorators } from './mountDecorators';
 // gotcha — a mount-local `let` would be TS2304 in the teardown).
 
 interface DefaultCtx {}
-
-function __rozieDisplay(v: unknown): string {
-  if (v == null) return '';
-  if (typeof v === 'string') return v;
-  if (typeof v === 'object') {
-    try {
-      return JSON.stringify(v, null, 2);
-    } catch {
-      // Circular structure or a non-serialisable value (BigInt nested in an
-      // object). Degrade to a non-throwing form so the wrap never crashes the
-      // render — that is the entire point of "safe" interpolation (SPEC-1).
-      return String(v);
-    }
-  }
-  return String(v);
-}
-
-function __rozieAttr(v: unknown): string | null {
-  return v == null ? null : __rozieDisplay(v);
-}
-
-const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
-  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
-    string,
-    InjectionToken<unknown>
-  >;
-function rozieToken(key: string): InjectionToken<unknown> {
-  let token = __rozieTokenRegistry.get(key);
-  if (!token) {
-    token = new InjectionToken<unknown>('rozie:' + key);
-    __rozieTokenRegistry.set(key, token);
-  }
-  return token;
-}
 
 @Component({
   selector: 'rozie-lexical-editor',

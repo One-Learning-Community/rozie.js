@@ -1,4 +1,5 @@
-import { Component, DestroyRef, InjectionToken, ViewEncapsulation, effect, inject } from '@angular/core';
+import { Component, DestroyRef, ViewEncapsulation, effect, inject } from '@angular/core';
+import { rozieToken } from '@rozie/runtime-angular';
 
 // registerList installs the list node-transforms + insert/remove list command
 // handlers (INSERT_UNORDERED_LIST_COMMAND / INSERT_ORDERED_LIST_COMMAND /
@@ -9,20 +10,6 @@ import { registerList } from '@lexical/list';
 // `const` (ROZ132), then aliases through a null-`let` (typeNeutralize) so `.instance`
 // type-checks on the strict bundled leaves; TOP-LEVEL scope so the hoisted Solid
 // teardown can reach it (see RichTextPlugin header for the full rationale).
-
-const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
-  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
-    string,
-    InjectionToken<unknown>
-  >;
-function rozieToken(key: string): InjectionToken<unknown> {
-  let token = __rozieTokenRegistry.get(key);
-  if (!token) {
-    token = new InjectionToken<unknown>('rozie:' + key);
-    __rozieTokenRegistry.set(key, token);
-  }
-  return token;
-}
 
 @Component({
   selector: 'rozie-list-plugin',
