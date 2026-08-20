@@ -121,13 +121,19 @@ describe('Angular emit — cross-component context ($provide / $inject)', () => 
     expect(code).not.toContain('$provide');
   });
 
-  it('provider: inline rozieToken helper is globalThis-backed (R11)', () => {
+  it('provider: rozieToken is imported from @rozie/runtime-angular, globalThis-backed (R11)', () => {
+    // Quick task 260819-qo8 — the `rozieToken` helper (and its `globalThis`
+    // seeding, which stays load-bearing for cross-package token identity) no
+    // longer inlines per-emitted-file. It is a real `@rozie/runtime-angular`
+    // export now (see packages/runtime/angular/src/rozieToken.ts); the emitted
+    // component imports it instead of carrying a module-scope copy.
     const { code } = compile(PROVIDER_SRC, 'ThemeProvider.rozie');
-    expect(code).toContain('function rozieToken(key: string): InjectionToken<unknown>');
-    expect(code).toContain('globalThis as Record<string, unknown>).__rozieCtx ??= new Map()');
-    expect(code).toContain("new InjectionToken<unknown>('rozie:' + key)");
-    // InjectionToken imported from @angular/core.
-    expect(code).toMatch(/import \{[^}]*\bInjectionToken\b[^}]*\} from '@angular\/core';/);
+    expect(code).toMatch(/import \{[^}]*\brozieToken\b[^}]*\} from '@rozie\/runtime-angular';/);
+    expect(code).not.toContain('function rozieToken(');
+    expect(code).not.toContain('__rozieTokenRegistry');
+    // `InjectionToken` is no longer imported from @angular/core — that's the
+    // runtime package's concern now, not the emitted component's.
+    expect(code).not.toMatch(/import \{[^}]*\bInjectionToken\b[^}]*\} from '@angular\/core';/);
   });
 
   it('consumer: const theme = $inject("theme") → theme = inject(rozieToken("theme")) class field', () => {
@@ -136,8 +142,9 @@ describe('Angular emit — cross-component context ($provide / $inject)', () => 
     expect(code).toContain("theme = inject(rozieToken('theme'));");
     expect(code).toMatch(/import \{[^}]*\binject\b[^}]*\} from '@angular\/core';/);
     expect(code).not.toContain('$inject');
-    // Consumer needs the token helper too (cross-file identity, R11).
-    expect(code).toContain('function rozieToken(');
+    // Consumer needs rozieToken too (cross-file identity, R11) — imported
+    // from @rozie/runtime-angular (260819-qo8), not a module-scope copy.
+    expect(code).toMatch(/import \{[^}]*\brozieToken\b[^}]*\} from '@rozie\/runtime-angular';/);
   });
 
   it('consumer with fallback: $inject("theme", fb) → inject(rozieToken("theme"), { optional: true }) ?? fb', () => {

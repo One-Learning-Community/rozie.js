@@ -36,12 +36,10 @@ function compileAngular(src: string, filename = 'Test.rozie'): string {
   return code;
 }
 
-const WRAPPING_SRC = `<rozie name="ThemeButton">
-<script>
-const theme = $inject('theme', { color: 'gray' });
-</script>
+const WRAPPING_SRC = `<rozie name="Display">
+<data>{ obj: {} }</data>
 <template>
-<button>{{ theme.color }}</button>
+<button>{{ obj }}</button>
 </template>
 </rozie>`;
 
@@ -51,6 +49,15 @@ $provide('theme', { color: 'red' });
 </script>
 <template>
 <div><slot></slot></div>
+</template>
+</rozie>`;
+
+const CONSUMER_FALLBACK_SRC = `<rozie name="ThemeButton">
+<script>
+const theme = $inject('theme', { color: 'gray' });
+</script>
+<template>
+<button>{{ theme.color }}</button>
 </template>
 </rozie>`;
 
@@ -118,7 +125,7 @@ describe('runtimeHelperImports — Angular emitter imports helpers from @rozie/r
     });
 
     it('a consumer $inject call site still reads inject(rozieToken(...))', () => {
-      const code = compileAngular(WRAPPING_SRC);
+      const code = compileAngular(CONSUMER_FALLBACK_SRC);
       expect(code).toContain("inject(rozieToken('theme'), { optional: true })");
     });
   });

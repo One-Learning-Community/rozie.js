@@ -16,10 +16,15 @@
  *   9. composeSourceMap produces a real SourceMap referencing the .rozie source.
  *
  * Per RESEARCH OQ A8/A9 RESOLVED: debounce/throttle/outsideClick stay
- * inline. Phase 80 reverses the narrower "NO `@rozie/runtime-angular`
- * imports" half of that decision specifically for the `[rozieSlot]` marker
- * directive — see the `hasDynamicSlotFiller` block below and
- * `collectAngularImports.ts`'s `runtimeSymbols` bucket.
+ * inline (Tier 2 — `__rozieApplyAttrs`/`__rozieGetHostAttrs`, CVA fields,
+ * keynav wiring, listener disposers, `__rozieMergeStyle`, pending a
+ * cross-package DI-identity review). Phase 80 reversed the narrower "NO
+ * `@rozie/runtime-angular` imports" half of that decision for the
+ * `[rozieSlot]` marker directive — see the `hasDynamicSlotFiller` block
+ * below. Quick task 260819-qo8 extended the same reversal to
+ * `rozieDisplay`/`rozieAttr`/`rozieToken` (previously inlined at module
+ * scope per-emitted-file; now real `@rozie/runtime-angular` exports). See
+ * `collectAngularImports.ts`'s `runtimeSymbols` bucket for all four.
  *
  * Per RESEARCH Pitfall 8: all `inject(Renderer2)` / `inject(DestroyRef)` calls
  * are constructor-body or field initializers — never inside arrow methods.
@@ -101,7 +106,6 @@ import {
   cvaDiagnostics as computeCvaDiagnostics,
   hasBooleanDisabledProp,
 } from './cvaDiagnostics.js';
-import { INLINE_ROZIE_TOKEN_FN } from './emit/emitContext.js';
 import { emitDecorator, registerDecoratorImports } from './emit/emitDecorator.js';
 // Phase 71 Plan 09 (r-keynav, Angular — highest blast radius), extended
 // Phase 77 Plan 05 (multi-root) — resolved ONCE here and threaded through
@@ -364,86 +368,32 @@ export interface EmitAngularResult {
 }
 
 /**
- * Phase 26 (SPEC-1/SPEC-2/SPEC-4, D-01/D-02 via RESEARCH Pitfall 4) — the
- * INLINED, module-scope `rozieDisplay` helper for the Angular target.
- *
- * There is NO `@rozie/runtime-angular` package and project convention forbids
- * one (`emitAngular.ts` header + `collectAngularImports`; `spreadBinding.test.ts`
- * asserts `not.toContain('@rozie/runtime-angular')`). So unlike the other four
- * non-Vue targets — which import `rozieDisplay` from their `@rozie/runtime-*`
- * package — Angular emits the helper body verbatim at module scope.
- *
- * The body is algorithmically byte-equivalent to the runtime-package helper
- * (`packages/runtime/{react,solid,svelte,lit}/src/rozieDisplay.ts`): null/
- * undefined → '', string passthrough, object (incl. arrays) → 2-space JSON,
- * else `String(v)`.
- *
- * Angular templates cannot call a module-scope free function (AOT resolves
- * interpolation/binding identifiers against the COMPONENT instance), so the
- * template never calls `__rozieDisplay` directly — it calls the delegating
- * CLASS METHOD synthesized in `DISPLAY_CLASS_METHOD`, which forwards to this fn.
- *
- * Both are emitted ONLY when at least one interpolation actually wrapped
- * (`tmplResult.hasDisplayWrap`), keeping non-wrapping components byte-identical
- * to pre-phase (SPEC-3).
- */
-const INLINE_DISPLAY_FN = [
-  'function __rozieDisplay(v: unknown): string {',
-  "  if (v == null) return '';",
-  "  if (typeof v === 'string') return v;",
-  "  if (typeof v === 'object') {",
-  '    try {',
-  '      return JSON.stringify(v, null, 2);',
-  '    } catch {',
-  '      // Circular structure or a non-serialisable value (BigInt nested in an',
-  '      // object). Degrade to a non-throwing form so the wrap never crashes the',
-  '      // render — that is the entire point of "safe" interpolation (SPEC-1).',
-  '      return String(v);',
-  '    }',
-  '  }',
-  '  return String(v);',
-  '}',
-].join('\n');
-
-/**
  * Phase 26 (D-02) — the delegating class method synthesized into the component
  * body (via the `allFieldInjections` / classBodyParts mechanism, the same path
  * the `$expose` methods + listener field initializers use). The template calls
- * `rozieDisplay(expr)` against `this`; this method forwards to the inlined
- * module-scope `__rozieDisplay`. Gated on `tmplResult.hasDisplayWrap`.
+ * `rozieDisplay(expr)` against `this`; this method forwards to the imported
+ * `rozieDisplay` (aliased `__rozieDisplay`, `@rozie/runtime-angular` — Quick
+ * task 260819-qo8). Gated on `tmplResult.hasDisplayWrap`.
  */
 const DISPLAY_CLASS_METHOD = 'rozieDisplay(v: unknown): string { return __rozieDisplay(v); }';
 
 /**
- * 260608-sya — inline module-scope `__rozieAttr` for the WHOLE-VALUE
- * attribute-binding position. Unlike interpolation/text (where nullish → ''),
- * a nullish bound attribute value must DROP the attribute, matching Vue's
- * `:attr` binding. Angular's `[attr.x]="null"` removes the attribute. `false`
- * is NOT dropped (delegates to `__rozieDisplay` → `"false"`), preserving
- * aria-/data- a11y. Depends on `__rozieDisplay`, so both inline whenever the
- * display-wrap flag is set (the attr swap sets the same flag). There is no
- * `@rozie/runtime-angular` package (convention forbids one), so it inlines.
- */
-const INLINE_ATTR_FN = [
-  'function __rozieAttr(v: unknown): string | null {',
-  '  return v == null ? null : __rozieDisplay(v);',
-  '}',
-].join('\n');
-
-/**
  * 260608-sya — the delegating class method synthesized into the component body
  * (same mechanism as `DISPLAY_CLASS_METHOD`). The template calls `rozieAttr(expr)`
- * against `this`; this forwards to the inlined module-scope `__rozieAttr`.
- * Gated on `tmplResult.hasDisplayWrap` (the attr swap flips it).
+ * against `this`; this forwards to the imported `rozieAttr` (aliased
+ * `__rozieAttr`, `@rozie/runtime-angular` — Quick task 260819-qo8). Gated on
+ * `tmplResult.hasDisplayWrap` (the attr swap flips it).
  */
 const ATTR_CLASS_METHOD = 'rozieAttr(v: unknown): string | null { return __rozieAttr(v); }';
 
 /**
  * Quick task 260717-uvk — self-contained class method for an array-form
- * `:style="[a, b]"` binding. There is no `@rozie/runtime-angular` package
- * (convention forbids one — same reason `__rozieDisplay`/`__rozieAttr` inline
- * above), so the merge logic lives directly in the class as a single method
- * (no free-function indirection needed; unlike `rozieDisplay`/`rozieAttr` it
+ * `:style="[a, b]"` binding. `@rozie/runtime-angular` exists (unlike when
+ * this comment was first written) but `__rozieMergeStyle` still inlines —
+ * it is Tier 2, out of scope for Quick task 260819-qo8's `rozieDisplay`/
+ * `rozieAttr`/`rozieToken` move pending its own cross-package review — so
+ * the merge logic lives directly in the class as a single method (no
+ * free-function indirection needed; unlike `rozieDisplay`/`rozieAttr` it
  * has no shared dependency to delegate to).
  *
  * Merges its args left-to-right into ONE CSS-declaration string (a later arg
@@ -953,27 +903,30 @@ export function emitAngular(ir: IRComponent, opts: EmitAngularOptions = {}): Emi
   const componentImportsBlock =
     componentImportsLines.length > 0 ? componentImportsLines.join('\n') + '\n' : '';
 
-  // Phase 26 (D-01-correction/D-02) — when any interpolation wrapped, append the
-  // inlined module-scope `function __rozieDisplay(v)` to the module-scope decls
-  // bucket (rendered above the @Component class by the shell). NO
-  // `@rozie/runtime-angular` import is emitted (the package does not exist;
-  // convention forbids it). When nothing wrapped, the bucket is unchanged so the
-  // emitted file is byte-identical to pre-phase (SPEC-3).
-  // 260608-sya — `__rozieAttr` is appended alongside `__rozieDisplay` (it
-  // delegates to it). Both inline only when the display-wrap flag is set, so a
-  // non-wrapping component's module-scope decls stay byte-identical to pre-phase.
-  // Phase 36 ($provide/$inject) — when the component uses the context primitive,
-  // splice the inline module-scope `rozieToken` helper (the globalThis-backed
-  // InjectionToken dedup, D-1/REQ-28) above the @Component class. No
-  // `@rozie/runtime-angular` import (D-2 — convention forbids one, mirroring the
-  // inline __rozieDisplay/__rozieAttr helpers). Gated on needsRozieTokenHelper so
-  // non-context components emit byte-identically (R12).
-  const baseModuleDecls = tmplResult.hasDisplayWrap
-    ? [...scriptResult.interfaceDecls, INLINE_DISPLAY_FN, INLINE_ATTR_FN]
-    : scriptResult.interfaceDecls;
-  const moduleDecls = scriptResult.needsRozieTokenHelper
-    ? [...baseModuleDecls, INLINE_ROZIE_TOKEN_FN]
-    : baseModuleDecls;
+  // Phase 26 (D-01-correction/D-02), reversed by Quick task 260819-qo8 — when
+  // any interpolation wrapped, import `rozieDisplay`/`rozieAttr` (aliased
+  // `__rozieDisplay`/`__rozieAttr`) from `@rozie/runtime-angular` instead of
+  // inlining a module-scope copy. `imports.addRuntime()` is dedupe-safe and
+  // the `.size > 0` render gate (`AngularImportCollector.render()`) is the
+  // structural mechanism keeping a non-wrapping component byte-identical to
+  // pre-260819-qo8 output (SPEC-3 / R12) — no other check re-verifies that.
+  // 260608-sya — `rozieAttr` is added alongside `rozieDisplay` (it delegates
+  // to it); both are gated on the SAME `hasDisplayWrap` flag (the attr swap
+  // flips it too).
+  if (tmplResult.hasDisplayWrap) {
+    imports.addRuntime('rozieDisplay');
+    imports.addRuntime('rozieAttr');
+  }
+  // Phase 36 ($provide/$inject), reversed by Quick task 260819-qo8 — when the
+  // component uses the context primitive, import `rozieToken` from
+  // `@rozie/runtime-angular` instead of inlining the module-scope helper +
+  // `globalThis`-backed registry (D-1/REQ-28). Gated on
+  // `scriptResult.needsRozieTokenHelper` so non-context components stay
+  // import-free (R12).
+  if (scriptResult.needsRozieTokenHelper) {
+    imports.addRuntime('rozieToken');
+  }
+  const moduleDecls = scriptResult.interfaceDecls;
 
   const {
     ms,

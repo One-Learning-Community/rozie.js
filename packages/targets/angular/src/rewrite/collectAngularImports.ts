@@ -135,7 +135,7 @@ export type AngularCommonImport = 'NgTemplateOutlet' | 'NgClass' | 'NgStyle';
 
 /**
  * Third-party npm runtime-package import kind — separate import line from
- * `@rozie/runtime-angular` (Phase 80).
+ * `@rozie/runtime-angular` (Phase 80; widened Quick task 260819-qo8).
  *
  * `RozieSlot` is the `[rozieSlot]` marker directive that `contentChildren`
  * collects on the producer side to build the content-collected fill map for
@@ -145,8 +145,40 @@ export type AngularCommonImport = 'NgTemplateOutlet' | 'NgClass' | 'NgStyle';
  * original narrower "at least one record-path slot" gate, which left a
  * static-identifier-only producer unable to collect a dynamic consumer
  * fill at all. A component declaring NO slots still emits no import.
+ *
+ * `rozieDisplay` / `rozieAttr` — the interpolation/whole-value-attribute
+ * display helpers (Phase 26 / 260608-sya). Added via
+ * `imports.addRuntime('rozieDisplay')` / `imports.addRuntime('rozieAttr')`
+ * whenever `tmplResult.hasDisplayWrap` is set (at least one interpolation
+ * wrapped). Both carry a LOCAL ALIAS (`__rozieDisplay` / `__rozieAttr`,
+ * see `RUNTIME_LOCAL_ALIAS` below) because the delegating `rozieDisplay` /
+ * `rozieAttr` CLASS METHODS synthesized elsewhere share those exported
+ * names — an un-aliased import would make the class method bodies read as
+ * infinite recursion (`rozieDisplay(v) { return rozieDisplay(v); }`) to
+ * every future human and linter, even though TypeScript class members
+ * technically don't shadow module bindings. The alias keeps the class
+ * method bodies (`return __rozieDisplay(v);`) byte-identical to the
+ * pre-260819-qo8 inlined shape.
+ *
+ * `rozieToken` — the cross-component context `InjectionToken` minting
+ * helper (Phase 36 `$provide`/`$inject`). Added via
+ * `imports.addRuntime('rozieToken')` whenever the component uses `$provide`
+ * or `$inject`. Carries NO alias — the emitted call sites already spell it
+ * `rozieToken('key')`, matching the exported name exactly.
  */
-export type AngularRuntimeImport = 'RozieSlot';
+export type AngularRuntimeImport = 'RozieSlot' | 'rozieDisplay' | 'rozieAttr' | 'rozieToken';
+
+/**
+ * Local aliases for runtime-import specifiers whose exported name collides
+ * with a same-named delegating class method the emitter synthesizes
+ * elsewhere (`DISPLAY_CLASS_METHOD` / `ATTR_CLASS_METHOD` in
+ * `emitAngular.ts`). Rendered as `` `${name} as ${alias}` `` in the import
+ * specifier list; omitted members render as the bare exported name.
+ */
+const RUNTIME_LOCAL_ALIAS: Partial<Record<AngularRuntimeImport, string>> = {
+  rozieDisplay: '__rozieDisplay',
+  rozieAttr: '__rozieAttr',
+};
 
 export class AngularImportCollector {
   private coreSymbols = new Set<AngularCoreImport>();
@@ -207,8 +239,16 @@ export class AngularImportCollector {
     // emits no runtime-package import at all" (SPEC boundary #2). No other
     // detection pass re-checks that condition.
     if (this.runtimeSymbols.size > 0) {
+      // Sort by the EXPORTED name (not the local alias) so specifier order
+      // is a pure function of which symbols were added, independent of the
+      // alias table. Each name is then rendered as `name` or
+      // `` `${name} as ${alias}` `` per RUNTIME_LOCAL_ALIAS.
       const sorted = [...this.runtimeSymbols].sort();
-      lines.push(`import { ${sorted.join(', ')} } from '@rozie/runtime-angular';`);
+      const specifiers = sorted.map((name) => {
+        const alias = RUNTIME_LOCAL_ALIAS[name];
+        return alias ? `${name} as ${alias}` : name;
+      });
+      lines.push(`import { ${specifiers.join(', ')} } from '@rozie/runtime-angular';`);
     }
     if (lines.length === 0) return '';
     return lines.join('\n') + '\n';

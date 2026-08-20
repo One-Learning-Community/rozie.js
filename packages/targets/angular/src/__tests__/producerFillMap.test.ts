@@ -221,7 +221,13 @@ describe('Angular producer — content-collected fill map (Task 1)', () => {
     const code = compileAngular(NO_SLOT_PRODUCER, 'Plain.rozie');
     expect(code).not.toContain('__rozieFills');
     expect(code).not.toContain('__rozieFillMap');
-    expect(code).not.toContain('@rozie/runtime-angular');
+    // Quick task 260819-qo8 — this fixture's `{{ label() }}` interpolation
+    // legitimately wraps in `rozieDisplay` (a non-provably-primitive read),
+    // so it DOES now import `@rozie/runtime-angular` for that helper. The
+    // slot-fill-collection boundary this test actually guards is `RozieSlot`
+    // (the `[rozieSlot]` marker directive) staying absent for a slotless
+    // producer — narrow to that rather than the whole-package assertion.
+    expect(code).not.toContain('RozieSlot');
     expect(code).not.toContain('templates = input<');
   });
 

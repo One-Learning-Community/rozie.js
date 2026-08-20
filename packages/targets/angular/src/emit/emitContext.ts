@@ -27,13 +27,14 @@
  *     produces the per-key entry STRINGS; the merge happens in the decorator.
  *
  *  2. The token is an `InjectionToken` deduped through a `globalThis`-backed
- *     registry — the inline module-level `rozieToken` helper (D-1 / REQ-28).
- *     A per-module `new Map()` would mint a DISTINCT token per separately-
- *     compiled file, breaking cross-file identity so `inject(...)` returns
- *     undefined through the unaware passthrough. There is NO
- *     `@rozie/runtime-angular` package (D-2 — convention forbids one, mirroring
- *     the inline `__rozieDisplay`/`__rozieAttr` helpers), so the helper is
- *     emitted verbatim at module scope.
+ *     registry — the `rozieToken` helper (D-1 / REQ-28), imported from
+ *     `@rozie/runtime-angular` (Quick task 260819-qo8 reversed the original
+ *     D-2 "no runtime-angular package" decision for this helper, once
+ *     Phase 80 created the package). A per-module `new Map()` would mint a
+ *     DISTINCT token per separately-loaded copy, breaking cross-file identity
+ *     so `inject(...)` returns undefined through the unaware passthrough —
+ *     see `packages/runtime/angular/src/rozieToken.ts`'s doc comment for why
+ *     the `globalThis` seeding is load-bearing.
  *
  *  3. The `useFactory: () => <value>` runs in the DECORATOR (static) scope, NOT
  *     a method body — it cannot reference `this`. Per D-3 the provided value is
@@ -149,32 +150,6 @@ function bindProvidedValue(
   };
 }
 
-/**
- * The inline module-level `rozieToken` helper (D-1 / REQ-28). `globalThis`-backed
- * dedup of an `InjectionToken` keyed by the author's string — the SAME token
- * object is returned in two separately-compiled modules so hierarchical DI
- * resolves the provider's value in a projected consumer.
- *
- * Emitted verbatim at module scope (above the `@Component` class) ONLY when the
- * component has at least one `$provide`/`$inject` — keeping non-context
- * components byte-identical (R12). NOT a `@rozie/runtime-angular` export (D-2).
- */
-export const INLINE_ROZIE_TOKEN_FN = [
-  'const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =',
-  '  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<',
-  '    string,',
-  '    InjectionToken<unknown>',
-  '  >;',
-  'function rozieToken(key: string): InjectionToken<unknown> {',
-  '  let token = __rozieTokenRegistry.get(key);',
-  '  if (!token) {',
-  "    token = new InjectionToken<unknown>('rozie:' + key);",
-  '    __rozieTokenRegistry.set(key, token);',
-  '  }',
-  '  return token;',
-  '}',
-].join('\n');
-
 export interface AngularContextEmit {
   /** True when the component has at least one `$provide`/`$inject`. */
   hasContext: boolean;
@@ -194,10 +169,10 @@ export interface AngularContextEmit {
    */
   providerEntries: string[];
   /**
-   * True when the inline `rozieToken` helper + `InjectionToken` import are
-   * needed (i.e. any `$provide`/`$inject` present). emitAngular splices
-   * `INLINE_ROZIE_TOKEN_FN` into the module-scope decls bucket and adds
-   * `InjectionToken` + `inject` to the @angular/core import line.
+   * True when the `rozieToken` helper is needed (i.e. any `$provide`/
+   * `$inject` present). emitAngular calls `imports.addRuntime('rozieToken')`
+   * (importing it from `@rozie/runtime-angular` — Quick task 260819-qo8) and
+   * adds `inject` to the @angular/core import line.
    */
   needsTokenHelper: boolean;
   /**

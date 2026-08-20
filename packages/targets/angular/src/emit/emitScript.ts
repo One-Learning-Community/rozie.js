@@ -37,8 +37,11 @@
  * exclusively in constructor body or as field initializers — NEVER inside
  * method/arrow bodies.
  *
- * Per RESEARCH OQ A8/A9 RESOLVED: NO `@rozie/runtime-angular` imports —
- * debounce/throttle/outsideClick all inline as IIFE / Renderer2.listen.
+ * Per RESEARCH OQ A8/A9 RESOLVED: debounce/throttle/outsideClick stay
+ * inlined as IIFE / Renderer2.listen — that half of the decision is
+ * unchanged. `rozieDisplay`/`rozieAttr`/`rozieToken`/`RozieSlot` DO import
+ * from `@rozie/runtime-angular` (Quick task 260819-qo8 reversed the other
+ * half of the decision once Phase 80 created the package).
  *
  * Per CONTEXT D-08 collected-not-thrown: never throws on user input.
  *
@@ -817,20 +820,24 @@ export interface EmitScriptResult {
    */
   contextProviderEntries: string[];
   /**
-   * Phase 36 ($provide/$inject) — true when the inline `rozieToken` helper must
-   * be spliced at module scope (and `InjectionToken` imported). emitAngular
-   * appends `INLINE_ROZIE_TOKEN_FN` to the module-scope decls bucket when set.
-   * False for non-context components (no helper emitted, R12).
+   * Phase 36 ($provide/$inject) — true when the `rozieToken` helper is needed.
+   * emitAngular calls `imports.addRuntime('rozieToken')` on this flag
+   * (`@rozie/runtime-angular` — Quick task 260819-qo8; previously an inline
+   * module-scope splice). False for non-context components (no import
+   * emitted, R12).
    */
   needsRozieTokenHelper: boolean;
   /**
    * Phase 71 (r-keynav) — `import { createKeynavStateMachine[,
    * normalizeClassTokens] } from '@rozie/runtime-keynav-core';\n`, or the
-   * empty string when the component has no `r-keynav` root. This is the
-   * ONLY external (non-`@angular/*`) runtime import Angular emits — per the
-   * 71-01 Wave-2 binding decision, there is no `@rozie/runtime-angular`
-   * package; `emitAngular.ts` appends this line to the shell's
-   * `@angular/core` import block.
+   * empty string when the component has no `r-keynav` root. This is a
+   * SEPARATE runtime import line from `@rozie/runtime-angular` (which carries
+   * `RozieSlot`/`rozieDisplay`/`rozieAttr`/`rozieToken`, added via
+   * `AngularImportCollector.addRuntime()`): r-keynav's runtime lives in its
+   * own `@rozie/runtime-keynav-core` package (per the 71-01 Wave-2 binding
+   * decision) and is threaded through this dedicated line rather than the
+   * collector's runtime bucket. `emitAngular.ts` appends this line to the
+   * shell's `@angular/core` import block.
    */
   keynavRuntimeImportLine: string;
   diagnostics: Diagnostic[];
@@ -1569,11 +1576,13 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   const contextEmit = emitContext(ir, cloned, ir.name);
   const contextProviderEntries: string[] = contextEmit.providerEntries;
   if (contextEmit.hasContext) {
-    // `inject(rozieToken('k'))` + the inline `rozieToken` helper need both
-    // `inject` and `InjectionToken` from @angular/core. The import Set dedupes
+    // `inject(rozieToken('k'))` needs `inject` from @angular/core; `rozieToken`
+    // itself is imported from `@rozie/runtime-angular` (emitAngular.ts calls
+    // `imports.addRuntime('rozieToken')` on this same `hasContext` gate — Quick
+    // task 260819-qo8 reversed the prior "InjectionToken imported from
+    // @angular/core for the inline helper" shape). The import Set dedupes
     // against any inject() the portal/lifecycle machinery already added.
     imports.add('inject');
-    imports.add('InjectionToken');
     // Phase 36 — a provided value that reads the component instance emits a
     // `useFactory: () => { const __rozieCtxHost = inject(forwardRef(() => Foo));
     // … }` host-capture factory, so `forwardRef` must be imported (deduped

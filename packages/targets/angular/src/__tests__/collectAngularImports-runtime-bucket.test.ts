@@ -55,4 +55,32 @@ describe('AngularImportCollector — runtime-package import bucket', () => {
     collector.addRuntime('RozieSlot');
     expect(collector.hasRuntime('RozieSlot')).toBe(true);
   });
+
+  // Quick task 260819-qo8 widened the bucket from RozieSlot-only to also
+  // carry rozieDisplay/rozieAttr/rozieToken. rozieDisplay/rozieAttr carry a
+  // LOCAL ALIAS (the delegating class methods emitAngular.ts synthesizes
+  // share those exported names); rozieToken does not.
+  it('renders ONE runtime import line with all four specifiers, sorted by exported name and aliased where applicable', () => {
+    const collector = new AngularImportCollector();
+    // Add out of alphabetical order to prove render() sorts, not insertion-orders.
+    collector.addRuntime('rozieToken');
+    collector.addRuntime('rozieDisplay');
+    collector.addRuntime('RozieSlot');
+    collector.addRuntime('rozieAttr');
+    const rendered = collector.render();
+    const runtimeLines = rendered
+      .split('\n')
+      .filter((line) => line.includes('@rozie/runtime-angular'));
+    expect(runtimeLines).toHaveLength(1);
+    expect(runtimeLines[0]).toBe(
+      `import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieToken } from '@rozie/runtime-angular';`,
+    );
+  });
+
+  it('rozieToken alone renders with no alias', () => {
+    const collector = new AngularImportCollector();
+    collector.addRuntime('rozieToken');
+    const rendered = collector.render();
+    expect(rendered).toContain(`import { rozieToken } from '@rozie/runtime-angular';`);
+  });
 });
