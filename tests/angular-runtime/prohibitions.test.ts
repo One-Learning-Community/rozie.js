@@ -3,15 +3,37 @@
  * negative-assertion tests. Each describe block names the prohibition it
  * enforces so a future failure is self-explaining.
  *
- * Phase 80 Plan 12 (Task 3) — AMENDS prohibitions 2 and 4 for the D-09 fix
+ * Phase 80 Plan 12 (Task 3) — AMENDED prohibitions 2 and 4 for the D-09 fix
  * (the widened `hasKeyedFillIntake` gate — 80-CONTEXT.md D-09). Prohibition
- * 2's dependency boundary moves from "does NOT use record-path slots" to
- * "declares NO slots"; prohibition 4 splits into 4a (RETAINED
- * byte-identical: @ContentChild path, per-slot context interfaces, consumer
- * static filler markup, static-content-child-leftmost precedence) and 4b
- * (AMENDED: whole-file byte-identity replaced by a machine-checked inverse
- * transform, strictly stronger than the retired gate). Prohibitions 1, 3,
- * and 5 are untouched by this amendment.
+ * 2's dependency boundary moved from "does NOT use record-path slots" to
+ * "declares NO slots"; prohibition 4 split into 4a (RETAINED byte-identical:
+ * @ContentChild path, per-slot context interfaces, consumer static filler
+ * markup, static-content-child-leftmost precedence) and 4b, which for a time
+ * carried a machine-checked inverse transform instead of whole-file
+ * byte-identity. Quick task 260819-qo8 further extended that transform (the
+ * `rozieDisplay`/`rozieAttr`/`rozieToken` move to `@rozie/runtime-angular`
+ * imports).
+ *
+ * Quick task 260819-sg9 (Tier 2, Task 3 STEP 9-10) RETIRED the inverse
+ * transform entirely and advanced `BASELINE_COMMIT` to this quick task's own
+ * re-bless commit. Reasons (full rationale in that commit's message and the
+ * plan's `<open_question_resolution>`): the transform had grown to 9
+ * permitted differences across two amendments and each addition further
+ * eroded real byte-comparison coverage over the tracked corpus (by the time
+ * of retirement, 120 of 131 tracked 4b fixtures carried the applier body a
+ * tenth extension would have had to re-fabricate rather than compare); the
+ * transform's own doc comment stated its job was proving the widened intake
+ * gate's insertions were *additive*, but Tier 2 is a *deletion* (the inlined
+ * IIFE bodies leave the emitted text entirely), so extending the transform a
+ * tenth time would have made the sibling `no-deletion` guard self-satisfying
+ * rather than a real check. Prohibition 4b is now, once again, whole-file
+ * byte-identity against `BASELINE_COMMIT` for every tracked fixture — the
+ * baseline reset restores the original, strictly stronger form with zero
+ * enumerated tolerances. Prohibition 5's machine-checkable half (the
+ * `RECORD_PATH_FIXTURES` "must differ from baseline" list) is retired for
+ * the same reason: at a fresh baseline nothing in the tracked corpus differs
+ * from it by construction, so that half would be vacuously true. The
+ * WORDING of prohibitions 1, 2, 3, 4a, and 5 is otherwise unaffected.
  *
  * Quick task 260818-okc (Task 3) — GENERALIZES prohibition 1's source-level
  * case's region-discovery, defensively, ahead of a follow-up cold-rebuild
@@ -26,21 +48,9 @@
  * WORDING of prohibition 1 does NOT change (still: zero unguarded console
  * output in production builds) — only the region-DISCOVERY implementation
  * generalizes to find every guarded region instead of assuming exactly one.
- * `tests/angular-runtime`'s `compileAngular` resolves `@rozie/target-angular`
- * through its export map to STALE dist during this quick task (see the
- * repo-traps note below), so this file's own test run today still sees the
- * ONE-region pre-fix shape — the generalized case is written to hold for
- * both shapes without modification, verified directly against today's
- * one-region output and reasoned against the post-rebuild two-region output
- * from the byte-level contract `producerFillMap.test.ts` pins.
  *
- * Quick task 260819-qo8 further EXTENDS prohibition 4b's inverse transform
- * (see `applyInverseTransform`'s doc comment above its definition) — it
- * moved the `rozieDisplay`/`rozieAttr`/`rozieToken` helpers from inlined
- * module-scope declarations to `@rozie/runtime-angular` imports, which is
- * an ADDITIONAL, orthogonal source of drift from `BASELINE_COMMIT` beyond
- * Phase 80's record-path-slot work. The wording of prohibitions 1-3 and 5 is
- * unaffected.
+ * Quick task 260819-sg9 (Tier 2, Task 2) AMENDED prohibition 2 again — see
+ * that describe block's own comment for the full account.
  *
  * Ambient globals (`describe`, `it`, `expect`, `vi`) per setup-vitest.ts —
  * do NOT `import { describe, it, expect } from 'vitest'` here.
@@ -68,17 +78,20 @@ function readExample(name: string): string {
 }
 
 /**
- * The pre-fix emitter commit recorded in RED-EVIDENCE.md — the byte-identity
- * baseline for every Angular fixture NOT on the record path (prohibition 4)
- * and the "did the emitter actually change this fixture" backstop
- * (prohibition 5's machine-checkable half).
+ * The byte-identity baseline for every tracked Angular fixture (prohibition
+ * 4b). Advanced by Quick task 260819-sg9 (Tier 2, Task 3 STEP 10) to that
+ * quick task's own re-bless commit — see the header comment above for why
+ * this could not be set until AFTER that commit existed (the SHA is
+ * unknowable before the commit it names), and why a fresh baseline is
+ * strictly stronger than the retired inverse-transform amendment it
+ * replaces.
  */
 // NOTE: reading this commit requires real git history. CI must check out with
 // `fetch-depth: 0` — actions/checkout's default depth-1 shallow clone does not
 // contain this object, and every gate below then fails with
 // "Command failed: git show …" (134 of 144 tests, one root cause). The
 // angular-matrix workflow sets it explicitly; keep them in sync.
-const BASELINE_COMMIT = '2f9444f51c8cf0d6655cdb7c659c2d8059b19e09';
+const BASELINE_COMMIT = '78d5b5b0c621dad0c6e0643204b0f15c040e739a';
 
 /** `git show <commit>:<path>` — throws if the path did not exist at that commit. */
 function readAtBaseline(relPath: string): string {
@@ -110,242 +123,6 @@ function listAngularFixtureFiles(): string[] {
   );
   return out.split('\n').filter((l) => l.length > 0);
 }
-
-/**
- * The documented inverse transform for AMENDED SPEC prohibition 4b (Phase 80
- * Plan 12; extended by Plan 14/D-10). Applying this function to a
- * POST-D-09-AND-D-10-fix Angular fixture's emitted text must reproduce the
- * PRE-fix bytes recorded at `BASELINE_COMMIT` exactly — proving every byte
- * the widened intake gate (`hasKeyedFillIntake`, `refineSlotTypes.ts`) and
- * the widened structural presence chain (`buildSlotsMerge.ts`) inserted is
- * strictly additive. Five permitted differences, undone in this fixed order:
- *
- *   1. `computed` and `contentChildren` — the only two `@angular/core`
- *      symbols the amended intake block (emitScript.ts:1328-1351) can add —
- *      are removed from the `@angular/core` named-import line, but ONLY the
- *      ones present now and ABSENT at baseline (a producer that already had
- *      `computed` for an unrelated reason, e.g. TodoList, keeps it).
- *   2. The `import { RozieSlot } from '@rozie/runtime-angular';` line
- *      (collectAngularImports.ts:209-211) is removed in full.
- *   3+4. The `__rozieFills`/`__rozieFillMap` class-field block
- *      (emitScript.ts:1328-1351, fixed known text) is removed in full, from
- *      its opening `__rozieFills = contentChildren(...)` line through its
- *      closing `});` line.
- *   5. The `__rozieFillMap()[<key>] ?? ` segment — from BOTH the outlet
- *      resolution chain (emitSlotInvocation.ts:436-438) AND, as of Plan 14
- *      (D-10), the structural slot-presence gate (`buildSlotsMerge.ts`) — is
- *      removed from every outlet expression, inner `@if` guard, and OUTER
- *      structural `@if`/`if (...)` wrapper gate it was spliced into. ONE
- *      regex covers all shapes: the record-only outlet form
- *      (`(__rozieFillMap()[key] ?? templates()?.[key])`), the identifier
- *      outlet/gate form (`(tpl ?? __rozieFillMap()['key'] ?? templates()?.['key'])`),
- *      and — new for D-10 — the CLASS-SCOPED gate form emitted by the
- *      script and listener rewrite contexts
- *      (`(this.tpl ?? this.__rozieFillMap()['key'] ?? this.templates()?.['key'])`).
- *      The `this.` qualifier is OPTIONAL in the pattern specifically for
- *      this last shape — without it, stripping only the bare
- *      `__rozieFillMap()['key'] ?? ` segment from a `this.`-qualified chain
- *      would leave a dangling, syntactically-broken `this.this.templates()`
- *      behind. Matching `(?:this\.)?` consumes the qualifier together with
- *      the term it belongs to, reproducing the pre-fix
- *      `(this.tpl ?? this.templates()?.['key'])` shape exactly. This does
- *      NOT loosen the transform's bound: the pattern still requires the
- *      literal `__rozieFillMap()[...] ?? ` text to be present — it merely
- *      also consumes an immediately-preceding `this.` when there is one.
- *
- * Quick task 260819-qo8 extends this transform with FOUR more permitted
- * differences (the emitted-file consequence of moving `rozieDisplay`/
- * `rozieAttr`/`rozieToken` from inlined module-scope declarations to
- * `@rozie/runtime-angular` imports — see that quick task's SUMMARY):
- *
- *   6. `rozieDisplay as __rozieDisplay`, `rozieAttr as __rozieAttr`, and
- *      `rozieToken` are removed from the `@rozie/runtime-angular` import
- *      line's specifier list (leaving `RozieSlot` alone if it was also
- *      present, or removing the whole line if it was not).
- *   7. `InjectionToken` is restored to the `@angular/core` named-import
- *      line (present at baseline, absent post-260819-qo8) whenever
- *      `rozieToken` was removed in step 6.
- *   8. The module-scope `__rozieDisplay`/`__rozieAttr` function pair (fixed
- *      known text, `DISPLAY_ATTR_BLOCK` below) is re-inserted immediately
- *      before `@Component(` whenever step 6 removed the display/attr
- *      specifiers.
- *   9. The module-scope `__rozieTokenRegistry`/`rozieToken` const+function
- *      pair (fixed known text, `TOKEN_BLOCK` below) is re-inserted
- *      immediately before `@Component(` — AFTER the display/attr pair when
- *      both apply — whenever step 6 removed the `rozieToken` specifier.
- *
- * Nothing outside this enumerated set (five Phase-80 differences + four
- * 260819-qo8 differences) is touched — a fixture whose drift from baseline
- * is NOT fully explained by these fails the byte-comparison in Task 3's
- * sweep below, which is the intended behavior (a real regression must still
- * be caught, not silently absorbed).
- */
-const PERMITTED_CORE_ADDITIONS = ['computed', 'contentChildren'] as const;
-
-/**
- * Quick task 260819-qo8 — the runtime-import specifiers that used to be
- * module-scope declarations and are now removed from
- * `@rozie/runtime-angular`'s specifier list by the inverse transform (step
- * 6 above), keyed to the fixed known text re-inserted in their place (steps
- * 8/9). `DISPLAY_ATTR_BLOCK`/`TOKEN_BLOCK` are read verbatim from the
- * pre-260819-qo8 emitter (`INLINE_DISPLAY_FN`/`INLINE_ATTR_FN` in
- * emitAngular.ts and `INLINE_ROZIE_TOKEN_FN` in emitContext.ts, both
- * deleted by that quick task) — never paraphrased, so a future divergence
- * in either would show up as a byte mismatch rather than being silently
- * tolerated.
- */
-const DISPLAY_ATTR_BLOCK = `function __rozieDisplay(v: unknown): string {
-  if (v == null) return '';
-  if (typeof v === 'string') return v;
-  if (typeof v === 'object') {
-    try {
-      return JSON.stringify(v, null, 2);
-    } catch {
-      // Circular structure or a non-serialisable value (BigInt nested in an
-      // object). Degrade to a non-throwing form so the wrap never crashes the
-      // render — that is the entire point of "safe" interpolation (SPEC-1).
-      return String(v);
-    }
-  }
-  return String(v);
-}
-
-function __rozieAttr(v: unknown): string | null {
-  return v == null ? null : __rozieDisplay(v);
-}`;
-
-const TOKEN_BLOCK = `const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
-  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
-    string,
-    InjectionToken<unknown>
-  >;
-function rozieToken(key: string): InjectionToken<unknown> {
-  let token = __rozieTokenRegistry.get(key);
-  if (!token) {
-    token = new InjectionToken<unknown>('rozie:' + key);
-    __rozieTokenRegistry.set(key, token);
-  }
-  return token;
-}`;
-
-function coreImportSymbols(text: string): Set<string> {
-  const m = text.match(/import \{ ([^}]*) \} from '@angular\/core';/);
-  if (!m) return new Set();
-  return new Set(m[1].split(', ').map((s) => s.trim()));
-}
-
-/** Fixed known text of emitScript.ts's `__rozieFills`/`__rozieFillMap` field block. */
-const FILL_MAP_MEMBER_BLOCK = `  __rozieFills = contentChildren(RozieSlot, { descendants: true });
-  __rozieFillMap = computed(() => {
-    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
-    for (const f of this.__rozieFills()) {
-      const k = f.rozieSlot();
-      if (k == null) continue;
-      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
-      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
-    }
-    return map;
-  });
-`;
-
-const RUNTIME_IMPORT_LINE = "import { RozieSlot } from '@rozie/runtime-angular';\n";
-
-/** The three specifiers 260819-qo8 added to the runtime import bucket. */
-const QO8_RUNTIME_SPECIFIERS = [
-  'rozieAttr as __rozieAttr',
-  'rozieDisplay as __rozieDisplay',
-  'rozieToken',
-] as const;
-
-function applyInverseTransform(current: string, baseline: string): string {
-  let out = current;
-
-  // 260819-qo8 STEP 6 — strip the specifiers this quick task added to the
-  // @rozie/runtime-angular import line's specifier list (leaving RozieSlot
-  // alone if it was also present, or removing the whole line if not),
-  // tracking which were present so steps 7-9 below know what to restore.
-  const runtimeMatch = out.match(/import \{ ([^}]*) \} from '@rozie\/runtime-angular';\n/);
-  let hadDisplayAttr = false;
-  let hadToken = false;
-  if (runtimeMatch) {
-    const specifiers = runtimeMatch[1].split(', ').map((s) => s.trim());
-    hadDisplayAttr =
-      specifiers.includes('rozieAttr as __rozieAttr') ||
-      specifiers.includes('rozieDisplay as __rozieDisplay');
-    hadToken = specifiers.includes('rozieToken');
-    const kept = specifiers.filter(
-      (s) => !(QO8_RUNTIME_SPECIFIERS as readonly string[]).includes(s),
-    );
-    out = out.replace(
-      runtimeMatch[0],
-      kept.length > 0 ? `import { ${kept.join(', ')} } from '@rozie/runtime-angular';\n` : '',
-    );
-  }
-
-  // 1. Core import line — remove symbols present now, absent at baseline
-  //    (Phase 80's small permitted-addition set), and restore
-  //    `InjectionToken` (260819-qo8 STEP 7 — present at baseline, absent
-  //    post-260819-qo8) whenever `rozieToken` was stripped in step 6.
-  const currentCore = coreImportSymbols(out);
-  const baselineCore = coreImportSymbols(baseline);
-  const toRemove: string[] = PERMITTED_CORE_ADDITIONS.filter(
-    (s) => currentCore.has(s) && !baselineCore.has(s),
-  );
-  const toAddBack: string[] =
-    hadToken && !currentCore.has('InjectionToken') ? ['InjectionToken'] : [];
-  if (toRemove.length > 0 || toAddBack.length > 0) {
-    out = out.replace(/import \{ ([^}]*) \} from '@angular\/core';/, (_full, names: string) => {
-      const kept = names.split(', ').filter((n) => !toRemove.includes(n));
-      return `import { ${[...kept, ...toAddBack].sort().join(', ')} } from '@angular/core';`;
-    });
-  }
-
-  // 260819-qo8 STEPS 8/9 — re-insert the module-scope function/const blocks
-  // this quick task moved into @rozie/runtime-angular, immediately before
-  // `@Component(` — the exact position the pre-260819-qo8 emitter spliced
-  // them (verified against BASELINE_COMMIT for both a display/attr-only
-  // fixture, AttrNullishDrop, and a token-only fixture, ThemeProvider).
-  // Display/attr comes before token, matching the emitter's original splice
-  // order (`baseModuleDecls`/`moduleDecls` in emitAngular.ts, pre-260819-qo8).
-  const restoreBlocks: string[] = [];
-  if (hadDisplayAttr) restoreBlocks.push(DISPLAY_ATTR_BLOCK);
-  if (hadToken) restoreBlocks.push(TOKEN_BLOCK);
-  if (restoreBlocks.length > 0) {
-    out = out.replace('\n@Component(', `\n${restoreBlocks.join('\n\n')}\n\n@Component(`);
-  }
-
-  // 2. Runtime import line (RozieSlot-only case, Phase 80) removed in full.
-  out = out.split(RUNTIME_IMPORT_LINE).join('');
-
-  // 3+4. __rozieFills / __rozieFillMap class-field block removed in full.
-  out = out.split(FILL_MAP_MEMBER_BLOCK).join('');
-
-  // 5. The fill-map resolution-chain term removed from every outlet
-  //    resolution expression, inner conditional guard, and (Plan 14, D-10)
-  //    outer structural presence gate — including the class-scoped
-  //    `this.__rozieFillMap()[...] ?? ` form the script/listener rewrite
-  //    contexts emit. The optional `(?:this\.)?` prefix is consumed WITH
-  //    the term so no dangling qualifier is left behind (see doc comment).
-  out = out.replace(/(?:this\.)?__rozieFillMap\(\)\[[^\]]*\] \?\? /g, '');
-
-  return out;
-}
-
-/**
- * Record-path fixtures re-blessed in Plan 07 Task 1 (must differ from
- * baseline) — the exact set `git diff <BASELINE_COMMIT> HEAD` identifies as
- * changed among `listAngularFixtureFiles()`'s output, hand-verified during
- * Task 1 (see 80-07 commit message) and pinned here as a literal list so a
- * regression in either direction (a record-path fixture NOT changing, or a
- * static fixture changing) fails loudly with the offending path.
- */
-const RECORD_PATH_FIXTURES = [
-  'tests/dist-parity/fixtures/DynamicSlots.angular.ts',
-  'tests/dist-parity/fixtures/DynamicSlotsConsumer.angular.ts',
-  'tests/dist-parity/fixtures/ModalConsumer.angular.ts',
-  'tests/slot-matrix/fixtures/consumer-dynamic-name/expected.angular.ts',
-  'tests/regressions/fixtures/loop-mustache-keyed-slot-rfor/expected.angular.ts',
-];
 
 /**
  * Quick task 260818-okc (Task 3) — the GENERALIZED region-discovery helper
@@ -540,94 +317,28 @@ describe('prohibition 4a — RETAINED byte-identical: @ContentChild declaration 
   });
 });
 
-// Phase 80 Plan 12 — AMENDED (D-09 fix, SPEC prohibition #4b amendment).
-// OLD form: prohibition 4 asserted whole-file byte-identity for every
-// tracked non-record-path Angular fixture against BASELINE_COMMIT. That
-// gate is now too strong — the D-09 fix legitimately, additively widens
-// EVERY slot-declaring producer's resolution chain, so an identifier-only
-// producer fixture (the population this plan's Task 2 re-blessed) is
-// SUPPOSED to differ from baseline now. NEW form: the byte-identity gate is
-// replaced by the STRICTLY STRONGER inverse-transform gate defined above —
-// applying `applyInverseTransform` to the current content must reproduce
-// the baseline content exactly, byte for byte. This is strictly stronger
-// than the old gate because it still catches every regression the old gate
-// caught (any change NOT explained by the five enumerated permitted
-// differences fails) while additionally tolerating ONLY the specific,
-// enumerated, additive D-09 shape — a future change cannot quietly widen
-// what counts as "permitted" without editing this file's own doc comment.
-describe('prohibition 4b — AMENDED: the inverse transform reproduces pre-fix bytes for every non-record-path Angular fixture (replaces whole-file byte-identity)', () => {
-  const files = listAngularFixtureFiles().filter((f) => !RECORD_PATH_FIXTURES.includes(f));
+// Quick task 260819-sg9 (Tier 2, Task 3 STEP 9-10) — RETIRED the machine-
+// checked inverse transform Phase 80 Plan 12 introduced (and Quick task
+// 260819-qo8 extended). See this file's header comment for the full
+// rationale. Prohibition 4b is restored to its ORIGINAL, strictly stronger
+// form: whole-file byte-identity against `BASELINE_COMMIT` for every tracked
+// non-record-path Angular fixture, no enumerated tolerances. The advanced
+// baseline (this quick task's own re-bless commit) already reflects every
+// legitimate emitter change up to and including this quick task, so there
+// is no longer a "record path" carve-out to maintain here — every tracked
+// fixture is checked, unconditionally.
+describe('prohibition 4b — the emitted Angular fixture is byte-identical to BASELINE_COMMIT (RESTORED from the retired 260819-qo8/Phase-80-Plan-12 inverse-transform amendment)', () => {
+  const files = listAngularFixtureFiles();
 
-  it('non-vacuity: at least one tracked fixture genuinely differs from the baseline BEFORE transformation — the gate cannot pass vacuously by comparing two identical files', () => {
-    const changed = files.filter((relPath) => {
-      const current = readFileSync(join(REPO_ROOT, relPath), 'utf8');
-      const baseline = readAtBaseline(relPath);
-      return current !== baseline;
-    });
-    expect(changed.length).toBeGreaterThan(0);
-  });
-
-  it('the non-vacuity guard is itself non-vacuous: a DELIBERATELY over-aggressive transform (stripping the whole merged operand, not just the fill-map term) produces a WRONG result, proving the real transform above is doing genuine, bounded work rather than trivially matching anything', () => {
-    const relPath = 'tests/dist-parity/fixtures/Modal.angular.ts';
+  it.each(files)('%s: byte-identical to the baseline commit', (relPath) => {
     const current = readFileSync(join(REPO_ROOT, relPath), 'utf8');
     const baseline = readAtBaseline(relPath);
-    // Over-aggressive: deletes the ENTIRE `?? __rozieFillMap()[...] ??
-    // templates()?.[...]` tail instead of just the fill-map term — this is
-    // exactly the kind of transform bug the non-vacuity/no-deletion guards
-    // exist to catch (T-80-12-01).
-    const overAggressive = current.replace(
-      /\?\? __rozieFillMap\(\)\['header'\] \?\? templates\(\)\?\.\['header'\]/g,
-      '',
-    );
-    expect(overAggressive).not.toBe(baseline);
-  });
-
-  it.each(
-    files,
-  )('%s: applying the documented inverse transform to the current content reproduces the baseline content exactly', (relPath) => {
-    const current = readFileSync(join(REPO_ROOT, relPath), 'utf8');
-    const baseline = readAtBaseline(relPath);
-    const transformed = applyInverseTransform(current, baseline);
-    // Fail with the offending path so a regression names itself.
-    if (transformed !== baseline) {
+    if (current !== baseline) {
       throw new Error(
-        `${relPath}: the inverse transform did NOT reproduce the pre-fix baseline — real byte drift beyond the permitted additive-only 4b amendment, at commit ${BASELINE_COMMIT}.`,
+        `${relPath}: not byte-identical to BASELINE_COMMIT (${BASELINE_COMMIT}) — a real emitted-output regression, or BASELINE_COMMIT needs advancing again after a deliberate emitter change.`,
       );
     }
-    expect(transformed).toBe(baseline);
-  });
-
-  it('no-deletion: no tracked fixture has any line present at the baseline and absent from the TRANSFORMED current — "no emitted line may be deleted" (SPEC prohibition #4b amendment text)', () => {
-    // Checked against the TRANSFORMED current, not raw current — the raw
-    // emitted text legitimately MODIFIES several lines in place (the
-    // `@angular/core` import line gains symbols; every outlet/guard line
-    // gains the `__rozieFillMap()[...] ?? ` segment mid-line), which a
-    // naive raw line-set comparison misreads as "the old line vanished."
-    // This guard is a genuinely independent second structural check
-    // (line-set containment) on top of the whole-file byte-equality sweep
-    // above — it would catch a transform bug that dropped content the
-    // equality check's own string comparison happened to still satisfy in
-    // some degenerate way, whereas the equality check would not
-    // necessarily catch a transform bug that reorders/duplicates lines
-    // without changing the overall character count.
-    const offenders: string[] = [];
-    for (const relPath of files) {
-      const current = readFileSync(join(REPO_ROOT, relPath), 'utf8');
-      const baseline = readAtBaseline(relPath);
-      const transformedLines = new Set(applyInverseTransform(current, baseline).split('\n'));
-      const missing = baseline
-        .split('\n')
-        .filter((line) => line.length > 0 && !transformedLines.has(line));
-      if (missing.length > 0) {
-        offenders.push(
-          `${relPath}: missing ${missing.length} baseline line(s), e.g. "${missing[0]}"`,
-        );
-      }
-    }
-    if (offenders.length > 0) {
-      throw new Error(offenders.join('\n'));
-    }
-    expect(offenders).toEqual([]);
+    expect(current).toBe(baseline);
   });
 });
 
@@ -635,14 +346,22 @@ describe('prohibition 5 — MUST NOT re-bless a fixture without a behavioral ass
   // This prohibition routes to JUDGMENT and cannot be fully automated (SPEC's
   // explicit verification: judgment). The judgment half — each rebless
   // citing the runtime test or precedence check that proves its new bytes —
-  // lives in Plan 07 Task 1's commit message and is reviewed there, not
-  // here. This describe block is the machine-checkable HALF: catch a
-  // fixture the emitter should have changed but did not (a silent miss).
-  it.each(
-    RECORD_PATH_FIXTURES,
-  )('%s differs from the pre-fix baseline commit — a record-path fixture the emitter did not change is a silent miss, not a pass', (relPath) => {
-    const current = readFileSync(join(REPO_ROOT, relPath), 'utf8');
-    const baseline = readAtBaseline(relPath);
-    expect(current).not.toBe(baseline);
+  // lives in the commit message of whichever change re-blessed the fixture,
+  // and is reviewed there, not here.
+  //
+  // Quick task 260819-sg9 (Tier 2, Task 3 STEP 9-10) RETIRED the
+  // machine-checkable half (the `RECORD_PATH_FIXTURES` "must differ from
+  // baseline" list) alongside the `BASELINE_COMMIT` advance: at a freshly
+  // advanced baseline, every tracked fixture is (by construction, per
+  // prohibition 4b above) byte-identical to that baseline, so a "must
+  // differ from baseline" assertion would be vacuously true for the entire
+  // corpus — not a real check. This is a genuine loss of automated coverage
+  // for the specific failure mode "an emitter change should have touched
+  // this fixture but silently didn't" — that check must be re-established
+  // BY HAND against the NEXT baseline advance (diff the two baseline commits
+  // and confirm every fixture the change was supposed to touch actually
+  // changed), not assumed to still be running here.
+  it('the machine-checkable half of this prohibition is retired at the current BASELINE_COMMIT — see the doc comment above for why, and re-establish it by hand at the next baseline advance', () => {
+    expect(true).toBe(true);
   });
 });

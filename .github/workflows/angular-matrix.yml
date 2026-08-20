@@ -43,10 +43,12 @@ jobs:
       # fetch-depth: 0 is REQUIRED, not incidental. This job runs
       # `tests/angular-runtime/prohibitions.test.ts`, whose byte-identity gates
       # read pre-fix fixture bytes straight out of git history via
-      # `git show <BASELINE_COMMIT>:<path>` (a Phase 80 commit, ~51 back).
-      # actions/checkout defaults to a depth-1 shallow clone where that object
-      # does not exist, so every one of those gates fails with
-      # "Command failed: git show …" — 134 of 144 tests in one cascade.
+      # `git show <BASELINE_COMMIT>:<path>` — a commit that walks forward every
+      # time a quick task advances the baseline (most recently Quick task
+      # 260819-sg9; see that file's own header comment for why). Regardless of
+      # which commit BASELINE_COMMIT names, actions/checkout defaults to a
+      # depth-1 shallow clone where that object does not exist, so every one
+      # of those gates fails with "Command failed: git show …" in one cascade.
       # Do not drop this without first removing the test's git-history dependency.
       - uses: actions/checkout@v7
         with:
