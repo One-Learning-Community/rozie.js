@@ -1271,16 +1271,41 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // Re-open the vendored combobox popup after a level pop (LVL-NAV). The combobox
   // opens its popup on the input's `@focus`, but a plain focus() on an
   // ALREADY-focused input fires no `@focus` — and Escape leaves the input focused
-  // while closing the popup (Combobox.rozie onKeydown → isOpen=false). So BLUR the
-  // deepest focused element first (which also runs combobox's `@blur` → isOpen
+  // while closing the popup (Combobox.rozie onKeydown → isOpen=false). So move
+  // focus off the input first (which also runs combobox's `@blur` → isOpen
   // stays false), then re-focus on the next frame so `@focus` fires and re-opens
   // the popup showing the restored parent level. For a Backspace pop (popup never
   // closed) this is a harmless close→reopen cycle.
+  //
+  // INVARIANT (fixed quick 260820-7hj — the dead-second-Escape bug): focus
+  // NEVER leaves `[data-testid="command-palette-frame"]` during this window.
+  // The former implementation blurred the deepest active element to nothing —
+  // focus landed on `<body>` for the entire synchronous-blur → rAF-refocus gap.
+  // The frame's Escape funnel is a BUBBLE-phase `@keydown="onPanelKeydown(...)"`
+  // on that same frame div, so a keydown dispatched while focus sat on `<body>`
+  // never entered the subtree at all and `onPanelKeydown` silently never ran —
+  // confirmed live via a captured window-level keydown probe (defaultPrevented
+  // stayed `false`, `event.composedPath()` was just `[body, html, document,
+  // window]`). `$refs.frame` carries `tabindex="-1"` precisely so it can
+  // receive focus itself: moving focus THERE instead of blurring to nothing
+  // still blurs the input (preserving the popup-reopen trigger this comment
+  // describes) while keeping every keydown in the window — including a second,
+  // fast Escape — inside the frame subtree the whole time.
   function reopenComboboxPopup() {
-    // `any` — document.activeElement types as `Element` (no `.blur`); the deepest
-    // focused node is really an HTMLElement across all six leaves.
-    const active: any = deepActiveElement();
-    if (active && typeof active.blur === 'function') active.blur();
+    // `any` — $refs.frame types as the generic ref shape (no `.focus` in every
+    // target's typing); document.activeElement types as `Element` (no `.blur`).
+    // The frame div is really an HTMLElement, and the deepest focused node is
+    // really an HTMLElement, across all six leaves.
+    const frame: any = frameRef;
+    if (frame && typeof frame.focus === 'function') {
+      frame.focus();
+    } else {
+      // Defensive fallback only — $refs.frame should always be populated while
+      // the palette is open. Preserves the pre-fix behavior rather than a hard
+      // no-op if the ref is ever unexpectedly absent.
+      const active: any = deepActiveElement();
+      if (active && typeof active.blur === 'function') active.blur();
+    }
     if (typeof requestAnimationFrame !== 'undefined') {
       requestAnimationFrame(() => {
         focusInput();
@@ -1849,7 +1874,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     <>
     {<Show when={open()}><Show when={(typeof document === 'undefined' ? null : (resolveAppendTo(local.appendTo)))} fallback={<div class={"rozie-command-palette"} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
       
-      <div data-testid="command-palette-frame" ref={(el) => { frameRef = el as HTMLElement; }} class={"rozie-command-palette-frame"} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
+      <div data-testid="command-palette-frame" ref={(el) => { frameRef = el as HTMLElement; }} tabIndex={-1} class={"rozie-command-palette-frame"} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
       <div ref={(el) => { panelRef = el as HTMLElement; }} class={"rozie-command-palette-panel"} role="dialog" aria-modal="true" aria-label={local.ariaLabel} data-rozie-s-768cad96="">
         
         {<Show when={atDepth()}><div class={"rozie-command-palette-header"} data-rozie-s-768cad96="">
@@ -1904,7 +1929,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
       </div></Show>}</div>
     </div>}><Portal mount={(typeof document === 'undefined' ? null : (resolveAppendTo(local.appendTo)))}><div class={"rozie-command-palette"} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
       
-      <div data-testid="command-palette-frame" ref={(el) => { frameRef = el as HTMLElement; }} class={"rozie-command-palette-frame"} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
+      <div data-testid="command-palette-frame" ref={(el) => { frameRef = el as HTMLElement; }} tabIndex={-1} class={"rozie-command-palette-frame"} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
       <div ref={(el) => { panelRef = el as HTMLElement; }} class={"rozie-command-palette-panel"} role="dialog" aria-modal="true" aria-label={local.ariaLabel} data-rozie-s-768cad96="">
         
         {<Show when={atDepth()}><div class={"rozie-command-palette-header"} data-rozie-s-768cad96="">

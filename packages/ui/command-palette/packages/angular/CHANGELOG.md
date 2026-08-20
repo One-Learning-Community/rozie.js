@@ -4,6 +4,8 @@
 
 ### Patch Changes
 
+- Fix the second Escape after popping a level being silently dropped ~1-in-6 of the time. `reopenComboboxPopup()` used to blur focus to `<body>` for the gap between the pop and its refocus; a keydown landing there never reached the Escape handler at all. The frame now keeps focus on itself (`tabindex="-1"`) across that gap, so every keystroke — including a fast second Escape — is still routed.
+
 - f3266db: `@rozie/runtime-angular` now exports `rozieDisplay`, `rozieAttr`, and `rozieToken`
   alongside the existing `RozieSlot` marker directive. The Angular target used to
   inline a copy of these three helpers (and, for `rozieToken`, its

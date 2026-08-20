@@ -2,7 +2,7 @@
 
 <Teleport :to="__roziePortalTo0" :disabled="!__roziePortalTo0"><div v-if="open" class="rozie-command-palette" @click="onBackdropClick($event)">
   
-  <div ref="frameRef" class="rozie-command-palette-frame" data-testid="command-palette-frame" @keydown="onPanelKeydown($event)">
+  <div ref="frameRef" tabindex="-1" class="rozie-command-palette-frame" data-testid="command-palette-frame" @keydown="onPanelKeydown($event)">
   <div ref="panelRef" class="rozie-command-palette-panel" role="dialog" aria-modal="true" :aria-label="props.ariaLabel">
     
     <div v-if="atDepth()" class="rozie-command-palette-header">
@@ -885,16 +885,41 @@ const deepActiveElement = () => {
 // Re-open the vendored combobox popup after a level pop (LVL-NAV). The combobox
 // opens its popup on the input's `@focus`, but a plain focus() on an
 // ALREADY-focused input fires no `@focus` — and Escape leaves the input focused
-// while closing the popup (Combobox.rozie onKeydown → isOpen=false). So BLUR the
-// deepest focused element first (which also runs combobox's `@blur` → isOpen
+// while closing the popup (Combobox.rozie onKeydown → isOpen=false). So move
+// focus off the input first (which also runs combobox's `@blur` → isOpen
 // stays false), then re-focus on the next frame so `@focus` fires and re-opens
 // the popup showing the restored parent level. For a Backspace pop (popup never
 // closed) this is a harmless close→reopen cycle.
+//
+// INVARIANT (fixed quick 260820-7hj — the dead-second-Escape bug): focus
+// NEVER leaves `[data-testid="command-palette-frame"]` during this window.
+// The former implementation blurred the deepest active element to nothing —
+// focus landed on `<body>` for the entire synchronous-blur → rAF-refocus gap.
+// The frame's Escape funnel is a BUBBLE-phase `@keydown="onPanelKeydown(...)"`
+// on that same frame div, so a keydown dispatched while focus sat on `<body>`
+// never entered the subtree at all and `onPanelKeydown` silently never ran —
+// confirmed live via a captured window-level keydown probe (defaultPrevented
+// stayed `false`, `event.composedPath()` was just `[body, html, document,
+// window]`). `$refs.frame` carries `tabindex="-1"` precisely so it can
+// receive focus itself: moving focus THERE instead of blurring to nothing
+// still blurs the input (preserving the popup-reopen trigger this comment
+// describes) while keeping every keydown in the window — including a second,
+// fast Escape — inside the frame subtree the whole time.
 const reopenComboboxPopup = () => {
-  // `any` — document.activeElement types as `Element` (no `.blur`); the deepest
-  // focused node is really an HTMLElement across all six leaves.
-  const active: any = deepActiveElement();
-  if (active && typeof active.blur === 'function') active.blur();
+  // `any` — $refs.frame types as the generic ref shape (no `.focus` in every
+  // target's typing); document.activeElement types as `Element` (no `.blur`).
+  // The frame div is really an HTMLElement, and the deepest focused node is
+  // really an HTMLElement, across all six leaves.
+  const frame: any = frameRef.value;
+  if (frame && typeof frame.focus === 'function') {
+    frame.focus();
+  } else {
+    // Defensive fallback only — $refs.frame should always be populated while
+    // the palette is open. Preserves the pre-fix behavior rather than a hard
+    // no-op if the ref is ever unexpectedly absent.
+    const active: any = deepActiveElement();
+    if (active && typeof active.blur === 'function') active.blur();
+  }
   if (typeof requestAnimationFrame !== 'undefined') {
     requestAnimationFrame(() => {
       focusInput();

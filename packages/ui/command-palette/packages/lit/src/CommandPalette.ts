@@ -767,7 +767,7 @@ private __rozieWatchInitial_0 = true;
     return html`
 ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span><div class="rozie-command-palette" @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onBackdropClick($event); }} data-rozie-portal-ref="__roziePortal0" data-rozie-s-768cad96>
   
-  <div class="rozie-command-palette-frame" data-testid="command-palette-frame" @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPanelKeydown($event); }} data-rozie-ref="frame" data-rozie-s-768cad96>
+  <div class="rozie-command-palette-frame" tabindex="-1" data-testid="command-palette-frame" @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPanelKeydown($event); }} data-rozie-ref="frame" data-rozie-s-768cad96>
   <div class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label=${this.ariaLabel} data-rozie-ref="panel" data-rozie-s-768cad96>
     
     ${this.atDepth() ? html`<div class="rozie-command-palette-header" data-rozie-s-768cad96>
@@ -1252,10 +1252,20 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
 };
 
   reopenComboboxPopup = () => {
-  // `any` — document.activeElement types as `Element` (no `.blur`); the deepest
-  // focused node is really an HTMLElement across all six leaves.
-  const active: any = this.deepActiveElement();
-  if (active && typeof active.blur === 'function') active.blur();
+  // `any` — $refs.frame types as the generic ref shape (no `.focus` in every
+  // target's typing); document.activeElement types as `Element` (no `.blur`).
+  // The frame div is really an HTMLElement, and the deepest focused node is
+  // really an HTMLElement, across all six leaves.
+  const frame: any = this._refFrame;
+  if (frame && typeof frame.focus === 'function') {
+    frame.focus();
+  } else {
+    // Defensive fallback only — $refs.frame should always be populated while
+    // the palette is open. Preserves the pre-fix behavior rather than a hard
+    // no-op if the ref is ever unexpectedly absent.
+    const active: any = this.deepActiveElement();
+    if (active && typeof active.blur === 'function') active.blur();
+  }
   if (typeof requestAnimationFrame !== 'undefined') {
     requestAnimationFrame(() => {
       this.focusInput();

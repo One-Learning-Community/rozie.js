@@ -105,7 +105,7 @@ interface TrailingCtx {
     @if (open()) {
     <div class="rozie-command-palette" (click)="onBackdropClick($event)" #roziePortal_0>
       
-      <div #frame class="rozie-command-palette-frame" data-testid="command-palette-frame" (keydown)="onPanelKeydown($event)">
+      <div #frame tabindex="-1" class="rozie-command-palette-frame" data-testid="command-palette-frame" (keydown)="onPanelKeydown($event)">
       <div #panel class="rozie-command-palette-panel" role="dialog" aria-modal="true" [attr.aria-label]="ariaLabel()">
         
         @if (atDepth()) {
@@ -1070,10 +1070,20 @@ export class CommandPalette {
     return node;
   };
   reopenComboboxPopup = () => {
-    // `any` — document.activeElement types as `Element` (no `.blur`); the deepest
-    // focused node is really an HTMLElement across all six leaves.
-    const active: any = this.deepActiveElement();
-    if (active && typeof active.blur === 'function') active.blur();
+    // `any` — $refs.frame types as the generic ref shape (no `.focus` in every
+    // target's typing); document.activeElement types as `Element` (no `.blur`).
+    // The frame div is really an HTMLElement, and the deepest focused node is
+    // really an HTMLElement, across all six leaves.
+    const frame: any = this.frame()?.nativeElement;
+    if (frame && typeof frame.focus === 'function') {
+      frame.focus();
+    } else {
+      // Defensive fallback only — $refs.frame should always be populated while
+      // the palette is open. Preserves the pre-fix behavior rather than a hard
+      // no-op if the ref is ever unexpectedly absent.
+      const active: any = this.deepActiveElement();
+      if (active && typeof active.blur === 'function') active.blur();
+    }
     if (typeof requestAnimationFrame !== 'undefined') {
       requestAnimationFrame(() => {
         this.focusInput();

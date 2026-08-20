@@ -617,10 +617,20 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     return node;
   }
   function reopenComboboxPopup() {
-    // `any` — document.activeElement types as `Element` (no `.blur`); the deepest
-    // focused node is really an HTMLElement across all six leaves.
-    const active: any = deepActiveElement();
-    if (active && typeof active.blur === 'function') active.blur();
+    // `any` — $refs.frame types as the generic ref shape (no `.focus` in every
+    // target's typing); document.activeElement types as `Element` (no `.blur`).
+    // The frame div is really an HTMLElement, and the deepest focused node is
+    // really an HTMLElement, across all six leaves.
+    const frame$local: any = frame.current;
+    if (frame$local && typeof frame$local.focus === 'function') {
+      frame$local.focus();
+    } else {
+      // Defensive fallback only — $refs.frame should always be populated while
+      // the palette is open. Preserves the pre-fix behavior rather than a hard
+      // no-op if the ref is ever unexpectedly absent.
+      const active: any = deepActiveElement();
+      if (active && typeof active.blur === 'function') active.blur();
+    }
     if (typeof requestAnimationFrame !== 'undefined') {
       requestAnimationFrame(() => {
         focusInput();
@@ -1016,7 +1026,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     <>
     {!!(open) && ((() => { const __rozieContainer = typeof document === 'undefined' ? null : (resolveAppendTo(props.appendTo)); return __rozieContainer ? createPortal(<div className={"rozie-command-palette"} onClick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
       
-      <div ref={frame} className={"rozie-command-palette-frame"} data-testid="command-palette-frame" onKeyDown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
+      <div ref={frame} tabIndex={-1} className={"rozie-command-palette-frame"} data-testid="command-palette-frame" onKeyDown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
       <div ref={panel} className={"rozie-command-palette-panel"} role="dialog" aria-modal="true" aria-label={props.ariaLabel} data-rozie-s-768cad96="">
         
         {!!(atDepth()) && <div className={"rozie-command-palette-header"} data-rozie-s-768cad96="">
@@ -1071,7 +1081,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
       </div>}</div>
     </div>, __rozieContainer) : (<div className={"rozie-command-palette"} onClick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
       
-      <div ref={frame} className={"rozie-command-palette-frame"} data-testid="command-palette-frame" onKeyDown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
+      <div ref={frame} tabIndex={-1} className={"rozie-command-palette-frame"} data-testid="command-palette-frame" onKeyDown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
       <div ref={panel} className={"rozie-command-palette-panel"} role="dialog" aria-modal="true" aria-label={props.ariaLabel} data-rozie-s-768cad96="">
         
         {!!(atDepth()) && <div className={"rozie-command-palette-header"} data-rozie-s-768cad96="">
