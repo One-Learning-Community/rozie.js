@@ -5,14 +5,21 @@
 // Two IDE-surface artifacts are hand-maintained or build-frozen, and both
 // silently drifted away from `@rozie/core` between 2026-06-21 and 2026-08-21:
 //
-//   1. `tools/textmate/server/server-standalone.cjs` is a COMMITTED build
-//      artifact that inlines `@rozie/core`. The language-server *source* has no
-//      drift of its own — `packages/language-server/src/diagnostics.ts` imports
-//      `compile` from `@rozie/core` and hardcodes zero ROZ codes. But the
-//      shipped bundle is a snapshot, so every diagnostic added to core after
-//      the last `pnpm bundle:server` is invisible in the editor. At the time
-//      this guard was written, 38 real codes were missing (ROZ090..ROZ096,
+//   1. `tools/textmate/server/server-standalone.cjs` inlines `@rozie/core` as a
+//      point-in-time snapshot. The language-server *source* has no drift of its
+//      own — `packages/language-server/src/diagnostics.ts` imports `compile`
+//      from `@rozie/core` and hardcodes zero ROZ codes — but every diagnostic
+//      added to core after the last `pnpm bundle:server` is invisible to
+//      anything running that bundle. When this guard was written the on-disk
+//      bundle was 60 days stale and missing 38 real codes (ROZ090..ROZ096,
 //      ROZ142..ROZ148, ROZ207..ROZ210, ROZ724, ROZ750, ROZ981..ROZ998, …).
+//
+//      NOTE ON BLAST RADIUS: `server/` is gitignored, and both `pnpm package`
+//      and `pnpm publish` run `bundle:server` first — so a stale bundle cannot
+//      reach the marketplace. This guard exists for the LOCAL case: a developer
+//      sideloading or debugging against a months-old build and drawing wrong
+//      conclusions about which diagnostics the editor supports. It skips when
+//      the artifact is absent, which is the normal state of a fresh clone.
 //
 //   2. The grammar's directive and sigil alternations are hand-written regexes
 //      in `tools/textmate/syntaxes/*.json`. Nothing checked them against core.
@@ -27,10 +34,13 @@
 // know MORE than core (retired codes kept for message continuity, directives
 // documented before they land). It must never know LESS.
 //
-// Rebuild the bundle with `pnpm --filter @rozie/tools-textmate bundle:server`
-// (or `node tools/textmate/scripts/bundle-server.mjs`) when guard 1 fails.
+// Rebuild the bundle when guard 1 fails. `tools/textmate` is deliberately
+// OUTSIDE the pnpm workspace (it carries its own lockfile), so there is no
+// `--filter` for it — run it from the extension root:
+//
+//     cd tools/textmate && pnpm bundle:server
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -94,7 +104,6 @@ function coreDirectives(): Set<string> {
 }
 
 function walk(dirs: string[]): string[] {
-  const { readdirSync, statSync } = require('node:fs');
   const found: string[] = [];
   const stack = [...dirs];
   while (stack.length > 0) {
@@ -172,12 +181,22 @@ describe('IDE surface parity — bundled language server vs @rozie/core', () => 
     expect(core.has('ROZ001')).toBe(true);
   });
 
-  it('ships every diagnostic code core can emit', () => {
-    const core = coreDiagnosticCodes();
-    const bundled = bundledServerCodes();
-    expect(bundled.size).toBeGreaterThan(100);
-    expect(missing(core, bundled)).toEqual([]);
-  });
+  // `server/` is a gitignored build output, so it is legitimately absent on a
+  // fresh clone and in CI. Skip rather than fail there — asserting against a
+  // file that is *supposed* not to exist would make `turbo run test` red for
+  // everyone who has never run `pnpm bundle:server`.
+  it.skipIf(!existsSync(BUNDLED_SERVER))(
+    'ships every diagnostic code core can emit',
+    () => {
+      const core = coreDiagnosticCodes();
+      const bundled = bundledServerCodes();
+      expect(bundled.size).toBeGreaterThan(100);
+      expect(
+        missing(core, bundled),
+        'stale local bundle — re-run `pnpm bundle:server` in tools/textmate',
+      ).toEqual([]);
+    },
+  );
 });
 
 describe('IDE surface parity — TextMate grammar vs @rozie/core', () => {
