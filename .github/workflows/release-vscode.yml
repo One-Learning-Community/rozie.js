@@ -1,0 +1,134 @@
+name: Release VS Code extension
+
+# Manual, dry-run-by-default publish of the Rozie VS Code extension
+# (`tools/textmate`) to the Visual Studio Marketplace.
+#
+# WHY THIS IS A SEPARATE WORKFLOW FROM release.yml
+#
+# Same publish RULES, different registry and different tooling:
+#   - release.yml publishes @rozie/* and @rozie-ui/* to npm via `pnpm publish`
+#     with OIDC provenance and the NPM_TOKEN automation token.
+#   - this publishes ONE artifact (a .vsix) to the VS Code Marketplace via
+#     `vsce`, authenticated with an Azure DevOps PAT (VSCE_PAT). npm provenance
+#     and OIDC have no marketplace equivalent, so `id-token: write` is not
+#     requested here.
+#
+# Two further structural differences, both consequences of `tools/textmate`
+# living OUTSIDE the pnpm workspace (it carries its own lockfile so vsce and
+# esbuild never enter the monorepo's dependency graph):
+#   - changesets cannot version it. The version bump in
+#     `tools/textmate/package.json` is MANUAL, and CHANGELOG.md is hand-written.
+#   - CI needs TWO frozen installs: the repo root (to build @rozie/core and the
+#     language server the extension bundles) and the extension itself.
+#
+# The guard model mirrors RELEASING.md exactly:
+#   (i)  LOCAL `pnpm release:precheck:vscode --gate` is the REAL guard. Run it
+#        after building and before dispatching. Exit 1 = do not dispatch.
+#   (ii) The step below is a non-blocking ADVISORY signal, run `--offline` with
+#        `continue-on-error: true` so marketplace timing can never false-fail CI.
+#
+# Dispatching with dry_run = true (the default) builds, validates and uploads a
+# sideloadable .vsix artifact WITHOUT publishing. Dispatch with dry_run = false
+# to publish that same artifact for real.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (build + validate + upload .vsix; do NOT publish)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-vscode
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release-vscode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # Root install first: `bundle:server` shells out to
+      # `pnpm --filter @rozie/language-server build:standalone` at the repo root,
+      # which needs the workspace present and @rozie/core buildable.
+      - name: Install dependencies (repo root)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @rozie/core
+        run: pnpm turbo run build --force --filter=@rozie/core
+
+      # Second, independent install — tools/textmate has its OWN lockfile.
+      - name: Install dependencies (extension)
+        working-directory: tools/textmate
+        run: pnpm install --frozen-lockfile
+
+      # Stages a FRESH standalone language server into server/. This is what
+      # makes a stale bundle unshippable: packaging always rebuilds it.
+      - name: Bundle language server
+        working-directory: tools/textmate
+        run: pnpm bundle:server
+
+      - name: Build extension client
+        working-directory: tools/textmate
+        run: pnpm build
+
+      # ADVISORY ONLY — never blocks. `--offline` skips the marketplace query so
+      # gallery availability can never false-fail a build. The real gate is the
+      # LOCAL `--gate` run the releaser does before dispatching (RELEASING.md §8).
+      - name: Pre-publish precheck (advisory)
+        continue-on-error: true
+        run: node scripts/release-precheck-vscode.mjs --offline
+
+      - name: Read extension version
+        id: ext
+        run: |
+          version=$(node -p "require('./tools/textmate/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "vsix=rozie-textmate-$version.vsix" >> "$GITHUB_OUTPUT"
+
+      - name: Package .vsix
+        working-directory: tools/textmate
+        run: pnpm exec vsce package --no-dependencies
+
+      # Uploaded on BOTH paths so a dry run always yields a sideloadable
+      # artifact to verify before the live dispatch.
+      - name: Upload .vsix artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: rozie-textmate-${{ steps.ext.outputs.version }}-vsix
+          path: tools/textmate/${{ steps.ext.outputs.vsix }}
+          if-no-files-found: error
+
+      - name: Announce mode
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "::notice::DRY RUN — built and validated ${{ steps.ext.outputs.vsix }}; nothing published. Download the artifact above to sideload."
+          else
+            echo "::warning::LIVE PUBLISH — ${{ steps.ext.outputs.vsix }} will be pushed to the VS Code Marketplace."
+          fi
+
+      # Publishes the EXACT artifact packaged above (--packagePath), not a
+      # re-pack, so what was verified in the dry run is what ships.
+      - name: Publish to Marketplace
+        if: ${{ inputs.dry_run == false }}
+        working-directory: tools/textmate
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::error::VSCE_PAT secret is not set — add an Azure DevOps PAT with Marketplace:Manage scope."
+            exit 1
+          fi
+          pnpm exec vsce publish --no-dependencies --packagePath "${{ steps.ext.outputs.vsix }}"
