@@ -121,6 +121,25 @@ function grammarSigils(file: string): Set<string> {
   return out;
 }
 
+/** The raw `begin` regex of the grammar rule that matches `r-*` directives. */
+function directivePattern(file: string): string {
+  const grammar = JSON.parse(read(file));
+  let pattern: string | null = null;
+  (function walkNode(node: unknown): void {
+    if (Array.isArray(node)) {
+      node.forEach(walkNode);
+      return;
+    }
+    if (node && typeof node === 'object') {
+      const begin = (node as { begin?: unknown }).begin;
+      if (typeof begin === 'string' && begin.includes('r-(?:')) pattern = begin;
+      Object.values(node as Record<string, unknown>).forEach(walkNode);
+    }
+  })(grammar);
+  if (pattern === null) throw new Error(`no r-* directive rule found in ${file}`);
+  return pattern;
+}
+
 /** The `r-(…)` directive alternation baked into the `.rozie` grammar. */
 function grammarDirectives(file: string): Set<string> {
   const txt = read(file);
@@ -168,6 +187,32 @@ describe('IDE surface parity — TextMate grammar vs @rozie/core', () => {
     expect(core.size).toBeGreaterThan(10);
     expect(grammar.size).toBeGreaterThan(10);
     expect(missing(core, grammar)).toEqual([]);
+  });
+
+  // Set-membership alone cannot catch an alternation-ORDERING regression:
+  // `r-(?:…|keynav|keynav-item|…)` would still "contain" r-keynav-item while
+  // tokenizing `r-keynav-item` as `r-keynav` plus an orphaned `-item`, because
+  // the directive's trailing groups are all optional. Longest-first ordering is
+  // load-bearing and is asserted behaviourally against the real grammar regex.
+  it('tokenises prefix-colliding directives longest-first', () => {
+    const pattern = directivePattern(ROZIE_GRAMMAR);
+    const re = new RegExp(pattern);
+    const expectations: Array<[string, string]> = [
+      ['r-keynav-item=""', 'r-keynav-item'],
+      ['r-keynav-active-class=""', 'r-keynav-active-class'],
+      ['r-keynav=""', 'r-keynav'],
+      ['r-portal=""', 'r-portal'],
+      ['r-else-if=""', 'r-else-if'],
+      ['r-else=""', 'r-else'],
+    ];
+    for (const [source, directive] of expectations) {
+      expect(re.exec(source)?.[1], source).toBe(directive);
+    }
+    // The colon form still carries its focus-model argument and modifiers.
+    const keynav = re.exec('r-keynav:vertical.wrap=""');
+    expect(keynav?.[1]).toBe('r-keynav');
+    expect(keynav?.[3]).toBe('vertical');
+    expect(keynav?.[4]).toBe('.wrap');
   });
 
   it.each([
