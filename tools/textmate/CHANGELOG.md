@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-21
+
+### Added
+
+- **Keyboard-navigation and portal directives.** `r-keynav`, `r-keynav-item`, `r-keynav-active-class` and `r-portal` now highlight as Rozie directives. The alternation had been stuck at 14 of core's 18 directives, so all four rendered as ordinary HTML attribute names — despite being used across 15 of our own `.rozie` sources and `r-keynav` carrying its own guide page (`docs/guide/r-keynav.md`). The colon form keeps its focus-model argument and modifier chain: `r-keynav:vertical.wrap` scopes as directive + `vertical` + `.wrap`, exactly like `r-model:value.lazy`.
+
+  The three `keynav*` entries are ordered longest-first (`keynav-active-class | keynav-item | keynav`). Every trailing group in the directive rule is optional, so a shorter alternative placed first would match `r-keynav-item` as `r-keynav` and silently orphan `-item` — the same first-match-wins hazard the existing `else-if | else` ordering already guards against.
+
+- **`$slotted` in script partials.** Added to the `.rzts` and `.rzjs` sigil injection grammars, which had 20 of 21 sigils. `$slotted` painted correctly in `.rozie` files but went dead the moment the same code was lifted into a script partial.
+
+### Fixed
+
+- **Drift guards for the whole IDE surface** (`tests/textmate/ide-surface-parity.test.ts`). Both regressions above existed because nothing checked the extension against `@rozie/core`. The grammar's directive and sigil alternations are hand-written regexes, and IntelliJ's `rozie-globals.d.ts` agreeing with them was discipline rather than mechanism. Two one-directional superset guards now assert the IDE surface never knows *less* than core — knowing more stays legal, since retired codes are kept for message continuity. A companion behavioural case execs the real grammar regex over the prefix-colliding directives, because set-membership alone would still pass while tokenisation split them.
+
+- **Stale local language-server bundles are now detectable.** `server/server-standalone.cjs` inlines `@rozie/core` at build time; the on-disk bundle had drifted 60 days and was missing 38 real diagnostic codes (`ROZ018`, `ROZ090`–`ROZ096`, `ROZ142`–`ROZ148`, `ROZ207`–`ROZ210`, `ROZ724`, `ROZ750`, `ROZ981`–`ROZ998`), among them the `ROZ997`/`ROZ998` event-name diagnostics and `ROZ142`'s Lit DOM-prop footgun class. Rebuilding took it from 190 to 228 codes. Note this was never a *shipping* defect — `server/` is gitignored and both `pnpm package` and `pnpm publish` rebuild first — so the guard targets the local sideload-and-debug case and skips when the artifact is absent.
+
+### Notes
+
+- The language server itself has no diagnostic drift by construction: `packages/language-server/src/diagnostics.ts` imports `compile` from `@rozie/core` and hardcodes zero ROZ codes. Every gap above came from the *bundling* step, not the source.
+- Post-0.4.0 grammar drift, now changelogged: `$slotted` was added to `rozie.tmLanguage.json` and the IntelliJ ambient globals on 2026-08-07 (`3ef519acd`) but never recorded here — the same class of omission this file's 0.3.0 notes flag for `$restoreFocus` and `$model`.
+- Sigil token regex is now 21 alternations in all three grammars (`.rozie`, `.rzts`, `.rzjs`); the directive alternation is 18.
+
 ## [0.4.0] — 2026-06-21
 
 ### Added
