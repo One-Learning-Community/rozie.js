@@ -1,6 +1,6 @@
 # Releasing Rozie.js packages
 
-The contributor playbook for publishing the Rozie.js monorepo to npm. Terse and footgun-forward — read it once, then lean on `pnpm release:precheck` to catch the mechanical misses automatically.
+The contributor playbook for publishing the Rozie.js monorepo — the `@rozie/*` and `@rozie-ui/*` packages to npm, and the VS Code extension to the Marketplace (§9). Terse and footgun-forward — read it once, then lean on `pnpm release:precheck` (and `pnpm release:precheck:vscode`) to catch the mechanical misses automatically.
 
 Most of what goes wrong on a release is mechanical: a forgotten version bump (pnpm then silently skips the package), a stale scaffold description, a wrong `repository.directory` after a leaf copy-paste, or a leaf depending on a runtime that isn't on npm yet. All of those are encoded in [`scripts/release-precheck.mjs`](scripts/release-precheck.mjs).
 
@@ -8,10 +8,11 @@ Most of what goes wrong on a release is mechanical: a forgotten version bump (pn
 
 ## 1. Overview
 
-Two package classes ship from this repo:
+Three artifact classes ship from this repo — the first two to npm, the third to the VS Code Marketplace:
 
 - **Toolchain — `@rozie/*`**: `core`, `cli`, `unplugin`, `babel-plugin`, and `runtime-{react,vue,svelte,solid,lit}`. (The `@rozie/target-*` emitters are **private** — they are inlined into `@rozie/core`/`@rozie/cli` at build time and never published.)
 - **Components — `@rozie-ui/*` leaves**: dual-package — a compiled `dist` **and** a raw `./source` export. Only the **release-verified** subset is in the workflow today (see §6).
+- **Editor — `onelearningcommunity.rozie-textmate`**: the VS Code extension in `tools/textmate`. Different registry, different tooling, same rules — see **§9**.
 
 Publishing happens through [`.github/workflows/release.yml`](.github/workflows/release.yml): a manual `workflow_dispatch` with one input, `dry_run` (**defaults to `true`** — packs + validates only). It publishes via `pnpm publish --access public --no-git-checks --provenance` with OIDC (`permissions: id-token: write`). Auth today is the `NPM_TOKEN` automation token (token-bootstrap); migration to npm **trusted publishing** is pending and will retire the long-lived token.
 
@@ -195,3 +196,61 @@ When a family becomes release-verified, widen the workflow — and mirror the sa
 - **Repo must be PUBLIC** — npm provenance requires a public source repo.
 - **`--provenance` + OIDC** (`id-token: write`) mints the SLSA provenance attestation at publish time. Without `id-token: write`, `--provenance` fails.
 - **Pending:** migration to npm **trusted publishing**, which will retire the long-lived `NPM_TOKEN`.
+
+---
+
+## 9. The VS Code extension (`tools/textmate`)
+
+Same rules as §2's checklist, different registry. The extension publishes to the **Visual Studio Marketplace** via `vsce`, not to npm, through [`.github/workflows/release-vscode.yml`](.github/workflows/release-vscode.yml) — a manual `workflow_dispatch` with one `dry_run` input that **defaults to `true`**, exactly like `release.yml`.
+
+### 9.1 Three structural differences — know these before you touch it
+
+`tools/textmate` lives **outside the pnpm workspace** on purpose: it carries its own `pnpm-lock.yaml` so `vsce` and `esbuild` never enter the monorepo's dependency graph. Three consequences follow, and none of them are bugs:
+
+1. **Changesets cannot version it.** It is invisible to `pnpm-workspace.yaml` globs, so it is absent from `.changeset/config.json` by construction. **The version bump in `tools/textmate/package.json` is manual, and `CHANGELOG.md` is hand-written.** There is no changeset to forget — and no changeset to catch you if you forget the bump, which is why check (a) matters more here than on the npm path.
+2. **`scripts/release-precheck.mjs` cannot see it either.** The extension has its own guard — `scripts/release-precheck-vscode.mjs`, run via `pnpm release:precheck:vscode` — mirroring the same (a)–(f) letters against the Marketplace. Same modes (`--gate`, `--offline`), same exit codes.
+3. **CI needs two frozen installs** — the repo root (to build `@rozie/core` and the language server the extension bundles) and the extension itself.
+
+### 9.2 What the check letters mean here
+
+| | npm path | extension path |
+| --- | --- | --- |
+| (a) | version vs npm | version vs Marketplace — `vsce` **rejects** a republish, it does not silently skip like `pnpm publish` |
+| (b) | description quality | same |
+| (c) | url / `repository.directory` | same, plus `publisher` and `license` must be present or `vsce` refuses |
+| (d) | `files` + `exports` resolve | `main`, `icon`, every contributed grammar + language-configuration, the staged server bundle, and the three marketplace-page files (README / CHANGELOG / LICENSE) all resolve on disk |
+| (e) | `@rozie/*` workspace deps on npm | every declared runtime dep is **actually inlined** into `dist/extension.js`. `vsce publish --no-dependencies` ships no `node_modules`, so a dep left as a bare `require(...)` fails activation. Declaring a dep is fine *if bundled* — `vscode-languageclient` is, and that is the expected steady state |
+| (f) | published-tarball drift | **server-bundle drift** — `server/server-standalone.cjs` inlines `@rozie/core` at build time, so the guard asserts the staged bundle carries every diagnostic code core can emit |
+
+> **Check (f) is belt-and-braces, not load-bearing.** `server/` is gitignored and both `pnpm package` and `pnpm publish` run `bundle:server` first, so a stale bundle **cannot reach the Marketplace**. The guard exists to catch the *local* case — sideloading a months-old build and drawing wrong conclusions about which diagnostics the editor supports. `tests/textmate/ide-surface-parity.test.ts` guards the same invariant in the normal test run.
+
+### 9.3 Step-by-step
+
+1. **Bump** `version` in `tools/textmate/package.json` and add the matching `CHANGELOG.md` entry by hand. Additive highlighting or new LSP features = minor; fixes = patch.
+2. **Build**, from the extension root — checks (d), (e) and (f) all read build outputs:
+   ```bash
+   cd tools/textmate && pnpm install --frozen-lockfile && pnpm bundle:server && pnpm build
+   ```
+3. **Run the LOCAL gate** — the real guard. Exit 1 = do not dispatch:
+   ```bash
+   pnpm release:precheck:vscode --gate
+   ```
+4. **Commit + push `main`.**
+5. **Dispatch `release-vscode.yml` with `dry_run = true`.** It builds, runs the advisory precheck, and uploads a `.vsix` artifact.
+6. **Download that artifact and sideload it** — `code --install-extension rozie-textmate-<version>.vsix` — then confirm highlighting across the `fixtures/` files and that the language server starts (diagnostics appear on a deliberately broken `.rozie`). This is the human gate; nothing automated replaces it.
+7. **Dispatch with `dry_run = false`.** The live step publishes the **exact** `.vsix` packaged in that run (`--packagePath`), so what you verified is what ships.
+8. **Verify** the listing resolves:
+   ```bash
+   curl -s -o /dev/null -w "%{http_code}\n" \
+     "https://marketplace.visualstudio.com/items?itemName=onelearningcommunity.rozie-textmate"   # 200 = live
+   ```
+
+### 9.4 Auth
+
+- **`VSCE_PAT`** — an **Azure DevOps** Personal Access Token (not a GitHub token) with **Marketplace → Manage** scope, on an account that owns the `onelearningcommunity` publisher. Stored as a repo secret. The publish step fails fast with a clear message if it is unset.
+- The publisher must **already exist** on the Marketplace before the first publish — create it once at <https://marketplace.visualstudio.com/manage>.
+- **No OIDC / provenance.** npm's `--provenance` has no Marketplace equivalent, so this workflow does not request `id-token: write`.
+
+### 9.5 Not done yet
+
+- **Open VSX is not wired up.** VSCodium, Cursor, Windsurf and Gitpod users install from [Open VSX](https://open-vsx.org), not the Microsoft Marketplace — publishing there needs an `OVSX_PAT` and an `ovsx publish` step. Worth doing given how much of Rozie's early interest comes from outside the mainstream toolchain, but deliberately out of scope for the first release.
