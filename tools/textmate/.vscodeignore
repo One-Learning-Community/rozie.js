@@ -9,3 +9,6 @@ pnpm-lock.yaml
 *.vsix
 **/.DS_Store
 **/*.map
+.gitignore
+media/icon.svg
+.turbo/**

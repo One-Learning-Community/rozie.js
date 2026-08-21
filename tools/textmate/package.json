@@ -1,19 +1,19 @@
 {
   "name": "rozie-textmate",
   "displayName": "Rozie",
-  "description": "Syntax highlighting for .rozie Single-File Component files",
+  "description": "Language support for Rozie .rozie single-file components: syntax highlighting for the SFC blocks, r-* directives and $sigils, plus diagnostics, completion, hover, go-to-definition, find-references, rename and outline from the bundled Rozie language server.",
   "version": "0.5.0",
   "publisher": "onelearningcommunity",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/One-Learning-Community/rozie.js",
-    "directory": "tools/textmate"
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#3b82f6",
+    "theme": "dark"
   },
-  "bugs": {
-    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
-  },
-  "homepage": "https://github.com/One-Learning-Community/rozie.js/tree/main/tools/textmate#readme",
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
   "keywords": [
     "rozie",
     "syntax",
@@ -24,29 +24,22 @@
     "react",
     "angular"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/One-Learning-Community/rozie.js",
+    "directory": "tools/textmate"
+  },
+  "homepage": "https://github.com/One-Learning-Community/rozie.js/tree/main/tools/textmate#readme",
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
-  "categories": ["Programming Languages"],
+  "activationEvents": [
+    "onLanguage:rozie"
+  ],
   "main": "./dist/extension.js",
-  "activationEvents": ["onLanguage:rozie"],
-  "scripts": {
-    "build": "node build.mjs",
-    "typecheck": "tsc --noEmit",
-    "bundle:server": "node ./scripts/bundle-server.mjs",
-    "package": "pnpm bundle:server && pnpm build && vsce package --no-dependencies",
-    "publish": "pnpm bundle:server && pnpm build && vsce publish --no-dependencies"
-  },
-  "dependencies": {
-    "vscode-languageclient": "^9.0.1"
-  },
-  "devDependencies": {
-    "@types/node": "^22.0.0",
-    "@types/vscode": "^1.80.0",
-    "@vscode/vsce": "^3.0.0",
-    "esbuild": "^0.24.0",
-    "typescript": "^5.6.0"
-  },
   "contributes": {
     "configuration": {
       "title": "Rozie",
@@ -61,20 +54,35 @@
     "languages": [
       {
         "id": "rozie",
-        "aliases": ["Rozie", "rozie"],
-        "extensions": [".rozie"],
+        "aliases": [
+          "Rozie",
+          "rozie"
+        ],
+        "extensions": [
+          ".rozie"
+        ],
         "configuration": "./language-configuration.json"
       },
       {
         "id": "rozie-ts",
-        "aliases": ["Rozie Script Partial (TypeScript)", "rzts"],
-        "extensions": [".rzts"],
+        "aliases": [
+          "Rozie Script Partial (TypeScript)",
+          "rzts"
+        ],
+        "extensions": [
+          ".rzts"
+        ],
         "configuration": "./language-configuration.partial.json"
       },
       {
         "id": "rozie-js",
-        "aliases": ["Rozie Script Partial (JavaScript)", "rzjs"],
-        "extensions": [".rzjs"],
+        "aliases": [
+          "Rozie Script Partial (JavaScript)",
+          "rzjs"
+        ],
+        "extensions": [
+          ".rzjs"
+        ],
         "configuration": "./language-configuration.partial.json"
       }
     ],
@@ -104,13 +112,34 @@
       {
         "scopeName": "source.rozie.ts.injection",
         "path": "./syntaxes/rozie-ts-sigils.injection.json",
-        "injectTo": ["source.rozie.ts"]
+        "injectTo": [
+          "source.rozie.ts"
+        ]
       },
       {
         "scopeName": "source.rozie.js.injection",
         "path": "./syntaxes/rozie-js-sigils.injection.json",
-        "injectTo": ["source.rozie.js"]
+        "injectTo": [
+          "source.rozie.js"
+        ]
       }
     ]
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "bundle:server": "node ./scripts/bundle-server.mjs",
+    "package": "pnpm bundle:server && pnpm build && vsce package --no-dependencies",
+    "publish": "pnpm bundle:server && pnpm build && vsce publish --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.80.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
   }
 }
