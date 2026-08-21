@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`$slotted` in script partials.** Added to the `.rzts` and `.rzjs` sigil injection grammars, which had 20 of 21 sigils. `$slotted` painted correctly in `.rozie` files but went dead the moment the same code was lifted into a script partial.
 
+- **Marketplace icon.** Deliberately the same mark as the IntelliJ plugin (`META-INF/pluginIcon.svg` — rounded square, `#3b82f6`, white bold `R`) so both IDE surfaces read as one product. `media/icon.svg` is the checked-in source; `media/icon.png` is rasterised from it at 256×256.
+
+- **A release path with the same rules as the npm packages.** `.github/workflows/release-vscode.yml` — a manual dispatch defaulting to dry run, which uploads a sideloadable `.vsix` and, on a live run, publishes that exact artifact. Guarded by `pnpm release:precheck:vscode`, which mirrors the npm precheck's (a)–(f) check letters against the Marketplace. Full run book in [RELEASING.md §9](../../RELEASING.md#9-the-vs-code-extension-toolstextmate).
+
+### Changed
+
+- **Description now matches what the extension does.** It read "Syntax highlighting for .rozie Single-File Component files" — written when that was true. The extension has bundled a language server since 0.4.0, so the description now names what the server actually advertises (completion, hover, go-to-definition, find-references, rename, outline, diagnostics), and the `Linters` category was added on the same evidence.
+
 ### Fixed
 
 - **Drift guards for the whole IDE surface** (`tests/textmate/ide-surface-parity.test.ts`). Both regressions above existed because nothing checked the extension against `@rozie/core`. The grammar's directive and sigil alternations are hand-written regexes, and IntelliJ's `rozie-globals.d.ts` agreeing with them was discipline rather than mechanism. Two one-directional superset guards now assert the IDE surface never knows *less* than core — knowing more stays legal, since retired codes are kept for message continuity. A companion behavioural case execs the real grammar regex over the prefix-colliding directives, because set-membership alone would still pass while tokenisation split them.
