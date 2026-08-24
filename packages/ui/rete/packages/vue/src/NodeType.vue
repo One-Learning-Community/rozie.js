@@ -3,7 +3,7 @@
 
 
 
-<div class="rozie-node-type-children" style="display:none"><slot></slot></div>
+<div class="rozie-node-type-children" style="display:none" v-bind="$attrs"><slot></slot></div>
 
 </template>
 

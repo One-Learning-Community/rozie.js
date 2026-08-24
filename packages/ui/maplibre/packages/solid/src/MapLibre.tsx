@@ -927,7 +927,7 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
   }
 }}>
     <>
-    <div class={"rozie-maplibre"} ref={(el) => { containerElRef = el as HTMLElement; }} data-rozie-s-f1ee1082="" />
+    <div ref={(el) => { containerElRef = el as HTMLElement; }} {...attrs} class={"rozie-maplibre" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-f1ee1082="" />
 
     {resolved()}
 

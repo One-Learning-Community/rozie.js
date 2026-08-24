@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
 import { mount, unmount } from 'svelte';
 import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';
@@ -133,6 +135,7 @@ interface Props {
   onpitchend?: (...args: unknown[]) => void;
   onmouseenter?: (...args: unknown[]) => void;
   onmouseleave?: (...args: unknown[]) => void;
+  [key: string]: unknown;
 }
 
 let __defaultFitBoundsOptions = (() => ({}))();
@@ -194,7 +197,8 @@ let {
   onrotateend,
   onpitchend,
   onmouseenter,
-  onmouseleave
+  onmouseleave,
+  ...__rozieAttrs
 }: Props = $props();
 
 const children = $derived(__childrenProp ?? snippets?.children);
@@ -949,7 +953,7 @@ let __rozieWatchInitial_23 = true;
 $effect(() => { (() => touchPitch)(); untrack(() => { if (__rozieWatchInitial_23) { __rozieWatchInitial_23 = false; return; } (() => applyInteractionToggles())(); }); });
 </script>
 
-<div class="rozie-maplibre" bind:this={containerEl} data-rozie-s-f1ee1082></div>{@render children?.()}
+<div bind:this={containerEl} {...__rozieAttrs} class={["rozie-maplibre", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-f1ee1082></div>{@render children?.()}
 
 <style>
 :global {

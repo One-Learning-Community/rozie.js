@@ -199,6 +199,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     marquee: _props.marquee ?? false,
     nodeToolbar: _props.nodeToolbar ?? false,
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { graph, validateTypes, zoom, pannable, zoomable, selectable, readonly, minZoom, maxZoom, snapGrid, accumulateOnCtrl, curvature, fitOnMount, controls, minimap, background, canConnect, history, mode, marquee, nodeToolbar, defaultValue, onGraphChange, defaultGraph, onZoomChange, defaultZoom, onModeChange, defaultMode, onEdgeClick, onEdgeSelected, onSelectionChange, onConnectEnd, onNodeAction, onConnectionRejected, onConnectionCreated, onConnectionRemoved, onNodePicked, onNodeMoved, onTranslated, onContextMenu, ...rest } = _props as FlowCanvasProps & Record<string, unknown>;
+    void graph; void validateTypes; void zoom; void pannable; void zoomable; void selectable; void readonly; void minZoom; void maxZoom; void snapGrid; void accumulateOnCtrl; void curvature; void fitOnMount; void controls; void minimap; void background; void canConnect; void history; void mode; void marquee; void nodeToolbar; void defaultValue; void onGraphChange; void defaultGraph; void onZoomChange; void defaultZoom; void onModeChange; void defaultMode; void onEdgeClick; void onEdgeSelected; void onSelectionChange; void onConnectEnd; void onNodeAction; void onConnectionRejected; void onConnectionCreated; void onConnectionRemoved; void onNodePicked; void onNodeMoved; void onTranslated; void onContextMenu;
+    return rest;
+  })();
   const _renderNodeRef = useRef(props.renderNode);
   _renderNodeRef.current = props.renderNode;
   const _renderToolbarRef = useRef(props.renderToolbar);
@@ -3861,7 +3866,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   }
 }}>
     <>
-    <div className={clsx("rozie-flow-canvas", { "rozie-flow-canvas--lines": props.background === 'lines', "rozie-flow-canvas--cross": props.background === 'cross', "rozie-flow-canvas--none": props.background === 'none' })} ref={canvasEl} tabIndex={0} data-rozie-s-cd396d6a="">
+    <div ref={canvasEl} tabIndex={0} {...attrs} className={clsx(clsx("rozie-flow-canvas", { "rozie-flow-canvas--lines": props.background === 'lines', "rozie-flow-canvas--cross": props.background === 'cross', "rozie-flow-canvas--none": props.background === 'none' }), (attrs.className as string | undefined))} data-rozie-s-cd396d6a="">
       
       {!!(props.controls) && <div className={"rozie-flow-controls"} data-rozie-s-cd396d6a="">
         <button type="button" className={"rozie-flow-controls__btn"} data-testid="flow-zoom-in" aria-label="Zoom in" onClick={controlZoomIn} data-rozie-s-cd396d6a="">+</button>

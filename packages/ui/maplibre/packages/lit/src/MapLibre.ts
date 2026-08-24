@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { adoptDocumentStyles, createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
+import { adoptDocumentStyles, createLitControllableProperty, injectGlobalStyles, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { ContextProvider, createContext } from '@lit/context';
 import maplibregl from 'maplibre-gl';
 
@@ -845,7 +845,7 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
 
   render() {
     return html`
-<div class="rozie-maplibre" data-rozie-ref="containerEl" data-rozie-s-f1ee1082></div>
+<div class="rozie-maplibre" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="containerEl" data-rozie-s-f1ee1082></div>
 
 <slot></slot>
 
@@ -1124,6 +1124,48 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
   set bearing(v: number) { this._bearingControllable.notifyPropertyWrite(v); }
   get pitch(): number { return this._pitchControllable.read(); }
   set pitch(v: number) { this._pitchControllable.notifyPropertyWrite(v); }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   *
+   * Phase 15 follow-up Bug A — declared-prop attribute names are filtered
+   * out so `$attrs` returns "rest after declared props" (semantic parity
+   * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming
+   * forms are folded into the skip set: kebab-case for model props
+   * (explicit `attribute:`) AND lowercased property name (Lit's default).
+   *
+   * command-palette-per-level-virtual / portal-through-portal cluster —
+   * `data-rozie-ref` is ALWAYS skipped too (a reserved compiler bookkeeping
+   * attribute, never a consumer prop) so a parent-assigned `ref=` on this
+   * component's own host tag can never clobber this component's OWN
+   * internal `data-rozie-ref` ref markers via fallthrough re-application.
+   */
+  private get $attrs(): Record<string, string> {
+    const __skip = new Set<string>(['data-rozie-ref', 'center', 'zoom', 'bearing', 'pitch', 'map-style', 'mapstyle', 'min-zoom', 'minzoom', 'max-zoom', 'maxzoom', 'max-bounds', 'maxbounds', 'bounds', 'fit-bounds-options', 'fitboundsoptions', 'drag-pan', 'dragpan', 'drag-rotate', 'dragrotate', 'scroll-zoom', 'scrollzoom', 'double-click-zoom', 'doubleclickzoom', 'box-zoom', 'boxzoom', 'keyboard', 'touch-zoom-rotate', 'touchzoomrotate', 'touch-pitch', 'touchpitch', 'markers', 'popups', 'sources', 'layers', 'interactive-layer-ids', 'interactivelayerids', 'controls', 'options']);
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) {
+      if (__skip.has(a.name)) continue;
+      out[a.name] = a.value;
+    }
+    return out;
+  }
+
+  /**
+   * Phase 15 D-19 — consumer-passed listener cluster placeholder.
+   * Lit attaches event listeners directly on the host element via
+   * `addEventListener` (no per-instance prop rest binding), so the
+   * runtime value is undefined; the `rozieListeners` directive's
+   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.
+   * The declaration exists to satisfy `tsc --noEmit` on consumer
+   * projects with strict mode — bare `$listeners` in `render()`
+   * would otherwise raise TS2304 (Cannot find name).
+   */
+  private get $listeners(): Record<string, EventListener> | undefined {
+    return undefined;
+  }
 }
 
 injectGlobalStyles('rozie-map-libre-13ad46d2-global', `

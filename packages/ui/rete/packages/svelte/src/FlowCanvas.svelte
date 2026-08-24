@@ -1,5 +1,5 @@
 <script lang="ts">
-import { rozieAttr, rozieDisplay } from '@rozie/runtime-svelte';
+import { applyListeners, rozieAttr, rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 import { mount, unmount } from 'svelte';
@@ -109,6 +109,7 @@ interface Props {
   onnodemoved?: (...args: unknown[]) => void;
   ontranslated?: (...args: unknown[]) => void;
   oncontextmenu?: (...args: unknown[]) => void;
+  [key: string]: unknown;
 }
 
 let {
@@ -151,7 +152,8 @@ let {
   onnodepicked,
   onnodemoved,
   ontranslated,
-  oncontextmenu
+  oncontextmenu,
+  ...__rozieAttrs
 }: Props = $props();
 
 const node$$slot = $derived(__nodeProp ?? snippets?.node);
@@ -4003,7 +4005,7 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
 })(__watchVal); }); });
 </script>
 
-<div class={["rozie-flow-canvas", { 'rozie-flow-canvas--lines': background === 'lines', 'rozie-flow-canvas--cross': background === 'cross', 'rozie-flow-canvas--none': background === 'none' }]} bind:this={canvasEl} tabindex="0" data-rozie-s-cd396d6a>{#if controls}<div class="rozie-flow-controls" data-rozie-s-cd396d6a><button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-in" aria-label="Zoom in" onclick={controlZoomIn} data-rozie-s-cd396d6a>+</button><button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-out" aria-label="Zoom out" onclick={controlZoomOut} data-rozie-s-cd396d6a>&#8722;</button><button type="button" class="rozie-flow-controls__btn" data-testid="flow-fit" aria-label="Fit view" onclick={controlFit} data-rozie-s-cd396d6a>&#9744;</button>{#if marquee}<button type="button" class={["rozie-flow-controls__btn", { 'is-active': mode === 'select' }]} data-testid="flow-mode" aria-label={rozieAttr(mode === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} onclick={toggleMode} data-rozie-s-cd396d6a>{rozieDisplay(mode === 'select' ? '▢' : '✥')}</button>{/if}</div>{/if}{#if minimap}<div class="rozie-flow-minimap" bind:this={minimapEl} data-testid="flow-minimap" data-rozie-s-cd396d6a></div>{/if}<div class="rozie-flow-marquee" bind:this={marqueeEl} data-testid="flow-marquee" data-rozie-s-cd396d6a></div><div class="rozie-flow-resize-handle rozie-flow-resize-handle--nw" bind:this={resizeHandleNwEl} data-testid="flow-resize-handle-nw" data-rozie-s-cd396d6a></div><div class="rozie-flow-resize-handle rozie-flow-resize-handle--ne" bind:this={resizeHandleNeEl} data-testid="flow-resize-handle-ne" data-rozie-s-cd396d6a></div><div class="rozie-flow-resize-handle rozie-flow-resize-handle--sw" bind:this={resizeHandleSwEl} data-testid="flow-resize-handle-sw" data-rozie-s-cd396d6a></div><div class="rozie-flow-resize-handle rozie-flow-resize-handle--se" bind:this={resizeHandleSeEl} data-testid="flow-resize-handle-se" data-rozie-s-cd396d6a></div>{#if nodeToolbar}<div class="rozie-flow-toolbar" bind:this={toolbarEl} data-testid="flow-toolbar" data-rozie-s-cd396d6a></div>{/if}</div>{@render children?.()}
+<div bind:this={canvasEl} tabindex="0" {...__rozieAttrs} class={["rozie-flow-canvas", { 'rozie-flow-canvas--lines': background === 'lines', 'rozie-flow-canvas--cross': background === 'cross', 'rozie-flow-canvas--none': background === 'none' }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-cd396d6a>{#if controls}<div class="rozie-flow-controls" data-rozie-s-cd396d6a><button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-in" aria-label="Zoom in" onclick={controlZoomIn} data-rozie-s-cd396d6a>+</button><button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-out" aria-label="Zoom out" onclick={controlZoomOut} data-rozie-s-cd396d6a>&#8722;</button><button type="button" class="rozie-flow-controls__btn" data-testid="flow-fit" aria-label="Fit view" onclick={controlFit} data-rozie-s-cd396d6a>&#9744;</button>{#if marquee}<button type="button" class={["rozie-flow-controls__btn", { 'is-active': mode === 'select' }]} data-testid="flow-mode" aria-label={rozieAttr(mode === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} onclick={toggleMode} data-rozie-s-cd396d6a>{rozieDisplay(mode === 'select' ? '▢' : '✥')}</button>{/if}</div>{/if}{#if minimap}<div class="rozie-flow-minimap" bind:this={minimapEl} data-testid="flow-minimap" data-rozie-s-cd396d6a></div>{/if}<div class="rozie-flow-marquee" bind:this={marqueeEl} data-testid="flow-marquee" data-rozie-s-cd396d6a></div><div class="rozie-flow-resize-handle rozie-flow-resize-handle--nw" bind:this={resizeHandleNwEl} data-testid="flow-resize-handle-nw" data-rozie-s-cd396d6a></div><div class="rozie-flow-resize-handle rozie-flow-resize-handle--ne" bind:this={resizeHandleNeEl} data-testid="flow-resize-handle-ne" data-rozie-s-cd396d6a></div><div class="rozie-flow-resize-handle rozie-flow-resize-handle--sw" bind:this={resizeHandleSwEl} data-testid="flow-resize-handle-sw" data-rozie-s-cd396d6a></div><div class="rozie-flow-resize-handle rozie-flow-resize-handle--se" bind:this={resizeHandleSeEl} data-testid="flow-resize-handle-se" data-rozie-s-cd396d6a></div>{#if nodeToolbar}<div class="rozie-flow-toolbar" bind:this={toolbarEl} data-testid="flow-toolbar" data-rozie-s-cd396d6a></div>{/if}</div>{@render children?.()}
 
 <style>
 :global {

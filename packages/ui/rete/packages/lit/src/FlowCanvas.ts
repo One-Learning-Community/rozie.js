@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { adoptDocumentStyles, createLitControllableProperty, injectGlobalStyles, rozieAttr, rozieDisplay } from '@rozie/runtime-lit';
+import { adoptDocumentStyles, createLitControllableProperty, injectGlobalStyles, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { ContextProvider, createContext } from '@lit/context';
 import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
@@ -3417,7 +3417,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   render() {
     return html`
-<div class="${Object.entries({ "rozie-flow-canvas": true, 'rozie-flow-canvas--lines': this.background === 'lines', 'rozie-flow-canvas--cross': this.background === 'cross', 'rozie-flow-canvas--none': this.background === 'none' }).filter(([, v]) => v).map(([k]) => k).join(' ')}" tabindex="0" data-rozie-ref="canvasEl" data-rozie-s-cd396d6a>
+<div class="${Object.entries({ "rozie-flow-canvas": true, 'rozie-flow-canvas--lines': this.background === 'lines', 'rozie-flow-canvas--cross': this.background === 'cross', 'rozie-flow-canvas--none': this.background === 'none' }).filter(([, v]) => v).map(([k]) => k).join(' ')}" tabindex="0" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="canvasEl" data-rozie-s-cd396d6a>
   
   ${this.controls ? html`<div class="rozie-flow-controls" data-rozie-s-cd396d6a>
     <button class="rozie-flow-controls__btn" type="button" data-testid="flow-zoom-in" aria-label="Zoom in" @click=${this.controlZoomIn} data-rozie-s-cd396d6a>+</button>
@@ -4435,6 +4435,48 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   set zoom(v: number) { this._zoomControllable.notifyPropertyWrite(v); }
   get mode(): string { return this._modeControllable.read(); }
   set mode(v: string) { this._modeControllable.notifyPropertyWrite(v); }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   *
+   * Phase 15 follow-up Bug A — declared-prop attribute names are filtered
+   * out so `$attrs` returns "rest after declared props" (semantic parity
+   * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming
+   * forms are folded into the skip set: kebab-case for model props
+   * (explicit `attribute:`) AND lowercased property name (Lit's default).
+   *
+   * command-palette-per-level-virtual / portal-through-portal cluster —
+   * `data-rozie-ref` is ALWAYS skipped too (a reserved compiler bookkeeping
+   * attribute, never a consumer prop) so a parent-assigned `ref=` on this
+   * component's own host tag can never clobber this component's OWN
+   * internal `data-rozie-ref` ref markers via fallthrough re-application.
+   */
+  private get $attrs(): Record<string, string> {
+    const __skip = new Set<string>(['data-rozie-ref', 'graph', 'validate-types', 'validatetypes', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'min-zoom', 'minzoom', 'max-zoom', 'maxzoom', 'snap-grid', 'snapgrid', 'accumulate-on-ctrl', 'accumulateonctrl', 'curvature', 'fit-on-mount', 'fitonmount', 'controls', 'minimap', 'background', 'can-connect', 'canconnect', 'history', 'mode', 'marquee', 'node-toolbar', 'nodetoolbar']);
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) {
+      if (__skip.has(a.name)) continue;
+      out[a.name] = a.value;
+    }
+    return out;
+  }
+
+  /**
+   * Phase 15 D-19 — consumer-passed listener cluster placeholder.
+   * Lit attaches event listeners directly on the host element via
+   * `addEventListener` (no per-instance prop rest binding), so the
+   * runtime value is undefined; the `rozieListeners` directive's
+   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.
+   * The declaration exists to satisfy `tsc --noEmit` on consumer
+   * projects with strict mode — bare `$listeners` in `render()`
+   * would otherwise raise TS2304 (Cannot find name).
+   */
+  private get $listeners(): Record<string, EventListener> | undefined {
+    return undefined;
+  }
 }
 
 injectGlobalStyles('rozie-flow-canvas-0c157859-global', `

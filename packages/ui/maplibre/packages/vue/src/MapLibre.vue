@@ -1,6 +1,6 @@
 <template>
 
-<div class="rozie-maplibre" ref="containerElRef"></div>
+<div class="rozie-maplibre" ref="containerElRef" v-bind="$attrs"></div>
 
 <slot></slot>
 

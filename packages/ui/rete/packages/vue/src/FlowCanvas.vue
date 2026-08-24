@@ -1,6 +1,6 @@
 <template>
 
-<div :class="['rozie-flow-canvas', { 'rozie-flow-canvas--lines': props.background === 'lines', 'rozie-flow-canvas--cross': props.background === 'cross', 'rozie-flow-canvas--none': props.background === 'none' }]" ref="canvasElRef" tabindex="0">
+<div :class="['rozie-flow-canvas', { 'rozie-flow-canvas--lines': props.background === 'lines', 'rozie-flow-canvas--cross': props.background === 'cross', 'rozie-flow-canvas--none': props.background === 'none' }]" ref="canvasElRef" tabindex="0" v-bind="$attrs">
   
   <div v-if="props.controls" class="rozie-flow-controls">
     <button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-in" aria-label="Zoom in" @click="controlZoomIn">+</button>

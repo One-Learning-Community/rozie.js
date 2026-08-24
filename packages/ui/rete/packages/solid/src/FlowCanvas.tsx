@@ -4366,7 +4366,7 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   }
 }}>
     <>
-    <div class={"rozie-flow-canvas" + " " + rozieClass({ 'rozie-flow-canvas--lines': local.background === 'lines', 'rozie-flow-canvas--cross': local.background === 'cross', 'rozie-flow-canvas--none': local.background === 'none' })} ref={(el) => { canvasElRef = el as HTMLElement; }} tabIndex={0} data-rozie-s-cd396d6a="">
+    <div ref={(el) => { canvasElRef = el as HTMLElement; }} tabIndex={0} {...attrs} class={"rozie-flow-canvas" + " " + rozieClass({ 'rozie-flow-canvas--lines': local.background === 'lines', 'rozie-flow-canvas--cross': local.background === 'cross', 'rozie-flow-canvas--none': local.background === 'none' }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-cd396d6a="">
       
       {<Show when={local.controls}><div class={"rozie-flow-controls"} data-rozie-s-cd396d6a="">
         <button type="button" data-testid="flow-zoom-in" aria-label="Zoom in" class={"rozie-flow-controls__btn"} onClick={controlZoomIn} data-rozie-s-cd396d6a="">+</button>

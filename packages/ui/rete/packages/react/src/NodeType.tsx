@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { rozieContext } from '@rozie/runtime-react';
+import { clsx, rozieContext } from '@rozie/runtime-react';
 
 interface BodyCtx { node: any; selected: any; emit: any; }
 
@@ -50,6 +50,11 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
     maxWidth: _props.maxWidth ?? null,
     maxHeight: _props.maxHeight ?? null,
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { type, resizable, minWidth, minHeight, maxWidth, maxHeight, ...rest } = _props as NodeTypeProps & Record<string, unknown>;
+    void type; void resizable; void minWidth; void minHeight; void maxWidth; void maxHeight;
+    return rest;
+  })();
   const _renderBodyRef = useRef(props.renderBody);
   _renderBodyRef.current = props.renderBody;
   const mountBody = useRef<any>(null);
@@ -231,7 +236,7 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
 
 
 
-    <div className={"rozie-node-type-children"} style={{ display: "none" }} data-rozie-s-372f9492="">{(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}</div>
+    <div style={{ display: "none" }} {...attrs} className={clsx("rozie-node-type-children", (attrs.className as string | undefined))} data-rozie-s-372f9492="">{(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}</div>
     </>
     </__ctx_rete_nodeType.Provider>
   );

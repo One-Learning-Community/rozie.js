@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
 import { mount, unmount } from 'svelte';
 import PortalHostReactive from '@rozie/runtime-svelte/PortalHostReactive.svelte';
@@ -34,6 +36,7 @@ interface Props {
   body?: Snippet<[{ node: any; selected: any; emit: any }]>;
   children?: Snippet;
   snippets?: Record<string, any>;
+  [key: string]: unknown;
 }
 
 let {
@@ -45,7 +48,8 @@ let {
   maxHeight = null,
   body: __bodyProp,
   children: __childrenProp,
-  snippets
+  snippets,
+  ...__rozieAttrs
 }: Props = $props();
 
 const body = $derived(__bodyProp ?? snippets?.body);
@@ -241,4 +245,4 @@ $effect(() => { (() => type)(); untrack(() => { if (__rozieWatchInitial_0) { __r
 })(); }); });
 </script>
 
-<div class="rozie-node-type-children" style="display:none" data-rozie-s-372f9492>{@render children?.()}</div>
+<div style="display:none" {...__rozieAttrs} class={["rozie-node-type-children", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-372f9492>{@render children?.()}</div>

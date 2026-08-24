@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { rozieContext, useControllableState } from '@rozie/runtime-react';
+import { clsx, rozieContext, useControllableState } from '@rozie/runtime-react';
 import './MapLibre.css';
 import './MapLibre.global.css';
 import maplibregl from 'maplibre-gl';
@@ -205,6 +205,11 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     controls: _props.controls ?? __defaultControls,
     options: _props.options ?? __defaultOptions,
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { center, zoom, bearing, pitch, mapStyle, minZoom, maxZoom, maxBounds, bounds, fitBoundsOptions, dragPan, dragRotate, scrollZoom, doubleClickZoom, boxZoom, keyboard, touchZoomRotate, touchPitch, markers, popups, sources, layers, interactiveLayerIds, controls, options, defaultValue, onCenterChange, defaultCenter, onZoomChange, defaultZoom, onBearingChange, defaultBearing, onPitchChange, defaultPitch, onLoad, onIdle, onMove, onRotate, onDragstart, onDrag, onDragend, onClick, onDblclick, onContextmenu, onMousemove, onError, onStyledata, onSourcedata, onMoveend, onZoomend, onRotateend, onPitchend, onMouseenter, onMouseleave, ...rest } = _props as MapLibreProps & Record<string, unknown>;
+    void center; void zoom; void bearing; void pitch; void mapStyle; void minZoom; void maxZoom; void maxBounds; void bounds; void fitBoundsOptions; void dragPan; void dragRotate; void scrollZoom; void doubleClickZoom; void boxZoom; void keyboard; void touchZoomRotate; void touchPitch; void markers; void popups; void sources; void layers; void interactiveLayerIds; void controls; void options; void defaultValue; void onCenterChange; void defaultCenter; void onZoomChange; void defaultZoom; void onBearingChange; void defaultBearing; void onPitchChange; void defaultPitch; void onLoad; void onIdle; void onMove; void onRotate; void onDragstart; void onDrag; void onDragend; void onClick; void onDblclick; void onContextmenu; void onMousemove; void onError; void onStyledata; void onSourcedata; void onMoveend; void onZoomend; void onRotateend; void onPitchend; void onMouseenter; void onMouseleave;
+    return rest;
+  })();
   const _renderMarkerRef = useRef(props.renderMarker);
   _renderMarkerRef.current = props.renderMarker;
   const _renderPopupRef = useRef(props.renderPopup);
@@ -1097,7 +1102,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   }
 }}>
     <>
-    <div className={"rozie-maplibre"} ref={containerEl} data-rozie-s-f1ee1082="" />
+    <div ref={containerEl} {...attrs} className={clsx("rozie-maplibre", (attrs.className as string | undefined))} data-rozie-s-f1ee1082="" />
 
     {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
 
