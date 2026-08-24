@@ -1,0 +1,57 @@
+<!--
+  ElementPlusSlotFallthrough.rozie — Phase 82 element-plus-slots auto-
+  fallthrough probe (D-01).
+
+  Single-file (no sibling .rozie producers). Runs on DEFAULT inherit-attrs
+  / inherit-listeners flags — no opt-out anywhere on this file. That is the
+  load-bearing property of this fixture: an opt-out would defeat the whole
+  purpose, since the point is to prove the core's root classification now
+  treats "one real element + N <slot> siblings" as single-root and auto-
+  synthesizes the fallthrough spread onto that element.
+
+  Before Phase 82, this exact source produced ROZ970 (ATTR_FALLTHROUGH_
+  MULTI_ROOT) and ROZ973 (LISTENER_FALLTHROUGH_MULTI_ROOT) — the classifier
+  counted the root <div> AND each <slot> invocation as separate structural
+  roots. It stands in for the real-world FlowCanvas / MapLibre shape: one
+  real element carrying the component's own chrome, with a handful of
+  <slot> invocations (default + named) as SIBLINGS rather than children —
+  some authored BEFORE the element, some AFTER, proving sibling-order
+  independence (NodeType.rozie is authored slot-first; FlowCanvas.rozie
+  and MapLibre.rozie are authored element-first — this fixture covers
+  both).
+
+  Exercises:
+    - Element-plus-slots single-root classification, order-independent:
+      a named <slot> invocation BEFORE the root element, a default and a
+      named <slot> invocation AFTER it.
+    - SPEC R6 class-always-merge: the root element carries both a static
+      `class` and a bound `:class`, so the auto-synthesized fallthrough
+      spread's class merges with both when a consumer passes its own.
+    - A named slot alongside the default one, so the fixture isn't
+      degenerate.
+-->
+
+<rozie name="ElementPlusSlotFallthrough">
+
+<props>
+{
+  variant: { type: String, default: 'primary' },
+}
+</props>
+
+<template>
+<slot name="header" />
+<div class="epsf-root" :class="'epsf-root--' + $props.variant">chrome</div>
+<slot />
+<slot name="footer" />
+</template>
+
+<style>
+.epsf-root {
+  display: block;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+}
+</style>
+
+</rozie>
