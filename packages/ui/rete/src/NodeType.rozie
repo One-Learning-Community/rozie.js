@@ -38,7 +38,16 @@
   guarded (the null-let `any` alias + the $onUpdate late-context registration).
   ZERO emitter/core change.
 -->
-<rozie name="NodeType" inherit-attrs="false" inherit-listeners="false">
+<!--
+  Phase 82: the ROZ970/ROZ973 escape hatch is gone — the core's root
+  classification now treats "one real element + N <slot> siblings" as
+  single-root, so consumer attrs/listeners auto-inherit onto the hidden
+  `.rozie-node-type-children` container below (the component's only real
+  element — a deliberately 0x0-hidden div that exists only so nested
+  renderless <Port> children mount). Consumer class/style now land on that
+  invisible div; this is the honest answer, not a bug (T-82-08).
+-->
+<rozie name="NodeType">
 
 <props>
 {

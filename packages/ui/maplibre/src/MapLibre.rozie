@@ -58,7 +58,13 @@
     - `control` — MOUNT-ONCE portal: custom control UI into a custom IControl host.
 -->
 
-<rozie name="MapLibre" inherit-attrs="false" inherit-listeners="false" adopt-document-styles>
+<!--
+  Phase 82: the ROZ970/ROZ973 escape hatch is gone — the core's root
+  classification now treats "one real element + N <slot> siblings" as
+  single-root, so consumer attrs/listeners auto-inherit onto the
+  `.rozie-maplibre` div above with no per-leaf spread needed.
+-->
+<rozie name="MapLibre" adopt-document-styles>
 
 <props>
 {
