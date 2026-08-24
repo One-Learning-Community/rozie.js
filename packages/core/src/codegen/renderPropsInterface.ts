@@ -30,6 +30,7 @@
  */
 import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation, ParamDecl, SlotDecl } from '../ir/types.js';
+import type { CompileTarget } from '../compile.js';
 import { buildPropJsdoc } from './buildPropJsdoc.js';
 import { isSlotNameIdentifier } from './slotNameIdentifier.js';
 import { lowerSlotParamType } from './slotParamTypeLowering.js';
@@ -53,6 +54,16 @@ export interface RenderPropsInterfaceOptions {
    * React-specific `ReactNode` is never hard-coded in core.
    */
   slotChildrenType: string;
+  /**
+   * The compile target this render is for (Phase 81 Plan 02). The second
+   * piece of per-target data this options object carries, alongside
+   * `slotChildrenType` — it exists so the shared JSDoc builder
+   * (`buildPropJsdoc`) can render each prop's `docs.example` in that
+   * surface's own authoring notation. REQUIRED for the same reason
+   * `buildPropJsdoc`'s own `target` parameter is required: an optional
+   * target would silently become the wrong-output path (SPEC decision D-06).
+   */
+  target: CompileTarget;
 }
 
 /**
@@ -83,8 +94,10 @@ export function renderPropsInterface(
     // docless prop, so a prop WITHOUT docs takes the exact existing path and
     // stays byte-identical — SC-5). `buildPropJsdoc` returns a trailing newline
     // for direct text splicing; here we strip it because the block is pushed as
-    // a single entry into the `\n`-joined `lines` array.
-    const jsdoc = buildPropJsdoc(prop, '  ');
+    // a single entry into the `\n`-joined `lines` array. Phase 81 Plan 02 — the
+    // block is now rendered PER-TARGET for the `@example` tag (via
+    // `opts.target`) while staying single-source for description/deprecated.
+    const jsdoc = buildPropJsdoc(prop, opts.target, '  ');
     let tsType = renderPropType(prop.typeAnnotation);
     // Phase 16 R1 — widen the prop type with `| null` when `default: null`
     // is declared, so the published `.d.ts` matches the inline Props
