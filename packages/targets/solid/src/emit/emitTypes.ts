@@ -77,6 +77,7 @@ export function emitSolidTypes(ir: IRComponent, opts: EmitSolidTypesOptions = {}
     renderPropsInterface(ir, {
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'JSX.Element',
+      target: 'solid',
     }),
   );
   lines.push('');

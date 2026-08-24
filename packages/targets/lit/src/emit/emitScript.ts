@@ -458,7 +458,7 @@ function emitNonModelProp(prop: PropDecl): string {
   // TS: JSDoc-above-decorator), gated on `prop.docs` (returns '' for a docless
   // prop → byte-identical, SC-5). The builder's trailing newline joins the
   // block directly onto the field line.
-  const jsdoc = buildPropJsdoc(prop, '  ');
+  const jsdoc = buildPropJsdoc(prop, 'lit', '  ');
   return `${jsdoc}  @property({ type: ${litType}${reflectField} }) ${prop.name}${fieldSuffix};`;
 }
 
@@ -493,7 +493,7 @@ function emitModelProp(prop: PropDecl, componentName: string): ModelPropEmit {
   // Phase 58 (SC-2/SC-3) — leading JSDoc above the public @property attr mirror
   // of a model prop, gated on `prop.docs` (returns '' → byte-identical, SC-5).
   // The builder's trailing newline joins the block onto the first field line.
-  const jsdoc = buildPropJsdoc(prop, '  ');
+  const jsdoc = buildPropJsdoc(prop, 'lit', '  ');
   const fieldDecl = [
     `${jsdoc}  @property({ type: ${litType}${reflectField}, attribute: '${attrName}' }) _${prop.name}_attr${attrFieldSuffix};`,
     `  private _${prop.name}Controllable = createLitControllableProperty<${tsType}>({ host: this, eventName: '${eventName}', defaultValue: ${defaultStr}, initialControlledValue: undefined });`,

@@ -137,6 +137,7 @@ export function emitReactTypes(ir: IRComponent, opts: EmitReactTypesOptions = {}
       // rejected; omit the key instead).
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'ReactNode',
+      target: 'react',
     }),
   );
   lines.push('');

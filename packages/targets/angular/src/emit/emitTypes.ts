@@ -130,6 +130,7 @@ export function emitAngularTypes(ir: IRComponent, opts: EmitAngularTypesOptions 
     renderPropsInterface(ir, {
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'unknown',
+      target: 'angular',
     }),
   );
   lines.push('');

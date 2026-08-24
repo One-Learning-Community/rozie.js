@@ -74,7 +74,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
         sourceLoc: { start: 0, end: 0 },
       },
     ];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     expect(out).toContain('export interface CounterProps {');
     expect(out).toContain('  value?: number;');
     expect(out).toContain('  defaultValue?: number;');
@@ -85,7 +85,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
   it('Test 2: ir.emits → on<Event>?: (...args: unknown[]) => void', () => {
     const ir = emptyIR('Widget');
     ir.emits = ['save', 'value-change'];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     expect(out).toContain('  onSave?: (...args: unknown[]) => void;');
     expect(out).toContain('  onValueChange?: (...args: unknown[]) => void;');
   });
@@ -136,7 +136,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
         sourceLoc: { start: 0, end: 0 },
       },
     ];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     // a defaulted prop emits `?`; a non-defaulted prop emits NO `?`.
     expect(out).toContain('  must: string;');
     expect(out).toContain('  maybe?: number;');
@@ -155,8 +155,8 @@ describe('renderPropsInterface — Task 1 behavior', () => {
         sourceLoc: { start: 0, end: 0 },
       },
     ];
-    const react = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
-    const svelte = renderPropsInterface(ir, { slotChildrenType: 'Snippet' });
+    const react = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
+    const svelte = renderPropsInterface(ir, { slotChildrenType: 'Snippet', target: 'svelte' });
     expect(react).toContain('  children?: ReactNode;');
     expect(svelte).toContain('  children?: Snippet;');
   });
@@ -200,7 +200,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
       },
     ];
     ir.emits = ['value-change'];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     // The model triplet owns `onValueChange?`; the colliding emit must be skipped.
     const occurrences = out.split('\n').filter((l) => l.includes('onValueChange?'));
     expect(occurrences).toHaveLength(1);
@@ -223,7 +223,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
       },
     ];
     ir.emits = ['select'];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     const occurrences = out.split('\n').filter((l) => l.includes('onSelect'));
     expect(occurrences).toHaveLength(1);
     // The surviving member is the literal prop, not the emit-derived handler.
@@ -243,7 +243,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
         sourceLoc: { start: 0, end: 0 },
       },
     ];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     // The bug this test guards against: `render${capitalize('cell-status')}`
     // produces the syntactically-INVALID field name `renderCell-status`.
     expect(out).not.toMatch(/renderCell-status/);
@@ -273,7 +273,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
         sourceLoc: { start: 0, end: 0 },
       },
     ];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     expect(out).toContain('  renderHeader?: () => ReactNode;');
   });
 
@@ -290,7 +290,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
         sourceLoc: { start: 0, end: 0 },
       },
     ];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     expect(out).toContain('  children?: ReactNode;');
   });
 
@@ -320,7 +320,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
         ],
       }),
     ];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     const childrenLines = out.split('\n').filter((l) => l.includes('children?:'));
     expect(childrenLines).toHaveLength(0);
   });
@@ -348,7 +348,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
         sourceLoc: { start: 0, end: 0 },
       },
     ];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     const childrenLines = out.split('\n').filter((l) => l.includes('children?:'));
     expect(childrenLines).toHaveLength(1);
   });
@@ -371,7 +371,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
         namePrefix: 'cell-',
       },
     ];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     expect(out).toContain('[key: `cell-${string}`]:');
     expect(out).toContain('row: any');
     expect(out).toContain('value: any');
@@ -406,7 +406,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
         namePrefix: 'cell-',
       },
     ];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     expect(out).toMatch(/'cell-total'\?: \(\(params: \{ value: any \}\) => ReactNode\) \| undefined;/);
   });
 
@@ -423,7 +423,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
         sourceLoc: { start: 0, end: 0 },
       },
     ];
-    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
     expect(out).toContain('  slots?: Record<string, () => ReactNode>;');
   });
 });

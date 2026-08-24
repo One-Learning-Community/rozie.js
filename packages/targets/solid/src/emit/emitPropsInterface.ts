@@ -210,7 +210,7 @@ export function emitPropsInterface(
     const opt = p.required ? '' : '?';
     // Phase 58 (SC-2/SC-3) — leading per-prop JSDoc from the shared builder,
     // gated on `p.docs` (returns '' for a docless prop → byte-identical, SC-5).
-    const jsdoc = buildPropJsdoc(p, '  ');
+    const jsdoc = buildPropJsdoc(p, 'solid', '  ');
     if (p.isModel) {
       // 3-field synthesis per D-135 Solid analog.
       if (jsdoc) fields.push(jsdoc.replace(/\n$/, ''));

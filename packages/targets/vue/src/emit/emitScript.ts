@@ -604,7 +604,7 @@ function renderPropsTypeBody(
   // indented one level (2 spaces) past the literal's closing brace.
   const innerIndent = `${closeIndent}  `;
   const memberLines = nonModel.map((p, i) => {
-    const jsdoc = buildPropJsdoc(p, innerIndent);
+    const jsdoc = buildPropJsdoc(p, 'vue', innerIndent);
     return `${jsdoc}${innerIndent}${fields[i]};`;
   });
   return `{\n${memberLines.join('\n')}\n${closeIndent}}`;
@@ -701,7 +701,7 @@ function emitDefineModels(ir: IRComponent): string[] {
     // trailing newline, so splicing it directly onto the front of the line puts
     // the JSDoc immediately above the `const X = defineModel…` statement. A
     // docless model prop gets `''` → byte-identical to today (SC-5).
-    const jsdoc = buildPropJsdoc(p, '');
+    const jsdoc = buildPropJsdoc(p, 'vue', '');
     if (p.defaultValue !== null) {
       // A defaulted model prop is optional regardless of `required`
       // (260521-oao — `required: true` + `default:` is dropped upstream in

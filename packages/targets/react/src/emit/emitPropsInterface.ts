@@ -136,7 +136,7 @@ export function emitPropsInterface(ir: IRComponent, slotPropFields?: string[]): 
     // gated on `p.docs` (returns '' for a docless prop → byte-identical, SC-5).
     // Strip the trailing newline because each member is a separate `fields`
     // entry joined by '\n'.
-    const jsdoc = buildPropJsdoc(p, '  ');
+    const jsdoc = buildPropJsdoc(p, 'react', '  ');
     if (p.isModel) {
       // 3-field synthesis per D-31/D-56 React analog. All three are keyed to
       // the model name — `default${Pascal}` matches emitTypes.ts's `.d.ts`

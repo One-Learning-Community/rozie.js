@@ -109,6 +109,7 @@ export function emitLitTypes(ir: IRComponent, opts: EmitLitTypesOptions = {}): s
     renderPropsInterface(ir, {
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'unknown',
+      target: 'lit',
     }),
   );
   lines.push('');

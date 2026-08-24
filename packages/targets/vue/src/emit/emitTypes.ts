@@ -84,6 +84,7 @@ export function emitVueTypes(ir: IRComponent, opts: EmitVueTypesOptions = {}): s
     renderPropsInterface(ir, {
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'unknown',
+      target: 'vue',
     }),
   );
   lines.push('');

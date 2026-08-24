@@ -86,6 +86,7 @@ export function emitSvelteTypes(ir: IRComponent, opts: EmitSvelteTypesOptions = 
     renderPropsInterface(ir, {
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'Snippet',
+      target: 'svelte',
     }),
   );
   lines.push('');

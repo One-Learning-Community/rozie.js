@@ -1107,7 +1107,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
     // Built at zero indent (shell.ts prepends the 2-space class-body indent) and
     // pushed line-by-line so `fieldLines.length` (the source-map preamble line
     // count) stays accurate per emitted line.
-    const jsdoc = buildPropJsdoc(p, '');
+    const jsdoc = buildPropJsdoc(p, 'angular', '');
     if (jsdoc) {
       for (const jl of jsdoc.replace(/\n$/, '').split('\n')) fieldLines.push(jl);
     }
