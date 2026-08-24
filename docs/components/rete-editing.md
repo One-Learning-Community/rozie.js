@@ -105,7 +105,9 @@ $data.graph = {
 
 ## Auto-layout
 
-The **`autoArrange(opts?)`** handle verb relayouts the whole graph into a non-overlapping layered arrangement (elkjs-backed) and writes the arranged positions back through the two-way `graph` model as one undoable gesture. It is **verb-only and never auto-triggered** — nothing reflows unless you call it (e.g. from a "Tidy up" button). It is `await`-able, and `opts.options` forwards elk layout options (direction, spacing). The three layout packages (`rete-auto-arrange-plugin`, `elkjs`, `web-worker`) are **optional peers** — only consumers who call `autoArrange()` need them installed.
+The **`autoArrange(opts?)`** handle verb relayouts the whole graph into a non-overlapping layered arrangement (elkjs-backed) and writes the arranged positions back through the two-way `graph` model as one undoable gesture. It is **verb-only and never auto-triggered** — nothing reflows unless you call it (e.g. from a "Tidy up" button). It is `await`-able, and `opts.options` forwards elk layout options (direction, spacing).
+
+The three layout packages (`rete-auto-arrange-plugin`, `elkjs`, `web-worker`) are **optional peers**, and they are optional in the way that actually matters: `<FlowCanvas>` reaches them through a **dynamic import on the first `autoArrange()` call**, so if you never arrange, elkjs — 1.5 MB in one non-tree-shakeable blob — never enters your bundle. The first call pays a chunk fetch; later calls reuse the loaded engine. If the peers are not installed, the returned promise rejects rather than silently doing nothing.
 
 ```js
 await $refs.flow.autoArrange()
