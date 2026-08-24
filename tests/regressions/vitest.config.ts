@@ -55,6 +55,7 @@ export default defineConfig({
       'runtime-side-effects.test.ts',
       'collision/**/*.test.ts',
       'dynamic-slot-name-rfor.test.ts',
+      'example-jsdoc-authoring-notation-guard.test.ts',
       '**/*.test.tsx',
     ],
     testTimeout: 30000,
