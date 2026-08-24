@@ -24,7 +24,7 @@ export class PropDocs {
    * The visible text label for the control.
    * @deprecated Use `text` instead — `label` is retained only for back-compat.
    * @example
-   * <PropDocs label="Save" />
+   * <rozie-prop-docs label="Save" />
    */
   label = input<string>('');
   count = input<number>(0);

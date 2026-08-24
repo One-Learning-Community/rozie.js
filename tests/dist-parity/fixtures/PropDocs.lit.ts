@@ -16,7 +16,7 @@ export default class PropDocs extends SignalWatcher(LitElement) {
    * The visible text label for the control.
    * @deprecated Use `text` instead — `label` is retained only for back-compat.
    * @example
-   * <PropDocs label="Save" />
+   * <rozie-prop-docs label="Save"></rozie-prop-docs>
    */
   @property({ type: String, reflect: true }) label: string = '';
   @property({ type: Number, reflect: true }) count: number = 0;
