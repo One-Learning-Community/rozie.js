@@ -62,6 +62,14 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative as pathRelative } from 'node:path';
 import { lowerToIR, ModifierRegistry, parse, registerBuiltins } from '@rozie/core';
+import type { Diagnostic } from '@rozie/core';
+// Phase 81 Plan 03 (R3 / SPEC D-04, T-81-07) — the same pre-emit
+// `docs.example` validator `compile()` runs, imported via the relative
+// core/src path (mirrors `validatePortalScopedStyle`'s import in
+// transform.ts): both parameters (`IRComponent`, `Diagnostic[]`) are plain
+// interfaces, so there is no class-identity hazard in taking the relative
+// path here.
+import { validatePropExampleMarkup } from '../../core/src/ir/validatePropExampleMarkup.js';
 import { emitAngularTypes } from '../../targets/angular/src/emit/emitTypes.js';
 import { emitLitTypes } from '../../targets/lit/src/emit/emitTypes.js';
 import { emitReactTypes } from '../../targets/react/src/emit/emitTypes.js';
@@ -158,6 +166,19 @@ export function renderSidecar(
   // pass would warn on nothing. The diagnostic fires on the emit pipelines
   // (transform.ts, which threads first) and in `compile()` — this `.d.rozie.ts`
   // generation path neither emits CSS nor surfaces warnings to the build.
+  //
+  // Phase 81 Plan 03 (T-81-07) — ROZ097's `docs.example` validator is NOT
+  // skipped here, unlike ROZ088 above: this path DOES render examples,
+  // through `renderTypesFor` → the shared `renderPropsInterface` →
+  // `buildPropJsdoc`, so an unrenderable example would otherwise ship a
+  // type-lying sidecar with no signal. Bailing to null on an error-severity
+  // finding here is the same posture this function already takes for parse
+  // and lowering errors above; the build still surfaces the real diagnostic
+  // through the transform path, which does call `compile()`.
+  const exampleDiags: Diagnostic[] = [];
+  validatePropExampleMarkup(ir, filename, exampleDiags);
+  if (exampleDiags.some((d) => d.severity === 'error')) return null;
+
   const body = renderTypesFor(target, ir);
   const header = `${SIDECAR_HEADER_PREFIX}${sidecarSourceHash(source)}\n`;
   return header + body + (body.endsWith('\n') ? '' : '\n');

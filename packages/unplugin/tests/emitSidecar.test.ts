@@ -28,6 +28,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { emitSidecar, renderSidecar, SIDECAR_HEADER_PREFIX } from '../src/emitSidecar.js';
 import { unplugin } from '../src/index.js';
+import { ALL_TARGETS } from '../src/options.js';
 
 const COUNTER_ROZIE = `<rozie name="Counter">
 <props>
@@ -230,5 +231,51 @@ describe('emitSidecarsForRoot (buildStart) — WR-04 failure aggregation + WR-05
     writeFileSync(join(tmpDir, 'Counter.rozie'), COUNTER_ROZIE);
     expect(() => runBuildStart()).not.toThrow();
     expect(existsSync(join(tmpDir, 'Counter.d.rozie.ts'))).toBe(true);
+  });
+});
+
+/**
+ * Phase 81 Plan 03 (T-81-07) — the second, independent ROZ097 wiring point.
+ * `renderSidecar` builds its own IR from `parse` + `lowerToIR` and never
+ * calls `compile()`, so it needs its own explicit call to
+ * `validatePropExampleMarkup`. Fixtures reuse constructs from
+ * 81-03-PLAN.md Task 1 Block A (rejected) and Block C (passthrough).
+ */
+function widgetSource(example: string): string {
+  return `<rozie name="Widget">
+<props>
+{ label: { type: String, default: '', docs: { example: ${JSON.stringify(example)} } } }
+</props>
+<template>
+<div class="widget">{{ $props.label }}</div>
+</template>
+</rozie>
+`;
+}
+
+describe('renderSidecar — Phase 81 Plan 03 (T-81-07): the docs.example validator', () => {
+  it('returns null on all six targets for a source whose prop example carries a rejected construct', () => {
+    const source = widgetSource('<Foo r-if="x" />');
+    for (const target of ALL_TARGETS) {
+      expect(renderSidecar(source, target, 'Widget.rozie')).toBeNull();
+    }
+  });
+
+  it('still returns a non-null sidecar containing the rendered example line for supported markup', () => {
+    const source = widgetSource('<div bar="baz" />');
+    for (const target of ALL_TARGETS) {
+      const out = renderSidecar(source, target, 'Widget.rozie');
+      expect(out).not.toBeNull();
+      expect(out).toContain('<div bar="baz" />');
+    }
+  });
+
+  it('still returns a non-null sidecar containing the passthrough example line for an arrow-function snippet', () => {
+    const source = widgetSource('validate: (v) => v.length > 0');
+    for (const target of ALL_TARGETS) {
+      const out = renderSidecar(source, target, 'Widget.rozie');
+      expect(out).not.toBeNull();
+      expect(out).toContain('validate: (v) => v.length > 0');
+    }
   });
 });
