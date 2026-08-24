@@ -204,7 +204,11 @@ describe('renderExampleMarkup — targeted construct behaviours (Block D)', () =
 
   it('kebabs an adjacent-uppercase component name correctly (does NOT copy Angular\'s weaker regex)', () => {
     expect(renderExampleMarkup('<ROnProbe />', 'angular')).toBe('<rozie-r-on-probe />');
-    expect(renderExampleMarkup('<ROnProbe />', 'lit')).toBe('<rozie-r-on-probe />');
+    // Lit forces an explicit open/close pair on a rewritten tag (planner
+    // ruling 2) — the tag-name assertion is the same kebab form either way.
+    expect(renderExampleMarkup('<ROnProbe />', 'lit')).toBe(
+      '<rozie-r-on-probe></rozie-r-on-probe>',
+    );
   });
 
   it('never rewrites a lowercase HTML tag while still rewriting a nested component tag', () => {
@@ -246,18 +250,20 @@ describe('renderExampleMarkup — targeted construct behaviours (Block D)', () =
   });
 
   it('camelCases a hyphenated static attribute name on the five non-Vue targets, keeps it verbatim on Vue', () => {
-    const input = '<Foo custom-attr="x" />';
-    expect(renderExampleMarkup(input, 'vue')).toBe('<Foo custom-attr="x" />');
+    // Lowercase `div` tag — never rewritten on any target — isolates the
+    // static-attribute-name behaviour from tag rewriting.
+    const input = '<div custom-attr="x" />';
+    expect(renderExampleMarkup(input, 'vue')).toBe('<div custom-attr="x" />');
     for (const target of ALL_TARGETS.filter((t) => t !== 'vue')) {
-      expect(renderExampleMarkup(input, target)).toBe('<Foo customAttr="x" />');
+      expect(renderExampleMarkup(input, target)).toBe('<div customAttr="x" />');
     }
   });
 
   it('leaves data-* and aria-* static attribute names verbatim on all six targets', () => {
-    const input = '<Foo data-test-id="x" aria-label="y" />';
+    const input = '<div data-test-id="x" aria-label="y" />';
     for (const target of ALL_TARGETS) {
       expect(renderExampleMarkup(input, target)).toBe(
-        '<Foo data-test-id="x" aria-label="y" />',
+        '<div data-test-id="x" aria-label="y" />',
       );
     }
   });
@@ -279,7 +285,7 @@ describe('renderExampleMarkup — targeted construct behaviours (Block D)', () =
   });
 
   it('round-trips a non-ASCII static attribute value unchanged on all six targets', () => {
-    const input = '<Foo label="héllo wörld 日本語" />';
+    const input = '<div label="héllo wörld 日本語" />';
     for (const target of ALL_TARGETS) {
       expect(renderExampleMarkup(input, target)).toBe(input);
     }
