@@ -30,6 +30,16 @@ function compileDiagnostics(source: string): Diagnostic[] {
   }).diagnostics;
 }
 
+/** Compile an inline `.rozie` source (Vue target) and return the emitted code. */
+function compileCode(source: string): string {
+  return compile(source, {
+    target: 'vue',
+    filename: 'AttrFallthrough.rozie',
+    types: false,
+    sourceMap: false,
+  }).code;
+}
+
 // A two-root template — two sibling elements at the template top level, no
 // single wrapping root to absorb inherited attributes.
 const MULTI_ROOT_BODY = `<header></header>
@@ -39,8 +49,55 @@ const MULTI_ROOT_BODY = `<header></header>
 // bare-spread r-bind — the double-apply shape.
 const SINGLE_ROOT_DOUBLE_APPLY = `<div r-bind="$attrs"></div>`;
 
+// Phase 82: one real element + a bare <slot> sibling — the shape Plan 82-02
+// must stop classifying as multi-root (Strategy B, D-01).
+const ELEMENT_PLUS_SLOT_BODY = `<div class="wrap"></div>
+<slot />`;
+
+// Phase 82: the same two nodes in the opposite order — `packages/ui/rete/src/
+// NodeType.rozie` is authored slot-first, so order-independence is a real
+// requirement, not a hypothetical (82-PLAN.md Task 2).
+const ELEMENT_AFTER_SLOT_BODY = `<slot />
+<div class="wrap"></div>`;
+
+// Phase 82 regression guard: two slot invocations and NO element. There is no
+// element anywhere in this body to receive the spread, so ROZ970 must survive
+// Plan 82-02's slot-tolerant generalization untouched.
+const TWO_SLOTS_NO_ELEMENT_BODY = `<slot />
+<slot name="footer" />`;
+
+// Phase 82 regression guard: a real element PLUS a conditional sibling (not a
+// slot). Only slot invocations are non-disqualifying per D-01/D-06 — a second
+// candidate root that is a conditional must keep erroring.
+const ELEMENT_PLUS_CONDITIONAL_BODY = `<div class="wrap"></div>
+<span r-if="$props.show"></span>`;
+
+// Phase 82: a lone r-if-gated root — Correction 3 / D-02's silent-drop repro
+// (`examples/Modal.rozie` / `examples/PortalOverlay.rozie` are authored this
+// way). `countRootElements` reports exactly 1 (a TemplateConditional root is
+// one structural root), so ROZ970 never fires; `synthesizeAttrsFallthrough`
+// also cannot resolve an element to receive the spread. Before ROZ098
+// existed this combination silently dropped the consumer's attributes with
+// no compile-time signal at all.
+const CONDITIONAL_ROOT_BODY = `<div class="wrap" r-if="$props.show"></div>`;
+
 function rozie(openTag: string, templateBody: string): string {
   return `${openTag}
+<template>
+${templateBody}
+</template>
+</rozie>
+`;
+}
+
+// Phase 82: `CONDITIONAL_ROOT_BODY` and `ELEMENT_PLUS_CONDITIONAL_BODY` both
+// read `$props.show` — declare it so $props.show resolves and no unrelated
+// ROZ100 (UNKNOWN_PROPS_REF) fires alongside the fallthrough assertions.
+function rozieWithShowProp(openTag: string, templateBody: string): string {
+  return `${openTag}
+<props>
+{ show: { type: Boolean, default: true } }
+</props>
 <template>
 ${templateBody}
 </template>
@@ -125,5 +182,190 @@ describe('attribute-fallthrough diagnostics (Phase 14 R8/R9)', () => {
       `expected ROZ971 for r-bind="$attrs" on r-match host; got ${JSON.stringify(diags)}`,
     ).toBe(1);
     expect(doubleApply[0]!.severity).toBe('warning');
+  });
+});
+
+// Phase 82 (multi-root consumer attribute fallthrough) — Plan 82-01 (Wave 0
+// RED fixtures). Strategy B (D-01) teaches `countRootElements` and
+// `synthesizeAttrsFallthrough` to ignore `<slot>` invocations when exactly
+// one real (`tagKind: 'html'`) element root exists, and adds ROZ098
+// ATTR_FALLTHROUGH_GATED_ROOT (D-04/D-05) for the r-if/r-match-single-root
+// silent-drop case (D-02, diagnose now — branch-descent synthesis DEFERRED).
+//
+// The five assertions below marked RED are INTENTIONALLY failing against the
+// current compiler: `countRootElements` and `synthesizeAttrsFallthrough`
+// still treat a slot sibling as a disqualifying second root, and
+// `validateAttrFallthrough` does not yet emit ROZ098 at all. Plan 82-02 turns
+// them green. The `RozieErrorCode` members already exist (Plan 82-01 Task 1
+// registered them) — the same Phase-14-Wave-0/Wave-1 sequencing this file's
+// own header documents.
+describe('attribute-fallthrough diagnostics (Phase 82 multi-root + gated-root)', () => {
+  it('Phase 82 RED: an element + slot template with default inherit-attrs produces no ROZ970', () => {
+    // Plan 82-02 implements the slot-tolerant root resolution — currently RED.
+    const diags = compileDiagnostics(
+      rozie('<rozie name="ElementPlusSlot">', ELEMENT_PLUS_SLOT_BODY),
+    );
+    const multiRoot = diags.filter(
+      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT,
+    );
+    expect(
+      multiRoot,
+      `expected no ROZ970 for an element + <slot> sibling (Plan 82-02 slot-tolerant root resolution); got ${JSON.stringify(diags)}`,
+    ).toEqual([]);
+  });
+
+  it('Phase 82 RED: an element + slot template emits the synthesized $attrs spread onto the element root', () => {
+    // Asserts on the EMITTED Vue output, not IR — proving the spread reaches
+    // codegen, not just that the diagnostic is silenced. Currently RED: the
+    // multi-root disqualification aborts compilation before codegen runs.
+    const code = compileCode(
+      rozie('<rozie name="ElementPlusSlotSpread">', ELEMENT_PLUS_SLOT_BODY),
+    );
+    expect(
+      code,
+      `expected the emitted Vue output to contain v-bind="$attrs"; got:\n${code}`,
+    ).toContain('v-bind="$attrs"');
+  });
+
+  it('Phase 82 RED: a slot + element template (opposite order) also produces no ROZ970', () => {
+    // Order-independence: packages/ui/rete/src/NodeType.rozie is authored
+    // slot-first, so root resolution must be set-based, not positional.
+    const diags = compileDiagnostics(
+      rozie('<rozie name="ElementAfterSlot">', ELEMENT_AFTER_SLOT_BODY),
+    );
+    const multiRoot = diags.filter(
+      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT,
+    );
+    expect(
+      multiRoot,
+      `expected no ROZ970 regardless of element/slot ordering; got ${JSON.stringify(diags)}`,
+    ).toEqual([]);
+  });
+
+  it('Phase 82 regression guard: two slots and no element still produce exactly one ROZ970', () => {
+    // GREEN today, must stay GREEN after Plan 82-02 — there is no element
+    // anywhere in this body to receive the attrs, so the hard error survives.
+    const diags = compileDiagnostics(
+      rozie('<rozie name="TwoSlotsNoElement">', TWO_SLOTS_NO_ELEMENT_BODY),
+    );
+    const multiRoot = diags.filter(
+      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT,
+    );
+    expect(
+      multiRoot.length,
+      `expected exactly one ROZ970 — no element exists to receive attrs; got ${JSON.stringify(diags)}`,
+    ).toBe(1);
+  });
+
+  it('Phase 82 regression guard: element plus conditional sibling still produces exactly one ROZ970', () => {
+    // GREEN today, must stay GREEN after Plan 82-02 — only <slot> invocations
+    // are non-disqualifying (D-01/D-06); a conditional sibling is still a
+    // second candidate root and must keep erroring.
+    const diags = compileDiagnostics(
+      rozieWithShowProp(
+        '<rozie name="ElementPlusConditional">',
+        ELEMENT_PLUS_CONDITIONAL_BODY,
+      ),
+    );
+    const multiRoot = diags.filter(
+      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT,
+    );
+    expect(
+      multiRoot.length,
+      `expected exactly one ROZ970 — a conditional sibling is a second candidate root, not exempted; got ${JSON.stringify(diags)}`,
+    ).toBe(1);
+  });
+
+  it('Phase 82 RED: a lone r-if-gated root produces exactly one ATTR_FALLTHROUGH_GATED_ROOT warning', () => {
+    // Plan 82-02 wires the ROZ098 emission call site — currently RED (zero
+    // diagnostics fire today; the drop is completely silent, D-02's premise).
+    const diags = compileDiagnostics(
+      rozieWithShowProp('<rozie name="ConditionalRoot">', CONDITIONAL_ROOT_BODY),
+    );
+    const gatedRoot = diags.filter(
+      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_GATED_ROOT,
+    );
+    expect(
+      gatedRoot.length,
+      `expected exactly one ATTR_FALLTHROUGH_GATED_ROOT for a gated single root; got ${JSON.stringify(diags)}`,
+    ).toBe(1);
+    expect(gatedRoot[0]!.severity).toBe('warning');
+  });
+
+  it('Phase 82: the same gated root with inherit-attrs="false" produces no ATTR_FALLTHROUGH_GATED_ROOT', () => {
+    // Vacuously true today (the diagnostic does not exist yet) and genuinely
+    // true after Plan 82-02 — the opt-out silences ROZ098 exactly as it
+    // silences ROZ970. Not a RED case; included as the opt-out half of the
+    // existing present/absent pair pattern (lines 67-75 above).
+    const diags = compileDiagnostics(
+      rozieWithShowProp(
+        '<rozie name="ConditionalRootOptOut" inherit-attrs="false">',
+        CONDITIONAL_ROOT_BODY,
+      ),
+    );
+    const gatedRoot = diags.filter(
+      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_GATED_ROOT,
+    );
+    expect(
+      gatedRoot,
+      `expected inherit-attrs="false" to silence ATTR_FALLTHROUGH_GATED_ROOT; got ${JSON.stringify(gatedRoot)}`,
+    ).toEqual([]);
+  });
+
+  it('Phase 82 RED: no new silent drops — every fixture body satisfies exactly one of {ROZ970, emitted $attrs bind, ATTR_FALLTHROUGH_GATED_ROOT}', () => {
+    // Structural guard: Plan 82-02's two independent predicates
+    // (`countRootElements` and the synthesizer's root-resolution loop) must
+    // never drift apart and open a NEW silent drop. Every body below must
+    // land in EXACTLY one of the three observable arms.
+    //
+    // TWO_SLOTS_NO_ELEMENT_BODY is deliberately exempt from this table: it is
+    // already covered by the regression-guard case above (the ROZ970 arm),
+    // and any body whose root is a lone slot invocation is a renderless
+    // pass-through excluded by D-06 — there is no element anywhere in that
+    // shape that could ever receive the spread.
+    const trichotomyCases: Array<{ name: string; source: string }> = [
+      { name: 'MULTI_ROOT_BODY', source: rozie('<rozie name="Trichotomy1">', MULTI_ROOT_BODY) },
+      {
+        name: 'SINGLE_ROOT_DOUBLE_APPLY',
+        source: rozie('<rozie name="Trichotomy2">', SINGLE_ROOT_DOUBLE_APPLY),
+      },
+      {
+        name: 'ELEMENT_PLUS_SLOT_BODY',
+        source: rozie('<rozie name="Trichotomy3">', ELEMENT_PLUS_SLOT_BODY),
+      },
+      {
+        name: 'ELEMENT_AFTER_SLOT_BODY',
+        source: rozie('<rozie name="Trichotomy4">', ELEMENT_AFTER_SLOT_BODY),
+      },
+      {
+        name: 'ELEMENT_PLUS_CONDITIONAL_BODY',
+        source: rozieWithShowProp('<rozie name="Trichotomy5">', ELEMENT_PLUS_CONDITIONAL_BODY),
+      },
+      {
+        name: 'CONDITIONAL_ROOT_BODY',
+        source: rozieWithShowProp('<rozie name="Trichotomy6">', CONDITIONAL_ROOT_BODY),
+      },
+    ];
+
+    for (const { name, source } of trichotomyCases) {
+      const result = compile(source, {
+        target: 'vue',
+        filename: 'AttrFallthrough.rozie',
+        types: false,
+        sourceMap: false,
+      });
+      const hasRoz970 = result.diagnostics.some(
+        (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT,
+      );
+      const hasSpread = result.code.includes('v-bind="$attrs"');
+      const hasGatedRoot = result.diagnostics.some(
+        (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_GATED_ROOT,
+      );
+      const satisfiedCount = [hasRoz970, hasSpread, hasGatedRoot].filter(Boolean).length;
+      expect(
+        satisfiedCount,
+        `${name}: expected exactly one of {ROZ970, emitted $attrs bind, ATTR_FALLTHROUGH_GATED_ROOT}; got hasRoz970=${hasRoz970} hasSpread=${hasSpread} hasGatedRoot=${hasGatedRoot}, diagnostics=${JSON.stringify(result.diagnostics)}`,
+      ).toBe(1);
+    }
   });
 });
