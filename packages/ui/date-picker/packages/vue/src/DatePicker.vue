@@ -126,7 +126,7 @@ const props = withDefaults(
 /**
  * The selected value (two-way `r-model`). **Polymorphic** on `selectionMode`: in `single` mode an ISO `YYYY-MM-DD` string (`""` = nothing selected); in `range` mode a `{ start, end }` object of ISO endpoints (`""` = an unset endpoint). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a DatePicker **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Selecting a day writes the new value back and emits `change`. **Lit caveat (range mode):** the object form must be delivered via a *property* binding (`.value=${obj}` / `r-model`), never a string `value="..."` attribute — the same rule already in force for `disabledDates`.
  * @example
- * <DatePicker r-model:value="date" :min="'2026-01-01'" @change="onPick" />
+ * <DatePicker v-model:value="date" :min="'2026-01-01'" @change="onPick" />
  */
 const value = defineModel<string | Record<string, any>>('value', { default: '' });
 

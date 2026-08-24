@@ -28,7 +28,7 @@ export default class Waveform extends SignalWatcher(LitElement) {
   /**
    * The audio URL the waveform loads. Bound at construction and reconciled at runtime — changing it calls the engine `load(url)`.
    * @example
-   * <Waveform :src="audioUrl" r-model:currentTime="time" />
+   * <rozie-waveform .src=${audioUrl} .currentTime=${time} @current-time-change=${…}></rozie-waveform>
    */
   @property({ type: String, reflect: true }) src: string | null = null;
   /**

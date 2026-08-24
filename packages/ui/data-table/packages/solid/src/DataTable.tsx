@@ -358,7 +358,7 @@ interface DataTableProps {
   /**
    * The row data — `model: true`, so a committed cell/row edit writes a **fresh** array back through `r-model:data` (uncontrolled fallback `dataDefault`). A stable reference per Rozie's setup-once model — fed directly into table-core (never map/cloned in the watcher).
    * @example
-   * <DataTable r-model:data="rows" :columns="cols" />
+   * <DataTable data={rows()} onDataChange={setRows} columns={cols} />
    */
   data: any[];
   defaultData?: any[];

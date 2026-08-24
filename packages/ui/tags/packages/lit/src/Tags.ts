@@ -111,7 +111,7 @@ export default class Tags extends SignalWatcher(LitElement) {
   /**
    * The committed tokens — `model: true`, so a commit/remove/paste writes a **fresh** array back through `r-model:modelValue` (uncontrolled fallback `[]`). Because it is the sole model prop, the Angular output is a `ControlValueAccessor` (`[formControl]` / `[(ngModel)]` bind directly).
    * @example
-   * <Tags r-model:modelValue="skills" placeholder="Add a skill…" />
+   * <rozie-tags .modelValue=${skills} @model-value-change=${…} placeholder="Add a skill…"></rozie-tags>
    */
   @property({ type: Array, attribute: 'model-value' }) _modelValue_attr: any[] = [];
   private _modelValueControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'model-value-change', defaultValue: [], initialControlledValue: undefined });

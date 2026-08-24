@@ -93,7 +93,7 @@ interface ResizableProps {
   /**
    * The first (`start`) panel's size as a percent of the container along the split axis (its width when `direction="horizontal"`, its height when `"vertical"`). Two-way via `r-model:size`. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so the splitter position **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Every commit (drag, keyboard, or a programmatic `applySize`) is clamped to `[min, max]` and written back.
    * @example
-   * <Resizable r-model:size="split" :min="20" :max="80" direction="horizontal" />
+   * <Resizable size={split()} onSizeChange={setSplit} min={20} max={80} direction="horizontal" />
    */
   size?: number;
   defaultSize?: number;

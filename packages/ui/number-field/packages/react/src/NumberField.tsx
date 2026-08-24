@@ -6,7 +6,7 @@ interface NumberFieldProps {
   /**
    * The numeric value of the field (two-way `r-model`). `null` means the field is empty. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a number field **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). The value is clamped to `[min, max]` and snapped to `step` on every commit.
    * @example
-   * <NumberField r-model:modelValue="qty" :min="0" :max="10" />
+   * <NumberField modelValue={qty} onModelValueChange={setQty} min={0} max={10} />
    */
   modelValue?: (number) | null;
   defaultModelValue?: (number) | null;

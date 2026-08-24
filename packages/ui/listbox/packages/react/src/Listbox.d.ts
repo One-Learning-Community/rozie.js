@@ -10,7 +10,7 @@ export interface ListboxProps {
   /**
    * The selected value (two-way `r-model`) — a scalar in single-select, an array of values in multi-select. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Listbox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).
    * @example
-   * <Listbox r-model:value="fruit" :options="fruits" />
+   * <Listbox value={fruit} onValueChange={setFruit} options={fruits} />
    */
   value?: (unknown) | null;
   defaultValue?: (unknown) | null;

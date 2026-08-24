@@ -41,7 +41,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
   /**
    * The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.
    * @example
-   * <SortableList r-model:items="$data.todos" itemKey="id" />
+   * <rozie-sortable-list .items=${todos} @items-change=${…} itemKey="id"></rozie-sortable-list>
    */
   @property({ type: Array, attribute: 'items' }) _items_attr: any[] = [];
   private _itemsControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'items-change', defaultValue: [], initialControlledValue: undefined });

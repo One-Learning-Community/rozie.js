@@ -427,7 +427,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
   /**
    * The row data — `model: true`, so a committed cell/row edit writes a **fresh** array back through `r-model:data` (uncontrolled fallback `dataDefault`). A stable reference per Rozie's setup-once model — fed directly into table-core (never map/cloned in the watcher).
    * @example
-   * <DataTable r-model:data="rows" :columns="cols" />
+   * <rozie-data-table .data=${rows} @data-change=${…} .columns=${cols}></rozie-data-table>
    */
   @property({ type: Array, attribute: 'data' }) _data_attr!: any[];
   private _dataControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'data-change', defaultValue: [], initialControlledValue: undefined });

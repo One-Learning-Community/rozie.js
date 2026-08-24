@@ -32,7 +32,7 @@ export default class Cropper extends SignalWatcher(LitElement) {
   /**
    * The image URL the cropper attaches to. Bound onto the `<img>` and reconciled at runtime — changing it calls the engine `replace(url)`.
    * @example
-   * <Cropper :src="imageUrl" r-model:data="crop" />
+   * <rozie-cropper .src=${imageUrl} .data=${crop} @data-change=${…}></rozie-cropper>
    */
   @property({ type: String, reflect: true }) src: string = '';
   /**

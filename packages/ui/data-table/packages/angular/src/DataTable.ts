@@ -836,7 +836,7 @@ export class DataTable {
   /**
    * The row data — `model: true`, so a committed cell/row edit writes a **fresh** array back through `r-model:data` (uncontrolled fallback `dataDefault`). A stable reference per Rozie's setup-once model — fed directly into table-core (never map/cloned in the watcher).
    * @example
-   * <DataTable r-model:data="rows" :columns="cols" />
+   * <rozie-data-table [(data)]="rows" [columns]="cols" />
    */
   data = model.required<any[]>();
   /**

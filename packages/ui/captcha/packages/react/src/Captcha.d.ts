@@ -14,7 +14,7 @@ export interface CaptchaProps {
   /**
    * The verified response token (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Written by the widget on success and cleared on expire/reset, so reading it gives you the live response to send to your server for form submission.
    * @example
-   * <Captcha r-model:token="token" provider="recaptcha" sitekey="…" />
+   * <Captcha token={token} onTokenChange={setToken} provider="recaptcha" sitekey="…" />
    */
   token?: string;
   defaultToken?: string;

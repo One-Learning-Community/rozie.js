@@ -18,7 +18,7 @@ export default class Column extends SignalWatcher(LitElement) {
   /**
    * The row field this column reads (table-core `accessorKey`). The plain accessor value renders when the `#cell` slot falls through.
    * @example
-   * <Column field="email" header="Email" />
+   * <rozie-column field="email" header="Email"></rozie-column>
    */
   @property({ type: String, reflect: true }) field: string = '';
   /**

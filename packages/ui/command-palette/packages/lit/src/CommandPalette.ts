@@ -397,7 +397,7 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   /**
    * Whether the palette overlay is shown (two-way `r-model`). Two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`); every close path (backdrop click, Escape, selecting an item when `closeOnSelect`, the imperative `close()`) writes `open = false`. As one of two `model: true` props the component does not generate an Angular `ControlValueAccessor`.
    * @example
-   * <CommandPalette r-model:open="paletteOpen" :items="commands" />
+   * <rozie-command-palette .open=${paletteOpen} @open-change=${…} .items=${commands}></rozie-command-palette>
    */
   @property({ type: Boolean, attribute: 'open' }) _open_attr: boolean = false;
   private _openControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'open-change', defaultValue: false, initialControlledValue: undefined });
@@ -409,7 +409,7 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   /**
    * Custom ranking/exclusion hook: `(item, query) => number | null`. Return `null` to exclude an item from the results; otherwise higher numbers rank first. Leave unset (`default: null`) to use the built-in fuzzy-subsequence scorer (label weighted above keywords). A recency/frecency boost is added INSIDE `score` (e.g. `return baseScore + recencyBonus(item.id)`), not as a separate prop.
    * @example
-   * <CommandPalette :score="(item, q) => item.label.includes(q) ? 1 : null" :items="commands" />
+   * <rozie-command-palette .score=${(item, q) => item.label.includes(q) ? 1 : null} .items=${commands}></rozie-command-palette>
    */
   @property({ type: Function }) score: ((...args: any[]) => any) | null = null;
   /**
@@ -419,7 +419,7 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   /**
    * Items shown when the query is empty (the empty/home state), resolved PER LEVEL. This top-level prop is the ROOT level's home view; a navigating item's own `defaultItems` field (alongside its `children`/`source`) is that CHILD level's home view. They render grouped when they carry `group` fields (composes with native sections, same as `items`), and scoring never reorders them (the empty-query short-circuit preserves author order). Typing a query switches to scored `items`/`source` results; clearing the query returns to `defaultItems`. This is the first-class replacement for branching on `query === ''` inside a `source` function — and the natural home for a recents/frecency list (composes with the `score` prop's recency boost). Leave unset (`default: () => []`) for today's behavior — no defaultItems is byte-behavior-identical to the full source-order list.
    * @example
-   * <CommandPalette :default-items="recentCommands" :items="commands" />
+   * <rozie-command-palette .defaultItems=${recentCommands} .items=${commands}></rozie-command-palette>
    */
   @property({ type: Array }) defaultItems: any[] = [];
   /**
@@ -445,13 +445,13 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   /**
    * Debounce (ms) applied to a nested level's ASYNC `source(query)` keystroke refetch only — sync (`children`) levels re-rank locally on every keystroke with no debounce. Defaults to ~150ms (`internal/asyncSource.ts`'s `DEFAULT_SEARCH_DEBOUNCE`).
    * @example
-   * <CommandPalette :search-debounce="300" :items="commands" />
+   * <rozie-command-palette .searchDebounce=${300} .items=${commands}></rozie-command-palette>
    */
   @property({ type: Number, reflect: true }) searchDebounce: number = 150;
   /**
    * The keyboard shortcut that opens the highlighted row's action menu — a portable `$mod+<letter>` token (default `"$mod+k"`, i.e. ⌘K/Ctrl+K) matched via `(event.metaKey || event.ctrlKey) && event.key === <letter>`. A bare single-letter token (e.g. `"k"`) matches with no modifier required. Pressing it (or caret-at-end Right-arrow, or clicking the row's actions affordance) on a row with no `actions` is a no-op — the menu only opens for a row that has them.
    * @example
-   * <CommandPalette action-key="$mod+j" :items="commands" />
+   * <rozie-command-palette actionKey="$mod+j" .items=${commands}></rozie-command-palette>
    */
   @property({ type: String, reflect: true }) actionKey: string = '$mod+k';
   /**
@@ -465,25 +465,25 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   /**
    * Where the overlay portals to, escaping an ancestor `overflow:hidden`/`transform`/`filter`/`contain` that would otherwise clip a `position:fixed` overlay (e.g. an embedding iframe/app-shell with its own layout chrome). `false`/absent (default) renders in place — byte-behavior-identical to every existing consumer, zero churn. `true` or `'body'` portals to `document.body`. A CSS selector string portals to the first element that selector matches. An `Element` reference portals to that element directly. SSR-safe: falls back to in-place when `document` is unavailable. Token-placement note: theming custom properties (`--rozie-command-palette-*`) must be set on `:root` (or the `appendTo` container itself) to reach a portalled overlay — a host-scoped token does not cross the portal on any target.
    * @example
-   * <CommandPalette append-to="body" :items="commands" />
+   * <rozie-command-palette appendTo="body" .items=${commands}></rozie-command-palette>
    */
   @property({ type: Boolean }) appendTo: boolean | string = false;
   /**
    * Opt-in vertical windowing for a long list, resolved PER LEVEL — this prop is the ROOT level; a navigating item's own `virtual` field windows THAT child level instead. A virtual level renders FLAT: the auto-derived groups + `groupCap` + `#groupHeading` are inactive for that level (the vendored combobox's `isGrouped` requires `!virtual`) — popping back to a grouped non-virtual level restores its groups. Windowing needs a bounded scroll height — pair with `virtualMaxHeight`. Default `false` is byte-behavior-identical to today (non-windowed).
    * @example
-   * <CommandPalette virtual virtual-max-height="320px" :items="longCommandList" />
+   * <rozie-command-palette virtual virtualMaxHeight="320px" .items=${longCommandList}></rozie-command-palette>
    */
   @property({ type: Boolean, reflect: true }) virtual: boolean = false;
   /**
    * A CSS length string (e.g. `"320px"`) bounding the windowed scroll container while the active level is virtual, resolved PER LEVEL like `virtual` above — passed straight through to the vendored combobox's `maxHeight`. Distinct from and non-conflicting with the panel's own `--rozie-command-palette-max-height` token (that clips the WHOLE panel; this bounds the INNER windowed list). Ignored while the active level is not virtual.
    * @example
-   * <CommandPalette virtual virtual-max-height="320px" :items="longCommandList" />
+   * <rozie-command-palette virtual virtualMaxHeight="320px" .items=${longCommandList}></rozie-command-palette>
    */
   @property({ type: String, reflect: true }) virtualMaxHeight: string | null = null;
   /**
    * Estimated option row height (px) seeding the windowing engine, resolved PER LEVEL like `virtual` above. Unset falls back to the vendored combobox's own default (36px) — but command-palette rows are typically taller (an icon + a right-aligned hotkey badge), so a consumer windowing a real palette level should usually raise this.
    * @example
-   * <CommandPalette virtual :virtual-estimate-row-height="44" :items="longCommandList" />
+   * <rozie-command-palette virtual .virtualEstimateRowHeight=${44} .items=${longCommandList}></rozie-command-palette>
    */
   @property({ type: Number, reflect: true }) virtualEstimateRowHeight: number | null = null;
   private _activeValue = signal<any>(null);

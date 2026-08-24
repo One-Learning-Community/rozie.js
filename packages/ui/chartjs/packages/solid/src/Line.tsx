@@ -31,7 +31,7 @@ interface LineProps {
   /**
    * Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.
    * @example
-   * <Chart :data="$data.chartData" type="bar" />
+   * <Chart data={chartData} type="bar" />
    */
   data?: Record<string, any>;
   /**

@@ -145,7 +145,7 @@ export class CodeMirror {
   /**
    * The two-way document text (`r-model:value`) — the editor's contents as a string. Typing in the editor writes the new text back through the model path (CodeMirror's `updateListener` extension); a consumer write reflects into the live document, echo-guarded so a programmatic set does not ping-pong. As the sole `model: true` prop this **is** the only change channel — there are no events.
    * @example
-   * <CodeMirror r-model:value="source" language="javascript" theme="dark" />
+   * <rozie-code-mirror [(value)]="source" language="javascript" theme="dark" />
    */
   value = model<string>('');
   /**

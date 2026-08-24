@@ -98,7 +98,7 @@ export default class Resizable extends SignalWatcher(LitElement) {
   /**
    * The first (`start`) panel's size as a percent of the container along the split axis (its width when `direction="horizontal"`, its height when `"vertical"`). Two-way via `r-model:size`. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so the splitter position **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Every commit (drag, keyboard, or a programmatic `applySize`) is clamped to `[min, max]` and written back.
    * @example
-   * <Resizable r-model:size="split" :min="20" :max="80" direction="horizontal" />
+   * <rozie-resizable .size=${split} @size-change=${…} .min=${20} .max=${80} direction="horizontal"></rozie-resizable>
    */
   @property({ type: Number, attribute: 'size' }) _size_attr: number = 50;
   private _sizeControllable = createLitControllableProperty<number>({ host: this, eventName: 'size-change', defaultValue: 50, initialControlledValue: undefined });

@@ -12,7 +12,7 @@ const props = withDefaults(
     /**
      * The PDF source — a URL string, a `data:` base64 URL, or binary data (`ArrayBuffer` / `Uint8Array`). Changing it tears down the previous document (via its loading task) and loads the new one; `undefined` renders an empty viewer.
      * @example
-     * <PdfViewer :src="pdfUrl" r-model:page="page" />
+     * <PdfViewer :src="pdfUrl" v-model:page="page" />
      */
     src?: unknown;
     /**

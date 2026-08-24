@@ -61,7 +61,7 @@ export default class PdfViewer extends SignalWatcher(LitElement) {
   /**
    * The PDF source — a URL string, a `data:` base64 URL, or binary data (`ArrayBuffer` / `Uint8Array`). Changing it tears down the previous document (via its loading task) and loads the new one; `undefined` renders an empty viewer.
    * @example
-   * <PdfViewer :src="pdfUrl" r-model:page="page" />
+   * <rozie-pdf-viewer .src=${pdfUrl} .page=${page} @page-change=${…}></rozie-pdf-viewer>
    */
   @property({ type: Object }) src?: unknown;
   /**

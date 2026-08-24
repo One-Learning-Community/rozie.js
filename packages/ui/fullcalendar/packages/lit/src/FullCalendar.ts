@@ -64,7 +64,7 @@ export default class FullCalendar extends SignalWatcher(LitElement) {
   /**
    * The two-way active view name (`'dayGridMonth'`, `'timeGridWeek'`, `'timeGridDay'`, …) — the sole `model: true` prop. The calendar's own toolbar writes the new view name back through the two-way path, and a consumer write switches the view via `changeView`.
    * @example
-   * <FullCalendar r-model:view="view" :events="events" />
+   * <rozie-full-calendar .view=${view} @view-change=${…} .events=${events}></rozie-full-calendar>
    */
   @property({ type: String, attribute: 'view' }) _view_attr: string = 'dayGridMonth';
   private _viewControllable = createLitControllableProperty<string>({ host: this, eventName: 'view-change', defaultValue: 'dayGridMonth', initialControlledValue: undefined });

@@ -6,7 +6,7 @@ export interface DialogProps {
   /**
    * Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.
    * @example
-   * <Dialog r-model:open="confirmOpen" ariaLabelledby="confirm-title" />
+   * <Dialog open={confirmOpen} onOpenChange={setConfirmOpen} ariaLabelledby="confirm-title" />
    */
   open?: boolean;
   defaultOpen?: boolean;

@@ -34,7 +34,7 @@ export class Waveform {
   /**
    * The audio URL the waveform loads. Bound at construction and reconciled at runtime — changing it calls the engine `load(url)`.
    * @example
-   * <Waveform :src="audioUrl" r-model:currentTime="time" />
+   * <rozie-waveform [src]="audioUrl" [(currentTime)]="time" />
    */
   src = input<(string) | null>(null);
   /**

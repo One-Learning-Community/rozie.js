@@ -15,7 +15,7 @@ export class Port {
   /**
    * Declares an OUTPUT port and names its key — set this (not `input`) so the port direction resolves to `output`. The attribute is `output`, not `out`: `out`/`in` are awkward bare identifiers, so `output`/`input` are used across all six targets.
    * @example
-   * <Port output="num" type="number" />
+   * <rozie-port output="num" type="number" />
    */
   output = input<string>(undefined);
   /**

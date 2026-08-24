@@ -6,7 +6,7 @@ export interface WaveformProps {
   /**
    * The audio URL the waveform loads. Bound at construction and reconciled at runtime — changing it calls the engine `load(url)`.
    * @example
-   * <Waveform :src="audioUrl" r-model:currentTime="time" />
+   * <Waveform src={audioUrl} currentTime={time} onCurrentTimeChange={setTime} />
    */
   src?: (string) | null;
   /**

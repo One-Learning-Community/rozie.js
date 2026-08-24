@@ -6,7 +6,7 @@ interface SourceProps {
   /**
    * The MapLibre source id (required). A `LayerSpecification.source` references this string, and nested `<Layer>` children auto-bind to it. Exposed to children as a live getter so it stays reactive.
    * @example
-   * <Source id="pts" :spec="geojson"><Layer id="circles" type="circle" /></Source>
+   * <Source id="pts" spec={geojson}><Layer id="circles" type="circle" /></Source>
    */
   id: string;
   /**

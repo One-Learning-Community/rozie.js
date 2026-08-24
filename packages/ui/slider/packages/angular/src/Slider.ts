@@ -252,7 +252,7 @@ export class Slider {
   /**
    * The current value (two-way `r-model`). A scalar number in single mode; a sorted `[lo, hi]` array in `range` mode, with each thumb neighbour-clamped so the pair stays sorted on every commit. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Slider **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).
    * @example
-   * <Slider r-model:value="volume" :min="0" :max="100" :step="1" ariaLabel="Volume" />
+   * <rozie-slider [(value)]="volume" [min]="0" [max]="100" [step]="1" ariaLabel="Volume" />
    */
   value = model<(unknown) | null>(null);
   /**

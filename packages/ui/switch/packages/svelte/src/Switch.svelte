@@ -7,7 +7,7 @@ interface Props {
   /**
    * The on/off state of the switch (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a switch **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `true` is the checked/on state; reflected as `aria-checked`.
    * @example
-   * <Switch r-model:modelValue="on" ariaLabel="Wi-Fi" />
+   * <Switch bind:modelValue={on} ariaLabel="Wi-Fi" />
    */
   modelValue?: boolean;
   /**

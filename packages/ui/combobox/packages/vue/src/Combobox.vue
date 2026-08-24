@@ -127,7 +127,7 @@ const props = withDefaults(
 /**
  * The selected option's value (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a combobox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `null` when nothing is selected.
  * @example
- * <Combobox r-model:value="country" :options="countries" />
+ * <Combobox v-model:value="country" :options="countries" />
  */
 const value = defineModel<unknown | null>('value', { default: null });
 

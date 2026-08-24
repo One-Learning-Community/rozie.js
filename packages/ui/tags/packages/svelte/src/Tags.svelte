@@ -7,7 +7,7 @@ interface Props {
   /**
    * The committed tokens — `model: true`, so a commit/remove/paste writes a **fresh** array back through `r-model:modelValue` (uncontrolled fallback `[]`). Because it is the sole model prop, the Angular output is a `ControlValueAccessor` (`[formControl]` / `[(ngModel)]` bind directly).
    * @example
-   * <Tags r-model:modelValue="skills" placeholder="Add a skill…" />
+   * <Tags bind:modelValue={skills} placeholder="Add a skill…" />
    */
   modelValue?: any[];
   /**

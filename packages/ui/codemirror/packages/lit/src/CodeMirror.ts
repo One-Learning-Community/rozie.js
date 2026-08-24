@@ -111,7 +111,7 @@ export default class CodeMirror extends SignalWatcher(LitElement) {
   /**
    * The two-way document text (`r-model:value`) — the editor's contents as a string. Typing in the editor writes the new text back through the model path (CodeMirror's `updateListener` extension); a consumer write reflects into the live document, echo-guarded so a programmatic set does not ping-pong. As the sole `model: true` prop this **is** the only change channel — there are no events.
    * @example
-   * <CodeMirror r-model:value="source" language="javascript" theme="dark" />
+   * <rozie-code-mirror .value=${source} @value-change=${…} language="javascript" theme="dark"></rozie-code-mirror>
    */
   @property({ type: String, attribute: 'value' }) _value_attr: string = '';
   private _valueControllable = createLitControllableProperty<string>({ host: this, eventName: 'value-change', defaultValue: '', initialControlledValue: undefined });

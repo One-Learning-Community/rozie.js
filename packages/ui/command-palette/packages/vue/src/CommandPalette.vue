@@ -163,7 +163,7 @@ const props = withDefaults(
 /**
  * Whether the palette overlay is shown (two-way `r-model`). Two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`); every close path (backdrop click, Escape, selecting an item when `closeOnSelect`, the imperative `close()`) writes `open = false`. As one of two `model: true` props the component does not generate an Angular `ControlValueAccessor`.
  * @example
- * <CommandPalette r-model:open="paletteOpen" :items="commands" />
+ * <CommandPalette v-model:open="paletteOpen" :items="commands" />
  */
 const open = defineModel<boolean>('open', { default: false });
 /**

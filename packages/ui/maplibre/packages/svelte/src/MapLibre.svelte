@@ -9,7 +9,7 @@ interface Props {
   /**
    * The map center as `[lng, lat]` — **longitude first** (MapLibre's convention, not Leaflet's `[lat, lng]`). Two-way: panning the map writes the new center back through the model path (echo-guarded), and a consumer write `easeTo`s the live map. The `moveend` echo reads `getCenter()` as `[lng, lat]`.
    * @example
-   * <MapLibre r-model:center="center" r-model:zoom="zoom" />
+   * <MapLibre bind:center bind:zoom />
    */
   center?: any[];
   /**

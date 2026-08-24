@@ -29,7 +29,7 @@ export default class Captcha extends SignalWatcher(LitElement) {
   /**
    * The verified response token (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Written by the widget on success and cleared on expire/reset, so reading it gives you the live response to send to your server for form submission.
    * @example
-   * <Captcha r-model:token="token" provider="recaptcha" sitekey="…" />
+   * <rozie-captcha .token=${token} @token-change=${…} provider="recaptcha" sitekey="…"></rozie-captcha>
    */
   @property({ type: String, attribute: 'token' }) _token_attr: string = '';
   private _tokenControllable = createLitControllableProperty<string>({ host: this, eventName: 'token-change', defaultValue: '', initialControlledValue: undefined });

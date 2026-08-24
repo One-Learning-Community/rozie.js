@@ -93,7 +93,7 @@ export class FullCalendar {
   /**
    * The two-way active view name (`'dayGridMonth'`, `'timeGridWeek'`, `'timeGridDay'`, …) — the sole `model: true` prop. The calendar's own toolbar writes the new view name back through the two-way path, and a consumer write switches the view via `changeView`.
    * @example
-   * <FullCalendar r-model:view="view" :events="events" />
+   * <rozie-full-calendar [(view)]="view" [events]="events" />
    */
   view = model<string>('dayGridMonth');
   /**

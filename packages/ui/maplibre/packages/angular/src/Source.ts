@@ -31,7 +31,7 @@ export class Source {
   /**
    * The MapLibre source id (required). A `LayerSpecification.source` references this string, and nested `<Layer>` children auto-bind to it. Exposed to children as a live getter so it stays reactive.
    * @example
-   * <Source id="pts" :spec="geojson"><Layer id="circles" type="circle" /></Source>
+   * <rozie-source id="pts" [spec]="geojson"><rozie-layer id="circles" type="circle" /></rozie-source>
    */
   id = input.required<string>();
   /**

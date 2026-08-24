@@ -14,7 +14,7 @@ export interface RecaptchaV3Props {
   /**
    * The latest verification token (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Written on each successful `execute()` — read it to attach the fresh token to your request.
    * @example
-   * <RecaptchaV3 r-model:token="token" sitekey="…" action="signup" />
+   * <RecaptchaV3 token={token} onTokenChange={setToken} sitekey="…" action="signup" />
    */
   token?: string;
   defaultToken?: string;

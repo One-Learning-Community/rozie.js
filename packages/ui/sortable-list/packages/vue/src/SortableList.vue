@@ -101,7 +101,7 @@ const props = withDefaults(
 /**
  * The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.
  * @example
- * <SortableList r-model:items="$data.todos" itemKey="id" />
+ * <SortableList v-model:items="todos" itemKey="id" />
  */
 const items = defineModel<any[]>('items', { default: () => [] });
 

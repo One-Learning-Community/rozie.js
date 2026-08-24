@@ -44,7 +44,7 @@ export class NodeType {
   /**
    * The node TYPE id (required). Every graph node whose `type` matches renders this template and uses this type's `<Port>` schema. There is no id/x/y here — this is a render-by-type TEMPLATE, not an instance; instance identity and position live in the bound `graph` model.
    * @example
-   * <NodeType type="source"><template #body="{ node }">{{ node.data.label }}</template></NodeType>
+   * <rozie-node-type type="source"><rozie-port output="num" type="number" /></rozie-node-type>
    */
   type = input.required<string>();
   /**

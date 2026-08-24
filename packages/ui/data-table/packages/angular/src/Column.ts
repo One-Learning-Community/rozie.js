@@ -22,7 +22,7 @@ export class Column {
   /**
    * The row field this column reads (table-core `accessorKey`). The plain accessor value renders when the `#cell` slot falls through.
    * @example
-   * <Column field="email" header="Email" />
+   * <rozie-column field="email" header="Email" />
    */
   field = input<string>('');
   /**

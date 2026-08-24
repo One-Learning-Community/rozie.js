@@ -8,7 +8,7 @@ interface Props {
   /**
    * The selected option's value (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a combobox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `null` when nothing is selected.
    * @example
-   * <Combobox r-model:value="country" :options="countries" />
+   * <Combobox bind:value={country} options={countries} />
    */
   value?: (unknown) | null;
   /**

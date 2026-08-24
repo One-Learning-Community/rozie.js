@@ -20,7 +20,7 @@ interface FlatpickrProps {
   /**
    * The two-way value (`r-model:date`) — the **formatted string** flatpickr produces, not a `Date`. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Consumers that need the parsed `Date[]` read them off the `change` event payload instead.
    * @example
-   * <Flatpickr r-model:date="picked" @change="onChange" />
+   * <Flatpickr date={picked()} onDateChange={setPicked} onChange={onChange} />
    */
   date?: string;
   defaultDate?: string;

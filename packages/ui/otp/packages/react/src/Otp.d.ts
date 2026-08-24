@@ -6,7 +6,7 @@ export interface OtpProps {
   /**
    * The assembled one-time code (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so an Otp **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Always a contiguous string of `0..length` characters; Otp writes the new code back on every edit (type, paste, backspace).
    * @example
-   * <Otp r-model:value="code" :length="6" type="numeric" ariaLabel="Verification code" />
+   * <Otp value={code} onValueChange={setCode} length={6} type="numeric" ariaLabel="Verification code" />
    */
   value?: string;
   defaultValue?: string;

@@ -65,7 +65,7 @@ export default class Switch extends SignalWatcher(LitElement) {
   /**
    * The on/off state of the switch (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a switch **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `true` is the checked/on state; reflected as `aria-checked`.
    * @example
-   * <Switch r-model:modelValue="on" ariaLabel="Wi-Fi" />
+   * <rozie-switch .modelValue=${on} @model-value-change=${…} ariaLabel="Wi-Fi"></rozie-switch>
    */
   @property({ type: Boolean, attribute: 'model-value' }) _modelValue_attr: boolean = false;
   private _modelValueControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'model-value-change', defaultValue: false, initialControlledValue: undefined });

@@ -228,7 +228,7 @@ export class Listbox {
   /**
    * The selected value (two-way `r-model`) — a scalar in single-select, an array of values in multi-select. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Listbox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).
    * @example
-   * <Listbox r-model:value="fruit" :options="fruits" />
+   * <rozie-listbox [(value)]="fruit" [options]="fruits" />
    */
   value = model<(unknown) | null>(null);
   /**

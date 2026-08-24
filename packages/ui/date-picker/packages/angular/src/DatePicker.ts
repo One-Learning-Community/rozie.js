@@ -454,7 +454,7 @@ export class DatePicker {
   /**
    * The selected value (two-way `r-model`). **Polymorphic** on `selectionMode`: in `single` mode an ISO `YYYY-MM-DD` string (`""` = nothing selected); in `range` mode a `{ start, end }` object of ISO endpoints (`""` = an unset endpoint). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a DatePicker **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Selecting a day writes the new value back and emits `change`. **Lit caveat (range mode):** the object form must be delivered via a *property* binding (`.value=${obj}` / `r-model`), never a string `value="..."` attribute — the same rule already in force for `disabledDates`.
    * @example
-   * <DatePicker r-model:value="date" :min="'2026-01-01'" @change="onPick" />
+   * <rozie-date-picker [(value)]="date" [min]="'2026-01-01'" (change)="onPick" />
    */
   value = model<string | Record<string, any>>('');
   /**
@@ -488,7 +488,7 @@ export class DatePicker {
   /**
    * Optional overrides for the 10 static English "chrome" strings, keyed by `root`, `previousMonth`, `nextMonth`, `changeMonthYear`, `changeYear`, `chooseMonth`, `chooseYear`, `presets`, `today`, `clear` (defaults: `"Date picker"`, `"Previous month"`, `"Next month"`, `"Change month and year"`, `"Change year"`, `"Choose month"`, `"Choose year"`, `"Date range presets"`, `"Today"`, `"Clear"`). **Honest split:** `Intl` is a date/number formatter, not a message catalog — it can localize a DATE but cannot translate the phrase "Previous month". The day-cell accessible name, each multi-month panel's own grid caption, the weekday header long names, and the month-year heading text are already Intl-derived from the `locale` prop and are NOT `labels` keys; the 10 chrome phrases above are English-static and only `labels` can translate them. An empty object (the default) yields the English defaults with zero config. **Lit caveat:** pass via a *property* binding (`.labels=${…}`), never a string attribute — the same rule already in force for `disabledDates`/`presetRanges`.
    * @example
-   * <DatePicker :labels="{ previousMonth: 'Mois précédent' }" locale="fr-FR" />
+   * <rozie-date-picker [labels]="{ previousMonth: 'Mois précédent' }" locale="fr-FR" />
    */
   labels = input<Record<string, any>>((() => ({}))());
   /**

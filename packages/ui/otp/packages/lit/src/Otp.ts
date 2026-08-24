@@ -53,7 +53,7 @@ export default class Otp extends SignalWatcher(LitElement) {
   /**
    * The assembled one-time code (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so an Otp **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Always a contiguous string of `0..length` characters; Otp writes the new code back on every edit (type, paste, backspace).
    * @example
-   * <Otp r-model:value="code" :length="6" type="numeric" ariaLabel="Verification code" />
+   * <rozie-otp .value=${code} @value-change=${…} .length=${6} type="numeric" ariaLabel="Verification code"></rozie-otp>
    */
   @property({ type: String, attribute: 'value' }) _value_attr: string = '';
   private _valueControllable = createLitControllableProperty<string>({ host: this, eventName: 'value-change', defaultValue: '', initialControlledValue: undefined });

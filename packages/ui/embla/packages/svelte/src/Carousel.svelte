@@ -8,7 +8,7 @@ interface Props {
   /**
    * Slide data for config-array mode (mode a): Rozie renders one `.rozie-embla__slide` per item, optionally via the scoped `slide` slot for custom markup. Optional — leave it unset and use the default slot (mode b) to drop slide DOM directly.
    * @example
-   * <Carousel :slides="['A', 'B', 'C']" r-model:selectedIndex="idx" />
+   * <Carousel slides={['A', 'B', 'C']} bind:selectedIndex={idx} />
    */
   slides?: any[];
   /**
@@ -86,7 +86,7 @@ interface Props {
   /**
    * The current scroll-snap index (two-way `r-model`). Dragging or scrolling writes the new index back (echo-guarded so a programmatic `scrollTo` does not ping-pong); a consumer write scrolls the carousel. Distinct from the `select` emit — a model prop must not share a name with an emit.
    * @example
-   * <Carousel :slides="items" r-model:selectedIndex="idx" />
+   * <Carousel slides={items} bind:selectedIndex={idx} />
    */
   selectedIndex?: number;
   slide?: Snippet<[{ slide: any; index: any }]>;

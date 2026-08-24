@@ -250,7 +250,7 @@ export class TipTap {
   /**
    * The editor's document content as an HTML string — the sole `model: true` prop (two-way `r-model`). Typing writes the new HTML back through the model path (TipTap's `onUpdate`); a consumer write reflects into the live document, echo-guarded so a programmatic set does not reset the selection or re-emit `update`.
    * @example
-   * <TipTap r-model:html="content" placeholder="Start writing…" />
+   * <rozie-tip-tap [(html)]="content" placeholder="Start writing…" />
    */
   html = model<string>('<p>Start writing…</p>');
   /**
@@ -288,19 +288,19 @@ export class TipTap {
   /**
    * Custom ProseMirror node registration for the reactive `nodeView` portal slot — general facility, read ONCE at mount (setup-once construction, not reactive). Each entry: `{ name, tag, group, inline, atom, content, selectable, defining, attrs }` — `name` (required, unique node name), `tag` (required, parseHTML selector string | string[]), `group` (default `'block'`), `inline` (default `false`), `atom` (default `false` — no contentDOM), `content` (e.g. `'inline*'`; presence ⇒ the node gets an editable contentDOM), `selectable` (default `true`), `defining` (default `false`), `attrs` (`{ key: { default } }`, ProseMirror `addAttributes` shape). One `Node.create` is built per entry; all render through the SAME `nodeView` fragment, which dispatches on `scope.node.type.name`. An empty array (default) registers no custom nodes — zero overhead.
    * @example
-   * <TipTap :node-specs="[{ name: 'mention', tag: 'span[data-mention]', group: 'inline', inline: true, atom: true, attrs: { id: { default: null } } }]"><template #nodeView="{ node }">…</template></TipTap>
+   * <rozie-tip-tap [nodeSpecs]="[{ name: 'mention', tag: 'span[data-mention]', group: 'inline', inline: true, atom: true, attrs: { id: { default: null } } }]" />
    */
   nodeSpecs = input<any[]>((() => [])());
   /**
    * An async image-upload hook, signature `(file: File) => Promise<string>` resolving to a URL. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping an image file uploads it via this function then inserts the resolved URL at the caret / drop position. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.
    * @example
-   * <TipTap :upload-image="uploadFn" />
+   * <rozie-tip-tap [uploadImage]="uploadFn" />
    */
   uploadImage = input<((...args: any[]) => any) | null>(null);
   /**
    * A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.
    * @example
-   * <TipTap :max-length="500" />
+   * <rozie-tip-tap [maxLength]="500" />
    */
   maxLength = input<(number) | null>(null);
   /**
@@ -310,7 +310,7 @@ export class TipTap {
   /**
    * A custom `shouldShow` predicate for the GENERAL `bubbleMenu` slot — the TipTap signature `({ editor, view, state, oldState, from, to }) => boolean`. When provided, it REPLACES the general bubbleMenu's default predicate (show on a non-empty text selection), turning the `bubbleMenu` slot into a fully consumer-controllable selection-tooling surface (e.g. show only inside a table, or only for a specific mark). When `null` (default), the default non-empty-selection behavior applies. Orthogonal to the built-in link editor, which is its own bubble-menu surface with a link-aware trigger. NOTE: as a Function prop it lowers to a loosely-typed callable on some targets (React `any` / Angular `unknown`) — pass a correctly-typed predicate; the wrapper forwards it verbatim to `BubbleMenu.configure({ shouldShow })`.
    * @example
-   * <TipTap :bubble-menu-should-show="({ editor }) => editor.isActive('table')"><template #bubbleMenu="{ editor }">…</template></TipTap>
+   * <rozie-tip-tap [bubbleMenuShouldShow]="({ editor }) => editor.isActive('table')" />
    */
   bubbleMenuShouldShow = input<((...args: any[]) => any) | null>(null);
   active = signal({

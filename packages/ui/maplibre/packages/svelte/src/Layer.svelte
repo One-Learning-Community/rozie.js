@@ -5,7 +5,7 @@ interface Props {
   /**
    * The MapLibre layer id (required). Identifies the layer in the parent `<MapLibre>` registry and the underlying style.
    * @example
-   * <Layer id="circles" type="circle" :paint="{ 'circle-radius': 5 }" />
+   * <Layer id="circles" type="circle" paint={{ 'circle-radius': 5 }} />
    */
   id: string;
   /**

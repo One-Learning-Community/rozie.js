@@ -109,7 +109,7 @@ const props = withDefaults(
 /**
  * The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data?, width?, height? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, type?, label?, stroke?, dashed? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope; `width`/`height` are the explicit fixed box a `<NodeType resizable>` corner-drag persists (absent = auto-sized, and double-clicking a resize handle clears them back to auto). A connection's `type` is its path shape — `bezier` (default), `step`, `smoothstep`, or `straight`. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.
  * @example
- * <FlowCanvas r-model:graph="graph" :validate-types="true" />
+ * <FlowCanvas v-model:graph="graph" :validate-types="true" />
  */
 const graph = defineModel<Record<string, any>>('graph', { default: () => ({
   nodes: [],

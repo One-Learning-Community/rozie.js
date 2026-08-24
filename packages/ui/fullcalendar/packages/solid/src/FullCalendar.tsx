@@ -40,7 +40,7 @@ interface FullCalendarProps {
   /**
    * The two-way active view name (`'dayGridMonth'`, `'timeGridWeek'`, `'timeGridDay'`, …) — the sole `model: true` prop. The calendar's own toolbar writes the new view name back through the two-way path, and a consumer write switches the view via `changeView`.
    * @example
-   * <FullCalendar r-model:view="view" :events="events" />
+   * <FullCalendar view={view()} onViewChange={setView} events={events} />
    */
   view?: string;
   defaultView?: string;

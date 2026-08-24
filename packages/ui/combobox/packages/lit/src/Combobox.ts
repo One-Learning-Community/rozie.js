@@ -169,7 +169,7 @@ export default class Combobox extends SignalWatcher(LitElement) {
   /**
    * The selected option's value (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a combobox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `null` when nothing is selected.
    * @example
-   * <Combobox r-model:value="country" :options="countries" />
+   * <rozie-combobox .value=${country} @value-change=${…} .options=${countries}></rozie-combobox>
    */
   @property({ type: Object, attribute: 'value' }) _value_attr: unknown = null;
   private _valueControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'value-change', defaultValue: null, initialControlledValue: undefined });
