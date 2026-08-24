@@ -61,15 +61,23 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative as pathRelative } from 'node:path';
-import { lowerToIR, ModifierRegistry, parse, registerBuiltins } from '@rozie/core';
+// Phase 81 Plan 03 (R3 / SPEC D-04, T-81-07) — `validatePropExampleMarkup`
+// is imported via the BARE `@rozie/core` specifier, not a relative
+// `../../core/src/**` path. A relative reach into core/src re-creates core's
+// dual nominal identity for any type whose signature carries a class with
+// private fields (here `ModifierRegistry`, surfaced transitively through
+// `compile.ts`'s `EmitVueOptions.modifierRegistry` — the exact
+// previously-fixed 260819-9tc bug class `threadParamTypes`/
+// `validateTwoWayBindings` were barrel-exported to prevent). See the
+// matching re-export + comment in `packages/core/src/index.ts`.
+import {
+  lowerToIR,
+  ModifierRegistry,
+  parse,
+  registerBuiltins,
+  validatePropExampleMarkup,
+} from '@rozie/core';
 import type { Diagnostic } from '@rozie/core';
-// Phase 81 Plan 03 (R3 / SPEC D-04, T-81-07) — the same pre-emit
-// `docs.example` validator `compile()` runs, imported via the relative
-// core/src path (mirrors `validatePortalScopedStyle`'s import in
-// transform.ts): both parameters (`IRComponent`, `Diagnostic[]`) are plain
-// interfaces, so there is no class-identity hazard in taking the relative
-// path here.
-import { validatePropExampleMarkup } from '../../core/src/ir/validatePropExampleMarkup.js';
 import { emitAngularTypes } from '../../targets/angular/src/emit/emitTypes.js';
 import { emitLitTypes } from '../../targets/lit/src/emit/emitTypes.js';
 import { emitReactTypes } from '../../targets/react/src/emit/emitTypes.js';

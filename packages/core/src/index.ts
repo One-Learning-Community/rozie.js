@@ -93,6 +93,15 @@ export { lowerToIR } from './ir/lower.js';
 // the plugin's raw-`src` type exports resolves ONE nominal identity without
 // needing its own `@rozie/core` `paths` pin.
 export { threadParamTypes } from './ir/threadParamTypes.js';
+// Phase 81 Plan 03 — `validatePropExampleMarkup` is the third symbol in this
+// same class (see the 260819-9tc note directly above): `@rozie/unplugin`'s
+// `emitSidecar.ts` needs it, and a relative `../../core/src/ir/**` import
+// re-creates the identical private-field nominal-identity split (this time
+// on `ModifierRegistry` rather than `IRCache`, surfaced by
+// `compile.ts`'s `EmitVueOptions.modifierRegistry` parameter). Re-exported
+// here so that consumer resolves ONE nominal identity via the bare
+// `@rozie/core` specifier, same as its two siblings above.
+export { validatePropExampleMarkup } from './ir/validatePropExampleMarkup.js';
 // IR types — Phase 2 Plan 02-05 (D-18 SlotDecl, D-19 LifecycleHook, D-20 Listener LOCKED).
 // @experimental — shape may change before v1.0
 export type {
