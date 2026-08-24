@@ -174,7 +174,33 @@ export const RozieErrorCode = {
   // diagnostics) and the band's last code (ROZ099), per that same note's
   // guidance.
   PROP_DOCS_EXAMPLE_UNSUPPORTED_CONSTRUCT: 'ROZ097', // error — a prop's `docs.example` contains a construct `renderExampleMarkup` cannot render (a slot fill, mustache interpolation, a non-model r-* directive, a bare or modifier-chained model/event directive, or malformed markup); the classifier's reason string names the specific construct (Phase 81 Plan 03, R3/SPEC D-04)
-  // ROZ098..ROZ099 remain free.
+  // Phase 82 (multi-root consumer attribute fallthrough) claims the final two
+  // codes in this reserved ROZ090..ROZ099 block — the same "genuinely free"
+  // block Phase 79 and Phase 81 Plan 03 already drew from above. These two
+  // entries exhaust it end to end; the next allocation in this numeric
+  // neighborhood must use a different reserved gap (see the HONEST BAND NOTE
+  // below).
+  //
+  // Both diagnose the SAME underlying gap: a template whose sole structural
+  // root is a `TemplateConditional` or `TemplateMatch` (an `r-if`/`r-else-if`/
+  // `r-else` or `r-match`/`r-case` chain as the only top-level node) has no
+  // element `synthesizeAttrsFallthrough` / `synthesizeListenersFallthrough`
+  // can resolve to receive the auto-fallthrough spread, while `countRootElements`
+  // still reports exactly 1 root, so neither ROZ970 nor ROZ973 fires either.
+  // Before these two codes existed, that combination silently dropped the
+  // consumer's inherited attributes/listeners with no compile-time signal
+  // whatsoever. `examples/Modal.rozie` and `examples/PortalOverlay.rozie` are
+  // both authored this way and will now warn on every compile — that is a
+  // deliberate, tracked consequence of shipping this diagnostic, NOT a
+  // regression.
+  //
+  // The actual repair — descending fallthrough synthesis into each branch of
+  // the conditional/match root instead of merely diagnosing the drop — is
+  // explicitly DEFERRED per D-02 (82-PLAN.md); these two codes are a warning,
+  // not a fix.
+  ATTR_FALLTHROUGH_GATED_ROOT: 'ROZ098', // warning — inheritAttrs !== false and the template's single structural root is a TemplateConditional/TemplateMatch, so no element can receive the synthesized $attrs spread; the drop is diagnosed, the branch-descent fix is DEFERRED (D-02)
+  LISTENER_FALLTHROUGH_GATED_ROOT: 'ROZ099', // warning — D-17 twin of ROZ098: inheritListeners !== false and the same gated-root shape, independent of ROZ098 exactly as ROZ973 is independent of ROZ970
+  // ROZ090..ROZ099 is now fully consumed — Phase 82 took the last two codes.
 
   // ---- Semantic-binding errors (Phase 2 Plan 02) — ROZ100..ROZ199 ----
   UNKNOWN_PROPS_REF: 'ROZ100', // error — SEM-01: $props.foo where foo not declared
@@ -1028,13 +1054,16 @@ export const RozieErrorCode = {
   // verified highest allocated code; ROZ997/ROZ998 are the next two free.
   // HONEST BAND NOTE: ROZ999 is now the LAST free code in the 9xx band — future
   // allocations should continue in the lower bands (e.g. the 100 semantic-
-  // binding cluster's tail, or the reserved ROZ097..ROZ099 / ROZ929..ROZ939
-  // gaps), never renumber, and never reuse retired codes. (Phase 79 corrected
-  // this note: ROZ090..ROZ095 is no longer free — it took those six codes —
-  // and Plan 79-06 additionally claimed ROZ096, leaving ROZ097..ROZ099 as the
-  // remainder of that block — and the Phase 07.2/07.3/11 slot-fill/two-way-
-  // binding/match block above is fully consumed end to end and should never
-  // have been listed here as free.)
+  // binding cluster's tail, or the reserved ROZ929..ROZ939 gap), never
+  // renumber, and never reuse retired codes. (Phase 79 corrected this note:
+  // ROZ090..ROZ095 is no longer free — it took those six codes — and Plan
+  // 79-06 additionally claimed ROZ096; Phase 81 Plan 03 then claimed ROZ097;
+  // Phase 82 claimed the last two, ROZ098 and ROZ099 — the entire
+  // ROZ090..ROZ099 block is now fully consumed, and the only reserved gap
+  // left in the 9xx neighborhood is ROZ929..ROZ939, earmarked above for
+  // `<components>` composition diagnostics. The Phase 07.2/07.3/11 slot-fill/
+  // two-way-binding/match block above is likewise fully consumed end to end
+  // and should never have been listed here as free.)
   //
   // ROZ997 — two (or more) distinct declared `$emit` spellings collapse to the
   // SAME canonical event key under kebab/camel/snake separator equivalence
