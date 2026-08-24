@@ -104,13 +104,13 @@ function readExample(name: string): string {
 
 /**
  * The byte-identity baseline for every tracked Angular fixture (prohibition
- * 4b). Advanced by Phase 82 Plan 05 to `179dbf034` — that plan's own `pnpm
+ * 4b). Advanced by Phase 82 Plan 05 to `179dbf03447ec44a9828924e3bfd24d4b661d1bb` — that plan's own `pnpm
  * --filter dist-parity bootstrap` re-bless commit, which added
  * `tests/dist-parity/fixtures/ElementPlusSlotFallthrough.angular.ts` (the
  * element-plus-slots single-root dist-parity fixture) and touched zero
  * existing fixture bytes. This IS the owed prohibition-5 hand-diff for this
  * advance (performed, not deferred): `git diff --name-only
- * 1b1d444cb2d23b022559d7b694df23b1394e8894 179dbf034` scoped to the same
+ * 1b1d444cb2d23b022559d7b694df23b1394e8894 179dbf03447ec44a9828924e3bfd24d4b661d1bb` scoped to the same
  * three globs `listAngularFixtureFiles()` below tracks returned exactly one
  * path, `tests/dist-parity/fixtures/ElementPlusSlotFallthrough.angular.ts` —
  * a NEW file, not a changed one, out of 137 tracked fixtures. Nothing in the
@@ -128,7 +128,7 @@ function readExample(name: string): string {
 // contain this object, and every gate below then fails with
 // "Command failed: git show …" (134 of 144 tests, one root cause). The
 // angular-matrix workflow sets it explicitly; keep them in sync.
-const BASELINE_COMMIT = '179dbf034';
+const BASELINE_COMMIT = '179dbf03447ec44a9828924e3bfd24d4b661d1bb';
 
 /** `git show <commit>:<path>` — throws if the path did not exist at that commit. */
 function readAtBaseline(relPath: string): string {
