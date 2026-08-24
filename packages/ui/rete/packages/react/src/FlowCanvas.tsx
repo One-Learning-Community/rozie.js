@@ -12,9 +12,15 @@ import { getDOMSocketPosition, classicConnectionPath } from 'rete-render-utils';
 // T2.6 — auto-layout (D-08, verb-only). The 3 deps (rete-auto-arrange-plugin / elkjs
 // @0.8.2 / web-worker) are OPTIONAL leaf peers, installed + bundle-smoked on all 6 in
 // Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
-// elk.bundled.js entry — no web-worker resolution error, no manual fallback switch). Only
-// a consumer calling autoArrange() pulls these in.
-import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin';
+// elk.bundled.js entry — no web-worker resolution error, no manual fallback switch).
+//
+// THERE IS DELIBERATELY NO STATIC IMPORT HERE (quick-260823-qgi). The plugin statically
+// imports elkjs at its own module top, and elk.bundled.js is 1.5 MB of GWT-transpiled Java
+// in one opaque non-tree-shakeable blob — a static specifier anywhere in this module lands
+// it in the main chunk of EVERY consumer, arranging or not, which is what "optional peer"
+// had been quietly failing to mean. autoArrange() loads it on first call instead (see the
+// verb), so a consumer who never arranges never pays. tests/lazy-arrange.test.ts is the
+// guard; re-adding a static import here turns it red on all six leaves.
 
 // ── engine instances — null-lets so typeNeutralize types them `any` (the
 // MapLibre `let instance = null` discipline). Rete's NodeEditor / AreaPlugin /
@@ -209,7 +215,6 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const reconnectDidWriteBack = useRef(false);
   const reconnectCloseScheduled = useRef(false);
   const renderScope = useRef<any>(null);
-  const arrange = useRef<any>(null);
   const onCanvasKeydown = useRef<any>(null);
   const selectedConnId = useRef<any>(null);
   const keydownContainer = useRef<any>(null);
@@ -275,6 +280,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const lastSelectionIds = useRef<any>(null);
   const selectedPathEl = useRef<any>(null);
   const resizeFlushRaf = useRef(0);
+  const arrangeReady = useRef<any>(null);
+  const arrange = useRef<any>(null);
   const [graph, setGraph] = useControllableState({
     value: props.graph,
     defaultValue: props.defaultGraph ?? (() => ({
@@ -1174,6 +1181,30 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // NOT an emit (node-*/connection-*/translated/context-menu/selection-change/edge-*/node-action),
   // NOT a prop, NOT a React model-setter (graph/zoom → setGraph/setZoom) — clean on all 6.
   async function autoArrange(opts: any) {
+    if (!area.current) return;
+    // Lazily pull in the engine (quick-260823-qgi). The dynamic import is the ONLY reference to
+    // rete-auto-arrange-plugin in this module, which is what keeps its static elkjs import — 1.5 MB
+    // of elk.bundled.js — out of the default chunk for consumers who never arrange. Memoized on the
+    // promise so concurrent callers share one import and one area.use() install.
+    //
+    // A failed import (the peer genuinely IS optional — a consumer can have skipped installing it)
+    // REJECTS out of the verb rather than no-oping silently: the caller explicitly asked to
+    // arrange, so a rejected promise is the honest answer and `autoArrange()` is already async.
+    // The memo is cleared on failure so a later call retries instead of being poisoned by one
+    // transient chunk-load error.
+    if (!arrangeReady.current) {
+      arrangeReady.current = import('rete-auto-arrange-plugin').then((m: any) => {
+        arrange.current = new m.AutoArrangePlugin();
+        arrange.current.addPreset(m.Presets.classic.setup());
+        area.current.use(arrange.current);
+      });
+      arrangeReady.current.catch(() => {
+        arrangeReady.current = null;
+      });
+    }
+    await arrangeReady.current;
+    // Re-check after the await: the component can be torn down while the chunk is in flight, and
+    // the teardown nulls `area`. Arranging a destroyed editor would throw deep inside the plugin.
     if (!arrange.current || !area.current) return;
     // Set elkjs dimensions on every live node instance from its measured node-view element
     // (Pitfall 3) — without dims the classic preset stacks all nodes at (0,0).
@@ -1586,15 +1617,18 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     socketWatcher.current.attach(renderScope.current);
 
     // ── T2.6 auto-layout (D-08, verb-only) ──
-    // Wire the AutoArrangePlugin (elkjs classic preset) so the top-level autoArrange() verb
-    // can run a layered relayout on demand. area.use(arrange) installs it as an area-scope
-    // plugin; arrange.layout() mutates the engine node positions directly (calls area.translate
-    // internally). The verb reads the arranged positions BACK into a FRESH $model.graph (the
-    // controlled-graph contract — the engine is never the source of truth). NO auto-trigger —
-    // the consumer calls autoArrange() (the MapLibre verb-first stance).
-    arrange.current = new AutoArrangePlugin();
-    arrange.current.addPreset(ArrangePresets.classic.setup());
-    area.current.use(arrange.current);
+    // NOTHING IS WIRED HERE (quick-260823-qgi). The AutoArrangePlugin used to be constructed
+    // and installed at this point in mount, which pulled elkjs into every consumer's bundle for
+    // a verb that is opt-in and never auto-triggered. autoArrange() now imports, constructs and
+    // area.use()-installs it on first call.
+    //
+    // Installing an area plugin AFTER mount is safe FOR THIS PLUGIN specifically, and that is a
+    // property of the plugin, not a general rule: AutoArrangePlugin registers no pipe handlers
+    // (no addPipe, no lifecycle subscription — its whole surface is addPreset/findPreset/
+    // getArea/getEditor/nodeToLayoutChild/connectionToLayoutEdge/graphToElk/getPortId/layout),
+    // and it resolves the area lazily via parentScope(BaseAreaPlugin) at layout() time. Contrast
+    // `selectableNodes` below, where pipe order IS registration order and a construction-time
+    // install was a real bug (quick-260803-s3m).
 
     // ── selection (selectableNodes) — INSTALLED FURTHER DOWN, after the gate pipe ──
     // quick-260803-s3m: the install used to sit HERE behind a construction-time
@@ -3696,6 +3730,13 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       for (const [, entry] of connEntries as any) entry.dispose();
       connEntries.clear();
       if (area.current) area.current.destroy();
+      // Null the handle after destroying it (quick-260823-qgi). Every top-level verb already
+      // opens with an `if (!area) return` guard, but before this line those guards only caught
+      // the BEFORE-mount window — after unmount `area` stayed truthy and pointed at a destroyed
+      // scope, so a late verb call operated on a corpse. autoArrange() made that reachable in
+      // practice: it now awaits a dynamic import, so the component can be torn down between the
+      // call and the layout. Nulling here makes the existing guards mean what they say.
+      area.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
