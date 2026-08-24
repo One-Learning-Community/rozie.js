@@ -47,12 +47,15 @@
  *    `bind:graph` for `r-model:graph="graph"`); otherwise it emits the long
  *    `bind:x={e}` form (Svelte 5 syntax).
  * 7. Anything the table doesn't cover is unsupported by default — a bare
- *    model directive with no prop name, a modifier chain on a model or
- *    event attribute, and every non-model `r-*` directive. SPEC decisions
- *    D-04 (hard error, always) and D-05 (nested children pass through the
- *    same rules; slot fills and interpolation are out) together make
- *    unsupported-by-default the correct posture — this module classifies
- *    honestly; Plan 03 turns the classification into a diagnostic.
+ *    model directive with no prop name, a model directive whose colon-arg
+ *    name is empty or spans more than one identifier segment (`r-model:`,
+ *    `r-model:a:b`), a `:`-binding attribute name that contains a `.`
+ *    (`:bar.baz`), a modifier chain on a model or event attribute, and
+ *    every non-model `r-*` directive. SPEC decisions D-04 (hard error,
+ *    always) and D-05 (nested children pass through the same rules; slot
+ *    fills and interpolation are out) together make unsupported-by-default
+ *    the correct posture — this module classifies honestly; Plan 03 turns
+ *    the classification into a diagnostic.
  *
  * @experimental — shape may change before v1.0
  */
@@ -149,10 +152,27 @@ export function classifyExampleMarkup(example: string, filename?: string): Examp
           reject('a model directive must name its prop (r-model:propName) to render an example');
           continue;
         }
+        // The colon-arg name must be a single non-empty identifier segment —
+        // an empty name (`r-model:`) or a multi-segment name (`r-model:a:b`)
+        // is not a renderable prop name on any target. `r-model:bar.trim`
+        // arrives here as name === 'model:bar' (parseTemplate splits the
+        // modifier chain off first), passes this check, and is still caught
+        // by the modifier-chain check below — this ordering is load-bearing,
+        // it keeps that fixture's reject reason unchanged.
+        const modelPropNameRaw = attr.name.slice('model:'.length);
+        if (!/^[A-Za-z_$][\w$-]*$/.test(modelPropNameRaw)) {
+          reject('a model directive must name its prop (r-model:propName) to render an example');
+          continue;
+        }
       }
 
       if ((attr.kind === 'directive' || attr.kind === 'event') && attr.modifierChainText !== '') {
         reject('a modifier chain is not supported in a rendered example');
+        continue;
+      }
+
+      if (attr.kind === 'binding' && attr.name.includes('.')) {
+        reject('a binding attribute name may not contain "." in a rendered example');
         continue;
       }
     }
@@ -270,8 +290,9 @@ function renderEventAttr(attr: TemplateAttr, target: CompileTarget): string {
 
 /** Renders an `r-model:x="e"` directive attribute into 1 (Vue/Svelte-shorthand/Angular) or 2 (React/Solid/Lit) attribute strings. */
 function renderModelAttr(attr: TemplateAttr, target: CompileTarget): string[] {
-  // classifyExampleMarkup already proved this attribute's name is exactly
-  // prefixed 'model:' — the bare-'model' and non-model-directive cases are
+  // classifyExampleMarkup already proved this attribute's name is a
+  // non-empty single-segment identifier prefixed 'model:' — the bare-'model',
+  // non-model-directive, empty-name, and multi-segment-name cases are all
   // rejected before renderExampleMarkup ever reaches a 'markup'-classified
   // tree, so the slice below is always well-formed here.
   const propNameRaw = attr.name.slice('model:'.length);
