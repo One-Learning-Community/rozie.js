@@ -58,21 +58,69 @@ const ATTRS_ACCESSOR = '$attrs';
  * A single-root template lowers to a `TemplateElement` directly (R8 never
  * fires). A multi-root template lowers to a `TemplateFragment` whose children
  * are the roots; cosmetic whitespace `TemplateStaticText` siblings do not
- * count. A `TemplateConditional` / `TemplateLoop` / `TemplateMatch` /
- * `TemplateSlotInvocation` / `TemplateInterpolation` root is treated as a
- * single (1) structural root — auto-fallthrough's single-root synthesis simply
- * does not apply to it (no ROZ970), mirroring `synthesizeAttrsFallthrough`
- * which no-ops on those shapes.
+ * count.
+ *
+ * Phase 82 (D-01, Strategy B) element-plus-slots exception: when the
+ * fragment's non-text children classify into EXACTLY one `TemplateElement`
+ * and ZERO other structural sibling kinds, any number of
+ * `TemplateSlotInvocation` siblings included, the template is treated as
+ * single-root (returns 1) regardless of sibling order. A `<slot>` invocation
+ * no longer disqualifies auto-fallthrough on its own — it renders nothing
+ * itself, so the one real element is still the sole candidate to receive the
+ * synthesized spread. This mirrors the portal-slot skip in
+ * `lowerRootElementRef.resolveRootElement`, widened from portal-only slots to
+ * ALL slot invocations. Two real elements, or an element plus any other
+ * structural sibling (conditional / loop / match / interpolation), still
+ * count every non-text child and remain multi-root (ROZ970).
  */
 function countRootElements(template: TemplateNode | null): number {
   if (template === null) return 0;
   if (template.type !== 'TemplateFragment') return 1;
-  let count = 0;
+
+  let elementCount = 0;
+  let slotCount = 0;
+  let otherCount = 0;
   for (const child of template.children) {
     if (child.type === 'TemplateStaticText') continue; // cosmetic whitespace
-    count += 1;
+    if (child.type === 'TemplateElement') {
+      elementCount += 1;
+    } else if (child.type === 'TemplateSlotInvocation') {
+      slotCount += 1;
+    } else {
+      otherCount += 1;
+    }
   }
-  return count;
+
+  // Element-plus-slots exception: exactly one element, no other disqualifying
+  // sibling kind — any number of slot siblings is tolerated.
+  if (elementCount === 1 && otherCount === 0) return 1;
+
+  return elementCount + slotCount + otherCount;
+}
+
+/**
+ * Resolve the single structural root node of the template, for the D-02
+ * gated-root check: the template itself when it is not a `TemplateFragment`,
+ * or the sole non-`TemplateStaticText` child when the template is a fragment
+ * with exactly one such child, or `null` otherwise (zero or multiple
+ * structural children). Deliberately NOT slot-tolerant like
+ * `countRootElements` above — this helper answers "is there exactly one
+ * structural node at all", which is what determines whether a
+ * `TemplateConditional` / `TemplateMatch` root has no sibling to disambiguate
+ * it from being the template's only content.
+ */
+function resolveSingleStructuralRoot(
+  template: TemplateNode | null,
+): TemplateNode | null {
+  if (template === null) return null;
+  if (template.type !== 'TemplateFragment') return template;
+  let only: TemplateNode | null = null;
+  for (const child of template.children) {
+    if (child.type === 'TemplateStaticText') continue; // cosmetic whitespace
+    if (only !== null) return null; // more than one structural child
+    only = child;
+  }
+  return only;
 }
 
 /**
@@ -147,7 +195,9 @@ export function validateAttrFallthrough(
   if (ir.inheritAttrs === false) return;
 
   // ----- R8: ROZ970 — multi-root template with auto-fallthrough enabled. -----
+  let multiRootFired = false;
   if (countRootElements(ir.template) > 1) {
+    multiRootFired = true;
     const loc: SourceLoc = ir.template?.sourceLoc ?? ir.sourceLoc;
     diagnostics.push({
       code: RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT,
@@ -157,6 +207,35 @@ export function validateAttrFallthrough(
       loc,
       hint: 'Set inherit-attrs="false" on the <rozie> tag and apply r-bind="$attrs" to the intended element, or restructure the template to a single root.',
     });
+  }
+
+  // ----- D-02: ROZ098 — a single structural root gated by a conditional or
+  // match has no unconditional element to attach the inherited attributes
+  // to, so auto-fallthrough silently drops them (`examples/Modal.rozie`,
+  // `examples/PortalOverlay.rozie` are live instances). Diagnosed now;
+  // branch-descent synthesis is DEFERRED (D-02). Structurally mutually
+  // exclusive with ROZ970: a shape that already fired R8 above cannot also
+  // resolve to a single structural root here (a multi-root fragment has more
+  // than one structural child, so `resolveSingleStructuralRoot` returns
+  // `null` for it), but the `multiRootFired` guard makes that exclusion
+  // explicit rather than incidental.
+  if (!multiRootFired) {
+    const singleRoot = resolveSingleStructuralRoot(ir.template);
+    if (
+      singleRoot !== null &&
+      (singleRoot.type === 'TemplateConditional' ||
+        singleRoot.type === 'TemplateMatch')
+    ) {
+      const loc: SourceLoc = singleRoot.sourceLoc ?? ir.sourceLoc;
+      diagnostics.push({
+        code: RozieErrorCode.ATTR_FALLTHROUGH_GATED_ROOT,
+        severity: 'warning',
+        message:
+          "The template's only root is gated by a conditional, so auto-fallthrough has no unconditional element to attach the inherited attributes to — they are dropped.",
+        loc,
+        hint: 'Move the gating condition onto a child so the root element is unconditional, or set inherit-attrs="false" on the <rozie> tag and apply the manual r-bind="$attrs" spread inside the branch.',
+      });
+    }
   }
 
   // ----- R9: ROZ971 — explicit r-bind="$attrs" while auto-fallthrough on. ----
