@@ -2281,10 +2281,18 @@ function lowerNodeList(
  *     `validateAttrFallthrough` pass errors ROZ970 instead; there is no single
  *     root to receive the spread).
  *
- * Single-root resolution mirrors `lowerRootElementRef.resolveRootElement`: a
- * `TemplateElement` directly, OR a `TemplateFragment` whose children are one
- * `TemplateElement` plus cosmetic whitespace text (any other structural sibling
- * disqualifies). Mutates the passed template node in place; never throws (D-08).
+ * Single-root resolution mirrors `lowerRootElementRef.resolveRootElement`'s
+ * shape, widened per Phase 82 (D-01, Strategy B): a `TemplateElement`
+ * directly, OR a `TemplateFragment` whose children are exactly one
+ * `TemplateElement` plus cosmetic whitespace text plus any number of
+ * `TemplateSlotInvocation` siblings, in either order — a `<slot>` sibling no
+ * longer disqualifies the element from being the single root, since it
+ * renders nothing itself. Any OTHER structural sibling kind (conditional,
+ * loop, match, interpolation) still disqualifies, and a second element still
+ * disqualifies. This matches `countRootElements` in
+ * `validateAttrFallthrough.ts` exactly, so the two predicates cannot
+ * disagree (T-82-06). Mutates the passed template node in place; never
+ * throws (D-08).
  *
  * @param template      - the lowered template root (`LowerTemplateResult.template`)
  * @param inheritAttrs  - `IRComponent.inheritAttrs`
@@ -2297,14 +2305,15 @@ export function synthesizeAttrsFallthrough(
   if (template === null) return;
 
   // Resolve the single root TemplateElement (direct, or the sole element of a
-  // whitespace-padded TemplateFragment). Anything else is multi-root / not a
-  // single element — no synthesis (R8 handles it).
+  // whitespace-and-slot-padded TemplateFragment). Anything else is
+  // multi-root / not a single element — no synthesis (R8 handles it).
   let rootEl: TemplateElementIR | null = null;
   if (template.type === 'TemplateElement') {
     rootEl = template;
   } else if (template.type === 'TemplateFragment') {
     for (const child of template.children) {
       if (child.type === 'TemplateStaticText') continue; // cosmetic whitespace
+      if (child.type === 'TemplateSlotInvocation') continue; // Phase 82 D-01: renders nothing itself, does not disqualify
       if (child.type === 'TemplateElement') {
         if (rootEl !== null) {
           rootEl = null; // multiple structural elements — not single-root
@@ -2313,7 +2322,7 @@ export function synthesizeAttrsFallthrough(
         rootEl = child;
         continue;
       }
-      // Any non-element/non-text structural sibling disqualifies.
+      // Every other structural sibling kind still disqualifies.
       rootEl = null;
       break;
     }
@@ -2363,6 +2372,15 @@ export function synthesizeAttrsFallthrough(
  *     component-tag root is itself a wrapper; its listener-fallthrough
  *     surface is owned by the inner component).
  *
+ * Single-root resolution mirrors `synthesizeAttrsFallthrough` per Phase 82
+ * (D-01, Strategy B): a `TemplateElement` directly, OR a `TemplateFragment`
+ * whose children are exactly one `TemplateElement` plus cosmetic whitespace
+ * text plus any number of `TemplateSlotInvocation` siblings, in either
+ * order — a `<slot>` sibling no longer disqualifies the element from being
+ * the single root. This matches `countRootElements` in
+ * `validateListenerFallthrough.ts` exactly, so the two predicates cannot
+ * disagree (T-82-06).
+ *
  * IMPORTANT — ORDERING vs `validateListenerFallthrough`: `lower.ts` invokes
  * `validateListenerFallthrough` BEFORE this synthesizer so the validator
  * does not see the synthesized bare-$listeners spread and emit a false
@@ -2380,13 +2398,14 @@ export function synthesizeListenersFallthrough(
   if (template === null) return;
 
   // Resolve the single root TemplateElement (direct, or the sole element of a
-  // whitespace-padded TemplateFragment). Mirrors synthesizeAttrsFallthrough.
+  // whitespace-and-slot-padded TemplateFragment). Mirrors synthesizeAttrsFallthrough.
   let rootEl: TemplateElementIR | null = null;
   if (template.type === 'TemplateElement') {
     rootEl = template;
   } else if (template.type === 'TemplateFragment') {
     for (const child of template.children) {
       if (child.type === 'TemplateStaticText') continue; // cosmetic whitespace
+      if (child.type === 'TemplateSlotInvocation') continue; // Phase 82 D-01: renders nothing itself, does not disqualify
       if (child.type === 'TemplateElement') {
         if (rootEl !== null) {
           rootEl = null; // multiple structural elements — not single-root
@@ -2395,7 +2414,7 @@ export function synthesizeListenersFallthrough(
         rootEl = child;
         continue;
       }
-      // Any non-element/non-text structural sibling disqualifies.
+      // Every other structural sibling kind still disqualifies.
       rootEl = null;
       break;
     }
