@@ -169,10 +169,11 @@ export function classifyExampleMarkup(example: string, filename?: string): Examp
  * — the alternation that ALSO matches an uppercase letter followed by an
  * uppercase-then-lowercase run, then lowercases the result. Angular's
  * simpler two-group regex (`packages/targets/angular/src/emit/
- * emitDecorator.ts`) mis-splits adjacent-uppercase component names
- * (`ROnProbe` -> `ron-probe` instead of `r-on-probe`) — deliberately NOT
- * mirrored here; that divergence is a pre-existing Angular bug this phase
- * does not propagate.
+ * emitDecorator.ts`) mis-splits adjacent-uppercase component names — the
+ * `ROnProbe` fixture name kebab-cases to `ron-probe` there, merging the
+ * component's leading letter into the second segment instead of hyphenating
+ * every word boundary — deliberately NOT mirrored here; that divergence is a
+ * pre-existing Angular bug this phase does not propagate.
  */
 function toKebabCase(name: string): string {
   const hyphenated = name.replace(/([a-z0-9]|[A-Z](?=[A-Z][a-z]))([A-Z])/g, '$1-$2');
