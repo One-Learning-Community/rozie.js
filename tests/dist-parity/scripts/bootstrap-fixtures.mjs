@@ -537,6 +537,20 @@ const EXAMPLES = [
   // 79-13-PLAN.md.
   'DynamicSlots',
   'DynamicSlotsConsumer',
+  // Phase 82 (multi-root-consumer-attribute-fallthrough) — the element-plus-
+  // slots auto-fallthrough dist-parity proof. One real element root plus
+  // three <slot> invocation siblings (a named slot before the element, a
+  // default and a named slot after it) under DEFAULT inherit-attrs/inherit-
+  // listeners flags — the shape Plan 82-02 generalized the core's root
+  // classification to accept as single-root. Registering it here makes the
+  // bootstrap compile() it across all six targets, which IS the six-target
+  // proof for this shape. Single-file; no sibling .rozie producers — stays
+  // OUT of RESOLVER_ROOT. NOTE: this fixture's bytes cannot be blessed until
+  // Plan 04's whole-repo forced rebuild lands (bootstrap must not bless
+  // stale-@rozie/core output) — the dist-parity suite is expected to stay
+  // red on this fixture between this commit and Plan 05's rebless, the same
+  // deliberate intermediate-red window PartialInlineHost documents above.
+  'ElementPlusSlotFallthrough',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
