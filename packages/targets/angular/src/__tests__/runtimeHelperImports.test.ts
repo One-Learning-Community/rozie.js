@@ -156,8 +156,20 @@ describe('runtimeHelperImports — Angular emitter imports helpers from @rozie/r
         .split('\n')
         .filter((line) => line.includes('@rozie/runtime-angular'));
       expect(runtimeLines).toHaveLength(1);
+      // Phase 82 (multi-root-consumer-attribute-fallthrough): COMBINED_SRC's
+      // template is a single `<div>` element root plus a sibling `<slot>`
+      // invocation, under default inherit-attrs/inherit-listeners flags. The
+      // Plan 02 root-classification generalization now recognizes this as a
+      // single structural root and synthesizes the attrs/listeners spread
+      // onto the `<div>`, which on Angular pulls in the
+      // createRozieAttrApplier/createRozieHostAttrsReader helper pair
+      // alongside the existing rozieAttr/rozieDisplay/rozieToken imports.
+      // Verified via a throwaway compile() probe: zero error diagnostics,
+      // the spread lands on the intended `<div>` via #rozieSpread_0 +
+      // afterRenderEffect, matching the shape documented in the Phase 82
+      // Plan 04 drift ledger for FlowCanvas/NodeType/MapLibre.
       expect(runtimeLines[0]).toBe(
-        `import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieToken } from '@rozie/runtime-angular';`,
+        `import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieToken } from '@rozie/runtime-angular';`,
       );
     });
   });
