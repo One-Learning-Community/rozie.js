@@ -22,6 +22,7 @@ import { describe, it, expect } from 'vitest';
 import { compile, type CompileTarget } from '../compile.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
 import { renderDiagnostic } from '../diagnostics/frame.js';
+import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 
 const ALL_TARGETS: CompileTarget[] = ['vue', 'react', 'solid', 'svelte', 'angular', 'lit'];
 
@@ -53,7 +54,7 @@ const DESCRIPTION_ONLY_SOURCE = `<rozie name="Widget">
 </rozie>
 `;
 
-function roz097Diagnostics(result: { diagnostics: Array<{ code: string }> }) {
+function roz097Diagnostics(result: { diagnostics: Diagnostic[] }): Diagnostic[] {
   return result.diagnostics.filter(
     (d) => d.code === RozieErrorCode.PROP_DOCS_EXAMPLE_UNSUPPORTED_CONSTRUCT,
   );

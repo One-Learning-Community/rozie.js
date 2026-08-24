@@ -164,7 +164,17 @@ export const RozieErrorCode = {
   // Phase-79 planning doc pre-allocated a code for this failure mode; ROZ096
   // is the next genuinely free code in the reserved ROZ090..ROZ099 block.
   SLOT_DYNAMIC_NAME_PARSE_ERROR: 'ROZ096', // error — a <slot>'s bound :name value failed to parse as a JavaScript expression; never silently falls back to an `undefined` identifier (T-79-12)
-  // ROZ097..ROZ099 remain free.
+  // Phase 81 Plan 03 (R3 / SPEC D-04) claims the next free code in this same
+  // reserved block. A prop's `docs.example` string, once classified by
+  // `classifyExampleMarkup` (Plan 01) as containing a construct the
+  // per-target example renderer cannot map, is a hard error on every
+  // target — SPEC D-04 leaves no silent-degrade path for this cluster. This
+  // allocation deliberately avoids the 9xx composition-reserved range (see
+  // the HONEST BAND NOTE below, earmarked for `<components>` composition
+  // diagnostics) and the band's last code (ROZ099), per that same note's
+  // guidance.
+  PROP_DOCS_EXAMPLE_UNSUPPORTED_CONSTRUCT: 'ROZ097', // error — a prop's `docs.example` contains a construct `renderExampleMarkup` cannot render (a slot fill, mustache interpolation, a non-model r-* directive, a bare or modifier-chained model/event directive, or malformed markup); the classifier's reason string names the specific construct (Phase 81 Plan 03, R3/SPEC D-04)
+  // ROZ098..ROZ099 remain free.
 
   // ---- Semantic-binding errors (Phase 2 Plan 02) — ROZ100..ROZ199 ----
   UNKNOWN_PROPS_REF: 'ROZ100', // error — SEM-01: $props.foo where foo not declared

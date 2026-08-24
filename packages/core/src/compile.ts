@@ -59,6 +59,9 @@ import { threadParamTypes } from './ir/threadParamTypes.js';
 // already cached (lookup-order-independent, but threading errors fire first).
 import { validateTwoWayBindings } from './ir/validateTwoWayBindings.js';
 import { validatePortalScopedStyle } from './ir/validatePortalScopedStyle.js';
+// Phase 81 Plan 03 (R3 / SPEC D-04) — pre-emit `docs.example` markup
+// validator. Reads only `ir.props`, needs no cache or resolver.
+import { validatePropExampleMarkup } from './ir/validatePropExampleMarkup.js';
 // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source string.
 // For `<style lang="scss">` the six emitStyle.ts files slice rule bodies at byte
 // offsets that index the COMPILED CSS (built by parseStyle, Plan 10-03); the
@@ -335,6 +338,16 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   // — empty propName or non-component target), ROZ951 (RHS not a writable
   // lvalue per D-03), and ROZ945 (cross-package resolver miss) when needed.
   validateTwoWayBindings(ir, filename ?? '<anonymous>', cache, resolver, opts.target, acc);
+
+  // 2.65. Phase 81 Plan 03 (R3 / SPEC D-04) — reject any prop's
+  // `docs.example` that carries a construct the per-target example renderer
+  // (`renderExampleMarkup`, Plan 01) cannot map. Runs here, after the two
+  // existing pre-emit validators and BEFORE the filename backfill + error
+  // gate below: it reads only `ir.props`, needs no cache or resolver, and
+  // MUST precede the gate because that gate is what makes the empty `code`
+  // guarantee uniform across all six targets — an unsupported example must
+  // never reach even one target's emitter.
+  validatePropExampleMarkup(ir, filename, acc);
 
   // Backfill `filename` on every pre-emit diagnostic that doesn't already
   // carry one (threadParamTypes/validatePortalScopedStyle/validateTwoWayBindings
