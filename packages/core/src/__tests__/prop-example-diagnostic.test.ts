@@ -86,6 +86,15 @@ const REJECTED: Array<{ name: string; example: string }> = [
     example: '<Foo @bar.stop="x" />',
   },
   { name: 'an unterminated tag', example: '<Foo><Bar></Foo>' },
+  {
+    name: 'a model directive with an empty prop name after the colon',
+    example: '<Foo r-model:="x" />',
+  },
+  {
+    name: 'a model directive with a multi-segment colon prop name',
+    example: '<Foo r-model:a:b="x" />',
+  },
+  { name: 'a binding attribute whose name contains a dot', example: '<Foo :bar.baz="x" />' },
 ];
 
 describe('Block A — rejected constructs: error ROZ097 + empty result.code on all six targets', () => {

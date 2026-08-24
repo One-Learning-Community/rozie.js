@@ -43,6 +43,10 @@ describe('classifyExampleMarkup — accepts (Block A)', () => {
   it('a component tag with a nested component child', () => {
     expect(classifyExampleMarkup('<Foo><Bar /></Foo>').kind).toBe('markup');
   });
+
+  it('a model directive with a hyphenated prop name', () => {
+    expect(classifyExampleMarkup('<Foo r-model:foo-bar="x" />').kind).toBe('markup');
+  });
 });
 
 describe('classifyExampleMarkup — rejects and passes through (Block B)', () => {
@@ -114,6 +118,24 @@ describe('classifyExampleMarkup — rejects and passes through (Block B)', () =>
     // Regression guard — a prose string containing a stray `<` must stay on
     // the verbatim path, not be classified as malformed markup.
     expect(classifyExampleMarkup('count < 5 && ok').kind).toBe('non-markup');
+  });
+
+  it('a model directive with an empty prop name after the colon', () => {
+    const result = classifyExampleMarkup('<Foo r-model:="x" />');
+    expect(result.kind).toBe('unsupported');
+    expect((result as { reason: string }).reason).toBeTruthy();
+  });
+
+  it('a model directive with a multi-segment colon prop name', () => {
+    const result = classifyExampleMarkup('<Foo r-model:a:b="x" />');
+    expect(result.kind).toBe('unsupported');
+    expect((result as { reason: string }).reason).toBeTruthy();
+  });
+
+  it('a binding attribute whose name contains a dot', () => {
+    const result = classifyExampleMarkup('<Foo :bar.baz="x" />');
+    expect(result.kind).toBe('unsupported');
+    expect((result as { reason: string }).reason).toBeTruthy();
   });
 });
 
