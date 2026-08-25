@@ -4108,3 +4108,191 @@ for (const target of TARGETS) {
     await expect(mergeStr).not.toHaveClass(INCOMPATIBLE);
   });
 }
+
+/**
+ * 34. INCOMPATIBLE-SOCKET ABORT PATHS — Escape and pointercancel clear a stuck mid-drag
+ * dimming (Phase 83 D-26, closes the D-14 gate).
+ *
+ * D-14's whole point is that no abort path leaves sockets permanently dimmed — a stuck
+ * dimmed socket is a visible, user-facing failure that outlives the gesture. Plan 05
+ * attached three window-level listeners (FlowCanvas.rozie:1618-1632) that all route through
+ * the same `clearIncompatibleSockets` helper: `pointercancel`, `keydown` (Escape only), and
+ * `blur`. This cell gates the first two permanently.
+ *
+ * WINDOW-BLUR IS DELIBERATELY NOT AUTOMATED HERE. Blur cannot be driven deterministically
+ * from Playwright without a second page or a real OS focus change, and a flaky abort cell
+ * in the shared VR suite is worse than none — it costs every future run. Plan 05 observed
+ * blur clearing the marking by hand, on all six targets (83-05-SUMMARY.md, Task 3
+ * observations table). This is a stated, recorded choice, not a silent gap.
+ *
+ * Escape is deliberately pressed WITHOUT first focusing the canvas container: the whole
+ * reason D-14 put Escape on a `window` listener rather than extending the existing
+ * `onCanvasKeydown` container listener is that focus during a pointer drag is not
+ * guaranteed to be on the canvas (rete's own `usePointerListener` drives the gesture from
+ * `window` itself, not from any focused element).
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-incompatible-socket-abort [${target}]: Escape and pointercancel clear the mid-drag dimming`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasValidateOff&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(2);
+
+    const typedSocketOf = (node: string, side: 'output' | 'input', portLabel: string) =>
+      page
+        .locator('.rozie-flow-node', { hasText: node })
+        .locator(`.rozie-flow-port--${side}`, { hasText: portLabel })
+        .locator('.rozie-flow-socket')
+        .first();
+
+    const center = async (locator: ReturnType<typeof typedSocketOf>) => {
+      await expect(locator).toBeVisible({ timeout: 10_000 });
+      const box = await locator.boundingBox();
+      if (!box) throw new Error('socket bounding box unavailable');
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    };
+
+    await expect(page.getByTestId('validate-state')).toHaveText('true');
+
+    const pickedOut = await center(typedSocketOf('Number Source', 'output', 'number'));
+    const mismatchedIn = await center(typedSocketOf('Merge', 'input', 'string'));
+    const mergeStr = typedSocketOf('Merge', 'input', 'string');
+    const INCOMPATIBLE = /rozie-flow-socket--incompatible/;
+
+    const startPausedGesture = async () => {
+      await page.mouse.move(pickedOut.x, pickedOut.y);
+      await page.mouse.down();
+      await page.mouse.move(
+        (pickedOut.x + mismatchedIn.x) / 2,
+        (pickedOut.y + mismatchedIn.y) / 2,
+        { steps: 8 },
+      );
+      await expect(mergeStr).toHaveClass(INCOMPATIBLE, { timeout: 5_000 });
+    };
+
+    // ---- Escape clears the marking while the pointer is STILL down ----
+    await startPausedGesture();
+    await page.keyboard.press('Escape');
+    await expect(mergeStr).not.toHaveClass(INCOMPATIBLE, { timeout: 5_000 });
+    // leave the page in a clean state for the next abort.
+    await page.mouse.up();
+
+    // ---- a dispatched `pointercancel` clears the marking while the pointer is STILL
+    // down — a fresh gesture, so results don't bleed into each other ----
+    await startPausedGesture();
+    await page.evaluate(() => {
+      let evt: Event;
+      try {
+        evt = new PointerEvent('pointercancel', { bubbles: true, cancelable: true });
+      } catch {
+        evt = new Event('pointercancel', { bubbles: true, cancelable: true });
+      }
+      document.dispatchEvent(evt);
+    });
+    await expect(mergeStr).not.toHaveClass(INCOMPATIBLE, { timeout: 5_000 });
+    await page.mouse.up();
+  });
+}
+
+/**
+ * 35. INCOMPATIBLE-SOCKET VALIDATION-OFF GUARD — nothing is ever dimmed when
+ * `:validate-types` is false (Phase 83 D-26, guards the D-13/D-12 `validateTypes` boundary
+ * Plan 05 recorded).
+ *
+ * `markIncompatibleSockets` returns immediately when `$props.validateTypes === false`
+ * (FlowCanvas.rozie:2162-2186): an automatic-off canvas allows a type-mismatched drop, so
+ * dimming a socket it will happily accept would misrepresent what the canvas is about to
+ * do. This cell proves the affordance and the actual behavior agree — not just that nothing
+ * is dimmed, but that the identical drag which WOULD have been refused with validation on
+ * genuinely commits a connection with it off.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-incompatible-socket-validate-off [${target}]: nothing is dimmed when :validate-types is false`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasValidateOff&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(2);
+
+    const typedSocketOf = (node: string, side: 'output' | 'input', portLabel: string) =>
+      page
+        .locator('.rozie-flow-node', { hasText: node })
+        .locator(`.rozie-flow-port--${side}`, { hasText: portLabel })
+        .locator('.rozie-flow-socket')
+        .first();
+
+    const center = async (locator: ReturnType<typeof typedSocketOf>) => {
+      await expect(locator).toBeVisible({ timeout: 10_000 });
+      const box = await locator.boundingBox();
+      if (!box) throw new Error('socket bounding box unavailable');
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    };
+
+    // counts DRAWN paths (non-empty `d`), the same helper cell 30 uses.
+    const drawnCount = async () =>
+      page
+        .locator('.rozie-flow-connection__path')
+        .evaluateAll(
+          (els) =>
+            els.filter((e) => (e.getAttribute('d') || '').trim().length > 0).length,
+        );
+
+    await expect(page.getByTestId('validate-state')).toHaveText('true');
+
+    // ---- turn validation off ----
+    await page.getByTestId('validate-btn').click();
+    await expect(page.getByTestId('validate-state')).toHaveText('false', { timeout: 5_000 });
+
+    const pickedOut = await center(typedSocketOf('Number Source', 'output', 'number'));
+    const mismatchedIn = await center(typedSocketOf('Merge', 'input', 'string'));
+    const mergeStr = typedSocketOf('Merge', 'input', 'string');
+    const mergeNum = typedSocketOf('Merge', 'input', 'number');
+    const srcStr = typedSocketOf('Number Source', 'output', 'string');
+    const srcNum = typedSocketOf('Number Source', 'output', 'number');
+    const INCOMPATIBLE = /rozie-flow-socket--incompatible/;
+
+    // ---- start the SAME drag, pause mid-gesture — with validation off, NONE of the four
+    // sockets is marked, including the type-mismatched target that WOULD be marked with
+    // validation on ----
+    await page.mouse.move(pickedOut.x, pickedOut.y);
+    await page.mouse.down();
+    await page.mouse.move(
+      (pickedOut.x + mismatchedIn.x) / 2,
+      (pickedOut.y + mismatchedIn.y) / 2,
+      { steps: 8 },
+    );
+    await page.waitForTimeout(200);
+    await expect(mergeStr).not.toHaveClass(INCOMPATIBLE);
+    await expect(mergeNum).not.toHaveClass(INCOMPATIBLE);
+    await expect(srcStr).not.toHaveClass(INCOMPATIBLE);
+    await expect(srcNum).not.toHaveClass(INCOMPATIBLE);
+
+    // ---- complete the gesture: with validation off, the drop is genuinely ALLOWED — the
+    // affordance and the behavior must agree, so prove a connection was actually created ----
+    await page.mouse.move(mismatchedIn.x, mismatchedIn.y, { steps: 8 });
+    await page.mouse.up();
+
+    await expect
+      .poll(drawnCount, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe(1);
+  });
+}
