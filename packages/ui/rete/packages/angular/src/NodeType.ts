@@ -1,6 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, Renderer2, TemplateRef, ViewContainerRef, ViewEncapsulation, afterRenderEffect, computed, contentChild, contentChildren, effect, forwardRef, inject, input, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, computed, contentChild, contentChildren, effect, forwardRef, inject, input, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieToken } from '@rozie/runtime-angular';
+import { RozieSlot, rozieToken } from '@rozie/runtime-angular';
 
 interface BodyCtx {
   $implicit: { node: any; selected: any; emit: any };
@@ -20,7 +20,7 @@ interface DefaultCtx {}
 
 
 
-    <div class="rozie-node-type-children" style="display:none" #rozieSpread_0 #rozieListenersTarget_1><ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" /></div>
+    <div class="rozie-node-type-children" style="display:none"><ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" /></div>
     <ng-container #rozie_portalAnchor></ng-container>
   `,
   styles: [`
@@ -263,48 +263,6 @@ export class NodeType {
   ): _ctx is BodyCtx | DefaultCtx {
     return true;
   }
-
-  private rozieSpread_0 = viewChild<ElementRef>('rozieSpread_0');
-
-  private __rozieApplyAttrs = createRozieAttrApplier(inject(Renderer2));
-
-  private __rozieGetHostAttrs = createRozieHostAttrsReader(inject(ElementRef));
-
-  private __rozieSpread_0_effect = afterRenderEffect(() => {
-    const el = this.rozieSpread_0()?.nativeElement;
-    if (!el) return;
-    this.__rozieApplyAttrs(el, this.__rozieGetHostAttrs());
-  });
-
-  private rozieListenersTarget_1 = viewChild<ElementRef>('rozieListenersTarget_1');
-
-  private __rozieListenersRenderer = inject(Renderer2);
-
-  private __rozieListenersDisposers_1: Array<() => void> = [];
-
-  private __rozieListenersDestroyRegistered_1 = false;
-
-  private __rozieListenersEffect_1 = effect(() => {
-    const el = this.rozieListenersTarget_1()?.nativeElement;
-    if (!el) return;
-    for (const off of this.__rozieListenersDisposers_1) off();
-    this.__rozieListenersDisposers_1 = [];
-    const obj: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
-      if (typeof v !== 'function') continue;
-      const norm = k.startsWith('on') ? k.slice(2).toLowerCase() : k;
-      const dispose = this.__rozieListenersRenderer.listen(el, norm, v as EventListener);
-      this.__rozieListenersDisposers_1.push(dispose);
-    }
-    if (!this.__rozieListenersDestroyRegistered_1) {
-      this.__rozieListenersDestroyRegistered_1 = true;
-      this.__rozieDestroyRef.onDestroy(() => {
-        for (const off of this.__rozieListenersDisposers_1) off();
-        this.__rozieListenersDisposers_1 = [];
-      });
-    }
-  });
 }
 
 export default NodeType;

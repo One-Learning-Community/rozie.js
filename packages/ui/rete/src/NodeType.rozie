@@ -39,15 +39,19 @@
   ZERO emitter/core change.
 -->
 <!--
-  Phase 82: the ROZ970/ROZ973 escape hatch is gone — the core's root
-  classification now treats "one real element + N <slot> siblings" as
-  single-root, so consumer attrs/listeners auto-inherit onto the hidden
-  `.rozie-node-type-children` container below (the component's only real
-  element — a deliberately 0x0-hidden div that exists only so nested
-  renderless <Port> children mount). Consumer class/style now land on that
-  invisible div; this is the honest answer, not a bug (T-82-08).
+  inherit-attrs/inherit-listeners are OFF: NodeType's only real element is the
+  hidden `.rozie-node-type-children` container (0x0, display:none) that exists
+  solely so nested renderless <Port> children mount — it never paints and never
+  receives pointer/keyboard interaction, so a consumer class/style landing on it
+  is a silent no-op and a consumer listener on it never fires. This is the same
+  fence Port's renderless shape uses, applied to a real-but-permanently-hidden
+  element instead of an absent one. Restored after Phase 82 Plan 06's
+  human-verify checkpoint (T-82-08): Plan 82-03 removed this opt-out on the
+  hypothesis that the generalized single-root classification made it dead
+  weight, but the checkpoint's live-DOM confirmation showed the container really
+  is inert, so the opt-out is deliberate again, not dead.
 -->
-<rozie name="NodeType">
+<rozie name="NodeType" inherit-attrs="false" inherit-listeners="false">
 
 <props>
 {

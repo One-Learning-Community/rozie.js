@@ -241,7 +241,7 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
 
 
 
-    <div style={{ display: "none" }} {...attrs} class={"rozie-node-type-children" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-372f9492="">{resolved()}</div>
+    <div class={"rozie-node-type-children"} style={{ display: "none" }} data-rozie-s-372f9492="">{resolved()}</div>
     </>
     </__ctx_rete_nodeType.Provider>
   );
