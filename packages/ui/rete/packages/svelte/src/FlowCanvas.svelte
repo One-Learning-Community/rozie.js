@@ -2101,6 +2101,26 @@ onMount(() => {
       // sized box on the very next render.
       existing.box.style.width = meta.width != null ? meta.width + 'px' : '';
       existing.box.style.height = meta.height != null ? meta.height + 'px' : '';
+      // RENDER-BY-TYPE bodies re-project HERE. The typeSpec branch of the fresh build
+      // below sets `entry.bodyHandle` and RETURNS EARLY, so a <NodeType>-templated node
+      // carries handle === null AND titleEl === null — without this call both arms below
+      // miss and area.update('node', id) repaints nothing, freezing the projected #body
+      // at first paint for the life of the node while the bound model moves underneath
+      // it (the upstream 0.2.0 report; gated by rete-flow-body-update). `bodyHandle` is
+      // NodeType.rozie's { update, dispose } wrapper over its reactive `body` portal
+      // handle — a reactive portal re-renders by being CALLED with a fresh scope, on all
+      // 6 targets (REQ-5), never by a per-target tracked effect. Guarded + try/catch like
+      // every other bodyHandle touch in this file (:2137, :2529, :3342): a per-target
+      // portal hiccup must never abort the renderNode loop mid-graph.
+      if (existing.bodyHandle && existing.bodyHandle.update) {
+        try {
+          existing.bodyHandle.update({
+            node: meta,
+            selected,
+            emit: existing.emit
+          });
+        } catch (e: any) {}
+      }
       if (existing.handle) {
         existing.handle.update({
           node: meta,
