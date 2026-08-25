@@ -31,11 +31,13 @@ jobs:
   # workspace ONCE and publishes `.turbo`; the jobs below restore it, so their
   # own `turbo run build` replays from cache instead of rebuilding.
   #
-  # Deliberately NOT a gate. It runs build only and asserts nothing, and every
-  # consumer below is `if: ${{ !cancelled() }}`, so a RED producer does not skip
-  # them — they fall back to a real full build, exactly as before this change.
-  # That preserves the 260819-mqx decision recorded in vue-matrix.yml: a
-  # `needs:` chain must never hide a downstream failure behind a skip.
+  # It also runs the framework-agnostic unit suites (quick 260825-n4y), so it
+  # DOES assert — but it still is not a gate. Every consumer below is
+  # `if: ${{ !cancelled() }}`, so a RED producer never skips them: they run,
+  # fall back to a real full build, and report their own result. That is what
+  # preserves the 260819-mqx decision recorded in vue-matrix.yml — the invariant
+  # is the !cancelled() guard, NOT the producer being assertion-free. A `needs:`
+  # chain must never hide a downstream failure behind a skip.
   build:
     name: Build workspace (shared turbo cache producer)
     runs-on: ubuntu-latest
@@ -68,6 +70,22 @@ jobs:
 
       - name: Build all packages
         run: pnpm turbo run build
+
+      # Hoisted out of the matrix cells (quick 260825-n4y). These two suites are
+      # framework-agnostic — nothing in either varies with this workflow's matrix
+      # axis — so they were running once PER CELL for no signal. Across CI that
+      # was 13 `packages/core` runs per push at ~126s each; hoisting takes it to
+      # 6 (~15 min/push). The cells keep their own target/runtime suites, which
+      # are the actual matrix signal.
+      #
+      # Safe to assert here: a failure turns the producer red but hides nothing,
+      # because every consumer is `if: ${{ !cancelled() }}` and still runs. The
+      # 260819-mqx invariant is the !cancelled() guard, not the producer being
+      # assertion-free.
+      - name: Run framework-agnostic unit tests (core + unplugin)
+        run: |
+          pnpm exec vitest run --root packages/core
+          pnpm exec vitest run --root packages/unplugin
 
       # ONLY the producer saves. Consumers are restore-only, which is what fixes
       # the `Unable to reserve cache ... another job may be creating this cache`
@@ -145,15 +163,13 @@ jobs:
       - name: Build all packages (generates .d.rozie.ts sidecars before typecheck — REQ-6)
         run: pnpm turbo run build
 
-      - name: Run unit tests (core + targets + runtime + unplugin)
+      - name: Run unit tests (targets + runtime)
         run: |
-          pnpm exec vitest run --root packages/core
           pnpm exec vitest run --root packages/targets/svelte
           pnpm exec vitest run --root packages/targets/vue
           pnpm exec vitest run --root packages/targets/react
           pnpm exec vitest run --root packages/runtime/vue
           pnpm exec vitest run --root packages/runtime/react
-          pnpm exec vitest run --root packages/unplugin
 
       - name: Override Svelte + Vite versions for the demo
         working-directory: examples/consumers/svelte-vite
