@@ -3883,3 +3883,106 @@ for (const target of TARGETS) {
     await expect(nodeCount).toHaveText('48');
   });
 }
+
+/**
+ * OS-DARK LIGHT-OPT-OUT GUARD (ISSUE-3 / D-01, Phase 83 Plan 01) — the zero-import
+ * OS-dark default must honor an app's explicit `.light` / `[data-theme="light"]` root
+ * opt-out.
+ *
+ * `base.css`'s own documented promise (see its header comment above the OS-dark block
+ * it declares) is two-fold: dark mode works with NO import at all (pure OS
+ * `prefers-color-scheme`), AND an app that opts into light at the document root keeps
+ * control even while the OS requests dark. Before this phase the SFC's zero-import
+ * OS-dark block carried NO opt-out guard at all, so the second half of that promise
+ * was false for every zero-import consumer of this component — and silently so, since
+ * the naive guard shape compiles to dead code with zero compiler diagnostics
+ * (`scopeCss()` scopes past a leading `:root` pseudo). This cell is RED-BY-CONSTRUCTION
+ * on react/vue/svelte/angular/solid until Task 2 lands the corrected `:root { @media
+ * {...} } }` escape-hatch shape.
+ *
+ * The Lit branch below is NOT an oversight — it records a deliberate, documented gap
+ * (D-01): Lit's dark palette lives inside a shadow root where an ancestor selector like
+ * `:root:not(.light)` can never be observed from outside, so Lit stays unguarded (still
+ * dark, opt-out or not). That is the accepted contract, asserted here so it stays a
+ * recorded fact rather than an accident.
+ *
+ * No `toHaveScreenshot` anywhere in this block — per this file's header, structural /
+ * behavioral assertions only; a transient DOM-classlist-driven theming check must never
+ * touch a pixel baseline.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-osdark-guard [${target}]: the zero-import OS-dark default honors the light opt-out`, async ({
+    page,
+  }) => {
+    // Dark tokens resolve at style time and the imperative minimap reads them at draw
+    // time — emulate BEFORE goto or the first paint is left light. Same ordering
+    // `rete-flow-dark.spec.ts` documents and relies on.
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto(`/?example=FlowCanvas&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThanOrEqual(3);
+
+    // The CSS locator pierces Lit's open shadow root, exactly as the neighbouring cells
+    // in this file rely on.
+    const canvasBg = () =>
+      page
+        .locator('.rozie-flow-canvas')
+        .first()
+        .evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    // ---- Assertion A (green today, permanent regression guard): no opt-out present —
+    // dark on all six targets ----
+    await expect
+      .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe('rgb(15, 23, 42)');
+
+    // ---- Assertion B (RED today on react/vue/svelte/angular/solid): `.light` class
+    // opt-out ----
+    await page.evaluate(() => document.documentElement.classList.add('light'));
+    if (target === 'lit') {
+      // D-01's documented, accepted gap: Lit's OS-dark copy lives inside a shadow root
+      // where the ancestor guard selector can never match, so Lit stays dark regardless
+      // of the opt-out.
+      await expect
+        .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+        .toBe('rgb(15, 23, 42)');
+    } else {
+      await expect
+        .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+        .toBe('rgb(247, 248, 250)');
+    }
+    await page.evaluate(() => document.documentElement.classList.remove('light'));
+    // the opt-out is not sticky — removing it returns the canvas to dark.
+    await expect
+      .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe('rgb(15, 23, 42)');
+
+    // ---- Assertion C (RED today on the same five): `[data-theme="light"]` attribute
+    // opt-out — base.css's guard covers both forms and the SFC copy must too ----
+    await page.evaluate(() =>
+      document.documentElement.setAttribute('data-theme', 'light'),
+    );
+    if (target === 'lit') {
+      await expect
+        .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+        .toBe('rgb(15, 23, 42)');
+    } else {
+      await expect
+        .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+        .toBe('rgb(247, 248, 250)');
+    }
+    await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
+  });
+}
