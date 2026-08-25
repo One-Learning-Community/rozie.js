@@ -53,13 +53,17 @@ export function Demo() {
 
 ## Theming
 
-Every visual value the canvas renders is a `--rozie-flow-*` CSS custom property with a built-in inline `var(token, fallback)` default — it looks right zero-config and re-skins by overriding a token at any ancestor scope. Overriding just `--rozie-flow-accent` recolors every selected/active affordance at once: the selected-node border + ring, socket hover, the selected-edge stroke, the active control button, the marquee box, and the minimap selection. **Dark mode is a zero-import, OS-driven default** — the component ships an `@media (prefers-color-scheme: dark)` block. Ready-made design-system bridges ship in the package:
+Every visual value the canvas renders is a `--rozie-flow-*` CSS custom property with a built-in inline `var(token, fallback)` default — it looks right zero-config and re-skins by overriding a token at any ancestor scope. Overriding just `--rozie-flow-accent` recolors every selected/active affordance at once: the selected-node border + ring, socket hover, the selected-edge stroke, the active control button, the marquee box, and the minimap selection.
+
+**Dark mode is a zero-import, OS-driven default** — the component ships an `@media (prefers-color-scheme: dark)` block that applies when the OS requests dark. An app that explicitly opts into light at the document root (a `.light` class or `[data-theme="light"]`) keeps control: the OS-dark default stands down and the light render applies instead. On the Lit build specifically, the canvas lives inside a shadow root, where a document-root ancestor selector cannot be observed, so the light opt-out above is **not honored there** — Lit keeps following the OS scheme regardless. Lit consumers who need app-controlled theming should use the `.dark` / `[data-theme="dark"]` class strategy below instead, since custom properties inherit across the shadow boundary. Ready-made design-system bridges ship in the package:
 
 ```tsx
 import '@rozie-ui/rete-react/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
 ```
 
 The full token vocabulary — plus the `.dark` / `[data-theme="dark"]` class strategy for apps that toggle theme by a root class — lives in `@rozie-ui/rete-react/themes/base.css`.
+
+Dragging a connection from a typed port dims type-mismatched target sockets on other nodes for the duration of the gesture. That hint is resolved from port **types only** — it never invokes the `canConnect` prop, which still runs once, as the override, at actual connection time.
 
 ## Props
 

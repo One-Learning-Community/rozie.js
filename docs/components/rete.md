@@ -268,14 +268,25 @@ The imperative overlays that draw with SVG attributes (the minimap fills, the co
 
 **Dark mode is a zero-import, OS-driven default.** The component ships an
 `@media (prefers-color-scheme: dark)` block that re-skins the color tokens when the OS
-requests dark — no import, no config (it rides the `:root` engine-DOM
-escape hatch, so it reaches the Lit shadow tree too). The light render is untouched (the
-query only matches in a dark context), so nothing changes for light-mode consumers.
+requests dark — no import, no config. An app that explicitly opts into light at the
+document root (a `.light` class or `[data-theme="light"]`) keeps control: the OS-dark
+default stands down and the light render applies instead, on the five **light-DOM**
+targets (React, Vue, Svelte, Angular, Solid). The light render itself is untouched by any
+of this (the query only matches in a dark context), so nothing changes for light-mode
+consumers.
+
+**Lit is the one documented exception.** Its canvas lives inside a shadow root, where a
+document-root ancestor selector cannot be observed — the `.light` / `[data-theme="light"]`
+opt-out above is **not honored there**, and the Lit build keeps following the OS scheme
+regardless. This is a real limitation of the shadow-DOM boundary, not an oversight:
+`:host-context()` was considered and rejected because it is Chromium-only and a silent
+no-op in Firefox/Safari. Lit consumers who need app-controlled theming should use the
+`.dark` / `[data-theme="dark"]` class strategy below instead.
 
 For apps that toggle theme by a **root class** rather than the OS setting, import
 `themes/base.css` — it adds the `.dark` / `[data-theme="dark"]` strategy. On the five
 light-DOM targets a class ancestor drives the switch; Lit's shadow boundary blocks a
-descendant class, so Lit relies on the built-in OS default (or a token override on the
-element).
+descendant class too, but custom properties inherit across shadow boundaries, so the
+class strategy still reaches Lit even though the OS-dark opt-out above cannot.
 
 The complete token table and the design-system bridges live on the [dedicated theming page](/components/rete-theming).

@@ -416,10 +416,29 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
       're-skins by overriding a token at any ancestor scope. Overriding just ' +
       '`--rozie-flow-accent` recolors every selected/active affordance at once: the ' +
       'selected-node border + ring, socket hover, the selected-edge stroke, the active ' +
-      'control button, the marquee box, and the minimap selection. **Dark mode is a ' +
-      'zero-import, OS-driven default** — the component ships an ' +
-      '`@media (prefers-color-scheme: dark)` block. Ready-made design-system bridges ship ' +
-      'in the package:',
+      'control button, the marquee box, and the minimap selection.',
+  );
+  lines.push('');
+  lines.push(
+    '**Dark mode is a zero-import, OS-driven default** — the component ships an ' +
+      '`@media (prefers-color-scheme: dark)` block that applies when the OS requests dark. ' +
+      'An app that explicitly opts into light at the document root (a `.light` class or ' +
+      '`[data-theme="light"]`) keeps control: the OS-dark default stands down and the light ' +
+      'render applies instead.' +
+      (target === 'lit'
+        ? ' On this Lit build, the canvas lives inside a shadow root, where a document-root ' +
+          'ancestor selector cannot be observed — the light opt-out above is **not honored ' +
+          'here**, and the canvas keeps following the OS scheme regardless of a `.light` / ' +
+          '`[data-theme="light"]` ancestor. If your app needs to control this component\'s ' +
+          'theme directly, use the `.dark` / `[data-theme="dark"]` class strategy below ' +
+          'instead — custom properties inherit across the shadow boundary, so it reaches this ' +
+          'component even though a plain ancestor selector cannot.'
+        : ' On the Lit build specifically, the canvas lives inside a shadow root, where a ' +
+          'document-root ancestor selector cannot be observed, so the light opt-out above is ' +
+          '**not honored there** — Lit keeps following the OS scheme regardless. Lit consumers ' +
+          'who need app-controlled theming should use the `.dark` / `[data-theme="dark"]` class ' +
+          'strategy below instead, since custom properties inherit across the shadow boundary.') +
+      ' Ready-made design-system bridges ship in the package:',
   );
   lines.push('');
   lines.push('```' + (target === 'lit' ? 'ts' : usage.lang === 'vue' ? 'ts' : usage.lang));
@@ -430,6 +449,13 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
     `The full token vocabulary — plus the \`.dark\` / \`[data-theme="dark"]\` class ` +
       `strategy for apps that toggle theme by a root class — lives in ` +
       `\`${pkgName}/themes/base.css\`.`,
+  );
+  lines.push('');
+  lines.push(
+    'Dragging a connection from a typed port dims type-mismatched target sockets on other ' +
+      'nodes for the duration of the gesture. That hint is resolved from port **types only** ' +
+      '— it never invokes the `canConnect` prop, which still runs once, as the override, at ' +
+      'actual connection time.',
   );
   lines.push('');
 

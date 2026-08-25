@@ -14,7 +14,7 @@ Every cosmetic value `FlowCanvas` renders is a `--rozie-flow-*` custom property 
   --rozie-flow-accent: #3b82f6;
   --rozie-flow-bg: #f7f8fa;
   --rozie-flow-node-bg: #ffffff;
-  --rozie-flow-port-fg: #6b7280;
+  --rozie-flow-node-body-padding: 0.5rem 0.75rem;
 }
 ```
 
@@ -47,17 +47,33 @@ Every cosmetic value `FlowCanvas` renders is a `--rozie-flow-*` custom property 
 | `--rozie-flow-node-title-fg` | `#1f2937` |
 | `--rozie-flow-node-selected-border` | `var(--rozie-flow-accent)` |
 | `--rozie-flow-node-selected-ring` | `rgba(59, 130, 246, 0.5)` |
+| `--rozie-flow-node-selected-shadow` | `0 2px 8px rgba(0, 0, 0, 0.15)` |
+
+D-09: a node editor has real full-bleed body cases — an image, a sparkline, a nested chart — where the consumer needs 0 padding; a hardcoded value leaves them fighting it with a negative margin. Default matches .rozie-flow-node__title's padding so body and title line up.
+
+| Token | Default |
+| --- | --- |
+| `--rozie-flow-node-body-padding` | `0.5rem 0.75rem` |
 
 ### ports + sockets
+
+D-15: under box-sizing: border-box this token now means the socket's RENDERED diameter (the 2px border sits inside it, not added on top). The default render is unchanged from the previous 12px content-box value — only the ~2px centring error is corrected. A consumer who previously hand-set 12px now gets a genuinely 12px socket; see the phase changeset.
 
 | Token | Default |
 | --- | --- |
 | `--rozie-flow-port-fg` | `#6b7280` |
-| `--rozie-flow-socket-size` | `12px` |
+| `--rozie-flow-socket-size` | `16px` |
 | `--rozie-flow-socket-bg` | `#94a3b8` |
 | `--rozie-flow-socket-border-color` | `#ffffff` |
+| `--rozie-flow-socket-border-width` | `2px` |
 | `--rozie-flow-socket-ring` | `rgba(0, 0, 0, 0.2)` |
 | `--rozie-flow-socket-hover-bg` | `var(--rozie-flow-accent)` |
+
+D-11 (ISSUE-6): opacity-only, deliberately carrying no colour — a colour-based hint would need an entry in all three hand-maintained dark palette copies, the very triplicate that produced both ISSUE-3 and A4. Opacity is immune to that drift, reads as "unavailable" rather than "error", and works against any consumer accent. Light-only by design; adds ZERO dark-block entries.
+
+| Token | Default |
+| --- | --- |
+| `--rozie-flow-socket-incompatible-opacity` | `0.3` |
 
 ### connections
 
@@ -84,13 +100,18 @@ Every cosmetic value `FlowCanvas` renders is a `--rozie-flow-*` custom property 
 | `--rozie-flow-control-selected-bg` | `#dbeafe` |
 | `--rozie-flow-control-selected-fg` | `#1d4ed8` |
 | `--rozie-flow-control-selected-border` | `var(--rozie-flow-accent)` |
+| `--rozie-flow-control-inset` | `10px` |
+| `--rozie-flow-control-btn-size` | `28px` |
 
 ### marquee (mode:'select')
 
+D-25: derives off --rozie-flow-accent in BOTH light and dark, so overriding accent alone recolors the marquee too — zero dark-block entries needed. The historical rgba(59, 130, 246, 0.12) literal lives on as the at-usage-site var() fallback in FlowCanvas.rozie, not as a second declaration here (a "preceding fallback" declaration is a no-op for a custom property).
+
 | Token | Default |
 | --- | --- |
-| `--rozie-flow-marquee-bg` | `rgba(59, 130, 246, 0.12)` |
+| `--rozie-flow-marquee-bg` | `color-mix(in srgb, var(--rozie-flow-accent) 12%, transparent)` |
 | `--rozie-flow-marquee-border` | `var(--rozie-flow-accent)` |
+| `--rozie-flow-marquee-radius` | `2px` |
 
 ### MiniMap overlay
 
@@ -114,6 +135,7 @@ The two tokens below are read from JS via a getComputedStyle-backed flowToken() 
 | `--rozie-flow-resize-handle-bg` | `#ffffff` |
 | `--rozie-flow-resize-handle-border` | `var(--rozie-flow-accent, #3b82f6)` |
 | `--rozie-flow-resize-handle-size` | `8px` |
+| `--rozie-flow-resize-handle-radius` | `2px` |
 
 ### NodeToolbar overlay
 
@@ -127,6 +149,27 @@ The two tokens below are read from JS via a getComputedStyle-backed flowToken() 
 | `--rozie-flow-toolbar-btn-border` | `rgba(0, 0, 0, 0.14)` |
 | `--rozie-flow-toolbar-btn-hover-bg` | `#eef2f7` |
 | `--rozie-flow-toolbar-delete-fg` | `#b91c1c` |
+
+### typography
+
+Splitting the family out from the four per-role sizes means rebranding is ONE override, while each role's size stays independently tunable — the two knobs solve different problems and shouldn't be conflated.
+
+| Token | Default |
+| --- | --- |
+| `--rozie-flow-font-family` | `system-ui, sans-serif` |
+| `--rozie-flow-node-font-size` | `13px` |
+| `--rozie-flow-control-font-size` | `16px` |
+| `--rozie-flow-toolbar-font-size` | `12px` |
+| `--rozie-flow-connection-label-font-size` | `11px` |
+
+### focus ring
+
+Defaults off --rozie-flow-accent, not a colour literal: both dark blocks already remap accent, so the ring inherits dark automatically and adds ZERO new entries to the three hand-maintained dark palettes. Do not "helpfully" hardcode a colour here — that would reintroduce exactly the drift D-20's predicate exists to catch.
+
+| Token | Default |
+| --- | --- |
+| `--rozie-flow-focus-ring` | `var(--rozie-flow-accent)` |
+| `--rozie-flow-focus-ring-width` | `2px` |
 
 ## Design-system bridges
 
