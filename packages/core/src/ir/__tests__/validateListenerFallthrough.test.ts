@@ -12,7 +12,7 @@
  *   $listeners member access does NOT trigger ROZ974 (only bare-identifier)
  *   $attrs bare-identifier on the same root does NOT trigger ROZ974
  */
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { compile } from '../../compile.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
@@ -68,6 +68,24 @@ const ELEMENT_PLUS_CONDITIONAL_BODY = `<div class="wrap"></div>
 // compile-time signal at all.
 const CONDITIONAL_ROOT_BODY = `<div class="wrap" r-if="$props.show"></div>`;
 
+// WR-01 (D-17 listeners twin): an `r-match` root authored on a REAL element.
+// The host `<div>` renders UNCONDITIONALLY (`TemplateMatchIR.hostElement`,
+// types.ts:1334); only the content nested inside it varies per branch. Not an
+// element-less shape, so ROZ099 must not fire and the synthesized
+// `$listeners` spread lands on the host.
+const MATCH_HOST_ROOT_BODY = `<div class="wrap" r-match="'a'">
+  <span r-case="'a'">a</span>
+  <span r-default>default</span>
+</div>`;
+
+// WR-01 over-reach guard: the SAME rungs under a non-rendering
+// `<template r-match>` host — no unconditional element, so ROZ099 must KEEP
+// firing. This shape stays D-02-deferred.
+const TEMPLATE_MATCH_ROOT_BODY = `<template r-match="'a'">
+  <span r-case="'a'">a</span>
+  <span r-default>default</span>
+</template>`;
+
 function rozieEnv(openTag: string, body: string): string {
   return `${openTag}
 <template>
@@ -95,15 +113,13 @@ ${body}
 describe('validateListenerFallthrough (Phase 15 R8/R9)', () => {
   // ---- R8 multi-root × 4-corner flag matrix ----
   it('multi-root + inheritAttrs default + inheritListeners default → ROZ970 + ROZ973', () => {
-    const diags = compileDiagnostics(
-      rozieEnv('<rozie name="MR">', MULTI_ROOT_BODY),
-    );
+    const diags = compileDiagnostics(rozieEnv('<rozie name="MR">', MULTI_ROOT_BODY));
     expect(
       diags.filter((d) => d.code === RozieErrorCode.LISTENER_FALLTHROUGH_MULTI_ROOT).length,
     ).toBe(1);
-    expect(
-      diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT).length,
-    ).toBe(1);
+    expect(diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT).length).toBe(
+      1,
+    );
   });
 
   it('multi-root + inheritAttrs=false + inheritListeners default → ONLY ROZ973 (independence)', () => {
@@ -113,21 +129,19 @@ describe('validateListenerFallthrough (Phase 15 R8/R9)', () => {
     expect(
       diags.filter((d) => d.code === RozieErrorCode.LISTENER_FALLTHROUGH_MULTI_ROOT).length,
     ).toBe(1);
-    expect(
-      diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT),
-    ).toEqual([]);
+    expect(diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT)).toEqual([]);
   });
 
   it('multi-root + inheritAttrs default + inheritListeners=false → ONLY ROZ970 (independence)', () => {
     const diags = compileDiagnostics(
       rozieEnv('<rozie name="MR" inherit-listeners="false">', MULTI_ROOT_BODY),
     );
-    expect(
-      diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT).length,
-    ).toBe(1);
-    expect(
-      diags.filter((d) => d.code === RozieErrorCode.LISTENER_FALLTHROUGH_MULTI_ROOT),
-    ).toEqual([]);
+    expect(diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT).length).toBe(
+      1,
+    );
+    expect(diags.filter((d) => d.code === RozieErrorCode.LISTENER_FALLTHROUGH_MULTI_ROOT)).toEqual(
+      [],
+    );
   });
 
   it('multi-root + both flags false → no R8 diagnostics', () => {
@@ -158,14 +172,9 @@ describe('validateListenerFallthrough (Phase 15 R8/R9)', () => {
 
   it('bare r-on="$listeners" + inheritListeners=false → no ROZ974', () => {
     const diags = compileDiagnostics(
-      rozieEnv(
-        '<rozie name="DA" inherit-listeners="false">',
-        `<div r-on="$listeners"></div>`,
-      ),
+      rozieEnv('<rozie name="DA" inherit-listeners="false">', `<div r-on="$listeners"></div>`),
     );
-    expect(
-      diags.filter((d) => d.code === RozieErrorCode.LISTENER_DOUBLE_APPLY),
-    ).toEqual([]);
+    expect(diags.filter((d) => d.code === RozieErrorCode.LISTENER_DOUBLE_APPLY)).toEqual([]);
   });
 
   // ---- $listeners member access does NOT trigger ROZ974 ----
@@ -178,41 +187,28 @@ describe('validateListenerFallthrough (Phase 15 R8/R9)', () => {
     const diags = compileDiagnostics(
       rozieEnv('<rozie name="NoMember">', `<div r-on="$listeners.click"></div>`),
     );
-    expect(
-      diags.filter((d) => d.code === RozieErrorCode.LISTENER_DOUBLE_APPLY),
-    ).toEqual([]);
+    expect(diags.filter((d) => d.code === RozieErrorCode.LISTENER_DOUBLE_APPLY)).toEqual([]);
   });
 
   // ---- Independence: bare $attrs vs bare $listeners on same root ----
   it('r-bind="$attrs" + r-on="$listeners" on same root → both ROZ971 AND ROZ974', () => {
     const diags = compileDiagnostics(
-      rozieEnv(
-        '<rozie name="Both">',
-        `<div r-bind="$attrs" r-on="$listeners"></div>`,
-      ),
+      rozieEnv('<rozie name="Both">', `<div r-bind="$attrs" r-on="$listeners"></div>`),
     );
-    expect(
-      diags.filter((d) => d.code === RozieErrorCode.LISTENER_DOUBLE_APPLY).length,
-    ).toBe(1);
-    expect(
-      diags.filter((d) => d.code === RozieErrorCode.ATTR_DOUBLE_APPLY).length,
-    ).toBe(1);
+    expect(diags.filter((d) => d.code === RozieErrorCode.LISTENER_DOUBLE_APPLY).length).toBe(1);
+    expect(diags.filter((d) => d.code === RozieErrorCode.ATTR_DOUBLE_APPLY).length).toBe(1);
   });
 
   it('r-bind="$attrs" alone does NOT trigger ROZ974 (only $listeners triggers it)', () => {
     const diags = compileDiagnostics(
       rozieEnv('<rozie name="AttrsOnly">', `<div r-bind="$attrs"></div>`),
     );
-    expect(
-      diags.filter((d) => d.code === RozieErrorCode.LISTENER_DOUBLE_APPLY),
-    ).toEqual([]);
+    expect(diags.filter((d) => d.code === RozieErrorCode.LISTENER_DOUBLE_APPLY)).toEqual([]);
   });
 
   // ---- Sanity: validator never throws ----
   it('clean single-root template emits no R8/R9 diagnostics', () => {
-    const diags = compileDiagnostics(
-      rozieEnv('<rozie name="Clean">', `<div></div>`),
-    );
+    const diags = compileDiagnostics(rozieEnv('<rozie name="Clean">', `<div></div>`));
     expect(
       diags.filter(
         (d) =>
@@ -308,10 +304,7 @@ describe('validateListenerFallthrough (Phase 82 multi-root + gated-root)', () =>
     // are non-disqualifying (D-01/D-06); a conditional sibling is still a
     // second candidate root and must keep erroring.
     const diags = compileDiagnostics(
-      rozieEnvWithShowProp(
-        '<rozie name="ElementPlusConditional">',
-        ELEMENT_PLUS_CONDITIONAL_BODY,
-      ),
+      rozieEnvWithShowProp('<rozie name="ElementPlusConditional">', ELEMENT_PLUS_CONDITIONAL_BODY),
     );
     const multiRoot = diags.filter(
       (d) => d.code === RozieErrorCode.LISTENER_FALLTHROUGH_MULTI_ROOT,
@@ -358,6 +351,40 @@ describe('validateListenerFallthrough (Phase 82 multi-root + gated-root)', () =>
     ).toEqual([]);
   });
 
+  it('WR-01 RED: an r-match root WITH a real host element produces no LISTENER_FALLTHROUGH_GATED_ROOT and does synthesize the spread', () => {
+    // D-17 listeners twin. The host `<div class="wrap">` renders
+    // unconditionally, so the ROZ099 message and hint are both false for this
+    // shape. RED today on both halves: one diagnostic fires and no spread is
+    // emitted. The two validators share no code — this case is what stops the
+    // listeners half from staying broken after the attrs half is fixed.
+    const source = rozieEnv('<rozie name="MatchHostRoot">', MATCH_HOST_ROOT_BODY);
+    const gatedRoot = compileDiagnostics(source).filter(
+      (d) => d.code === RozieErrorCode.LISTENER_FALLTHROUGH_GATED_ROOT,
+    );
+    expect(
+      gatedRoot,
+      `an r-match host element IS unconditional — expected no LISTENER_FALLTHROUGH_GATED_ROOT; got ${JSON.stringify(gatedRoot)}`,
+    ).toEqual([]);
+    expect(
+      compileCode(source),
+      'expected the synthesized $listeners spread to land on the unconditional r-match host',
+    ).toContain('v-on="$listeners"');
+  });
+
+  it('WR-01 over-reach guard: a <template r-match> root still produces exactly one LISTENER_FALLTHROUGH_GATED_ROOT', () => {
+    // GREEN today, must stay GREEN — a `<template r-match>` host is
+    // non-rendering, so the D-02-deferred signal must survive the
+    // hostElement exemption.
+    const gatedRoot = compileDiagnostics(
+      rozieEnv('<rozie name="TemplateMatchRoot">', TEMPLATE_MATCH_ROOT_BODY),
+    ).filter((d) => d.code === RozieErrorCode.LISTENER_FALLTHROUGH_GATED_ROOT);
+    expect(
+      gatedRoot.length,
+      `a <template r-match> root has no unconditional element — expected exactly one LISTENER_FALLTHROUGH_GATED_ROOT; got ${JSON.stringify(gatedRoot)}`,
+    ).toBe(1);
+    expect(gatedRoot[0]!.severity).toBe('warning');
+  });
+
   it('Phase 82 RED: no new silent drops — every fixture body satisfies exactly one of {ROZ973, emitted fallthrough spread, LISTENER_FALLTHROUGH_GATED_ROOT}', () => {
     // Structural guard, listeners twin of the attrs-side trichotomy. Every
     // body below must land in EXACTLY one of the three observable arms.
@@ -388,6 +415,14 @@ describe('validateListenerFallthrough (Phase 82 multi-root + gated-root)', () =>
       {
         name: 'CONDITIONAL_ROOT_BODY',
         source: rozieEnvWithShowProp('<rozie name="Trichotomy6">', CONDITIONAL_ROOT_BODY),
+      },
+      {
+        name: 'MATCH_HOST_ROOT_BODY',
+        source: rozieEnv('<rozie name="Trichotomy7">', MATCH_HOST_ROOT_BODY),
+      },
+      {
+        name: 'TEMPLATE_MATCH_ROOT_BODY',
+        source: rozieEnv('<rozie name="Trichotomy8">', TEMPLATE_MATCH_ROOT_BODY),
       },
     ];
 

@@ -15,7 +15,7 @@
 // `RozieErrorCode` symbols already exist (Task 1 registered them). The
 // diagnostic is COLLECTED — these tests assert on the diagnostic array, never
 // `.toThrow()`.
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { compile } from '../compile.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
@@ -81,6 +81,24 @@ const ELEMENT_PLUS_CONDITIONAL_BODY = `<div class="wrap"></div>
 // no compile-time signal at all.
 const CONDITIONAL_ROOT_BODY = `<div class="wrap" r-if="$props.show"></div>`;
 
+// WR-01: an `r-match` root authored on a REAL element — the host `<div>` is
+// rendered UNCONDITIONALLY and only the content nested inside it varies per
+// branch (`TemplateMatchIR.hostElement`, types.ts:1334). This is NOT an
+// element-less shape, so ROZ098 must not fire and the synthesized `$attrs`
+// spread has an obvious destination: the host itself.
+const MATCH_HOST_ROOT_BODY = `<div class="wrap" r-match="'a'">
+  <span r-case="'a'">a</span>
+  <span r-default>default</span>
+</div>`;
+
+// WR-01 over-reach guard: the SAME rungs under a non-rendering
+// `<template r-match>` host. There is no unconditional element here, so
+// ROZ098 must KEEP firing — this shape stays D-02-deferred.
+const TEMPLATE_MATCH_ROOT_BODY = `<template r-match="'a'">
+  <span r-case="'a'">a</span>
+  <span r-default>default</span>
+</template>`;
+
 function rozie(openTag: string, templateBody: string): string {
   return `${openTag}
 <template>
@@ -108,12 +126,8 @@ ${templateBody}
 describe('attribute-fallthrough diagnostics (Phase 14 R8/R9)', () => {
   it('R8: a multi-root template with default inherit-attrs produces a ROZ970 error', () => {
     // Wave 1 (Plan 14-02) implements this — currently RED.
-    const diags = compileDiagnostics(
-      rozie('<rozie name="MultiRoot">', MULTI_ROOT_BODY),
-    );
-    const multiRoot = diags.filter(
-      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT,
-    );
+    const diags = compileDiagnostics(rozie('<rozie name="MultiRoot">', MULTI_ROOT_BODY));
+    const multiRoot = diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT);
     expect(
       multiRoot.length,
       `expected a ROZ970 for a multi-root + fallthrough; got ${JSON.stringify(diags)}`,
@@ -125,20 +139,14 @@ describe('attribute-fallthrough diagnostics (Phase 14 R8/R9)', () => {
     const diags = compileDiagnostics(
       rozie('<rozie name="MultiRoot" inherit-attrs="false">', MULTI_ROOT_BODY),
     );
-    const multiRoot = diags.filter(
-      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT,
-    );
+    const multiRoot = diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT);
     expect(multiRoot, JSON.stringify(multiRoot)).toEqual([]);
   });
 
   it('R9: a single-root template + r-bind="$attrs" with default inherit-attrs produces a ROZ971 warning', () => {
     // Wave 1 (Plan 14-02) implements this — currently RED.
-    const diags = compileDiagnostics(
-      rozie('<rozie name="DoubleApply">', SINGLE_ROOT_DOUBLE_APPLY),
-    );
-    const doubleApply = diags.filter(
-      (d) => d.code === RozieErrorCode.ATTR_DOUBLE_APPLY,
-    );
+    const diags = compileDiagnostics(rozie('<rozie name="DoubleApply">', SINGLE_ROOT_DOUBLE_APPLY));
+    const doubleApply = diags.filter((d) => d.code === RozieErrorCode.ATTR_DOUBLE_APPLY);
     expect(
       doubleApply.length,
       `expected a ROZ971 for explicit $attrs while auto-fallthrough on; got ${JSON.stringify(diags)}`,
@@ -148,14 +156,9 @@ describe('attribute-fallthrough diagnostics (Phase 14 R8/R9)', () => {
 
   it('R9: the same single-root + r-bind="$attrs" with inherit-attrs="false" produces no ROZ971', () => {
     const diags = compileDiagnostics(
-      rozie(
-        '<rozie name="DoubleApply" inherit-attrs="false">',
-        SINGLE_ROOT_DOUBLE_APPLY,
-      ),
+      rozie('<rozie name="DoubleApply" inherit-attrs="false">', SINGLE_ROOT_DOUBLE_APPLY),
     );
-    const doubleApply = diags.filter(
-      (d) => d.code === RozieErrorCode.ATTR_DOUBLE_APPLY,
-    );
+    const doubleApply = diags.filter((d) => d.code === RozieErrorCode.ATTR_DOUBLE_APPLY);
     expect(doubleApply, JSON.stringify(doubleApply)).toEqual([]);
   });
 
@@ -174,9 +177,7 @@ describe('attribute-fallthrough diagnostics (Phase 14 R8/R9)', () => {
 </div>`,
       ),
     );
-    const doubleApply = diags.filter(
-      (d) => d.code === RozieErrorCode.ATTR_DOUBLE_APPLY,
-    );
+    const doubleApply = diags.filter((d) => d.code === RozieErrorCode.ATTR_DOUBLE_APPLY);
     expect(
       doubleApply.length,
       `expected ROZ971 for r-bind="$attrs" on r-match host; got ${JSON.stringify(diags)}`,
@@ -205,9 +206,7 @@ describe('attribute-fallthrough diagnostics (Phase 82 multi-root + gated-root)',
     const diags = compileDiagnostics(
       rozie('<rozie name="ElementPlusSlot">', ELEMENT_PLUS_SLOT_BODY),
     );
-    const multiRoot = diags.filter(
-      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT,
-    );
+    const multiRoot = diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT);
     expect(
       multiRoot,
       `expected no ROZ970 for an element + <slot> sibling (Plan 82-02 slot-tolerant root resolution); got ${JSON.stringify(diags)}`,
@@ -218,9 +217,7 @@ describe('attribute-fallthrough diagnostics (Phase 82 multi-root + gated-root)',
     // Asserts on the EMITTED Vue output, not IR — proving the spread reaches
     // codegen, not just that the diagnostic is silenced. Currently RED: the
     // multi-root disqualification aborts compilation before codegen runs.
-    const code = compileCode(
-      rozie('<rozie name="ElementPlusSlotSpread">', ELEMENT_PLUS_SLOT_BODY),
-    );
+    const code = compileCode(rozie('<rozie name="ElementPlusSlotSpread">', ELEMENT_PLUS_SLOT_BODY));
     expect(
       code,
       `expected the emitted Vue output to contain v-bind="$attrs"; got:\n${code}`,
@@ -233,9 +230,7 @@ describe('attribute-fallthrough diagnostics (Phase 82 multi-root + gated-root)',
     const diags = compileDiagnostics(
       rozie('<rozie name="ElementAfterSlot">', ELEMENT_AFTER_SLOT_BODY),
     );
-    const multiRoot = diags.filter(
-      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT,
-    );
+    const multiRoot = diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT);
     expect(
       multiRoot,
       `expected no ROZ970 regardless of element/slot ordering; got ${JSON.stringify(diags)}`,
@@ -248,9 +243,7 @@ describe('attribute-fallthrough diagnostics (Phase 82 multi-root + gated-root)',
     const diags = compileDiagnostics(
       rozie('<rozie name="TwoSlotsNoElement">', TWO_SLOTS_NO_ELEMENT_BODY),
     );
-    const multiRoot = diags.filter(
-      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT,
-    );
+    const multiRoot = diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT);
     expect(
       multiRoot.length,
       `expected exactly one ROZ970 — no element exists to receive attrs; got ${JSON.stringify(diags)}`,
@@ -262,14 +255,9 @@ describe('attribute-fallthrough diagnostics (Phase 82 multi-root + gated-root)',
     // are non-disqualifying (D-01/D-06); a conditional sibling is still a
     // second candidate root and must keep erroring.
     const diags = compileDiagnostics(
-      rozieWithShowProp(
-        '<rozie name="ElementPlusConditional">',
-        ELEMENT_PLUS_CONDITIONAL_BODY,
-      ),
+      rozieWithShowProp('<rozie name="ElementPlusConditional">', ELEMENT_PLUS_CONDITIONAL_BODY),
     );
-    const multiRoot = diags.filter(
-      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT,
-    );
+    const multiRoot = diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_MULTI_ROOT);
     expect(
       multiRoot.length,
       `expected exactly one ROZ970 — a conditional sibling is a second candidate root, not exempted; got ${JSON.stringify(diags)}`,
@@ -282,9 +270,7 @@ describe('attribute-fallthrough diagnostics (Phase 82 multi-root + gated-root)',
     const diags = compileDiagnostics(
       rozieWithShowProp('<rozie name="ConditionalRoot">', CONDITIONAL_ROOT_BODY),
     );
-    const gatedRoot = diags.filter(
-      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_GATED_ROOT,
-    );
+    const gatedRoot = diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_GATED_ROOT);
     expect(
       gatedRoot.length,
       `expected exactly one ATTR_FALLTHROUGH_GATED_ROOT for a gated single root; got ${JSON.stringify(diags)}`,
@@ -303,13 +289,47 @@ describe('attribute-fallthrough diagnostics (Phase 82 multi-root + gated-root)',
         CONDITIONAL_ROOT_BODY,
       ),
     );
-    const gatedRoot = diags.filter(
-      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_GATED_ROOT,
-    );
+    const gatedRoot = diags.filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_GATED_ROOT);
     expect(
       gatedRoot,
       `expected inherit-attrs="false" to silence ATTR_FALLTHROUGH_GATED_ROOT; got ${JSON.stringify(gatedRoot)}`,
     ).toEqual([]);
+  });
+
+  it('WR-01 RED: an r-match root WITH a real host element produces no ATTR_FALLTHROUGH_GATED_ROOT and does synthesize the spread', () => {
+    // The host `<div class="wrap">` renders unconditionally on every target,
+    // so the ROZ098 message ("no unconditional element to attach the
+    // inherited attributes to") is factually false for this shape and its
+    // hint ("move the gating condition onto a child so the root element is
+    // unconditional") is inapplicable — the root element already IS
+    // unconditional. RED today on both halves: one diagnostic fires and no
+    // spread is emitted.
+    const source = rozie('<rozie name="MatchHostRoot">', MATCH_HOST_ROOT_BODY);
+    const gatedRoot = compileDiagnostics(source).filter(
+      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_GATED_ROOT,
+    );
+    expect(
+      gatedRoot,
+      `an r-match host element IS unconditional — expected no ATTR_FALLTHROUGH_GATED_ROOT; got ${JSON.stringify(gatedRoot)}`,
+    ).toEqual([]);
+    expect(
+      compileCode(source),
+      'expected the synthesized $attrs spread to land on the unconditional r-match host',
+    ).toContain('v-bind="$attrs"');
+  });
+
+  it('WR-01 over-reach guard: a <template r-match> root still produces exactly one ATTR_FALLTHROUGH_GATED_ROOT', () => {
+    // GREEN today, must stay GREEN. A `<template r-match>` host is
+    // non-rendering — there is genuinely no unconditional element, so the
+    // D-02-deferred signal must survive the hostElement exemption.
+    const gatedRoot = compileDiagnostics(
+      rozie('<rozie name="TemplateMatchRoot">', TEMPLATE_MATCH_ROOT_BODY),
+    ).filter((d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_GATED_ROOT);
+    expect(
+      gatedRoot.length,
+      `a <template r-match> root has no unconditional element — expected exactly one ATTR_FALLTHROUGH_GATED_ROOT; got ${JSON.stringify(gatedRoot)}`,
+    ).toBe(1);
+    expect(gatedRoot[0]!.severity).toBe('warning');
   });
 
   it('Phase 82 RED: no new silent drops — every fixture body satisfies exactly one of {ROZ970, emitted $attrs bind, ATTR_FALLTHROUGH_GATED_ROOT}', () => {
@@ -344,6 +364,14 @@ describe('attribute-fallthrough diagnostics (Phase 82 multi-root + gated-root)',
       {
         name: 'CONDITIONAL_ROOT_BODY',
         source: rozieWithShowProp('<rozie name="Trichotomy6">', CONDITIONAL_ROOT_BODY),
+      },
+      {
+        name: 'MATCH_HOST_ROOT_BODY',
+        source: rozie('<rozie name="Trichotomy7">', MATCH_HOST_ROOT_BODY),
+      },
+      {
+        name: 'TEMPLATE_MATCH_ROOT_BODY',
+        source: rozie('<rozie name="Trichotomy8">', TEMPLATE_MATCH_ROOT_BODY),
       },
     ];
 
