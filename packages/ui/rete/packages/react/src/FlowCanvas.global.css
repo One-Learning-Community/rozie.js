@@ -53,7 +53,7 @@
     box-shadow: var(--rozie-flow-node-shadow, 0 2px 6px rgba(0, 0, 0, 0.12));
     user-select: none;
     cursor: grab;
-    font: 13px/1.4 system-ui, sans-serif;
+    font: var(--rozie-flow-node-font-size, 13px)/1.4 var(--rozie-flow-font-family, system-ui, sans-serif);
   }
 .rozie-flow-canvas .rozie-flow-node.is-selected {
     border-color: var(--rozie-flow-node-selected-border, var(--rozie-flow-accent, #3b82f6));
@@ -151,7 +151,7 @@
     stroke-width: var(--rozie-flow-connection-selected-width, 4px);
   }
 .rozie-flow-canvas .rozie-flow-connection__label {
-    font: 600 11px system-ui, sans-serif;
+    font: 600 var(--rozie-flow-connection-label-font-size, 11px) var(--rozie-flow-font-family, system-ui, sans-serif);
     fill: var(--rozie-flow-connection-label-fg, #334155);
     paint-order: stroke;
     stroke: var(--rozie-flow-connection-label-halo, #ffffff);

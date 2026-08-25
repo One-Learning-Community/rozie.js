@@ -4058,7 +4058,13 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
     align-items: center;
     justify-content: center;
     padding: 0;
-    font: 600 16px/1 system-ui, sans-serif;
+    /* D-05/D-06 — tokens interpolate INSIDE the font shorthand, never split
+       into font-family/font-size longhands: the shorthand resets font-style/
+       font-variant/font-stretch to initial as a side effect, and splitting
+       would silently change that cascade behavior. Every fallback below
+       equals today's hardcoded literal, so the default render is pixel-
+       identical to before this token was minted. */
+    font: 600 var(--rozie-flow-control-font-size, 16px)/1 var(--rozie-flow-font-family, system-ui, sans-serif);
     color: var(--rozie-flow-control-fg, #334155);
     background: var(--rozie-flow-control-bg, #ffffff);
     border: 1px solid var(--rozie-flow-control-border, rgba(0, 0, 0, 0.16));
@@ -4137,7 +4143,7 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
     white-space: nowrap;
   }
   .rozie-flow-toolbar__btn[data-rozie-s-cd396d6a] {
-    font: 600 12px/1 system-ui, sans-serif;
+    font: 600 var(--rozie-flow-toolbar-font-size, 12px)/1 var(--rozie-flow-font-family, system-ui, sans-serif);
     color: var(--rozie-flow-toolbar-btn-fg, #334155);
     background: var(--rozie-flow-toolbar-btn-bg, #f8fafc);
     border: 1px solid var(--rozie-flow-toolbar-btn-border, rgba(0, 0, 0, 0.14));
@@ -4207,7 +4213,7 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
       box-shadow: var(--rozie-flow-node-shadow, 0 2px 6px rgba(0, 0, 0, 0.12));
       user-select: none;
       cursor: grab;
-      font: 13px/1.4 system-ui, sans-serif;
+      font: var(--rozie-flow-node-font-size, 13px)/1.4 var(--rozie-flow-font-family, system-ui, sans-serif);
     }
   .rozie-flow-canvas .rozie-flow-node.is-selected {
       border-color: var(--rozie-flow-node-selected-border, var(--rozie-flow-accent, #3b82f6));
@@ -4305,7 +4311,7 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
       stroke-width: var(--rozie-flow-connection-selected-width, 4px);
     }
   .rozie-flow-canvas .rozie-flow-connection__label {
-      font: 600 11px system-ui, sans-serif;
+      font: 600 var(--rozie-flow-connection-label-font-size, 11px) var(--rozie-flow-font-family, system-ui, sans-serif);
       fill: var(--rozie-flow-connection-label-fg, #334155);
       paint-order: stroke;
       stroke: var(--rozie-flow-connection-label-halo, #ffffff);
