@@ -4588,6 +4588,23 @@ for (const target of TARGETS) {
       .poll(async () => ((await path.getAttribute('d')) ?? '').length, { timeout: 15_000 })
       .toBeGreaterThan(10);
 
+    // Sample the path only once it has STOPPED moving. The resize write-back is a genuine
+    // round trip — the drag commits width/height into the bound graph, the reconcile sets
+    // an explicit pixel box where the height was previously `auto`, and the resulting few-px
+    // correction lands a frame or more later on React and Angular than on the other four.
+    // A fixed-delay sample encodes one target's flush timing as the contract; polling for
+    // two identical consecutive reads asserts the real property — it settled — without one.
+    const settledD = async (tries = 20): Promise<string> => {
+      let prev = (await path.getAttribute('d')) ?? '';
+      for (let i = 0; i < tries; i++) {
+        await page.waitForTimeout(150);
+        const cur = (await path.getAttribute('d')) ?? '';
+        if (cur === prev) return cur;
+        prev = cur;
+      }
+      throw new Error('connection path never settled');
+    };
+
     const autoNode = page.locator('.rozie-flow-node', { hasText: 'Source' }).first();
     const sizedNode = page.locator('.rozie-flow-node', { hasText: 'Sink' }).first();
     const widthOf = async (n: typeof autoNode) => {
@@ -4598,7 +4615,7 @@ for (const target of TARGETS) {
 
     // ── LEG 1: body content changes the auto-sized node's width ──────────────────
     const w0 = await widthOf(autoNode);
-    const d0 = await path.getAttribute('d');
+    const d0 = await settledD();
     await expect(page.getByTestId('wide-state')).toHaveText('wide');
 
     await page.getByTestId('badge-btn').click();
@@ -4621,7 +4638,7 @@ for (const target of TARGETS) {
     await expect(seHandle).toBeVisible({ timeout: 5_000 });
 
     const hw0 = await widthOf(sizedNode);
-    const d1 = await path.getAttribute('d');
+    const d1 = await settledD();
     const hb = await seHandle.boundingBox();
     if (!hb) throw new Error('resize handle bounding box unavailable');
 
@@ -4638,11 +4655,13 @@ for (const target of TARGETS) {
       .poll(async () => await path.getAttribute('d'), { timeout: 5_000 })
       .not.toBe(d1);
 
-    // settle-and-resample (the file's own idiom): the re-measure is stable, not a frame a
-    // later reconcile echo reverts back to the stale coordinates.
-    const dFinal = await path.getAttribute('d');
+    // settle-and-resample (the file's own idiom): once the path has stopped moving it STAYS
+    // there — the re-measure is not a transient frame that a later reconcile echo reverts
+    // back to the stale first-paint coordinates.
+    const dFinal = await settledD();
+    expect(dFinal).not.toBe(d1);
     await page.waitForTimeout(500);
     await expect(path).toHaveCount(1);
-    await expect(await path.getAttribute('d')).toBe(dFinal);
+    expect(await path.getAttribute('d')).toBe(dFinal);
   });
 }

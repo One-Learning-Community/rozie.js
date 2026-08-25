@@ -214,6 +214,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const area = useRef<any>(null);
   const connectionPlugin = useRef<any>(null);
   const socketWatcher = useRef<any>(null);
+  const nodeResizeObserver = useRef<any>(null);
   const programmatic = useRef(0);
   const markIncompatibleSockets = useRef<any>(null);
   const reconnectInFlight = useRef(0);
@@ -386,6 +387,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const _watch4First = useRef(true);
   const _watch5First = useRef(true);
 
+  const boxEntries = useMemo(() => new WeakMap(), []);
   const pendingResizeSizes = useMemo(() => new Map(), []);
   const MINIMAP_W = useMemo(() => 200, []);
   const MINIMAP_H = useMemo(() => 150, []);
@@ -1521,6 +1523,37 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     socketWatcher.current = getDOMSocketPosition({
       offset: socketOffset
     });
+
+    // ISSUE-8: create the node-box ResizeObserver BEFORE the first reconcile, so every node
+    // built from here on is observed as it is created (renderNode's fresh build calls
+    // observe()). The callback replays that node's per-socket re-measure closures, which
+    // re-emit the `rendered` socket signal getDOMSocketPosition needs to recalculate and
+    // re-store the position; each stored position is pushed straight into the
+    // renderConnection `socketWatcher.listen` callbacks, which redraw the path. Nothing
+    // needs to call area.update('connection', …) — and in fact that would NOT work, because
+    // it redraws faithfully from the (stale) position store.
+    //
+    // The box→entry lookup is a WeakMap so a culled node's entry is collected with its DOM
+    // and no explicit delete is owed. Iterating nodeEntries per resized box instead would be
+    // O(n²) on the initial observe burst, which ResizeObserver delivers as ONE batch.
+    //
+    // Re-measuring cannot resize anything, so this can never feed back into itself. The
+    // one-shot callback ResizeObserver fires on observe() is a harmless redundant re-measure
+    // of a just-measured socket — and a useful one, since it lands after first layout has
+    // settled.
+    if (typeof ResizeObserver === 'function') {
+      nodeResizeObserver.current = new ResizeObserver((entries: any) => {
+        for (const roEntry of entries as any) {
+          const nodeEntry = boxEntries.get(roEntry.target);
+          if (!nodeEntry || !nodeEntry.socketRemeasures) continue;
+          for (const remeasure of nodeEntry.socketRemeasures as any) {
+            try {
+              remeasure();
+            } catch (e: any) {}
+          }
+        }
+      });
+    }
     editor.current.use(area.current);
     area.current.use(connectionPlugin.current);
 
@@ -1915,6 +1948,15 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       // FlowCanvasScreenshot pixel baseline is untouched. A node that declares ANY top/
       // bottom port gets the 3-ROW structure (topRow / midRow[left|body|right] / bottomRow).
       const socketDisposers = [];
+      // ISSUE-8: per-socket re-measure closures, filled by renderSocketInto alongside
+      // socketDisposers and replayed by the ResizeObserver below when this node's box
+      // changes size. ALL of the node's sockets are re-measured, both sides and every
+      // position — a strict superset of rete's own `noderesized` handler, which re-measures
+      // only `side === 'output'`. That upstream assumption (a node grows right/down from its
+      // top-left anchor, so only outputs move) is wrong for this component's F2
+      // position-aware ports: a height change moves `bottom` sockets on BOTH sides. (That
+      // handler is dead here regardless — this component never emits `noderesized`.)
+      const socketRemeasures = [];
       const portEntries = [];
       for (const key of Object.keys(node.inputs) as any) portEntries.push({
         side: 'input',
@@ -1938,7 +1980,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         box.appendChild(outputsCol);
         element.appendChild(box);
         for (const p of portEntries as any) {
-          renderSocketInto(p.position === 'right' ? outputsCol : inputsCol, node, p.side, p.key, p.position, socketDisposers);
+          renderSocketInto(p.position === 'right' ? outputsCol : inputsCol, node, p.side, p.key, p.position, socketDisposers, socketRemeasures);
         }
       } else {
         // VERTICAL-capable 3-row layout (only when a top/bottom port exists).
@@ -1962,7 +2004,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         element.appendChild(box);
         for (const p of portEntries as any) {
           const zone = p.position === 'top' ? topRow : p.position === 'bottom' ? bottomRow : p.position === 'right' ? rightCol : leftCol;
-          renderSocketInto(zone, node, p.side, p.key, p.position, socketDisposers);
+          renderSocketInto(zone, node, p.side, p.key, p.position, socketDisposers, socketRemeasures);
         }
       }
 
@@ -1982,8 +2024,25 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         titleEl: null,
         bodyMoved: false,
         emit,
-        socketDisposers
+        socketDisposers,
+        socketRemeasures
       };
+
+      // ISSUE-8: watch THIS node's box for a size change. The unobserve rides
+      // socketDisposers, which all three existing teardown sites already sweep
+      // (cleanupElement, the portsAdded rebuild, and the component teardown), so a node that
+      // is culled or rebuilt never leaves a live observation behind. Observing is a no-op
+      // when the environment has no ResizeObserver (SSR / a bare jsdom) — the same
+      // `typeof`-guard shape scheduleResizeFlush already uses for requestAnimationFrame.
+      if (nodeResizeObserver.current) {
+        boxEntries.set(box, entry);
+        nodeResizeObserver.current.observe(box);
+        socketDisposers.push(() => {
+          try {
+            nodeResizeObserver.current.unobserve(box);
+          } catch (e: any) {}
+        });
+      }
 
       // ── RENDER-BY-TYPE: select the body by `node.type` ──────────────────────────
       // 1) the node's TYPE template (typeReg[type].bodyRenderer) — the primary path
@@ -2033,7 +2092,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // placement (left|right|top|bottom). For left/right the DOM is byte-identical to pre-F2
     // (the classic horizontal port row); top/bottom get a vertical port (socket above its
     // label) + a `--<position>` socket class so the socket straddles the matching edge.
-    const renderSocketInto = (zone: any, node: any, side: any, key: any, position: any, socketDisposers: any) => {
+    const renderSocketInto = (zone: any, node: any, side: any, key: any, position: any, socketDisposers: any, socketRemeasures: any) => {
       const port = (side === 'input' ? node.inputs : node.outputs)[key];
       if (!port) return;
       const vertical = position === 'top' || position === 'bottom';
@@ -2090,6 +2149,29 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             socket: port.socket
           }
         }
+      });
+      // ISSUE-8: a re-measure closure for THIS socket — re-fires the SAME `rendered` signal
+      // the line above emits, which is the only thing that makes getDOMSocketPosition
+      // recalculate and re-store the position (and push it into every renderConnection
+      // `socketWatcher.listen` callback, which redraws). Free — reuses the exact
+      // side/key/node.id/socketEl/port.socket locals the two LOAD-BEARING emits already
+      // need. Emitting only `rendered` and NOT `render` is deliberate: `render` is the
+      // ConnectionPlugin's drag-anchor REGISTRATION, which must happen once per socket
+      // element, whereas `rendered` is the measurement signal and is idempotent.
+      socketRemeasures.push(() => {
+        area.current.emit({
+          type: 'rendered',
+          data: {
+            type: 'socket',
+            side,
+            key,
+            nodeId: node.id,
+            element: socketEl,
+            payload: {
+              socket: port.socket
+            }
+          }
+        });
       });
       // ISSUE-6: register this socket for the incompatible-port hint. Free — reuses
       // the side/key/node.id/socketEl locals the two LOAD-BEARING emits above already
@@ -3880,6 +3962,15 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         }
       }
       nodeEntries.clear();
+      // ISSUE-8: drop the whole observation set in one call. Each node's unobserve already
+      // rode its socketDisposers above; this is the belt-and-braces sweep for an entry whose
+      // disposer was skipped, matching the socketReg.clear() directly below.
+      if (nodeResizeObserver.current) {
+        try {
+          nodeResizeObserver.current.disconnect();
+        } catch (e: any) {}
+      }
+      nodeResizeObserver.current = null;
       // ISSUE-6: whole-map clear so an unmount leaves nothing retained even if a
       // per-socket disposer was skipped (T-83-17). WR-03: also drop the active-pick
       // record — an unmount mid-gesture must not leave a stale pick behind.
