@@ -554,6 +554,18 @@ export const EXAMPLES = [
   // `connectioncreate` pipe (FlowCanvas.rozie:2060-2080), not captured at construction.
   // Behavioral-only; NOT a screenshot cell.
   'FlowCanvasValidateOff',
+  // 260824 WR-03 runtime reproduction (closes the last Phase 83 human_verification item)
+  // — FlowCanvasPortAdd is the BEHAVIORAL cell (loader → examples/demos/
+  // FlowCanvasPortAddDemo.rozie): a typed 2-node pipeline (`source`/`merge`, modelled on
+  // FlowCanvasValidateOffDemo) plus a window-level 'p' keydown listener that
+  // conditionally registers a THIRD <Port> on the `merge` type mid-session. The spec
+  // (rete-flow-port-add) pauses a type-mismatched drag mid-gesture, presses 'p' to
+  // trigger a live `reconcileNodesPass` `portsAdded` rebuild on the ALREADY-marked
+  // node, and asserts the target socket stays dimmed across the rebuild (WR-03,
+  // `df9505e4a`) instead of silently losing its mark. Behavioral-only; NOT a
+  // screenshot cell — transient mid-drag DOM state, same reasoning as
+  // rete-flow-incompatible-socket.
+  'FlowCanvasPortAdd',
   // quick-260803-uwb (the 260702-wws dark deferral) — FlowCanvasDarkScreenshot is a PIXEL
   // cell (loader → examples/demos/FlowCanvasDarkScreenshotDemo.rozie): the same fixed
   // 3-node / 2-edge content-stable graph as FlowCanvasScreenshotDemo (identity transform,
@@ -1419,6 +1431,9 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasVerbs: 'rozie-flow-canvas-verbs',
   FlowCanvasAccumOff: 'rozie-flow-canvas-accum-off',
   FlowCanvasValidateOff: 'rozie-flow-canvas-validate-off',
+  // 260824 WR-03 runtime reproduction — '-demo' appended by the entry →
+  // 'rozie-flow-canvas-port-add-demo' = kebab of FlowCanvasPortAddDemo.
+  FlowCanvasPortAdd: 'rozie-flow-canvas-port-add',
   // quick-260803-uwb dark pixel cell — '-demo' appended by the entry →
   // 'rozie-flow-canvas-dark-screenshot-demo' = kebab of FlowCanvasDarkScreenshotDemo.
   FlowCanvasDarkScreenshot: 'rozie-flow-canvas-dark-screenshot',
@@ -1890,6 +1905,12 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   FlowCanvasVerbs: {},
   FlowCanvasAccumOff: {},
   FlowCanvasValidateOff: {},
+  // 260824 WR-03 runtime reproduction — FlowCanvasPortAddDemo is self-contained (seeds
+  // its own 2-node typed graph and drives `portAdded` from its own window-level 'p'
+  // keydown listener, not a parent prop). No parent props; no MODEL_PROPS entry
+  // (graph is bound internally — the FlowCanvas precedent; `portAdded` is one-way,
+  // driven internally, not a model).
+  FlowCanvasPortAdd: {},
   // quick-260803-uwb — FlowCanvasDarkScreenshotDemo is self-contained (hardcodes its own
   // fixed 3-node / 2-edge graph and pins zoom/interaction off). No parent props; no
   // MODEL_PROPS entry (graph is bound internally — the FlowCanvas precedent).

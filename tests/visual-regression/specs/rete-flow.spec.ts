@@ -4313,3 +4313,129 @@ for (const target of TARGETS) {
       .toBe(1);
   });
 }
+
+/**
+ * 36. WR-03 RUNTIME REPRODUCTION — a mid-drag `portsAdded` reconcile keeps an
+ * already-dimmed incompatible socket dimmed (closes 83-VERIFICATION.md's last
+ * `human_verification` item for RETE-09).
+ *
+ * THE FAILURE MODE THIS GUARDS: before commit `df9505e4a`, `reconcileNodesPass`'s
+ * `portsAdded` branch (FlowCanvas.rozie:2503-2552) disposed and rebuilt a node's
+ * socket DOM whenever that node's TYPE gained a new port — including mid-drag, if the
+ * port-add landed while a connection pick was active. The rebuild produced fresh
+ * socket elements carrying no memory of `rozie-flow-socket--incompatible`, so a
+ * socket the drag had legitimately dimmed silently un-dimmed the moment an unrelated
+ * reactive port mutation touched its node — misrepresenting an active drag as valid
+ * mid-gesture. The fix tracks the active pick in a component-scope `activePick`
+ * record and re-invokes `markIncompatibleSockets` synchronously, in the SAME
+ * reconcile pass, right after the socket rebuild. This cell is the first executable
+ * reproduction of that exact interleaving: an active drag CONCURRENT with a
+ * `portsAdded` reconcile landing on the very node the drag has marked.
+ *
+ * THE TRIGGER: `examples/demos/FlowCanvasPortAddDemo.rozie` registers a window-level
+ * 'p' keydown listener in $onMount that flips local `$data.portAdded`, which
+ * conditionally mounts a THIRD `<Port>` on the `merge` NodeType — registering a new
+ * port into the type's schema and firing FlowCanvas's own `$watch(() =>
+ * $data.portReg, ...)` reconcile. `page.keyboard.press('p')` fires this without
+ * releasing `page.mouse.down()`, which a button click could never do (see the demo's
+ * own header for the full reasoning).
+ *
+ * THIS IS DELIBERATELY A BEHAVIORAL DOM CHECK, NOT A SCREENSHOT — the marking is
+ * transient mid-drag state, same reasoning as `rete-flow-incompatible-socket`'s own
+ * header (a mid-drag frame is gesture-timing-dependent by construction, and per
+ * `feedback_vr_linux_baselines` every baseline PNG must be Linux-Docker-rendered,
+ * which makes a flaky baseline expensive to churn). `rete-flow.spec.ts` stays
+ * entirely `toHaveScreenshot`-free.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-port-add [${target}]: a mid-drag portsAdded reconcile keeps an already-marked socket dimmed`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasPortAdd&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(2);
+
+    // the same typed socket-row locator the validate-off cell (30) and the
+    // incompatible-socket cells (33/34) use.
+    const typedSocketOf = (node: string, side: 'output' | 'input', portLabel: string) =>
+      page
+        .locator('.rozie-flow-node', { hasText: node })
+        .locator(`.rozie-flow-port--${side}`, { hasText: portLabel })
+        .locator('.rozie-flow-socket')
+        .first();
+
+    const center = async (locator: ReturnType<typeof typedSocketOf>) => {
+      await expect(locator).toBeVisible({ timeout: 10_000 });
+      const box = await locator.boundingBox();
+      if (!box) throw new Error('socket bounding box unavailable');
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    };
+
+    // precondition: the port-add hasn't fired yet.
+    await expect(page.getByTestId('port-added-state')).toHaveCount(1);
+    await expect(page.getByTestId('port-added-state')).toHaveText('false');
+    // WR-01: existence-check before the negative — the reactive third port must not
+    // exist yet, and a vanished-locator false-pass would be indistinguishable from a
+    // genuinely-absent one without this.
+    await expect(typedSocketOf('Merge', 'input', 'extra')).toHaveCount(0);
+
+    const pickedOut = await center(typedSocketOf('Number Source', 'output', 'number'));
+    const mismatchedIn = await center(typedSocketOf('Merge', 'input', 'string'));
+    const mergeStr = typedSocketOf('Merge', 'input', 'string');
+    const INCOMPATIBLE = /rozie-flow-socket--incompatible/;
+
+    // ---- start the gesture and PAUSE mid-drag (pointer still down) ----
+    await page.mouse.move(pickedOut.x, pickedOut.y);
+    await page.mouse.down();
+    await page.mouse.move(
+      (pickedOut.x + mismatchedIn.x) / 2,
+      (pickedOut.y + mismatchedIn.y) / 2,
+      { steps: 8 },
+    );
+
+    // ---- POSITIVE FIRST (also proves the locator resolves): the type-mismatched
+    // target socket is marked before any reconcile has run ----
+    await expect(mergeStr).toHaveCount(1);
+    await expect(mergeStr).toHaveClass(INCOMPATIBLE, { timeout: 5_000 });
+
+    // ---- fire the mid-drag portsAdded reconcile: 'p' registers a new port on the
+    // `merge` TYPE without releasing the pointer ----
+    await page.keyboard.press('p');
+
+    // ---- proves the toggle landed (the reconcile was actually triggered), not
+    // merely that the key was pressed ----
+    await expect(page.getByTestId('port-added-state')).toHaveText('true', { timeout: 5_000 });
+    // ---- proves the reconcile actually ran end-to-end: the new port's socket DOM
+    // exists on the live node, not just the data flag flipped ----
+    await expect(typedSocketOf('Merge', 'input', 'extra')).toHaveCount(1, { timeout: 5_000 });
+
+    // ---- THE REGRESSION GATE (WR-03): the already-marked socket survived the
+    // portsAdded rebuild — still dimmed, not silently un-marked ----
+    await expect(mergeStr).toHaveCount(1);
+    await expect(mergeStr).toHaveClass(INCOMPATIBLE, { timeout: 5_000 });
+
+    // ---- release the gesture: marking clears completely ----
+    await page.mouse.move(mismatchedIn.x, mismatchedIn.y, { steps: 8 });
+    await page.mouse.up();
+
+    // WR-01: existence-check before the negative — same discipline as every other
+    // negative assertion in this file.
+    await expect(mergeStr).toHaveCount(1);
+    await expect(mergeStr).not.toHaveClass(INCOMPATIBLE, { timeout: 5_000 });
+
+    // ---- settle-and-resample (the file's own idiom): a late re-mark cannot slip
+    // through after the gesture has fully settled ----
+    await page.waitForTimeout(500);
+    await expect(mergeStr).toHaveCount(1);
+    await expect(mergeStr).not.toHaveClass(INCOMPATIBLE);
+  });
+}
