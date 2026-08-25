@@ -1,0 +1,193 @@
+<!--
+  FlowCanvasFixedWidthDemo.rozie — BEHAVIORAL gate for type-level node sizing (260825-mip).
+
+  WHAT THIS PROVES. Before this feature, `<NodeType>`'s minWidth/maxWidth/minHeight/
+  maxHeight were consumed at exactly ONE place — `clampResizeSize`, called only from the
+  resize-drag handler. They were GESTURE bounds, not LAYOUT bounds: a `<NodeType
+  maxWidth="240">` whose #body rendered 600px of content still rendered 600px wide, and on
+  a non-`resizable` type the props did nothing at all. The only way to fix a box was the
+  per-INSTANCE `node.width` in the graph model, which is what the resize gesture writes
+  back — not something an author would hand-write for design consistency.
+
+  Now: a type-level `width`/`height` sets the box for EVERY node of the type, and min/max
+  clamp the rendered box whatever the size came from. Resolution is
+
+      effective = clamp( instance node.width ?? type width ?? auto )
+
+  — instance beats type, clamp applies last to whichever won.
+
+  FOUR INDEPENDENT LEGS, so a partial implementation cannot pass:
+
+    1. `fixed`  (:width="320")  — width is CONSTANT across a node.data change that
+       materially changes body content. This is the deliberate contrast with
+       rete-flow-body-update, where the width is expected to MOVE: same trigger, opposite
+       contract, and that is the whole point of the feature.
+    2. `capped` (:max-width="200") — overlong body content renders AT the cap, never wider.
+    3. `narrow` (:width="120")  — really renders 120px. `.rozie-flow-node` carries
+       `min-width: 140px` in base.css, so this leg is the one that proves an explicit width
+       lowers that floor instead of being silently clamped up to 140.
+    4. `sized`  (:width="240" resizable) — a corner drag persists an INSTANCE width that
+       beats the type width, and a handle double-click resets back to the TYPE width (240),
+       NOT to auto. That reset semantic is a deliberate consequence of the precedence rule.
+
+  The badge text lives in each node's own `data` and is toggled by re-binding the graph —
+  the #body scope is { node, selected, emit }, so component state read from OUTSIDE it is
+  snapshot at projection time (the reactive-portal constraint). This is the same discipline
+  FlowCanvasBodyResizeDemo documents.
+
+  `:fit-on-mount="false"` keeps seeded positions deterministic. Behavioral-only, NOT a pixel
+  cell — every assertion is a measured width, so no Linux-rendered `.png` baseline is owed.
+
+  Container needs explicit height/width (the VR host mounts at max-content).
+-->
+
+<rozie name="FlowCanvasFixedWidthDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  // One node per leg. Every node seeds the SAME long badge so a width difference between
+  // them can only come from its type's sizing props, never from its content.
+  graph: {
+    nodes: [
+      { id: 'fx', type: 'fixed',  x: 30,  y: 30,  data: { label: 'Fixed',  badge: '8 completed · 1 failed · 1 skipped' } },
+      { id: 'cp', type: 'capped', x: 340, y: 30,  data: { label: 'Capped', badge: '8 completed · 1 failed · 1 skipped' } },
+      { id: 'nw', type: 'narrow', x: 30,  y: 210, data: { label: 'Narrow', badge: '8 completed · 1 failed · 1 skipped' } },
+      { id: 'sz', type: 'sized',  x: 340, y: 210, data: { label: 'Sized',  badge: '8 completed · 1 failed · 1 skipped' } },
+    ],
+    connections: [],
+  },
+}
+</data>
+
+<script>
+// Clear every node's badge by RE-BINDING a fresh graph — the supported path (the canvas
+// watches `graph` by reference) and the one that reaches renderNode's in-place branch.
+// Leg 1 asserts the `fixed` node's width does NOT move across this.
+const BADGE = '8 completed · 1 failed · 1 skipped'
+const toggleBadges = () => {
+  const nodes = $data.graph.nodes.map((n) => ({ ...n, data: { ...n.data, badge: n.data.badge ? '' : BADGE } }))
+  $data.graph = { ...$data.graph, nodes }
+}
+
+// read off the BOUND MODEL — proves the click re-bound the graph.
+const badgeState = () => ($data.graph.nodes[0].data.badge ? 'wide' : 'narrow')
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — type-level node sizing (fixed / capped / narrow / resizable)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="badge-btn" @click="toggleBadges">Toggle badges</button>
+    <span class="readout" data-testid="badge-state">{{ badgeState() }}</span>
+    <span class="readout" data-testid="node-count">{{ $data.graph.nodes.length }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 420px; width: 900px">
+    <FlowCanvas
+      r-model:graph="$data.graph"
+      :fit-on-mount="false"
+    >
+      <!-- LEG 1 — a fixed type width: every `fixed` node is exactly 320px. -->
+      <NodeType type="fixed" :width="320">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+            <span class="rozie-demo-badge">{{ node.data.badge }}</span>
+          </div>
+        </template>
+        <Port input="in" type="number" label="in" multiple />
+        <Port output="out" type="number" label="out" />
+      </NodeType>
+
+      <!-- LEG 2 — a cap only: auto-sizes, but never wider than 200px. -->
+      <NodeType type="capped" :max-width="200">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+            <span class="rozie-demo-badge">{{ node.data.badge }}</span>
+          </div>
+        </template>
+        <Port input="in" type="number" label="in" multiple />
+        <Port output="out" type="number" label="out" />
+      </NodeType>
+
+      <!-- LEG 3 — BELOW base.css's `.rozie-flow-node { min-width: 140px }` floor. An
+           explicit width must lower that floor, or this renders 140 and the prop is a lie. -->
+      <NodeType type="narrow" :width="120">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+            <span class="rozie-demo-badge">{{ node.data.badge }}</span>
+          </div>
+        </template>
+        <Port input="in" type="number" label="in" multiple />
+        <Port output="out" type="number" label="out" />
+      </NodeType>
+
+      <!-- LEG 4 — type width PLUS resizable: a drag persists an instance width that beats
+           it, and a handle double-click resets to the TYPE width (240), not to auto. -->
+      <NodeType type="sized" :width="240" resizable :min-width="80" :min-height="60" :max-width="420" :max-height="320">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+            <span class="rozie-demo-badge">{{ node.data.badge }}</span>
+          </div>
+        </template>
+        <Port input="in" type="number" label="in" multiple />
+        <Port output="out" type="number" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 940px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+
+:root {
+  /* the #body chrome teleports into the engine node element inside the canvas shadow
+     root, so on Lit a plain scoped rule cannot reach it — :root emits document-level
+     CSS adopted into the shadow root. NOT :global() (ROZ128 hard error).
+     NOTE: deliberately NO overflow/text-overflow here — whether a capped body wraps or
+     truncates is the CONSUMER's design decision; the component's job is only to make the
+     box actually constrain. This demo lets it wrap. */
+  .rozie-flow-canvas .rozie-demo-node {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .rozie-flow-canvas .rozie-demo-badge {
+    font-size: 0.75rem;
+    color: #6b7280;
+  }
+}
+</style>
+
+</rozie>

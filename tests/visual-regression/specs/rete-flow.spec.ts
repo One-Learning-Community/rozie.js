@@ -4665,3 +4665,111 @@ for (const target of TARGETS) {
     expect(await path.getAttribute('d')).toBe(dFinal);
   });
 }
+
+/**
+ * 39. TYPE-LEVEL NODE SIZING — a `<NodeType>` can fix or cap the box for every node of the
+ * type, and min/max are real LAYOUT bounds rather than resize-gesture bounds (260825-mip).
+ *
+ * WHAT CHANGED: `minWidth`/`maxWidth`/`minHeight`/`maxHeight` used to be consumed at
+ * exactly one place — `clampResizeSize`, called only from the resize-drag handler. They
+ * bounded a GESTURE, not a LAYOUT: a `<NodeType maxWidth="240">` whose `#body` rendered
+ * 600px of content still rendered 600px wide, and on a non-`resizable` type they did
+ * nothing at all. The only way to fix a box was the per-INSTANCE `node.width` the resize
+ * gesture writes back. Now a type-level `width`/`height` sets the box for every node of
+ * the type, and the resolution is
+ *
+ *     effective = clamp( instance node.width ?? type width ?? auto )
+ *
+ * — instance beats type, clamp applies last to whichever won.
+ *
+ * FOUR INDEPENDENT LEGS, so a partial implementation cannot pass:
+ *   1. FIXED   — a `:width` type holds ONE width across a `node.data` change that
+ *      materially changes body content. Deliberate contrast with rete-flow-body-update,
+ *      which asserts the width DOES move on the same trigger: same gesture, opposite
+ *      contract, and that contrast is the feature.
+ *   2. CAPPED  — a `:max-width` type with overlong content renders AT the cap, not wider.
+ *   3. NARROW  — a `:width="120"` type really renders 120px. `.rozie-flow-node` carries
+ *      `min-width: 140px` in base.css, so this leg proves an explicit width LOWERS that
+ *      floor rather than being silently clamped up to it.
+ *   4. INSTANCE-BEATS-TYPE — a corner drag persists an instance width that overrides the
+ *      type width, and a handle double-click resets to the TYPE width, not to auto.
+ *
+ * Behavioral only — every assertion is a measured width, so no `.png` baseline is owed.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-fixed-width [${target}]: a NodeType can fix or cap the box for every node of its type`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasFixedWidth&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(4);
+
+    const nodeOf = (label: string) =>
+      page.locator('.rozie-flow-node', { hasText: label }).first();
+    const widthOf = async (label: string) => {
+      const box = await nodeOf(label).boundingBox();
+      if (!box) throw new Error(`no bounding box for ${label}`);
+      return Math.round(box.width);
+    };
+
+    // Every node seeds the SAME badge text, so any width difference between them can only
+    // come from its type's sizing props — never from its content.
+    await expect(page.getByTestId('badge-state')).toHaveText('wide');
+
+    // ── LEG 1: a :width type renders at exactly that width ──────────────────────
+    await expect.poll(async () => await widthOf('Fixed'), { timeout: 10_000 }).toBe(320);
+
+    // ── LEG 2: a :max-width type is capped, not stretched by its content ────────
+    await expect.poll(async () => await widthOf('Capped'), { timeout: 10_000 }).toBe(200);
+
+    // ── LEG 3: an explicit width BELOW base.css's 140px node floor really renders ──
+    await expect.poll(async () => await widthOf('Narrow'), { timeout: 10_000 }).toBe(120);
+
+    // ── LEG 1 (the point of the feature): the fixed width HOLDS across a data change
+    // that materially changes body content — the exact trigger under which
+    // rete-flow-body-update asserts an auto-sized node's width MOVES ──────────────
+    await page.getByTestId('badge-btn').click();
+    await expect(page.getByTestId('badge-state')).toHaveText('narrow', { timeout: 5_000 });
+    // the auto-sized-in-every-other-respect capped node proves the data change really did
+    // shrink the content — otherwise "fixed width held" would be vacuously true.
+    await expect
+      .poll(async () => await widthOf('Capped'), { timeout: 5_000 })
+      .toBeLessThan(200);
+    await expect(await widthOf('Fixed')).toBe(320);
+    await expect(await widthOf('Narrow')).toBe(120);
+
+    // ── LEG 4: instance width beats type width; reset returns to the TYPE width ──
+    await expect(await widthOf('Sized')).toBe(240);
+    await nodeOf('Sized').click();
+    const seHandle = page.getByTestId('flow-resize-handle-se').first();
+    await expect(seHandle).toBeVisible({ timeout: 5_000 });
+    const hb = await seHandle.boundingBox();
+    if (!hb) throw new Error('resize handle bounding box unavailable');
+
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hb.x + hb.width / 2 + 100, hb.y + hb.height / 2, { steps: 10 });
+    await page.mouse.up();
+
+    // the persisted INSTANCE width now overrides the type's 240.
+    await expect
+      .poll(async () => await widthOf('Sized'), { timeout: 5_000 })
+      .toBeGreaterThan(260);
+
+    // a handle double-click clears the instance width — which returns the node to its
+    // TYPE width (240), NOT to auto. That is the precedence rule's deliberate consequence.
+    const hb2 = await seHandle.boundingBox();
+    if (!hb2) throw new Error('resize handle bounding box unavailable after drag');
+    await page.mouse.dblclick(hb2.x + hb2.width / 2, hb2.y + hb2.height / 2);
+    await expect.poll(async () => await widthOf('Sized'), { timeout: 5_000 }).toBe(240);
+  });
+}

@@ -585,6 +585,12 @@ export const EXAMPLES = [
   // first-paint coordinates and every edge stayed pinned to them. Behavioral-only; NOT a
   // screenshot cell (the assertion is an attribute string).
   'FlowCanvasBodyResize',
+  // 260825-mip type-level node sizing — FlowCanvasFixedWidth is the BEHAVIORAL cell
+  // (loader → examples/demos/FlowCanvasFixedWidthDemo.rozie): four <NodeType>s exercising
+  // a fixed :width, a :max-width cap, a :width BELOW base.css's 140px node floor, and a
+  // :width + resizable combination. The spec (rete-flow-fixed-width) asserts measured node
+  // widths, so it is behavioral-only and owes no .png baseline.
+  'FlowCanvasFixedWidth',
   // quick-260803-uwb (the 260702-wws dark deferral) — FlowCanvasDarkScreenshot is a PIXEL
   // cell (loader → examples/demos/FlowCanvasDarkScreenshotDemo.rozie): the same fixed
   // 3-node / 2-edge content-stable graph as FlowCanvasScreenshotDemo (identity transform,
@@ -1459,6 +1465,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // 260825-l9x socket re-measure gate — '-demo' appended by the entry →
   // 'rozie-flow-canvas-body-resize-demo' = kebab of FlowCanvasBodyResizeDemo.
   FlowCanvasBodyResize: 'rozie-flow-canvas-body-resize',
+  // 260825-mip — '-demo' appended by the entry → 'rozie-flow-canvas-fixed-width-demo'.
+  FlowCanvasFixedWidth: 'rozie-flow-canvas-fixed-width',
   // quick-260803-uwb dark pixel cell — '-demo' appended by the entry →
   // 'rozie-flow-canvas-dark-screenshot-demo' = kebab of FlowCanvasDarkScreenshotDemo.
   FlowCanvasDarkScreenshot: 'rozie-flow-canvas-dark-screenshot',
@@ -1944,6 +1952,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // 2-node graph and drives the badge from its own button). No parent props; no
   // MODEL_PROPS entry (graph is bound internally — the FlowCanvas precedent).
   FlowCanvasBodyResize: {},
+  // 260825-mip — FlowCanvasFixedWidthDemo is self-contained (seeds its own 4-node graph,
+  // one node per sizing leg). No parent props; no MODEL_PROPS entry.
+  FlowCanvasFixedWidth: {},
   // quick-260803-uwb — FlowCanvasDarkScreenshotDemo is self-contained (hardcodes its own
   // fixed 3-node / 2-edge graph and pins zoom/interaction off). No parent props; no
   // MODEL_PROPS entry (graph is bound internally — the FlowCanvas precedent).
