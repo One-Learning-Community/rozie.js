@@ -576,6 +576,15 @@ export const EXAMPLES = [
   // first paint. Behavioral-only; NOT a screenshot cell (no Linux-rendered baseline is
   // owed for a cell that asserts on text content).
   'FlowCanvasBodyUpdate',
+  // 260825-l9x runtime reproduction (upstream 0.2.1 report) — FlowCanvasBodyResize is the
+  // BEHAVIORAL cell (loader → examples/demos/FlowCanvasBodyResizeDemo.rozie): one connected
+  // edge between an AUTO-sized node whose #body badge changes width and a RESIZABLE node
+  // whose corner handle can be dragged. The spec (rete-flow-socket-remeasure) samples the
+  // connection path's `d` attribute across each size change and asserts it MOVED — sockets
+  // were only ever measured on the fresh-build path, so the position store kept
+  // first-paint coordinates and every edge stayed pinned to them. Behavioral-only; NOT a
+  // screenshot cell (the assertion is an attribute string).
+  'FlowCanvasBodyResize',
   // quick-260803-uwb (the 260702-wws dark deferral) — FlowCanvasDarkScreenshot is a PIXEL
   // cell (loader → examples/demos/FlowCanvasDarkScreenshotDemo.rozie): the same fixed
   // 3-node / 2-edge content-stable graph as FlowCanvasScreenshotDemo (identity transform,
@@ -1447,6 +1456,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // 260825-hs8 body-repaint regression gate — '-demo' appended by the entry →
   // 'rozie-flow-canvas-body-update-demo' = kebab of FlowCanvasBodyUpdateDemo.
   FlowCanvasBodyUpdate: 'rozie-flow-canvas-body-update',
+  // 260825-l9x socket re-measure gate — '-demo' appended by the entry →
+  // 'rozie-flow-canvas-body-resize-demo' = kebab of FlowCanvasBodyResizeDemo.
+  FlowCanvasBodyResize: 'rozie-flow-canvas-body-resize',
   // quick-260803-uwb dark pixel cell — '-demo' appended by the entry →
   // 'rozie-flow-canvas-dark-screenshot-demo' = kebab of FlowCanvasDarkScreenshotDemo.
   FlowCanvasDarkScreenshot: 'rozie-flow-canvas-dark-screenshot',
@@ -1928,6 +1940,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // typed graph and re-binds it from its own button). No parent props; no MODEL_PROPS
   // entry (graph is bound internally — the FlowCanvas precedent).
   FlowCanvasBodyUpdate: {},
+  // 260825-l9x — FlowCanvasBodyResizeDemo is self-contained (seeds its own connected
+  // 2-node graph and drives the badge from its own button). No parent props; no
+  // MODEL_PROPS entry (graph is bound internally — the FlowCanvas precedent).
+  FlowCanvasBodyResize: {},
   // quick-260803-uwb — FlowCanvasDarkScreenshotDemo is self-contained (hardcodes its own
   // fixed 3-node / 2-edge graph and pins zoom/interaction off). No parent props; no
   // MODEL_PROPS entry (graph is bound internally — the FlowCanvas precedent).

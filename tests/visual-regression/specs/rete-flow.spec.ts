@@ -4525,3 +4525,124 @@ for (const target of TARGETS) {
     await expect(labels.filter({ hasText: 'Alpha' })).toHaveCount(0);
   });
 }
+
+/**
+ * 38. SOCKET RE-MEASURE GATE — a node box that changes size re-measures its sockets, so
+ * the attached connection paths follow (the upstream 0.2.1 report: "#body content that
+ * changes width leaves the connections behind").
+ *
+ * THE FAILURE MODE THIS GUARDS: `getDOMSocketPosition` (rete-render-utils) measures and
+ * STORES a socket's position ONLY on a `rendered` + `socket` signal — verified in its own
+ * source (`context.type === 'rendered' && context.data.type === 'socket'` →
+ * `calculatePosition` → `sockets.add` → `emitter.emit`). FlowCanvas emits that signal from
+ * exactly one place, `renderSocketInto` (FlowCanvas.rozie:1869), which runs only on the
+ * FRESH-BUILD path; `renderNode`'s in-place branch is documented "leave sockets" (`:1694`).
+ * So the position store kept first-paint coordinates for the life of the node and every
+ * connection path stayed pinned to them. The reporter measured `d` byte-identical across a
+ * change that narrowed five of seven nodes.
+ *
+ * A re-measure is SUFFICIENT — `renderConnection` subscribes
+ * `socketWatcher.listen(nodeId, side, key, (p) => { start = p; redraw() })` (`:2120-2121`),
+ * so a fresh position pushes straight into a redraw. That is also why the reporter's
+ * `area.update('connection', id)` was inert: it redraws faithfully from the stale store.
+ *
+ * TWO LEGS, because there are two ways to move the box:
+  *   1. BODY CONTENT — `badge-btn` toggles the badge text on the node's own `data` via a
+ *      graph re-bind (the reporter's "user filters the underlying data"), changing the
+ *      auto-sized node's width. Only reachable since 0.2.1 — before the ISSUE-7 fix a
+ *      `#body` never repainted at all. Note the badge must live in `node.data`, not in
+ *      component state: the slot scope is { node, selected, emit }, and a value read from
+ *      outside it is snapshot at projection time by the reactive-portal contract.
+ *   2. RESIZE GESTURE — a NodeResizer corner drag. `flushResizeWriteBack` (`:893`) commits
+ *      width/height into the bound graph, which reconciles through the SAME in-place branch
+ *      (`:1701-1702` sets `box.style.width/height`) and never re-measured. PRE-EXISTING,
+ *      not a 0.2.1 regression; in scope because it is the same defect.
+ *
+ * Each leg asserts the node's own width CHANGED before asserting the path moved — the
+ * existence proof that the box actually resized, so a dead button or a missed drag can
+ * never masquerade as a pass. Behavioral DOM check, NOT a screenshot: the assertion is an
+ * attribute string, so no Linux-rendered baseline is owed.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-socket-remeasure [${target}]: a resized node box re-measures its sockets so connections follow`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasBodyResize&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(2);
+
+    const path = page.locator('.rozie-flow-connection__path').first();
+    await expect(path).toHaveCount(1, { timeout: 15_000 });
+    // the one seeded edge must actually be drawn before anything is sampled — a null/empty
+    // `d` would make every "changed" comparison below vacuous.
+    await expect
+      .poll(async () => ((await path.getAttribute('d')) ?? '').length, { timeout: 15_000 })
+      .toBeGreaterThan(10);
+
+    const autoNode = page.locator('.rozie-flow-node', { hasText: 'Source' }).first();
+    const sizedNode = page.locator('.rozie-flow-node', { hasText: 'Sink' }).first();
+    const widthOf = async (n: typeof autoNode) => {
+      const box = await n.boundingBox();
+      if (!box) throw new Error('node bounding box unavailable');
+      return box.width;
+    };
+
+    // ── LEG 1: body content changes the auto-sized node's width ──────────────────
+    const w0 = await widthOf(autoNode);
+    const d0 = await path.getAttribute('d');
+    await expect(page.getByTestId('wide-state')).toHaveText('wide');
+
+    await page.getByTestId('badge-btn').click();
+    await expect(page.getByTestId('wide-state')).toHaveText('narrow', { timeout: 5_000 });
+
+    // EXISTENCE PROOF that the box really resized. Without this, a `d` that did not move
+    // would be indistinguishable from a body that never changed width at all.
+    await expect
+      .poll(async () => Math.round(await widthOf(autoNode)), { timeout: 5_000 })
+      .not.toBe(Math.round(w0));
+
+    // THE REGRESSION GATE: the socket moved with the box, so the path must have moved.
+    await expect
+      .poll(async () => await path.getAttribute('d'), { timeout: 5_000 })
+      .not.toBe(d0);
+
+    // ── LEG 2: a NodeResizer corner drag on the `sized` node ─────────────────────
+    await sizedNode.click();
+    const seHandle = page.getByTestId('flow-resize-handle-se').first();
+    await expect(seHandle).toBeVisible({ timeout: 5_000 });
+
+    const hw0 = await widthOf(sizedNode);
+    const d1 = await path.getAttribute('d');
+    const hb = await seHandle.boundingBox();
+    if (!hb) throw new Error('resize handle bounding box unavailable');
+
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hb.x + hb.width / 2 + 120, hb.y + hb.height / 2 + 60, { steps: 10 });
+    await page.mouse.up();
+
+    // Same discipline: prove the box resized before asserting the path followed.
+    await expect
+      .poll(async () => Math.round(await widthOf(sizedNode)), { timeout: 5_000 })
+      .not.toBe(Math.round(hw0));
+    await expect
+      .poll(async () => await path.getAttribute('d'), { timeout: 5_000 })
+      .not.toBe(d1);
+
+    // settle-and-resample (the file's own idiom): the re-measure is stable, not a frame a
+    // later reconcile echo reverts back to the stale coordinates.
+    const dFinal = await path.getAttribute('d');
+    await page.waitForTimeout(500);
+    await expect(path).toHaveCount(1);
+    await expect(await path.getAttribute('d')).toBe(dFinal);
+  });
+}

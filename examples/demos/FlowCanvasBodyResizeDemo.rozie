@@ -1,0 +1,182 @@
+<!--
+  FlowCanvasBodyResizeDemo.rozie — BEHAVIORAL runtime reproduction for the upstream 0.2.1
+  report "#body content that changes width leaves the connections behind".
+
+  THE SCENARIO THIS EXISTS TO PROVE. A node auto-sizes to its `#body`, so body content that
+  changes width changes the node box, and the sockets move with the box. But
+  `getDOMSocketPosition` (rete-render-utils) measures and STORES a socket's position ONLY on
+  a `rendered` + `socket` signal, and FlowCanvas emits that from exactly one place —
+  `renderSocketInto` (:1869), on the FRESH-BUILD path. `renderNode`'s in-place branch is
+  documented "leave sockets" (:1694), so the position store keeps its first-paint
+  coordinates for the life of the node and every connection path keeps pointing at where
+  the sockets USED to be. `area.update('connection', id)` cannot rescue it: that redraws
+  faithfully from the stale store.
+
+  TWO LEGS, because there are two ways to move the box and both were broken:
+
+    1. BODY CONTENT (the report). `badge-btn` toggles the badge text ON THE NODE'S OWN
+       `data`, by re-binding a fresh graph object — the reporter's actual trigger ("the
+       user filters the underlying data"), and the only one that works: the `#body` scope
+       is { node, selected, emit }, so component state read from OUTSIDE that scope is
+       snapshot at projection time and never repaints (the documented reactive-portal
+       constraint). Through `node.data` it is IN scope, where 0.2.1's `bodyHandle.update`
+       re-delivers it. This trigger only became reachable in 0.2.1 — before the ISSUE-7 fix
+       a `#body` never repainted at all, so its content could not change width at all.
+
+    2. RESIZE GESTURE (found while confirming the report; PRE-EXISTING, not a 0.2.1
+       regression). `flushResizeWriteBack` (:893) commits width/height into the bound graph,
+       which reconciles through the SAME in-place branch — it sets `box.style.width/height`
+       (:1701-1702) and never re-measures. So dragging a NodeResizer corner detaches the
+       edges too. The `sized` NodeType carries `resizable` so a spec can drive that.
+
+  WHY THE ASSERTION IS ON THE PATH `d` ATTRIBUTE. The bug is invisible in node-level DOM —
+  the box really does resize and the sockets really do move; it is only the CONNECTION
+  geometry that is stale. Reading `d` off `.rozie-flow-connection__path` is the only place
+  the staleness surfaces, and the reporter measured exactly this (`d` byte-identical across
+  a change that narrowed five nodes). Each leg asserts the node's own width CHANGED first —
+  the existence proof that the box actually resized — so a dead button or a missed drag can
+  never masquerade as a passing repaint.
+
+  Both nodes carry a `left` input and a `right` output in the CLASSIC layout, so the DOM is
+  the pre-F2 3-column shape and this fixture does not depend on position-aware ports.
+  `:fit-on-mount="false"` keeps seeded positions deterministic. Behavioral-only, NOT a
+  pixel cell — the assertion is on an attribute string, so no Linux-rendered `.png`
+  baseline is owed (`feedback_vr_linux_baselines`).
+
+  Container needs explicit height/width (the VR host mounts at max-content).
+-->
+
+<rozie name="FlowCanvasBodyResizeDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  // THE SINGLE SOURCE OF TRUTH. `a` -> `b` connected, so there is exactly one path whose
+  // `d` the spec can sample. `a` is the auto-sized node whose body drives leg 1; `b` is
+  // the `sized` resizable node whose corner handle drives leg 2.
+  graph: {
+    nodes: [
+      { id: 'a', type: 'auto',  x: 40,  y: 60, data: { label: 'Source', badge: '8 completed · 1 failed · 1 skipped (10 instances)' } },
+      { id: 'b', type: 'sized', x: 460, y: 60, data: { label: 'Sink' } },
+    ],
+    connections: [
+      { id: 'ab', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+    ],
+  },
+}
+</data>
+
+<script>
+// Toggle the badge text ON THE NODE'S OWN `data`, by RE-BINDING a fresh graph object.
+// This is the reporter's actual trigger ("the user filters the underlying data") and it is
+// the only one that works: the `#body` slot scope is { node, selected, emit }, so a value
+// read from component state OUTSIDE that scope is snapshot at projection time and would
+// never repaint (the documented reactive-portal constraint). Routing the change through
+// `node.data` puts it IN scope, where the 0.2.1 `bodyHandle.update` re-delivers it.
+//
+// Node ids, types, positions and the port schema are all untouched, so the reconcile takes
+// renderNode's IN-PLACE branch — the branch under test.
+const BADGE = '8 completed · 1 failed · 1 skipped (10 instances)'
+const toggleBadge = () => {
+  const nodes = $data.graph.nodes.map((n) =>
+    n.id === 'a' ? { ...n, data: { ...n.data, badge: n.data.badge ? '' : BADGE } } : n,
+  )
+  $data.graph = { ...$data.graph, nodes }
+}
+
+// read straight off the BOUND MODEL — proves the click re-bound the graph.
+const badgeState = () => ($data.graph.nodes[0].data.badge ? 'wide' : 'narrow')
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — a resized node box re-measures its sockets (regression gate)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="badge-btn" @click="toggleBadge">Toggle badge</button>
+    <span class="readout" data-testid="wide-state">{{ badgeState() }}</span>
+    <span class="readout" data-testid="conn-count">{{ $data.graph.connections.length }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 360px; width: 900px">
+    <FlowCanvas
+      r-model:graph="$data.graph"
+      :fit-on-mount="false"
+    >
+      <!-- LEG 1: auto-sized. The badge row is what changes width. -->
+      <NodeType type="auto">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+            <span class="rozie-demo-badge">{{ node.data.badge }}</span>
+          </div>
+        </template>
+        <Port input="in" type="number" label="in" multiple />
+        <Port output="out" type="number" label="out" />
+      </NodeType>
+
+      <!-- LEG 2: resizable, so a corner-handle drag drives the SAME in-place branch
+           through flushResizeWriteBack's width/height commit. -->
+      <NodeType type="sized" resizable :min-width="80" :min-height="60" :max-width="420" :max-height="320">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+          </div>
+        </template>
+        <Port input="in" type="number" label="in" multiple />
+        <Port output="out" type="number" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 940px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+
+:root {
+  /* the #body chrome teleports into the engine node element inside the canvas shadow
+     root, so on Lit a plain scoped rule cannot reach it — :root emits document-level
+     CSS adopted into the shadow root. NOT :global() (ROZ128 hard error). */
+  .rozie-flow-canvas .rozie-demo-node {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+  .rozie-flow-canvas .rozie-demo-badge {
+    font-size: 0.75rem;
+    color: #6b7280;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>
