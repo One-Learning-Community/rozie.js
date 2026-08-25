@@ -31,7 +31,7 @@ resolves to the same single-root classification and the same target element.
   release only widens the "one real element" case to tolerate slot siblings, it does not change
   root-arity rules.
 - **One element plus a non-slot structural sibling still hard-errors as before**, EXCEPT for the
-  new diagnosed-but-deferred case below (a conditional/loop-gated single root).
+  new diagnosed-but-deferred case below (a conditional/match-gated single root).
 - **A component-tag root is still out of scope.** `<MyOtherComponent />` as the sole top-level node
   is unaffected by this change.
 - **The documented opt-out still works exactly as documented.** `inherit-attrs="false"
@@ -42,12 +42,15 @@ resolves to the same single-root classification and the same target element.
 `ROZ090`..`ROZ099` band:
 
 - **`ROZ098`** (attrs) and **`ROZ099`** (listeners) — `inheritAttrs`/`inheritListeners` are `true`
-  (or unset) and the template's single structural root is a conditional (`r-if`/`r-match`) or loop
-  (`r-for`), so there is no single element the synthesized spread can land on. Previously this shape
+  (or unset) and the template's single structural root is gated by a conditional (`r-if`) or a match
+  (`r-match`), so there is no unconditional element the synthesized spread can land on. A loop-gated
+  root (`r-for`) is deliberately NOT covered and stays silent, along with an interpolation root or a
+  lone `<slot>` root: those are renderless shapes with no element that could have received the attrs,
+  so a warning there would be pure noise. Previously this shape
   silently dropped the consumer's attrs/listeners with zero signal. It is now diagnosed at
   warning severity instead of erroring, because the shape is common and often intentional — but
   **the underlying drop is NOT yet repaired.** The branch-descent fix (pushing the spread onto
-  every branch of the conditional, or onto the loop's mapped root) is deliberately deferred to a
+  every branch of the conditional or match) is deliberately deferred to a
   future phase. Two remedies are available today: apply the documented `inherit-attrs="false"
   inherit-listeners="false"` opt-out to silence the warning once you've confirmed the drop is
   intentional, or restructure the template so the gate lives *inside* a single wrapping element
