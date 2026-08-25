@@ -160,3 +160,7 @@
     pointer-events: none;
     user-select: none;
   }
+.rozie-flow-canvas .rozie-flow-toolbar__btn:focus-visible {
+    outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+    outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+  }

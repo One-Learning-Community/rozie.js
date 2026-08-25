@@ -4021,6 +4021,10 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
       var(--rozie-flow-bg, #f7f8fa);
     border: 1px solid var(--rozie-flow-border-color, rgba(0, 0, 0, 0.1));
   }
+  .rozie-flow-canvas[data-rozie-s-cd396d6a]:focus-visible {
+    outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+    outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+  }
   .rozie-flow-canvas.rozie-flow-canvas--lines[data-rozie-s-cd396d6a] {
     background:
       linear-gradient(to right, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
@@ -4065,6 +4069,10 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
   }
   .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:hover { background: var(--rozie-flow-control-hover-bg, #f1f5f9); }
   .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:active { background: var(--rozie-flow-control-active-bg, #e2e8f0); }
+  .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:focus-visible {
+    outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+    outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+  }
   .rozie-flow-controls__btn.is-active[data-rozie-s-cd396d6a] {
     background: var(--rozie-flow-control-selected-bg, #dbeafe);
     color: var(--rozie-flow-control-selected-fg, #1d4ed8);
@@ -4095,6 +4103,10 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
   .rozie-flow-resize-handle--ne[data-rozie-s-cd396d6a] { cursor: nesw-resize; }
   .rozie-flow-resize-handle--sw[data-rozie-s-cd396d6a] { cursor: nesw-resize; }
   .rozie-flow-resize-handle--se[data-rozie-s-cd396d6a] { cursor: nwse-resize; }
+  .rozie-flow-resize-handle[data-rozie-s-cd396d6a]:focus-visible {
+    outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+    outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+  }
   .rozie-flow-minimap[data-rozie-s-cd396d6a] {
     position: absolute;
     right: 10px;
@@ -4301,6 +4313,10 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
       stroke-linejoin: round;
       pointer-events: none;
       user-select: none;
+    }
+  .rozie-flow-canvas .rozie-flow-toolbar__btn:focus-visible {
+      outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+      outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
     }
 }
 </style>

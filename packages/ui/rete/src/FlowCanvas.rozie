@@ -3769,6 +3769,17 @@ $expose({
   border: 1px solid var(--rozie-flow-border-color, rgba(0, 0, 0, 0.1));
 }
 
+/* D-02/D-04 — keyboard-only focus ring (tabindex="0" lives on this element).
+   Drawn as an inside-the-border-box outline with a NEGATIVE outline-offset
+   so it survives this rule's own `overflow: hidden` above; an outward
+   outline or a box-shadow ring would be clipped identically. Modality-gated
+   (the "-visible" pseudo-class variant below), never the unqualified one,
+   so clicking to pan does not ring it — only tabbing to it does. */
+.rozie-flow-canvas:focus-visible {
+  outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+  outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+}
+
 /* Phase 74 (D-01..D-04) — :background variant switch, the React Flow <Background
    variant> parity. 'dots' (default, unset class, the base rule above) stays byte-
    identical. The 3 variants below only override `background:`; width/height/border/
@@ -3829,6 +3840,11 @@ $expose({
 }
 .rozie-flow-controls__btn:hover { background: var(--rozie-flow-control-hover-bg, #f1f5f9); }
 .rozie-flow-controls__btn:active { background: var(--rozie-flow-control-active-bg, #e2e8f0); }
+/* D-02/D-04 — same modality-gated inside-the-border-box ring; see .rozie-flow-canvas above for the shape's rationale. */
+.rozie-flow-controls__btn:focus-visible {
+  outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+  outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+}
 /* T2.4 — the gated mode button's active (select-mode) state. */
 .rozie-flow-controls__btn.is-active {
   background: var(--rozie-flow-control-selected-bg, #dbeafe);
@@ -3871,6 +3887,11 @@ $expose({
 .rozie-flow-resize-handle--ne { cursor: nesw-resize; }
 .rozie-flow-resize-handle--sw { cursor: nesw-resize; }
 .rozie-flow-resize-handle--se { cursor: nwse-resize; }
+/* D-02/D-04 — same modality-gated inside-the-border-box ring; see .rozie-flow-canvas above for the shape's rationale. */
+.rozie-flow-resize-handle:focus-visible {
+  outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+  outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+}
 
 /* built-in MiniMap overlay (Phase 42) — COMPONENT-template host div, so plain scoped
    CSS positions it (it carries the [data-rozie-s-*] scope attr). The inner SVG is built
@@ -4171,6 +4192,15 @@ $expose({
     stroke-linejoin: round;
     pointer-events: none;
     user-select: none;
+  }
+  /* D-02/D-04 — the default NodeToolbar buttons are built via
+     document.createElement, so they never carry the [data-rozie-s-*] scope
+     attribute; a scoped focus rule of this shape would be dead on arrival, same
+     reason the engine-rendered node/socket/connection DOM lives in this
+     escape hatch. Anchored under the canvas like the rest of this block. */
+  .rozie-flow-canvas .rozie-flow-toolbar__btn:focus-visible {
+    outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+    outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
   }
 }
 </style>

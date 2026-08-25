@@ -4005,6 +4005,10 @@ defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, duplicateNod
     var(--rozie-flow-bg, #f7f8fa);
   border: 1px solid var(--rozie-flow-border-color, rgba(0, 0, 0, 0.1));
 }
+.rozie-flow-canvas:focus-visible {
+  outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+  outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+}
 .rozie-flow-canvas.rozie-flow-canvas--lines {
   background:
     linear-gradient(to right, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
@@ -4049,6 +4053,10 @@ defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, duplicateNod
 }
 .rozie-flow-controls__btn:hover { background: var(--rozie-flow-control-hover-bg, #f1f5f9); }
 .rozie-flow-controls__btn:active { background: var(--rozie-flow-control-active-bg, #e2e8f0); }
+.rozie-flow-controls__btn:focus-visible {
+  outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+  outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+}
 .rozie-flow-controls__btn.is-active {
   background: var(--rozie-flow-control-selected-bg, #dbeafe);
   color: var(--rozie-flow-control-selected-fg, #1d4ed8);
@@ -4079,6 +4087,10 @@ defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, duplicateNod
 .rozie-flow-resize-handle--ne { cursor: nesw-resize; }
 .rozie-flow-resize-handle--sw { cursor: nesw-resize; }
 .rozie-flow-resize-handle--se { cursor: nwse-resize; }
+.rozie-flow-resize-handle:focus-visible {
+  outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+  outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+}
 .rozie-flow-minimap {
   position: absolute;
   right: 10px;
@@ -4285,5 +4297,9 @@ defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, duplicateNod
     stroke-linejoin: round;
     pointer-events: none;
     user-select: none;
+  }
+.rozie-flow-canvas .rozie-flow-toolbar__btn:focus-visible {
+    outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
+    outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
   }
 </style>
