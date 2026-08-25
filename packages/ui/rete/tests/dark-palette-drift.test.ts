@@ -175,24 +175,40 @@ describe('dark-palette-drift — OS-dark guard selector (D-22)', () => {
  * `indexOf` on that marker would anchor on the COMMENT text, not the real rule.
  * The actual OS-dark rule is base.css's LAST occurrence of that string.
  */
+/**
+ * Strip CSS `/* ... *\/` comments before either the brace-counter or the token
+ * regex ever sees the text (WR-02). Neither `extractBlock`'s brace-counter nor
+ * `extractTokens`'s regex has any notion of "inside a comment": an unbalanced
+ * `{`/`}` inside a future comment would mis-locate a block's closing brace, and
+ * a token-shaped string in prose (e.g. `/* was --rozie-flow-old-shadow: rgba(0,0,0,.6);
+ * before D-23 *\/`) would be regex-matched as a real declaration. Comments are
+ * removed outright (not blanked to equal length) — every caller here re-derives
+ * its own start/end offsets FROM the stripped text via `indexOf`/brace-counting,
+ * so nothing downstream depends on offsets into the original, unstripped source.
+ */
+function stripComments(text: string): string {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
 function extractBlock(
   text: string,
   marker: string,
   opts: { fromLastOccurrence?: boolean } = {},
 ): string {
-  const start = opts.fromLastOccurrence ? text.lastIndexOf(marker) : text.indexOf(marker);
+  const stripped = stripComments(text);
+  const start = opts.fromLastOccurrence ? stripped.lastIndexOf(marker) : stripped.indexOf(marker);
   if (start === -1) {
     throw new Error(`dark-palette-drift: marker not found: ${JSON.stringify(marker)}`);
   }
-  const braceStart = text.indexOf('{', start);
+  const braceStart = stripped.indexOf('{', start);
   if (braceStart === -1) {
     throw new Error(`dark-palette-drift: no opening brace found after marker: ${JSON.stringify(marker)}`);
   }
   let depth = 0;
   let end = -1;
-  for (let i = braceStart; i < text.length; i++) {
-    if (text[i] === '{') depth++;
-    else if (text[i] === '}') {
+  for (let i = braceStart; i < stripped.length; i++) {
+    if (stripped[i] === '{') depth++;
+    else if (stripped[i] === '}') {
       depth--;
       if (depth === 0) {
         end = i;
@@ -203,13 +219,13 @@ function extractBlock(
   if (end === -1) {
     throw new Error(`dark-palette-drift: unbalanced braces after marker: ${JSON.stringify(marker)}`);
   }
-  return text.slice(start, end + 1);
+  return stripped.slice(start, end + 1);
 }
 
 /** Every `--rozie-flow-*` declaration in `block`, name -> trimmed value. */
 function extractTokens(block: string): Map<string, string> {
   const out = new Map<string, string>();
-  for (const m of block.matchAll(/(--rozie-flow-[a-z-]+)\s*:\s*([^;]+);/g)) {
+  for (const m of stripComments(block).matchAll(/(--rozie-flow-[a-z-]+)\s*:\s*([^;]+);/g)) {
     out.set(m[1], m[2].trim());
   }
   return out;
