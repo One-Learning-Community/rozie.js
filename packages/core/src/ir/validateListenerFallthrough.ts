@@ -46,11 +46,12 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
+
 import _traverse from '@babel/traverse';
+import * as t from '@babel/types';
+import type { SourceLoc } from '../ast/types.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
-import type { SourceLoc } from '../ast/types.js';
 import type { IRComponent, TemplateNode } from './types.js';
 
 // Default-export interop: @babel/traverse ships a CJS default export that some
@@ -128,9 +129,7 @@ function countRootElements(template: TemplateNode | null): number {
  * non-`TemplateStaticText` child when the template is a fragment with exactly
  * one such child, or `null` otherwise.
  */
-function resolveSingleStructuralRoot(
-  template: TemplateNode | null,
-): TemplateNode | null {
+function resolveSingleStructuralRoot(template: TemplateNode | null): TemplateNode | null {
   if (template === null) return null;
   if (template.type !== 'TemplateFragment') return template;
   let only: TemplateNode | null = null;
@@ -149,10 +148,7 @@ function resolveSingleStructuralRoot(
  * Mirrors `validateAttrFallthrough.walkTemplate` — the WR-02
  * `TemplateMatch.hostElement` walk is load-bearing and copied verbatim.
  */
-function walkTemplate(
-  node: TemplateNode | null,
-  visit: (n: TemplateNode) => void,
-): void {
+function walkTemplate(node: TemplateNode | null, visit: (n: TemplateNode) => void): void {
   if (node === null) return;
   visit(node);
   switch (node.type) {
@@ -205,10 +201,7 @@ function isBareListenersIdentifier(expr: t.Expression): boolean {
  * @param ir          - the lowered IRComponent
  * @param diagnostics - accumulator (mutated in place; ROZ973/974 pushed)
  */
-export function validateListenerFallthrough(
-  ir: IRComponent,
-  diagnostics: Diagnostic[],
-): void {
+export function validateListenerFallthrough(ir: IRComponent, diagnostics: Diagnostic[]): void {
   // Fallthrough is OFF — neither rule applies. The author opted out, so a
   // multi-root template is fine and an explicit `r-on="$listeners"` is the
   // single (intended) application.
@@ -243,10 +236,19 @@ export function validateListenerFallthrough(
   // independence note style already used elsewhere in this file.
   if (!multiRootFired) {
     const singleRoot = resolveSingleStructuralRoot(ir.template);
+    // WR-01: a `TemplateMatch` is only element-less when its host is the
+    // non-rendering `<template r-match>` form. `<div r-match>` carries a real
+    // wrapper in `hostElement` (types.ts:1334) that renders UNCONDITIONALLY —
+    // only the content nested inside it varies per branch — so both the
+    // message and the hint below would be false for it, and the synthesizer
+    // lands the spread on that host instead (lowerTemplate.ts). The
+    // exemption keys on host PRESENCE, not `tagKind`: a component-tag host
+    // gets no diagnostic and no spread, exactly as a plain component-tag root
+    // does today (Plan 14-05). `TemplateConditional` has no host at all.
     if (
       singleRoot !== null &&
       (singleRoot.type === 'TemplateConditional' ||
-        singleRoot.type === 'TemplateMatch')
+        (singleRoot.type === 'TemplateMatch' && !singleRoot.hostElement))
     ) {
       const loc: SourceLoc = singleRoot.sourceLoc ?? ir.sourceLoc;
       diagnostics.push({

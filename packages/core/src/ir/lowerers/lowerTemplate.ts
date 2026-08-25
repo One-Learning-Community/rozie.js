@@ -21,48 +21,45 @@
 import { parseExpression } from '@babel/parser';
 import * as t from '@babel/types';
 import type {
-  TemplateAST,
-  TemplateNode as ASTTemplateNode,
   TemplateElement as ASTTemplateElement,
+  TemplateNode as ASTTemplateNode,
+  TemplateAST,
   TemplateAttr,
 } from '../../ast/blocks/TemplateAST.js';
-import type { BindingsTable } from '../../semantic/types.js';
-import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
-import type { ReactiveDepGraph } from '../../reactivity/ReactiveDepGraph.js';
-import type {
-  ModifierRegistry,
-  ModifierContext,
-} from '../../modifiers/ModifierRegistry.js';
-import { isModelModifier } from '../../modifiers/ModifierRegistry.js';
-import { extractRForAliases } from '../../semantic/extractRForAliases.js';
-import { computeExpressionDeps } from '../../reactivity/computeDeps.js';
-import { resolveModifierPipeline } from './lowerListeners.js';
-import { isPascalCase } from '../utils/isPascalCase.js';
-import { didYouMean } from '../../diagnostics/didYouMean.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
-import { extractSlotFillers } from './lowerSlotFillers.js';
-import { foldConstantSlotName } from './lowerSlots.js';
+import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
+import { didYouMean } from '../../diagnostics/didYouMean.js';
+import type { ModifierChain } from '../../modifier-grammar/parseModifierChain.js';
+import { parseModifierChain } from '../../modifier-grammar/parseModifierChain.js';
+import type { ModifierContext, ModifierRegistry } from '../../modifiers/ModifierRegistry.js';
+import { isModelModifier } from '../../modifiers/ModifierRegistry.js';
+import { computeExpressionDeps } from '../../reactivity/computeDeps.js';
+import type { ReactiveDepGraph } from '../../reactivity/ReactiveDepGraph.js';
+import type { SignalRef } from '../../reactivity/signalRef.js';
+import { extractRForAliases } from '../../semantic/extractRForAliases.js';
+import type { BindingsTable } from '../../semantic/types.js';
 import type {
-  TemplateNode as IRTemplateNode,
-  TemplateElementIR,
-  TemplateConditionalIR,
-  TemplateMatchIR,
-  TemplateLoopIR,
-  TemplateSlotInvocationIR,
-  TemplateInterpolationIR,
-  TemplateStaticTextIR,
   AttributeBinding,
   ComponentDecl,
+  TemplateNode as IRTemplateNode,
+  KeynavItemIR,
+  KeynavRootIR,
   Listener,
   ListenerSpreadIR,
-  SlotFillerDecl,
   ResolvedModelModifier,
-  KeynavRootIR,
-  KeynavItemIR,
+  SlotFillerDecl,
+  TemplateConditionalIR,
+  TemplateElementIR,
+  TemplateInterpolationIR,
+  TemplateLoopIR,
+  TemplateMatchIR,
+  TemplateSlotInvocationIR,
+  TemplateStaticTextIR,
 } from '../types.js';
-import { parseModifierChain } from '../../modifier-grammar/parseModifierChain.js';
-import type { ModifierChain } from '../../modifier-grammar/parseModifierChain.js';
-import type { SignalRef } from '../../reactivity/signalRef.js';
+import { isPascalCase } from '../utils/isPascalCase.js';
+import { resolveModifierPipeline } from './lowerListeners.js';
+import { extractSlotFillers } from './lowerSlotFillers.js';
+import { foldConstantSlotName } from './lowerSlots.js';
 
 /**
  * Per-element annotation of tagKind + diagnostic emission for Phase 06.2 P1
@@ -385,13 +382,8 @@ function lowerAttribute(
 /**
  * Find a `:key` binding among the attrs.
  */
-function findKeyExpression(
-  attrs: TemplateAttr[],
-  bindings: BindingsTable,
-): t.Expression | null {
-  const keyAttr = attrs.find(
-    (a) => a.kind === 'binding' && a.name === 'key' && a.value !== null,
-  );
+function findKeyExpression(attrs: TemplateAttr[], bindings: BindingsTable): t.Expression | null {
+  const keyAttr = attrs.find((a) => a.kind === 'binding' && a.name === 'key' && a.value !== null);
   if (!keyAttr || !keyAttr.value) return null;
   return tryParseExpression(keyAttr.value);
 }
@@ -415,9 +407,7 @@ function getConditionalDirective(
  * Find an `r-for` directive on a template element. Returns null if absent.
  */
 function getRForDirective(el: ASTTemplateElement): TemplateAttr | null {
-  return (
-    el.attributes.find((a) => a.kind === 'directive' && a.name === 'for') ?? null
-  );
+  return el.attributes.find((a) => a.kind === 'directive' && a.name === 'for') ?? null;
 }
 
 /**
@@ -428,9 +418,7 @@ function getRForDirective(el: ASTTemplateElement): TemplateAttr | null {
  * Returns the directive `attr` alongside `kind`/`expr` so the match-grouping
  * branch can attach the most specific source frame to ROZ953-959 diagnostics.
  */
-function getMatchDirective(
-  el: ASTTemplateElement,
-): {
+function getMatchDirective(el: ASTTemplateElement): {
   kind: 'match' | 'case' | 'default';
   expr: string | null;
   attr: TemplateAttr;
@@ -484,9 +472,7 @@ function foldCaseTest(
     const comparisons: t.Expression[] = caseValue.expressions.map((v) =>
       t.binaryExpression('===', t.cloneNode(discriminantExpr), v),
     );
-    return comparisons.reduce((acc, cmp) =>
-      t.logicalExpression('||', acc, cmp),
-    );
+    return comparisons.reduce((acc, cmp) => t.logicalExpression('||', acc, cmp));
   }
   // Normal strict-equality case.
   return t.binaryExpression('===', discriminantExpr, caseValue);
@@ -510,16 +496,10 @@ function caseLiteralValue(caseValue: t.Expression): string | undefined {
   // UnaryExpression with operator `-` wrapping a NumericLiteral, NOT a plain
   // NumericLiteral. Special-case the unary-minus/plus-on-numeric form so two
   // `r-case="-1"` rungs are still caught by the ROZ959 duplicate-case check.
-  if (
-    t.isUnaryExpression(caseValue, { operator: '-' }) &&
-    t.isNumericLiteral(caseValue.argument)
-  ) {
+  if (t.isUnaryExpression(caseValue, { operator: '-' }) && t.isNumericLiteral(caseValue.argument)) {
     return `n:${-caseValue.argument.value}`;
   }
-  if (
-    t.isUnaryExpression(caseValue, { operator: '+' }) &&
-    t.isNumericLiteral(caseValue.argument)
-  ) {
+  if (t.isUnaryExpression(caseValue, { operator: '+' }) && t.isNumericLiteral(caseValue.argument)) {
     return `n:${+caseValue.argument.value}`;
   }
   return undefined;
@@ -635,10 +615,7 @@ function lowerElement(
         (a) =>
           !(
             a.kind === 'directive' &&
-            (a.name === 'for' ||
-              a.name === 'if' ||
-              a.name === 'else-if' ||
-              a.name === 'else')
+            (a.name === 'for' || a.name === 'if' || a.name === 'else-if' || a.name === 'else')
           ),
       ),
     };
@@ -901,8 +878,7 @@ function resolveKeynavModifiers(
           diagnostics.push({
             code: RozieErrorCode.KEYNAV_GRID_BAD_COLUMNS,
             severity: 'error',
-            message:
-              '.grid requires a columns argument — write .grid(7) or .grid($data.cols).',
+            message: '.grid requires a columns argument — write .grid(7) or .grid($data.cols).',
             loc: m.loc,
             hint: '.grid(<expr>) — a numeric literal or a $-prefixed reactive expression naming the column count.',
           });
@@ -915,7 +891,10 @@ function resolveKeynavModifiers(
         if (arg.kind === 'expr') {
           const parsed = tryParseExpression(arg.raw);
           if (parsed) {
-            grid = { columnsExpression: parsed, columnsDeps: computeExpressionDeps(parsed, bindings) };
+            grid = {
+              columnsExpression: parsed,
+              columnsDeps: computeExpressionDeps(parsed, bindings),
+            };
             break;
           }
         }
@@ -1036,7 +1015,7 @@ function lowerBareElement(
           code: RozieErrorCode.PORTAL_DIRECTIVE_ON_SLOT,
           severity: 'error',
           message:
-            'r-portal is not valid on <slot> — use the boolean `portal` attribute for slot-content portalling (r-portal is a distinct directive for portalling an ordinary element\'s own rendered subtree).',
+            "r-portal is not valid on <slot> — use the boolean `portal` attribute for slot-content portalling (r-portal is a distinct directive for portalling an ordinary element's own rendered subtree).",
           loc: attr.loc,
           hint: 'Use <slot portal /> (no r-, boolean form) to portal slot content into an engine-owned container; r-portal="<expr>" portals an ordinary element out to a container.',
         });
@@ -1134,11 +1113,7 @@ function lowerBareElement(
   // `booleanLiteral(true)` binding. The full `annotateTagKind` (which owns the
   // ROZ920..928 diagnostics) still runs after the loop; this is a diagnostic-
   // free probe mirroring its component classification.
-  const elementIsComponent = isComponentElement(
-    el.tagName,
-    outerName,
-    componentsTable,
-  );
+  const elementIsComponent = isComponentElement(el.tagName, outerName, componentsTable);
 
   // Lower attributes + collect template @event listeners.
   const attributes: AttributeBinding[] = [];
@@ -1170,8 +1145,7 @@ function lowerBareElement(
 
   for (const attr of el.attributes) {
     if (attr.kind === 'event') {
-      const handlerExpr =
-        attr.value !== null ? tryParseExpression(attr.value) : null;
+      const handlerExpr = attr.value !== null ? tryParseExpression(attr.value) : null;
       // ROZ143 (Spike-012 silent-miscompile fix): a non-empty handler that
       // failed to parse as an expression — dominant cause is a statement-body
       // handler (`if (...) { a() } else { b() }`, a loop, a bare block) — is a
@@ -1196,12 +1170,7 @@ function lowerBareElement(
         event: attr.name,
         sourceLoc: attr.loc,
       };
-      const modifierPipeline = resolveModifierPipeline(
-        attr.chain,
-        ctx,
-        registry,
-        diagnostics,
-      );
+      const modifierPipeline = resolveModifierPipeline(attr.chain, ctx, registry, diagnostics);
       const tplListener: Listener = {
         type: 'Listener',
         // Template event handlers bind to the element they're declared on —
@@ -1281,11 +1250,7 @@ function lowerBareElement(
         // a hard error (ROZ963 — built-ins are form-input-`r-model`-only per
         // SPEC R5); a custom model modifier on the two-way form is permitted.
         // The resolved list is still carried on the IR regardless.
-        const twoWayModifiers = resolveModelModifiers(
-          attr.chain,
-          registry,
-          diagnostics,
-        );
+        const twoWayModifiers = resolveModelModifiers(attr.chain, registry, diagnostics);
         for (const m of twoWayModifiers) {
           if (BUILTIN_MODEL_MODIFIERS.has(m.name)) {
             diagnostics.push({
@@ -1405,10 +1370,7 @@ function lowerBareElement(
               // loc as a conservative source span (diagnostics from the
               // modifier grammar still localise; downstream consumers do not
               // depend on per-character key offsets).
-              const { chain } = parseModifierChain(
-                modifierChainText,
-                attr.loc.start,
-              );
+              const { chain } = parseModifierChain(modifierChainText, attr.loc.start);
               const ctx: ModifierContext = {
                 source: 'template-event',
                 event: eventName,
@@ -1422,7 +1384,6 @@ function lowerBareElement(
                 modifierPipeline,
                 valueExpr: valueNode,
               });
-              continue;
             }
             // Keys matching neither shape are SILENTLY SKIPPED per SPEC R1
             // acceptance (only valid-key behavior is specified).
@@ -1519,15 +1480,11 @@ function lowerBareElement(
           }
         }
         keynavItem = {
-          ...(labelExpression !== undefined
-            ? { labelExpression, labelDeps: labelDeps ?? [] }
-            : {}),
+          ...(labelExpression !== undefined ? { labelExpression, labelDeps: labelDeps ?? [] } : {}),
           ...(disabledExpression !== undefined
             ? { disabledExpression, disabledDeps: disabledDeps ?? [] }
             : {}),
-          ...(indexExpression !== undefined
-            ? { indexExpression, indexDeps: indexDeps ?? [] }
-            : {}),
+          ...(indexExpression !== undefined ? { indexExpression, indexDeps: indexDeps ?? [] } : {}),
           sourceLoc: attr.loc,
         };
         continue;
@@ -1635,9 +1592,7 @@ function lowerBareElement(
         // r-model and for r-show/r-html/r-text (they never carry a chain —
         // a dot on them was already caught by the ROZ962 guard above).
         const modifiers =
-          attr.name === 'model'
-            ? resolveModelModifiers(attr.chain, registry, diagnostics)
-            : [];
+          attr.name === 'model' ? resolveModelModifiers(attr.chain, registry, diagnostics) : [];
         attributes.push({
           kind: 'binding',
           name: `r-${attr.name}`,
@@ -1703,13 +1658,10 @@ function lowerBareElement(
   // the r-for path already consumed (`keyConsumedByLoop`) are left untouched
   // as before.
   let remountKeyExpression: t.Expression | undefined;
-  if (
-    !keyConsumedByLoop &&
-    (annotation.tagKind === 'component' || annotation.tagKind === 'self')
-  ) {
-    const keyAttr = attributes.find(
-      (a) => a.kind === 'binding' && a.name === 'key',
-    ) as Extract<AttributeBinding, { kind: 'binding' }> | undefined;
+  if (!keyConsumedByLoop && (annotation.tagKind === 'component' || annotation.tagKind === 'self')) {
+    const keyAttr = attributes.find((a) => a.kind === 'binding' && a.name === 'key') as
+      | Extract<AttributeBinding, { kind: 'binding' }>
+      | undefined;
     if (keyAttr) {
       remountKeyExpression = keyAttr.expression;
     }
@@ -1719,8 +1671,7 @@ function lowerBareElement(
   // child becomes default-shorthand fill content; <template #name> children
   // are explicit fills). Every <slot> inside any of these bodies must lower
   // with context: 'fill-body' (re-projection semantics, D-06).
-  const childIsFillBody =
-    annotation.tagKind === 'component' || annotation.tagKind === 'self';
+  const childIsFillBody = annotation.tagKind === 'component' || annotation.tagKind === 'self';
   const childFillBodyFlag = childIsFillBody ? true : lowerInFillBody;
 
   const children = lowerNodeList(
@@ -1763,9 +1714,7 @@ function lowerBareElement(
     sourceLoc: el.loc,
     tagKind: annotation.tagKind,
     // exactOptionalPropertyTypes: spread componentRef + slotFillers only when defined.
-    ...(annotation.componentRef !== undefined
-      ? { componentRef: annotation.componentRef }
-      : {}),
+    ...(annotation.componentRef !== undefined ? { componentRef: annotation.componentRef } : {}),
     ...(slotFillers !== undefined ? { slotFillers } : {}),
     // `r-external` engine-wrapper marker. Spread only when set so non-marked
     // elements stay byte-identical to the pre-change IR (and dist-parity
@@ -1875,12 +1824,9 @@ function lowerNodeList(
       // cheap — inline it into every rung. A CallExpression (or anything else
       // non-trivial) is hoisted so it evaluates exactly once; allocate a
       // per-component-unique temp name from the threaded counter.
-      const isInline =
-        t.isIdentifier(discriminant) || t.isMemberExpression(discriminant);
+      const isInline = t.isIdentifier(discriminant) || t.isMemberExpression(discriminant);
       const discriminantMode: 'inline' | 'hoist' = isInline ? 'inline' : 'hoist';
-      const tempName = isInline
-        ? undefined
-        : `__rozieMatch_${matchCounter.next++}`;
+      const tempName = isInline ? undefined : `__rozieMatch_${matchCounter.next++}`;
       // The expression substituted into each folded branch test.
       const discriminantExpr: t.Expression =
         tempName !== undefined ? t.identifier(tempName) : discriminant;
@@ -2027,10 +1973,7 @@ function lowerNodeList(
         // A valueless r-case is ROZ955 — still lower the rung with a
         // null-literal placeholder test so the IR shape stays stable.
         const caseText = childDir.expr;
-        const caseValue =
-          caseText && caseText.trim() !== ''
-            ? tryParseExpression(caseText)
-            : null;
+        const caseValue = caseText && caseText.trim() !== '' ? tryParseExpression(caseText) : null;
         if (caseValue === null) {
           diagnostics.push({
             code: RozieErrorCode.MATCH_CASE_NO_VALUE,
@@ -2261,6 +2204,40 @@ function lowerNodeList(
 }
 
 /**
+ * WR-01 — resolve the real wrapper element of a sole-structural-root
+ * `r-match`, or `null` when there is none.
+ *
+ * `<div r-match>` lowers to a `TemplateMatch` carrying the wrapper in
+ * `hostElement` (types.ts:1334); `<template r-match>` is non-rendering and
+ * carries no host. The host renders UNCONDITIONALLY — only the content nested
+ * inside it varies per branch — so it is a valid destination for the
+ * synthesized fallthrough spread, and the shape must NOT be reported
+ * element-less by ROZ098/ROZ099.
+ *
+ * PREDICATE AGREEMENT (T-82-06): this deliberately mirrors
+ * `resolveSingleStructuralRoot` in the two validators — the match must be the
+ * template itself, or a fragment's ONLY non-text child. That is exactly the
+ * shape for which `countRootElements` returns 1 (a root `TemplateMatch` falls
+ * into its `otherCount` bucket), so the synthesizer and the multi-root check
+ * cannot disagree. It is deliberately NOT slot-tolerant the way the
+ * element path is (D-01): `<div r-match>` + `<slot/>` counts 2 and keeps
+ * erroring ROZ970/ROZ973 with no spread, unchanged from before WR-01.
+ */
+function resolveMatchHostRoot(template: IRTemplateNode | null): TemplateElementIR | null {
+  if (template === null) return null;
+  if (template.type === 'TemplateMatch') return template.hostElement ?? null;
+  if (template.type !== 'TemplateFragment') return null;
+  let only: IRTemplateNode | null = null;
+  for (const child of template.children) {
+    if (child.type === 'TemplateStaticText') continue; // cosmetic whitespace
+    if (only !== null) return null; // more than one structural child
+    only = child;
+  }
+  if (only === null || only.type !== 'TemplateMatch') return null;
+  return only.hostElement ?? null;
+}
+
+/**
  * Phase 14 R4 / RESEARCH.md Pattern 5 — synthesize the `$attrs` auto-fallthrough
  * spread.
  *
@@ -2307,8 +2284,13 @@ export function synthesizeAttrsFallthrough(
   // Resolve the single root TemplateElement (direct, or the sole element of a
   // whitespace-and-slot-padded TemplateFragment). Anything else is
   // multi-root / not a single element — no synthesis (R8 handles it).
-  let rootEl: TemplateElementIR | null = null;
-  if (template.type === 'TemplateElement') {
+  // WR-01: a sole-structural-root `<div r-match>` already has an
+  // unconditionally-rendered wrapper — that host IS the spread's destination,
+  // so resolve it before falling through to the element/slot loop below.
+  let rootEl: TemplateElementIR | null = resolveMatchHostRoot(template);
+  if (rootEl !== null) {
+    // resolved — skip the element/slot root resolution entirely
+  } else if (template.type === 'TemplateElement') {
     rootEl = template;
   } else if (template.type === 'TemplateFragment') {
     for (const child of template.children) {
@@ -2399,8 +2381,13 @@ export function synthesizeListenersFallthrough(
 
   // Resolve the single root TemplateElement (direct, or the sole element of a
   // whitespace-and-slot-padded TemplateFragment). Mirrors synthesizeAttrsFallthrough.
-  let rootEl: TemplateElementIR | null = null;
-  if (template.type === 'TemplateElement') {
+  // WR-01: a sole-structural-root `<div r-match>` already has an
+  // unconditionally-rendered wrapper — that host IS the spread's destination,
+  // so resolve it before falling through to the element/slot loop below.
+  let rootEl: TemplateElementIR | null = resolveMatchHostRoot(template);
+  if (rootEl !== null) {
+    // resolved — skip the element/slot root resolution entirely
+  } else if (template.type === 'TemplateElement') {
     rootEl = template;
   } else if (template.type === 'TemplateFragment') {
     for (const child of template.children) {

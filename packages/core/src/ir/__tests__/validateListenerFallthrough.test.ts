@@ -365,10 +365,23 @@ describe('validateListenerFallthrough (Phase 82 multi-root + gated-root)', () =>
       gatedRoot,
       `an r-match host element IS unconditional — expected no LISTENER_FALLTHROUGH_GATED_ROOT; got ${JSON.stringify(gatedRoot)}`,
     ).toEqual([]);
+    // D-19: Vue has no `$listeners` — the listener cluster folds into
+    // `$attrs`, so Vue output cannot distinguish the listeners half of this
+    // fix from the attrs half. Compile the SAME source to Lit, whose emitter
+    // renders a listener spread as its own `rozieListeners(this.$listeners)`
+    // directive, and assert it sits on the host `<div>`'s opening tag. That
+    // is the observable token proving the listeners synthesizer — not just
+    // its attrs twin — resolved the match host.
+    const litCode = compile(source, {
+      target: 'lit',
+      filename: 'ListenerFallthroughUnit.rozie',
+      types: false,
+      sourceMap: false,
+    }).code;
     expect(
-      compileCode(source),
-      'expected the synthesized $listeners spread to land on the unconditional r-match host',
-    ).toContain('v-on="$listeners"');
+      /<div class="wrap"[^>]*rozieListeners\(this\.\$listeners\)/.test(litCode),
+      `expected the synthesized $listeners spread to land on the unconditional r-match host; got:\n${litCode}`,
+    ).toBe(true);
   });
 
   it('WR-01 over-reach guard: a <template r-match> root still produces exactly one LISTENER_FALLTHROUGH_GATED_ROOT', () => {
