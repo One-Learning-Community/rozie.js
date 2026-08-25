@@ -4150,28 +4150,33 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
         --rozie-flow-node-bg: #1e293b;
         --rozie-flow-node-border: rgba(255, 255, 255, 0.12);
         --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        --rozie-flow-node-selected-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
         --rozie-flow-node-title-fg: #e2e8f0;
         --rozie-flow-node-selected-ring: rgba(96, 165, 250, 0.5);
         --rozie-flow-port-fg: #94a3b8;
         --rozie-flow-socket-bg: #64748b;
         --rozie-flow-socket-border-color: #1e293b;
+        --rozie-flow-socket-ring: rgba(255, 255, 255, 0.16);
         --rozie-flow-connection-stroke: #64748b;
         --rozie-flow-connection-label-fg: #e2e8f0;
         --rozie-flow-connection-label-halo: #0f172a;
         --rozie-flow-control-bg: #1e293b;
         --rozie-flow-control-fg: #cbd5e1;
         --rozie-flow-control-border: rgba(255, 255, 255, 0.14);
+        --rozie-flow-control-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
         --rozie-flow-control-hover-bg: #334155;
         --rozie-flow-control-active-bg: #475569;
         --rozie-flow-control-selected-bg: #1e3a8a;
         --rozie-flow-control-selected-fg: #bfdbfe;
         --rozie-flow-minimap-bg: rgba(15, 23, 42, 0.82);
         --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
+        --rozie-flow-minimap-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
         --rozie-flow-minimap-node-fill: #64748b;
         --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
         --rozie-flow-resize-handle-bg: #1e293b;
         --rozie-flow-toolbar-bg: #1e293b;
         --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
+        --rozie-flow-toolbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
         --rozie-flow-toolbar-btn-bg: #334155;
         --rozie-flow-toolbar-btn-fg: #cbd5e1;
         --rozie-flow-toolbar-btn-border: rgba(255, 255, 255, 0.12);
@@ -4194,7 +4199,7 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
     }
   .rozie-flow-canvas .rozie-flow-node.is-selected {
       border-color: var(--rozie-flow-node-selected-border, var(--rozie-flow-accent, #3b82f6));
-      box-shadow: 0 0 0 2px var(--rozie-flow-node-selected-ring, rgba(59, 130, 246, 0.5)), 0 2px 8px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 0 0 2px var(--rozie-flow-node-selected-ring, rgba(59, 130, 246, 0.5)), var(--rozie-flow-node-selected-shadow, 0 2px 8px rgba(0, 0, 0, 0.15));
     }
   .rozie-flow-canvas .rozie-flow-node__title {
       padding: 0.5rem 0.75rem;
