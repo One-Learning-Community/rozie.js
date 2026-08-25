@@ -55,6 +55,7 @@
     cursor: grab;
     font: var(--rozie-flow-node-font-size, 13px)/1.4 var(--rozie-flow-font-family, system-ui, sans-serif);
   }
+.rozie-flow-canvas .rozie-flow-node:active { cursor: grabbing; }
 .rozie-flow-canvas .rozie-flow-node.is-selected {
     border-color: var(--rozie-flow-node-selected-border, var(--rozie-flow-accent, #3b82f6));
     box-shadow: 0 0 0 2px var(--rozie-flow-node-selected-ring, rgba(59, 130, 246, 0.5)), var(--rozie-flow-node-selected-shadow, 0 2px 8px rgba(0, 0, 0, 0.15));
@@ -65,7 +66,10 @@
     color: var(--rozie-flow-node-title-fg, #1f2937);
     white-space: nowrap;
   }
-.rozie-flow-canvas .rozie-flow-node__body { min-width: 0; }
+.rozie-flow-canvas .rozie-flow-node__body {
+    min-width: 0;
+    padding: var(--rozie-flow-node-body-padding, 0.5rem 0.75rem);
+  }
 .rozie-flow-canvas .rozie-flow-node__col {
     display: flex;
     flex-direction: column;

@@ -4042,18 +4042,23 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
   }
   .rozie-flow-controls[data-rozie-s-cd396d6a] {
     position: absolute;
-    left: 10px;
-    bottom: 10px;
+    left: var(--rozie-flow-control-inset, 10px);
+    bottom: var(--rozie-flow-control-inset, 10px);
     z-index: 10;
     display: flex;
     flex-direction: column;
+    /* D-07: this micro-gap (and the toolbar's gap/padding below) is deliberately
+       NOT tokenised — every token is a permanent public-API commitment and these
+       don't clear CLAUDE.md's "does a component-library author actually need
+       this?" bar. Recorded so a future reader doesn't mistake the asymmetry
+       with the tokenised inset/btn-size above for an omission. */
     gap: 2px;
     pointer-events: none;
   }
   .rozie-flow-controls__btn[data-rozie-s-cd396d6a] {
     pointer-events: auto;
-    width: 28px;
-    height: 28px;
+    width: var(--rozie-flow-control-btn-size, 28px);
+    height: var(--rozie-flow-control-btn-size, 28px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -4091,7 +4096,9 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
     pointer-events: none;
     background: var(--rozie-flow-marquee-bg, rgba(59, 130, 246, 0.12));
     border: 1px solid var(--rozie-flow-marquee-border, var(--rozie-flow-accent, #3b82f6));
-    border-radius: 2px;
+    /* D-07: was a hardcoded 2px that ignored --rozie-flow-radius entirely, so a
+       consumer setting a sharp-corner theme still got a rounded marquee. */
+    border-radius: var(--rozie-flow-marquee-radius, 2px);
   }
   .rozie-flow-resize-handle[data-rozie-s-cd396d6a] {
     position: absolute;
@@ -4101,7 +4108,9 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
     height: var(--rozie-flow-resize-handle-size, 8px);
     background: var(--rozie-flow-resize-handle-bg, #ffffff);
     border: 1px solid var(--rozie-flow-resize-handle-border, var(--rozie-flow-accent, #3b82f6));
-    border-radius: 2px;
+    /* D-07: was a hardcoded 2px that ignored --rozie-flow-radius entirely, same
+       fix as the marquee above. */
+    border-radius: var(--rozie-flow-resize-handle-radius, 2px);
     pointer-events: auto;
     touch-action: none;
   }
@@ -4215,6 +4224,7 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
       cursor: grab;
       font: var(--rozie-flow-node-font-size, 13px)/1.4 var(--rozie-flow-font-family, system-ui, sans-serif);
     }
+  .rozie-flow-canvas .rozie-flow-node:active { cursor: grabbing; }
   .rozie-flow-canvas .rozie-flow-node.is-selected {
       border-color: var(--rozie-flow-node-selected-border, var(--rozie-flow-accent, #3b82f6));
       box-shadow: 0 0 0 2px var(--rozie-flow-node-selected-ring, rgba(59, 130, 246, 0.5)), var(--rozie-flow-node-selected-shadow, 0 2px 8px rgba(0, 0, 0, 0.15));
@@ -4225,7 +4235,10 @@ $effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__roz
       color: var(--rozie-flow-node-title-fg, #1f2937);
       white-space: nowrap;
     }
-  .rozie-flow-canvas .rozie-flow-node__body { min-width: 0; }
+  .rozie-flow-canvas .rozie-flow-node__body {
+      min-width: 0;
+      padding: var(--rozie-flow-node-body-padding, 0.5rem 0.75rem);
+    }
   .rozie-flow-canvas .rozie-flow-node__col {
       display: flex;
       flex-direction: column;
