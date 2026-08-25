@@ -105,7 +105,7 @@ D-11 (ISSUE-6): opacity-only, deliberately carrying no colour — a colour-based
 
 ### marquee (mode:'select')
 
-D-25: derives off --rozie-flow-accent in BOTH light and dark, so overriding accent alone recolors the marquee too — zero dark-block entries needed. The historical rgba(59, 130, 246, 0.12) literal lives on as the at-usage-site var() fallback in FlowCanvas.rozie, not as a second declaration here (a "preceding fallback" declaration is a no-op for a custom property).
+D-25: derives off --rozie-flow-accent in BOTH light and dark, so overriding accent alone recolors the marquee too — zero dark-block entries needed. The historical rgba(59, 130, 246, 0.12) literal lives on as the at-usage-site var() fallback in FlowCanvas.rozie, not as a second declaration here (a "preceding fallback" declaration is a no-op for a custom property). IN-01: that var() fallback only activates when --rozie-flow-marquee-bg is completely UNSET (e.g. an ancestor scope that unsets the variable) — NOT when the color-mix() value it IS set to fails to parse in an older browser. An unsupported color-mix() makes the `background` declaration invalid at computed-value time, which falls back to `background`'s own initial value (transparent), not to this rgba(...) argument. There is no working degrade path today; if one is ever needed, it requires an `@supports not (color: color-mix(in srgb, red, blue))` block, not this fallback argument. Not a functional concern as of 2026 — color-mix() has near-universal evergreen-browser support and is already used in 86 other files in this repo.
 
 | Token | Default |
 | --- | --- |
