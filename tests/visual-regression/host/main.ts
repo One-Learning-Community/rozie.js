@@ -566,6 +566,16 @@ export const EXAMPLES = [
   // screenshot cell — transient mid-drag DOM state, same reasoning as
   // rete-flow-incompatible-socket.
   'FlowCanvasPortAdd',
+  // 260825-hs8 runtime reproduction (upstream 0.2.0 report) — FlowCanvasBodyUpdate is
+  // the BEHAVIORAL cell (loader → examples/demos/FlowCanvasBodyUpdateDemo.rozie): two
+  // nodes of ONE `task` type whose <NodeType> #body renders `node.data.label`, plus a
+  // rename button that RE-BINDS `$data.graph` with a fresh node object. The spec
+  // (rete-flow-body-update) asserts the projected body text follows the re-bind —
+  // renderNode's in-place branch used to update only `entry.handle` (the low-level
+  // `#node` portal) and never `entry.bodyHandle`, so a render-by-type body froze at
+  // first paint. Behavioral-only; NOT a screenshot cell (no Linux-rendered baseline is
+  // owed for a cell that asserts on text content).
+  'FlowCanvasBodyUpdate',
   // quick-260803-uwb (the 260702-wws dark deferral) — FlowCanvasDarkScreenshot is a PIXEL
   // cell (loader → examples/demos/FlowCanvasDarkScreenshotDemo.rozie): the same fixed
   // 3-node / 2-edge content-stable graph as FlowCanvasScreenshotDemo (identity transform,
@@ -1434,6 +1444,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // 260824 WR-03 runtime reproduction — '-demo' appended by the entry →
   // 'rozie-flow-canvas-port-add-demo' = kebab of FlowCanvasPortAddDemo.
   FlowCanvasPortAdd: 'rozie-flow-canvas-port-add',
+  // 260825-hs8 body-repaint regression gate — '-demo' appended by the entry →
+  // 'rozie-flow-canvas-body-update-demo' = kebab of FlowCanvasBodyUpdateDemo.
+  FlowCanvasBodyUpdate: 'rozie-flow-canvas-body-update',
   // quick-260803-uwb dark pixel cell — '-demo' appended by the entry →
   // 'rozie-flow-canvas-dark-screenshot-demo' = kebab of FlowCanvasDarkScreenshotDemo.
   FlowCanvasDarkScreenshot: 'rozie-flow-canvas-dark-screenshot',
@@ -1911,6 +1924,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // (graph is bound internally — the FlowCanvas precedent; `portAdded` is one-way,
   // driven internally, not a model).
   FlowCanvasPortAdd: {},
+  // 260825-hs8 — FlowCanvasBodyUpdateDemo is self-contained (seeds its own 2-node
+  // typed graph and re-binds it from its own button). No parent props; no MODEL_PROPS
+  // entry (graph is bound internally — the FlowCanvas precedent).
+  FlowCanvasBodyUpdate: {},
   // quick-260803-uwb — FlowCanvasDarkScreenshotDemo is self-contained (hardcodes its own
   // fixed 3-node / 2-edge graph and pins zoom/interaction off). No parent props; no
   // MODEL_PROPS entry (graph is bound internally — the FlowCanvas precedent).

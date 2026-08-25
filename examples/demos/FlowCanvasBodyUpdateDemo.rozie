@@ -1,0 +1,157 @@
+<!--
+  FlowCanvasBodyUpdateDemo.rozie — BEHAVIORAL runtime reproduction for the upstream
+  0.2.0 report "<NodeType #body> content is rendered once and never updates".
+
+  THE SCENARIO THIS EXISTS TO PROVE. `<NodeType>`'s `#body` is a REACTIVE portal slot:
+  the canvas's `renderNode` projects it per graph node through the type's registered
+  `bodyRenderer` (FlowCanvas.rozie:1787-1800), and `NodeType.rozie:200-213` hands back a
+  `{ update, dispose }` handle so the projection can be re-rendered with a fresh scope.
+  A reactive portal is re-rendered by CALLING that handle — the primitive is imperative
+  by contract on all six targets (`packages/targets/*/src/emit/emitPortals.ts`, REQ-5),
+  never by a per-target tracked effect. `renderNode`'s in-place branch called
+  `existing.handle.update(...)` (the LOW-LEVEL `#node` escape-hatch portal) but never
+  `existing.bodyHandle.update(...)`, and because the render-by-type branch RETURNS EARLY
+  after setting `bodyHandle`, a `<NodeType>`-templated node has `handle === null` AND
+  `titleEl === null` — so both arms of that branch missed and `area.update('node', id)`
+  repainted nothing at all. The `#body` froze at first paint for the entire life of the
+  node while the bound model moved underneath it.
+
+  WHY A GRAPH RE-BIND, NOT AN IN-PLACE MUTATION. FlowCanvas watches `() => $props.graph`
+  (`:3391`) — a REFERENCE watch, the controlled-model contract every other demo in this
+  family follows. Re-binding a fresh graph object is therefore the SUPPORTED way a
+  consumer changes node data, and it is the path that must repaint the body: the watch
+  fires, `reconcileNodesPass` re-seeds `nodeMeta` from the new spec (`:2489`) and calls
+  `await area.update('node', spec.id)` (`:2534`) for every EXISTING node, which lands in
+  exactly the in-place branch under test. An in-place deep mutation is deliberately NOT
+  what this fixture drives — it is silently dropped on React/Solid/Lit/Angular anyway
+  (the FlowCanvasDemo `addNode` header says the same), so proving it would prove nothing.
+
+  THE PORT SCHEMA IS UNCHANGED ACROSS THE GESTURE — deliberately. If the rename also
+  mutated the type's ports, `reconcileNodesPass`'s `portsAdded` branch (`:2500-2532`)
+  would DROP the node's render entry and force `area.update` down the FRESH-BUILD path,
+  which re-projects the body from scratch and would mask the frozen-body bug entirely.
+  Only the node's `data` moves here, so the reconcile is guaranteed to take the in-place
+  branch and nothing else.
+
+  `label-state` reads the label back off the BOUND MODEL (`$data.graph.nodes[0].data
+  .label`), so the spec can prove the click actually re-bound the graph BEFORE it looks
+  at the rendered body — a dead button and a frozen body are then impossible to confuse.
+  The rendered proof is `.rozie-demo-node-label`, a class on the `#body` template's own
+  element, so the assertion reads the PROJECTED text and not the readout it mirrors.
+
+  `:fit-on-mount="false"` keeps the seeded positions deterministic (the family
+  convention); nodes sit far apart (40 / 420) so their boxes never overlap. NOT
+  registered in any pixel-baseline matrix cell — behavioral only, so no Linux-rendered
+  `.png` baseline is owed (`feedback_vr_linux_baselines`).
+
+  Container needs explicit height/width (the VR host mounts at max-content).
+-->
+
+<rozie name="FlowCanvasBodyUpdateDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  // THE SINGLE SOURCE OF TRUTH. Two nodes of ONE type so the render-by-type template
+  // renders more than one instance (a single-node fixture cannot tell "the body
+  // repainted" apart from "the only body was rebuilt"). `a` is the rename target.
+  graph: {
+    nodes: [
+      { id: 'a', type: 'task', x: 40,  y: 40, data: { label: 'Alpha' } },
+      { id: 'b', type: 'task', x: 420, y: 40, data: { label: 'Bravo' } },
+    ],
+    connections: [],
+  },
+}
+</data>
+
+<script>
+// Rename node `a` by RE-BINDING a fresh graph object (fresh node object and fresh
+// `data` object too — the reconciler re-seeds `nodeMeta` from the spec it is handed,
+// so the object identity the body's scope receives must actually be new). Node ids,
+// types, positions and the port schema are all untouched: the reconcile is guaranteed
+// to take renderNode's IN-PLACE branch, which is the branch under test.
+const rename = () => {
+  const nodes = $data.graph.nodes.map((n) =>
+    n.id === 'a' ? { ...n, data: { ...n.data, label: 'Renamed' } } : n,
+  )
+  $data.graph = { ...$data.graph, nodes }
+}
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — a graph re-bind repaints the &lt;NodeType&gt; #body (regression gate)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="rename-btn" @click="rename">Rename Alpha</button>
+    <!-- read straight off the BOUND MODEL: proves the click re-bound the graph, so a
+         frozen body can never be mistaken for a dead button. -->
+    <span class="readout" data-testid="label-state">{{ $data.graph.nodes[0].data.label }}</span>
+    <span class="readout" data-testid="node-count">{{ $data.graph.nodes.length }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 320px; width: 760px">
+    <FlowCanvas
+      r-model:graph="$data.graph"
+      :fit-on-mount="false"
+    >
+      <!-- ONE type, TWO instances — the render-by-type template under test. The label
+           element carries its own class so the spec asserts on the PROJECTED body text
+           rather than on the `label-state` readout that mirrors it. -->
+      <NodeType type="task">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong class="rozie-demo-node-label">{{ node.data.label }}</strong>
+          </div>
+        </template>
+        <Port input="in" type="number" label="in" multiple />
+        <Port output="out" type="number" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 800px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+
+:root {
+  /* the #body chrome teleports into the engine node element inside the canvas shadow
+     root, so on Lit a plain scoped rule cannot reach it — :root emits document-level
+     CSS adopted into the shadow root. NOT :global() (ROZ128 hard error). */
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

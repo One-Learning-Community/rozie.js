@@ -4439,3 +4439,89 @@ for (const target of TARGETS) {
     await expect(mergeStr).not.toHaveClass(INCOMPATIBLE);
   });
 }
+
+/**
+ * 37. BODY-REPAINT REGRESSION GATE — a graph re-bind repaints a `<NodeType>` `#body`
+ * (the upstream 0.2.0 report: "`<NodeType #body>` content is rendered once and never
+ * updates").
+ *
+ * THE FAILURE MODE THIS GUARDS: `renderNode`'s in-place branch (FlowCanvas.rozie:1697-
+ * 1707) refreshed `existing.handle` — the LOW-LEVEL `#node` escape-hatch portal — and
+ * fell back to `existing.titleEl` for default chrome. The render-by-type branch
+ * (`:1787-1800`) sets `entry.bodyHandle` and RETURNS EARLY, so a `<NodeType>`-templated
+ * node carries `handle === null` AND `titleEl === null`: both arms missed and
+ * `area.update('node', id)` repainted nothing. `entry.bodyHandle` was built and
+ * disposed but never updated anywhere in the file, so the projected `#body` froze at
+ * first paint for the life of the node while the bound model moved underneath it.
+ *
+ * THE TRIGGER: `examples/demos/FlowCanvasBodyUpdateDemo.rozie` re-binds `$data.graph`
+ * with a fresh node object carrying a changed `data.label`. That is the CONTROLLED-MODEL
+ * path — FlowCanvas watches `() => $props.graph` by reference (`:3391`) — and it drives
+ * `reconcileNodesPass` to re-seed `nodeMeta` (`:2489`) and call `area.update('node', id)`
+ * (`:2534`) for the existing node, landing in exactly the in-place branch under test.
+ * The port schema is deliberately untouched across the gesture: a port change would send
+ * the reconcile down the `portsAdded` fresh-build path (`:2500-2532`), which re-projects
+ * the body from scratch and would mask the frozen-body bug entirely.
+ *
+ * `label-state` (read off the BOUND MODEL) is asserted BEFORE the rendered body, so a
+ * dead button and a frozen body can never be confused. The rendered proof reads
+ * `.rozie-demo-node-label`, a class on the `#body` template's own element — not the
+ * readout that mirrors it.
+ *
+ * Behavioral DOM check, NOT a screenshot — this asserts text content, so no
+ * Linux-rendered baseline is owed (`feedback_vr_linux_baselines`). `rete-flow.spec.ts`
+ * stays entirely `toHaveScreenshot`-free.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-body-update [${target}]: a graph re-bind repaints the NodeType #body`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasBodyUpdate&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(2);
+
+    // The PROJECTED body text — one per graph node, from the single render-by-type
+    // template. Two of them proves the type template renders per INSTANCE, which is
+    // also the existence proof backing every negative count assertion below (WR-01:
+    // a vanished locator must never be indistinguishable from a genuinely-absent one).
+    const labels = page.locator('.rozie-flow-node .rozie-demo-node-label');
+    await expect(labels).toHaveCount(2, { timeout: 15_000 });
+
+    // ---- precondition: the seeded label is projected, the renamed one is not ----
+    await expect(page.getByTestId('label-state')).toHaveText('Alpha');
+    await expect(labels.filter({ hasText: 'Alpha' })).toHaveCount(1);
+    await expect(labels.filter({ hasText: 'Bravo' })).toHaveCount(1);
+    await expect(labels.filter({ hasText: 'Renamed' })).toHaveCount(0);
+
+    // ---- re-bind the graph with a fresh node object carrying the new label ----
+    await page.getByTestId('rename-btn').click();
+
+    // ---- proves the BOUND MODEL actually moved (a dead button fails here, before
+    // the render assertion can report a false negative) ----
+    await expect(page.getByTestId('label-state')).toHaveText('Renamed', { timeout: 5_000 });
+
+    // ---- THE REGRESSION GATE: the projected #body followed the re-bind ----
+    await expect(labels).toHaveCount(2, { timeout: 5_000 });
+    await expect(labels.filter({ hasText: 'Renamed' })).toHaveCount(1, { timeout: 5_000 });
+    await expect(labels.filter({ hasText: 'Alpha' })).toHaveCount(0);
+    // the UNTOUCHED sibling instance kept its own body — the update re-projected the
+    // renamed node's scope, it did not re-render every node with one shared scope.
+    await expect(labels.filter({ hasText: 'Bravo' })).toHaveCount(1);
+
+    // ---- settle-and-resample (the file's own idiom): the repaint is stable, not a
+    // frame that a later reconcile echo reverts ----
+    await page.waitForTimeout(500);
+    await expect(labels).toHaveCount(2);
+    await expect(labels.filter({ hasText: 'Renamed' })).toHaveCount(1);
+    await expect(labels.filter({ hasText: 'Alpha' })).toHaveCount(0);
+  });
+}
