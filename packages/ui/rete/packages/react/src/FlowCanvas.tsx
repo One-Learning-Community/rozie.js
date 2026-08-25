@@ -400,6 +400,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const connInstances = useMemo(() => new Map(), []);
   const nodeEntries = useMemo(() => new Map(), []);
   const connEntries = useMemo(() => new Map(), []);
+  const socketReg = useMemo(() => new Map(), []);
+  const incompatibleMarked = useMemo(() => new Set(), []);
   const connMeta = useMemo(() => new Map(), []);
   // T1.3 — UNDO / REDO (D-02 on-by-default, D-03 per-gesture graph-only scope, D-04
   // echo-guarded restore). A CAPPED snapshot stack over the BOUND GRAPH only — nodes
@@ -2025,6 +2027,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           }
         }
       });
+      // ISSUE-6: register this socket for the incompatible-port hint. Free — reuses
+      // the side/key/node.id/socketEl locals the two LOAD-BEARING emits above already
+      // need. INSTANCE-keyed, non-reactive; see the socketReg comment at its declaration.
+      socketReg.set(node.id + '::' + side + '::' + key, socketEl);
       socketDisposers.push(() => {
         area.current.emit({
           type: 'unmount',
@@ -2032,6 +2038,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             element: socketEl
           }
         });
+        // ISSUE-6 teardown: drop this socket from both registries so neither retains a
+        // detached DOM element after node culling or remount (T-83-17).
+        socketReg.delete(node.id + '::' + side + '::' + key);
+        incompatibleMarked.delete(socketEl);
       });
     };
 
@@ -3732,6 +3742,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         }
       }
       nodeEntries.clear();
+      // ISSUE-6: whole-map clear so an unmount leaves nothing retained even if a
+      // per-socket disposer was skipped (T-83-17).
+      socketReg.clear();
+      incompatibleMarked.clear();
       for (const [, entry] of connEntries as any) entry.dispose();
       connEntries.clear();
       if (area.current) area.current.destroy();

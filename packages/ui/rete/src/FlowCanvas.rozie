@@ -521,11 +521,21 @@ const SOCKET = new ClassicPreset.Socket('flow')
 //   connInstances : id → live ClassicPreset.Connection    (engine truth)
 //   nodeEntries   : id → { element, bodyHost, handle, socketDisposers }
 //   connEntries   : id → { element, dispose }
+//   socketReg     : "nodeId::side::key" → the live socket <div> element (ISSUE-6
+//                   incompatible-port hint). INSTANCE-keyed and NON-reactive — do
+//                   NOT confuse with portReg (TYPE-keyed, reactive, "type::side::key",
+//                   defined inside $onMount for React-liveness). They must never share
+//                   a variable or a key shape.
 const nodeInstances = new Map()
 const nodeMeta = new Map()
 const connInstances = new Map()
 const nodeEntries = new Map()
 const connEntries = new Map()
+const socketReg = new Map()
+// incompatibleMarked : the Set of socket elements CURRENTLY carrying
+// rozie-flow-socket--incompatible, so clearIncompatibleSockets is O(marked) and a
+// no-op clear costs nothing.
+const incompatibleMarked = new Set()
 // connMeta : id → the consumer's connection spec ({ …, label?, stroke?, dashed? }) — the
 // connection-side analog of nodeMeta, read by renderConnection for per-edge label/styling (F3).
 const connMeta = new Map()
@@ -1771,8 +1781,16 @@ $onMount(() => {
     // store stays empty, every socketWatcher.listen() callback reads null, and NO
     // connection path (committed OR drag preview) is ever drawn.
     area.emit({ type: 'rendered', data: { type: 'socket', side, key, nodeId: node.id, element: socketEl, payload: { socket: port.socket } } })
+    // ISSUE-6: register this socket for the incompatible-port hint. Free — reuses
+    // the side/key/node.id/socketEl locals the two LOAD-BEARING emits above already
+    // need. INSTANCE-keyed, non-reactive; see the socketReg comment at its declaration.
+    socketReg.set(node.id + '::' + side + '::' + key, socketEl)
     socketDisposers.push(() => {
       area.emit({ type: 'unmount', data: { element: socketEl } })
+      // ISSUE-6 teardown: drop this socket from both registries so neither retains a
+      // detached DOM element after node culling or remount (T-83-17).
+      socketReg.delete(node.id + '::' + side + '::' + key)
+      incompatibleMarked.delete(socketEl)
     })
   }
 
@@ -3183,6 +3201,10 @@ $onMount(() => {
       for (const d of entry.socketDisposers) { try { d() } catch (e) {} }
     }
     nodeEntries.clear()
+    // ISSUE-6: whole-map clear so an unmount leaves nothing retained even if a
+    // per-socket disposer was skipped (T-83-17).
+    socketReg.clear()
+    incompatibleMarked.clear()
     for (const [, entry] of connEntries) entry.dispose()
     connEntries.clear()
     if (area) area.destroy()

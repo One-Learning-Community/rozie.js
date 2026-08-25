@@ -808,6 +808,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         }
       }
       this.nodeEntries.clear();
+      // ISSUE-6: whole-map clear so an unmount leaves nothing retained even if a
+      // per-socket disposer was skipped (T-83-17).
+      this.socketReg.clear();
+      this.incompatibleMarked.clear();
       for (const [, entry] of this.connEntries as any) entry.dispose();
       this.connEntries.clear();
       if (this.area) this.area.destroy();
@@ -1637,6 +1641,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           }
         }
       });
+      // ISSUE-6: register this socket for the incompatible-port hint. Free — reuses
+      // the side/key/node.id/socketEl locals the two LOAD-BEARING emits above already
+      // need. INSTANCE-keyed, non-reactive; see the socketReg comment at its declaration.
+      this.socketReg.set(node.id + '::' + side + '::' + key, socketEl);
       socketDisposers.push(() => {
         this.area.emit({
           type: 'unmount',
@@ -1644,6 +1652,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
             element: socketEl
           }
         });
+        // ISSUE-6 teardown: drop this socket from both registries so neither retains a
+        // detached DOM element after node culling or remount (T-83-17).
+        this.socketReg.delete(node.id + '::' + side + '::' + key);
+        this.incompatibleMarked.delete(socketEl);
       });
     };
 
@@ -3622,6 +3634,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   nodeEntries = new Map();
 
   connEntries = new Map();
+
+  socketReg = new Map();
+
+  incompatibleMarked = new Set();
 
   connMeta = new Map();
 
