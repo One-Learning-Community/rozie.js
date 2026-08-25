@@ -225,6 +225,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const onCanvasKeydown = useRef<any>(null);
   const selectedConnId = useRef<any>(null);
   const keydownContainer = useRef<any>(null);
+  const onWindowPointerCancelClearIncompatible = useRef<any>(null);
+  const onWindowKeydownClearIncompatible = useRef<any>(null);
+  const onWindowBlurClearIncompatible = useRef<any>(null);
   const scheduleMinimapRedraw = useRef<any>(null);
   const dragGestureActive = useRef(false);
   const pendingDragSnapshot = useRef<any>(null);
@@ -1779,6 +1782,31 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       };
       keydownContainer.current = container;
       container.addEventListener('keydown', onCanvasKeydown.current);
+
+      // D-14: the three abort-path listeners. Each is a no-op when nothing is marked
+      // (clearIncompatibleSockets returns immediately when incompatibleMarked is
+      // empty), which is why they attach for the component's WHOLE lifetime rather
+      // than per-gesture — an attach/detach-per-pick scheme has strictly more state
+      // to get wrong and one more path that can leak, for no measurable saving.
+      if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        // A pointercancel can originate from any element under an active pointer, so
+        // window is the only reliable catch-all.
+        onWindowPointerCancelClearIncompatible.current = () => {
+          if (clearIncompatibleSockets.current) clearIncompatibleSockets.current();
+        };
+        window.addEventListener('pointercancel', onWindowPointerCancelClearIncompatible.current);
+        // Escape lives HERE, on window — NOT on onCanvasKeydown above, which only
+        // fires when focus is inside the canvas container. Two listeners handling
+        // Escape would also risk a double-fire.
+        onWindowKeydownClearIncompatible.current = (e: any) => {
+          if (e.key === 'Escape' && clearIncompatibleSockets.current) clearIncompatibleSockets.current();
+        };
+        window.addEventListener('keydown', onWindowKeydownClearIncompatible.current);
+        onWindowBlurClearIncompatible.current = () => {
+          if (clearIncompatibleSockets.current) clearIncompatibleSockets.current();
+        };
+        window.addEventListener('blur', onWindowBlurClearIncompatible.current);
+      }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -3809,6 +3837,27 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       incompatibleMarked.clear();
       for (const [, entry] of connEntries as any) entry.dispose();
       connEntries.clear();
+      // D-14: detach the three abort-path listeners before area.destroy() (T-83-18) —
+      // otherwise they fire against a destroyed area after unmount and retain the
+      // whole closure graph.
+      if (onWindowPointerCancelClearIncompatible.current && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        try {
+          window.removeEventListener('pointercancel', onWindowPointerCancelClearIncompatible.current);
+        } catch (e: any) {}
+      }
+      if (onWindowKeydownClearIncompatible.current && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        try {
+          window.removeEventListener('keydown', onWindowKeydownClearIncompatible.current);
+        } catch (e: any) {}
+      }
+      if (onWindowBlurClearIncompatible.current && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        try {
+          window.removeEventListener('blur', onWindowBlurClearIncompatible.current);
+        } catch (e: any) {}
+      }
+      onWindowPointerCancelClearIncompatible.current = null;
+      onWindowKeydownClearIncompatible.current = null;
+      onWindowBlurClearIncompatible.current = null;
       if (area.current) area.current.destroy();
       // Null the handle after destroying it (quick-260823-qgi). Every top-level verb already
       // opens with an `if (!area) return` guard, but before this line those guards only caught

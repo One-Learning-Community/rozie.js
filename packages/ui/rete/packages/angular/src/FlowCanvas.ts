@@ -1152,6 +1152,31 @@ export class FlowCanvas {
       };
       this.keydownContainer = container;
       container.addEventListener('keydown', this.onCanvasKeydown);
+
+      // D-14: the three abort-path listeners. Each is a no-op when nothing is marked
+      // (clearIncompatibleSockets returns immediately when incompatibleMarked is
+      // empty), which is why they attach for the component's WHOLE lifetime rather
+      // than per-gesture — an attach/detach-per-pick scheme has strictly more state
+      // to get wrong and one more path that can leak, for no measurable saving.
+      if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        // A pointercancel can originate from any element under an active pointer, so
+        // window is the only reliable catch-all.
+        this.onWindowPointerCancelClearIncompatible = () => {
+          if (this.clearIncompatibleSockets) this.clearIncompatibleSockets();
+        };
+        window.addEventListener('pointercancel', this.onWindowPointerCancelClearIncompatible);
+        // Escape lives HERE, on window — NOT on onCanvasKeydown above, which only
+        // fires when focus is inside the canvas container. Two listeners handling
+        // Escape would also risk a double-fire.
+        this.onWindowKeydownClearIncompatible = (e: any) => {
+          if (e.key === 'Escape' && this.clearIncompatibleSockets) this.clearIncompatibleSockets();
+        };
+        window.addEventListener('keydown', this.onWindowKeydownClearIncompatible);
+        this.onWindowBlurClearIncompatible = () => {
+          if (this.clearIncompatibleSockets) this.clearIncompatibleSockets();
+        };
+        window.addEventListener('blur', this.onWindowBlurClearIncompatible);
+      }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -3413,6 +3438,27 @@ export class FlowCanvas {
       this.incompatibleMarked.clear();
       for (const [, entry] of this.connEntries as any) entry.dispose();
       this.connEntries.clear();
+      // D-14: detach the three abort-path listeners before area.destroy() (T-83-18) —
+      // otherwise they fire against a destroyed area after unmount and retain the
+      // whole closure graph.
+      if (this.onWindowPointerCancelClearIncompatible && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        try {
+          window.removeEventListener('pointercancel', this.onWindowPointerCancelClearIncompatible);
+        } catch (e: any) {}
+      }
+      if (this.onWindowKeydownClearIncompatible && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        try {
+          window.removeEventListener('keydown', this.onWindowKeydownClearIncompatible);
+        } catch (e: any) {}
+      }
+      if (this.onWindowBlurClearIncompatible && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        try {
+          window.removeEventListener('blur', this.onWindowBlurClearIncompatible);
+        } catch (e: any) {}
+      }
+      this.onWindowPointerCancelClearIncompatible = null;
+      this.onWindowKeydownClearIncompatible = null;
+      this.onWindowBlurClearIncompatible = null;
       if (this.area) this.area.destroy();
       // Null the handle after destroying it (quick-260823-qgi). Every top-level verb already
       // opens with an `if (!area) return` guard, but before this line those guards only caught
@@ -3440,6 +3486,9 @@ export class FlowCanvas {
   onCanvasKeydown: any = null;
   markIncompatibleSockets: any = null;
   clearIncompatibleSockets: any = null;
+  onWindowPointerCancelClearIncompatible: any = null;
+  onWindowKeydownClearIncompatible: any = null;
+  onWindowBlurClearIncompatible: any = null;
   minimapHost: any = null;
   minimapSvg: any = null;
   minimapRedrawRaf = 0;

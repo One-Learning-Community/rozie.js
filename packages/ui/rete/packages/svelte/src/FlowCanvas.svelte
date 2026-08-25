@@ -226,6 +226,16 @@ let onCanvasKeydown: any = null;
 // also keeps them visible to the Solid-hoisted teardown.
 let markIncompatibleSockets: any = null;
 let clearIncompatibleSockets: any = null;
+// D-14: defensive teardown so no abort path can leave sockets permanently dimmed.
+// COMPONENT-scope (not $onMount-local) so the Solid-hoisted teardown can detach
+// them. `window` — not the canvas container — is the right scope for all three:
+// the connection drag itself is driven by `window`-level pointer listeners inside
+// rete's own usePointerListener, and focus during a pointer-driven drag is not
+// guaranteed to be inside the canvas container, so a container-scoped Escape would
+// silently fail exactly in the abort case this exists to cover.
+let onWindowPointerCancelClearIncompatible: any = null;
+let onWindowKeydownClearIncompatible: any = null;
+let onWindowBlurClearIncompatible: any = null;
 // Phase 42 MiniMap (opt-in :minimap) — the absolute SVG overlay host + its imperative
 // SVG layer + the pointer-pan listeners. COMPONENT-scope (NOT $onMount-local) so the
 // $onMount-returned teardown — which the Solid emitter hoists into a sibling
@@ -1996,6 +2006,31 @@ onMount(() => {
     };
     keydownContainer = container;
     container.addEventListener('keydown', onCanvasKeydown);
+
+    // D-14: the three abort-path listeners. Each is a no-op when nothing is marked
+    // (clearIncompatibleSockets returns immediately when incompatibleMarked is
+    // empty), which is why they attach for the component's WHOLE lifetime rather
+    // than per-gesture — an attach/detach-per-pick scheme has strictly more state
+    // to get wrong and one more path that can leak, for no measurable saving.
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      // A pointercancel can originate from any element under an active pointer, so
+      // window is the only reliable catch-all.
+      onWindowPointerCancelClearIncompatible = () => {
+        if (clearIncompatibleSockets) clearIncompatibleSockets();
+      };
+      window.addEventListener('pointercancel', onWindowPointerCancelClearIncompatible);
+      // Escape lives HERE, on window — NOT on onCanvasKeydown above, which only
+      // fires when focus is inside the canvas container. Two listeners handling
+      // Escape would also risk a double-fire.
+      onWindowKeydownClearIncompatible = (e: any) => {
+        if (e.key === 'Escape' && clearIncompatibleSockets) clearIncompatibleSockets();
+      };
+      window.addEventListener('keydown', onWindowKeydownClearIncompatible);
+      onWindowBlurClearIncompatible = () => {
+        if (clearIncompatibleSockets) clearIncompatibleSockets();
+      };
+      window.addEventListener('blur', onWindowBlurClearIncompatible);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -4024,6 +4059,27 @@ onMount(() => {
     incompatibleMarked.clear();
     for (const [, entry] of connEntries as any) entry.dispose();
     connEntries.clear();
+    // D-14: detach the three abort-path listeners before area.destroy() (T-83-18) —
+    // otherwise they fire against a destroyed area after unmount and retain the
+    // whole closure graph.
+    if (onWindowPointerCancelClearIncompatible && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+      try {
+        window.removeEventListener('pointercancel', onWindowPointerCancelClearIncompatible);
+      } catch (e: any) {}
+    }
+    if (onWindowKeydownClearIncompatible && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+      try {
+        window.removeEventListener('keydown', onWindowKeydownClearIncompatible);
+      } catch (e: any) {}
+    }
+    if (onWindowBlurClearIncompatible && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+      try {
+        window.removeEventListener('blur', onWindowBlurClearIncompatible);
+      } catch (e: any) {}
+    }
+    onWindowPointerCancelClearIncompatible = null;
+    onWindowKeydownClearIncompatible = null;
+    onWindowBlurClearIncompatible = null;
     if (area) area.destroy();
     // Null the handle after destroying it (quick-260823-qgi). Every top-level verb already
     // opens with an `if (!area) return` guard, but before this line those guards only caught
