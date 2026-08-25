@@ -198,7 +198,7 @@ export const RozieErrorCode = {
   // the conditional/match root instead of merely diagnosing the drop — is
   // explicitly DEFERRED per D-02 (82-PLAN.md); these two codes are a warning,
   // not a fix.
-  ATTR_FALLTHROUGH_GATED_ROOT: 'ROZ098', // warning — inheritAttrs !== false and the template's single structural root is a TemplateConditional/TemplateMatch, so no element can receive the synthesized $attrs spread; the drop is diagnosed, the branch-descent fix is DEFERRED (D-02)
+  ATTR_FALLTHROUGH_GATED_ROOT: 'ROZ098', // warning — inheritAttrs !== false and the template's single structural root is a TemplateConditional, or a TemplateMatch with NO hostElement (`<template r-match>`), so no element can receive the synthesized $attrs spread; the drop is diagnosed, the branch-descent fix is DEFERRED (D-02). A `<div r-match>` root carries a real, unconditionally-rendered hostElement and is exempt — the spread lands on that host (WR-01)
   LISTENER_FALLTHROUGH_GATED_ROOT: 'ROZ099', // warning — D-17 twin of ROZ098: inheritListeners !== false and the same gated-root shape, independent of ROZ098 exactly as ROZ973 is independent of ROZ970
   // ROZ090..ROZ099 is now fully consumed — Phase 82 took the last two codes.
 
@@ -839,46 +839,46 @@ export const RozieErrorCode = {
   // ROZ940..ROZ947 are the 8 core consumer-side codes per CONTEXT.md D-08.
   // ROZ948..ROZ959 reserved for surface-derived codes that emerge from the
   // Wave-1/Wave-2 per-target emitters or the dogfood gate.
-  DUPLICATE_DEFAULT_FILL: 'ROZ940',                // error — locked in SPEC.md R3; loose children + explicit <template #default>
-  UNKNOWN_SLOT_NAME: 'ROZ941',                     // warn  — consumer fills a slot the producer doesn't declare (typo catch)
-  DUPLICATE_NAMED_FILL: 'ROZ942',                  // error — two sibling <template #header> directives
-  REPROJECTION_UNDECLARED_WRAPPER_SLOT: 'ROZ943',  // error — wrapper forwards a slot it doesn't itself declare
-  REPROJECTION_UNDECLARED_INNER_SLOT: 'ROZ944',    // warn  — wrapper forwards into a slot the inner producer doesn't declare
-  CROSS_PACKAGE_LOOKUP_FAILED: 'ROZ945',           // error — npm/relative resolution of a <components> importPath returns null
-  DYNAMIC_NAME_EXPRESSION_INVALID: 'ROZ946',       // error — `<template #[expr]>` bracketed text fails to parse as a JS expression
-  SCOPED_PARAM_MISMATCH: 'ROZ947',                 // error — D-09 — consumer destructures a param the producer SlotDecl.params doesn't declare
-  SCOPED_PARAMS_ALL_DROPPED: 'ROZ948',             // warn  — scoped-params destructure had properties but none resolved to simple bindings (e.g. spread, computed keys, rename)
+  DUPLICATE_DEFAULT_FILL: 'ROZ940', // error — locked in SPEC.md R3; loose children + explicit <template #default>
+  UNKNOWN_SLOT_NAME: 'ROZ941', // warn  — consumer fills a slot the producer doesn't declare (typo catch)
+  DUPLICATE_NAMED_FILL: 'ROZ942', // error — two sibling <template #header> directives
+  REPROJECTION_UNDECLARED_WRAPPER_SLOT: 'ROZ943', // error — wrapper forwards a slot it doesn't itself declare
+  REPROJECTION_UNDECLARED_INNER_SLOT: 'ROZ944', // warn  — wrapper forwards into a slot the inner producer doesn't declare
+  CROSS_PACKAGE_LOOKUP_FAILED: 'ROZ945', // error — npm/relative resolution of a <components> importPath returns null
+  DYNAMIC_NAME_EXPRESSION_INVALID: 'ROZ946', // error — `<template #[expr]>` bracketed text fails to parse as a JS expression
+  SCOPED_PARAM_MISMATCH: 'ROZ947', // error — D-09 — consumer destructures a param the producer SlotDecl.params doesn't declare
+  SCOPED_PARAMS_ALL_DROPPED: 'ROZ948', // warn  — scoped-params destructure had properties but none resolved to simple bindings (e.g. spread, computed keys, rename)
 
   // ---- Phase 07.3 consumer-side two-way binding — ROZ949..ROZ951 ----
   // Per 07.3-SPEC.md §Diagnostic Code Assignments: ROZ949 is the next free
   // code after the 07.2 cleanup that registered ROZ948 (ROADMAP working-list
   // mentioned ROZ950 but predated that cleanup; SPEC.md is authoritative).
-  TWO_WAY_PROP_NOT_MODEL: 'ROZ949',           // error — r-model:prop= where producer prop lacks model:true (dual-frame: consumer site + producer decl)
-  TWO_WAY_ARG_OR_TARGET_INVALID: 'ROZ950',    // error — r-model: with empty arg (`r-model:=`), OR applied to non-component HTML tag (`<div r-model:foo=`)
-  TWO_WAY_LHS_NOT_WRITABLE: 'ROZ951',         // error — RHS not a writable lvalue per 07.3-CONTEXT D-03 permissive rule (literal/ternary/call/$computed)
-  TWO_WAY_DIRECTIVE_TYPO: 'ROZ952',           // error — colon-form directive `r-<base>:<arg>` whose `<base>` is a Levenshtein near-miss of `model` (e.g. `r-modle:open`); `model` is the only directive taking a colon argument, so the typo'd directive would otherwise be silently dropped. did-you-mean suggests `r-model:<arg>`.
+  TWO_WAY_PROP_NOT_MODEL: 'ROZ949', // error — r-model:prop= where producer prop lacks model:true (dual-frame: consumer site + producer decl)
+  TWO_WAY_ARG_OR_TARGET_INVALID: 'ROZ950', // error — r-model: with empty arg (`r-model:=`), OR applied to non-component HTML tag (`<div r-model:foo=`)
+  TWO_WAY_LHS_NOT_WRITABLE: 'ROZ951', // error — RHS not a writable lvalue per 07.3-CONTEXT D-03 permissive rule (literal/ternary/call/$computed)
+  TWO_WAY_DIRECTIVE_TYPO: 'ROZ952', // error — colon-form directive `r-<base>:<arg>` whose `<base>` is a Levenshtein near-miss of `model` (e.g. `r-modle:open`); `model` is the only directive taking a colon argument, so the typo'd directive would otherwise be silently dropped. did-you-mean suggests `r-model:<arg>`.
 
   // ---- Phase 11 r-match construct — ROZ953..ROZ959 ----
   // The switch-style `r-match` / `r-case` / `r-default` trio. Six error
   // conditions + one warning, all detected inline in the lowerTemplate
   // match-grouping pass (D-05) and collected-not-thrown.
-  MATCH_EMPTY_DISCRIMINANT: 'ROZ953',   // error — r-match host with no value (`<template r-match>` / `<template r-match="">`)
-  MATCH_STRAY_CHILD: 'ROZ954',          // error — r-match host child that is neither r-case nor r-default
-  MATCH_CASE_NO_VALUE: 'ROZ955',        // error — valueless r-case (hint: did you mean r-default?)
-  MATCH_CASE_WITH_FOR: 'ROZ956',        // error — r-case + r-for on the same element
-  MATCH_DEFAULT_NOT_LAST: 'ROZ957',     // error — r-default is not the last branch of the match
-  MATCH_MULTIPLE_DEFAULT: 'ROZ958',     // error — more than one r-default in a single r-match
-  MATCH_DUPLICATE_CASE: 'ROZ959',       // warning — duplicate literal r-case value (first occurrence wins, like `switch`)
+  MATCH_EMPTY_DISCRIMINANT: 'ROZ953', // error — r-match host with no value (`<template r-match>` / `<template r-match="">`)
+  MATCH_STRAY_CHILD: 'ROZ954', // error — r-match host child that is neither r-case nor r-default
+  MATCH_CASE_NO_VALUE: 'ROZ955', // error — valueless r-case (hint: did you mean r-default?)
+  MATCH_CASE_WITH_FOR: 'ROZ956', // error — r-case + r-for on the same element
+  MATCH_DEFAULT_NOT_LAST: 'ROZ957', // error — r-default is not the last branch of the match
+  MATCH_MULTIPLE_DEFAULT: 'ROZ958', // error — more than one r-default in a single r-match
+  MATCH_DUPLICATE_CASE: 'ROZ959', // warning — duplicate literal r-case value (first occurrence wins, like `switch`)
 
   // ---- Phase 12 r-model modifiers — ROZ960..ROZ964 ----
   // The r-model modifier chain: an unknown / misused modifier is a hard
   // error, never a silent drop. All four are detected inline in the
   // lowerTemplate r-model branch (collected-not-thrown), parallel to where
   // event modifiers resolve.
-  RMODEL_UNKNOWN_MODIFIER: 'ROZ960',        // error — unknown r-model modifier (did-you-mean among model modifiers)
-  RMODEL_EVENT_MODIFIER_MISUSED: 'ROZ961',  // error — a valid event modifier used on r-model
-  DIRECTIVE_TAKES_NO_MODIFIERS: 'ROZ962',   // error — modifier on r-if/r-for/r-show/r-html/r-text
-  RMODEL_BUILTIN_ON_TWO_WAY: 'ROZ963',      // error — built-in r-model modifier on consumer-side r-model:propName
+  RMODEL_UNKNOWN_MODIFIER: 'ROZ960', // error — unknown r-model modifier (did-you-mean among model modifiers)
+  RMODEL_EVENT_MODIFIER_MISUSED: 'ROZ961', // error — a valid event modifier used on r-model
+  DIRECTIVE_TAKES_NO_MODIFIERS: 'ROZ962', // error — modifier on r-if/r-for/r-show/r-html/r-text
+  RMODEL_BUILTIN_ON_TWO_WAY: 'ROZ963', // error — built-in r-model modifier on consumer-side r-model:propName
   // CR-01 (12-REVIEW) — a value-transform modifier (.number/.trim/custom) on a
   // checkbox/radio r-model has no effect: the bound value is a boolean
   // `checked` (checkbox) or a fixed `value` string chosen by the input, not a
@@ -899,8 +899,8 @@ export const RozieErrorCode = {
   // `ROZ964` is the verified current highest (Phase 12 RMODEL fix) — these do
   // NOT collide.
   CLASS_SELECTOR_ARG_NOT_LITERAL: 'ROZ965', // error — R3: $classSelector argument is not a string literal
-  CLASS_SELECTOR_UNKNOWN_CLASS: 'ROZ966',   // error — R4: class not declared in the component's <style> scope; did-you-mean hint
-  CLASS_SELECTOR_INVALID_TOKEN: 'ROZ967',   // error — R5: multi-token / dotted / combinator / `#` argument (fails the bare-class-token regex)
+  CLASS_SELECTOR_UNKNOWN_CLASS: 'ROZ966', // error — R4: class not declared in the component's <style> scope; did-you-mean hint
+  CLASS_SELECTOR_INVALID_TOKEN: 'ROZ967', // error — R5: multi-token / dotted / combinator / `#` argument (fails the bare-class-token regex)
   // React emit-config error: the React lowering of `$classSelector` emits a
   // runtime `"." + styles.<class>` expression, but `emitReact` only emits the
   // `styles` CSS-Modules import when `opts.source` is supplied (it needs the
@@ -915,9 +915,9 @@ export const RozieErrorCode = {
   // fallthrough. `ROZ968` (Phase 13 $classSelector) was the highest assigned
   // code when this cluster was added — these do NOT collide. (The registry has
   // since grown past it; e.g. ROZ978 for Phase 26 bare-sigil rejection.)
-  R_BIND_COLON_FORM: 'ROZ969',             // error — R1: `r-bind:foo="x"` colon form is not supported (use the `:foo` shorthand or the bare-spread `r-bind="obj"`)
-  ATTR_FALLTHROUGH_MULTI_ROOT: 'ROZ970',   // error — R8: a multi-root template with auto-fallthrough enabled has no single root to receive inherited attributes
-  ATTR_DOUBLE_APPLY: 'ROZ971',             // warning — R9: `$attrs` referenced (e.g. via `r-bind="$attrs"`) while auto-fallthrough is still on — attributes would be applied twice
+  R_BIND_COLON_FORM: 'ROZ969', // error — R1: `r-bind:foo="x"` colon form is not supported (use the `:foo` shorthand or the bare-spread `r-bind="obj"`)
+  ATTR_FALLTHROUGH_MULTI_ROOT: 'ROZ970', // error — R8: a multi-root template with auto-fallthrough enabled has no single root to receive inherited attributes
+  ATTR_DOUBLE_APPLY: 'ROZ971', // warning — R9: `$attrs` referenced (e.g. via `r-bind="$attrs"`) while auto-fallthrough is still on — attributes would be applied twice
 
   // ---- Phase 15 listener fallthrough — ROZ972..ROZ974 ----
   // Cross-framework listener fallthrough: the `r-on="<expr>"` object-spread
@@ -928,9 +928,9 @@ export const RozieErrorCode = {
   // ROZ971) per SPEC R8/R9: the two checks are INDEPENDENT — a multi-root
   // component with `inherit-attrs="false"` but default `inherit-listeners`
   // produces ROZ973 (not ROZ970), and vice versa.
-  R_ON_COLON_FORM: 'ROZ972',                  // error — R1: `r-on:click="x"` colon form is not supported (use the single-event `@click` syntax or the bare object-spread `r-on="{ click: fn }"`)
-  LISTENER_FALLTHROUGH_MULTI_ROOT: 'ROZ973',  // error — R8: a multi-root template with auto-listener-fallthrough enabled has no single root to receive inherited listeners (INDEPENDENT of ROZ970)
-  LISTENER_DOUBLE_APPLY: 'ROZ974',            // warning — R9: `$listeners` referenced (e.g. via `r-on="$listeners"`) while auto-listener-fallthrough is still on — listeners would be applied twice (INDEPENDENT of ROZ971)
+  R_ON_COLON_FORM: 'ROZ972', // error — R1: `r-on:click="x"` colon form is not supported (use the single-event `@click` syntax or the bare object-spread `r-on="{ click: fn }"`)
+  LISTENER_FALLTHROUGH_MULTI_ROOT: 'ROZ973', // error — R8: a multi-root template with auto-listener-fallthrough enabled has no single root to receive inherited listeners (INDEPENDENT of ROZ970)
+  LISTENER_DOUBLE_APPLY: 'ROZ974', // warning — R9: `$listeners` referenced (e.g. via `r-on="$listeners"`) while auto-listener-fallthrough is still on — listeners would be applied twice (INDEPENDENT of ROZ971)
 
   // ---- Phase 16 $restoreFocus — ROZ975..ROZ976 ----
   // The `$restoreFocus(selector, idx)` sigil restores focus to a keyed-list row
@@ -939,7 +939,7 @@ export const RozieErrorCode = {
   // time, wired into `lowerToIR` so both `compile()` and `@rozie/unplugin`
   // catch errors. SPEC R9/R10.
   RESTORE_FOCUS_NON_LITERAL_SELECTOR: 'ROZ975', // error — SPEC R9: $restoreFocus first arg is not a string literal
-  RESTORE_FOCUS_BAD_ARITY:            'ROZ976', // error — SPEC R9: $restoreFocus called with wrong number of arguments
+  RESTORE_FOCUS_BAD_ARITY: 'ROZ976', // error — SPEC R9: $restoreFocus called with wrong number of arguments
 
   // ---- compile() empty-code guard — ROZ977 ----
   // Fail-loud sentinel for the "silent compile failure" anti-pattern: if
@@ -949,7 +949,7 @@ export const RozieErrorCode = {
   // bug silently dropped a required block, downstream emit produced empty
   // output, and the failure was invisible until the docs build crashed with
   // a generic ROZ500. This is the safety net.
-  COMPILE_EMPTY_CODE_NO_DIAGNOSTICS:  'ROZ977', // error — internal: compile() emit produced empty code with no error diagnostics (parser/lowerer/emitter internal failure)
+  COMPILE_EMPTY_CODE_NO_DIAGNOSTICS: 'ROZ977', // error — internal: compile() emit produced empty code with no error diagnostics (parser/lowerer/emitter internal failure)
 
   // ---- Phase 26 bare-sigil rejection — ROZ978 ----
   // A bare whole-object `$props`/`$data`/`$refs`/`$slots` identifier (NOT a
@@ -960,7 +960,7 @@ export const RozieErrorCode = {
   // One shared pre-IR semantic validator (always-on, independent of the
   // safeInterpolation flag — D-14) replaces that with a uniform compile error +
   // a member-access hint. SPEC-5, extended by CONTEXT D-04/D-05.
-  BARE_OBJECT_SIGIL:                  'ROZ978', // error — bare $props/$data/$refs/$slots used as a whole-object value (not a member access). No portable representation in v1.
+  BARE_OBJECT_SIGIL: 'ROZ978', // error — bare $props/$data/$refs/$slots used as a whole-object value (not a member access). No portable representation in v1.
 
   // ---- Phase 37 $portals.default — ROZ979 ----
   // A component declares BOTH a DEFAULT portal slot (`<slot portal />`, whose
