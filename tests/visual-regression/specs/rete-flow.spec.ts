@@ -3986,3 +3986,125 @@ for (const target of TARGETS) {
     await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
   });
 }
+
+/**
+ * 33. INCOMPATIBLE-SOCKET DRAG FEEDBACK — mid-gesture ONLY (Phase 83 D-26, closes ISSUE-6).
+ *
+ * THE FAILURE MODE THIS GUARDS: before this phase, a rejected connection gave NO feedback
+ * at the target port — the user dragged a typed output over a type-mismatched input,
+ * released, and the edge simply failed to appear with no visual explanation. Plan 05 wired
+ * `socketReg` (a `nodeId::side::key → element` registry populated for free from the
+ * existing socket render emit) plus `markIncompatibleSockets`/`clearIncompatibleSockets`
+ * (FlowCanvas.rozie:2153-2186) to dim type-mismatched, opposite-side sockets on OTHER nodes
+ * while a typed connection is being dragged, via the `.rozie-flow-socket--incompatible`
+ * class (opacity + `cursor: not-allowed`, driven by
+ * `--rozie-flow-socket-incompatible-opacity`).
+ *
+ * THIS IS DELIBERATELY A BEHAVIORAL DOM CHECK, NOT A SCREENSHOT. The marking exists ONLY
+ * while the pointer is down — it is transient DOM state that no pixel baseline could ever
+ * capture deterministically. Baking a mid-drag frame into a `toHaveScreenshot` baseline
+ * would be gesture-timing-dependent by construction, and per `feedback_vr_linux_baselines`
+ * every baseline PNG must be Linux-Docker-rendered, which makes a flaky baseline expensive
+ * to churn. `rete-flow.spec.ts` is explicitly a structural/behavioral spec with ZERO
+ * `toHaveScreenshot` calls (see the file header) — this cell holds that discipline.
+ *
+ * THE NEGATIVE ASSERTIONS ARE THE POINT (D-12/D-13's scoping). A predicate that marked
+ * every socket would satisfy a presence-only check. `examples/demos/FlowCanvasValidateOffDemo.rozie`
+ * gives a genuine type-mismatched pair (`Number Source` output `number` → `Merge` input
+ * `string`) AND a compatible control pair (`Merge` input `number`) in one graph, from a
+ * single pick:
+ *
+ *   | Socket                        | Expected    | Why                                    |
+ *   |--------------------------------|-------------|-----------------------------------------|
+ *   | `Merge` input `string`         | MARKED      | opposite side, other node, type mismatch |
+ *   | `Merge` input `number`         | NOT marked  | opposite side, other node, types agree   |
+ *   | `Number Source` output `string`| NOT marked  | same node AND same side                  |
+ *   | `Number Source` output `number`| NOT marked  | the picked socket itself                 |
+ *
+ * Sockets carry `data-testid="socket"` (FlowCanvas.rozie:1752), but this file's own
+ * convention selects by node label text + `.rozie-flow-port--{side}` + `.rozie-flow-socket`
+ * (the `typedSocketOf` idiom from cell 30) — preferred here over introducing a second
+ * selector style, since two typed ports per side make a bare `data-testid="socket"` lookup
+ * ambiguous.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-incompatible-socket [${target}]: a connection drag dims type-mismatched target ports and clears on drop`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasValidateOff&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(2);
+
+    // the same typed socket-row locator the validate-off cell (30) uses — both nodes carry
+    // two ports on the relevant side, so `.first()` alone would be ambiguous.
+    const typedSocketOf = (node: string, side: 'output' | 'input', portLabel: string) =>
+      page
+        .locator('.rozie-flow-node', { hasText: node })
+        .locator(`.rozie-flow-port--${side}`, { hasText: portLabel })
+        .locator('.rozie-flow-socket')
+        .first();
+
+    const center = async (locator: ReturnType<typeof typedSocketOf>) => {
+      await expect(locator).toBeVisible({ timeout: 10_000 });
+      const box = await locator.boundingBox();
+      if (!box) throw new Error('socket bounding box unavailable');
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    };
+
+    // precondition: validation is ON, so the mismatched pair really is incompatible.
+    await expect(page.getByTestId('validate-state')).toHaveText('true');
+
+    const pickedOut = await center(typedSocketOf('Number Source', 'output', 'number'));
+    const mismatchedIn = await center(typedSocketOf('Merge', 'input', 'string'));
+
+    const mergeStr = typedSocketOf('Merge', 'input', 'string');
+    const mergeNum = typedSocketOf('Merge', 'input', 'number');
+    const srcStr = typedSocketOf('Number Source', 'output', 'string');
+    const srcNum = typedSocketOf('Number Source', 'output', 'number');
+    const INCOMPATIBLE = /rozie-flow-socket--incompatible/;
+
+    // ---- start the gesture and PAUSE mid-drag (pointer still down) ----
+    await page.mouse.move(pickedOut.x, pickedOut.y);
+    await page.mouse.down();
+    await page.mouse.move(
+      (pickedOut.x + mismatchedIn.x) / 2,
+      (pickedOut.y + mismatchedIn.y) / 2,
+      { steps: 8 },
+    );
+
+    // ---- MID-GESTURE: the type-mismatched opposite-side socket on the OTHER node IS
+    // marked ----
+    await expect(mergeStr).toHaveClass(INCOMPATIBLE, { timeout: 5_000 });
+    // D-12: type-agreeing opposite-side socket on the other node is NOT marked.
+    await expect(mergeNum).not.toHaveClass(INCOMPATIBLE);
+    // D-12: same node AND same side is NOT marked.
+    await expect(srcStr).not.toHaveClass(INCOMPATIBLE);
+    // D-12: the picked socket itself is NOT marked.
+    await expect(srcNum).not.toHaveClass(INCOMPATIBLE);
+
+    // ---- complete the gesture over the mismatched target → drop (refused by validation) ----
+    await page.mouse.move(mismatchedIn.x, mismatchedIn.y, { steps: 8 });
+    await page.mouse.up();
+
+    // ---- POST-DROP: marking clears completely — check ALL FOUR sockets so a partial
+    // clear cannot slip through ----
+    await expect(mergeStr).not.toHaveClass(INCOMPATIBLE, { timeout: 5_000 });
+    await expect(mergeNum).not.toHaveClass(INCOMPATIBLE);
+    await expect(srcStr).not.toHaveClass(INCOMPATIBLE);
+    await expect(srcNum).not.toHaveClass(INCOMPATIBLE);
+
+    // ---- settle-and-resample (the file's own idiom, cell 1's echo-safety check): a late
+    // re-mark cannot slip through after the gesture has fully settled ----
+    await page.waitForTimeout(500);
+    await expect(mergeStr).not.toHaveClass(INCOMPATIBLE);
+  });
+}
