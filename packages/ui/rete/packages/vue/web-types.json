@@ -317,8 +317,26 @@
               "default": "false"
             },
             {
+              "name": "width",
+              "description": "Fixed width (px) for EVERY node of this type — the design-consistency knob, so a node does not resize as its `#body` content changes. Unset (the default) auto-sizes to the body. A node instance's own `width` in the bound graph (what a `resizable` corner-drag persists) overrides this; `minWidth`/`maxWidth` clamp whichever wins. An explicit width also lowers the default 140px node floor, so a value below it renders as authored.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "height",
+              "description": "Fixed height (px) for EVERY node of this type. Unset (the default) auto-sizes to the body. Same precedence as `width`: a node instance's own `height` overrides it, and `minHeight`/`maxHeight` clamp the result.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            },
+            {
               "name": "min-width",
-              "description": "Minimum width (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.",
+              "description": "Minimum width (px) for this type. Clamps the RENDERED box whatever its size came from — auto-sized body content, an authored `width`, or a resize gesture — and bounds how far a corner-drag may shrink it. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.",
               "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
               "type": [
                 "number"
@@ -327,7 +345,7 @@
             },
             {
               "name": "min-height",
-              "description": "Minimum height (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.",
+              "description": "Minimum height (px) for this type. Clamps the RENDERED box whatever its size came from, and bounds how far a corner-drag may shrink it. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.",
               "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
               "type": [
                 "number"
@@ -336,7 +354,7 @@
             },
             {
               "name": "max-width",
-              "description": "Maximum width (px) a resize gesture may grow this type to. Unset = unbounded growth.",
+              "description": "Maximum width (px) for this type. Clamps the RENDERED box whatever its size came from — auto-sized body content, an authored `width`, or a resize gesture — so body content can never stretch a node past it. Unset = unbounded.",
               "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
               "type": [
                 "number"
@@ -345,7 +363,7 @@
             },
             {
               "name": "max-height",
-              "description": "Maximum height (px) a resize gesture may grow this type to. Unset = unbounded growth.",
+              "description": "Maximum height (px) for this type. Clamps the RENDERED box whatever its size came from, so body content can never stretch a node past it. Unset = unbounded.",
               "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
               "type": [
                 "number"

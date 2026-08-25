@@ -43,6 +43,13 @@
     }
   }
 .rozie-flow-canvas .rozie-flow-node {
+    /* 260825-mip: border-box so an authored `:width="240"` means 240px RENDERED, not 240
+       plus the 1px borders. Same reasoning the socket token already documents below. No
+       effect on an auto-sized node (`width: auto` has no content box to expand), which is
+       every node in the pixel-baseline demos — verified before adding. It also removes a
+       one-time 2px growth on a node's FIRST corner-drag: measureNodeSize reads offsetWidth
+       (border included) and the write-back was re-applied as a content-box width. */
+    box-sizing: border-box;
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: stretch;

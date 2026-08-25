@@ -18,19 +18,31 @@ interface NodeTypeProps {
    */
   resizable?: boolean;
   /**
-   * Minimum width (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
+   * Fixed width (px) for EVERY node of this type — the design-consistency knob, so a node does not resize as its `#body` content changes. Unset (the default) auto-sizes to the body. A node instance's own `width` in the bound graph (what a `resizable` corner-drag persists) overrides this; `minWidth`/`maxWidth` clamp whichever wins. An explicit width also lowers the default 140px node floor, so a value below it renders as authored.
+   * @example
+   * <NodeType type="task" width={240}><Port output="out" /></NodeType>
+   */
+  width?: (number) | null;
+  /**
+   * Fixed height (px) for EVERY node of this type. Unset (the default) auto-sizes to the body. Same precedence as `width`: a node instance's own `height` overrides it, and `minHeight`/`maxHeight` clamp the result.
+   * @example
+   * <NodeType type="task" height={120}><Port output="out" /></NodeType>
+   */
+  height?: (number) | null;
+  /**
+   * Minimum width (px) for this type. Clamps the RENDERED box whatever its size came from — auto-sized body content, an authored `width`, or a resize gesture — and bounds how far a corner-drag may shrink it. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
    */
   minWidth?: (number) | null;
   /**
-   * Minimum height (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
+   * Minimum height (px) for this type. Clamps the RENDERED box whatever its size came from, and bounds how far a corner-drag may shrink it. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
    */
   minHeight?: (number) | null;
   /**
-   * Maximum width (px) a resize gesture may grow this type to. Unset = unbounded growth.
+   * Maximum width (px) for this type. Clamps the RENDERED box whatever its size came from — auto-sized body content, an authored `width`, or a resize gesture — so body content can never stretch a node past it. Unset = unbounded.
    */
   maxWidth?: (number) | null;
   /**
-   * Maximum height (px) a resize gesture may grow this type to. Unset = unbounded growth.
+   * Maximum height (px) for this type. Clamps the RENDERED box whatever its size came from, so body content can never stretch a node past it. Unset = unbounded.
    */
   maxHeight?: (number) | null;
   renderBody?: (ctx: BodyCtx) => ReactNode;
@@ -42,9 +54,11 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
   const canvas = useContext(rozieContext("rete:canvas"));
   const __ctx_rete_nodeType = rozieContext("rete:nodeType");
   const portalRoots = useRef<Set<Root>>(new Set());
-  const props: Omit<NodeTypeProps, 'resizable' | 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight'> & { resizable: boolean; minWidth: (number) | null; minHeight: (number) | null; maxWidth: (number) | null; maxHeight: (number) | null } = {
+  const props: Omit<NodeTypeProps, 'resizable' | 'width' | 'height' | 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight'> & { resizable: boolean; width: (number) | null; height: (number) | null; minWidth: (number) | null; minHeight: (number) | null; maxWidth: (number) | null; maxHeight: (number) | null } = {
     ..._props,
     resizable: _props.resizable ?? false,
+    width: _props.width ?? null,
+    height: _props.height ?? null,
     minWidth: _props.minWidth ?? null,
     minHeight: _props.minHeight ?? null,
     maxWidth: _props.maxWidth ?? null,
@@ -107,11 +121,14 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
     // NodeResizer (D-14/D-17): carried into the canvas's typeReg registry so
     // renderNode/the resize gesture can read resizable/min/max for this type.
     resizable: props.resizable,
+    // 260825-mip: the type-level authored box, read by renderNode's resolveNodeBox.
+    width: props.width,
+    height: props.height,
     minWidth: props.minWidth,
     minHeight: props.minHeight,
     maxWidth: props.maxWidth,
     maxHeight: props.maxHeight
-  }), [props.maxHeight, props.maxWidth, props.minHeight, props.minWidth, props.resizable, props.type]);
+  }), [props.height, props.maxHeight, props.maxWidth, props.minHeight, props.minWidth, props.resizable, props.type, props.width]);
 
   const _buildSpecRef = useRef(buildSpec);
   _buildSpecRef.current = buildSpec;

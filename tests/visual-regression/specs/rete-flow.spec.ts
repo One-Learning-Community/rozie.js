@@ -4715,11 +4715,14 @@ for (const target of TARGETS) {
 
     const nodeOf = (label: string) =>
       page.locator('.rozie-flow-node', { hasText: label }).first();
-    const widthOf = async (label: string) => {
-      const box = await nodeOf(label).boundingBox();
-      if (!box) throw new Error(`no bounding box for ${label}`);
-      return Math.round(box.width);
-    };
+    // offsetWidth, NOT boundingBox().width: the canvas applies a CSS transform, so a
+    // bounding box is SCREEN space and silently multiplies by the zoom factor. That is not
+    // a hypothetical — rete's AreaPlugin zooms by 1.4 on double-click, so the reset gesture
+    // in leg 4 changes the zoom as well as the size, and a screen-space read of a correctly
+    // reset 240px node comes back as 336. `offsetWidth` is layout space and is what "this
+    // node is 240px wide" actually means.
+    const widthOf = async (label: string) =>
+      await nodeOf(label).evaluate((el: HTMLElement) => el.offsetWidth);
 
     // Every node seeds the SAME badge text, so any width difference between them can only
     // come from its type's sizing props — never from its content.
@@ -4760,16 +4763,22 @@ for (const target of TARGETS) {
     await page.mouse.move(hb.x + hb.width / 2 + 100, hb.y + hb.height / 2, { steps: 10 });
     await page.mouse.up();
 
-    // the persisted INSTANCE width now overrides the type's 240.
+    // the persisted INSTANCE width now overrides the type's 240 — asserted on the BOUND
+    // MODEL as well as the rendered box, so "reset never fired" and "reset fired but the
+    // type width was not re-applied" cannot be confused later.
     await expect
       .poll(async () => await widthOf('Sized'), { timeout: 5_000 })
       .toBeGreaterThan(260);
+    await expect(page.getByTestId('sized-width')).not.toHaveText('auto');
 
     // a handle double-click clears the instance width — which returns the node to its
     // TYPE width (240), NOT to auto. That is the precedence rule's deliberate consequence.
     const hb2 = await seHandle.boundingBox();
     if (!hb2) throw new Error('resize handle bounding box unavailable after drag');
     await page.mouse.dblclick(hb2.x + hb2.width / 2, hb2.y + hb2.height / 2);
+    // the model drops the instance width first…
+    await expect(page.getByTestId('sized-width')).toHaveText('auto', { timeout: 5_000 });
+    // …and the render falls back to the TYPE width, not to auto.
     await expect.poll(async () => await widthOf('Sized'), { timeout: 5_000 }).toBe(240);
   });
 }

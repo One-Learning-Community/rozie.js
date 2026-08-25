@@ -173,12 +173,15 @@ describe('NodeType.rozie + Port.rozie surface gate', () => {
   const NODE_TYPE_SRC = readFileSync(resolve(HERE, '..', 'src', 'NodeType.rozie'), 'utf8');
   const PORT_SRC = readFileSync(resolve(HERE, '..', 'src', 'Port.rozie'), 'utf8');
 
-  it('NodeType has type + resizable/min/max props + provides rete:nodeType', () => {
+  it('NodeType has type + resizable/width/height/min/max props + provides rete:nodeType', () => {
     const { ast } = parse(NODE_TYPE_SRC, { filename: 'NodeType.rozie' });
     const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
     expect(ir.name).toBe('NodeType');
     expect(ir.props.map((p: { name: string }) => p.name)).toEqual([
-      'type', 'resizable', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight',
+      // 260825-mip: `width`/`height` are the type-level authored box; min/max are now real
+      // LAYOUT bounds (they clamp the rendered box whatever its size came from), not the
+      // resize-gesture-only bounds they were.
+      'type', 'resizable', 'width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight',
     ]);
     expect(NODE_TYPE_SRC).toContain("$provide('rete:nodeType'");
     expect(NODE_TYPE_SRC).toContain('registerType');

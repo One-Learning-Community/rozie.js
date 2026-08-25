@@ -89,6 +89,11 @@ const badgeState = () => ($data.graph.nodes[0].data.badge ? 'wide' : 'narrow')
     <button type="button" data-testid="badge-btn" @click="toggleBadges">Toggle badges</button>
     <span class="readout" data-testid="badge-state">{{ badgeState() }}</span>
     <span class="readout" data-testid="node-count">{{ $data.graph.nodes.length }}</span>
+    <!-- the `sized` node's INSTANCE width straight off the bound model: `auto` until a
+         corner-drag persists one, and back to `auto` after a handle double-click reset.
+         Distinguishes "the reset never fired" from "the reset fired but the type width
+         was not re-applied" — two failures that look identical in a measured width. -->
+    <span class="readout" data-testid="sized-width">{{ $data.graph.nodes[3].width == null ? 'auto' : Math.round($data.graph.nodes[3].width) }}</span>
   </div>
 
   <div class="flow-wrap" style="height: 420px; width: 900px">

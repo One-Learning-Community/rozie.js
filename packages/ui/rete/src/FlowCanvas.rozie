@@ -1722,6 +1722,41 @@ $onMount(() => {
   // the lowered slot-merge binding to `node$$slot` everywhere it's referenced
   // (including this function's own `$slots.node` read below), so `if ($slots.node)`
   // resolves to the true slot-presence check, never this local parameter.
+  // 260825-mip — resolve and apply a node's box size. THE single place width/height are
+  // decided, shared by renderNode's fresh-build and in-place branches so the two can never
+  // disagree.
+  //
+  //     effective = clamp( instance node.width ?? type width ?? auto )
+  //
+  // Instance beats type: an instance `width` is a deliberate act (a corner-drag write-back,
+  // or explicit authoring in the bound graph), while the type value is a template default.
+  // The clamp applies LAST, to whichever won — that is what makes minWidth/maxWidth genuine
+  // invariants of the TYPE rather than mere gesture bounds: nothing renders outside them,
+  // including auto-sized body content, which is exactly what a consumer setting
+  // `maxWidth: 400` means. (`clampResizeSize` is untouched and still clamps the value
+  // written back into the MODEL, so the graph never stores a number CSS silently corrects.)
+  //
+  // The clamp is expressed as CSS min-width/max-width rather than arithmetic because CSS
+  // clamps the `auto` case too, which JS cannot do without measuring.
+  //
+  // An explicit width ALSO writes minWidth: base.css gives .rozie-flow-node a 140px floor,
+  // which is a default for AUTO-sized nodes — a node authored `:width="120"` must render
+  // 120, not be silently clamped up to 140. Same for height, defensively.
+  const resolveNodeBox = (box, meta, typeSpec) => {
+    const explicitW = meta.width != null ? meta.width : (typeSpec && typeSpec.width != null ? typeSpec.width : null)
+    const explicitH = meta.height != null ? meta.height : (typeSpec && typeSpec.height != null ? typeSpec.height : null)
+    const minW = typeSpec && typeSpec.minWidth != null ? typeSpec.minWidth : null
+    const minH = typeSpec && typeSpec.minHeight != null ? typeSpec.minHeight : null
+    const maxW = typeSpec && typeSpec.maxWidth != null ? typeSpec.maxWidth : null
+    const maxH = typeSpec && typeSpec.maxHeight != null ? typeSpec.maxHeight : null
+    box.style.width = explicitW != null ? explicitW + 'px' : ''
+    box.style.height = explicitH != null ? explicitH + 'px' : ''
+    box.style.minWidth = explicitW != null ? explicitW + 'px' : (minW != null ? minW + 'px' : '')
+    box.style.minHeight = explicitH != null ? explicitH + 'px' : (minH != null ? minH + 'px' : '')
+    box.style.maxWidth = maxW != null ? maxW + 'px' : ''
+    box.style.maxHeight = maxH != null ? maxH + 'px' : ''
+  }
+
   const renderNode = (element, node) => {
     // a (re)render means node DOM exists / changed → refresh the minimap (its node
     // rects measure these elements; coalesced, so calling it on every render is cheap,
@@ -1737,12 +1772,12 @@ $onMount(() => {
     if (existing && existing.element === element) {
       // in-place update — refresh chrome + reactive portal scope, leave sockets.
       existing.box.classList.toggle('is-selected', selected)
-      // NodeResizer (D-06/D-07): re-apply an explicit width/height as a fixed CSS
-      // box on every re-render; clear back to '' (auto-size) when meta no longer
-      // carries a size, so a double-click-reset (74-03) reverts a previously
-      // sized box on the very next render.
-      existing.box.style.width = meta.width != null ? meta.width + 'px' : ''
-      existing.box.style.height = meta.height != null ? meta.height + 'px' : ''
+      // NodeResizer (D-06/D-07) + 260825-mip: re-apply the resolved box on every
+      // re-render. A double-click-reset (74-03) clears the INSTANCE width/height, so this
+      // falls back to the TYPE's authored width/height if it has one — "reset" means back
+      // to the type default, which is auto only when the type declares no size — and back
+      // to fully auto otherwise, reverting a previously sized box on the very next render.
+      resolveNodeBox(existing.box, meta, meta.type != null ? $data.typeReg[meta.type] : null)
       // RENDER-BY-TYPE bodies re-project HERE. The typeSpec branch of the fresh build
       // below sets `entry.bodyHandle` and RETURNS EARLY, so a <NodeType>-templated node
       // carries handle === null AND titleEl === null — without this call both arms below
@@ -1769,12 +1804,11 @@ $onMount(() => {
     element.innerHTML = ''
     const box = document.createElement('div')
     box.className = 'rozie-flow-node' + (selected ? ' is-selected' : '')
-    // NodeResizer (D-06/D-07): a graph node with an explicit width/height renders
-    // at that EXACT fixed CSS box size instead of auto-sizing from #body content.
-    // undefined/null (the default, never-resized state) skips the assignment
-    // entirely — CSS width/height stay `auto`, today's behavior unchanged.
-    if (meta.width != null) box.style.width = meta.width + 'px'
-    if (meta.height != null) box.style.height = meta.height + 'px'
+    // NodeResizer (D-06/D-07) + 260825-mip: resolve the box from the instance size, then
+    // the TYPE's authored width/height, then auto — clamped by the type's min/max. With no
+    // instance size and no type size and no bounds every assignment is '', so CSS width/
+    // height stay `auto`: today's behavior, unchanged.
+    resolveNodeBox(box, meta, meta.type != null ? $data.typeReg[meta.type] : null)
 
     const body = document.createElement('div')
     body.className = 'rozie-flow-node__body'
@@ -4353,6 +4387,13 @@ $expose({
      escape hatch (NOT :global(), a ROZ128 hard error). Rete ships NO stylesheet,
      so ALL flow chrome lives here. */
   .rozie-flow-canvas .rozie-flow-node {
+    /* 260825-mip: border-box so an authored `:width="240"` means 240px RENDERED, not 240
+       plus the 1px borders. Same reasoning the socket token already documents below. No
+       effect on an auto-sized node (`width: auto` has no content box to expand), which is
+       every node in the pixel-baseline demos — verified before adding. It also removes a
+       one-time 2px growth on a node's FIRST corner-drag: measureNodeSize reads offsetWidth
+       (border included) and the write-back was re-applied as a content-box width. */
+    box-sizing: border-box;
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: stretch;

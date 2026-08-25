@@ -52,19 +52,31 @@ export class NodeType {
    */
   resizable = input<boolean>(false);
   /**
-   * Minimum width (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
+   * Fixed width (px) for EVERY node of this type — the design-consistency knob, so a node does not resize as its `#body` content changes. Unset (the default) auto-sizes to the body. A node instance's own `width` in the bound graph (what a `resizable` corner-drag persists) overrides this; `minWidth`/`maxWidth` clamp whichever wins. An explicit width also lowers the default 140px node floor, so a value below it renders as authored.
+   * @example
+   * <rozie-node-type type="task" [width]="240"><rozie-port output="out" /></rozie-node-type>
+   */
+  width = input<(number) | null>(null);
+  /**
+   * Fixed height (px) for EVERY node of this type. Unset (the default) auto-sizes to the body. Same precedence as `width`: a node instance's own `height` overrides it, and `minHeight`/`maxHeight` clamp the result.
+   * @example
+   * <rozie-node-type type="task" [height]="120"><rozie-port output="out" /></rozie-node-type>
+   */
+  height = input<(number) | null>(null);
+  /**
+   * Minimum width (px) for this type. Clamps the RENDERED box whatever its size came from — auto-sized body content, an authored `width`, or a resize gesture — and bounds how far a corner-drag may shrink it. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
    */
   minWidth = input<(number) | null>(null);
   /**
-   * Minimum height (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
+   * Minimum height (px) for this type. Clamps the RENDERED box whatever its size came from, and bounds how far a corner-drag may shrink it. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
    */
   minHeight = input<(number) | null>(null);
   /**
-   * Maximum width (px) a resize gesture may grow this type to. Unset = unbounded growth.
+   * Maximum width (px) for this type. Clamps the RENDERED box whatever its size came from — auto-sized body content, an authored `width`, or a resize gesture — so body content can never stretch a node past it. Unset = unbounded.
    */
   maxWidth = input<(number) | null>(null);
   /**
-   * Maximum height (px) a resize gesture may grow this type to. Unset = unbounded growth.
+   * Maximum height (px) for this type. Clamps the RENDERED box whatever its size came from, so body content can never stretch a node past it. Unset = unbounded.
    */
   maxHeight = input<(number) | null>(null);
   @ContentChild('body', { read: TemplateRef }) bodyTpl?: TemplateRef<BodyCtx>;
@@ -251,6 +263,9 @@ export class NodeType {
     // NodeResizer (D-14/D-17): carried into the canvas's typeReg registry so
     // renderNode/the resize gesture can read resizable/min/max for this type.
     resizable: this.resizable(),
+    // 260825-mip: the type-level authored box, read by renderNode's resolveNodeBox.
+    width: this.width(),
+    height: this.height(),
     minWidth: this.minWidth(),
     minHeight: this.minHeight(),
     maxWidth: this.maxWidth(),
