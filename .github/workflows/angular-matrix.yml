@@ -28,8 +28,67 @@ on:
     branches: [main]
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Shared build producer (quick 260825-hp3). Every job below used to run its
+  # own bare `pnpm turbo run build` — measured at ~11 min on push f699edef and
+  # ~86% of this workflow's CI minutes, paid 2× over. This job builds the
+  # workspace ONCE and publishes `.turbo`; the jobs below restore it, so their
+  # own `turbo run build` replays from cache instead of rebuilding.
+  #
+  # Deliberately NOT a gate. It runs build only and asserts nothing, and every
+  # consumer below is `if: ${{ !cancelled() }}`, so a RED producer does not skip
+  # them — they fall back to a real full build, exactly as before this change.
+  # That preserves the 260819-mqx decision recorded in vue-matrix.yml: a
+  # `needs:` chain must never hide a downstream failure behind a skip.
+  build:
+    name: Build workspace (shared turbo cache producer)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Seed from the most recent prior build so unchanged packages hit turbo's
+      # content-addressed cache. A `packages/core` change still invalidates the
+      # whole downstream graph and rebuilds it — that is intended, and nothing
+      # here introduces a `--filter` assumption about target independence.
+      - name: Restore turbo cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-angular-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-angular-
+            ${{ runner.os }}-turbo-
+
+      - name: Build all packages
+        run: pnpm turbo run build
+
+      # ONLY the producer saves. Consumers are restore-only, which is what fixes
+      # the `Unable to reserve cache ... another job may be creating this cache`
+      # that 4 of the 5 React jobs hit when every cell wrote the same key.
+      - name: Save turbo cache
+        uses: actions/cache/save@v6
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-angular-${{ github.sha }}
+
   angular-matrix:
     runs-on: ubuntu-latest
+    needs: build
+    # 260825-hp3: `needs: build` is for ORDERING only. `!cancelled()` keeps
+    # this job running even when the producer is red, so it falls back to a
+    # real full build instead of being skipped and masking a failure.
+    if: ${{ !cancelled() }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -64,13 +123,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache turbo build output
-        uses: actions/cache@v6
+      # Restore-only (quick 260825-hp3). The `build` job above already produced
+      # this exact key for this SHA, so `turbo run build` below replays from
+      # cache instead of rebuilding the workspace. This job deliberately does
+      # NOT save: every cell writing one key is what produced the observed
+      # `Unable to reserve cache ... another job may be creating this cache`.
+      # If the restore misses (producer red, cache evicted), the build step
+      # below still does a real full build — degraded, never wrong.
+      - name: Restore turbo cache (produced by the `build` job)
+        uses: actions/cache/restore@v6
         with:
           path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.job }}-${{ github.sha }}
+          key: ${{ runner.os }}-turbo-angular-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-turbo-${{ github.job }}-
+            ${{ runner.os }}-turbo-angular-
             ${{ runner.os }}-turbo-
 
       # Build the whole workspace via turbo. The swipe canary's emit tests
