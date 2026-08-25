@@ -3928,56 +3928,106 @@ $expose({
 .rozie-flow-toolbar__btn--delete { color: var(--rozie-flow-toolbar-delete-fg, #b91c1c); }
 
 /* ── DARK-MODE-AWARE DEFAULT (zero-import, OS-driven) ───────────────────────────
-   A natural top-level scoped `@media (prefers-color-scheme: dark)` block: since
-   quick 260703-12j (commit 6c80e9c4) the compiler preserves scoped conditional
-   at-rules (@media/@supports/@container) instead of dropping the wrapper, so this
-   no longer needs the `:root {}` escape-hatch workaround it previously required.
-   `.rozie-flow-canvas` is a template element and always carries the scope attr on
-   every target, so this block sets `--rozie-flow-*` custom properties scoped to
-   it. Custom properties INHERIT to the unscoped engine-DOM node/socket/connection
+   Phase 83 / D-01 (ISSUE-3): this block moved BACK into the `:root {}` engine-DOM
+   escape hatch. Since quick 260703-12j (commit 6c80e9c4) the compiler preserves
+   scoped conditional at-rules (@media/@supports/@container) instead of dropping
+   the wrapper — that part is still true, and is NOT why the escape hatch is
+   needed here. The real reason: this block now carries a light-opt-out ANCESTOR
+   GUARD (`:root:not(.light):not([data-theme="light"])`), and an ancestor-guard
+   selector cannot survive `scopeCss()` as a bare top-level rule. `scopeCss()`
+   scopes every compound in a selector — including inside `:not()` — by walking
+   right-to-left while the trailing nodes are pseudo-classes; since `:root` is
+   itself a pseudo node, an unwrapped `:root:not(...) .rozie-flow-canvas` gets its
+   `[data-rozie-s-*]` scope attribute inserted BEFORE `:root`, producing a
+   selector that requires the literal `<html>` element to carry the component's
+   scope attribute — which it never does. The whole override goes permanently
+   inert, with ZERO compiler diagnostic. Wrapping in `:root {}` routes the rule
+   through the SAME root-block/engineRules path used elsewhere in this file for
+   engine-rendered DOM, which emits the nested selector verbatim/unscoped instead
+   of scoping it. DO NOT "simplify" this wrapper away per the 260703-12j
+   precedent — that precedent covers at-rule PRESERVATION, not ANCESTOR-SELECTOR
+   SURVIVAL, which is a different problem this exact block now has.
+
+   `:root` MUST be the outer wrapper and `@media` the inner nest — the reverse
+   order double-emits (once correctly unscoped, once broken/scoped).
+
+   Two-branch selector list sharing one declaration block:
+     - Branch 1 (five light-DOM targets — react/vue/svelte/angular/solid): the
+       `:root` ancestor guard below, negating both the `.light` class and the
+       `[data-theme="light"]` attribute opt-outs. Byte-identical to
+       themes/base.css's own guard (base.css:161) — one wording, two files.
+     - Branch 2 (Lit only): `.rozie-flow-canvas:not(html *)` — matches ONLY when
+       `.rozie-flow-canvas` has no `html` ancestor, i.e. inside Lit's shadow
+       tree, where Branch 1's `:root` ancestor guard can never be observed from
+       outside the shadow boundary anyway. This keeps Lit's zero-import OS-dark
+       default alive (D-01: "Lit stays unguarded and the gap is documented")
+       while staying inert on the five light-DOM targets, where every
+       `.rozie-flow-canvas` DOES have an `html` ancestor. `:host
+       .rozie-flow-canvas` was evaluated first per plan priority (a) but
+       REJECTED: Angular's emulated ViewEncapsulation rewrites `:host` into its
+       host-attribute selector, which would make that branch also match on
+       Angular and silently reinstate the unguarded rule there — confirmed by
+       running Task 1's Assertion B against it before landing this shape.
+       `.rozie-flow-canvas:not(html *)` has no `:host` token, so Angular cannot
+       rewrite it; it requires Selectors Level 4 complex `:not()`, comfortably
+       inside this project's browser compat bar.
+
+   An unmatched selector-list branch does not invalidate the rule (both branches
+   are well-formed, they simply match nothing in the other context), so no
+   `:is()`/`:where()` wrapper is needed.
+
+   Custom properties INHERIT to the unscoped engine-DOM node/socket/connection
    descendants below (and are read by flowToken()/getComputedStyle for the
    imperative minimap/arrowhead SVG), so the dark values reach them regardless of
    scope. Light is untouched (the query never matches in a light context) → the
    FlowCanvasScreenshot VR baseline needs no rebless. App-TOGGLED dark
    (`.dark`/`[data-theme]`) for the five light-DOM targets ships separately in
    themes/base.css (opt-in; a class ancestor can't cross Lit's shadow boundary,
-   but OS dark covers Lit zero-import). */
-@media (prefers-color-scheme: dark) {
-  .rozie-flow-canvas {
-    --rozie-flow-accent: #60a5fa;
-    --rozie-flow-bg: #0f172a;
-    --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
-    --rozie-flow-border-color: rgba(255, 255, 255, 0.1);
-    --rozie-flow-node-bg: #1e293b;
-    --rozie-flow-node-border: rgba(255, 255, 255, 0.12);
-    --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-    --rozie-flow-node-title-fg: #e2e8f0;
-    --rozie-flow-node-selected-ring: rgba(96, 165, 250, 0.5);
-    --rozie-flow-port-fg: #94a3b8;
-    --rozie-flow-socket-bg: #64748b;
-    --rozie-flow-socket-border-color: #1e293b;
-    --rozie-flow-connection-stroke: #64748b;
-    --rozie-flow-connection-label-fg: #e2e8f0;
-    --rozie-flow-connection-label-halo: #0f172a;
-    --rozie-flow-control-bg: #1e293b;
-    --rozie-flow-control-fg: #cbd5e1;
-    --rozie-flow-control-border: rgba(255, 255, 255, 0.14);
-    --rozie-flow-control-hover-bg: #334155;
-    --rozie-flow-control-active-bg: #475569;
-    --rozie-flow-control-selected-bg: #1e3a8a;
-    --rozie-flow-control-selected-fg: #bfdbfe;
-    --rozie-flow-minimap-bg: rgba(15, 23, 42, 0.82);
-    --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
-    --rozie-flow-minimap-node-fill: #64748b;
-    --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
-    --rozie-flow-resize-handle-bg: #1e293b;
-    --rozie-flow-toolbar-bg: #1e293b;
-    --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
-    --rozie-flow-toolbar-btn-bg: #334155;
-    --rozie-flow-toolbar-btn-fg: #cbd5e1;
-    --rozie-flow-toolbar-btn-border: rgba(255, 255, 255, 0.12);
-    --rozie-flow-toolbar-btn-hover-bg: #475569;
-    --rozie-flow-toolbar-delete-fg: #f87171;
+   but OS dark covers Lit zero-import).
+
+   Semantic note: this makes the rule UNSCOPED/global instead of component-
+   scoped on all six targets — the same posture themes/base.css's own guard
+   already has, and harmless since `.rozie-flow-canvas` is not a class name
+   expected to collide. */
+:root {
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light):not([data-theme="light"]) .rozie-flow-canvas,
+    .rozie-flow-canvas:not(html *) {
+      --rozie-flow-accent: #60a5fa;
+      --rozie-flow-bg: #0f172a;
+      --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
+      --rozie-flow-border-color: rgba(255, 255, 255, 0.1);
+      --rozie-flow-node-bg: #1e293b;
+      --rozie-flow-node-border: rgba(255, 255, 255, 0.12);
+      --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      --rozie-flow-node-title-fg: #e2e8f0;
+      --rozie-flow-node-selected-ring: rgba(96, 165, 250, 0.5);
+      --rozie-flow-port-fg: #94a3b8;
+      --rozie-flow-socket-bg: #64748b;
+      --rozie-flow-socket-border-color: #1e293b;
+      --rozie-flow-connection-stroke: #64748b;
+      --rozie-flow-connection-label-fg: #e2e8f0;
+      --rozie-flow-connection-label-halo: #0f172a;
+      --rozie-flow-control-bg: #1e293b;
+      --rozie-flow-control-fg: #cbd5e1;
+      --rozie-flow-control-border: rgba(255, 255, 255, 0.14);
+      --rozie-flow-control-hover-bg: #334155;
+      --rozie-flow-control-active-bg: #475569;
+      --rozie-flow-control-selected-bg: #1e3a8a;
+      --rozie-flow-control-selected-fg: #bfdbfe;
+      --rozie-flow-minimap-bg: rgba(15, 23, 42, 0.82);
+      --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
+      --rozie-flow-minimap-node-fill: #64748b;
+      --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
+      --rozie-flow-resize-handle-bg: #1e293b;
+      --rozie-flow-toolbar-bg: #1e293b;
+      --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
+      --rozie-flow-toolbar-btn-bg: #334155;
+      --rozie-flow-toolbar-btn-fg: #cbd5e1;
+      --rozie-flow-toolbar-btn-border: rgba(255, 255, 255, 0.12);
+      --rozie-flow-toolbar-btn-hover-bg: #475569;
+      --rozie-flow-toolbar-delete-fg: #f87171;
+    }
   }
 }
 
