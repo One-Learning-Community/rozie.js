@@ -4131,18 +4131,39 @@ $expose({
     color: var(--rozie-flow-port-fg, #6b7280);
   }
   .rozie-flow-canvas .rozie-flow-port--output { justify-content: flex-end; }
+  /* A2/D-15/D-16/D-17/D-18 — box-sizing: border-box is the whole fix: under
+     content-box (the pre-existing default) the 2px border ADDED to the size
+     token, so the −6px nudge (half of the true 16px outer box) left the
+     socket's centre ~2px inside the node edge. Under border-box at the new
+     16px default, the border sits INSIDE the box — outer width stays 16px
+     (byte-identical render to today's 12px content-box + 2px border), only
+     the centring error is corrected. --rozie-flow-socket-size now means the
+     RENDERED diameter; a consumer who previously hand-set 12px now gets a
+     genuinely 12px socket (see the phase changeset). The nudge derives from
+     the same token (calc(.../-2)) so it can never desync from the size
+     again. The border width is now tokenised too — geometry-safe only
+     because of border-box: the border no longer affects the outer box, so a
+     consumer changing it can't desync the nudge. The 1px ring box-shadow is
+     UNCHANGED and deliberately excluded from the centring math: it is
+     decoration, draws outside the border box regardless of box-sizing, and
+     folding it in would make the nudge depend on a shadow a consumer can
+     override to any spread. SOCKET_SHIFT (the connection-anchor offset,
+     script-side) is NOT derived from this token and needs no change here —
+     getDOMSocketPosition measures the socket ELEMENT, so the connection
+     endpoint follows the socket's corrected position automatically. */
   .rozie-flow-canvas .rozie-flow-socket {
-    width: var(--rozie-flow-socket-size, 12px);
-    height: var(--rozie-flow-socket-size, 12px);
+    box-sizing: border-box;
+    width: var(--rozie-flow-socket-size, 16px);
+    height: var(--rozie-flow-socket-size, 16px);
     border-radius: 50%;
     background: var(--rozie-flow-socket-bg, #94a3b8);
-    border: 2px solid var(--rozie-flow-socket-border-color, #ffffff);
+    border: var(--rozie-flow-socket-border-width, 2px) solid var(--rozie-flow-socket-border-color, #ffffff);
     box-shadow: 0 0 0 1px var(--rozie-flow-socket-ring, rgba(0, 0, 0, 0.2));
     cursor: crosshair;
     flex: none;
   }
-  .rozie-flow-canvas .rozie-flow-socket--input { margin-left: -6px; }
-  .rozie-flow-canvas .rozie-flow-socket--output { margin-right: -6px; }
+  .rozie-flow-canvas .rozie-flow-socket--input { margin-left: calc(var(--rozie-flow-socket-size, 16px) / -2); }
+  .rozie-flow-canvas .rozie-flow-socket--output { margin-right: calc(var(--rozie-flow-socket-size, 16px) / -2); }
   .rozie-flow-canvas .rozie-flow-socket:hover { background: var(--rozie-flow-socket-hover-bg, var(--rozie-flow-accent, #3b82f6)); }
 
   /* ── F2: top/bottom handle positioning (only on nodes that declare a top/bottom
@@ -4175,8 +4196,8 @@ $expose({
   /* top/bottom sockets straddle the matching edge (and drop the left/right −6px nudge). */
   .rozie-flow-canvas .rozie-flow-socket--top,
   .rozie-flow-canvas .rozie-flow-socket--bottom { margin-left: 0; margin-right: 0; }
-  .rozie-flow-canvas .rozie-flow-socket--top { margin-top: -6px; }
-  .rozie-flow-canvas .rozie-flow-socket--bottom { margin-bottom: -6px; }
+  .rozie-flow-canvas .rozie-flow-socket--top { margin-top: calc(var(--rozie-flow-socket-size, 16px) / -2); }
+  .rozie-flow-canvas .rozie-flow-socket--bottom { margin-bottom: calc(var(--rozie-flow-socket-size, 16px) / -2); }
   .rozie-flow-canvas .rozie-flow-connection { position: absolute; }
   .rozie-flow-canvas .rozie-flow-connection__svg {
     /* display:block is LOAD-BEARING, not cosmetic. An <svg> is display:inline by

@@ -288,17 +288,18 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   }
 .rozie-flow-canvas .rozie-flow-port--output { justify-content: flex-end; }
 .rozie-flow-canvas .rozie-flow-socket {
-    width: var(--rozie-flow-socket-size, 12px);
-    height: var(--rozie-flow-socket-size, 12px);
+    box-sizing: border-box;
+    width: var(--rozie-flow-socket-size, 16px);
+    height: var(--rozie-flow-socket-size, 16px);
     border-radius: 50%;
     background: var(--rozie-flow-socket-bg, #94a3b8);
-    border: 2px solid var(--rozie-flow-socket-border-color, #ffffff);
+    border: var(--rozie-flow-socket-border-width, 2px) solid var(--rozie-flow-socket-border-color, #ffffff);
     box-shadow: 0 0 0 1px var(--rozie-flow-socket-ring, rgba(0, 0, 0, 0.2));
     cursor: crosshair;
     flex: none;
   }
-.rozie-flow-canvas .rozie-flow-socket--input { margin-left: -6px; }
-.rozie-flow-canvas .rozie-flow-socket--output { margin-right: -6px; }
+.rozie-flow-canvas .rozie-flow-socket--input { margin-left: calc(var(--rozie-flow-socket-size, 16px) / -2); }
+.rozie-flow-canvas .rozie-flow-socket--output { margin-right: calc(var(--rozie-flow-socket-size, 16px) / -2); }
 .rozie-flow-canvas .rozie-flow-socket:hover { background: var(--rozie-flow-socket-hover-bg, var(--rozie-flow-accent, #3b82f6)); }
 .rozie-flow-canvas .rozie-flow-node--rows {
     display: flex;
@@ -324,8 +325,8 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   }
 .rozie-flow-canvas .rozie-flow-socket--top,
   .rozie-flow-canvas .rozie-flow-socket--bottom { margin-left: 0; margin-right: 0; }
-.rozie-flow-canvas .rozie-flow-socket--top { margin-top: -6px; }
-.rozie-flow-canvas .rozie-flow-socket--bottom { margin-bottom: -6px; }
+.rozie-flow-canvas .rozie-flow-socket--top { margin-top: calc(var(--rozie-flow-socket-size, 16px) / -2); }
+.rozie-flow-canvas .rozie-flow-socket--bottom { margin-bottom: calc(var(--rozie-flow-socket-size, 16px) / -2); }
 .rozie-flow-canvas .rozie-flow-connection { position: absolute; }
 .rozie-flow-canvas .rozie-flow-connection__svg {
     /* display:block is LOAD-BEARING, not cosmetic. An <svg> is display:inline by
@@ -4520,7 +4521,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   }
 }
 
-injectGlobalStyles('rozie-flow-canvas-753e9d25-global', `
+injectGlobalStyles('rozie-flow-canvas-a80e4864-global', `
 @media (prefers-color-scheme: dark) {
     :root:not(.light):not([data-theme="light"]) .rozie-flow-canvas,
     .rozie-flow-canvas:not(html *) {
@@ -4609,17 +4610,18 @@ injectGlobalStyles('rozie-flow-canvas-753e9d25-global', `
   }
 .rozie-flow-canvas .rozie-flow-port--output { justify-content: flex-end; }
 .rozie-flow-canvas .rozie-flow-socket {
-    width: var(--rozie-flow-socket-size, 12px);
-    height: var(--rozie-flow-socket-size, 12px);
+    box-sizing: border-box;
+    width: var(--rozie-flow-socket-size, 16px);
+    height: var(--rozie-flow-socket-size, 16px);
     border-radius: 50%;
     background: var(--rozie-flow-socket-bg, #94a3b8);
-    border: 2px solid var(--rozie-flow-socket-border-color, #ffffff);
+    border: var(--rozie-flow-socket-border-width, 2px) solid var(--rozie-flow-socket-border-color, #ffffff);
     box-shadow: 0 0 0 1px var(--rozie-flow-socket-ring, rgba(0, 0, 0, 0.2));
     cursor: crosshair;
     flex: none;
   }
-.rozie-flow-canvas .rozie-flow-socket--input { margin-left: -6px; }
-.rozie-flow-canvas .rozie-flow-socket--output { margin-right: -6px; }
+.rozie-flow-canvas .rozie-flow-socket--input { margin-left: calc(var(--rozie-flow-socket-size, 16px) / -2); }
+.rozie-flow-canvas .rozie-flow-socket--output { margin-right: calc(var(--rozie-flow-socket-size, 16px) / -2); }
 .rozie-flow-canvas .rozie-flow-socket:hover { background: var(--rozie-flow-socket-hover-bg, var(--rozie-flow-accent, #3b82f6)); }
 .rozie-flow-canvas .rozie-flow-node--rows {
     display: flex;
@@ -4645,8 +4647,8 @@ injectGlobalStyles('rozie-flow-canvas-753e9d25-global', `
   }
 .rozie-flow-canvas .rozie-flow-socket--top,
   .rozie-flow-canvas .rozie-flow-socket--bottom { margin-left: 0; margin-right: 0; }
-.rozie-flow-canvas .rozie-flow-socket--top { margin-top: -6px; }
-.rozie-flow-canvas .rozie-flow-socket--bottom { margin-bottom: -6px; }
+.rozie-flow-canvas .rozie-flow-socket--top { margin-top: calc(var(--rozie-flow-socket-size, 16px) / -2); }
+.rozie-flow-canvas .rozie-flow-socket--bottom { margin-bottom: calc(var(--rozie-flow-socket-size, 16px) / -2); }
 .rozie-flow-canvas .rozie-flow-connection { position: absolute; }
 .rozie-flow-canvas .rozie-flow-connection__svg {
     /* display:block is LOAD-BEARING, not cosmetic. An <svg> is display:inline by
