@@ -4085,10 +4085,16 @@ for (const target of TARGETS) {
     // marked ----
     await expect(mergeStr).toHaveClass(INCOMPATIBLE, { timeout: 5_000 });
     // D-12: type-agreeing opposite-side socket on the other node is NOT marked.
+    // WR-01: `toHaveCount(1)` FIRST — Playwright's negated `.not.toHaveClass()` is
+    // trivially satisfied by a locator that resolves to ZERO elements, so without
+    // this the negative below would pass just as happily if the socket vanished.
+    await expect(mergeNum).toHaveCount(1);
     await expect(mergeNum).not.toHaveClass(INCOMPATIBLE);
     // D-12: same node AND same side is NOT marked.
+    await expect(srcStr).toHaveCount(1);
     await expect(srcStr).not.toHaveClass(INCOMPATIBLE);
     // D-12: the picked socket itself is NOT marked.
+    await expect(srcNum).toHaveCount(1);
     await expect(srcNum).not.toHaveClass(INCOMPATIBLE);
 
     // ---- complete the gesture over the mismatched target → drop (refused by validation) ----
@@ -4096,10 +4102,15 @@ for (const target of TARGETS) {
     await page.mouse.up();
 
     // ---- POST-DROP: marking clears completely — check ALL FOUR sockets so a partial
-    // clear cannot slip through ----
+    // clear cannot slip through. WR-01: existence-check every locator first, same
+    // reasoning as the mid-gesture block above. ----
+    await expect(mergeStr).toHaveCount(1);
     await expect(mergeStr).not.toHaveClass(INCOMPATIBLE, { timeout: 5_000 });
+    await expect(mergeNum).toHaveCount(1);
     await expect(mergeNum).not.toHaveClass(INCOMPATIBLE);
+    await expect(srcStr).toHaveCount(1);
     await expect(srcStr).not.toHaveClass(INCOMPATIBLE);
+    await expect(srcNum).toHaveCount(1);
     await expect(srcNum).not.toHaveClass(INCOMPATIBLE);
 
     // ---- settle-and-resample (the file's own idiom, cell 1's echo-safety check): a late
@@ -4281,9 +4292,15 @@ for (const target of TARGETS) {
       { steps: 8 },
     );
     await page.waitForTimeout(200);
+    // WR-01: existence-check every locator before its negative assertion — see the
+    // matching comment in the rete-flow-incompatible-socket cell above.
+    await expect(mergeStr).toHaveCount(1);
     await expect(mergeStr).not.toHaveClass(INCOMPATIBLE);
+    await expect(mergeNum).toHaveCount(1);
     await expect(mergeNum).not.toHaveClass(INCOMPATIBLE);
+    await expect(srcStr).toHaveCount(1);
     await expect(srcStr).not.toHaveClass(INCOMPATIBLE);
+    await expect(srcNum).toHaveCount(1);
     await expect(srcNum).not.toHaveClass(INCOMPATIBLE);
 
     // ---- complete the gesture: with validation off, the drop is genuinely ALLOWED — the
