@@ -179,7 +179,7 @@
             {
               "kind": "field",
               "name": "canConnect",
-              "description": "Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.",
+              "description": "Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule. Note: the mid-drag incompatible-port hint (dimmed target sockets while dragging) is resolved from port TYPES only — this predicate is evaluated once, at connection time, and is deliberately not invoked per-socket during a drag.",
               "type": {
                 "text": "((...args: any[]) => any)"
               },
@@ -508,7 +508,7 @@
             },
             {
               "name": "canconnect",
-              "description": "Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.",
+              "description": "Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule. Note: the mid-drag incompatible-port hint (dimmed target sockets while dragging) is resolved from port TYPES only — this predicate is evaluated once, at connection time, and is deliberately not invoked per-socket during a drag.",
               "type": {
                 "text": "((...args: any[]) => any)"
               },

@@ -99,6 +99,10 @@
 .rozie-flow-canvas .rozie-flow-socket--input { margin-left: calc(var(--rozie-flow-socket-size, 16px) / -2); }
 .rozie-flow-canvas .rozie-flow-socket--output { margin-right: calc(var(--rozie-flow-socket-size, 16px) / -2); }
 .rozie-flow-canvas .rozie-flow-socket:hover { background: var(--rozie-flow-socket-hover-bg, var(--rozie-flow-accent, #3b82f6)); }
+.rozie-flow-canvas .rozie-flow-socket--incompatible {
+    opacity: var(--rozie-flow-socket-incompatible-opacity, 0.3);
+    cursor: not-allowed;
+  }
 .rozie-flow-canvas .rozie-flow-node--rows {
     display: flex;
     flex-direction: column;

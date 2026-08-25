@@ -64,6 +64,12 @@
   --rozie-flow-socket-border-width: 2px;
   --rozie-flow-socket-ring: rgba(0, 0, 0, 0.2);
   --rozie-flow-socket-hover-bg: var(--rozie-flow-accent);
+  /* D-11 (ISSUE-6): opacity-only, deliberately carrying no colour — a colour-based
+     hint would need an entry in all three hand-maintained dark palette copies, the
+     very triplicate that produced both ISSUE-3 and A4. Opacity is immune to that
+     drift, reads as "unavailable" rather than "error", and works against any
+     consumer accent. Light-only by design; adds ZERO dark-block entries. */
+  --rozie-flow-socket-incompatible-opacity: 0.3;
 
   /* connections */
   --rozie-flow-connection-stroke: #64748b;

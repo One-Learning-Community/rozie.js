@@ -338,6 +338,10 @@ interface DefaultCtx {}
     ::ng-deep .rozie-flow-canvas .rozie-flow-socket--input { margin-left: calc(var(--rozie-flow-socket-size, 16px) / -2); }
     ::ng-deep .rozie-flow-canvas .rozie-flow-socket--output { margin-right: calc(var(--rozie-flow-socket-size, 16px) / -2); }
     ::ng-deep .rozie-flow-canvas .rozie-flow-socket:hover { background: var(--rozie-flow-socket-hover-bg, var(--rozie-flow-accent, #3b82f6)); }
+    ::ng-deep .rozie-flow-canvas .rozie-flow-socket--incompatible {
+        opacity: var(--rozie-flow-socket-incompatible-opacity, 0.3);
+        cursor: not-allowed;
+      }
     ::ng-deep .rozie-flow-canvas .rozie-flow-node--rows {
         display: flex;
         flex-direction: column;
@@ -541,7 +545,7 @@ export class FlowCanvas {
    */
   background = input<string>('dots');
   /**
-   * Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.
+   * Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule. Note: the mid-drag incompatible-port hint (dimmed target sockets while dragging) is resolved from port TYPES only — this predicate is evaluated once, at connection time, and is deliberately not invoked per-socket during a drag.
    */
   canConnect = input<((...args: any[]) => any) | null>(null);
   /**
@@ -837,6 +841,13 @@ export class FlowCanvas {
         // never opens a coalesce window that nothing would close. `!programmatic` keeps
         // imperative/restore-driven engine ops unaffected.
         if (!this.programmatic && this.readonly() === true) return undefined;
+        // ISSUE-6 (D-10): a vetoed pick never reaches here, so nothing is marked for a
+        // readonly canvas. `context.data.socket` is the render-emit payload the
+        // ConnectionPlugin cached for the picked socket ({ side, key, nodeId, element,
+        // … }) — see socketsCache.set(element, context.data) in the plugin source.
+        if (!this.programmatic && this.markIncompatibleSockets && context.data && context.data.socket) {
+          this.markIncompatibleSockets(context.data.socket.nodeId, context.data.socket.side, context.data.socket.key);
+        }
         // Open the coalesce window + capture the pre-gesture snapshot once. Gated on
         // !programmatic + history (a restore-driven engine op must not record history). A
         // re-pick while a close is pending cancels the pending close (the gesture continues).
@@ -847,6 +858,12 @@ export class FlowCanvas {
           this.reconnectCloseScheduled = false;
         }
       } else if (context.type === 'connectiondrop') {
+        // ISSUE-6 (D-14): release the incompatible-port hint immediately on gesture end,
+        // BEFORE the deferred reconnect bookkeeping below. `connectiondrop` is the NORMAL
+        // path; if an abort skips it, sockets stay dimmed permanently — a visible stuck
+        // state that outlives the gesture — which is exactly what the window-level abort
+        // listeners defend against.
+        if (this.clearIncompatibleSockets) this.clearIncompatibleSockets();
         // The gesture ended. CRITICAL ORDERING: the classic preset emits `connectiondrop`
         // BEFORE the editor's `connectionremoved` / `connectioncreated` signals fire (the
         // pseudo-connection is dropped, THEN the real add/remove run — verified in the event
@@ -1781,6 +1798,58 @@ export class FlowCanvas {
       if (!meta || meta.type == null || key == null) return null;
       const entry = this.portReg()[meta.type + '::' + side + '::' + key];
       return entry ? entry.portType : null;
+    };
+
+    // ISSUE-6: clear the incompatible-port hint. Empty-set fast path so an idle handler
+    // costs nothing. Removing the class from an element that has since been detached is
+    // harmless, so no liveness check is needed.
+    // ISSUE-6: clear the incompatible-port hint. Empty-set fast path so an idle handler
+    // costs nothing. Removing the class from an element that has since been detached is
+    // harmless, so no liveness check is needed.
+    this.clearIncompatibleSockets = () => {
+      if (this.incompatibleMarked.size === 0) return;
+      for (const el of this.incompatibleMarked as any) el.classList.remove('rozie-flow-socket--incompatible');
+      this.incompatibleMarked.clear();
+    };
+
+    // ISSUE-6 (D-10/D-12/D-13): mark every type-mismatched, opposite-side socket on an
+    // OTHER node as incompatible. Clears first — a re-pick while a previous marking is
+    // still live must not accumulate.
+    // ISSUE-6 (D-10/D-12/D-13): mark every type-mismatched, opposite-side socket on an
+    // OTHER node as incompatible. Clears first — a re-pick while a previous marking is
+    // still live must not accumulate.
+    this.markIncompatibleSockets = (pickedNodeId: any, pickedSide: any, pickedKey: any) => {
+      this.clearIncompatibleSockets();
+      // With automatic validation off, a type-mismatched drop is ALLOWED — dimming
+      // would misrepresent what will actually happen, so nothing is marked at all.
+      if (this.validateTypes() === false) return;
+      const pickedType = portTypeOf(pickedNodeId, pickedSide, pickedKey);
+      // An untyped source imposes no constraint, matching the validateTypes rule.
+      if (pickedType == null) return;
+      const oppositeSide = pickedSide === 'output' ? 'input' : 'output';
+      for (const [regKey, el] of this.socketReg as any) {
+        const sep1 = regKey.indexOf('::');
+        const sep2 = regKey.indexOf('::', sep1 + 2);
+        const nodeId = regKey.slice(0, sep1);
+        const side = regKey.slice(sep1 + 2, sep2);
+        const key = regKey.slice(sep2 + 2);
+        // D-12: other nodes only — a same-node socket is structurally not a target,
+        // not "incompatible", so dimming it is noise.
+        if (nodeId === pickedNodeId) continue;
+        // D-12: opposite side only — same-side sockets are never targets either.
+        if (side !== oppositeSide) continue;
+        const candidateType = portTypeOf(nodeId, side, key);
+        // A null candidate type imposes no constraint, matching the validateTypes rule.
+        if (candidateType == null) continue;
+        if (candidateType !== pickedType) {
+          el.classList.add('rozie-flow-socket--incompatible');
+          this.incompatibleMarked.add(el);
+        }
+      }
+      // D-13: the consumer's canConnect predicate is DELIBERATELY never invoked here —
+      // it can have side effects and arbitrary cost, and running it once per socket on
+      // every pick would multiply both. The marking path is type-only; that predicate
+      // still runs once, at connectioncreate, via the existing gate below.
     };
 
     // ─── connection-validation gate (D2/D3 — typed-socket validation + override) ──
@@ -3369,6 +3438,8 @@ export class FlowCanvas {
   arrangeReady: any = null;
   keydownContainer: any = null;
   onCanvasKeydown: any = null;
+  markIncompatibleSockets: any = null;
+  clearIncompatibleSockets: any = null;
   minimapHost: any = null;
   minimapSvg: any = null;
   minimapRedrawRaf = 0;
