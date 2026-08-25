@@ -217,25 +217,39 @@ export function validateAttrFallthrough(ir: IRComponent, diagnostics: Diagnostic
     // WR-01: a `TemplateMatch` is only element-less when its host is the
     // non-rendering `<template r-match>` form. `<div r-match>` carries a real
     // wrapper in `hostElement` (types.ts:1334) that renders UNCONDITIONALLY —
-    // only the content nested inside it varies per branch — so both the
-    // message and the hint below would be false for it, and the synthesizer
-    // lands the spread on that host instead (lowerTemplate.ts). The
-    // exemption keys on host PRESENCE, not `tagKind`: a component-tag host
-    // gets no diagnostic and no spread, exactly as a plain component-tag root
-    // does today (Plan 14-05). `TemplateConditional` has no host at all.
+    // only the content nested inside it varies per branch — so the
+    // gated-root wording would be false for it, and the synthesizer lands the
+    // spread on that host instead (lowerTemplate.ts).
+    //
+    // The exemption keys on `tagKind === 'html'`, NOT on host presence, so it
+    // is the SAME predicate the synthesizer uses. Keying on presence alone
+    // would exempt a component-tag host that the synthesizer still skips
+    // (Plan 14-05 — the spread would land as a prop on the inner component,
+    // not as a DOM attribute), silently dropping the consumer's attributes:
+    // exactly the validator-vs-synthesizer drift that produced WR-01 in the
+    // first place. `TemplateConditional` has no host at all.
     if (
       singleRoot !== null &&
       (singleRoot.type === 'TemplateConditional' ||
-        (singleRoot.type === 'TemplateMatch' && !singleRoot.hostElement))
+        (singleRoot.type === 'TemplateMatch' && singleRoot.hostElement?.tagKind !== 'html'))
     ) {
       const loc: SourceLoc = singleRoot.sourceLoc ?? ir.sourceLoc;
+      // Two distinct shapes reach here and they are NOT the same defect, so
+      // they do not share wording. A component-tag host renders
+      // unconditionally — claiming otherwise is the WR-01 mistake repeated —
+      // it just is not an element the spread can land on.
+      const componentHost =
+        singleRoot.type === 'TemplateMatch' && singleRoot.hostElement !== undefined;
       diagnostics.push({
         code: RozieErrorCode.ATTR_FALLTHROUGH_GATED_ROOT,
         severity: 'warning',
-        message:
-          "The template's only root is gated by a conditional, so auto-fallthrough has no unconditional element to attach the inherited attributes to — they are dropped.",
+        message: componentHost
+          ? "The template's only root is a component tag, so auto-fallthrough has no HTML element to attach the inherited attributes to — they are dropped."
+          : "The template's only root is gated by a conditional, so auto-fallthrough has no unconditional element to attach the inherited attributes to — they are dropped.",
         loc,
-        hint: 'Move the gating condition onto a child so the root element is unconditional, or set inherit-attrs="false" on the <rozie> tag and apply the manual r-bind="$attrs" spread inside the branch.',
+        hint: componentHost
+          ? 'Move the r-match onto a wrapping HTML element, or set inherit-attrs="false" on the <rozie> tag — a component-tag root owns its own fallthrough surface, so the spread would land as a prop on the inner component rather than as a DOM attribute.'
+          : 'Move the gating condition onto a child so the root element is unconditional, or set inherit-attrs="false" on the <rozie> tag and apply the manual r-bind="$attrs" spread inside the branch.',
       });
     }
   }

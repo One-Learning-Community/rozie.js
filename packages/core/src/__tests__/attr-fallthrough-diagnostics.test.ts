@@ -99,6 +99,34 @@ const TEMPLATE_MATCH_ROOT_BODY = `<template r-match="'a'">
   <span r-default>default</span>
 </template>`;
 
+// WR-01 follow-up (code review): a COMPONENT-tag `r-match` host. The wrapper
+// renders unconditionally, but Plan 14-05 skips synthesis on a non-`html`
+// root — the spread would land as a prop on the inner component rather than
+// as a DOM attribute — so this shape still drops the consumer's attributes
+// and must keep a diagnostic. Keying the exemption on host PRESENCE alone
+// would have silenced it, splitting the validator's predicate from the
+// synthesizer's: exactly the drift class that caused WR-01.
+const COMPONENT_MATCH_HOST_BODY = `<Foo r-match="$props.status">
+  <span r-case="'a'">a</span>
+  <span r-default>default</span>
+</Foo>`;
+
+/** Declares a `Foo` child component so COMPONENT_MATCH_HOST_BODY resolves. */
+function rozieWithComponent(openTag: string, templateBody: string): string {
+  return `${openTag}
+<components>
+{ Foo: './Foo.rozie' }
+</components>
+<props>
+{ status: { type: String, default: 'a' } }
+</props>
+<template>
+${templateBody}
+</template>
+</rozie>
+`;
+}
+
 function rozie(openTag: string, templateBody: string): string {
   return `${openTag}
 <template>
@@ -332,6 +360,34 @@ describe('attribute-fallthrough diagnostics (Phase 82 multi-root + gated-root)',
     expect(gatedRoot[0]!.severity).toBe('warning');
   });
 
+  it('WR-01 follow-up RED: a component-tag r-match host keeps ROZ098, with wording that does not claim the root is conditional', () => {
+    // The synthesizer skips a non-`html` root (Plan 14-05), so the attrs are
+    // still dropped here and the signal must survive. But the gated-root
+    // message would be false for this shape too — the root IS unconditional,
+    // it just is not an HTML element — so it gets its own wording. RED on the
+    // message assertion today: the diagnostic does not fire at all.
+    const source = rozieWithComponent(
+      '<rozie name="ComponentMatchHost">',
+      COMPONENT_MATCH_HOST_BODY,
+    );
+    const gatedRoot = compileDiagnostics(source).filter(
+      (d) => d.code === RozieErrorCode.ATTR_FALLTHROUGH_GATED_ROOT,
+    );
+    expect(
+      gatedRoot.length,
+      `a component-tag r-match host still drops attrs — expected exactly one ATTR_FALLTHROUGH_GATED_ROOT; got ${JSON.stringify(gatedRoot)}`,
+    ).toBe(1);
+    expect(gatedRoot[0]!.severity).toBe('warning');
+    expect(
+      gatedRoot[0]!.message,
+      `expected component-tag wording, not the conditional-root message; got: ${gatedRoot[0]!.message}`,
+    ).toContain('component tag');
+    expect(
+      compileCode(source),
+      'a component-tag root owns its own fallthrough surface — no spread should be synthesized',
+    ).not.toContain('v-bind="$attrs"');
+  });
+
   it('Phase 82 RED: no new silent drops — every fixture body satisfies exactly one of {ROZ970, emitted $attrs bind, ATTR_FALLTHROUGH_GATED_ROOT}', () => {
     // Structural guard: Plan 82-02's two independent predicates
     // (`countRootElements` and the synthesizer's root-resolution loop) must
@@ -372,6 +428,10 @@ describe('attribute-fallthrough diagnostics (Phase 82 multi-root + gated-root)',
       {
         name: 'TEMPLATE_MATCH_ROOT_BODY',
         source: rozie('<rozie name="Trichotomy8">', TEMPLATE_MATCH_ROOT_BODY),
+      },
+      {
+        name: 'COMPONENT_MATCH_HOST_BODY',
+        source: rozieWithComponent('<rozie name="Trichotomy9">', COMPONENT_MATCH_HOST_BODY),
       },
     ];
 

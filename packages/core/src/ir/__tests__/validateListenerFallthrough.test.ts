@@ -86,6 +86,31 @@ const TEMPLATE_MATCH_ROOT_BODY = `<template r-match="'a'">
   <span r-default>default</span>
 </template>`;
 
+// WR-01 follow-up (code review), D-17 listeners twin: a COMPONENT-tag
+// `r-match` host. Plan 14-05 skips synthesis on a non-`html` root, so this
+// shape still drops the consumer's listeners and must keep its diagnostic —
+// with wording that does not claim the root is conditional.
+const COMPONENT_MATCH_HOST_BODY = `<Foo r-match="$props.status">
+  <span r-case="'a'">a</span>
+  <span r-default>default</span>
+</Foo>`;
+
+/** Declares a `Foo` child component so COMPONENT_MATCH_HOST_BODY resolves. */
+function rozieEnvWithComponent(openTag: string, body: string): string {
+  return `${openTag}
+<components>
+{ Foo: './Foo.rozie' }
+</components>
+<props>
+{ status: { type: String, default: 'a' } }
+</props>
+<template>
+${body}
+</template>
+</rozie>
+`;
+}
+
 function rozieEnv(openTag: string, body: string): string {
   return `${openTag}
 <template>
@@ -398,6 +423,28 @@ describe('validateListenerFallthrough (Phase 82 multi-root + gated-root)', () =>
     expect(gatedRoot[0]!.severity).toBe('warning');
   });
 
+  it('WR-01 follow-up RED: a component-tag r-match host keeps ROZ099, with wording that does not claim the root is conditional', () => {
+    // D-17 twin. The two validators share no code, so this case is what stops
+    // the listeners half from silently losing its signal once the attrs half
+    // is fixed. RED today: the diagnostic does not fire at all.
+    const source = rozieEnvWithComponent(
+      '<rozie name="ComponentMatchHost">',
+      COMPONENT_MATCH_HOST_BODY,
+    );
+    const gatedRoot = compileDiagnostics(source).filter(
+      (d) => d.code === RozieErrorCode.LISTENER_FALLTHROUGH_GATED_ROOT,
+    );
+    expect(
+      gatedRoot.length,
+      `a component-tag r-match host still drops listeners — expected exactly one LISTENER_FALLTHROUGH_GATED_ROOT; got ${JSON.stringify(gatedRoot)}`,
+    ).toBe(1);
+    expect(gatedRoot[0]!.severity).toBe('warning');
+    expect(
+      gatedRoot[0]!.message,
+      `expected component-tag wording, not the conditional-root message; got: ${gatedRoot[0]!.message}`,
+    ).toContain('component tag');
+  });
+
   it('Phase 82 RED: no new silent drops — every fixture body satisfies exactly one of {ROZ973, emitted fallthrough spread, LISTENER_FALLTHROUGH_GATED_ROOT}', () => {
     // Structural guard, listeners twin of the attrs-side trichotomy. Every
     // body below must land in EXACTLY one of the three observable arms.
@@ -436,6 +483,10 @@ describe('validateListenerFallthrough (Phase 82 multi-root + gated-root)', () =>
       {
         name: 'TEMPLATE_MATCH_ROOT_BODY',
         source: rozieEnv('<rozie name="Trichotomy8">', TEMPLATE_MATCH_ROOT_BODY),
+      },
+      {
+        name: 'COMPONENT_MATCH_HOST_BODY',
+        source: rozieEnvWithComponent('<rozie name="Trichotomy9">', COMPONENT_MATCH_HOST_BODY),
       },
     ];
 

@@ -43,6 +43,13 @@ inherit-listeners="false"` opt-out, whose behavior is unchanged.
   hard-errors `ROZ970`/`ROZ973` — the host really is a second root there. `<div r-match>` plus a
   `<slot>` sibling likewise still errors; the slot-tolerance widening from the previous release
   applies to plain element roots, not to match hosts.
-- **A component-tag host is still out of scope.** `<MyComponent r-match="…">` receives no spread,
-  exactly as a plain `<MyComponent />` root does — its fallthrough surface is owned by the inner
-  component.
+
+**A component-tag match host keeps its warning, with new wording.** `<MyComponent r-match="…">`
+receives no spread — its fallthrough surface is owned by the inner component, as for a plain
+`<MyComponent />` root — but unlike a plain component root it still reports `ROZ098`/`ROZ099`,
+because auto-fallthrough is on and the consumer's attrs/listeners really are dropped. That
+diagnostic now carries its own message ("the template's only root is a component tag, so
+auto-fallthrough has no HTML element to attach the inherited attributes to") rather than the
+conditional-root wording, which would have been just as false for it as for a `<div r-match>` host.
+The validator and the synthesizer share one predicate here, so a shape can never be exempted from
+the warning while still being skipped for synthesis.

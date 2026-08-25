@@ -198,7 +198,7 @@ export const RozieErrorCode = {
   // the conditional/match root instead of merely diagnosing the drop — is
   // explicitly DEFERRED per D-02 (82-PLAN.md); these two codes are a warning,
   // not a fix.
-  ATTR_FALLTHROUGH_GATED_ROOT: 'ROZ098', // warning — inheritAttrs !== false and the template's single structural root is a TemplateConditional, or a TemplateMatch with NO hostElement (`<template r-match>`), so no element can receive the synthesized $attrs spread; the drop is diagnosed, the branch-descent fix is DEFERRED (D-02). A `<div r-match>` root carries a real, unconditionally-rendered hostElement and is exempt — the spread lands on that host (WR-01)
+  ATTR_FALLTHROUGH_GATED_ROOT: 'ROZ098', // warning — inheritAttrs !== false and no element can receive the synthesized $attrs spread. Two shapes, two messages: a TemplateConditional root or a hostElement-less TemplateMatch (`<template r-match>`) is genuinely gated (branch-descent fix DEFERRED, D-02); a TemplateMatch whose hostElement is a COMPONENT tag renders unconditionally but is skipped by Plan 14-05, so it gets component-tag wording instead. A `<div r-match>` host (tagKind 'html') is exempt — the spread lands on it (WR-01). The predicate matches the synthesizer's exactly, so the two cannot drift
   LISTENER_FALLTHROUGH_GATED_ROOT: 'ROZ099', // warning — D-17 twin of ROZ098: inheritListeners !== false and the same gated-root shape, independent of ROZ098 exactly as ROZ973 is independent of ROZ970
   // ROZ090..ROZ099 is now fully consumed — Phase 82 took the last two codes.
 
