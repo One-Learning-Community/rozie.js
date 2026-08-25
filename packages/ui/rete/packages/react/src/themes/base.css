@@ -108,6 +108,25 @@
   --rozie-flow-toolbar-btn-border: rgba(0, 0, 0, 0.14);
   --rozie-flow-toolbar-btn-hover-bg: #eef2f7;
   --rozie-flow-toolbar-delete-fg: #b91c1c;
+
+  /* Splitting the family out from the four per-role sizes means rebranding
+     is ONE override, while each role's size stays independently tunable —
+     the two knobs solve different problems and shouldn't be conflated. */
+  /* typography */
+  --rozie-flow-font-family: system-ui, sans-serif;
+  --rozie-flow-node-font-size: 13px;
+  --rozie-flow-control-font-size: 16px;
+  --rozie-flow-toolbar-font-size: 12px;
+  --rozie-flow-connection-label-font-size: 11px;
+
+  /* Defaults off --rozie-flow-accent, not a colour literal: both dark blocks
+     already remap accent, so the ring inherits dark automatically and adds
+     ZERO new entries to the three hand-maintained dark palettes. Do not
+     "helpfully" hardcode a colour here — that would reintroduce exactly the
+     drift D-20's predicate exists to catch. */
+  /* focus ring */
+  --rozie-flow-focus-ring: var(--rozie-flow-accent);
+  --rozie-flow-focus-ring-width: 2px;
 }
 
 /*
