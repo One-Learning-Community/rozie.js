@@ -157,3 +157,133 @@ describe('dark-palette-drift — OS-dark guard selector (D-22)', () => {
   // and would break on any unrelated recompile. Match on CSS content only (the
   // it.each loop above already covers Solid via GUARD substring presence).
 });
+
+/**
+ * D-20/D-21 — the palette union-of-keys drift predicate (Plan 83-02).
+ *
+ * Brace-counts from the FIRST `{` after `marker` to the point where nesting
+ * returns to zero, and returns that slice (marker through matching close-brace,
+ * inclusive). Brace counting rather than a line-range slice is deliberate: it
+ * survives future line-number drift, and it already survived Plan 01's
+ * re-nesting of the SFC block inside the `:root { @media {...} } }` escape
+ * hatch. Throws a NAMED error if the marker is absent, so a renamed block fails
+ * loudly instead of silently comparing against an empty slice.
+ *
+ * `fromLastOccurrence` exists because `themes/base.css`'s own header comment
+ * (lines 7 and 109) describes the OS-dark feature in prose using the exact
+ * literal string `@media (prefers-color-scheme: dark)` — a first-occurrence
+ * `indexOf` on that marker would anchor on the COMMENT text, not the real rule.
+ * The actual OS-dark rule is base.css's LAST occurrence of that string.
+ */
+function extractBlock(
+  text: string,
+  marker: string,
+  opts: { fromLastOccurrence?: boolean } = {},
+): string {
+  const start = opts.fromLastOccurrence ? text.lastIndexOf(marker) : text.indexOf(marker);
+  if (start === -1) {
+    throw new Error(`dark-palette-drift: marker not found: ${JSON.stringify(marker)}`);
+  }
+  const braceStart = text.indexOf('{', start);
+  if (braceStart === -1) {
+    throw new Error(`dark-palette-drift: no opening brace found after marker: ${JSON.stringify(marker)}`);
+  }
+  let depth = 0;
+  let end = -1;
+  for (let i = braceStart; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+    }
+  }
+  if (end === -1) {
+    throw new Error(`dark-palette-drift: unbalanced braces after marker: ${JSON.stringify(marker)}`);
+  }
+  return text.slice(start, end + 1);
+}
+
+/** Every `--rozie-flow-*` declaration in `block`, name -> trimmed value. */
+function extractTokens(block: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of block.matchAll(/(--rozie-flow-[a-z-]+)\s*:\s*([^;]+);/g)) {
+    out.set(m[1], m[2].trim());
+  }
+  return out;
+}
+
+describe('dark-palette-drift — palette union-of-keys (D-20)', () => {
+  const sfcSrc = readSrc('src/FlowCanvas.rozie');
+  const baseCssSrc = readSrc('src/themes/base.css');
+
+  const sfcDarkBlock = extractBlock(sfcSrc, '@media (prefers-color-scheme: dark)');
+  const baseDarkClassBlock = extractBlock(baseCssSrc, '.dark .rozie-flow-canvas,');
+  const baseOsDarkBlock = extractBlock(baseCssSrc, '@media (prefers-color-scheme: dark)', {
+    fromLastOccurrence: true,
+  });
+
+  const sfcDark = extractTokens(sfcDarkBlock);
+  const baseDarkClass = extractTokens(baseDarkClassBlock);
+  const baseOsDark = extractTokens(baseOsDarkBlock);
+
+  const BLOCKS: ReadonlyArray<readonly [string, Map<string, string>]> = [
+    ['SFC OS-dark block (FlowCanvas.rozie)', sfcDark],
+    ['base.css .dark/[data-theme="dark"] block', baseDarkClass],
+    ['base.css OS-dark block', baseOsDark],
+  ];
+
+  // D-20's predicate compares the three DARK blocks to EACH OTHER only — it never
+  // compares dark against light. 13 of this phase's 15 new tokens are light-only
+  // by design (sizes, font family, focus-ring width, body padding, socket border
+  // width, chrome insets) and are never declared in ANY dark block. A
+  // light-vs-dark key comparison would therefore fail immediately on this
+  // phase's own additions and would need a hand-maintained allowlist to stay
+  // green — exactly the kind of upkeep the last two bugs (ISSUE-3's missing
+  // guard, A4's missing token) suggest nobody keeps current. Light-only tokens
+  // are structurally excluded here for free: since they are absent from all
+  // three dark sets, they never enter the union computed below.
+  const union = Array.from(
+    new Set([...sfcDark.keys(), ...baseDarkClass.keys(), ...baseOsDark.keys()]),
+  ).sort();
+
+  it('the computed dark-key union is non-empty and larger than 30 keys (extractor sanity)', () => {
+    // A broken extractor that returns an empty (or near-empty) slice would make
+    // every predicate below pass vacuously against three (near-)empty sets. This
+    // is deliberately NOT an exact count assertion — D-19's own rationale notes
+    // the absolute counts (33/33/34) are each off by one, and baking a wrong
+    // literal into the suite is exactly what this test must not do. Assert
+    // against the computed union, not a hardcoded number.
+    expect(union.length).toBeGreaterThan(30);
+  });
+
+  it.each(BLOCKS)('%s declares the full union of dark keys', (name, tokens) => {
+    const missing = union.filter((key) => !tokens.has(key));
+    expect(missing, `${name} is missing: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it.each(BLOCKS)(
+    '%s declares identical values to the reference block (SFC) for every shared union key',
+    (name, tokens) => {
+      // The SFC block is the reference copy: it is the zero-import default — the
+      // exact CSS a consumer gets with no import of base.css at all — so it is
+      // the copy every other hand-maintained copy must agree with. (Comparing
+      // the SFC block against itself here is intentional and trivially passes;
+      // it keeps the it.each loop uniform across all three named blocks.)
+      const mismatches: string[] = [];
+      for (const key of union) {
+        const refValue = sfcDark.get(key);
+        const value = tokens.get(key);
+        if (refValue !== undefined && value !== undefined && value !== refValue) {
+          mismatches.push(`${key}: ${JSON.stringify(value)} !== reference ${JSON.stringify(refValue)}`);
+        }
+      }
+      expect(
+        mismatches,
+        `${name} has value mismatches vs the SFC reference:\n${mismatches.join('\n')}`,
+      ).toEqual([]);
+    },
+  );
+});
