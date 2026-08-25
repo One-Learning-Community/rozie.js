@@ -813,9 +813,11 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       }
       this.nodeEntries.clear();
       // ISSUE-6: whole-map clear so an unmount leaves nothing retained even if a
-      // per-socket disposer was skipped (T-83-17).
+      // per-socket disposer was skipped (T-83-17). WR-03: also drop the active-pick
+      // record — an unmount mid-gesture must not leave a stale pick behind.
       this.socketReg.clear();
       this.incompatibleMarked.clear();
+      this.activePick = null;
       for (const [, entry] of this.connEntries as any) entry.dispose();
       this.connEntries.clear();
       // D-14: detach the three abort-path listeners before area.destroy() (T-83-18) —
@@ -2074,6 +2076,11 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // costs nothing. Removing the class from an element that has since been detached is
     // harmless, so no liveness check is needed.
     this.clearIncompatibleSockets = () => {
+      // WR-03: always clear the active-pick record, even on the empty-set fast path
+      // below — a pick that marked nothing (validateTypes off, untyped source) is
+      // still an active pick until this fires, and a stale record would make a
+      // later portsAdded rebuild re-mark against a pick that has already ended.
+      this.activePick = null;
       if (this.incompatibleMarked.size === 0) return;
       for (const el of this.incompatibleMarked as any) el.classList.remove('rozie-flow-socket--incompatible');
       this.incompatibleMarked.clear();
@@ -2087,6 +2094,14 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // still live must not accumulate.
     this.markIncompatibleSockets = (pickedNodeId: any, pickedSide: any, pickedKey: any) => {
       this.clearIncompatibleSockets();
+      // WR-03: record the pick AFTER clearIncompatibleSockets (which just reset it to
+      // null) so a portsAdded reconcile mid-gesture can re-invoke this exact call —
+      // see the reconcileNodesPass portsAdded branch below.
+      this.activePick = {
+        nodeId: pickedNodeId,
+        side: pickedSide,
+        key: pickedKey
+      };
       // With automatic validation off, a type-mismatched drop is ALLOWED — dimming
       // would misrepresent what will actually happen, so nothing is marked at all.
       if (this.validateTypes === false) return;
@@ -2577,6 +2592,21 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
             // a port change must re-run connections — an edge that was skipped because
             // its endpoint port didn't exist yet can now be drawn.
             if (portsAdded && this.reconcileConnections) await this.reconcileConnections();
+            // WR-03: the block above just disposed this node's socketDisposers (each
+            // of which does incompatibleMarked.delete(socketEl), :1849-1850ish) and
+            // rebuilt its sockets via area.update — fresh DOM that never carries
+            // rozie-flow-socket--incompatible. If a connection pick is STILL active
+            // (activePick set on connectionpick, cleared on every existing abort
+            // path — see its declaration), re-run the SAME marking pass now so a
+            // still-genuinely-incompatible socket on this node keeps its dim state
+            // for the rest of the gesture instead of silently un-marking. This runs
+            // SYNCHRONOUSLY within this same async reconcile pass (not deferred to a
+            // later reactive flush), so it is not the cross-flush suppress-flag
+            // antipattern — it re-derives the mark from the SAME activePick record
+            // markIncompatibleSockets itself maintains, not a flag read out-of-band.
+            if (portsAdded && this.activePick && this.markIncompatibleSockets) {
+              this.markIncompatibleSockets(this.activePick.nodeId, this.activePick.side, this.activePick.key);
+            }
           }
         }
         // remove dropped GRAPH-managed nodes (+ their connections) — imperatively added
@@ -3633,6 +3663,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   markIncompatibleSockets: any = null;
 
   clearIncompatibleSockets: any = null;
+
+  activePick: any = null;
 
   onWindowPointerCancelClearIncompatible: any = null;
 

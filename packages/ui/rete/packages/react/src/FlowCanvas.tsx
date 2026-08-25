@@ -229,6 +229,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const onWindowKeydownClearIncompatible = useRef<any>(null);
   const onWindowBlurClearIncompatible = useRef<any>(null);
   const scheduleMinimapRedraw = useRef<any>(null);
+  const activePick = useRef<any>(null);
   const dragGestureActive = useRef(false);
   const pendingDragSnapshot = useRef<any>(null);
   const edgeClickGuard = useRef(false);
@@ -2405,6 +2406,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // costs nothing. Removing the class from an element that has since been detached is
     // harmless, so no liveness check is needed.
     clearIncompatibleSockets.current = () => {
+      // WR-03: always clear the active-pick record, even on the empty-set fast path
+      // below — a pick that marked nothing (validateTypes off, untyped source) is
+      // still an active pick until this fires, and a stale record would make a
+      // later portsAdded rebuild re-mark against a pick that has already ended.
+      activePick.current = null;
       if (incompatibleMarked.size === 0) return;
       for (const el of incompatibleMarked as any) el.classList.remove('rozie-flow-socket--incompatible');
       incompatibleMarked.clear();
@@ -2415,6 +2421,14 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // still live must not accumulate.
     markIncompatibleSockets.current = (pickedNodeId: any, pickedSide: any, pickedKey: any) => {
       clearIncompatibleSockets.current();
+      // WR-03: record the pick AFTER clearIncompatibleSockets (which just reset it to
+      // null) so a portsAdded reconcile mid-gesture can re-invoke this exact call —
+      // see the reconcileNodesPass portsAdded branch below.
+      activePick.current = {
+        nodeId: pickedNodeId,
+        side: pickedSide,
+        key: pickedKey
+      };
       // With automatic validation off, a type-mismatched drop is ALLOWED — dimming
       // would misrepresent what will actually happen, so nothing is marked at all.
       if (_validateTypesRef.current === false) return;
@@ -2813,6 +2827,21 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             // a port change must re-run connections — an edge that was skipped because
             // its endpoint port didn't exist yet can now be drawn.
             if (portsAdded && reconcileConnections.current) await reconcileConnections.current();
+            // WR-03: the block above just disposed this node's socketDisposers (each
+            // of which does incompatibleMarked.delete(socketEl), :1849-1850ish) and
+            // rebuilt its sockets via area.update — fresh DOM that never carries
+            // rozie-flow-socket--incompatible. If a connection pick is STILL active
+            // (activePick set on connectionpick, cleared on every existing abort
+            // path — see its declaration), re-run the SAME marking pass now so a
+            // still-genuinely-incompatible socket on this node keeps its dim state
+            // for the rest of the gesture instead of silently un-marking. This runs
+            // SYNCHRONOUSLY within this same async reconcile pass (not deferred to a
+            // later reactive flush), so it is not the cross-flush suppress-flag
+            // antipattern — it re-derives the mark from the SAME activePick record
+            // markIncompatibleSockets itself maintains, not a flag read out-of-band.
+            if (portsAdded && activePick.current && markIncompatibleSockets.current) {
+              markIncompatibleSockets.current(activePick.current.nodeId, activePick.current.side, activePick.current.key);
+            }
           }
         }
         // remove dropped GRAPH-managed nodes (+ their connections) — imperatively added
@@ -3832,9 +3861,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       }
       nodeEntries.clear();
       // ISSUE-6: whole-map clear so an unmount leaves nothing retained even if a
-      // per-socket disposer was skipped (T-83-17).
+      // per-socket disposer was skipped (T-83-17). WR-03: also drop the active-pick
+      // record — an unmount mid-gesture must not leave a stale pick behind.
       socketReg.clear();
       incompatibleMarked.clear();
+      activePick.current = null;
       for (const [, entry] of connEntries as any) entry.dispose();
       connEntries.clear();
       // D-14: detach the three abort-path listeners before area.destroy() (T-83-18) —

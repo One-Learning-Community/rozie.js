@@ -213,6 +213,21 @@ let onCanvasKeydown: any = null;
 // also keeps them visible to the Solid-hoisted teardown.
 let markIncompatibleSockets: any = null;
 let clearIncompatibleSockets: any = null;
+// WR-03 fix: the picked socket's `{nodeId, side, key}` for the CURRENTLY active
+// pick, or null when no pick is in flight. Set at the top of markIncompatibleSockets
+// (so it tracks the pick regardless of whether validateTypes/pickedType end up
+// marking anything) and cleared at the top of clearIncompatibleSockets — so it
+// stays in lockstep with every existing path that already clears the marking
+// (connectiondrop, the three D-14 abort listeners, unmount). This lets a
+// `portsAdded` reconcile mid-gesture (FlowCanvas.rozie's reconcileNodesPass) re-run
+// the SAME marking pass after it disposes+rebuilds a node's socket DOM, so a still-
+// genuinely-incompatible socket doesn't silently lose its dimming just because its
+// DOM element was recreated. Component-scope, non-reactive `let` — same idiom as
+// the two bridges above and the socketReg/incompatibleMarked Maps/Sets below;
+// re-invoked SYNCHRONOUSLY within the same async reconcile pass that just rebuilt
+// the DOM, never deferred to a later reactive flush (the cross-flush
+// suppress-flag antipattern — see feedback_cross_flush_suppress_flag_antipattern).
+let activePick: any = null;
 // D-14: defensive teardown so no abort path can leave sockets permanently dimmed.
 // COMPONENT-scope (not $onMount-local) so the Solid-hoisted teardown can detach
 // them. `window` — not the canvas container — is the right scope for all three:
@@ -2619,6 +2634,11 @@ onMounted(() => {
   // costs nothing. Removing the class from an element that has since been detached is
   // harmless, so no liveness check is needed.
   clearIncompatibleSockets = () => {
+    // WR-03: always clear the active-pick record, even on the empty-set fast path
+    // below — a pick that marked nothing (validateTypes off, untyped source) is
+    // still an active pick until this fires, and a stale record would make a
+    // later portsAdded rebuild re-mark against a pick that has already ended.
+    activePick = null;
     if (incompatibleMarked.size === 0) return;
     for (const el of incompatibleMarked as any) el.classList.remove('rozie-flow-socket--incompatible');
     incompatibleMarked.clear();
@@ -2629,6 +2649,14 @@ onMounted(() => {
   // still live must not accumulate.
   markIncompatibleSockets = (pickedNodeId: any, pickedSide: any, pickedKey: any) => {
     clearIncompatibleSockets();
+    // WR-03: record the pick AFTER clearIncompatibleSockets (which just reset it to
+    // null) so a portsAdded reconcile mid-gesture can re-invoke this exact call —
+    // see the reconcileNodesPass portsAdded branch below.
+    activePick = {
+      nodeId: pickedNodeId,
+      side: pickedSide,
+      key: pickedKey
+    };
     // With automatic validation off, a type-mismatched drop is ALLOWED — dimming
     // would misrepresent what will actually happen, so nothing is marked at all.
     if (props.validateTypes === false) return;
@@ -3027,6 +3055,21 @@ onMounted(() => {
           // a port change must re-run connections — an edge that was skipped because
           // its endpoint port didn't exist yet can now be drawn.
           if (portsAdded && reconcileConnections) await reconcileConnections();
+          // WR-03: the block above just disposed this node's socketDisposers (each
+          // of which does incompatibleMarked.delete(socketEl), :1849-1850ish) and
+          // rebuilt its sockets via area.update — fresh DOM that never carries
+          // rozie-flow-socket--incompatible. If a connection pick is STILL active
+          // (activePick set on connectionpick, cleared on every existing abort
+          // path — see its declaration), re-run the SAME marking pass now so a
+          // still-genuinely-incompatible socket on this node keeps its dim state
+          // for the rest of the gesture instead of silently un-marking. This runs
+          // SYNCHRONOUSLY within this same async reconcile pass (not deferred to a
+          // later reactive flush), so it is not the cross-flush suppress-flag
+          // antipattern — it re-derives the mark from the SAME activePick record
+          // markIncompatibleSockets itself maintains, not a flag read out-of-band.
+          if (portsAdded && activePick && markIncompatibleSockets) {
+            markIncompatibleSockets(activePick.nodeId, activePick.side, activePick.key);
+          }
         }
       }
       // remove dropped GRAPH-managed nodes (+ their connections) — imperatively added
@@ -4044,9 +4087,11 @@ onMounted(() => {
     }
     nodeEntries.clear();
     // ISSUE-6: whole-map clear so an unmount leaves nothing retained even if a
-    // per-socket disposer was skipped (T-83-17).
+    // per-socket disposer was skipped (T-83-17). WR-03: also drop the active-pick
+    // record — an unmount mid-gesture must not leave a stale pick behind.
     socketReg.clear();
     incompatibleMarked.clear();
+    activePick = null;
     for (const [, entry] of connEntries as any) entry.dispose();
     connEntries.clear();
     // D-14: detach the three abort-path listeners before area.destroy() (T-83-18) —
