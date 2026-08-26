@@ -153,11 +153,13 @@ jobs:
       - name: Build all packages (generates .d.rozie.ts sidecars before typecheck — REQ-6)
         run: pnpm turbo run build
 
-      - name: Run unit tests (targets + runtime + swipe MOD-05 dogfood)
+      # 260825-n4y Tier 2: the Vue target/runtime suites used to run here too.
+      # They were inherited when this workflow was created (e304d30b4), not
+      # chosen — nothing about them varies with the React matrix axis, and
+      # vue-matrix has NO path filter so it runs them on every single PR.
+      - name: Run unit tests (target-react + runtime-react + swipe MOD-05 dogfood)
         run: |
-          pnpm exec vitest run --root packages/targets/vue
           pnpm exec vitest run --root packages/targets/react
-          pnpm exec vitest run --root packages/runtime/vue
           pnpm exec vitest run --root packages/runtime/react
           pnpm exec vitest run --root tests/plugins/swipe
 

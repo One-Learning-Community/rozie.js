@@ -177,14 +177,13 @@ jobs:
       - name: Build all packages (generates .rozie.ts disk-cache before typecheck — REQ-6)
         run: pnpm turbo run build
 
-      - name: Run unit tests (targets + runtime)
+      # 260825-n4y Tier 2: the svelte/vue/react target suites and the vue/react
+      # runtime suites used to run here. All six arrived in this workflow's own
+      # creation commit (e751fa0ea) as template copy-paste — none of them varies
+      # with the Angular matrix axis, and each is covered by its own workflow.
+      - name: Run unit tests (target-angular + runtime-angular)
         run: |
           pnpm exec vitest run --root packages/targets/angular
-          pnpm exec vitest run --root packages/targets/svelte
-          pnpm exec vitest run --root packages/targets/vue
-          pnpm exec vitest run --root packages/targets/react
-          pnpm exec vitest run --root packages/runtime/vue
-          pnpm exec vitest run --root packages/runtime/react
           # Added with the Angular runtime harness (Phase 80) -- deliberate,
           # not incidental. Closes the exact "no hosted-CI coverage" gap
           # that let both target bugs this phase fixes survive undetected.
