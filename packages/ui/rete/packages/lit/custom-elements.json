@@ -314,7 +314,7 @@
             {
               "kind": "method",
               "name": "autoArrange",
-              "description": "Relayout the graph into a non-overlapping layered arrangement — `await autoArrange(opts?)` runs the elkjs-backed auto-layout, then reads the arranged node positions back through the two-way `graph` model (echo-guarded, one undoable gesture). Verb-only — never auto-triggered. `opts.options` forwards elk layout options (direction / spacing). No-op before mount. The engine (`rete-auto-arrange-plugin` + its 1.5 MB elkjs payload) is loaded by a dynamic import on the FIRST call and reused after — so it stays out of your bundle entirely unless you arrange, and the first call pays a chunk fetch. If the optional peer is not installed, the returned promise rejects rather than silently doing nothing."
+              "description": "Relayout the graph into a non-overlapping layered arrangement — `await autoArrange(opts?)` runs the elkjs-backed auto-layout, then reads the arranged node positions back through the two-way `graph` model (echo-guarded, one undoable gesture). Verb-only — never auto-triggered. `opts.options` is merged OVER the component's tuned elk layout defaults (spacing / node placement strategy) — any key the caller passes wins, an untouched default survives. No-op before mount. The engine (`rete-auto-arrange-plugin` + its 1.5 MB elkjs payload) is loaded by a dynamic import on the FIRST call and reused after — so it stays out of your bundle entirely unless you arrange, and the first call pays a chunk fetch. If the optional peer is not installed, the returned promise rejects rather than silently doing nothing."
             },
             {
               "kind": "method",

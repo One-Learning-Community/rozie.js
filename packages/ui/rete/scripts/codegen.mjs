@@ -11,8 +11,12 @@
  *
  * Like @rozie-ui/maplibre, FlowCanvas.rozie imports the engine packages (`rete`,
  * `rete-area-plugin`, `rete-connection-plugin`, `rete-render-utils`) directly, so
- * the leaves carry no colocated engine-bridge. The ONLY copy step is the design-token
- * presets (src/themes/ → each leaf src/themes/), mirroring @rozie-ui/embla.
+ * the leaves carry no colocated engine-bridge. Two copy steps run per leaf: the
+ * design-token presets (src/themes/ → each leaf src/themes/, mirroring
+ * @rozie-ui/embla) and, since 260826-h7k, the pure arrange-geometry algorithm
+ * (src/internal/ → each leaf src/internal/, excluding *.test.ts, mirroring
+ * @rozie-ui/date-picker's copyInternal) so the relative `./internal/arrangeGeometry`
+ * specifier FlowCanvas imports resolves verbatim in every leaf.
  *
  * BUILD-ORDER CONTRACT: this writes each leaf's src/FlowCanvas.*, so it MUST run
  * before the bundled-leaf tsdown builds (`turbo run build --force`).
@@ -150,6 +154,23 @@ function copyThemes(leafSrc) {
   cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
 }
 
+/**
+ * Copy src/internal/ → leaf src/internal/, excluding any *.test.ts (260826-h7k).
+ * Vendors the pure `arrangeGeometry.ts` module (autoArrange's truthful measured
+ * socket geometry) into every leaf so the relative `./internal/arrangeGeometry`
+ * specifier FlowCanvas.rozie imports resolves. Modeled directly on
+ * @rozie-ui/date-picker's copyInternal.
+ */
+function copyInternal(leafSrc) {
+  const src = resolve(ROOT, 'src/internal');
+  if (!existsSync(src))
+    throw new Error('codegen: src/internal/ not found (the arrange-geometry algorithm must exist)');
+  cpSync(src, resolve(leafSrc, 'internal'), {
+    recursive: true,
+    filter: (from) => !from.endsWith('.test.ts'),
+  });
+}
+
 function main() {
   // Read every component source once. Keyed by component name.
   const sources = Object.fromEntries(
@@ -187,6 +208,8 @@ function main() {
 
     // Vendor the design-token presets (base + shadcn/material/bootstrap bridges).
     copyThemes(leafSrc);
+    // Vendor the pure arrange-geometry algorithm (260826-h7k).
+    copyInternal(leafSrc);
 
     // STALE-LEAF CLEANUP (Phase 41 D6 clean break): delete any pre-existing leaf
     // output for a REMOVED component (FlowNode/Handle/Connection). The codegen never

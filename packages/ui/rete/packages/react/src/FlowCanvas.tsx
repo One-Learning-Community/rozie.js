@@ -9,6 +9,11 @@ import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
 import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
 import { getDOMSocketPosition, classicConnectionPath } from 'rete-render-utils';
+// 260826-h7k — the pure arrange-geometry algorithm (tuned elk layout option defaults +
+// truthful measured-port-rect fallback). A RELATIVE specifier — codegen vendors
+// src/internal/ into every leaf (copyInternal) so this resolves verbatim on all six.
+// This is NOT the arrange plugin and does not weaken the lazy-import guarantee below.
+import { arrangeLayoutOptions, arrangePortRect } from './internal/arrangeGeometry';
 // T2.6 — auto-layout (D-08, verb-only). The 3 deps (rete-auto-arrange-plugin / elkjs
 // @0.8.2 / web-worker) are OPTIONAL leaf peers, installed + bundle-smoked on all 6 in
 // Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
@@ -1147,10 +1152,63 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     };
   }
 
+  // 260826-h7k — arrangePort(data): the LOCAL preset's port() callback, reporting each
+  // socket's REAL measured geometry to elk instead of the plugin's built-in classic preset —
+  // whose port offsets match rete's own DEFAULT node view, not ours, and are unfixable via
+  // preset options once elk hard-pins portConstraints: FIXED_POS on every node (the root
+  // cause of the fixed per-hop y staircase this fix removes). Component-scope (closes over
+  // `area` + `socketReg`), so it stays in the .rozie exactly like screenToFlowPosition — NOT
+  // extracted to src/internal/ (arrangeGeometry.ts holds only the pure math).
+  //
+  // The socket rect is measured via getBoundingClientRect() deltas against the node element,
+  // divided by the canvas zoom `k`: the area is CSS-transform scaled, so both rects come back
+  // in SCREEN space, and offsetTop/offsetLeft do NOT work here because a socket's
+  // offsetParent is not its owning node element. A null `measured` (either element missing,
+  // or the socket rect not yet laid out — the same unmeasured-first-paint class
+  // MINIMAP_DEFAULT_NODE_W/H at :549-550 already covers, notably Lit's async first paint)
+  // falls through to arrangePortRect's symmetric centred fallback.
+  // 260826-h7k — arrangePort(data): the LOCAL preset's port() callback, reporting each
+  // socket's REAL measured geometry to elk instead of the plugin's built-in classic preset —
+  // whose port offsets match rete's own DEFAULT node view, not ours, and are unfixable via
+  // preset options once elk hard-pins portConstraints: FIXED_POS on every node (the root
+  // cause of the fixed per-hop y staircase this fix removes). Component-scope (closes over
+  // `area` + `socketReg`), so it stays in the .rozie exactly like screenToFlowPosition — NOT
+  // extracted to src/internal/ (arrangeGeometry.ts holds only the pure math).
+  //
+  // The socket rect is measured via getBoundingClientRect() deltas against the node element,
+  // divided by the canvas zoom `k`: the area is CSS-transform scaled, so both rects come back
+  // in SCREEN space, and offsetTop/offsetLeft do NOT work here because a socket's
+  // offsetParent is not its owning node element. A null `measured` (either element missing,
+  // or the socket rect not yet laid out — the same unmeasured-first-paint class
+  // MINIMAP_DEFAULT_NODE_W/H at :549-550 already covers, notably Lit's async first paint)
+  // falls through to arrangePortRect's symmetric centred fallback.
+  function arrangePort(data: any) {
+    const nodeView = area.current && area.current.nodeViews ? area.current.nodeViews.get(data.nodeId) : null;
+    const nodeEl = nodeView && nodeView.element ? nodeView.element : null;
+    const socketEl = socketReg.get(data.nodeId + '::' + data.side + '::' + data.key);
+    const t = area.current && area.current.area ? area.current.area.transform : null;
+    const k = t && t.k ? t.k : 1;
+    let measured: any = null;
+    if (nodeEl && typeof nodeEl.getBoundingClientRect === 'function' && socketEl && typeof socketEl.getBoundingClientRect === 'function') {
+      const nr = nodeEl.getBoundingClientRect();
+      const sr = socketEl.getBoundingClientRect();
+      if (sr.width > 0 && sr.height > 0) {
+        measured = {
+          x: (sr.left - nr.left) / k,
+          y: (sr.top - nr.top) / k,
+          width: sr.width / k,
+          height: sr.height / k
+        };
+      }
+    }
+    return arrangePortRect(data.side, data.width, data.height, measured);
+  }
+
   // T2.6 — autoArrange(opts?) — relayout the graph into a non-overlapping LAYERED arrangement
   // (D-08, verb-only, NO auto-trigger — the MapLibre verb-first stance). Runs the
-  // AutoArrangePlugin (elkjs classic preset), then READS the arranged positions BACK into a
-  // FRESH `{ nodes, connections }` object written through `$model.graph` (the controlled-graph
+  // AutoArrangePlugin with a LOCAL preset (`arrangePort` above) reporting each socket's real
+  // measured geometry, then READS the arranged positions BACK into a FRESH
+  // `{ nodes, connections }` object written through `$model.graph` (the controlled-graph
   // contract — the engine is never the source of truth, mirroring the drag write-back).
   //
   // PITFALL 3 (Plan 00 / RESEARCH): elkjs needs each node's `width`/`height`; our nodes are
@@ -1163,9 +1221,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   //
   // Echo-guarded (programmatic++ around layout AND the write-back) so the engine relayout and
   // the resulting $model.graph re-bind → $watch(graph) → reconcile don't re-enter; ONE history
-  // snapshot is pushed for the whole gesture (D-03, gated on !programmatic + history). The
-  // optional `opts.options` (elk layout options — direction/spacing) is forwarded to
-  // arrange.layout() (D-01 discretion — default-only is fine; the arg stays optional).
+  // snapshot is pushed for the whole gesture (D-03, gated on !programmatic + history). Layout
+  // options are always the component's tuned elk defaults (src/internal/arrangeGeometry.ts's
+  // arrangeLayoutOptions — spacing / node-placement strategy) merged OVER with the caller's
+  // `opts.options`, key-by-key — a caller-supplied key wins, an untouched default survives.
   //
   // Collision discipline: `autoArrange` is NOT a Lit lifecycle name (update/render/firstUpdated/
   // updated/willUpdate/requestUpdate), NOT an inherited DOM method (the Embla scrollTo lesson),
@@ -1173,8 +1232,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // NOT a prop, NOT a React model-setter (graph/zoom → setGraph/setZoom) — clean on all 6.
   // T2.6 — autoArrange(opts?) — relayout the graph into a non-overlapping LAYERED arrangement
   // (D-08, verb-only, NO auto-trigger — the MapLibre verb-first stance). Runs the
-  // AutoArrangePlugin (elkjs classic preset), then READS the arranged positions BACK into a
-  // FRESH `{ nodes, connections }` object written through `$model.graph` (the controlled-graph
+  // AutoArrangePlugin with a LOCAL preset (`arrangePort` above) reporting each socket's real
+  // measured geometry, then READS the arranged positions BACK into a FRESH
+  // `{ nodes, connections }` object written through `$model.graph` (the controlled-graph
   // contract — the engine is never the source of truth, mirroring the drag write-back).
   //
   // PITFALL 3 (Plan 00 / RESEARCH): elkjs needs each node's `width`/`height`; our nodes are
@@ -1187,9 +1247,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   //
   // Echo-guarded (programmatic++ around layout AND the write-back) so the engine relayout and
   // the resulting $model.graph re-bind → $watch(graph) → reconcile don't re-enter; ONE history
-  // snapshot is pushed for the whole gesture (D-03, gated on !programmatic + history). The
-  // optional `opts.options` (elk layout options — direction/spacing) is forwarded to
-  // arrange.layout() (D-01 discretion — default-only is fine; the arg stays optional).
+  // snapshot is pushed for the whole gesture (D-03, gated on !programmatic + history). Layout
+  // options are always the component's tuned elk defaults (src/internal/arrangeGeometry.ts's
+  // arrangeLayoutOptions — spacing / node-placement strategy) merged OVER with the caller's
+  // `opts.options`, key-by-key — a caller-supplied key wins, an untouched default survives.
   //
   // Collision discipline: `autoArrange` is NOT a Lit lifecycle name (update/render/firstUpdated/
   // updated/willUpdate/requestUpdate), NOT an inherited DOM method (the Embla scrollTo lesson),
@@ -1210,7 +1271,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     if (!arrangeReady.current) {
       arrangeReady.current = import('rete-auto-arrange-plugin').then((m: any) => {
         arrange.current = new m.AutoArrangePlugin();
-        arrange.current.addPreset(m.Presets.classic.setup());
+        arrange.current.addPreset(() => ({
+          port: arrangePort
+        }));
         area.current.use(arrange.current);
       });
       arrangeReady.current.catch(() => {
@@ -1234,9 +1297,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     pushHistory();
     programmatic.current++;
     try {
-      await arrange.current.layout(opts && opts.options ? {
-        options: opts.options
-      } : undefined);
+      await arrange.current.layout({
+        options: arrangeLayoutOptions(opts && opts.options)
+      });
     } finally {
       programmatic.current--;
     }

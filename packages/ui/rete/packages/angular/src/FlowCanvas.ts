@@ -6,6 +6,11 @@ import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
 import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
 import { getDOMSocketPosition, classicConnectionPath } from 'rete-render-utils';
+// 260826-h7k — the pure arrange-geometry algorithm (tuned elk layout option defaults +
+// truthful measured-port-rect fallback). A RELATIVE specifier — codegen vendors
+// src/internal/ into every leaf (copyInternal) so this resolves verbatim on all six.
+// This is NOT the arrange plugin and does not weaken the lazy-import guarantee below.
+import { arrangeLayoutOptions, arrangePortRect } from './internal/arrangeGeometry';
 // T2.6 — auto-layout (D-08, verb-only). The 3 deps (rete-auto-arrange-plugin / elkjs
 // @0.8.2 / web-worker) are OPTIONAL leaf peers, installed + bundle-smoked on all 6 in
 // Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
@@ -4462,6 +4467,27 @@ export class FlowCanvas {
       y: (clientY - rect.top - t.y) / k
     };
   };
+  arrangePort = (data: any) => {
+    const nodeView = this.area && this.area.nodeViews ? this.area.nodeViews.get(data.nodeId) : null;
+    const nodeEl = nodeView && nodeView.element ? nodeView.element : null;
+    const socketEl = this.socketReg.get(data.nodeId + '::' + data.side + '::' + data.key);
+    const t = this.area && this.area.area ? this.area.area.transform : null;
+    const k = t && t.k ? t.k : 1;
+    let measured: any = null;
+    if (nodeEl && typeof nodeEl.getBoundingClientRect === 'function' && socketEl && typeof socketEl.getBoundingClientRect === 'function') {
+      const nr = nodeEl.getBoundingClientRect();
+      const sr = socketEl.getBoundingClientRect();
+      if (sr.width > 0 && sr.height > 0) {
+        measured = {
+          x: (sr.left - nr.left) / k,
+          y: (sr.top - nr.top) / k,
+          width: sr.width / k,
+          height: sr.height / k
+        };
+      }
+    }
+    return arrangePortRect(data.side, data.width, data.height, measured);
+  };
   autoArrange = async (opts: any) => {
     if (!this.area) return;
     // Lazily pull in the engine (quick-260823-qgi). The dynamic import is the ONLY reference to
@@ -4477,7 +4503,9 @@ export class FlowCanvas {
     if (!this.arrangeReady) {
       this.arrangeReady = import('rete-auto-arrange-plugin').then((m: any) => {
         this.arrange = new m.AutoArrangePlugin();
-        this.arrange.addPreset(m.Presets.classic.setup());
+        this.arrange.addPreset(() => ({
+          port: this.arrangePort
+        }));
         this.area.use(this.arrange);
       });
       this.arrangeReady.catch(() => {
@@ -4501,9 +4529,9 @@ export class FlowCanvas {
     this.pushHistory();
     this.programmatic++;
     try {
-      await this.arrange.layout(opts && opts.options ? {
-        options: opts.options
-      } : undefined);
+      await this.arrange.layout({
+        options: arrangeLayoutOptions(opts && opts.options)
+      });
     } finally {
       this.programmatic--;
     }
