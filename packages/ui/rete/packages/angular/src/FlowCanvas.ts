@@ -4503,8 +4503,19 @@ export class FlowCanvas {
     if (!this.arrangeReady) {
       this.arrangeReady = import('rete-auto-arrange-plugin').then((m: any) => {
         this.arrange = new m.AutoArrangePlugin();
+        // Wrap in an INLINE arrow rather than passing `arrangePort` by bare reference —
+        // every other third-party callback registration in this file (addPipe below,
+        // ConnectionPresets.classic.setup()) follows the same inline-closure shape. A bare
+        // method reference detaches from its receiver when a target lowers a top-level
+        // .rozie function to an UNBOUND prototype method (Lit) rather than an auto-bound
+        // arrow class field (Angular) or a closure (React/Vue/Svelte/Solid) — the plugin
+        // calls `preset.port(data)` with no receiver, so `this.area`/`this.socketReg`
+        // inside arrangePort would resolve against `undefined` on that target. The inline
+        // arrow's call-site (`arrangePort(data)`) is rewritten per-target the same way
+        // every other internal call in this file already is, so it stays correctly bound
+        // on all six.
         this.arrange.addPreset(() => ({
-          port: this.arrangePort
+          port: (data: any) => this.arrangePort(data)
         }));
         this.area.use(this.arrange);
       });
