@@ -228,11 +228,22 @@ __rozieInjectStyle('FlowCanvas-cd396d6a', `.rozie-flow-canvas[data-rozie-s-cd396
   }
 .rozie-flow-canvas .rozie-flow-node {
     /* 260825-mip: border-box so an authored \`:width="240"\` means 240px RENDERED, not 240
-       plus the 1px borders. Same reasoning the socket token already documents below. No
-       effect on an auto-sized node (\`width: auto\` has no content box to expand), which is
-       every node in the pixel-baseline demos — verified before adding. It also removes a
-       one-time 2px growth on a node's FIRST corner-drag: measureNodeSize reads offsetWidth
-       (border included) and the write-back was re-applied as a content-box width. */
+       plus the 1px borders. Same reasoning the socket token already documents below. It
+       also removes a one-time 2px growth on a node's FIRST corner-drag: measureNodeSize
+       reads offsetWidth (border included) and the write-back was re-applied as a
+       content-box width.
+
+       IT IS NOT PURELY ADDITIVE, and the pixel baselines are the record of that. \`width:
+       auto\` really is unaffected — but \`min-width: 140px\` below is NOT: under content-box
+       it bounded the CONTENT box, so a node sitting at the floor rendered 142px. Under
+       border-box the floor means 142 -> 140, i.e. every floor-width node narrows by 2px.
+       FlowCanvasScreenshot and FlowCanvasDarkScreenshot both moved (160 and 144 differing
+       pixels), localised to the right edge of exactly the two nodes at the floor, with the
+       wider content-driven node untouched — which is the signature that confirms the
+       mechanism. Accepted deliberately rather than compensated for (a 142px floor would
+       have preserved the old pixels): 2px, cosmetic, and \`min-width\` now means the
+       rendered minimum, consistent with \`width\`. Baselines reblessed with the diffs
+       inspected. */
     box-sizing: border-box;
     display: grid;
     grid-template-columns: auto 1fr auto;
