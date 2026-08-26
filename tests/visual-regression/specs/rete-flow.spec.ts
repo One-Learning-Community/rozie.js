@@ -2327,6 +2327,116 @@ for (const target of TARGETS) {
   });
 }
 
+/**
+ * rete-resize-dblclick-zoom regression — a resize-handle double-click must reset the
+ * node's size WITHOUT ALSO triggering rete AreaPlugin's own dblclick-to-zoom (k *= 1.4).
+ *
+ * Root cause (debug session `.planning/debug/resolved/rete-resize-dblclick-zoom.md`):
+ * rete-area-plugin's `Zoom` class installs a plain, undelegated
+ * `container.addEventListener('dblclick', ...)` on the area container, tagged
+ * `source: 'dblclick'` in its guard-pipe context. FlowCanvas.rozie's `area.addPipe`
+ * now vetoes that specific source (alongside the pre-existing `zoomable === false`
+ * veto), through rete's own official interception point — not by fighting the DOM
+ * event (which is unreliable cross-target: React/Svelte 5/Solid DELEGATE the
+ * `dblclick` event type to a shared root/document dispatcher, so a template-bound
+ * `stopPropagation()` on the handle runs too late to stop rete's plain ancestor
+ * listener; only Vue/Angular/Lit — which attach true native per-element listeners —
+ * would have "worked" by accident).
+ *
+ * Reads the area container's live CSS transform directly (piercing shadow roots for
+ * Lit) before and after a REAL double-click (`page.mouse.dblclick`, not two synthetic
+ * `.click()` calls — those never produce a native `dblclick`) and asserts it is
+ * BYTE-IDENTICAL, while the size reset (the actual D-08 feature) still fires.
+ */
+function readAreaTransform(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    function walk(root: Document | ShadowRoot): string | null {
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const transform = (el as HTMLElement).style?.transform;
+        if (transform && transform.includes('translate')) return transform;
+        if ((el as HTMLElement).shadowRoot) {
+          const found = walk((el as HTMLElement).shadowRoot as ShadowRoot);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+    return walk(document);
+  });
+}
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-resize-dblclick-zoom [${target}]: a resize-handle double-click resets size WITHOUT zooming the canvas`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasResize&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(1);
+
+    const widthReadout = page.getByTestId('node-width');
+    const readWidth = async (): Promise<string> => (await widthReadout.textContent())?.trim() ?? '';
+
+    const node = page.locator('.rozie-flow-node').first();
+    const nb0 = await node.boundingBox();
+    if (!nb0) throw new Error('node bounding box unavailable');
+    await page.mouse.click(nb0.x + nb0.width / 2, nb0.y + nb0.height / 2);
+    await expect(page.locator('.rozie-flow-node.is-selected')).toHaveCount(1, { timeout: 5_000 });
+
+    const seHandle = page.getByTestId('flow-resize-handle-se');
+    await expect(seHandle).toBeVisible({ timeout: 5_000 });
+
+    // Establish an explicit size first (mirrors rete-flow-resize) so the double-click
+    // reset below has something real to clear back to 'auto'.
+    const seBox1 = await seHandle.boundingBox();
+    if (!seBox1) throw new Error('se-handle bounding box unavailable');
+    const seCx1 = seBox1.x + seBox1.width / 2;
+    const seCy1 = seBox1.y + seBox1.height / 2;
+    await page.mouse.move(seCx1, seCy1);
+    await page.mouse.down();
+    await page.mouse.move(seCx1 + 60, seCy1 + 40, { steps: 6 });
+    await page.mouse.up();
+    await expect.poll(readWidth, { timeout: 10_000, intervals: [100, 300, 600, 1000] }).not.toBe('auto');
+    await page.waitForTimeout(400);
+
+    const transformBefore = await readAreaTransform(page);
+    // NON-VACUITY GUARD: readAreaTransform returns `string | null`, so if the area
+    // container is ever restructured such that the walk finds nothing, the final
+    // transformAfter === transformBefore assertion would degrade to
+    // expect(null).toBe(null) and pass while testing NOTHING. Pin that both reads are
+    // real transform strings, so this cell fails loudly rather than going quietly green.
+    expect(
+      transformBefore,
+      'area transform must be readable — otherwise the zoom assertion below is vacuous',
+    ).toBeTruthy();
+
+    // The actual reproduction: a REAL native double-click (page.mouse.dblclick — two
+    // synthetic .click() calls do NOT produce a native 'dblclick').
+    const seBox2 = await seHandle.boundingBox();
+    if (!seBox2) throw new Error('se-handle bounding box unavailable (post-resize)');
+    await page.mouse.dblclick(seBox2.x + seBox2.width / 2, seBox2.y + seBox2.height / 2);
+
+    // The D-08 reset still fires (pointerup-timing, independent of dblclick).
+    await expect.poll(readWidth, { timeout: 5_000, intervals: [100, 300, 600, 1000] }).toBe('auto');
+    await page.waitForTimeout(300);
+    expect(await readWidth(), 'double-click reset must hold at auto').toBe('auto');
+
+    // The regression: rete's own dblclick-to-zoom must NOT have fired.
+    const transformAfter = await readAreaTransform(page);
+    expect(transformAfter, 'the resize-handle double-click must not zoom the canvas').toBe(
+      transformBefore,
+    );
+  });
+}
+
 // ───────────────────────────────────────────────────────────────────────────────
 // rete-flow-reactive-* helpers (quick-260803-s3m).
 //
@@ -4773,8 +4883,35 @@ for (const target of TARGETS) {
 
     // a handle double-click clears the instance width — which returns the node to its
     // TYPE width (240), NOT to auto. That is the precedence rule's deliberate consequence.
-    const hb2 = await seHandle.boundingBox();
-    if (!hb2) throw new Error('resize handle bounding box unavailable after drag');
+    //
+    // SETTLE BEFORE RE-MEASURING (rete-resize-dblclick-zoom debug session, flake (B)):
+    // `sized-width` updates as soon as the DEMO receives the resize write-back's two-way
+    // echo, but the handle's OWN on-screen position is a SEPARATE, slightly slower round
+    // trip — FlowCanvas's internal `$props.graph` $watch (which drives both
+    // `reconcileNodes()` and `scheduleResizerTrack()`) only fires once the prop echoes
+    // back down through the framework's own reactivity, one tick behind the readout. A
+    // `boundingBox()` read taken the instant the readout flips can catch the handle
+    // mid-correction (measured directly: up to ~20-40ms / one extra tick of drift on the
+    // `se` handle's x) and cache a now-stale coordinate. The dblclick below then lands off
+    // the (tiny, ~8px) handle entirely, onto whatever is underneath — which reaches rete's
+    // own window-level pointerup listener unblocked (rete-area-plugin's `Area` binds
+    // pointerup on `window`, not the container, per rete-area-plugin.esm.js:413) and
+    // deselects the node via its click-like-background-pointerup guard (`twitch < 4` ->
+    // `unselectAll()`, rete-area-plugin.esm.js:1315), hiding the handles and silently
+    // swallowing the reset with no exception — exactly the reported "reset silently stops
+    // firing" shape. Poll for two consecutive identical reads (the file's own `settledD`
+    // settle idiom above) instead of firing at a single, possibly-mid-flight sample.
+    const settledHandleBox = async (tries = 20) => {
+      let prev = await seHandle.boundingBox();
+      for (let i = 0; i < tries; i++) {
+        await page.waitForTimeout(15);
+        const cur = await seHandle.boundingBox();
+        if (prev && cur && prev.x === cur.x && prev.y === cur.y) return cur;
+        prev = cur;
+      }
+      throw new Error('resize handle position never settled after the drag');
+    };
+    const hb2 = await settledHandleBox();
     await page.mouse.dblclick(hb2.x + hb2.width / 2, hb2.y + hb2.height / 2);
     // the model drops the instance width first…
     await expect(page.getByTestId('sized-width')).toHaveText('auto', { timeout: 5_000 });

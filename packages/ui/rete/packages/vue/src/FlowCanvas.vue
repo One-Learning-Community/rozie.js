@@ -3101,6 +3101,37 @@ onMounted(() => {
       // for the zoom origin directly, without emitting `translate` — so a `pannable` veto
       // does not block zoom-origin panning, exactly as setDragHandler(null) did not.
       if (props.zoomable === false) return undefined;
+      // rete-resize-dblclick-zoom — AreaPlugin's built-in Zoom class installs its OWN
+      // dblclick-to-zoom (k *= 1.4) on the area container (rete-area-plugin's Zoom.dblclick,
+      // `container.addEventListener('dblclick', ...)`), tagging the resulting guard context
+      // `source: 'dblclick'`. This is NOT a documented FlowCanvas feature — rete.md scopes
+      // zoom to scroll/pinch, the Controls overlay, and the zoomTo/zoomToFit/setViewport
+      // handle verbs; nowhere is double-click-to-zoom mentioned — and it collides with the
+      // D-08 resize-handle double-click-to-reset gesture: double-clicking a handle to reset
+      // a node's size ALSO rescaled the whole graph under the pointer.
+      //
+      // Vetoing THIS event through rete's own zoom guard (returning undefined here makes
+      // Area.zoom() bail out before touching `transform`, exactly like the zoomable===false
+      // veto above) is the only fix that is correct on all 6 targets. The alternative —
+      // swallowing the native `dblclick` DOM event on each handle with a
+      // `@dblclick.stop.prevent` template listener — was tried and reliably suppresses the
+      // zoom on Vue/Angular/Lit but NOT on React/Svelte/Solid: those three DELEGATE the
+      // `dblclick` event type (React's root-level synthetic dispatch; Svelte 5's compiler
+      // `DELEGATED_EVENTS` list; Solid's `DelegatedEvents` set — both explicitly include
+      // `'dblclick'`), attaching ONE listener far up the tree and re-walking the DOM
+      // internally. rete's Zoom class attaches its listener with a plain, undelegated
+      // `container.addEventListener('dblclick', ...)`, so on those three targets the real
+      // native event has ALREADY bubbled through — and fired — that ancestor listener
+      // before the framework's delegated dispatcher ever invokes our handler; calling
+      // `stopPropagation()` there is structurally too late. Vue/Angular/Lit attach a true
+      // native listener directly on the element (Vue's `.stop`/`.prevent` compile to native
+      // pass-through; Angular's `(dblclick)=` and Lit's `@dblclick=` both call
+      // `addEventListener` on the element itself), so it happened to work there — by
+      // accident of each target's event architecture, not by anything the emitter could fix
+      // per-target. Going through rete's own pipe sidesteps the DOM event entirely, so it
+      // is uniform across all 6 and leaves the D-08 pointerup-timing reset (which never
+      // touches `dblclick` at all) completely untouched.
+      if (context.data && context.data.source === 'dblclick') return undefined;
     }
     return context;
   });
