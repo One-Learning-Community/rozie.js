@@ -240,4 +240,112 @@ describe('providers.wire — Volar-composed ROZ plugins over real stdio', () => 
     // <props> key `title` is on source line 4 (0-based) — see ProbeProducer.rozie.
     expect(titleSymbol?.range?.start?.line).toBe(4);
   });
+
+  it('(4) go-to-definition on a props-sigil member lands on that key inside <props>, same file', async () => {
+    const r = await request('textDocument/definition', {
+      textDocument: { uri: producerUri },
+      position: posOf(producerSource, propsTitleUsageOffset),
+    });
+    const result = r.result as AnyRecord[] | AnyRecord | null;
+    const links = Array.isArray(result) ? result : result ? [result] : [];
+    const link = links[0];
+    const uri = link?.targetUri ?? link?.uri;
+    const line = link?.targetRange?.start?.line ?? link?.range?.start?.line;
+    expect(uri, `definition: ${JSON.stringify(link)}`).toBe(producerUri);
+    // <props> key `title` is on source line 4 (0-based).
+    expect(line, `definition: ${JSON.stringify(link)}`).toBe(4);
+  });
+
+  it('(5) go-to-definition on a composed-component tag lands at the start of the PRODUCER file, with the producer own URI', async () => {
+    const r = await request('textDocument/definition', {
+      textDocument: { uri: consumerUri },
+      position: posOf(consumerSource, consumerTagNameOffset),
+    });
+    const result = r.result as AnyRecord[] | AnyRecord | null;
+    const links = Array.isArray(result) ? result : result ? [result] : [];
+    const link = links[0];
+    const uri = link?.targetUri ?? link?.uri;
+    const range = link?.targetRange ?? link?.range;
+    expect(uri, `definition: ${JSON.stringify(link)}`).toBe(producerUri);
+    expect(range, `definition: ${JSON.stringify(link)}`).toEqual({
+      start: { line: 0, character: 0 },
+      end: { line: 0, character: 0 },
+    });
+  });
+
+  it('(6) go-to-definition on a named slot fill lands on the producer matching slot declaration', async () => {
+    const r = await request('textDocument/definition', {
+      textDocument: { uri: consumerUri },
+      position: posOf(consumerSource, consumerSlotFillOffset),
+    });
+    const result = r.result as AnyRecord[] | AnyRecord | null;
+    const links = Array.isArray(result) ? result : result ? [result] : [];
+    const link = links[0];
+    const uri = link?.targetUri ?? link?.uri;
+    const line = link?.targetRange?.start?.line ?? link?.range?.start?.line;
+    expect(uri, `definition: ${JSON.stringify(link)}`).toBe(producerUri);
+    // `<slot name="header">` is on source line 10 (0-based) — see ProbeProducer.rozie.
+    expect(line, `definition: ${JSON.stringify(link)}`).toBe(10);
+  });
+
+  it('(7) find-references on a props-sigil member returns every usage, including the declaration when requested', async () => {
+    // `textDocument/references` is a UNION across every answering plugin
+    // (`provideReferences.js`, read this session) — `volar-service-typescript`
+    // ALSO answers here (the generated `__RozieProps.title` interface member
+    // has its own TS references, reverse-mapped back onto the same source
+    // lines) and its own result is not gated by our `includeDeclaration`
+    // flag. So the assertions below check line-set MEMBERSHIP (what OUR
+    // provider is responsible for), not exact counts across the union.
+    const withDecl = await request('textDocument/references', {
+      textDocument: { uri: producerUri },
+      position: posOf(producerSource, propsTitleUsageOffset),
+      context: { includeDeclaration: true },
+    });
+    const withDeclLines = ((withDecl.result as AnyRecord[] | null) ?? []).map(
+      (l) => l.range?.start?.line,
+    );
+    // Declaration (line 4) AND the template usage (line 10).
+    expect(withDeclLines, `references: ${JSON.stringify(withDeclLines)}`).toContain(4);
+    expect(withDeclLines, `references: ${JSON.stringify(withDeclLines)}`).toContain(10);
+
+    const withoutDecl = await request('textDocument/references', {
+      textDocument: { uri: producerUri },
+      position: posOf(producerSource, propsTitleUsageOffset),
+      context: { includeDeclaration: false },
+    });
+    const withoutDeclLines = ((withoutDecl.result as AnyRecord[] | null) ?? []).map(
+      (l) => l.range?.start?.line,
+    );
+    expect(withoutDeclLines, `references: ${JSON.stringify(withoutDeclLines)}`).toContain(10);
+  });
+
+  it('(8) completion after the props-sigil dot offers declared prop names AND TypeScript member completions coexist', async () => {
+    const r = await request('textDocument/completion', {
+      textDocument: { uri: producerUri },
+      position: posOf(producerSource, propsTitleUsageOffset),
+      context: { triggerKind: 1 },
+    });
+    const items = ((r.result as AnyRecord)?.items ?? r.result ?? []) as AnyRecord[];
+    const titleItems = items.filter((i) => i.label === 'title');
+    // Rozie's own item (detail === the declared type token) AND
+    // volar-service-typescript's own member-completion item for the same
+    // property — neither suppresses the other (isAdditionalCompletion).
+    expect(titleItems.length, `title items: ${JSON.stringify(titleItems)}`).toBeGreaterThanOrEqual(2);
+    expect(
+      titleItems.some((i) => i.detail === 'String'),
+      `title items: ${JSON.stringify(titleItems)}`,
+    ).toBe(true);
+  });
+
+  it('(9) completion of a composed-component tag name offers the registered component names', async () => {
+    const partialOffset = consumerTagNameOffset + 'ProbeP'.length;
+    const r = await request('textDocument/completion', {
+      textDocument: { uri: consumerUri },
+      position: posOf(consumerSource, partialOffset),
+      context: { triggerKind: 1 },
+    });
+    const items = ((r.result as AnyRecord)?.items ?? r.result ?? []) as AnyRecord[];
+    const names = items.map((i) => i.label);
+    expect(names, `completion items: ${JSON.stringify(names)}`).toContain('ProbeProducer');
+  });
 });
