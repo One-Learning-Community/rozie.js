@@ -23,6 +23,17 @@
   may be clipped out of the canvas. Behavioral-only; NOT a screenshot cell (autoArrange is
   verb-only → FlowCanvasScreenshot stays byte-identical, same precedent as
   FlowCanvasArrangeDemo).
+
+  Phase 84-02 (D-04, FR-05/FR-08) extensions: the `step` NodeType is marked `resizable`
+  (min/max box matching FlowCanvasResizeDemo's convention) so a corner-drag handle exists
+  on every node — the `rete-flow-routing-resize` cell drags node C's `se` handle. An
+  `undo-btn` mirrors FlowCanvasUndoDemo's `ref="canvas"` + `doUndo()` shape verbatim, for
+  both the resize-invalidation cell's undo assertion and the dedicated undo/redo-composes-
+  with-routes cell. `edgeWaypointCount(id)` generalizes the original `skipWaypointCount`
+  reader to any connection id, read off the BOUND model exactly like the original — three
+  new readouts (`ab-waypoint-count`/`bc-waypoint-count`/`cd-waypoint-count`) let a cell
+  assert BOTH halves of scoped invalidation: the edges a gesture touched drop to 0 while an
+  untouched edge (the skip edge) keeps its count.
 -->
 
 <rozie name="FlowCanvasRoutingDemo">
@@ -63,20 +74,24 @@
 </data>
 
 <script>
-// Grab the FlowCanvas imperative handle ($refs.canvas) to drive autoArrange() — read in the
-// button handler (post-mount), never eagerly (ROZ123-safe). autoArrange() is async (elkjs
-// layout); we don't await in the handler — the bound `graph` re-binds when it resolves and
-// the node*-x / skip-waypoint-count readouts update (the spec waits on the settled readout).
+// Grab the FlowCanvas imperative handle ($refs.canvas) to drive autoArrange()/undo() — read
+// in the button handlers (post-mount), never eagerly (ROZ123-safe). autoArrange() is async
+// (elkjs layout); we don't await in the handler — the bound `graph` re-binds when it
+// resolves and the readouts below update (the spec waits on the settled readout).
 const doArrange = () => { const c = $refs.canvas; if (c && c.autoArrange) c.autoArrange() }
+const doUndo = () => { const c = $refs.canvas; if (c && c.undo) c.undo() }
+const doRedo = () => { const c = $refs.canvas; if (c && c.redo) c.redo() }
 
-// The skip edge's waypoint count, read off the BOUND model (not the engine) — the readout
-// the spec polls to prove autoArrange() actually wrote a route (FR-02) and that
-// reconcileConnections actually redrew it (FR-04, the edgeStyleSig gate).
-const skipWaypointCount = () => {
+// A connection's waypoint count, read off the BOUND model (not the engine) — the readout
+// the spec polls to prove autoArrange() actually wrote a route (FR-02), that
+// reconcileConnections actually redrew it (FR-04, the edgeStyleSig gate), and (Phase 84-02,
+// D-04) that a drag/resize gesture drops it ONLY for the edges it touches.
+const edgeWaypointCount = (id) => {
   const conns = ($data.graph && $data.graph.connections) || []
-  const skip = conns.find((c) => c && c.id === 'e-skip')
-  return skip && Array.isArray(skip.waypoints) ? skip.waypoints.length : 0
+  const e = conns.find((c) => c && c.id === id)
+  return e && Array.isArray(e.waypoints) ? e.waypoints.length : 0
 }
+const skipWaypointCount = () => edgeWaypointCount('e-skip')
 </script>
 
 <template>
@@ -85,10 +100,15 @@ const skipWaypointCount = () => {
 
   <div class="controls">
     <button type="button" data-testid="arrange-btn" @click="doArrange">arrange</button>
+    <button type="button" data-testid="undo-btn" @click="doUndo">undo</button>
+    <button type="button" data-testid="redo-btn" @click="doRedo">redo</button>
     <span class="readout">A x: <b data-testid="node0-x">{{ Math.round($data.graph.nodes[0].x) }}</b></span>
     <span class="readout">B x: <b data-testid="node1-x">{{ Math.round($data.graph.nodes[1].x) }}</b></span>
     <span class="readout">C x: <b data-testid="node2-x">{{ Math.round($data.graph.nodes[2].x) }}</b></span>
     <span class="readout">D x: <b data-testid="node3-x">{{ Math.round($data.graph.nodes[3].x) }}</b></span>
+    <span class="readout">ab waypoints: <b data-testid="ab-waypoint-count">{{ edgeWaypointCount('e-ab') }}</b></span>
+    <span class="readout">bc waypoints: <b data-testid="bc-waypoint-count">{{ edgeWaypointCount('e-bc') }}</b></span>
+    <span class="readout">cd waypoints: <b data-testid="cd-waypoint-count">{{ edgeWaypointCount('e-cd') }}</b></span>
     <span class="readout">skip waypoints: <b data-testid="skip-waypoint-count">{{ skipWaypointCount() }}</b></span>
   </div>
 
@@ -99,7 +119,7 @@ const skipWaypointCount = () => {
       r-model:zoom="$data.zoom"
       :fit-on-mount="false"
     >
-      <NodeType type="step">
+      <NodeType type="step" resizable :min-width="80" :min-height="52" :max-width="300" :max-height="200">
         <template #body="{ node }">
           <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
         </template>

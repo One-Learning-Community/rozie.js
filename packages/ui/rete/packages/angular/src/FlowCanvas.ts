@@ -3978,6 +3978,11 @@ export class FlowCanvas {
       return;
     }
     if (this.pendingDragPositions.size === 0) return;
+    // Phase 84-02 (D-04) — the touched-node-id set MUST be built from pendingDragPositions'
+    // OWN keys BEFORE pendingDragPositions.clear() below empties it. Building it after would
+    // read an empty set and silently no-op the whole route invalidation — the single most
+    // likely way this ships broken (84-02-PLAN.md Task 1).
+    const touchedIds = new Set(this.pendingDragPositions.keys());
     const g = this.baseGraph();
     const nodes = (g.nodes || []).map((n: any) => {
       const p = n && n.id != null ? this.pendingDragPositions.get(n.id) : null;
@@ -3987,10 +3992,17 @@ export class FlowCanvas {
         y: p.y
       } : n;
     });
+    // A connection whose source OR target was just dragged carries a route computed for its
+    // OLD socket positions — drop it (D-04) so the edge falls back to the plain chord rather
+    // than pointing at where the node used to be. A connection this gesture didn't touch
+    // passes through by reference — withoutWaypoints returns the SAME object when no
+    // `waypoints` field is present, so an untouched edge never allocates garbage here.
+    const connections = (g.connections || []).map((c: any) => c && (touchedIds.has(c.source) || touchedIds.has(c.target)) ? withoutWaypoints(c) : c);
     this.pendingDragPositions.clear();
     this.commitGraph({
       ...g,
-      nodes
+      nodes,
+      connections
     });
   };
   scheduleDragFlush = () => {
@@ -4009,6 +4021,9 @@ export class FlowCanvas {
       return;
     }
     if (this.pendingResizeSizes.size === 0) return;
+    // Same touched-set-before-clear ordering as flushDragWriteBack (D-04) — read the keys
+    // before pendingResizeSizes.clear() below empties them.
+    const touchedIds = new Set(this.pendingResizeSizes.keys());
     const g = this.baseGraph();
     const nodes = (g.nodes || []).map((n: any) => {
       const p = n && n.id != null ? this.pendingResizeSizes.get(n.id) : null;
@@ -4022,10 +4037,12 @@ export class FlowCanvas {
       if (p.y != null) next.y = p.y;
       return next;
     });
+    const connections = (g.connections || []).map((c: any) => c && (touchedIds.has(c.source) || touchedIds.has(c.target)) ? withoutWaypoints(c) : c);
     this.pendingResizeSizes.clear();
     this.commitGraph({
       ...g,
-      nodes
+      nodes,
+      connections
     });
   };
   scheduleResizeFlush = () => {

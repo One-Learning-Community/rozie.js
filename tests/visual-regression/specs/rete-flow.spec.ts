@@ -5091,3 +5091,209 @@ for (const target of TARGETS) {
     ).toBe(true);
   });
 }
+
+/**
+ * 41. ROUTE INVALIDATION ON DRAG — Phase 84-02 (D-04, FR-05). A stored route is wrong the
+ * moment a node moves: dragging a node must drop the route of EVERY edge that node is an
+ * endpoint of, in the SAME commit the existing drag write-back already makes (no second
+ * write, no second history entry). An edge whose endpoints were NOT touched by the gesture
+ * must KEEP its route — that half is what proves the invalidation is SCOPED rather than a
+ * blanket wipe of every connection's route.
+ *
+ * MEASURED, NOT ASSUMED (this plan's own governing theme): under this fixture's chain-of-4
+ * + skip shape, ELK only ever bends the SKIP edge (`e-skip`, a→d) — the three chain edges
+ * (`e-ab`/`e-bc`/`e-cd`) sit on directly-adjacent layers and are always straight, so their
+ * waypoint count is 0 both before AND after any gesture. Asserting "count drops to 0" on
+ * one of THOSE edges would be vacuous — trivially true whether or not invalidation is
+ * implemented at all. So this cell proves both D-04 halves against the ONE edge that ever
+ * carries a real, non-zero route (`e-skip`), via two SEQUENTIAL gestures instead of
+ * assuming a second real route exists on a chain edge:
+ *
+ *   1. Arrange (skip edge gets a real route, count ≥ 2 — cell 40's own proof).
+ *   2. Drag node `B` (an intermediate node — endpoint of `e-ab`/`e-bc`, NOT an endpoint of
+ *      `e-skip`). Assert `e-skip`'s waypoint count AND rendered `d` are BYTE-IDENTICAL to
+ *      their post-arrange values — the SCOPED half: a gesture elsewhere never touches a
+ *      route it has no business touching.
+ *   3. Drag node `D` (`e-skip`'s own target endpoint). Assert `e-skip`'s waypoint count
+ *      drops to 0 AND its `d` returns to a curve (no line-to commands) — the DROP half:
+ *      the only edge this fixture ever routes genuinely loses that route the moment one of
+ *      its own endpoints moves.
+ *
+ * Both surfaces (model readout AND rendered `d`) are asserted at each step — a model-only
+ * assertion would pass even if the render never updated. Behavioral-only — no
+ * `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-routing-drag [${target}]: dragging an untouched node keeps a route; dragging its own endpoint drops it`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasRouting&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(4);
+
+    const skipPath = page.locator('.rozie-flow-connection__path[marker-end="url(#rozie-arrow-e-skip)"]');
+    const readCount = async (testid: string): Promise<number> =>
+      Number((await page.getByTestId(testid).textContent())?.trim() ?? '0');
+
+    const dragNode = async (label: string, dx: number, dy: number) => {
+      const node = page.locator('.rozie-flow-node', { hasText: label }).first();
+      await expect(node).toBeVisible({ timeout: 10_000 });
+      const nb = await node.boundingBox();
+      if (!nb) throw new Error(`node ${label} bounding box unavailable`);
+      const grabX = nb.x + 14;
+      const grabY = nb.y + 10;
+      await page.mouse.move(grabX, grabY);
+      await page.mouse.down();
+      await page.mouse.move(grabX + dx / 2, grabY + dy / 2, { steps: 6 });
+      await page.mouse.move(grabX + dx, grabY + dy, { steps: 6 });
+      await page.mouse.up();
+    };
+
+    // ---- 1. arrange: e-skip carries a real, settled route ----
+    await page.getByTestId('arrange-btn').click();
+    await expect
+      .poll(async () => readCount('skip-waypoint-count'), {
+        timeout: 15_000,
+        intervals: [100, 300, 600, 1000, 2000],
+      })
+      .toBeGreaterThanOrEqual(2);
+    await page.waitForTimeout(500);
+    const skipCountAfterArrange = await readCount('skip-waypoint-count');
+    const dSkipAfterArrange = await skipPath.getAttribute('d');
+    expect(dSkipAfterArrange, 'skip edge should have a rendered path after arrange').toBeTruthy();
+
+    // ---- 2. drag node B (untouched by e-skip) — SCOPED half: e-skip's route survives ----
+    await dragNode('B', 60, 40);
+    await page.waitForTimeout(500);
+    expect(
+      await readCount('skip-waypoint-count'),
+      'a gesture on a node NOT touching e-skip must not change its waypoint count',
+    ).toBe(skipCountAfterArrange);
+    expect(
+      await skipPath.getAttribute('d'),
+      "e-skip's rendered path must be byte-identical after an unrelated node's drag",
+    ).toBe(dSkipAfterArrange);
+
+    // ---- 3. drag node D (e-skip's OWN endpoint) — DROP half: e-skip's route is dropped ----
+    await dragNode('D', 60, 40);
+    await expect
+      .poll(async () => readCount('skip-waypoint-count'), { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe(0);
+    await page.waitForTimeout(400);
+    const dSkipAfterDrag = await skipPath.getAttribute('d');
+    expect(
+      dSkipAfterDrag,
+      'e-skip should redraw as a curve (no line-to) once its route is dropped',
+    ).not.toMatch(/\bL\b/);
+  });
+}
+
+/**
+ * 42. ROUTE INVALIDATION ON RESIZE — Phase 84-02 (D-04, FR-05). Resize is a first-class
+ * invalidating gesture, not a secondary one inherited from the drag cell by code symmetry
+ * — a corner-drag resize moves sockets exactly as a body drag does, so it gets its own
+ * executed proof. Mirrors cell 41's two-gesture structure and its measured, non-vacuous
+ * choice of edge exactly (see cell 41's docblock for why `e-skip` is the only edge this
+ * fixture ever gives a real route to drop); only the touching gesture differs (a
+ * corner-drag on a resizable node instead of a body drag).
+ *
+ *   1. Arrange (`e-skip` gets a real route).
+ *   2. Resize node `B` (an intermediate node, NOT an endpoint of `e-skip`) via its `se`
+ *      handle. Assert `e-skip`'s waypoint count AND `d` are unchanged — the scoped half.
+ *   3. Resize node `D` (`e-skip`'s own endpoint) via its `se` handle. Assert `e-skip`'s
+ *      waypoint count drops to 0 and its `d` returns to a curve — the drop half.
+ *
+ * The fixture's `step` NodeType is marked `resizable` (Phase 84-02 extension), so every
+ * node exposes the 4 canvas-level corner handles once selected
+ * (`flow-resize-handle-{nw,ne,sw,se}`, the `rete-flow-resize` precedent).
+ *
+ * Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-routing-resize [${target}]: resizing an untouched node keeps a route; resizing its own endpoint drops it`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasRouting&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(4);
+
+    const skipPath = page.locator('.rozie-flow-connection__path[marker-end="url(#rozie-arrow-e-skip)"]');
+    const readCount = async (testid: string): Promise<number> =>
+      Number((await page.getByTestId(testid).textContent())?.trim() ?? '0');
+
+    const resizeNodeSe = async (label: string, dx: number, dy: number) => {
+      const node = page.locator('.rozie-flow-node', { hasText: label }).first();
+      await expect(node).toBeVisible({ timeout: 10_000 });
+      const nb0 = await node.boundingBox();
+      if (!nb0) throw new Error(`node ${label} bounding box unavailable`);
+      await page.mouse.click(nb0.x + nb0.width / 2, nb0.y + nb0.height / 2);
+      await expect(page.locator('.rozie-flow-node.is-selected')).toHaveCount(1, { timeout: 5_000 });
+      const seHandle = page.getByTestId('flow-resize-handle-se');
+      await expect(seHandle).toBeVisible({ timeout: 5_000 });
+      const seBox = await seHandle.boundingBox();
+      if (!seBox) throw new Error('se-handle bounding box unavailable');
+      const seCx = seBox.x + seBox.width / 2;
+      const seCy = seBox.y + seBox.height / 2;
+      await page.mouse.move(seCx, seCy);
+      await page.mouse.down();
+      await page.mouse.move(seCx + dx / 2, seCy + dy / 2, { steps: 6 });
+      await page.mouse.move(seCx + dx, seCy + dy, { steps: 6 });
+      await page.mouse.up();
+    };
+
+    // ---- 1. arrange: e-skip carries a real, settled route ----
+    await page.getByTestId('arrange-btn').click();
+    await expect
+      .poll(async () => readCount('skip-waypoint-count'), {
+        timeout: 15_000,
+        intervals: [100, 300, 600, 1000, 2000],
+      })
+      .toBeGreaterThanOrEqual(2);
+    await page.waitForTimeout(500);
+    const skipCountAfterArrange = await readCount('skip-waypoint-count');
+    const dSkipAfterArrange = await skipPath.getAttribute('d');
+    expect(dSkipAfterArrange, 'skip edge should have a rendered path after arrange').toBeTruthy();
+
+    // ---- 2. resize node B (untouched by e-skip) — SCOPED half: e-skip's route survives ----
+    await resizeNodeSe('B', 50, 30);
+    await page.waitForTimeout(500);
+    expect(
+      await readCount('skip-waypoint-count'),
+      'a resize on a node NOT touching e-skip must not change its waypoint count',
+    ).toBe(skipCountAfterArrange);
+    expect(
+      await skipPath.getAttribute('d'),
+      "e-skip's rendered path must be byte-identical after an unrelated node's resize",
+    ).toBe(dSkipAfterArrange);
+
+    // ---- 3. resize node D (e-skip's OWN endpoint) — DROP half: e-skip's route is dropped ----
+    await resizeNodeSe('D', 50, 30);
+    await expect
+      .poll(async () => readCount('skip-waypoint-count'), { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe(0);
+    await page.waitForTimeout(400);
+    const dSkipAfterResize = await skipPath.getAttribute('d');
+    expect(
+      dSkipAfterResize,
+      'e-skip should redraw as a curve (no line-to) once its route is dropped',
+    ).not.toMatch(/\bL\b/);
+  });
+}
