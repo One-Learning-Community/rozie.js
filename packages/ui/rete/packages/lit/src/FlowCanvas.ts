@@ -702,6 +702,14 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       }
       this.dragFlushRaf = 0;
       this.pendingDragPositions.clear();
+      // quick 260827-mtu — no connWarnTimer may survive unmount.
+      if (this.connWarnTimer && typeof clearTimeout === 'function') {
+        try {
+          clearTimeout(this.connWarnTimer);
+        } catch (e: any) {}
+      }
+      this.connWarnTimer = null;
+      this.pendingConnWarns.clear();
       // T1.1: drop the edge-selection state + its cached <path> reference on teardown.
       this.clearEdgeSelection();
       // MiniMap teardown — remove the pointer-pan listeners + cancel a pending redraw.
@@ -2988,22 +2996,42 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           }
           const sourceNode = this.nodeInstances.get(spec.source);
           const targetNode = this.nodeInstances.get(spec.target);
-          if (!sourceNode || !targetNode) continue;
+          if (!sourceNode || !targetNode) {
+            this.queueConnWarn(spec.id, `connection "${spec.id}": endpoint node "${!sourceNode ? spec.source : spec.target}" not found.`);
+            continue;
+          }
           // DEFENSIVE: the referenced output/input ports must exist on the live node
           // instances before addConnection (Rete throws "source node doesn't have
           // output with a key out" otherwise, aborting the loop). An edge may reference
           // a port the node's TYPE schema has not flushed yet (a <Port> registered
           // after the <NodeType>); skip until the ports exist — reconcileNodes re-runs
           // reconcileConnections after a port-schema change, so the edge lands later.
-          if (!sourceNode.outputs || !sourceNode.outputs[spec.sourceOutput]) continue;
-          if (!targetNode.inputs || !targetNode.inputs[spec.targetInput]) continue;
+          // The warn below is deferred (queueConnWarn), not inline, precisely because of
+          // that transient: an edge that lands on a later pass must stay silent.
+          if (!sourceNode.outputs || !sourceNode.outputs[spec.sourceOutput]) {
+            this.queueConnWarn(spec.id, `connection "${spec.id}": source node "${spec.source}" has no output "${spec.sourceOutput}".`);
+            continue;
+          }
+          if (!targetNode.inputs || !targetNode.inputs[spec.targetInput]) {
+            this.queueConnWarn(spec.id, `connection "${spec.id}": target node "${spec.target}" has no input "${spec.targetInput}".`);
+            continue;
+          }
           const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput);
           conn.id = spec.id;
           this.connInstances.set(spec.id, conn);
           // seed connMeta BEFORE addConnection so renderConnection sees the label/style on
           // its first render (the render fires synchronously inside addConnection's pipe).
           this.connMeta.set(spec.id, spec);
-          await this.editor.addConnection(conn);
+          const added = await this.editor.addConnection(conn);
+          if (added === false) {
+            // the pipe rejected it — roll back the optimistic seed above so this id does
+            // not corrupt the next reconcile diff with a phantom entry the engine never
+            // took (D-04). want.push(spec.id) above stays untouched: keeping the id
+            // wanted is what lets a later reconcile pass re-attempt it.
+            this.connInstances.delete(spec.id);
+            this.connMeta.delete(spec.id);
+            this.queueConnWarn(spec.id, `connection "${spec.id}": rejected by connection validation.`);
+          }
         }
         // remove dropped GRAPH-managed edges — imperatively added edges survive.
         const tracked = new Set(this.lastPropConnIds);
@@ -4087,6 +4115,41 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   connMeta = new Map();
 
+  CONN_WARN_SETTLE_MS = 500;
+
+  warnConn = (msg: any) => {
+  if (typeof console !== 'undefined' && console.warn) {
+    console.warn(`[@rozie-ui/rete] ${msg}`);
+  }
+};
+
+  pendingConnWarns = new Map();
+
+  warnedConnIds = new Set();
+
+  connWarnTimer: any = null;
+
+  flushConnWarns = () => {
+  this.connWarnTimer = null;
+  for (const [id, reason] of this.pendingConnWarns as any) {
+    if (this.connInstances.has(id) || this.warnedConnIds.has(id)) continue;
+    this.warnedConnIds.add(id);
+    this.warnConn(reason);
+  }
+  this.pendingConnWarns.clear();
+};
+
+  queueConnWarn = (id: any, reason: any) => {
+  if (id == null || this.warnedConnIds.has(id)) return;
+  this.pendingConnWarns.set(id, reason);
+  if (this.connWarnTimer && typeof clearTimeout === 'function') {
+    try {
+      clearTimeout(this.connWarnTimer);
+    } catch (e: any) {}
+  }
+  if (typeof setTimeout === 'function') this.connWarnTimer = setTimeout(this.flushConnWarns, this.CONN_WARN_SETTLE_MS);else Promise.resolve().then(this.flushConnWarns);
+};
+
   lastPropNodeIds: any = null;
 
   lastPropConnIds: any = null;
@@ -4684,13 +4747,26 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     const sourceNode = this.nodeInstances.get(spec.source);
     const targetNode = this.nodeInstances.get(spec.target);
     if (!sourceNode || !targetNode) return null;
+    if (!sourceNode.outputs || !sourceNode.outputs[srcOut]) {
+      this.warnConn(`addConnection: source node "${spec.source}" has no output "${srcOut}".`);
+      return null;
+    }
+    if (!targetNode.inputs || !targetNode.inputs[tgtIn]) {
+      this.warnConn(`addConnection: target node "${spec.target}" has no input "${tgtIn}".`);
+      return null;
+    }
     const conn = new ClassicPreset.Connection(sourceNode, srcOut, targetNode, tgtIn);
     if (spec.id != null) conn.id = spec.id;
+    let added = false;
     this.programmatic++;
     try {
-      await this.editor.addConnection(conn);
+      added = await this.editor.addConnection(conn);
     } finally {
       this.programmatic--;
+    }
+    if (added === false) {
+      this.warnConn(`addConnection: connection from "${spec.source}"."${srcOut}" to "${spec.target}"."${tgtIn}" was rejected by connection validation.`);
+      return null;
     }
     this.connInstances.set(conn.id, conn);
     return conn.id;
@@ -4720,6 +4796,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     this.nodeMeta.clear();
     this.connInstances.clear();
     this.connMeta.clear();
+    // quick 260827-mtu — a wiped graph must not carry a stale warn memo that silences
+    // a re-added edge with the same id.
+    this.warnedConnIds.clear();
+    this.pendingConnWarns.clear();
     this.lastPropNodeIds = [];
     this.lastPropConnIds = [];
   }

@@ -438,6 +438,53 @@ const incompatibleMarked = new Set();
 // connMeta : id → the consumer's connection spec ({ …, label?, stroke?, dashed? }) — the
 // connection-side analog of nodeMeta, read by renderConnection for per-edge label/styling (F3).
 const connMeta = new Map();
+// ─── connection-drop diagnostics (quick 260827-mtu) ────────────────────────────
+// Console-only visibility for the five paths that used to silently drop a connection.
+// The imperative addConnection verb (Site A) warns synchronously — the caller named
+// that exact pair of endpoints in that exact call, so there is no legitimate
+// transient to wait out. reconcileConnections' three guards (Site B) route through
+// this shared debounced flush instead: reconcile can run mid-cascade, before a
+// later-declared <NodeType>/<Port> has registered, so an inline warn there would
+// false-positive on an ordinary multi-pass settle. Debouncing (re-arming the timer
+// on every queue call) waits for the cascade to quiesce, and re-checking
+// connInstances at flush time drops the warn for any edge a later pass went on to
+// place. The settle delay is 500ms rather than 0 because a late port registration
+// lands through a reactive write that arrives in a LATER macrotask (a React commit
+// / Angular CD tick), not just the microtask queue a 0ms timeout would clear.
+const CONN_WARN_SETTLE_MS = 500;
+const warnConn = (msg: any) => {
+  if (typeof console !== 'undefined' && console.warn) {
+    console.warn(`[@rozie-ui/rete] ${msg}`);
+  }
+};
+const pendingConnWarns = new Map();
+const warnedConnIds = new Set();
+// connWarnTimer inits to null (not 0), matching the debounce-timer convention already
+// established by holdTimer (NumberField.rozie) / debounceTimerId (CommandPalette.rozie) /
+// remeasureTimer (Carousel.rozie): a `let x = 0` gets TS's fixed `number` inference, which
+// the Angular leaf's Node-typed `setTimeout` (returning `Timeout`, not `number`) then fails
+// to satisfy under strict typecheck; `let x = null` gets TS's "evolving any" inference
+// instead, which accepts either return shape on all six targets.
+let connWarnTimer: any = null;
+const flushConnWarns = () => {
+  connWarnTimer = null;
+  for (const [id, reason] of pendingConnWarns as any) {
+    if (connInstances.has(id) || warnedConnIds.has(id)) continue;
+    warnedConnIds.add(id);
+    warnConn(reason);
+  }
+  pendingConnWarns.clear();
+};
+const queueConnWarn = (id: any, reason: any) => {
+  if (id == null || warnedConnIds.has(id)) return;
+  pendingConnWarns.set(id, reason);
+  if (connWarnTimer && typeof clearTimeout === 'function') {
+    try {
+      clearTimeout(connWarnTimer);
+    } catch (e: any) {}
+  }
+  if (typeof setTimeout === 'function') connWarnTimer = setTimeout(flushConnWarns, CONN_WARN_SETTLE_MS);else Promise.resolve().then(flushConnWarns);
+};
 // ids last applied FROM THE BOUND GRAPH, so reconcile removes only graph-managed
 // entities — an imperative $expose addNode/addConnection is NOT auto-reaped on the
 // next graph change (the power-user escape hatch stays alive). MapLibre reconciles
@@ -1285,13 +1332,26 @@ export async function addConnection(spec: any) {
   const sourceNode = nodeInstances.get(spec.source);
   const targetNode = nodeInstances.get(spec.target);
   if (!sourceNode || !targetNode) return null;
+  if (!sourceNode.outputs || !sourceNode.outputs[srcOut]) {
+    warnConn(`addConnection: source node "${spec.source}" has no output "${srcOut}".`);
+    return null;
+  }
+  if (!targetNode.inputs || !targetNode.inputs[tgtIn]) {
+    warnConn(`addConnection: target node "${spec.target}" has no input "${tgtIn}".`);
+    return null;
+  }
   const conn = new ClassicPreset.Connection(sourceNode, srcOut, targetNode, tgtIn);
   if (spec.id != null) conn.id = spec.id;
+  let added = false;
   programmatic++;
   try {
-    await editor.addConnection(conn);
+    added = await editor.addConnection(conn);
   } finally {
     programmatic--;
+  }
+  if (added === false) {
+    warnConn(`addConnection: connection from "${spec.source}"."${srcOut}" to "${spec.target}"."${tgtIn}" was rejected by connection validation.`);
+    return null;
   }
   connInstances.set(conn.id, conn);
   return conn.id;
@@ -1319,6 +1379,10 @@ export async function clear() {
   nodeMeta.clear();
   connInstances.clear();
   connMeta.clear();
+  // quick 260827-mtu — a wiped graph must not carry a stale warn memo that silences
+  // a re-added edge with the same id.
+  warnedConnIds.clear();
+  pendingConnWarns.clear();
   lastPropNodeIds = [];
   lastPropConnIds = [];
 }
@@ -3500,22 +3564,42 @@ onMount(() => {
         }
         const sourceNode = nodeInstances.get(spec.source);
         const targetNode = nodeInstances.get(spec.target);
-        if (!sourceNode || !targetNode) continue;
+        if (!sourceNode || !targetNode) {
+          queueConnWarn(spec.id, `connection "${spec.id}": endpoint node "${!sourceNode ? spec.source : spec.target}" not found.`);
+          continue;
+        }
         // DEFENSIVE: the referenced output/input ports must exist on the live node
         // instances before addConnection (Rete throws "source node doesn't have
         // output with a key out" otherwise, aborting the loop). An edge may reference
         // a port the node's TYPE schema has not flushed yet (a <Port> registered
         // after the <NodeType>); skip until the ports exist — reconcileNodes re-runs
         // reconcileConnections after a port-schema change, so the edge lands later.
-        if (!sourceNode.outputs || !sourceNode.outputs[spec.sourceOutput]) continue;
-        if (!targetNode.inputs || !targetNode.inputs[spec.targetInput]) continue;
+        // The warn below is deferred (queueConnWarn), not inline, precisely because of
+        // that transient: an edge that lands on a later pass must stay silent.
+        if (!sourceNode.outputs || !sourceNode.outputs[spec.sourceOutput]) {
+          queueConnWarn(spec.id, `connection "${spec.id}": source node "${spec.source}" has no output "${spec.sourceOutput}".`);
+          continue;
+        }
+        if (!targetNode.inputs || !targetNode.inputs[spec.targetInput]) {
+          queueConnWarn(spec.id, `connection "${spec.id}": target node "${spec.target}" has no input "${spec.targetInput}".`);
+          continue;
+        }
         const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput);
         conn.id = spec.id;
         connInstances.set(spec.id, conn);
         // seed connMeta BEFORE addConnection so renderConnection sees the label/style on
         // its first render (the render fires synchronously inside addConnection's pipe).
         connMeta.set(spec.id, spec);
-        await editor.addConnection(conn);
+        const added = await editor.addConnection(conn);
+        if (added === false) {
+          // the pipe rejected it — roll back the optimistic seed above so this id does
+          // not corrupt the next reconcile diff with a phantom entry the engine never
+          // took (D-04). want.push(spec.id) above stays untouched: keeping the id
+          // wanted is what lets a later reconcile pass re-attempt it.
+          connInstances.delete(spec.id);
+          connMeta.delete(spec.id);
+          queueConnWarn(spec.id, `connection "${spec.id}": rejected by connection validation.`);
+        }
       }
       // remove dropped GRAPH-managed edges — imperatively added edges survive.
       const tracked = new Set(lastPropConnIds);
@@ -4285,6 +4369,14 @@ onMount(() => {
     }
     dragFlushRaf = 0;
     pendingDragPositions.clear();
+    // quick 260827-mtu — no connWarnTimer may survive unmount.
+    if (connWarnTimer && typeof clearTimeout === 'function') {
+      try {
+        clearTimeout(connWarnTimer);
+      } catch (e: any) {}
+    }
+    connWarnTimer = null;
+    pendingConnWarns.clear();
     // T1.1: drop the edge-selection state + its cached <path> reference on teardown.
     clearEdgeSelection();
     // MiniMap teardown — remove the pointer-pan listeners + cancel a pending redraw.
