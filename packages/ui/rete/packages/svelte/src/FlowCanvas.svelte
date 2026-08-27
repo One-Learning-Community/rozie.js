@@ -864,9 +864,16 @@ const resetNodeSize = (id: any) => {
     width: undefined,
     height: undefined
   } : n);
+  // Phase 84 (CR-01, D-04 parity): resetting a node's size moves its sockets exactly like
+  // a drag/resize does — drop the route of every connection this node is an endpoint of,
+  // same as flushDragWriteBack/flushResizeWriteBack. Without this, a route computed for
+  // the node's PRE-reset box survives its reset to auto-size, stitching stale intermediate
+  // points onto the new live socket coordinates.
+  const connections = (g.connections || []).map((c: any) => c && (c.source === id || c.target === id) ? withoutWaypoints(c) : c);
   commitGraph({
     ...g,
-    nodes
+    nodes,
+    connections
   });
 };
 // CONNECT — append a fresh connection into a fresh graph object. Echo-guarded.
