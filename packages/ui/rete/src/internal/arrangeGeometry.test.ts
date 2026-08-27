@@ -21,6 +21,7 @@ import {
   arrangeLayoutOptions,
   arrangePortRect,
   sanitizeWaypoints,
+  segmentIntersectsRect,
   waypointPathD,
   waypointsFromElkEdges,
   waypointsSignature,
@@ -213,6 +214,53 @@ describe('withWaypoints / withoutWaypoints', () => {
     expect(out).not.toBe(conn);
     expect(out.waypoints).toBe(points);
     expect(Object.prototype.hasOwnProperty.call(conn, 'waypoints')).toBe(false);
+  });
+});
+
+describe('segmentIntersectsRect', () => {
+  const box = { x: 10, y: 10, width: 20, height: 20 }; // spans [10,30] x [10,30]
+
+  it('a segment FULLY INSIDE the box intersects', () => {
+    expect(segmentIntersectsRect({ x: 15, y: 15 }, { x: 25, y: 25 }, box)).toBe(true);
+  });
+
+  it('a segment FULLY OUTSIDE the box does not intersect', () => {
+    expect(segmentIntersectsRect({ x: 0, y: 0 }, { x: 5, y: 5 }, box)).toBe(false);
+    expect(segmentIntersectsRect({ x: 40, y: 40 }, { x: 60, y: 60 }, box)).toBe(false);
+  });
+
+  it('a segment CROSSING ONE EDGE (enters and stops inside) intersects', () => {
+    expect(segmentIntersectsRect({ x: 0, y: 20 }, { x: 20, y: 20 }, box)).toBe(true);
+  });
+
+  it('a segment CROSSING TWO EDGES (passes straight through) intersects', () => {
+    expect(segmentIntersectsRect({ x: 0, y: 20 }, { x: 40, y: 20 }, box)).toBe(true);
+  });
+
+  it('a segment that runs alongside the box but stays clear of it does not intersect', () => {
+    // horizontal line at y=5, well above the box's top edge (y=10) — a parallel-to-boundary
+    // case for the Liang-Barsky y-planes (p===0 for the y-axis clips).
+    expect(segmentIntersectsRect({ x: 0, y: 5 }, { x: 40, y: 5 }, box)).toBe(false);
+  });
+
+  it('a segment TOUCHING a boundary exactly (endpoint ON the edge) intersects at margin 0', () => {
+    // endpoint sits exactly on the box's left edge (x=10).
+    expect(segmentIntersectsRect({ x: 10, y: 20 }, { x: 0, y: 20 }, box, 0)).toBe(true);
+  });
+
+  it('an inward MARGIN shrinks the box so a boundary-grazing segment clears it', () => {
+    // the same boundary-touching segment as above, now against a margin that shrinks the
+    // box's left edge from x=10 to x=13 — the touching point (x=10) is now outside.
+    expect(segmentIntersectsRect({ x: 10, y: 20 }, { x: 0, y: 20 }, box, 3)).toBe(false);
+  });
+
+  it('a margin large enough to invert the rect makes it vacuous (always false)', () => {
+    expect(segmentIntersectsRect({ x: 15, y: 15 }, { x: 25, y: 25 }, box, 11)).toBe(false);
+  });
+
+  it('a degenerate zero-length segment falls back to a point-in-rect check', () => {
+    expect(segmentIntersectsRect({ x: 20, y: 20 }, { x: 20, y: 20 }, box)).toBe(true);
+    expect(segmentIntersectsRect({ x: 0, y: 0 }, { x: 0, y: 0 }, box)).toBe(false);
   });
 });
 

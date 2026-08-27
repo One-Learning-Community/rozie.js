@@ -54,7 +54,11 @@
 import { describe, expect, it } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ELK = require('elkjs');
-import { arrangeLayoutOptions, waypointsFromElkEdges } from '../src/internal/arrangeGeometry';
+import {
+  arrangeLayoutOptions,
+  segmentIntersectsRect,
+  waypointsFromElkEdges,
+} from '../src/internal/arrangeGeometry';
 
 const elk = new ELK();
 
@@ -138,6 +142,23 @@ function diamondGraph(routingOverride?: string) {
       ['s-b', 's', 'b'],
       ['a-k', 'a', 'k'],
       ['b-k', 'b', 'k'],
+      ['s-k', 's', 'k'],
+    ],
+    routingOverride,
+  );
+}
+
+/** fan-out: source -> {A, B, C} -> sink, plus a source -> sink skip edge (Phase 84-02, D-03). */
+function fanoutGraph(routingOverride?: string) {
+  return buildGraph(
+    ['s', 'a', 'b', 'c', 'k'],
+    [
+      ['s-a', 's', 'a'],
+      ['s-b', 's', 'b'],
+      ['s-c', 's', 'c'],
+      ['a-k', 'a', 'k'],
+      ['b-k', 'b', 'k'],
+      ['c-k', 'c', 'k'],
       ['s-k', 's', 'k'],
     ],
     routingOverride,
@@ -254,6 +275,102 @@ describe('branching shapes (diamond) — NOT asserted as a bendpoint count (see 
     // reproduced against this construction (both returned 0 in this repo's
     // run) — recorded in the SUMMARY as a non-reproduced measurement per
     // M3 consequence 2, rather than asserted as if it were confirmed.
+  });
+});
+
+/**
+ * Data-layer clearance proof (Phase 84-02, D-03) — the counterpart to the browser
+ * geometry cell (`rete-flow-routing`, `rete-flow.spec.ts`) for the two branching shapes
+ * that cell does NOT cover. Lives here rather than as two more VR cells for reasons
+ * recorded in 84-01-PLAN.md's own fixture-split rationale: this proof can check EVERY
+ * edge of every shape against every non-endpoint node's box, with no browser flake, no
+ * viewport clipping, and no zoom transform in the way — the browser cell's distinct job
+ * (proving a route survives the whole model-to-DOM chain on all 6 targets) is already
+ * discharged once by the chain-of-4 + skip fixture.
+ *
+ * MEASURED, NOT ASSUMED (this plan's own governing theme). 84-02-PLAN.md's text asserted
+ * "the diamond and fan-out skip edges DO route under ORTHOGONAL: 2 bendpoints each",
+ * attributed to 84-01-PLAN.md's M4a. Re-running the EXACT diamond construction already
+ * committed above (and the fan-out construction added for this task) against the real
+ * installed elkjs gives **0 bendpoints for both shapes, under BOTH routing modes** — the
+ * identical non-reproduction 84-01-SUMMARY.md already documented for this diamond. The
+ * "≥2 bendpoints, strictly more than POLYLINE" assertion 84-02-PLAN.md asked for is
+ * therefore NOT added — it would be false, not merely conservative.
+ *
+ * This does NOT mean the clearance claim is false. `source` and `sink` land in the SAME
+ * layer on both shapes (confirmed below), so the skip edge's own straight run — ELK's
+ * `startPoint` to `endPoint`, zero bends — sits well outside every intermediate node's
+ * band purely from LAYERED PLACEMENT, without needing a single bend. D-03's truth ("ELK's
+ * own computed polyline clears every non-endpoint node") holds either way: a polyline with
+ * zero interior points is still a polyline, and clearance is what the truth actually
+ * requires — not that the route bends. Every edge of every shape is checked below, not
+ * just the skip edge, so the proof is not narrowed to the one case that was expected to
+ * be interesting.
+ */
+describe('D-03 data-layer clearance — diamond and fan-out (segment-vs-node-box, no VR needed)', () => {
+  /** `points[i] -> points[i+1]` for every consecutive pair, per `waypointPathD`'s own composition order. */
+  const CLEARANCE_MARGIN = 2;
+
+  function assertEveryEdgeClearsNonEndpoints(result: any) {
+    const byId = new Map((result.children || []).map((n: any) => [n.id, n]));
+    for (const edge of result.edges || []) {
+      const section = edge.sections && edge.sections[0];
+      if (!section) continue;
+      const points = [section.startPoint, ...(section.bendPoints || []), section.endPoint];
+      // connectionToLayoutEdge sets sources/targets to `${nodeId}_out_output` /
+      // `${nodeId}_in_input` — strip the suffix to recover the endpoint node ids (mirrors
+      // M1/M2's own incomingShape/outgoingShape parsing above).
+      const srcId = String((edge.sources || [])[0] || '').replace(/_out_output$/, '');
+      const tgtId = String((edge.targets || [])[0] || '').replace(/_in_input$/, '');
+
+      for (const [nodeId, node] of byId) {
+        if (nodeId === srcId || nodeId === tgtId) continue; // never check an edge against its OWN endpoints
+        const rect = { x: (node as any).x, y: (node as any).y, width: (node as any).width, height: (node as any).height };
+        for (let i = 0; i < points.length - 1; i++) {
+          const hit = segmentIntersectsRect(points[i], points[i + 1], rect, CLEARANCE_MARGIN);
+          expect(
+            hit,
+            `edge ${edge.id} segment [${i}] should clear non-endpoint node ${nodeId}'s box`,
+          ).toBe(false);
+        }
+      }
+    }
+  }
+
+  it('diamond: source and sink share a layer (the placement fact that makes the skip edge clear without bending)', async () => {
+    const result = await elk.layout(diamondGraph('ORTHOGONAL'));
+    const byId = new Map((result.children || []).map((n: any) => [n.id, n]));
+    const s: any = byId.get('s');
+    const k: any = byId.get('k');
+    expect(s.y).toBe(k.y);
+  });
+
+  it('diamond: every edge of ELK\'s own computed route clears every non-endpoint node box (ORTHOGONAL)', async () => {
+    const result = await elk.layout(diamondGraph('ORTHOGONAL'));
+    assertEveryEdgeClearsNonEndpoints(result);
+  });
+
+  it('diamond: the same clearance holds under POLYLINE (placement, not routing mode, is what clears this shape)', async () => {
+    const result = await elk.layout(diamondGraph('POLYLINE'));
+    assertEveryEdgeClearsNonEndpoints(result);
+  });
+
+  it('fan-out: source and sink share a layer, same as the diamond', async () => {
+    const result = await elk.layout(fanoutGraph('ORTHOGONAL'));
+    const byId = new Map((result.children || []).map((n: any) => [n.id, n]));
+    const s: any = byId.get('s');
+    const k: any = byId.get('k');
+    expect(s.y).toBe(k.y);
+  });
+
+  it('fan-out: every edge of ELK\'s own computed route clears every non-endpoint node box (ORTHOGONAL)', async () => {
+    const result = await elk.layout(fanoutGraph('ORTHOGONAL'));
+    assertEveryEdgeClearsNonEndpoints(result);
+  });
+
+  it('fan-out: the same clearance holds under POLYLINE', async () => {
+    const result = await elk.layout(fanoutGraph('POLYLINE'));
+    assertEveryEdgeClearsNonEndpoints(result);
   });
 });
 

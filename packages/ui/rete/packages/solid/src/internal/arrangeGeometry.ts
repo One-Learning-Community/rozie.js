@@ -321,3 +321,73 @@ export function waypointPathD(start: Waypoint, points: Waypoint[], end: Waypoint
   const all = [start, ...points, end];
   return all.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ');
 }
+
+/** An axis-aligned box in the same graph (unscaled) coordinate space as `Waypoint`/node `x,y`. */
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Segment-versus-axis-aligned-rectangle intersection, over plain numbers — the primitive
+ * `tests/elk-edge-sections.test.ts`'s data-layer clearance proof (Phase 84-02, D-03) composes
+ * into "does ELK's own polyline clear every non-endpoint node box on the diamond and fan-out
+ * shapes." Genuinely useful beyond that one test: any future feature that needs to know
+ * whether a straight run between two graph-space points crosses a node's box can reach for
+ * this rather than re-deriving line-clipping math.
+ *
+ * `margin` shrinks the rect INWARD on all four sides before testing — the same "small inward
+ * margin so a route that legitimately grazes a shared boundary does not flake" idiom this
+ * repo's VR specs already use for `insideBox` checks (`rete-flow.spec.ts`'s `rete-flow-routing`
+ * cell). A margin that would invert the rect (make it wider than it is tall/short) makes the
+ * rect vacuous and this function returns `false` — there is nothing left to intersect.
+ *
+ * Implementation: Liang-Barsky parametric line clipping against the four half-planes of the
+ * (margin-shrunk) box. This correctly reports a hit for every case that matters here: the
+ * segment fully inside the box, fully outside, crossing exactly one edge, crossing two edges
+ * (passing straight through), and one endpoint exactly on a boundary — all covered by the
+ * co-located unit tests. A degenerate zero-length segment (`a` equals `b`) falls back to a
+ * plain point-in-rect check, since the parametric form below divides by the segment's delta.
+ */
+export function segmentIntersectsRect(a: Waypoint, b: Waypoint, rect: Rect, margin = 0): boolean {
+  const minX = rect.x + margin;
+  const maxX = rect.x + rect.width - margin;
+  const minY = rect.y + margin;
+  const maxY = rect.y + rect.height - margin;
+  if (minX > maxX || minY > maxY) return false;
+
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+
+  if (dx === 0 && dy === 0) {
+    return a.x >= minX && a.x <= maxX && a.y >= minY && a.y <= maxY;
+  }
+
+  // Liang-Barsky: clip the parametric segment a + t*(b-a), t in [0,1], against each of the
+  // 4 half-planes; p<0 heads INTO that boundary (tightens the lower bound t0), p>0 heads OUT
+  // of it (tightens the upper bound t1); p===0 means the segment runs PARALLEL to that
+  // boundary, so it only survives if it is already on the inside (q>=0) of that one plane.
+  let t0 = 0;
+  let t1 = 1;
+  const p = [-dx, dx, -dy, dy];
+  const q = [a.x - minX, maxX - a.x, a.y - minY, maxY - a.y];
+
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) {
+      if (q[i] < 0) return false;
+      continue;
+    }
+    const r = q[i] / p[i];
+    if (p[i] < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+  }
+
+  return t0 <= t1;
+}

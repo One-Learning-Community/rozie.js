@@ -5297,3 +5297,113 @@ for (const target of TARGETS) {
     ).not.toMatch(/\bL\b/);
   });
 }
+
+/**
+ * 43. UNDO/REDO COMPOSES WITH ROUTE INVALIDATION — Phase 84-02 (D-04, FR-08). 84-CONTEXT.md
+ * D-04 explicitly leaves this REASONED BUT UNVERIFIED: history snapshots are whole-graph
+ * objects captured BEFORE a drag/resize gesture, so an undo SHOULD restore a fully
+ * self-consistent prior state — old positions WITH whatever route was valid for those old
+ * positions at snapshot time — "for free," with no route-specific undo/redo code required.
+ * This cell closes that open question by RUNNING it rather than reasoning about it further.
+ *
+ *   1. Arrange (`e-skip` gets a real route, count ≥ 2).
+ *   2. Drag node `D` (`e-skip`'s own endpoint) — `e-skip`'s route drops to 0 (cell 41's own
+ *      proof, re-established here as this cell's starting condition).
+ *   3. UNDO — one click must restore BOTH the pre-drag node position AND `e-skip`'s
+ *      pre-drag route: waypoint count back to its post-arrange value, `d` back to its
+ *      post-arrange value. If undo restored positions but NOT the route, the cause would be
+ *      an in-place mutation somewhere in the write-back chain (84-RESEARCH.md Pitfall 3) —
+ *      this is exactly the failure this cell is designed to catch.
+ *   4. REDO — one click must re-drop the route (count back to 0, `d` back to a curve),
+ *      exactly re-applying the post-drag state.
+ *
+ * Asserts BOTH surfaces (model readout AND rendered `d`) at every step. Behavioral-only —
+ * no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-routing-undo [${target}]: undo restores a dropped route along with positions; redo re-drops it`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasRouting&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(4);
+
+    const skipPath = page.locator('.rozie-flow-connection__path[marker-end="url(#rozie-arrow-e-skip)"]');
+    const readCount = async (testid: string): Promise<number> =>
+      Number((await page.getByTestId(testid).textContent())?.trim() ?? '0');
+
+    // ---- 1. arrange: e-skip carries a real, settled route ----
+    await page.getByTestId('arrange-btn').click();
+    await expect
+      .poll(async () => readCount('skip-waypoint-count'), {
+        timeout: 15_000,
+        intervals: [100, 300, 600, 1000, 2000],
+      })
+      .toBeGreaterThanOrEqual(2);
+    await page.waitForTimeout(500);
+    const skipCountAfterArrange = await readCount('skip-waypoint-count');
+    const dSkipAfterArrange = await skipPath.getAttribute('d');
+    expect(dSkipAfterArrange, 'skip edge should have a rendered path after arrange').toBeTruthy();
+
+    // ---- 2. drag node D (e-skip's OWN endpoint) — its route drops ----
+    const nodeD = page.locator('.rozie-flow-node', { hasText: 'D' }).first();
+    await expect(nodeD).toBeVisible({ timeout: 10_000 });
+    const nb = await nodeD.boundingBox();
+    if (!nb) throw new Error('node D bounding box unavailable');
+    const grabX = nb.x + 14;
+    const grabY = nb.y + 10;
+    const DX = 60;
+    const DY = 40;
+    await page.mouse.move(grabX, grabY);
+    await page.mouse.down();
+    await page.mouse.move(grabX + DX / 2, grabY + DY / 2, { steps: 6 });
+    await page.mouse.move(grabX + DX, grabY + DY, { steps: 6 });
+    await page.mouse.up();
+
+    await expect
+      .poll(async () => readCount('skip-waypoint-count'), { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe(0);
+    await page.waitForTimeout(400);
+    const dSkipAfterDrag = await skipPath.getAttribute('d');
+    expect(dSkipAfterDrag, 'e-skip should be a curve once its route is dropped by the drag').not.toMatch(/\bL\b/);
+
+    // ---- 3. UNDO — restores BOTH the pre-drag position AND the pre-drag route ----
+    await page.getByTestId('undo-btn').click();
+    await expect
+      .poll(async () => readCount('skip-waypoint-count'), { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe(skipCountAfterArrange);
+    await page.waitForTimeout(400);
+    expect(
+      await readCount('skip-waypoint-count'),
+      'undo must hold at the pre-drag waypoint count (no oscillation)',
+    ).toBe(skipCountAfterArrange);
+    expect(
+      await skipPath.getAttribute('d'),
+      'undo must restore the EXACT pre-drag rendered path, not merely a route with the same count',
+    ).toBe(dSkipAfterArrange);
+
+    // ---- 4. REDO — re-drops the route, returning to the post-drag state ----
+    await page.getByTestId('redo-btn').click();
+    await expect
+      .poll(async () => readCount('skip-waypoint-count'), { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe(0);
+    await page.waitForTimeout(400);
+    expect(
+      await readCount('skip-waypoint-count'),
+      'redo must hold at 0 (no oscillation)',
+    ).toBe(0);
+    expect(
+      await skipPath.getAttribute('d'),
+      'redo must return e-skip to a curve, re-applying the post-drag state',
+    ).not.toMatch(/\bL\b/);
+  });
+}
