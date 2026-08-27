@@ -322,6 +322,22 @@ export function waypointPathD(start: Waypoint, points: Waypoint[], end: Waypoint
   return all.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ');
 }
 
+/**
+ * WR-01 (84-REVIEW.md) — the arrowhead-orientation tangent for a WAYPOINT-ROUTED edge,
+ * computed directly from the route's own final segment (`lastRoutePoint` -> `end`) rather
+ * than an arc-length walk back along the rendered path. `redraw()`'s pre-existing
+ * arc-length heuristic (`path.getPointAtLength(pathLen - ARROW_LEN)`) was tuned for a
+ * 2-point bezier chord; on a multi-segment ELK polyline, the final leg into the port can
+ * legitimately be shorter than `ARROW_LEN` (12px — ELK's own port-anchored bend can sit
+ * very close to the socket), which makes the arc-length walk sample a point on the segment
+ * BEFORE the final bend — cutting across the corner instead of following the true
+ * final-approach direction. This function is exact for any final-leg length, including
+ * zero (degenerate: returns 0, matching `Math.atan2(0, 0)`).
+ */
+export function waypointArrowAngleDeg(lastRoutePoint: Waypoint, end: Waypoint): number {
+  return (Math.atan2(end.y - lastRoutePoint.y, end.x - lastRoutePoint.x) * 180) / Math.PI;
+}
+
 /** An axis-aligned box in the same graph (unscaled) coordinate space as `Waypoint`/node `x,y`. */
 export interface Rect {
   x: number;

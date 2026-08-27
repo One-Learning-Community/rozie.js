@@ -22,6 +22,7 @@ import {
   arrangePortRect,
   sanitizeWaypoints,
   segmentIntersectsRect,
+  waypointArrowAngleDeg,
   waypointPathD,
   waypointsFromElkEdges,
   waypointsSignature,
@@ -273,5 +274,33 @@ describe('waypointPathD', () => {
   it('with no intermediate points, composes a single move-to plus one line-to', () => {
     const d = waypointPathD({ x: 0, y: 0 }, [], { x: 3, y: 3 });
     expect(d).toBe('M 0 0 L 3 3');
+  });
+});
+
+describe('waypointArrowAngleDeg', () => {
+  it('computes the true final-leg angle even when that leg is SHORTER than ARROW_LEN (WR-01) — a 1px final leg', () => {
+    // A route whose last point sits 1px above-left of `end` (a final leg far shorter than
+    // the 12px ARROW_LEN redraw()'s old arc-length walk assumed) — straight down-right, 45°.
+    const angle = waypointArrowAngleDeg({ x: 99, y: 99 }, { x: 100, y: 100 });
+    expect(angle).toBeCloseTo(45, 5);
+  });
+
+  it('matches a plain horizontal final leg (0deg) regardless of the rest of the route', () => {
+    expect(waypointArrowAngleDeg({ x: 50, y: 20 }, { x: 100, y: 20 })).toBeCloseTo(0, 10);
+  });
+
+  it('matches a plain vertical final leg (90deg, SVG y-down convention)', () => {
+    expect(waypointArrowAngleDeg({ x: 50, y: 20 }, { x: 50, y: 80 })).toBeCloseTo(90, 10);
+  });
+
+  it('a degenerate zero-length final leg (last route point coincides with end) returns 0, not NaN', () => {
+    expect(waypointArrowAngleDeg({ x: 50, y: 20 }, { x: 50, y: 20 })).toBe(0);
+  });
+
+  it('is unaffected by segments earlier in the route — only the final leg matters', () => {
+    // Same final-leg geometry (down-right 45deg) regardless of where the route "came from".
+    const a = waypointArrowAngleDeg({ x: 0, y: 0 }, { x: 10, y: 10 });
+    const b = waypointArrowAngleDeg({ x: 500, y: -300 }, { x: 510, y: -290 });
+    expect(a).toBeCloseTo(b, 10);
   });
 });

@@ -348,6 +348,7 @@ import {
   arrangeLayoutOptions,
   arrangePortRect,
   sanitizeWaypoints,
+  waypointArrowAngleDeg,
   waypointPathD,
   waypointsFromElkEdges,
   waypointsSignature,
@@ -2264,7 +2265,16 @@ $onMount(() => {
         // horizontal entry into the input) for a stable, standard arrow. FORWARD
         // edges keep the final-ARROW_LEN tangent, which follows a descending edge
         // AND aligns with where the line meets the head.
-        if (end.x < start.x) {
+        if (route) {
+          // WR-01 (84-REVIEW.md): a routed edge's final leg into the port can legitimately
+          // be shorter than ARROW_LEN — the arc-length walk below would then sample a
+          // point BEFORE the route's final bend, cutting across the corner. Derive the
+          // tangent directly from the route's own last segment instead; exact for any
+          // final-leg length, and stable regardless of the backward/forward split below
+          // (which only exists to route around the bezier's own u-turn instability — a
+          // routed edge is drawn as a plain polyline and never u-turns like a bezier does).
+          marker.setAttribute('orient', String(waypointArrowAngleDeg(route[route.length - 1], end)))
+        } else if (end.x < start.x) {
           marker.setAttribute('orient', 'auto')
         } else {
           const tip = path.getPointAtLength(pathLen)

@@ -16,7 +16,7 @@ import { getDOMSocketPosition, classicConnectionPath } from 'rete-render-utils';
 // renderConnection's redraw() (render), and autoArrange()'s write-back (compute) — every one
 // CALLED directly, never handed to a third party as a bare function value (the Lit
 // unbound-prototype-method hazard from quick 260826-h7k does not recur here).
-import { arrangeLayoutOptions, arrangePortRect, sanitizeWaypoints, waypointPathD, waypointsFromElkEdges, waypointsSignature, withoutWaypoints, withWaypoints } from './internal/arrangeGeometry';
+import { arrangeLayoutOptions, arrangePortRect, sanitizeWaypoints, waypointArrowAngleDeg, waypointPathD, waypointsFromElkEdges, waypointsSignature, withoutWaypoints, withWaypoints } from './internal/arrangeGeometry';
 // T2.6 — auto-layout (D-08, verb-only). The 3 deps (rete-auto-arrange-plugin / elkjs
 // @0.8.2 / web-worker) are OPTIONAL leaf peers, installed + bundle-smoked on all 6 in
 // Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
@@ -1917,7 +1917,16 @@ export class FlowCanvas {
           // horizontal entry into the input) for a stable, standard arrow. FORWARD
           // edges keep the final-ARROW_LEN tangent, which follows a descending edge
           // AND aligns with where the line meets the head.
-          if (end.x < start.x) {
+          if (route) {
+            // WR-01 (84-REVIEW.md): a routed edge's final leg into the port can legitimately
+            // be shorter than ARROW_LEN — the arc-length walk below would then sample a
+            // point BEFORE the route's final bend, cutting across the corner. Derive the
+            // tangent directly from the route's own last segment instead; exact for any
+            // final-leg length, and stable regardless of the backward/forward split below
+            // (which only exists to route around the bezier's own u-turn instability — a
+            // routed edge is drawn as a plain polyline and never u-turns like a bezier does).
+            marker.setAttribute('orient', String(waypointArrowAngleDeg(route[route.length - 1], end)));
+          } else if (end.x < start.x) {
             marker.setAttribute('orient', 'auto');
           } else {
             const tip = path.getPointAtLength(pathLen);
