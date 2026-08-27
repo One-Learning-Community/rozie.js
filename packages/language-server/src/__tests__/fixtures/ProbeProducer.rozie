@@ -1,0 +1,15 @@
+<rozie name="ProbeProducer">
+
+<props>
+{
+  title: { type: String, default: 'Untitled' },
+}
+</props>
+
+<template>
+<div class="probe-producer">
+  <slot name="header">{{ $props.title }}</slot>
+</div>
+</template>
+
+</rozie>

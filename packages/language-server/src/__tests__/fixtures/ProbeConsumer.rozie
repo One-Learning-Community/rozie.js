@@ -1,0 +1,19 @@
+<rozie name="ProbeConsumer">
+
+<components>
+{
+  ProbeProducer: './ProbeProducer.rozie',
+}
+</components>
+
+<template>
+<div class="probe-consumer">
+  <ProbeProducer>
+    <template #header>
+      <strong>Custom header</strong>
+    </template>
+  </ProbeProducer>
+</div>
+</template>
+
+</rozie>
