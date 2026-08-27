@@ -26,7 +26,9 @@ import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { TextDocument } from 'vscode-languageserver-textdocument';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { computeDiagnostics } from '../../diagnostics.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = path.resolve(HERE, '../../..');
@@ -347,5 +349,82 @@ describe('providers.wire — Volar-composed ROZ plugins over real stdio', () => 
     const items = ((r.result as AnyRecord)?.items ?? r.result ?? []) as AnyRecord[];
     const names = items.map((i) => i.label);
     expect(names, `completion items: ${JSON.stringify(names)}`).toContain('ProbeProducer');
+  });
+
+  it('(10) prepare-rename at a props-sigil member returns the range of that member name', async () => {
+    const r = await request('textDocument/prepareRename', {
+      textDocument: { uri: producerUri },
+      position: posOf(producerSource, propsTitleDeclOffset),
+    });
+    const range = (r.result as AnyRecord)?.range ?? r.result;
+    expect(range, `prepareRename: ${JSON.stringify(r.result)}`).toBeTruthy();
+    expect(range?.start?.line).toBe(4);
+  });
+
+  it('(11) prepare-rename at a caret with nothing renameable returns nothing', async () => {
+    const neutralOffset = at(producerSource, 'probe-producer');
+    const r = await request('textDocument/prepareRename', {
+      textDocument: { uri: producerUri },
+      position: posOf(producerSource, neutralOffset),
+    });
+    expect(r.result, `prepareRename: ${JSON.stringify(r.result)}`).toBeFalsy();
+  });
+
+  it('(12) rename rewrites the declaration AND every usage as one WorkspaceEdit; the result still reparses with zero new ROZ diagnostics', async () => {
+    const r = await request('textDocument/rename', {
+      textDocument: { uri: producerUri },
+      position: posOf(producerSource, propsTitleDeclOffset),
+      newName: 'heading',
+    });
+    const changes = (r.result as AnyRecord)?.changes as Record<string, AnyRecord[]> | undefined;
+    const edits = changes?.[producerUri] ?? [];
+    expect(edits.length, `edits: ${JSON.stringify(edits)}`).toBeGreaterThanOrEqual(2);
+
+    // Assert edit CONTENTS, not just count — a rename at the wrong offsets
+    // looks identical to a correct one from a count-only assertion. Every
+    // edit must rewrite exactly the ORIGINAL "title" text, at the exact
+    // declaration/usage offsets computed independently above.
+    const producerDoc = TextDocument.create(producerUri, 'rozie', 1, producerSource);
+    for (const edit of edits) {
+      const start = producerDoc.offsetAt(edit.range.start);
+      const end = producerDoc.offsetAt(edit.range.end);
+      expect(producerSource.slice(start, end), `edit: ${JSON.stringify(edit)}`).toBe('title');
+      expect(edit.newText).toBe('heading');
+    }
+    const editLines = edits.map((e) => e.range.start.line).sort((a, b) => a - b);
+    expect(editLines, `edit lines: ${JSON.stringify(editLines)}`).toContain(4); // <props> decl
+    expect(editLines, `edit lines: ${JSON.stringify(editLines)}`).toContain(10); // template usage
+
+    // Apply every edit (descending by start offset so earlier offsets stay
+    // valid) and confirm the RESULT still parses with zero new ROZ
+    // diagnostics — the same compiler path the diagnostics plugin uses.
+    const sorted = [...edits].sort(
+      (a, b) => producerDoc.offsetAt(b.range.start) - producerDoc.offsetAt(a.range.start),
+    );
+    let renamed = producerSource;
+    for (const edit of sorted) {
+      const start = producerDoc.offsetAt(edit.range.start);
+      const end = producerDoc.offsetAt(edit.range.end);
+      renamed = renamed.slice(0, start) + edit.newText + renamed.slice(end);
+    }
+    expect(renamed).toContain('heading: { type: String');
+    expect(renamed).toContain('$props.heading');
+    const renamedDoc = TextDocument.create(producerUri, 'rozie', 1, renamed);
+    const diagnostics = computeDiagnostics(renamedDoc);
+    expect(diagnostics, `post-rename diagnostics: ${JSON.stringify(diagnostics)}`).toHaveLength(0);
+  });
+
+  it('(13) diagnostics — the clean consumer/producer pair publishes zero diagnostics', async () => {
+    await sleep(500);
+    const check = (uri: string): void => {
+      const published = notifications.filter(
+        (n) => n.method === 'textDocument/publishDiagnostics' && (n.params as AnyRecord)?.uri === uri,
+      );
+      const last = published[published.length - 1];
+      const diagnostics: AnyRecord[] = (last?.params as AnyRecord)?.diagnostics ?? [];
+      expect(diagnostics, `${uri} diagnostics: ${JSON.stringify(diagnostics)}`).toHaveLength(0);
+    };
+    check(producerUri);
+    check(consumerUri);
   });
 });
