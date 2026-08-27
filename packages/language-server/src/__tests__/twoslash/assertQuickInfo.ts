@@ -41,6 +41,17 @@ export interface TwoslashHarness {
    * `generateVirtualTs` never emits a `mapped()` chunk for.
    */
   firstMappedOffsetInRange(filePath: string, range: [number, number]): number | undefined;
+  /**
+   * `.rozie` source offset -> generated-TS offset, or `undefined` if unmapped.
+   * Exposed for tests that need an EXACT offset (e.g. a specific identifier
+   * inside a multi-expression line), rather than the "first mapped offset
+   * on the line" convention `firstMappedOffsetInRange` implements — the
+   * fine-grained scope assertions the nested composition fixture needs
+   * (Task 3) query several distinct names on the same line.
+   */
+  toGeneratedOffset(filePath: string, sourceOffset: number): number | undefined;
+  /** generated-TS offset -> `.rozie` source offset, or `undefined` if unmapped — the reverse-mapping direction. */
+  toSourceOffset(filePath: string, generatedOffset: number): number | undefined;
 }
 
 /**
@@ -97,6 +108,13 @@ export function createTwoslashHarness(files: Map<string, string>): TwoslashHarne
     return undefined;
   }
 
+  function toSrc(file: string, off: number): number | undefined {
+    const map = maps.get(file);
+    if (!map) return undefined;
+    for (const [s] of map.toSourceLocation(off)) return s;
+    return undefined;
+  }
+
   function firstMappedOffsetInRange(file: string, range: [number, number]): number | undefined {
     const [start, end] = range;
     const mappings = rawMappings.get(file);
@@ -132,7 +150,13 @@ export function createTwoslashHarness(files: Map<string, string>): TwoslashHarne
     return qi ? ts.displayPartsToString(qi.displayParts) : '(none)';
   }
 
-  return { languageService, quickInfoAt, firstMappedOffsetInRange };
+  return {
+    languageService,
+    quickInfoAt,
+    firstMappedOffsetInRange,
+    toGeneratedOffset: toGen,
+    toSourceOffset: toSrc,
+  };
 }
 
 export interface ResolvedMarker extends MarkerHit {

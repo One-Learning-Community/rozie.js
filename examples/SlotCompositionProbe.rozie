@@ -1,0 +1,59 @@
+<!--
+  SlotCompositionProbe.rozie
+
+  Phase 85 Plan 06 Task 3 (D5) — the ONE deliberately-nested composition
+  fixture the corpus needed and never had: a conditional (`r-if`) containing
+  a component reference, that component's slot filled with a scoped
+  parameter (`#header="{ remaining, total }"`), and a loop (`r-for`) inside
+  the fill body — with expressions at every level reading the loop alias,
+  the slot parameter, and a `$props` sigil together. Every other probe in
+  this corpus tests one of those constructs in isolation; every known
+  failure of this generator has been a NESTING failure, one level off.
+
+  Reuses `TodoList.rozie`'s existing scoped `header` slot — it exposes two
+  scoped params, a computed remaining-count and a total — as the producer
+  rather than adding a second new file.
+
+  Two interpolations near the end are DELIBERATE NEGATIVE probes — they
+  read the loop alias / slot parameter from OUTSIDE the scope that
+  introduces them and are expected to NOT resolve at the TypeScript layer
+  (`slotScope.test.ts` already established this "leak probe" pattern for
+  the language-server test suite; here it proves the SAME boundary holds
+  under real nesting, not just isolation). This is a Rozie-COMPILE-clean
+  file — `compile()` does no JS-identifier resolution, so these negative
+  probes cost nothing at the ROZIE level; they exist purely for the
+  TypeScript-layer scope assertions in `probes.test.ts`.
+-->
+
+<rozie name="SlotCompositionProbe">
+
+<components>
+{
+  TodoList: './TodoList.rozie',
+}
+</components>
+
+<props>
+{
+  items: { type: Array, default: () => [] },
+  label: { type: String, default: '' },
+}
+</props>
+
+<template>
+<div class="slot-composition-probe">
+  <TodoList r-if="$props.items.length > 0" :items="$props.items">
+    <template #header="{ remaining, total }">
+      <ul class="composed">
+        <li r-for="entry in $props.items" :key="entry.id">
+          {{ entry.id + remaining + total + $props.label.length }}<!-- ^? -->
+        </li>
+      </ul>
+      <p class="after-loop">{{ remaining }}{{ entry }}</p>
+    </template>
+  </TodoList>
+  <p class="outside-fill">{{ remaining }}{{ entry }}</p>
+</div>
+</template>
+
+</rozie>

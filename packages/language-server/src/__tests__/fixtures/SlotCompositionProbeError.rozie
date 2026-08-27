@@ -1,0 +1,45 @@
+<!--
+  SlotCompositionProbeError.rozie
+
+  Phase 85 Plan 06 Task 3 (D5) — the deliberate type-error VARIANT of
+  `examples/SlotCompositionProbe.rozie`, used ONLY by the language-server
+  test suite (never shipped — `examples/` feeds the demo apps, the docs
+  site, and the visual-regression host, and a broken example is a broken
+  demo). Byte-identical to the shipped fixture except the innermost
+  expression calls `.toFixed()` — a Number method — on `$props.label`,
+  which is declared `String`. This must be a real, reported type error that
+  reverse-maps onto `toFixed` in this file's own source.
+-->
+
+<rozie name="SlotCompositionProbeError">
+
+<components>
+{
+  TodoList: './TodoList.rozie',
+}
+</components>
+
+<props>
+{
+  items: { type: Array, default: () => [] },
+  label: { type: String, default: '' },
+}
+</props>
+
+<template>
+<div class="slot-composition-probe">
+  <TodoList r-if="$props.items.length > 0" :items="$props.items">
+    <template #header="{ remaining, total }">
+      <ul class="composed">
+        <li r-for="entry in $props.items" :key="entry.id">
+          {{ entry.id + remaining + total + $props.label.toFixed() }}
+        </li>
+      </ul>
+      <p class="after-loop">{{ remaining }}{{ entry }}</p>
+    </template>
+  </TodoList>
+  <p class="outside-fill">{{ remaining }}{{ entry }}</p>
+</div>
+</template>
+
+</rozie>
