@@ -29,7 +29,7 @@
 
 <template>
 <div class="card-body" part="body">
-  <h3 class="card-title">{{ $props.title }}</h3>
+  <h3 class="card-title">{{ $props.title }}</h3><!-- ^? -->
   <slot/>
 </div>
 </template>

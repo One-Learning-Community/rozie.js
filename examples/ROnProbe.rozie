@@ -61,7 +61,7 @@
 <div class="r-on-probe">
   <span r-on="{ 'click.stop': fn, 'input.debounce(300)': onInput }">literal modifier-bearing</span>
   <span r-on="someObj">dynamic</span>
-  <span @click="f1" r-on="{ click: f2 }">R6 source-order merge</span>
+  <span @click="f1" r-on="{ click: f2 }">R6 source-order merge</span><!-- ^? -->
 </div>
 </template>
 

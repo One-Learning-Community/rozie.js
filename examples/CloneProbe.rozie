@@ -36,7 +36,7 @@ $onMount(() => {
 
 <template>
 <div class="probe">
-  <span class="count">count: {{ $data.state.count }}</span>
+  <span class="count">count: {{ $data.state.count }}</span><!-- ^? -->
   <span class="cloned" r-if="$data.cloned">cloned</span>
 </div>
 </template>

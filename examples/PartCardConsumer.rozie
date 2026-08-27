@@ -35,7 +35,7 @@
 
 <template>
 <div class="part-card-consumer">
-  <PartCard :title="'Hello'">
+  <PartCard :title="'Hello'"><!-- ^? -->
     Cross-shadow styled body content.
   </PartCard>
 </div>

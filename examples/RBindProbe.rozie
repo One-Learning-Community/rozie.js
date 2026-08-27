@@ -28,7 +28,7 @@
 
 <template>
 <div class="rbind-probe">
-  <span :class="'a'" r-bind="{ class: 'b', id: 'x' }">canonical</span>
+  <span :class="'a'" r-bind="{ class: 'b', id: 'x' }">canonical</span><!-- ^? -->
   <span r-bind="{ class: 'b', id: 'y' }" :class="'a'">reordered</span>
 </div>
 </template>

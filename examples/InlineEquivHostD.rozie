@@ -34,7 +34,7 @@ const outer = $computed(() => clampD(inner + $props.base));
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ outer }}</span>
+  <span class="echo">{{ outer }}</span><!-- ^? -->
 </div>
 </template>
 

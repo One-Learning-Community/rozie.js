@@ -4,7 +4,7 @@
     "name": "Dropdown",
     "loc": {
       "start": 587,
-      "end": 3873
+      "end": 3884
     },
     "props": {
       "type": "PropsAST",
@@ -3058,7 +3058,7 @@
       "type": "TemplateAST",
       "loc": {
         "start": 3192,
-        "end": 3451
+        "end": 3462
       },
       "children": [
         {
@@ -3144,8 +3144,8 @@
                   "type": "TemplateText",
                   "text": "\n    ",
                   "loc": {
-                    "start": 3255,
-                    "end": 3260
+                    "start": 3266,
+                    "end": 3271
                   }
                 },
                 {
@@ -3157,16 +3157,16 @@
                       "rawName": "name",
                       "name": "name",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 3270,
+                      "modifierChainBaseOffset": 3281,
                       "chain": [],
                       "value": "trigger",
                       "valueLoc": {
-                        "start": 3272,
-                        "end": 3279
+                        "start": 3283,
+                        "end": 3290
                       },
                       "loc": {
-                        "start": 3266,
-                        "end": 3280
+                        "start": 3277,
+                        "end": 3291
                       }
                     },
                     {
@@ -3174,16 +3174,16 @@
                       "rawName": ":open",
                       "name": "open",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 3286,
+                      "modifierChainBaseOffset": 3297,
                       "chain": [],
                       "value": "$props.open",
                       "valueLoc": {
-                        "start": 3288,
-                        "end": 3299
+                        "start": 3299,
+                        "end": 3310
                       },
                       "loc": {
-                        "start": 3281,
-                        "end": 3300
+                        "start": 3292,
+                        "end": 3311
                       }
                     },
                     {
@@ -3191,47 +3191,47 @@
                       "rawName": ":toggle",
                       "name": "toggle",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 3308,
+                      "modifierChainBaseOffset": 3319,
                       "chain": [],
                       "value": "toggle",
                       "valueLoc": {
-                        "start": 3310,
-                        "end": 3316
+                        "start": 3321,
+                        "end": 3327
                       },
                       "loc": {
-                        "start": 3301,
-                        "end": 3317
+                        "start": 3312,
+                        "end": 3328
                       }
                     }
                   ],
                   "children": [],
                   "selfClosing": true,
                   "loc": {
-                    "start": 3260,
-                    "end": 3320
+                    "start": 3271,
+                    "end": 3331
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n  ",
                   "loc": {
-                    "start": 3320,
-                    "end": 3323
+                    "start": 3331,
+                    "end": 3334
                   }
                 }
               ],
               "selfClosing": false,
               "loc": {
                 "start": 3218,
-                "end": 3329
+                "end": 3340
               }
             },
             {
               "type": "TemplateText",
               "text": "\n\n  ",
               "loc": {
-                "start": 3329,
-                "end": 3333
+                "start": 3340,
+                "end": 3344
               }
             },
             {
@@ -3243,16 +3243,16 @@
                   "rawName": "r-if",
                   "name": "if",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 3342,
+                  "modifierChainBaseOffset": 3353,
                   "chain": [],
                   "value": "$props.open",
                   "valueLoc": {
-                    "start": 3344,
-                    "end": 3355
+                    "start": 3355,
+                    "end": 3366
                   },
                   "loc": {
-                    "start": 3338,
-                    "end": 3356
+                    "start": 3349,
+                    "end": 3367
                   }
                 },
                 {
@@ -3260,16 +3260,16 @@
                   "rawName": "ref",
                   "name": "ref",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 3360,
+                  "modifierChainBaseOffset": 3371,
                   "chain": [],
                   "value": "panelEl",
                   "valueLoc": {
-                    "start": 3362,
-                    "end": 3369
+                    "start": 3373,
+                    "end": 3380
                   },
                   "loc": {
-                    "start": 3357,
-                    "end": 3370
+                    "start": 3368,
+                    "end": 3381
                   }
                 },
                 {
@@ -3277,16 +3277,16 @@
                   "rawName": "class",
                   "name": "class",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 3376,
+                  "modifierChainBaseOffset": 3387,
                   "chain": [],
                   "value": "dropdown-panel",
                   "valueLoc": {
-                    "start": 3378,
-                    "end": 3392
+                    "start": 3389,
+                    "end": 3403
                   },
                   "loc": {
-                    "start": 3371,
-                    "end": 3393
+                    "start": 3382,
+                    "end": 3404
                   }
                 },
                 {
@@ -3294,16 +3294,16 @@
                   "rawName": "role",
                   "name": "role",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 3398,
+                  "modifierChainBaseOffset": 3409,
                   "chain": [],
                   "value": "menu",
                   "valueLoc": {
-                    "start": 3400,
-                    "end": 3404
+                    "start": 3411,
+                    "end": 3415
                   },
                   "loc": {
-                    "start": 3394,
-                    "end": 3405
+                    "start": 3405,
+                    "end": 3416
                   }
                 }
               ],
@@ -3312,8 +3312,8 @@
                   "type": "TemplateText",
                   "text": "\n    ",
                   "loc": {
-                    "start": 3406,
-                    "end": 3411
+                    "start": 3417,
+                    "end": 3422
                   }
                 },
                 {
@@ -3325,62 +3325,62 @@
                       "rawName": ":close",
                       "name": "close",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 3423,
+                      "modifierChainBaseOffset": 3434,
                       "chain": [],
                       "value": "close",
                       "valueLoc": {
-                        "start": 3425,
-                        "end": 3430
+                        "start": 3436,
+                        "end": 3441
                       },
                       "loc": {
-                        "start": 3417,
-                        "end": 3431
+                        "start": 3428,
+                        "end": 3442
                       }
                     }
                   ],
                   "children": [],
                   "selfClosing": true,
                   "loc": {
-                    "start": 3411,
-                    "end": 3434
+                    "start": 3422,
+                    "end": 3445
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n  ",
                   "loc": {
-                    "start": 3434,
-                    "end": 3437
+                    "start": 3445,
+                    "end": 3448
                   }
                 }
               ],
               "selfClosing": false,
               "loc": {
-                "start": 3333,
-                "end": 3443
+                "start": 3344,
+                "end": 3454
               }
             },
             {
               "type": "TemplateText",
               "text": "\n",
               "loc": {
-                "start": 3443,
-                "end": 3444
+                "start": 3454,
+                "end": 3455
               }
             }
           ],
           "selfClosing": false,
           "loc": {
             "start": 3193,
-            "end": 3450
+            "end": 3461
           }
         },
         {
           "type": "TemplateText",
           "text": "\n",
           "loc": {
-            "start": 3450,
-            "end": 3451
+            "start": 3461,
+            "end": 3462
           }
         }
       ]
@@ -3388,8 +3388,8 @@
     "style": {
       "type": "StyleAST",
       "loc": {
-        "start": 3471,
-        "end": 3855
+        "start": 3482,
+        "end": 3866
       },
       "cssText": "\n.dropdown { position: relative; display: inline-block; }\n.dropdown-panel {\n  position: fixed;\n  z-index: var(--rozie-dropdown-z, 1000);\n  background: white;\n  border: 1px solid rgba(0, 0, 0, 0.1);\n  border-radius: 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);\n}\n\n/* Unscoped escape hatch — anything inside :root { } is emitted globally. */\n:root {\n  --rozie-dropdown-z: 1000;\n}\n",
       "rules": [
@@ -3397,8 +3397,8 @@
           "kind": "rule",
           "selector": ".dropdown",
           "loc": {
-            "start": 3472,
-            "end": 3528
+            "start": 3483,
+            "end": 3539
           },
           "isRootEscape": false
         },
@@ -3406,8 +3406,8 @@
           "kind": "rule",
           "selector": ".dropdown-panel",
           "loc": {
-            "start": 3529,
-            "end": 3738
+            "start": 3540,
+            "end": 3749
           },
           "isRootEscape": false
         },
@@ -3415,8 +3415,8 @@
           "kind": "rule",
           "selector": ":root",
           "loc": {
-            "start": 3817,
-            "end": 3854
+            "start": 3828,
+            "end": 3865
           },
           "isRootEscape": true
         }
@@ -3450,17 +3450,17 @@
         }
       },
       "template": {
-        "content": "\n<div class=\"dropdown\">\n  <div ref=\"triggerEl\" @click=\"toggle\">\n    <slot name=\"trigger\" :open=\"$props.open\" :toggle=\"toggle\" />\n  </div>\n\n  <div r-if=\"$props.open\" ref=\"panelEl\" class=\"dropdown-panel\" role=\"menu\">\n    <slot :close=\"close\" />\n  </div>\n</div>\n",
+        "content": "\n<div class=\"dropdown\">\n  <div ref=\"triggerEl\" @click=\"toggle\"><!-- ^? -->\n    <slot name=\"trigger\" :open=\"$props.open\" :toggle=\"toggle\" />\n  </div>\n\n  <div r-if=\"$props.open\" ref=\"panelEl\" class=\"dropdown-panel\" role=\"menu\">\n    <slot :close=\"close\" />\n  </div>\n</div>\n",
         "loc": {
           "start": 3182,
-          "end": 3462
+          "end": 3473
         }
       },
       "style": {
         "content": "\n.dropdown { position: relative; display: inline-block; }\n.dropdown-panel {\n  position: fixed;\n  z-index: var(--rozie-dropdown-z, 1000);\n  background: white;\n  border: 1px solid rgba(0, 0, 0, 0.1);\n  border-radius: 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);\n}\n\n/* Unscoped escape hatch — anything inside :root { } is emitted globally. */\n:root {\n  --rozie-dropdown-z: 1000;\n}\n",
         "loc": {
-          "start": 3464,
-          "end": 3863
+          "start": 3475,
+          "end": 3874
         }
       }
     }

@@ -23,7 +23,7 @@
 <template>
 <div class="rmodel-number-trim">
   <input type="text" r-model.number.trim="$data.quantity" placeholder="Enter a quantity" />
-  <p class="echo">Quantity: {{ $data.quantity }}</p>
+  <p class="echo">Quantity: {{ $data.quantity }}</p><!-- ^? -->
 </div>
 </template>
 

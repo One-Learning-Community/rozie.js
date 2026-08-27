@@ -39,7 +39,7 @@ const filtered = $memo(
 <div class="probe">
   <input :value="$data.query" @input="$data.query = $event.target.value" />
   <ul>
-    <li r-for="item in filtered()" :key="item">{{ item }}</li>
+    <li r-for="item in filtered()" :key="item">{{ item }}</li><!-- ^? -->
   </ul>
 </div>
 </template>

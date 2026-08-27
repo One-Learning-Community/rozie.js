@@ -31,7 +31,7 @@
   :style="{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }"
   r-bind="$attrs"
 >
-  {{ $props.label }}
+  {{ $props.label }}<!-- ^? -->
 </button>
 </template>
 

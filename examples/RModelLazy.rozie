@@ -22,7 +22,7 @@
 <template>
 <div class="rmodel-lazy">
   <input type="text" r-model.lazy="$data.draft" placeholder="Commit on blur" />
-  <p class="echo">Committed: {{ $data.draft }}</p>
+  <p class="echo">Committed: {{ $data.draft }}</p><!-- ^? -->
 </div>
 </template>
 

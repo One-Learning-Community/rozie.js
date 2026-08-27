@@ -34,7 +34,7 @@ $expose({ reset, focus });
 <template>
 <div class="expose-probe">
   <input ref="field" type="text" r-model="$data.value" placeholder="Type something" />
-  <span class="echo">{{ $data.value }}</span>
+  <span class="echo">{{ $data.value }}</span><!-- ^? -->
 </div>
 </template>
 

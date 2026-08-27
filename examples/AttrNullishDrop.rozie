@@ -76,7 +76,7 @@
     :key="c"
     class="attr-nullish-drop-loop"
     :title="$props.maybeNullProp"
-  >{{ c }}</i>
+  >{{ c }}</i><!-- ^? -->
 </div>
 </template>
 

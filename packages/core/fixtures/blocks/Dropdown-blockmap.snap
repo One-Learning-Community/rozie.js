@@ -4,7 +4,7 @@
     "name": "Dropdown",
     "loc": {
       "start": 587,
-      "end": 3873
+      "end": 3884
     }
   },
   "props": {
@@ -41,25 +41,25 @@
     }
   },
   "template": {
-    "content": "\n<div class=\"dropdown\">\n  <div ref=\"triggerEl\" @click=\"toggle\">\n    <slot name=\"trigger\" :open=\"$props.open\" :toggle=\"toggle\" />\n  </div>\n\n  <div r-if=\"$props.open\" ref=\"panelEl\" class=\"dropdown-panel\" role=\"menu\">\n    <slot :close=\"close\" />\n  </div>\n</div>\n",
+    "content": "\n<div class=\"dropdown\">\n  <div ref=\"triggerEl\" @click=\"toggle\"><!-- ^? -->\n    <slot name=\"trigger\" :open=\"$props.open\" :toggle=\"toggle\" />\n  </div>\n\n  <div r-if=\"$props.open\" ref=\"panelEl\" class=\"dropdown-panel\" role=\"menu\">\n    <slot :close=\"close\" />\n  </div>\n</div>\n",
     "contentLoc": {
       "start": 3192,
-      "end": 3451
+      "end": 3462
     },
     "loc": {
       "start": 3182,
-      "end": 3462
+      "end": 3473
     }
   },
   "style": {
     "content": "\n.dropdown { position: relative; display: inline-block; }\n.dropdown-panel {\n  position: fixed;\n  z-index: var(--rozie-dropdown-z, 1000);\n  background: white;\n  border: 1px solid rgba(0, 0, 0, 0.1);\n  border-radius: 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);\n}\n\n/* Unscoped escape hatch — anything inside :root { } is emitted globally. */\n:root {\n  --rozie-dropdown-z: 1000;\n}\n",
     "contentLoc": {
-      "start": 3471,
-      "end": 3855
+      "start": 3482,
+      "end": 3866
     },
     "loc": {
-      "start": 3464,
-      "end": 3863
+      "start": 3475,
+      "end": 3874
     }
   }
 }

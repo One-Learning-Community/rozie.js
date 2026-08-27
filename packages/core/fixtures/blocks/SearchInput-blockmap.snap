@@ -4,7 +4,7 @@
     "name": "SearchInput",
     "loc": {
       "start": 483,
-      "end": 2218
+      "end": 2229
     }
   },
   "props": {
@@ -41,25 +41,25 @@
     }
   },
   "template": {
-    "content": "\n<div class=\"search-input\">\n  <!--\n    Modifier on a template event, same grammar as the <listeners> block:\n    - .debounce(300) waits 300ms after the last keystroke before firing\n    - .enter triggers immediately on Enter even if the debounce window hasn't elapsed\n  -->\n  <input\n    ref=\"inputEl\"\n    type=\"search\"\n    :placeholder=\"$props.placeholder\"\n    r-model=\"$data.query\"\n    @input.debounce(300)=\"onSearch\"\n    @keydown.enter=\"onSearch\"\n    @keydown.escape=\"clear\"\n  />\n\n  <button r-if=\"$data.query.length > 0\" class=\"clear-btn\" @click=\"clear\" aria-label=\"Clear\">\n    ×\n  </button>\n  <span r-else class=\"hint\">{{ $props.minLength }}+ chars</span>\n</div>\n",
+    "content": "\n<div class=\"search-input\">\n  <!--\n    Modifier on a template event, same grammar as the <listeners> block:\n    - .debounce(300) waits 300ms after the last keystroke before firing\n    - .enter triggers immediately on Enter even if the debounce window hasn't elapsed\n  -->\n  <input\n    ref=\"inputEl\"\n    type=\"search\"\n    :placeholder=\"$props.placeholder\"\n    r-model=\"$data.query\"\n    @input.debounce(300)=\"onSearch\"\n    @keydown.enter=\"onSearch\"\n    @keydown.escape=\"clear\"\n  />\n\n  <button r-if=\"$data.query.length > 0\" class=\"clear-btn\" @click=\"clear\" aria-label=\"Clear\">\n    ×\n  </button>\n  <span r-else class=\"hint\">{{ $props.minLength }}+ chars</span><!-- ^? -->\n</div>\n",
     "contentLoc": {
       "start": 1265,
-      "end": 1929
+      "end": 1940
     },
     "loc": {
       "start": 1255,
-      "end": 1940
+      "end": 1951
     }
   },
   "style": {
     "content": "\n.search-input { display: inline-flex; align-items: center; gap: 0.25rem; }\ninput { padding: 0.25rem 0.5rem; }\n.clear-btn { background: none; border: none; cursor: pointer; font-size: 1.25rem; }\n.hint { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }\n",
     "contentLoc": {
-      "start": 1949,
-      "end": 2200
+      "start": 1960,
+      "end": 2211
     },
     "loc": {
-      "start": 1942,
-      "end": 2208
+      "start": 1953,
+      "end": 2219
     }
   }
 }

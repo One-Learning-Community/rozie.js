@@ -4,7 +4,7 @@
     "name": "Modal",
     "loc": {
       "start": 753,
-      "end": 4117
+      "end": 4128
     },
     "props": {
       "type": "PropsAST",
@@ -2869,7 +2869,7 @@
       "type": "TemplateAST",
       "loc": {
         "start": 2518,
-        "end": 3202
+        "end": 3213
       },
       "children": [
         {
@@ -3190,23 +3190,23 @@
                           "type": "TemplateText",
                           "text": "\n      ",
                           "loc": {
-                            "start": 2916,
-                            "end": 2923
+                            "start": 2927,
+                            "end": 2934
                           }
                         }
                       ],
                       "selfClosing": false,
                       "loc": {
                         "start": 2845,
-                        "end": 2930
+                        "end": 2941
                       }
                     },
                     {
                       "type": "TemplateText",
                       "text": "\n      ",
                       "loc": {
-                        "start": 2930,
-                        "end": 2937
+                        "start": 2941,
+                        "end": 2948
                       }
                     },
                     {
@@ -3218,16 +3218,16 @@
                           "rawName": "class",
                           "name": "class",
                           "modifierChainText": "",
-                          "modifierChainBaseOffset": 2950,
+                          "modifierChainBaseOffset": 2961,
                           "chain": [],
                           "value": "close-btn",
                           "valueLoc": {
-                            "start": 2952,
-                            "end": 2961
+                            "start": 2963,
+                            "end": 2972
                           },
                           "loc": {
-                            "start": 2945,
-                            "end": 2962
+                            "start": 2956,
+                            "end": 2973
                           }
                         },
                         {
@@ -3235,16 +3235,16 @@
                           "rawName": "@click",
                           "name": "click",
                           "modifierChainText": "",
-                          "modifierChainBaseOffset": 2969,
+                          "modifierChainBaseOffset": 2980,
                           "chain": [],
                           "value": "close",
                           "valueLoc": {
-                            "start": 2971,
-                            "end": 2976
+                            "start": 2982,
+                            "end": 2987
                           },
                           "loc": {
-                            "start": 2963,
-                            "end": 2977
+                            "start": 2974,
+                            "end": 2988
                           }
                         },
                         {
@@ -3252,16 +3252,16 @@
                           "rawName": "aria-label",
                           "name": "aria-label",
                           "modifierChainText": "",
-                          "modifierChainBaseOffset": 2988,
+                          "modifierChainBaseOffset": 2999,
                           "chain": [],
                           "value": "Close",
                           "valueLoc": {
-                            "start": 2990,
-                            "end": 2995
+                            "start": 3001,
+                            "end": 3006
                           },
                           "loc": {
-                            "start": 2978,
-                            "end": 2996
+                            "start": 2989,
+                            "end": 3007
                           }
                         }
                       ],
@@ -3270,38 +3270,38 @@
                           "type": "TemplateText",
                           "text": "×",
                           "loc": {
-                            "start": 2997,
-                            "end": 2998
+                            "start": 3008,
+                            "end": 3009
                           }
                         }
                       ],
                       "selfClosing": false,
                       "loc": {
-                        "start": 2937,
-                        "end": 3007
+                        "start": 2948,
+                        "end": 3018
                       }
                     },
                     {
                       "type": "TemplateText",
                       "text": "\n    ",
                       "loc": {
-                        "start": 3007,
-                        "end": 3012
+                        "start": 3018,
+                        "end": 3023
                       }
                     }
                   ],
                   "selfClosing": false,
                   "loc": {
                     "start": 2793,
-                    "end": 3021
+                    "end": 3032
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n\n    ",
                   "loc": {
-                    "start": 3021,
-                    "end": 3027
+                    "start": 3032,
+                    "end": 3038
                   }
                 },
                 {
@@ -3313,16 +3313,16 @@
                       "rawName": "class",
                       "name": "class",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 3037,
+                      "modifierChainBaseOffset": 3048,
                       "chain": [],
                       "value": "modal-body",
                       "valueLoc": {
-                        "start": 3039,
-                        "end": 3049
+                        "start": 3050,
+                        "end": 3060
                       },
                       "loc": {
-                        "start": 3032,
-                        "end": 3050
+                        "start": 3043,
+                        "end": 3061
                       }
                     }
                   ],
@@ -3331,8 +3331,8 @@
                       "type": "TemplateText",
                       "text": "\n      ",
                       "loc": {
-                        "start": 3051,
-                        "end": 3058
+                        "start": 3062,
+                        "end": 3069
                       }
                     },
                     {
@@ -3344,47 +3344,47 @@
                           "rawName": ":close",
                           "name": "close",
                           "modifierChainText": "",
-                          "modifierChainBaseOffset": 3070,
+                          "modifierChainBaseOffset": 3081,
                           "chain": [],
                           "value": "close",
                           "valueLoc": {
-                            "start": 3072,
-                            "end": 3077
+                            "start": 3083,
+                            "end": 3088
                           },
                           "loc": {
-                            "start": 3064,
-                            "end": 3078
+                            "start": 3075,
+                            "end": 3089
                           }
                         }
                       ],
                       "children": [],
                       "selfClosing": true,
                       "loc": {
-                        "start": 3058,
-                        "end": 3081
+                        "start": 3069,
+                        "end": 3092
                       }
                     },
                     {
                       "type": "TemplateText",
                       "text": "\n    ",
                       "loc": {
-                        "start": 3081,
-                        "end": 3086
+                        "start": 3092,
+                        "end": 3097
                       }
                     }
                   ],
                   "selfClosing": false,
                   "loc": {
-                    "start": 3027,
-                    "end": 3092
+                    "start": 3038,
+                    "end": 3103
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n\n    ",
                   "loc": {
-                    "start": 3092,
-                    "end": 3098
+                    "start": 3103,
+                    "end": 3109
                   }
                 },
                 {
@@ -3396,16 +3396,16 @@
                       "rawName": "r-if",
                       "name": "if",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 3110,
+                      "modifierChainBaseOffset": 3121,
                       "chain": [],
                       "value": "$slots.footer",
                       "valueLoc": {
-                        "start": 3112,
-                        "end": 3125
+                        "start": 3123,
+                        "end": 3136
                       },
                       "loc": {
-                        "start": 3106,
-                        "end": 3126
+                        "start": 3117,
+                        "end": 3137
                       }
                     }
                   ],
@@ -3414,8 +3414,8 @@
                       "type": "TemplateText",
                       "text": "\n      ",
                       "loc": {
-                        "start": 3127,
-                        "end": 3134
+                        "start": 3138,
+                        "end": 3145
                       }
                     },
                     {
@@ -3427,16 +3427,16 @@
                           "rawName": "name",
                           "name": "name",
                           "modifierChainText": "",
-                          "modifierChainBaseOffset": 3144,
+                          "modifierChainBaseOffset": 3155,
                           "chain": [],
                           "value": "footer",
                           "valueLoc": {
-                            "start": 3146,
-                            "end": 3152
+                            "start": 3157,
+                            "end": 3163
                           },
                           "loc": {
-                            "start": 3140,
-                            "end": 3153
+                            "start": 3151,
+                            "end": 3164
                           }
                         },
                         {
@@ -3444,77 +3444,77 @@
                           "rawName": ":close",
                           "name": "close",
                           "modifierChainText": "",
-                          "modifierChainBaseOffset": 3160,
+                          "modifierChainBaseOffset": 3171,
                           "chain": [],
                           "value": "close",
                           "valueLoc": {
-                            "start": 3162,
-                            "end": 3167
+                            "start": 3173,
+                            "end": 3178
                           },
                           "loc": {
-                            "start": 3154,
-                            "end": 3168
+                            "start": 3165,
+                            "end": 3179
                           }
                         }
                       ],
                       "children": [],
                       "selfClosing": true,
                       "loc": {
-                        "start": 3134,
-                        "end": 3171
+                        "start": 3145,
+                        "end": 3182
                       }
                     },
                     {
                       "type": "TemplateText",
                       "text": "\n    ",
                       "loc": {
-                        "start": 3171,
-                        "end": 3176
+                        "start": 3182,
+                        "end": 3187
                       }
                     }
                   ],
                   "selfClosing": false,
                   "loc": {
-                    "start": 3098,
-                    "end": 3185
+                    "start": 3109,
+                    "end": 3196
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n  ",
                   "loc": {
-                    "start": 3185,
-                    "end": 3188
+                    "start": 3196,
+                    "end": 3199
                   }
                 }
               ],
               "selfClosing": false,
               "loc": {
                 "start": 2634,
-                "end": 3194
+                "end": 3205
               }
             },
             {
               "type": "TemplateText",
               "text": "\n",
               "loc": {
-                "start": 3194,
-                "end": 3195
+                "start": 3205,
+                "end": 3206
               }
             }
           ],
           "selfClosing": false,
           "loc": {
             "start": 2519,
-            "end": 3201
+            "end": 3212
           }
         },
         {
           "type": "TemplateText",
           "text": "\n",
           "loc": {
-            "start": 3201,
-            "end": 3202
+            "start": 3212,
+            "end": 3213
           }
         }
       ]
@@ -3522,8 +3522,8 @@
     "style": {
       "type": "StyleAST",
       "loc": {
-        "start": 3222,
-        "end": 4099
+        "start": 3233,
+        "end": 4110
       },
       "cssText": "\n.modal-backdrop {\n  position: fixed; inset: 0;\n  background: rgba(0, 0, 0, 0.4);\n  display: flex; align-items: center; justify-content: center;\n  z-index: var(--rozie-modal-z, 2000);\n}\n.modal-dialog {\n  background: white;\n  border-radius: 8px;\n  min-width: 20rem;\n  max-width: min(90vw, 40rem);\n  max-height: 90vh;\n  display: flex; flex-direction: column;\n  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);\n  outline: none;\n}\nheader, footer { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }\nheader { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }\nheader h2 { flex: 1; margin: 0; font-size: 1.1rem; }\nfooter { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }\n.modal-body { padding: 1rem; overflow: auto; }\n.close-btn { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }\n\n:root {\n  --rozie-modal-z: 2000;\n}\n",
       "rules": [
@@ -3531,8 +3531,8 @@
           "kind": "rule",
           "selector": ".modal-backdrop",
           "loc": {
-            "start": 3223,
-            "end": 3407
+            "start": 3234,
+            "end": 3418
           },
           "isRootEscape": false
         },
@@ -3540,8 +3540,8 @@
           "kind": "rule",
           "selector": ".modal-dialog",
           "loc": {
-            "start": 3408,
-            "end": 3642
+            "start": 3419,
+            "end": 3653
           },
           "isRootEscape": false
         },
@@ -3549,8 +3549,8 @@
           "kind": "rule",
           "selector": "header, footer",
           "loc": {
-            "start": 3643,
-            "end": 3725
+            "start": 3654,
+            "end": 3736
           },
           "isRootEscape": false
         },
@@ -3558,8 +3558,8 @@
           "kind": "rule",
           "selector": "header",
           "loc": {
-            "start": 3726,
-            "end": 3782
+            "start": 3737,
+            "end": 3793
           },
           "isRootEscape": false
         },
@@ -3567,8 +3567,8 @@
           "kind": "rule",
           "selector": "header h2",
           "loc": {
-            "start": 3783,
-            "end": 3835
+            "start": 3794,
+            "end": 3846
           },
           "isRootEscape": false
         },
@@ -3576,8 +3576,8 @@
           "kind": "rule",
           "selector": "footer",
           "loc": {
-            "start": 3836,
-            "end": 3916
+            "start": 3847,
+            "end": 3927
           },
           "isRootEscape": false
         },
@@ -3585,8 +3585,8 @@
           "kind": "rule",
           "selector": ".modal-body",
           "loc": {
-            "start": 3917,
-            "end": 3963
+            "start": 3928,
+            "end": 3974
           },
           "isRootEscape": false
         },
@@ -3594,8 +3594,8 @@
           "kind": "rule",
           "selector": ".close-btn",
           "loc": {
-            "start": 3964,
-            "end": 4062
+            "start": 3975,
+            "end": 4073
           },
           "isRootEscape": false
         },
@@ -3603,8 +3603,8 @@
           "kind": "rule",
           "selector": ":root",
           "loc": {
-            "start": 4064,
-            "end": 4098
+            "start": 4075,
+            "end": 4109
           },
           "isRootEscape": true
         }
@@ -3638,17 +3638,17 @@
         }
       },
       "template": {
-        "content": "\n<div r-if=\"$props.open\" class=\"modal-backdrop\" ref=\"backdropEl\" @click.self=\"$props.closeOnBackdrop && close()\">\n  <div\n    ref=\"dialogEl\"\n    class=\"modal-dialog\"\n    role=\"dialog\"\n    aria-modal=\"true\"\n    :aria-label=\"$props.title || undefined\"\n    tabindex=\"-1\"\n  >\n    <header r-if=\"$props.title || $slots.header\">\n      <slot name=\"header\" :close=\"close\">\n        <h2>{{ $props.title }}</h2>\n      </slot>\n      <button class=\"close-btn\" @click=\"close\" aria-label=\"Close\">×</button>\n    </header>\n\n    <div class=\"modal-body\">\n      <slot :close=\"close\" />\n    </div>\n\n    <footer r-if=\"$slots.footer\">\n      <slot name=\"footer\" :close=\"close\" />\n    </footer>\n  </div>\n</div>\n",
+        "content": "\n<div r-if=\"$props.open\" class=\"modal-backdrop\" ref=\"backdropEl\" @click.self=\"$props.closeOnBackdrop && close()\">\n  <div\n    ref=\"dialogEl\"\n    class=\"modal-dialog\"\n    role=\"dialog\"\n    aria-modal=\"true\"\n    :aria-label=\"$props.title || undefined\"\n    tabindex=\"-1\"\n  >\n    <header r-if=\"$props.title || $slots.header\">\n      <slot name=\"header\" :close=\"close\">\n        <h2>{{ $props.title }}</h2><!-- ^? -->\n      </slot>\n      <button class=\"close-btn\" @click=\"close\" aria-label=\"Close\">×</button>\n    </header>\n\n    <div class=\"modal-body\">\n      <slot :close=\"close\" />\n    </div>\n\n    <footer r-if=\"$slots.footer\">\n      <slot name=\"footer\" :close=\"close\" />\n    </footer>\n  </div>\n</div>\n",
         "loc": {
           "start": 2508,
-          "end": 3213
+          "end": 3224
         }
       },
       "style": {
         "content": "\n.modal-backdrop {\n  position: fixed; inset: 0;\n  background: rgba(0, 0, 0, 0.4);\n  display: flex; align-items: center; justify-content: center;\n  z-index: var(--rozie-modal-z, 2000);\n}\n.modal-dialog {\n  background: white;\n  border-radius: 8px;\n  min-width: 20rem;\n  max-width: min(90vw, 40rem);\n  max-height: 90vh;\n  display: flex; flex-direction: column;\n  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);\n  outline: none;\n}\nheader, footer { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }\nheader { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }\nheader h2 { flex: 1; margin: 0; font-size: 1.1rem; }\nfooter { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }\n.modal-body { padding: 1rem; overflow: auto; }\n.close-btn { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }\n\n:root {\n  --rozie-modal-z: 2000;\n}\n",
         "loc": {
-          "start": 3215,
-          "end": 4107
+          "start": 3226,
+          "end": 4118
         }
       }
     }

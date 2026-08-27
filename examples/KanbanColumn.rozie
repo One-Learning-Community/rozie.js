@@ -32,7 +32,7 @@
 <template>
 <section class="kanban-column">
   <header class="column-bar">
-    <h4 class="column-title">{{ $props.title }}</h4>
+    <h4 class="column-title">{{ $props.title }}</h4><!-- ^? -->
     <span class="column-count">{{ $props.cards.length }}</span>
   </header>
   <SortableList r-model:items="$props.cards" :group="$props.group" itemKey="id" :handle="$classSelector('grip')">

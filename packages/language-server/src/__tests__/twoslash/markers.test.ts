@@ -72,6 +72,40 @@ describe('findMarkers — line resolution', () => {
     const source = ['const x = 1', '// ^|', 'const y = 2'].join('\n');
     expect(findMarkers(source)).toHaveLength(0);
   });
+
+  it('a TRAILING template marker (appended to a content line, no new line) resolves to its OWN line', () => {
+    // Added during Task 2 (T-85-20): a standalone marker line is NOT inert
+    // on 5/6 targets (inertness.test.ts) because those emitters preserve
+    // <template> whitespace near-verbatim; a trailing marker adds no new
+    // line at all and is the form every shipped example probe actually uses.
+    const source = ['<div>', '  <span>{{$props.label}}</span><!-- ^? -->', '  <span>next</span>', '</div>'].join(
+      '\n',
+    );
+    const hits = findMarkers(source);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]?.kind).toBe('template');
+    expect(hits[0]?.markerLine).toBe(2);
+    expect(hits[0]?.targetLine).toBe(2); // itself, not the line above
+    expect(source.slice(...(hits[0]?.targetLineRange as [number, number]))).toBe(
+      '  <span>{{$props.label}}</span>',
+    );
+  });
+
+  it('a line consisting ONLY of the template marker is the STANDALONE form, never mistaken for a trailing one', () => {
+    const source = ['<div>', '  <span>A</span>', '  <!-- ^? -->', '</div>'].join('\n');
+    const hits = findMarkers(source);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]?.targetLine).toBe(2); // walk-back to the line above, not line 3 itself
+  });
+
+  it('stripMarkerLines removes a whole-line marker entirely but only the SUFFIX of a trailing marker', async () => {
+    const { stripMarkerLines } = await import('./markers.js');
+    const withStandalone = ['<div>', '  <span>A</span>', '  <!-- ^? -->', '</div>'].join('\n');
+    expect(stripMarkerLines(withStandalone)).toBe(['<div>', '  <span>A</span>', '</div>'].join('\n'));
+
+    const withTrailing = ['<div>', '  <span>A</span><!-- ^? -->', '</div>'].join('\n');
+    expect(stripMarkerLines(withTrailing)).toBe(['<div>', '  <span>A</span>', '</div>'].join('\n'));
+  });
 });
 
 describe('resolveMarkersForFile — against the production generator + a real ts.LanguageService', () => {
@@ -88,8 +122,9 @@ describe('resolveMarkersForFile — against the production generator + a real ts
     // `rawExpr` VERBATIM starting at `loc.start + 2`, so a leading space
     // inside `{{ }}` would put the FIRST mapped offset on the space itself
     // rather than on `$props` — this fixture asserts a real identifier.
-    '<div>{{$props.label}}</div>',
-    '<!-- ^? -->',
+    // TRAILING form (Task 2 / T-85-20's proven-inert production shape):
+    // the marker shares the target's own line rather than adding a new one.
+    '<div>{{$props.label}}</div><!-- ^? -->',
     '</template>',
     '</rozie>',
     '',

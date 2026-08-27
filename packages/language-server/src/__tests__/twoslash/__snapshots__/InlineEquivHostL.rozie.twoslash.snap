@@ -1,0 +1,2 @@
+[InlineEquivHostL.rozie#0] kind=template marker@L44 -> line 44
+const verbL: (n: number) => number

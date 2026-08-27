@@ -41,7 +41,7 @@ const verb2L = (n: number): number => verbL(n) + 1;
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ verbL(1) }}</span>
+  <span class="echo">{{ verbL(1) }}</span><!-- ^? -->
   <span class="echo">{{ verb2L(1) }}</span>
 </div>
 </template>

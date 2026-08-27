@@ -3,7 +3,7 @@
     "type": "TemplateAST",
     "loc": {
       "start": 1265,
-      "end": 1929
+      "end": 1940
     },
     "children": [
       {
@@ -353,23 +353,23 @@
             "type": "TemplateText",
             "text": "\n",
             "loc": {
-              "start": 1921,
-              "end": 1922
+              "start": 1932,
+              "end": 1933
             }
           }
         ],
         "selfClosing": false,
         "loc": {
           "start": 1266,
-          "end": 1928
+          "end": 1939
         }
       },
       {
         "type": "TemplateText",
         "text": "\n",
         "loc": {
-          "start": 1928,
-          "end": 1929
+          "start": 1939,
+          "end": 1940
         }
       }
     ]

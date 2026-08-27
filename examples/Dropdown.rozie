@@ -79,7 +79,7 @@ $expose({ toggle, close })
 
 <template>
 <div class="dropdown">
-  <div ref="triggerEl" @click="toggle">
+  <div ref="triggerEl" @click="toggle"><!-- ^? -->
     <slot name="trigger" :open="$props.open" :toggle="toggle" />
   </div>
 

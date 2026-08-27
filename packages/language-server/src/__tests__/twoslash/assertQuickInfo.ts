@@ -101,13 +101,24 @@ export function createTwoslashHarness(files: Map<string, string>): TwoslashHarne
     const [start, end] = range;
     const mappings = rawMappings.get(file);
     if (!mappings) return undefined;
+    const text = files.get(file);
     let best: number | undefined;
     for (const m of mappings) {
       for (let i = 0; i < m.sourceOffsets.length; i++) {
         const so = m.sourceOffsets[i] as number;
         const len = (m.lengths[i] as number | undefined) ?? 0;
         if (so + len <= start || so >= end) continue; // no intersection with the target line
-        const candidate = Math.max(so, start);
+        let candidate = Math.max(so, start);
+        // The FIRST mapped offset can land on leading whitespace inside a
+        // `{{ expr }}` interpolation's own mapped chunk (the natural
+        // `{{ $props.x }}` authoring convention, space included verbatim in
+        // the mapping) — a quick-info query there answers nothing useful.
+        // Advance past whitespace, but never past this SAME mapped chunk's
+        // own extent or past the target line's own range.
+        if (text) {
+          const chunkEnd = Math.min(so + len, end);
+          while (candidate < chunkEnd && /\s/.test(text[candidate] ?? '')) candidate++;
+        }
         if (best === undefined || candidate < best) best = candidate;
       }
     }

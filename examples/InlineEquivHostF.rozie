@@ -40,7 +40,7 @@ const usedSecondF = $computed(() => clamp(usedFirstF + 1));
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ usedFirstF }}</span>
+  <span class="echo">{{ usedFirstF }}</span><!-- ^? -->
   <span class="echo">{{ usedSecondF }}</span>
 </div>
 </template>

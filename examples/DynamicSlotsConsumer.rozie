@@ -23,7 +23,7 @@
          consumer-side dynamic-fill bracket syntax used further below. Family resolution
          against the producer's cell- family is the compiler's job via matchedFamily. -->
     <template #cell-status="{ row, value }">
-      <span class="status">{{ value }}</span>
+      <span class="status">{{ value }}</span><!-- ^? -->
     </template>
     <template #cell-score="{ row, value }">
       <span class="score">{{ value }}</span>

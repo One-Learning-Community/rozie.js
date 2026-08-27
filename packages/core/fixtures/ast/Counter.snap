@@ -4,7 +4,7 @@
     "name": "Counter",
     "loc": {
       "start": 375,
-      "end": 1728
+      "end": 1739
     },
     "props": {
       "type": "PropsAST",
@@ -1906,7 +1906,7 @@
       "type": "TemplateAST",
       "loc": {
         "start": 1015,
-        "end": 1391
+        "end": 1402
       },
       "children": [
         {
@@ -2121,8 +2121,8 @@
               "type": "TemplateText",
               "text": "\n  ",
               "loc": {
-                "start": 1294,
-                "end": 1297
+                "start": 1305,
+                "end": 1308
               }
             },
             {
@@ -2134,16 +2134,16 @@
                   "rawName": ":disabled",
                   "name": "disabled",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 1314,
+                  "modifierChainBaseOffset": 1325,
                   "chain": [],
                   "value": "!canIncrement",
                   "valueLoc": {
-                    "start": 1316,
-                    "end": 1329
+                    "start": 1327,
+                    "end": 1340
                   },
                   "loc": {
-                    "start": 1305,
-                    "end": 1330
+                    "start": 1316,
+                    "end": 1341
                   }
                 },
                 {
@@ -2151,16 +2151,16 @@
                   "rawName": "@click",
                   "name": "click",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 1337,
+                  "modifierChainBaseOffset": 1348,
                   "chain": [],
                   "value": "increment",
                   "valueLoc": {
-                    "start": 1339,
-                    "end": 1348
+                    "start": 1350,
+                    "end": 1359
                   },
                   "loc": {
-                    "start": 1331,
-                    "end": 1349
+                    "start": 1342,
+                    "end": 1360
                   }
                 },
                 {
@@ -2168,16 +2168,16 @@
                   "rawName": "aria-label",
                   "name": "aria-label",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 1360,
+                  "modifierChainBaseOffset": 1371,
                   "chain": [],
                   "value": "Increment",
                   "valueLoc": {
-                    "start": 1362,
-                    "end": 1371
+                    "start": 1373,
+                    "end": 1382
                   },
                   "loc": {
-                    "start": 1350,
-                    "end": 1372
+                    "start": 1361,
+                    "end": 1383
                   }
                 }
               ],
@@ -2186,38 +2186,38 @@
                   "type": "TemplateText",
                   "text": "+",
                   "loc": {
-                    "start": 1373,
-                    "end": 1374
+                    "start": 1384,
+                    "end": 1385
                   }
                 }
               ],
               "selfClosing": false,
               "loc": {
-                "start": 1297,
-                "end": 1383
+                "start": 1308,
+                "end": 1394
               }
             },
             {
               "type": "TemplateText",
               "text": "\n",
               "loc": {
-                "start": 1383,
-                "end": 1384
+                "start": 1394,
+                "end": 1395
               }
             }
           ],
           "selfClosing": false,
           "loc": {
             "start": 1016,
-            "end": 1390
+            "end": 1401
           }
         },
         {
           "type": "TemplateText",
           "text": "\n",
           "loc": {
-            "start": 1390,
-            "end": 1391
+            "start": 1401,
+            "end": 1402
           }
         }
       ]
@@ -2225,8 +2225,8 @@
     "style": {
       "type": "StyleAST",
       "loc": {
-        "start": 1411,
-        "end": 1710
+        "start": 1422,
+        "end": 1721
       },
       "cssText": "\n.counter { display: inline-flex; gap: 0.5rem; align-items: center; }\n.counter.hovering { background: rgba(0, 0, 0, 0.04); }\n.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }\nbutton { padding: 0.25rem 0.5rem; }\nbutton:disabled { opacity: 0.4; cursor: not-allowed; }\n",
       "rules": [
@@ -2234,8 +2234,8 @@
           "kind": "rule",
           "selector": ".counter",
           "loc": {
-            "start": 1412,
-            "end": 1480
+            "start": 1423,
+            "end": 1491
           },
           "isRootEscape": false
         },
@@ -2243,8 +2243,8 @@
           "kind": "rule",
           "selector": ".counter.hovering",
           "loc": {
-            "start": 1481,
-            "end": 1535
+            "start": 1492,
+            "end": 1546
           },
           "isRootEscape": false
         },
@@ -2252,8 +2252,8 @@
           "kind": "rule",
           "selector": ".value",
           "loc": {
-            "start": 1536,
-            "end": 1618
+            "start": 1547,
+            "end": 1629
           },
           "isRootEscape": false
         },
@@ -2261,8 +2261,8 @@
           "kind": "rule",
           "selector": "button",
           "loc": {
-            "start": 1619,
-            "end": 1654
+            "start": 1630,
+            "end": 1665
           },
           "isRootEscape": false
         },
@@ -2270,8 +2270,8 @@
           "kind": "rule",
           "selector": "button:disabled",
           "loc": {
-            "start": 1655,
-            "end": 1709
+            "start": 1666,
+            "end": 1720
           },
           "isRootEscape": false
         }
@@ -2305,17 +2305,17 @@
         }
       },
       "template": {
-        "content": "\n<div\n  class=\"counter\"\n  :class=\"{ hovering: $data.hovering }\"\n  @mouseenter=\"$data.hovering = true\"\n  @mouseleave=\"$data.hovering = false\"\n>\n  <button :disabled=\"!canDecrement\" @click=\"decrement\" aria-label=\"Decrement\">−</button>\n  <span class=\"value\">{{ $props.value }}</span>\n  <button :disabled=\"!canIncrement\" @click=\"increment\" aria-label=\"Increment\">+</button>\n</div>\n",
+        "content": "\n<div\n  class=\"counter\"\n  :class=\"{ hovering: $data.hovering }\"\n  @mouseenter=\"$data.hovering = true\"\n  @mouseleave=\"$data.hovering = false\"\n>\n  <button :disabled=\"!canDecrement\" @click=\"decrement\" aria-label=\"Decrement\">−</button>\n  <span class=\"value\">{{ $props.value }}</span><!-- ^? -->\n  <button :disabled=\"!canIncrement\" @click=\"increment\" aria-label=\"Increment\">+</button>\n</div>\n",
         "loc": {
           "start": 1005,
-          "end": 1402
+          "end": 1413
         }
       },
       "style": {
         "content": "\n.counter { display: inline-flex; gap: 0.5rem; align-items: center; }\n.counter.hovering { background: rgba(0, 0, 0, 0.04); }\n.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }\nbutton { padding: 0.25rem 0.5rem; }\nbutton:disabled { opacity: 0.4; cursor: not-allowed; }\n",
         "loc": {
-          "start": 1404,
-          "end": 1718
+          "start": 1415,
+          "end": 1729
         }
       }
     }

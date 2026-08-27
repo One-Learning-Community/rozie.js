@@ -46,7 +46,7 @@ $onMount(() => {
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ setColumnFilterJ(1, 2) }}</span>
+  <span class="echo">{{ setColumnFilterJ(1, 2) }}</span><!-- ^? -->
   <span class="echo">{{ refreshRowModelJ }}</span>
 </div>
 </template>

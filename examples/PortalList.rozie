@@ -121,7 +121,7 @@ $onMount(() => {
     consumer's `<template #item="{ item }">` content into each engine-owned
     `<div>` (engine sets the per-cell flex styles inline).
   -->
-  <slot name="item" portal :params="['item']" />
+  <slot name="item" portal :params="['item']" /><!-- ^? -->
 </div>
 </template>
 

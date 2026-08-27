@@ -35,7 +35,7 @@ $onMount(() => {
 </script>
 
 <template>
-<div class="panel" :data-handle="$classSelector('panel')" :data-grip="gripSelector">
+<div class="panel" :data-handle="$classSelector('panel')" :data-grip="gripSelector"><!-- ^? -->
   <span class="grip" aria-hidden="true">⋮⋮</span>
   <span r-if="$data.ready">ready</span>
 </div>

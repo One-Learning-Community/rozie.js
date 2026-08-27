@@ -1,0 +1,8 @@
+[CloneProbe.rozie#0] kind=template marker@L39 -> line 39
+const $data: {
+    state: {
+        count: number;
+        created: Date;
+    };
+    cloned: null;
+}

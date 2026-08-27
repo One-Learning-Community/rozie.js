@@ -61,7 +61,7 @@ const removeItem = (id) => {
   <header>
     <slot name="header" :remaining="remaining" :total="$props.items.length">
       <!-- Fallback content if consumer doesn't provide #header -->
-      <h3>{{ $props.title }} ({{ remaining }} remaining)</h3>
+      <h3>{{ $props.title }} ({{ remaining }} remaining)</h3><!-- ^? -->
     </slot>
   </header>
 

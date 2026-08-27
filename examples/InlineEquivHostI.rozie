@@ -16,7 +16,7 @@ let fillDragUpI = afterDeclI(1);
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ rangeTransitionI }}</span>
+  <span class="echo">{{ rangeTransitionI }}</span><!-- ^? -->
   <span class="echo">{{ afterDeclI(1) }}</span>
   <span class="echo">{{ fillDragUpI }}</span>
 </div>

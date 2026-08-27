@@ -1,0 +1,2 @@
+[InlineEquivHostM.rozie#0] kind=template marker@L53 -> line 53
+const gridKeydownHandlersM: (rIdx: number, cIdx: number) => number

@@ -3,7 +3,7 @@
     "type": "TemplateAST",
     "loc": {
       "start": 1015,
-      "end": 1391
+      "end": 1402
     },
     "children": [
       {
@@ -218,8 +218,8 @@
             "type": "TemplateText",
             "text": "\n  ",
             "loc": {
-              "start": 1294,
-              "end": 1297
+              "start": 1305,
+              "end": 1308
             }
           },
           {
@@ -231,16 +231,16 @@
                 "rawName": ":disabled",
                 "name": "disabled",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 1314,
+                "modifierChainBaseOffset": 1325,
                 "chain": [],
                 "value": "!canIncrement",
                 "valueLoc": {
-                  "start": 1316,
-                  "end": 1329
+                  "start": 1327,
+                  "end": 1340
                 },
                 "loc": {
-                  "start": 1305,
-                  "end": 1330
+                  "start": 1316,
+                  "end": 1341
                 }
               },
               {
@@ -248,16 +248,16 @@
                 "rawName": "@click",
                 "name": "click",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 1337,
+                "modifierChainBaseOffset": 1348,
                 "chain": [],
                 "value": "increment",
                 "valueLoc": {
-                  "start": 1339,
-                  "end": 1348
+                  "start": 1350,
+                  "end": 1359
                 },
                 "loc": {
-                  "start": 1331,
-                  "end": 1349
+                  "start": 1342,
+                  "end": 1360
                 }
               },
               {
@@ -265,16 +265,16 @@
                 "rawName": "aria-label",
                 "name": "aria-label",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 1360,
+                "modifierChainBaseOffset": 1371,
                 "chain": [],
                 "value": "Increment",
                 "valueLoc": {
-                  "start": 1362,
-                  "end": 1371
+                  "start": 1373,
+                  "end": 1382
                 },
                 "loc": {
-                  "start": 1350,
-                  "end": 1372
+                  "start": 1361,
+                  "end": 1383
                 }
               }
             ],
@@ -283,38 +283,38 @@
                 "type": "TemplateText",
                 "text": "+",
                 "loc": {
-                  "start": 1373,
-                  "end": 1374
+                  "start": 1384,
+                  "end": 1385
                 }
               }
             ],
             "selfClosing": false,
             "loc": {
-              "start": 1297,
-              "end": 1383
+              "start": 1308,
+              "end": 1394
             }
           },
           {
             "type": "TemplateText",
             "text": "\n",
             "loc": {
-              "start": 1383,
-              "end": 1384
+              "start": 1394,
+              "end": 1395
             }
           }
         ],
         "selfClosing": false,
         "loc": {
           "start": 1016,
-          "end": 1390
+          "end": 1401
         }
       },
       {
         "type": "TemplateText",
         "text": "\n",
         "loc": {
-          "start": 1390,
-          "end": 1391
+          "start": 1401,
+          "end": 1402
         }
       }
     ]

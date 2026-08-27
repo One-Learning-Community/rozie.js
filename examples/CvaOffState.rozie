@@ -38,7 +38,7 @@ function onInput(e) {
 <template>
 <div class="cva-off-state">
   <input type="text" :value="$props.value" @input="onInput" placeholder="Type a value" />
-  <span class="echo">{{ $props.value }}</span>
+  <span class="echo">{{ $props.value }}</span><!-- ^? -->
 </div>
 </template>
 

@@ -1,0 +1,4 @@
+[ExposeProbe.rozie#0] kind=template marker@L37 -> line 37
+const $data: {
+    value: string;
+}

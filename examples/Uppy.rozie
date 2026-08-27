@@ -166,7 +166,7 @@ $watch(() => $props.allowedFileTypes, () => instance?.setOptions({ restrictions:
   <ul r-if="$data.files.length > 0" class="rozie-uppy-list">
     <li r-for="f in $data.files" :key="f.id" class="rozie-uppy-item" :class="{ uploaded: f.uploaded, failed: f.failed }">
       <div class="meta">
-        <span class="name">{{ f.name }}</span>
+        <span class="name">{{ f.name }}</span><!-- ^? -->
         <span class="size">{{ Math.round(f.size / 1024) }} KB</span>
       </div>
       <div class="bar"><div class="fill" :style="{ width: f.progress + '%' }" /></div>

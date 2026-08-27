@@ -41,7 +41,7 @@
   r-bind="$attrs"
   r-on="$listeners"
 >
-  {{ $props.label }}
+  {{ $props.label }}<!-- ^? -->
 </button>
 </template>
 

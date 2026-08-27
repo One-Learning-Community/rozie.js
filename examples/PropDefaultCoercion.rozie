@@ -58,7 +58,7 @@ $onMount(() => {
 
 <template>
 <div class="pdc">
-  <pre data-rozie-pdc-output>{{ JSON.stringify($data.observed) }}</pre>
+  <pre data-rozie-pdc-output>{{ JSON.stringify($data.observed) }}</pre><!-- ^? -->
   <!--
     D-02 once-per-instance factory identity probe. Two consecutive reads of
     `$props.e` (or `$props.f`) within the same expression MUST return the

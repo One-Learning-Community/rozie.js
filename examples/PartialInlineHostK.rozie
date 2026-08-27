@@ -42,7 +42,7 @@ import { ariaSortK, sortIndicatorK } from './partialLogicK.rzts';
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ ariaSortK(1) }}</span>
+  <span class="echo">{{ ariaSortK(1) }}</span><!-- ^? -->
   <span class="echo">{{ sortIndicatorK(1) }}</span>
 </div>
 </template>

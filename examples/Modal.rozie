@@ -82,7 +82,7 @@ $onMount(() => {
   >
     <header r-if="$props.title || $slots.header">
       <slot name="header" :close="close">
-        <h2>{{ $props.title }}</h2>
+        <h2>{{ $props.title }}</h2><!-- ^? -->
       </slot>
       <button class="close-btn" @click="close" aria-label="Close">×</button>
     </header>

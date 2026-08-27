@@ -40,7 +40,7 @@
   :style="{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }"
   r-on="$listeners"
 >
-  {{ $props.label }}
+  {{ $props.label }}<!-- ^? -->
 </button>
 </template>
 

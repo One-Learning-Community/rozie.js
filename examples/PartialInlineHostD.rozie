@@ -37,7 +37,7 @@ import { outer } from './partialOuterD.rzts';
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ outer }}</span>
+  <span class="echo">{{ outer }}</span><!-- ^? -->
 </div>
 </template>
 

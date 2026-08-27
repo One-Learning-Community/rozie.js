@@ -45,7 +45,7 @@
   :class="$props.variant"
   :style="{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }"
 >
-  {{ $props.label }}
+  {{ $props.label }}<!-- ^? -->
 </button>
 </template>
 

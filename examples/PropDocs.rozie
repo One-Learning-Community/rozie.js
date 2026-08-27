@@ -40,7 +40,7 @@
 
 <template>
 <div class="prop-docs">
-  <span class="label">{{ $props.label }}</span>
+  <span class="label">{{ $props.label }}</span><!-- ^? -->
   <span class="count">{{ $props.count }}</span>
 </div>
 </template>

@@ -50,7 +50,7 @@ const hostTailE = (n: number): number => usedNameE(n) + headE(n);
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ usedNameE(1) }}</span>
+  <span class="echo">{{ usedNameE(1) }}</span><!-- ^? -->
   <span class="echo">{{ hostTailE(1) }}</span>
 </div>
 </template>

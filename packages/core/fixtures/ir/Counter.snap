@@ -841,8 +841,8 @@
       ],
       "source": "template-event",
       "sourceLoc": {
-        "start": 1331,
-        "end": 1349
+        "start": 1342,
+        "end": 1360
       }
     }
   ],
@@ -1793,7 +1793,7 @@
             "deps": [],
             "sourceLoc": {
               "start": 1016,
-              "end": 1390
+              "end": 1401
             }
           }
         ],
@@ -1811,7 +1811,7 @@
             "deps": [],
             "sourceLoc": {
               "start": 1016,
-              "end": 1390
+              "end": 1401
             }
           }
         ],
@@ -2008,8 +2008,8 @@
             "type": "TemplateStaticText",
             "text": "\n  ",
             "sourceLoc": {
-              "start": 1294,
-              "end": 1297
+              "start": 1305,
+              "end": 1308
             }
           },
           {
@@ -2062,8 +2062,8 @@
                   }
                 ],
                 "sourceLoc": {
-                  "start": 1305,
-                  "end": 1330
+                  "start": 1316,
+                  "end": 1341
                 },
                 "wrapForDisplay": false
               },
@@ -2072,8 +2072,8 @@
                 "name": "aria-label",
                 "value": "Increment",
                 "sourceLoc": {
-                  "start": 1350,
-                  "end": 1372
+                  "start": 1361,
+                  "end": 1383
                 }
               }
             ],
@@ -2086,14 +2086,14 @@
                 "type": "TemplateStaticText",
                 "text": "+",
                 "sourceLoc": {
-                  "start": 1373,
-                  "end": 1374
+                  "start": 1384,
+                  "end": 1385
                 }
               }
             ],
             "sourceLoc": {
-              "start": 1297,
-              "end": 1383
+              "start": 1308,
+              "end": 1394
             },
             "tagKind": "html"
           },
@@ -2101,14 +2101,14 @@
             "type": "TemplateStaticText",
             "text": "\n",
             "sourceLoc": {
-              "start": 1383,
-              "end": 1384
+              "start": 1394,
+              "end": 1395
             }
           }
         ],
         "sourceLoc": {
           "start": 1016,
-          "end": 1390
+          "end": 1401
         },
         "tagKind": "html"
       },
@@ -2116,14 +2116,14 @@
         "type": "TemplateStaticText",
         "text": "\n",
         "sourceLoc": {
-          "start": 1390,
-          "end": 1391
+          "start": 1401,
+          "end": 1402
         }
       }
     ],
     "sourceLoc": {
       "start": 1015,
-      "end": 1391
+      "end": 1402
     }
   },
   "inheritAttrs": true,
@@ -2136,8 +2136,8 @@
         "kind": "rule",
         "selector": ".counter",
         "loc": {
-          "start": 1412,
-          "end": 1480
+          "start": 1423,
+          "end": 1491
         },
         "isRootEscape": false
       },
@@ -2145,8 +2145,8 @@
         "kind": "rule",
         "selector": ".counter.hovering",
         "loc": {
-          "start": 1481,
-          "end": 1535
+          "start": 1492,
+          "end": 1546
         },
         "isRootEscape": false
       },
@@ -2154,8 +2154,8 @@
         "kind": "rule",
         "selector": ".value",
         "loc": {
-          "start": 1536,
-          "end": 1618
+          "start": 1547,
+          "end": 1629
         },
         "isRootEscape": false
       },
@@ -2163,8 +2163,8 @@
         "kind": "rule",
         "selector": "button",
         "loc": {
-          "start": 1619,
-          "end": 1654
+          "start": 1630,
+          "end": 1665
         },
         "isRootEscape": false
       },
@@ -2172,8 +2172,8 @@
         "kind": "rule",
         "selector": "button:disabled",
         "loc": {
-          "start": 1655,
-          "end": 1709
+          "start": 1666,
+          "end": 1720
         },
         "isRootEscape": false
       }
@@ -2182,13 +2182,13 @@
     "portalRules": [],
     "engineRules": [],
     "sourceLoc": {
-      "start": 1411,
-      "end": 1710
+      "start": 1422,
+      "end": 1721
     }
   },
   "components": [],
   "sourceLoc": {
     "start": 375,
-    "end": 1728
+    "end": 1739
   }
 }

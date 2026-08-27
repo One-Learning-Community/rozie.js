@@ -40,7 +40,7 @@ $onMount(() => {
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ editTransitionH }}</span>
+  <span class="echo">{{ editTransitionH }}</span><!-- ^? -->
   <span class="echo">{{ editorBindingsH(1) }}</span>
 </div>
 </template>

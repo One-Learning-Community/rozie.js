@@ -17,7 +17,7 @@
 <Modal r-model:open="$props.open" :title="$props.title">
   <template #header>
     <slot name="brand">
-      <h2>{{ $props.title }}</h2>
+      <h2>{{ $props.title }}</h2><!-- ^? -->
     </slot>
   </template>
   <slot />

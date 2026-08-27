@@ -48,7 +48,7 @@ import { verbL, verb2L } from './partialLogicL.rzts';
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ verbL(1) }}</span>
+  <span class="echo">{{ verbL(1) }}</span><!-- ^? -->
   <span class="echo">{{ verb2L(1) }}</span>
 </div>
 </template>

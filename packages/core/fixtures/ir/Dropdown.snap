@@ -122,8 +122,8 @@
       "name": "panelEl",
       "elementTag": "div",
       "sourceLoc": {
-        "start": 3357,
-        "end": 3370
+        "start": 3368,
+        "end": 3381
       }
     }
   ],
@@ -184,8 +184,8 @@
             "comments": []
           },
           "sourceLoc": {
-            "start": 3281,
-            "end": 3300
+            "start": 3292,
+            "end": 3311
           }
         },
         {
@@ -212,16 +212,16 @@
             "comments": []
           },
           "sourceLoc": {
-            "start": 3301,
-            "end": 3317
+            "start": 3312,
+            "end": 3328
           }
         }
       ],
       "presence": "always",
       "nestedSlots": [],
       "sourceLoc": {
-        "start": 3260,
-        "end": 3320
+        "start": 3271,
+        "end": 3331
       }
     },
     {
@@ -253,16 +253,16 @@
             "comments": []
           },
           "sourceLoc": {
-            "start": 3417,
-            "end": 3431
+            "start": 3428,
+            "end": 3442
           }
         }
       ],
       "presence": "always",
       "nestedSlots": [],
       "sourceLoc": {
-        "start": 3411,
-        "end": 3434
+        "start": 3422,
+        "end": 3445
       }
     }
   ],
@@ -3164,7 +3164,7 @@
             "deps": [],
             "sourceLoc": {
               "start": 3193,
-              "end": 3450
+              "end": 3461
             }
           }
         ],
@@ -3179,7 +3179,7 @@
             "deps": [],
             "sourceLoc": {
               "start": 3193,
-              "end": 3450
+              "end": 3461
             }
           }
         ],
@@ -3211,8 +3211,8 @@
                 "type": "TemplateStaticText",
                 "text": "\n    ",
                 "sourceLoc": {
-                  "start": 3255,
-                  "end": 3260
+                  "start": 3266,
+                  "end": 3271
                 }
               },
               {
@@ -3314,14 +3314,14 @@
                 "type": "TemplateStaticText",
                 "text": "\n  ",
                 "sourceLoc": {
-                  "start": 3320,
-                  "end": 3323
+                  "start": 3331,
+                  "end": 3334
                 }
               }
             ],
             "sourceLoc": {
               "start": 3218,
-              "end": 3329
+              "end": 3340
             },
             "tagKind": "html"
           },
@@ -3329,8 +3329,8 @@
             "type": "TemplateStaticText",
             "text": "\n\n  ",
             "sourceLoc": {
-              "start": 3329,
-              "end": 3333
+              "start": 3340,
+              "end": 3344
             }
           },
           {
@@ -3407,8 +3407,8 @@
                         "name": "class",
                         "value": "dropdown-panel",
                         "sourceLoc": {
-                          "start": 3371,
-                          "end": 3393
+                          "start": 3382,
+                          "end": 3404
                         }
                       },
                       {
@@ -3416,8 +3416,8 @@
                         "name": "role",
                         "value": "menu",
                         "sourceLoc": {
-                          "start": 3394,
-                          "end": 3405
+                          "start": 3405,
+                          "end": 3416
                         }
                       }
                     ],
@@ -3428,8 +3428,8 @@
                         "type": "TemplateStaticText",
                         "text": "\n    ",
                         "sourceLoc": {
-                          "start": 3406,
-                          "end": 3411
+                          "start": 3417,
+                          "end": 3422
                         }
                       },
                       {
@@ -3473,14 +3473,14 @@
                         "type": "TemplateStaticText",
                         "text": "\n  ",
                         "sourceLoc": {
-                          "start": 3434,
-                          "end": 3437
+                          "start": 3445,
+                          "end": 3448
                         }
                       }
                     ],
                     "sourceLoc": {
-                      "start": 3333,
-                      "end": 3443
+                      "start": 3344,
+                      "end": 3454
                     },
                     "tagKind": "html"
                   }
@@ -3491,7 +3491,7 @@
         ],
         "sourceLoc": {
           "start": 3193,
-          "end": 3450
+          "end": 3461
         },
         "tagKind": "html"
       },
@@ -3499,14 +3499,14 @@
         "type": "TemplateStaticText",
         "text": "\n",
         "sourceLoc": {
-          "start": 3450,
-          "end": 3451
+          "start": 3461,
+          "end": 3462
         }
       }
     ],
     "sourceLoc": {
       "start": 3192,
-      "end": 3451
+      "end": 3462
     }
   },
   "inheritAttrs": true,
@@ -3519,8 +3519,8 @@
         "kind": "rule",
         "selector": ".dropdown",
         "loc": {
-          "start": 3472,
-          "end": 3528
+          "start": 3483,
+          "end": 3539
         },
         "isRootEscape": false
       },
@@ -3528,8 +3528,8 @@
         "kind": "rule",
         "selector": ".dropdown-panel",
         "loc": {
-          "start": 3529,
-          "end": 3738
+          "start": 3540,
+          "end": 3749
         },
         "isRootEscape": false
       }
@@ -3539,8 +3539,8 @@
         "kind": "rule",
         "selector": ":root",
         "loc": {
-          "start": 3817,
-          "end": 3854
+          "start": 3828,
+          "end": 3865
         },
         "isRootEscape": true
       }
@@ -3548,13 +3548,13 @@
     "portalRules": [],
     "engineRules": [],
     "sourceLoc": {
-      "start": 3471,
-      "end": 3855
+      "start": 3482,
+      "end": 3866
     }
   },
   "components": [],
   "sourceLoc": {
     "start": 587,
-    "end": 3873
+    "end": 3884
   }
 }

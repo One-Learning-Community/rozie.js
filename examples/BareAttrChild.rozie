@@ -23,7 +23,7 @@
 
 <template>
 <div class="bare-attr-child" :data-combobox="$props.combobox">
-  combobox = {{ $props.combobox }}
+  combobox = {{ $props.combobox }}<!-- ^? -->
 </div>
 </template>
 

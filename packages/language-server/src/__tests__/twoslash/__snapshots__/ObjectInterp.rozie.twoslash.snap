@@ -1,0 +1,7 @@
+[ObjectInterp.rozie#0] kind=template marker@L33 -> line 33
+const $data: {
+    obj: {
+        a: number;
+        b: number[];
+    };
+}

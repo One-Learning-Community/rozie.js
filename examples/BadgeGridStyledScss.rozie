@@ -40,7 +40,7 @@
 <template>
 <div class="badge-grid">
   <span r-for="badge in $props.badges" :key="badge" class="badge badge--neutral">
-    {{ badge }}
+    {{ badge }}<!-- ^? -->
   </span>
 </div>
 </template>

@@ -554,8 +554,8 @@
       "name": "panelEl",
       "elementTag": "div",
       "sourceLoc": {
-        "start": 3357,
-        "end": 3370
+        "start": 3368,
+        "end": 3381
       }
     }
   },
@@ -568,22 +568,22 @@
           "name": "open",
           "valueExpressionRaw": "$props.open",
           "sourceLoc": {
-            "start": 3281,
-            "end": 3300
+            "start": 3292,
+            "end": 3311
           }
         },
         {
           "name": "toggle",
           "valueExpressionRaw": "toggle",
           "sourceLoc": {
-            "start": 3301,
-            "end": 3317
+            "start": 3312,
+            "end": 3328
           }
         }
       ],
       "sourceLoc": {
-        "start": 3260,
-        "end": 3320
+        "start": 3271,
+        "end": 3331
       }
     },
     "": {
@@ -594,14 +594,14 @@
           "name": "close",
           "valueExpressionRaw": "close",
           "sourceLoc": {
-            "start": 3417,
-            "end": 3431
+            "start": 3428,
+            "end": 3442
           }
         }
       ],
       "sourceLoc": {
-        "start": 3411,
-        "end": 3434
+        "start": 3422,
+        "end": 3445
       }
     }
   },

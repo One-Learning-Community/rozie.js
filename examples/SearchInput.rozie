@@ -71,7 +71,7 @@ $onMount(() => {
   <button r-if="$data.query.length > 0" class="clear-btn" @click="clear" aria-label="Clear">
     ×
   </button>
-  <span r-else class="hint">{{ $props.minLength }}+ chars</span>
+  <span r-else class="hint">{{ $props.minLength }}+ chars</span><!-- ^? -->
 </div>
 </template>
 

@@ -167,6 +167,7 @@ examples/consumers/react-vite/src/Counter.rozie
 examples/consumers/react-vite/src/Dropdown.rozie
 examples/consumers/react-vite/src/Modal.rozie
 examples/consumers/react-vite/src/ModalConsumer.rozie
+examples/consumers/react-vite/src/ObjectInterp.rozie
 examples/consumers/react-vite/src/PropDefaultCoercion.rozie
 examples/consumers/react-vite/src/SearchInput.rozie
 examples/consumers/react-vite/src/TodoList.rozie

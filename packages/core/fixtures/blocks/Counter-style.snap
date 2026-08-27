@@ -2,8 +2,8 @@
   "node": {
     "type": "StyleAST",
     "loc": {
-      "start": 1411,
-      "end": 1710
+      "start": 1422,
+      "end": 1721
     },
     "cssText": "\n.counter { display: inline-flex; gap: 0.5rem; align-items: center; }\n.counter.hovering { background: rgba(0, 0, 0, 0.04); }\n.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }\nbutton { padding: 0.25rem 0.5rem; }\nbutton:disabled { opacity: 0.4; cursor: not-allowed; }\n",
     "rules": [
@@ -11,8 +11,8 @@
         "kind": "rule",
         "selector": ".counter",
         "loc": {
-          "start": 1412,
-          "end": 1480
+          "start": 1423,
+          "end": 1491
         },
         "isRootEscape": false
       },
@@ -20,8 +20,8 @@
         "kind": "rule",
         "selector": ".counter.hovering",
         "loc": {
-          "start": 1481,
-          "end": 1535
+          "start": 1492,
+          "end": 1546
         },
         "isRootEscape": false
       },
@@ -29,8 +29,8 @@
         "kind": "rule",
         "selector": ".value",
         "loc": {
-          "start": 1536,
-          "end": 1618
+          "start": 1547,
+          "end": 1629
         },
         "isRootEscape": false
       },
@@ -38,8 +38,8 @@
         "kind": "rule",
         "selector": "button",
         "loc": {
-          "start": 1619,
-          "end": 1654
+          "start": 1630,
+          "end": 1665
         },
         "isRootEscape": false
       },
@@ -47,8 +47,8 @@
         "kind": "rule",
         "selector": "button:disabled",
         "loc": {
-          "start": 1655,
-          "end": 1709
+          "start": 1666,
+          "end": 1720
         },
         "isRootEscape": false
       }

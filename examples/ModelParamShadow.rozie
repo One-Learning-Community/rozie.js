@@ -65,7 +65,7 @@ const logLabel = (label) => {
   <button @click="solve('demo-token')">solve</button>
   <button @click="setStatus('ready')">status</button>
   <button @click="logLabel('hi')">label</button>
-  <span class="status">{{ $data.status }}</span>
+  <span class="status">{{ $data.status }}</span><!-- ^? -->
 </div>
 </template>
 

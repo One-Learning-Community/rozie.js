@@ -33,7 +33,7 @@ import { usedName } from './partialLogic.rzts';
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ usedName }}</span>
+  <span class="echo">{{ usedName }}</span><!-- ^? -->
 </div>
 </template>
 

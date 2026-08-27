@@ -46,7 +46,7 @@ $expose({ note })
 
 <template>
 <div class="expose-trailing-optional">
-  {{ $data.value }}
+  {{ $data.value }}<!-- ^? -->
   <!-- Internal fewer-arg TEMPLATE @event call site (mirrors embla's
        Carousel.rozie `@click="scrollNext()"` built-in nav button) — this
        call lives in ir.listeners, NOT ir.setupBody.scriptProgram. -->

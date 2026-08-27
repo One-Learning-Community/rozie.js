@@ -32,7 +32,7 @@ const usedName = $computed(() => clamp(double($props.base)));
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ usedName }}</span>
+  <span class="echo">{{ usedName }}</span><!-- ^? -->
 </div>
 </template>
 

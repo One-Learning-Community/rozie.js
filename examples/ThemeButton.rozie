@@ -28,7 +28,7 @@ const theme = $inject('theme')
 
 <template>
 <button class="theme-button" data-theme-button type="button" @click="theme && theme.cycle()">
-  {{ theme && theme.color }}
+  {{ theme && theme.color }}<!-- ^? -->
 </button>
 </template>
 

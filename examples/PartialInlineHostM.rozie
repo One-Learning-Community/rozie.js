@@ -59,7 +59,7 @@ $onMount(() => {
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ gridKeydownHandlersM(1, 2) }}</span>
+  <span class="echo">{{ gridKeydownHandlersM(1, 2) }}</span><!-- ^? -->
   <span class="echo">{{ refreshRowModelM }}</span>
 </div>
 </template>

@@ -19,7 +19,7 @@ let fillDragUpG = beforeDeclG(1);
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ selectAllBoxG }}</span>
+  <span class="echo">{{ selectAllBoxG }}</span><!-- ^? -->
   <span class="echo">{{ afterDeclG(1) }}</span>
   <span class="echo">{{ rangeTransitionG }}</span>
   <span class="echo">{{ beforeDeclG(1) }}</span>

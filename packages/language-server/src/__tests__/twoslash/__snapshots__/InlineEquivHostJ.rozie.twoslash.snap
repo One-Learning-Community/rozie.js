@@ -1,0 +1,2 @@
+[InlineEquivHostJ.rozie#0] kind=template marker@L49 -> line 49
+const setColumnFilterJ: (colId: number, value: number) => number

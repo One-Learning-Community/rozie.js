@@ -56,7 +56,7 @@ $onMount(() => {
 
 <template>
 <div class="rozie-portal-list">
-  <slot name="item" portal :params="['item']" />
+  <slot name="item" portal :params="['item']" /><!-- ^? -->
 </div>
 </template>
 

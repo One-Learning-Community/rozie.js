@@ -41,7 +41,7 @@ const getCellValue = (row, column) => row?.[column.key]
 
 <template>
 <table class="rozie-table" :class="{ striped: $props.striped }">
-  <caption r-if="$props.caption">{{ $props.caption }}</caption>
+  <caption r-if="$props.caption">{{ $props.caption }}</caption><!-- ^? -->
   <thead>
     <tr>
       <slot name="header" :columns="$props.columns">

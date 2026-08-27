@@ -55,7 +55,7 @@ $onMount(() => {
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ editTransitionM }}</span>
+  <span class="echo">{{ editTransitionM }}</span><!-- ^? -->
   <span class="echo">{{ hostTailM(1) }}</span>
   <span class="echo">{{ columnChromeM(1) }}</span>
   <span class="echo">{{ outerM }}</span>

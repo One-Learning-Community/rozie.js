@@ -30,7 +30,7 @@
 
 <template>
 <div class="object-interp">
-  <p class="card--{{ $data.obj }}" :data-x="$data.obj">{{ $data.obj }}</p>
+  <p class="card--{{ $data.obj }}" :data-x="$data.obj">{{ $data.obj }}</p><!-- ^? -->
 </div>
 </template>
 

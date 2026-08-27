@@ -3,7 +3,7 @@
     "type": "TemplateAST",
     "loc": {
       "start": 1616,
-      "end": 2817
+      "end": 2828
     },
     "children": [
       {
@@ -179,38 +179,38 @@
                     "type": "TemplateText",
                     "text": "\n    ",
                     "loc": {
-                      "start": 1858,
-                      "end": 1863
+                      "start": 1869,
+                      "end": 1874
                     }
                   }
                 ],
                 "selfClosing": false,
                 "loc": {
                   "start": 1656,
-                  "end": 1870
+                  "end": 1881
                 }
               },
               {
                 "type": "TemplateText",
                 "text": "\n  ",
                 "loc": {
-                  "start": 1870,
-                  "end": 1873
+                  "start": 1881,
+                  "end": 1884
                 }
               }
             ],
             "selfClosing": false,
             "loc": {
               "start": 1643,
-              "end": 1882
+              "end": 1893
             }
           },
           {
             "type": "TemplateText",
             "text": "\n\n  ",
             "loc": {
-              "start": 1882,
-              "end": 1886
+              "start": 1893,
+              "end": 1897
             }
           },
           {
@@ -222,16 +222,16 @@
                 "rawName": "@submit.prevent",
                 "name": "submit",
                 "modifierChainText": ".prevent",
-                "modifierChainBaseOffset": 1899,
+                "modifierChainBaseOffset": 1910,
                 "chain": [],
                 "value": "add",
                 "valueLoc": {
-                  "start": 1909,
-                  "end": 1912
+                  "start": 1920,
+                  "end": 1923
                 },
                 "loc": {
-                  "start": 1892,
-                  "end": 1913
+                  "start": 1903,
+                  "end": 1924
                 }
               }
             ],
@@ -240,8 +240,8 @@
                 "type": "TemplateText",
                 "text": "\n    ",
                 "loc": {
-                  "start": 1914,
-                  "end": 1919
+                  "start": 1925,
+                  "end": 1930
                 }
               },
               {
@@ -253,16 +253,16 @@
                     "rawName": "r-model",
                     "name": "model",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 1933,
+                    "modifierChainBaseOffset": 1944,
                     "chain": [],
                     "value": "$data.draft",
                     "valueLoc": {
-                      "start": 1935,
-                      "end": 1946
+                      "start": 1946,
+                      "end": 1957
                     },
                     "loc": {
-                      "start": 1926,
-                      "end": 1947
+                      "start": 1937,
+                      "end": 1958
                     }
                   },
                   {
@@ -270,32 +270,32 @@
                     "rawName": "placeholder",
                     "name": "placeholder",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 1959,
+                    "modifierChainBaseOffset": 1970,
                     "chain": [],
                     "value": "What needs doing?",
                     "valueLoc": {
-                      "start": 1961,
-                      "end": 1978
+                      "start": 1972,
+                      "end": 1989
                     },
                     "loc": {
-                      "start": 1948,
-                      "end": 1979
+                      "start": 1959,
+                      "end": 1990
                     }
                   }
                 ],
                 "children": [],
                 "selfClosing": true,
                 "loc": {
-                  "start": 1919,
-                  "end": 1982
+                  "start": 1930,
+                  "end": 1993
                 }
               },
               {
                 "type": "TemplateText",
                 "text": "\n    ",
                 "loc": {
-                  "start": 1982,
-                  "end": 1987
+                  "start": 1993,
+                  "end": 1998
                 }
               },
               {
@@ -307,16 +307,16 @@
                     "rawName": "type",
                     "name": "type",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 1999,
+                    "modifierChainBaseOffset": 2010,
                     "chain": [],
                     "value": "submit",
                     "valueLoc": {
-                      "start": 2001,
-                      "end": 2007
+                      "start": 2012,
+                      "end": 2018
                     },
                     "loc": {
-                      "start": 1995,
-                      "end": 2008
+                      "start": 2006,
+                      "end": 2019
                     }
                   },
                   {
@@ -324,16 +324,16 @@
                     "rawName": ":disabled",
                     "name": "disabled",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 2018,
+                    "modifierChainBaseOffset": 2029,
                     "chain": [],
                     "value": "!$data.draft.trim()",
                     "valueLoc": {
-                      "start": 2020,
-                      "end": 2039
+                      "start": 2031,
+                      "end": 2050
                     },
                     "loc": {
-                      "start": 2009,
-                      "end": 2040
+                      "start": 2020,
+                      "end": 2051
                     }
                   }
                 ],
@@ -342,38 +342,38 @@
                     "type": "TemplateText",
                     "text": "Add",
                     "loc": {
-                      "start": 2041,
-                      "end": 2044
+                      "start": 2052,
+                      "end": 2055
                     }
                   }
                 ],
                 "selfClosing": false,
                 "loc": {
-                  "start": 1987,
-                  "end": 2053
+                  "start": 1998,
+                  "end": 2064
                 }
               },
               {
                 "type": "TemplateText",
                 "text": "\n  ",
                 "loc": {
-                  "start": 2053,
-                  "end": 2056
+                  "start": 2064,
+                  "end": 2067
                 }
               }
             ],
             "selfClosing": false,
             "loc": {
-              "start": 1886,
-              "end": 2063
+              "start": 1897,
+              "end": 2074
             }
           },
           {
             "type": "TemplateText",
             "text": "\n\n  ",
             "loc": {
-              "start": 2063,
-              "end": 2067
+              "start": 2074,
+              "end": 2078
             }
           },
           {
@@ -385,16 +385,16 @@
                 "rawName": "r-if",
                 "name": "if",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2075,
+                "modifierChainBaseOffset": 2086,
                 "chain": [],
                 "value": "$props.items.length > 0",
                 "valueLoc": {
-                  "start": 2077,
-                  "end": 2100
+                  "start": 2088,
+                  "end": 2111
                 },
                 "loc": {
-                  "start": 2071,
-                  "end": 2101
+                  "start": 2082,
+                  "end": 2112
                 }
               }
             ],
@@ -403,8 +403,8 @@
                 "type": "TemplateText",
                 "text": "\n    ",
                 "loc": {
-                  "start": 2102,
-                  "end": 2107
+                  "start": 2113,
+                  "end": 2118
                 }
               },
               {
@@ -416,16 +416,16 @@
                     "rawName": "r-for",
                     "name": "for",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 2116,
+                    "modifierChainBaseOffset": 2127,
                     "chain": [],
                     "value": "item in $props.items",
                     "valueLoc": {
-                      "start": 2118,
-                      "end": 2138
+                      "start": 2129,
+                      "end": 2149
                     },
                     "loc": {
-                      "start": 2111,
-                      "end": 2139
+                      "start": 2122,
+                      "end": 2150
                     }
                   },
                   {
@@ -433,16 +433,16 @@
                     "rawName": ":key",
                     "name": "key",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 2144,
+                    "modifierChainBaseOffset": 2155,
                     "chain": [],
                     "value": "item.id",
                     "valueLoc": {
-                      "start": 2146,
-                      "end": 2153
+                      "start": 2157,
+                      "end": 2164
                     },
                     "loc": {
-                      "start": 2140,
-                      "end": 2154
+                      "start": 2151,
+                      "end": 2165
                     }
                   },
                   {
@@ -450,16 +450,16 @@
                     "rawName": ":class",
                     "name": "class",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 2161,
+                    "modifierChainBaseOffset": 2172,
                     "chain": [],
                     "value": "{ done: item.done }",
                     "valueLoc": {
-                      "start": 2163,
-                      "end": 2182
+                      "start": 2174,
+                      "end": 2193
                     },
                     "loc": {
-                      "start": 2155,
-                      "end": 2183
+                      "start": 2166,
+                      "end": 2194
                     }
                   }
                 ],
@@ -468,16 +468,16 @@
                     "type": "TemplateText",
                     "text": "\n      ",
                     "loc": {
-                      "start": 2184,
-                      "end": 2191
+                      "start": 2195,
+                      "end": 2202
                     }
                   },
                   {
                     "type": "TemplateText",
                     "text": "\n      ",
                     "loc": {
-                      "start": 2401,
-                      "end": 2408
+                      "start": 2412,
+                      "end": 2419
                     }
                   },
                   {
@@ -489,16 +489,16 @@
                         "rawName": ":item",
                         "name": "item",
                         "modifierChainText": "",
-                        "modifierChainBaseOffset": 2419,
+                        "modifierChainBaseOffset": 2430,
                         "chain": [],
                         "value": "item",
                         "valueLoc": {
-                          "start": 2421,
-                          "end": 2425
+                          "start": 2432,
+                          "end": 2436
                         },
                         "loc": {
-                          "start": 2414,
-                          "end": 2426
+                          "start": 2425,
+                          "end": 2437
                         }
                       },
                       {
@@ -506,16 +506,16 @@
                         "rawName": ":toggle",
                         "name": "toggle",
                         "modifierChainText": "",
-                        "modifierChainBaseOffset": 2434,
+                        "modifierChainBaseOffset": 2445,
                         "chain": [],
                         "value": "() => toggle(item.id)",
                         "valueLoc": {
-                          "start": 2436,
-                          "end": 2457
+                          "start": 2447,
+                          "end": 2468
                         },
                         "loc": {
-                          "start": 2427,
-                          "end": 2458
+                          "start": 2438,
+                          "end": 2469
                         }
                       },
                       {
@@ -523,16 +523,16 @@
                         "rawName": ":remove",
                         "name": "remove",
                         "modifierChainText": "",
-                        "modifierChainBaseOffset": 2466,
+                        "modifierChainBaseOffset": 2477,
                         "chain": [],
                         "value": "() => removeItem(item.id)",
                         "valueLoc": {
-                          "start": 2468,
-                          "end": 2493
+                          "start": 2479,
+                          "end": 2504
                         },
                         "loc": {
-                          "start": 2459,
-                          "end": 2494
+                          "start": 2470,
+                          "end": 2505
                         }
                       }
                     ],
@@ -541,8 +541,8 @@
                         "type": "TemplateText",
                         "text": "\n        ",
                         "loc": {
-                          "start": 2495,
-                          "end": 2504
+                          "start": 2506,
+                          "end": 2515
                         }
                       },
                       {
@@ -559,16 +559,16 @@
                                 "rawName": "type",
                                 "name": "type",
                                 "modifierChainText": "",
-                                "modifierChainBaseOffset": 2522,
+                                "modifierChainBaseOffset": 2533,
                                 "chain": [],
                                 "value": "checkbox",
                                 "valueLoc": {
-                                  "start": 2524,
-                                  "end": 2532
+                                  "start": 2535,
+                                  "end": 2543
                                 },
                                 "loc": {
-                                  "start": 2518,
-                                  "end": 2533
+                                  "start": 2529,
+                                  "end": 2544
                                 }
                               },
                               {
@@ -576,16 +576,16 @@
                                 "rawName": ":checked",
                                 "name": "checked",
                                 "modifierChainText": "",
-                                "modifierChainBaseOffset": 2542,
+                                "modifierChainBaseOffset": 2553,
                                 "chain": [],
                                 "value": "item.done",
                                 "valueLoc": {
-                                  "start": 2544,
-                                  "end": 2553
+                                  "start": 2555,
+                                  "end": 2564
                                 },
                                 "loc": {
-                                  "start": 2534,
-                                  "end": 2554
+                                  "start": 2545,
+                                  "end": 2565
                                 }
                               },
                               {
@@ -593,24 +593,24 @@
                                 "rawName": "@change",
                                 "name": "change",
                                 "modifierChainText": "",
-                                "modifierChainBaseOffset": 2562,
+                                "modifierChainBaseOffset": 2573,
                                 "chain": [],
                                 "value": "toggle(item.id)",
                                 "valueLoc": {
-                                  "start": 2564,
-                                  "end": 2579
+                                  "start": 2575,
+                                  "end": 2590
                                 },
                                 "loc": {
-                                  "start": 2555,
-                                  "end": 2580
+                                  "start": 2566,
+                                  "end": 2591
                                 }
                               }
                             ],
                             "children": [],
                             "selfClosing": true,
                             "loc": {
-                              "start": 2511,
-                              "end": 2583
+                              "start": 2522,
+                              "end": 2594
                             }
                           },
                           {
@@ -622,30 +622,30 @@
                                 "type": "TemplateInterpolation",
                                 "rawExpr": " item.text ",
                                 "loc": {
-                                  "start": 2589,
-                                  "end": 2604
+                                  "start": 2600,
+                                  "end": 2615
                                 }
                               }
                             ],
                             "selfClosing": false,
                             "loc": {
-                              "start": 2583,
-                              "end": 2611
+                              "start": 2594,
+                              "end": 2622
                             }
                           }
                         ],
                         "selfClosing": false,
                         "loc": {
-                          "start": 2504,
-                          "end": 2619
+                          "start": 2515,
+                          "end": 2630
                         }
                       },
                       {
                         "type": "TemplateText",
                         "text": "\n        ",
                         "loc": {
-                          "start": 2619,
-                          "end": 2628
+                          "start": 2630,
+                          "end": 2639
                         }
                       },
                       {
@@ -657,16 +657,16 @@
                             "rawName": "@click",
                             "name": "click",
                             "modifierChainText": "",
-                            "modifierChainBaseOffset": 2642,
+                            "modifierChainBaseOffset": 2653,
                             "chain": [],
                             "value": "removeItem(item.id)",
                             "valueLoc": {
-                              "start": 2644,
-                              "end": 2663
+                              "start": 2655,
+                              "end": 2674
                             },
                             "loc": {
-                              "start": 2636,
-                              "end": 2664
+                              "start": 2647,
+                              "end": 2675
                             }
                           },
                           {
@@ -674,16 +674,16 @@
                             "rawName": "aria-label",
                             "name": "aria-label",
                             "modifierChainText": "",
-                            "modifierChainBaseOffset": 2675,
+                            "modifierChainBaseOffset": 2686,
                             "chain": [],
                             "value": "Remove",
                             "valueLoc": {
-                              "start": 2677,
-                              "end": 2683
+                              "start": 2688,
+                              "end": 2694
                             },
                             "loc": {
-                              "start": 2665,
-                              "end": 2684
+                              "start": 2676,
+                              "end": 2695
                             }
                           }
                         ],
@@ -692,68 +692,68 @@
                             "type": "TemplateText",
                             "text": "×",
                             "loc": {
-                              "start": 2685,
-                              "end": 2686
+                              "start": 2696,
+                              "end": 2697
                             }
                           }
                         ],
                         "selfClosing": false,
                         "loc": {
-                          "start": 2628,
-                          "end": 2695
+                          "start": 2639,
+                          "end": 2706
                         }
                       },
                       {
                         "type": "TemplateText",
                         "text": "\n      ",
                         "loc": {
-                          "start": 2695,
-                          "end": 2702
+                          "start": 2706,
+                          "end": 2713
                         }
                       }
                     ],
                     "selfClosing": false,
                     "loc": {
-                      "start": 2408,
-                      "end": 2709
+                      "start": 2419,
+                      "end": 2720
                     }
                   },
                   {
                     "type": "TemplateText",
                     "text": "\n    ",
                     "loc": {
-                      "start": 2709,
-                      "end": 2714
+                      "start": 2720,
+                      "end": 2725
                     }
                   }
                 ],
                 "selfClosing": false,
                 "loc": {
-                  "start": 2107,
-                  "end": 2719
+                  "start": 2118,
+                  "end": 2730
                 }
               },
               {
                 "type": "TemplateText",
                 "text": "\n  ",
                 "loc": {
-                  "start": 2719,
-                  "end": 2722
+                  "start": 2730,
+                  "end": 2733
                 }
               }
             ],
             "selfClosing": false,
             "loc": {
-              "start": 2067,
-              "end": 2727
+              "start": 2078,
+              "end": 2738
             }
           },
           {
             "type": "TemplateText",
             "text": "\n\n  ",
             "loc": {
-              "start": 2727,
-              "end": 2731
+              "start": 2738,
+              "end": 2742
             }
           },
           {
@@ -765,13 +765,13 @@
                 "rawName": "r-else",
                 "name": "else",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2740,
+                "modifierChainBaseOffset": 2751,
                 "chain": [],
                 "value": null,
                 "valueLoc": null,
                 "loc": {
-                  "start": 2734,
-                  "end": 2740
+                  "start": 2745,
+                  "end": 2751
                 }
               },
               {
@@ -779,16 +779,16 @@
                 "rawName": "class",
                 "name": "class",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2746,
+                "modifierChainBaseOffset": 2757,
                 "chain": [],
                 "value": "empty",
                 "valueLoc": {
-                  "start": 2748,
-                  "end": 2753
+                  "start": 2759,
+                  "end": 2764
                 },
                 "loc": {
-                  "start": 2741,
-                  "end": 2754
+                  "start": 2752,
+                  "end": 2765
                 }
               }
             ],
@@ -797,8 +797,8 @@
                 "type": "TemplateText",
                 "text": "\n    ",
                 "loc": {
-                  "start": 2755,
-                  "end": 2760
+                  "start": 2766,
+                  "end": 2771
                 }
               },
               {
@@ -810,16 +810,16 @@
                     "rawName": "name",
                     "name": "name",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 2770,
+                    "modifierChainBaseOffset": 2781,
                     "chain": [],
                     "value": "empty",
                     "valueLoc": {
-                      "start": 2772,
-                      "end": 2777
+                      "start": 2783,
+                      "end": 2788
                     },
                     "loc": {
-                      "start": 2766,
-                      "end": 2778
+                      "start": 2777,
+                      "end": 2789
                     }
                   }
                 ],
@@ -828,53 +828,53 @@
                     "type": "TemplateText",
                     "text": "Nothing to do. ✨",
                     "loc": {
-                      "start": 2779,
-                      "end": 2795
+                      "start": 2790,
+                      "end": 2806
                     }
                   }
                 ],
                 "selfClosing": false,
                 "loc": {
-                  "start": 2760,
-                  "end": 2802
+                  "start": 2771,
+                  "end": 2813
                 }
               },
               {
                 "type": "TemplateText",
                 "text": "\n  ",
                 "loc": {
-                  "start": 2802,
-                  "end": 2805
+                  "start": 2813,
+                  "end": 2816
                 }
               }
             ],
             "selfClosing": false,
             "loc": {
-              "start": 2731,
-              "end": 2809
+              "start": 2742,
+              "end": 2820
             }
           },
           {
             "type": "TemplateText",
             "text": "\n",
             "loc": {
-              "start": 2809,
-              "end": 2810
+              "start": 2820,
+              "end": 2821
             }
           }
         ],
         "selfClosing": false,
         "loc": {
           "start": 1617,
-          "end": 2816
+          "end": 2827
         }
       },
       {
         "type": "TemplateText",
         "text": "\n",
         "loc": {
-          "start": 2816,
-          "end": 2817
+          "start": 2827,
+          "end": 2828
         }
       }
     ]

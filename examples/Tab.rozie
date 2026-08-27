@@ -41,7 +41,7 @@ const tabs = $inject('tabs')
   :class="{ 'is-active': tabs && tabs.active === $props.index }"
   @click="tabs && tabs.setActive($props.index)"
 >
-  {{ $props.label }}
+  {{ $props.label }}<!-- ^? -->
 </button>
 </template>
 

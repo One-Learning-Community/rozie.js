@@ -901,7 +901,7 @@
       ],
       "sourceLoc": {
         "start": 2845,
-        "end": 2930
+        "end": 2941
       }
     },
     "": {
@@ -912,14 +912,14 @@
           "name": "close",
           "valueExpressionRaw": "close",
           "sourceLoc": {
-            "start": 3064,
-            "end": 3078
+            "start": 3075,
+            "end": 3089
           }
         }
       ],
       "sourceLoc": {
-        "start": 3058,
-        "end": 3081
+        "start": 3069,
+        "end": 3092
       }
     },
     "footer": {
@@ -930,14 +930,14 @@
           "name": "close",
           "valueExpressionRaw": "close",
           "sourceLoc": {
-            "start": 3154,
-            "end": 3168
+            "start": 3165,
+            "end": 3179
           }
         }
       ],
       "sourceLoc": {
-        "start": 3134,
-        "end": 3171
+        "start": 3145,
+        "end": 3182
       }
     }
   },

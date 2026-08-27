@@ -1,0 +1,4 @@
+[RModelLazy.rozie#0] kind=template marker@L25 -> line 25
+const $data: {
+    draft: string;
+}

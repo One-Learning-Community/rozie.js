@@ -479,7 +479,7 @@
       ],
       "sourceLoc": {
         "start": 1656,
-        "end": 1870
+        "end": 1881
       }
     },
     "": {
@@ -490,30 +490,30 @@
           "name": "item",
           "valueExpressionRaw": "item",
           "sourceLoc": {
-            "start": 2414,
-            "end": 2426
+            "start": 2425,
+            "end": 2437
           }
         },
         {
           "name": "toggle",
           "valueExpressionRaw": "() => toggle(item.id)",
           "sourceLoc": {
-            "start": 2427,
-            "end": 2458
+            "start": 2438,
+            "end": 2469
           }
         },
         {
           "name": "remove",
           "valueExpressionRaw": "() => removeItem(item.id)",
           "sourceLoc": {
-            "start": 2459,
-            "end": 2494
+            "start": 2470,
+            "end": 2505
           }
         }
       ],
       "sourceLoc": {
-        "start": 2408,
-        "end": 2709
+        "start": 2419,
+        "end": 2720
       }
     },
     "empty": {
@@ -521,8 +521,8 @@
       "presence": "always",
       "params": [],
       "sourceLoc": {
-        "start": 2760,
-        "end": 2802
+        "start": 2771,
+        "end": 2813
       }
     }
   },

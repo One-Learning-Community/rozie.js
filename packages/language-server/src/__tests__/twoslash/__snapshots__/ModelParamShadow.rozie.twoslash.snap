@@ -1,0 +1,4 @@
+[ModelParamShadow.rozie#0] kind=template marker@L68 -> line 68
+const $data: {
+    status: string;
+}

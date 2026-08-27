@@ -43,7 +43,7 @@ import { usedFirstF, usedSecondF } from './partialLogicF.rzts';
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ usedFirstF }}</span>
+  <span class="echo">{{ usedFirstF }}</span><!-- ^? -->
   <span class="echo">{{ usedSecondF }}</span>
 </div>
 </template>

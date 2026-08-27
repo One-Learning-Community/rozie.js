@@ -46,7 +46,7 @@ const decValue = () => { $model.value-- }
 <template>
 <div class="probe">
   <button @click="decCount" aria-label="Decrement count">−</button>
-  <span class="count">{{ $data.count }}</span>
+  <span class="count">{{ $data.count }}</span><!-- ^? -->
   <button @click="incCount" aria-label="Increment count">+</button>
   <button @click="decValue" aria-label="Decrement value">−</button>
   <span class="value">{{ $props.value }}</span>

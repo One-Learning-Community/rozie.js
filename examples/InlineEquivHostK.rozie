@@ -36,7 +36,7 @@ const sortIndicatorK = (n: number): number => ariaSortK(n) + 1;
 
 <template>
 <div class="partial-inline-host">
-  <span class="echo">{{ ariaSortK(1) }}</span>
+  <span class="echo">{{ ariaSortK(1) }}</span><!-- ^? -->
   <span class="echo">{{ sortIndicatorK(1) }}</span>
 </div>
 </template>

@@ -41,7 +41,7 @@
 
 <template>
 <slot name="header" />
-<div class="epsf-root" :class="'epsf-root--' + $props.variant">chrome</div>
+<div class="epsf-root" :class="'epsf-root--' + $props.variant">chrome</div><!-- ^? -->
 <slot />
 <slot name="footer" />
 </template>

@@ -32,7 +32,7 @@ function onConfirm() {
 <div class="modal-consumer">
   <Modal r-model:open="$data.open1">
     <template #header="{ close }">
-      <h2>{{ $props.title }}</h2>
+      <h2>{{ $props.title }}</h2><!-- ^? -->
       <button class="close" @click="close">×</button>
     </template>
     Are you sure you want to proceed?
