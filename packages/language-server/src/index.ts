@@ -44,3 +44,9 @@ export type {
 export { extractProducerSurface } from './producers.js';
 export type { ProducerSurface, ProducerEvent, ProducerSlot } from './producers.js';
 export type { FeatureContext } from './features.js';
+// Phase 85 Task 3 — the virtual-TypeScript generator, exported so the corpus
+// survey (scripts/survey.mjs) can import the SAME production function this
+// package's Volar language plugin uses internally, from the built dist
+// rather than a forked copy.
+export { generateVirtualTs } from './volar/virtualCode.js';
+export type { GenerateVirtualTsResult } from './volar/virtualCode.js';

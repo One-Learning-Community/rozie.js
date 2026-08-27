@@ -25,7 +25,8 @@
     "build:standalone": "tsdown --config tsdown.standalone.config.ts",
     "test": "vitest run --passWithNoTests",
     "lint": "biome lint src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "survey": "tsdown && node scripts/survey.mjs"
   },
   "dependencies": {
     "@rozie/core": "workspace:*",
