@@ -19,6 +19,7 @@
 import type { LanguageServicePlugin } from '@volar/language-service';
 import { URI } from 'vscode-uri';
 import { computeDiagnostics } from '../../diagnostics.js';
+import { toSourceDocument } from '../featureContext.js';
 
 const ROZIE_SOURCE_EMBEDDED_ID = 'rozie-source';
 
@@ -33,7 +34,16 @@ export function createRozieDiagnosticsPlugin(): LanguageServicePlugin {
         provideDiagnostics(document) {
           const decoded = context.decodeEmbeddedDocumentUri(URI.parse(document.uri));
           if (!decoded || decoded[1] !== ROZIE_SOURCE_EMBEDDED_ID) return undefined;
-          return computeDiagnostics(document);
+          // toSourceDocument (Plan 85-02 Task 2): `document.uri` here is the
+          // rozie-source EMBEDDED document's URI, not the plain `.rozie`
+          // file:// URI. `compile()`'s <components> import resolution
+          // (ROZ945) derives its base path from the document URI — against
+          // the embedded URI's opaque encoded path it always fails to
+          // resolve a real sibling file, producing a false ROZ945 on every
+          // file with a <components> block. Plan 85-01's fixtures (Probe /
+          // ProbeBad) had no <components> block, so this was latent until
+          // Plan 85-02's ProbeConsumer/ProbeProducer pair caught it.
+          return computeDiagnostics(toSourceDocument(context, document));
         },
       };
     },

@@ -11,6 +11,7 @@ import { createRozieCompletionPlugin } from './rozieCompletion.js';
 import { createRozieDiagnosticsPlugin } from './rozieDiagnostics.js';
 import { createRozieHoverPlugin } from './rozieHover.js';
 import { createRozieNavigationPlugin } from './rozieNavigation.js';
+import { createRozieRenamePlugin } from './rozieRename.js';
 import { createRozieSymbolsPlugin } from './rozieSymbols.js';
 
 export function createRozieServicePlugins(): LanguageServicePlugin[] {
@@ -20,5 +21,6 @@ export function createRozieServicePlugins(): LanguageServicePlugin[] {
     createRozieSymbolsPlugin(),
     createRozieNavigationPlugin(),
     createRozieCompletionPlugin(),
+    createRozieRenamePlugin(),
   ];
 }

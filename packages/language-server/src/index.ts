@@ -50,3 +50,7 @@ export type { FeatureContext } from './features.js';
 // rather than a forked copy.
 export { generateVirtualTs } from './volar/virtualCode.js';
 export type { GenerateVirtualTsResult } from './volar/virtualCode.js';
+// Phase 85 Plan 02 Task 3 — the full ROZ Volar service-plugin factory,
+// alongside the analyzer exports above (which the unit tests consume
+// directly and remain a stable surface).
+export { createRozieServicePlugins } from './volar/plugins/index.js';
