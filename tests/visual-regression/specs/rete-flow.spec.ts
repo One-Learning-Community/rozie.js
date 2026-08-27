@@ -5407,3 +5407,110 @@ for (const target of TARGETS) {
     ).not.toMatch(/\bL\b/);
   });
 }
+
+/**
+ * 44. ROUTE INVALIDATION ON RESET-TO-AUTO-SIZE — CR-01 (84-REVIEW.md). `resetNodeSize`
+ * (the double-click-a-resize-handle "reset to auto" gesture, D-08) is a THIRD
+ * graph-mutating, socket-moving gesture — exactly like drag (cell 41) and corner-drag
+ * resize (cell 42) — but the 84-02 staleness-invalidation work (D-04) never touched it:
+ * it rebuilt only `g.nodes`, never `g.connections`, so a route computed for a node's OLD
+ * box survives a reset to its auto box untouched, producing a visibly broken path (old
+ * intermediate points stitched onto new live socket coordinates).
+ *
+ * Mirrors cells 41/42's two-sequential-gesture structure exactly, substituting the
+ * touching gesture with a STATIONARY double-click on a resize handle (two rapid
+ * `page.mouse.click` cycles at the same point within the handle's 400ms pointerup-timing
+ * window — `rete-flow-resize`'s own precedent) rather than a drag. Note this gesture
+ * requires NO prior resize: `resetNodeSize` fires purely off timing, independent of
+ * whether the node's box actually changed (FlowCanvas.rozie's `onResizeHandleUp`).
+ *
+ *   1. Arrange (`e-skip` gets a real route, count ≥ 2 — cell 40's own proof).
+ *   2. Select node `B` (untouched by `e-skip`), double-click its `se` handle. Assert
+ *      `e-skip`'s waypoint count AND rendered `d` are BYTE-IDENTICAL to their post-arrange
+ *      values — the SCOPED half.
+ *   3. Select node `D` (`e-skip`'s own target endpoint), double-click its `se` handle.
+ *      Assert `e-skip`'s waypoint count drops to 0 and its `d` returns to a curve (no
+ *      line-to commands) — the DROP half: this is the exact regression CR-01 fixes.
+ *
+ * Both surfaces (model readout AND rendered `d`) are asserted at each step.
+ * Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-routing-reset [${target}]: resetting an untouched node keeps a route; resetting its own endpoint drops it`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasRouting&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(4);
+
+    const skipPath = page.locator('.rozie-flow-connection__path[marker-end="url(#rozie-arrow-e-skip)"]');
+    const readCount = async (testid: string): Promise<number> =>
+      Number((await page.getByTestId(testid).textContent())?.trim() ?? '0');
+
+    // Select the node (click its center, away from any edge/handle), then double-click
+    // its own `se` resize handle via two rapid stationary `page.mouse.click` cycles —
+    // mirrors `rete-flow-resize`'s own double-click-reset gesture exactly.
+    const dblClickResetSe = async (label: string) => {
+      const node = page.locator('.rozie-flow-node', { hasText: label }).first();
+      await expect(node).toBeVisible({ timeout: 10_000 });
+      const nb = await node.boundingBox();
+      if (!nb) throw new Error(`node ${label} bounding box unavailable`);
+      await page.mouse.click(nb.x + nb.width / 2, nb.y + nb.height / 2);
+      await expect(page.locator('.rozie-flow-node.is-selected')).toHaveCount(1, { timeout: 5_000 });
+      const seHandle = page.getByTestId('flow-resize-handle-se');
+      await expect(seHandle).toBeVisible({ timeout: 5_000 });
+      const seBox = await seHandle.boundingBox();
+      if (!seBox) throw new Error(`se-handle bounding box unavailable for node ${label}`);
+      const seCx = seBox.x + seBox.width / 2;
+      const seCy = seBox.y + seBox.height / 2;
+      await page.mouse.click(seCx, seCy);
+      await page.mouse.click(seCx, seCy);
+    };
+
+    // ---- 1. arrange: e-skip carries a real, settled route ----
+    await page.getByTestId('arrange-btn').click();
+    await expect
+      .poll(async () => readCount('skip-waypoint-count'), {
+        timeout: 15_000,
+        intervals: [100, 300, 600, 1000, 2000],
+      })
+      .toBeGreaterThanOrEqual(2);
+    await page.waitForTimeout(500);
+    const skipCountAfterArrange = await readCount('skip-waypoint-count');
+    const dSkipAfterArrange = await skipPath.getAttribute('d');
+    expect(dSkipAfterArrange, 'skip edge should have a rendered path after arrange').toBeTruthy();
+
+    // ---- 2. reset-double-click node B (untouched by e-skip) — SCOPED half ----
+    await dblClickResetSe('B');
+    await page.waitForTimeout(500);
+    expect(
+      await readCount('skip-waypoint-count'),
+      'a reset gesture on a node NOT touching e-skip must not change its waypoint count',
+    ).toBe(skipCountAfterArrange);
+    expect(
+      await skipPath.getAttribute('d'),
+      "e-skip's rendered path must be byte-identical after an unrelated node's reset",
+    ).toBe(dSkipAfterArrange);
+
+    // ---- 3. reset-double-click node D (e-skip's OWN endpoint) — DROP half (CR-01) ----
+    await dblClickResetSe('D');
+    await expect
+      .poll(async () => readCount('skip-waypoint-count'), { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe(0);
+    await page.waitForTimeout(400);
+    const dSkipAfterReset = await skipPath.getAttribute('d');
+    expect(
+      dSkipAfterReset,
+      'e-skip should redraw as a curve (no line-to) once its route is dropped by the reset',
+    ).not.toMatch(/\bL\b/);
+  });
+}
