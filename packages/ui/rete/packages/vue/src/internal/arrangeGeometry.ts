@@ -50,11 +50,30 @@ const FALLBACK_PORT_SIZE = 14;
 /**
  * The component's tuned ELK layout defaults, spread FIRST so a caller's
  * `userOptions` (spread LAST) wins on every shared key while an untouched
- * default survives. Deliberately sets NEITHER `elk.edgeRouting` NOR
- * `elk.algorithm` — the plugin supplies `elk.algorithm: 'layered'`,
- * `elk.hierarchyHandling: 'INCLUDE_CHILDREN'`, and POLYLINE routing
- * underneath, and both must survive untouched (overriding edgeRouting
- * measured worse for socket-to-socket chords).
+ * default survives.
+ *
+ * **SETS `elk.edgeRouting: 'ORTHOGONAL'` (Phase 84, measured — see
+ * `tests/elk-edge-sections.test.ts` and 84-CONTEXT.md D3/D5).** The plugin's
+ * own unconditional default is `POLYLINE`, which bends the NODE PLACEMENT
+ * rather than the edge itself. On a chain — the shape that motivated this
+ * phase — POLYLINE returns ZERO bendpoints, so a route this component now
+ * consumes (`autoArrange()` -> `connection.waypoints`) would always come back
+ * empty under the old default: a silent no-op on the exact case the phase
+ * exists to fix. An earlier version of this comment stated "overriding
+ * edgeRouting measured worse for socket-to-socket chords" — that measurement
+ * was taken while the route was still being DISCARDED, so it was really
+ * measuring placement side-effects on a bezier chord drawn between two raw
+ * endpoints. Now that the route is consumed instead of thrown away, the trade
+ * inverts: every probed shape routes at least as well under ORTHOGONAL, the
+ * chain contrast is starkest (0 bendpoints vs 4+), and the layout-time cost
+ * difference is negligible (~6% on a 48-node/86-edge graph). Escape hatch:
+ * `userOptions` is spread LAST, so a caller can restore the previous behaviour
+ * per call via `autoArrange({ options: { 'elk.edgeRouting': 'POLYLINE' } })`.
+ *
+ * Still sets NEITHER `elk.algorithm` NOR `elk.hierarchyHandling` — the plugin
+ * supplies `elk.algorithm: 'layered'` and
+ * `elk.hierarchyHandling: 'INCLUDE_CHILDREN'` unconditionally, and that half
+ * of the original discipline is untouched.
  *
  * `elk.layered.nodePlacement.strategy: 'NETWORK_SIMPLEX'` is a measured
  * choice: on the chain-6+skip-edge probe it yields 31px of skip-edge
@@ -70,6 +89,7 @@ export function arrangeLayoutOptions(
     'elk.layered.spacing.edgeNodeBetweenLayers': '30',
     'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
     'elk.layered.thoroughness': '10',
+    'elk.edgeRouting': 'ORTHOGONAL',
     ...(userOptions || {}),
   };
 }
@@ -132,4 +152,172 @@ export function arrangePortRect(
     height: portSize,
     side: elkSide,
   };
+}
+
+/**
+ * A two-number waypoint — one intermediate point on a routed connection.
+ * Always graph-space coordinates, matching node `x`/`y` (see M1 above and
+ * `tests/elk-edge-sections.test.ts`'s coordinate-space assertions).
+ */
+export interface Waypoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * Minimal, LOCALLY-DECLARED shape of what elkjs's `layout()` result carries —
+ * this module has zero dependency on elkjs's own types (or on elkjs at all)
+ * because it is vendored verbatim into every one of the six leaf packages by
+ * codegen's `copyInternal`, several of which do not otherwise depend on elkjs.
+ * Structural typing means the REAL elkjs result already satisfies this shape.
+ */
+interface ElkEdgeSectionLike {
+  bendPoints?: Array<{ x: number; y: number }>;
+}
+interface ElkEdgeLike {
+  id?: string;
+  sections?: ElkEdgeSectionLike[];
+}
+interface ElkLayoutResultLike {
+  edges?: ElkEdgeLike[];
+}
+
+/**
+ * The client-side denial-of-service guard for a pathological hand-authored
+ * `connection.waypoints` array (threat T-84-01-1). Every probed shape in this
+ * phase's planning stayed in the single digits; this cap is generous headroom
+ * well above any real layout while still bounding the SVG `d` string length
+ * `waypointPathD` below can produce from untrusted consumer data.
+ */
+const MAX_WAYPOINTS = 64;
+
+/**
+ * Maps an ELK edge id to the flat array of `{x,y}` points it routed through,
+ * built by CONCATENATING the `bendPoints` of every section of that edge in
+ * order — never a hard `sections[0]` (M6: a single-segment edge is the common
+ * case measured, but nothing guarantees ELK never splits one, so the read
+ * path must not assume it). Non-finite coordinates are dropped via the same
+ * finite-number guard `arrangePortRect` already uses. An edge that
+ * contributes NO points is OMITTED from the map entirely — this lets a caller
+ * distinguish "ELK routed this edge around something" from "ELK left it
+ * straight" and drop a stale `waypoints` field in the second case, rather than
+ * writing an empty array that would need its own "is this actually a route"
+ * check downstream. A nullish/malformed `result` yields an empty map rather
+ * than throwing (defensive: this consumes elkjs's own Web-Worker
+ * structured-clone output, per threat T-84-01-4).
+ */
+export function waypointsFromElkEdges(result: ElkLayoutResultLike | null | undefined): Map<string, Waypoint[]> {
+  const map = new Map<string, Waypoint[]>();
+  const edges = result && Array.isArray(result.edges) ? result.edges : [];
+
+  for (const edge of edges) {
+    if (!edge || edge.id == null) continue;
+    const points: Waypoint[] = [];
+    const sections = Array.isArray(edge.sections) ? edge.sections : [];
+    for (const section of sections) {
+      const bendPoints = section && Array.isArray(section.bendPoints) ? section.bendPoints : [];
+      for (const bp of bendPoints) {
+        if (bp && isFiniteNumber(bp.x) && isFiniteNumber(bp.y)) {
+          points.push({ x: bp.x, y: bp.y });
+        }
+      }
+    }
+    if (points.length) map.set(String(edge.id), points);
+  }
+
+  return map;
+}
+
+/**
+ * The defensive read-path normalizer for CONSUMER-AUTHORED `waypoints` data
+ * (as opposed to `waypointsFromElkEdges`'s output, which is already-trusted
+ * ELK data). Returns `null` unless `value` is a non-empty array whose EVERY
+ * entry carries a finite `x` and a finite `y` — one malformed entry rejects
+ * the whole array rather than silently dropping just that entry, so a caller
+ * can tell "no route" from "a route, some of it garbage". Always returns
+ * FRESH `{x,y}` point objects (never the caller's array or its element
+ * objects), so a later consumer-side mutation of their own graph object can
+ * never reach into anything already committed to the render path. Caps the
+ * read length at `MAX_WAYPOINTS` (T-84-01-1) — a pathological hand-authored
+ * graph cannot make `waypointPathD` below build an unbounded `d` string.
+ */
+export function sanitizeWaypoints(value: unknown): Waypoint[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+
+  const out: Waypoint[] = [];
+  for (const entry of value) {
+    const x = entry && typeof entry === 'object' ? (entry as { x?: unknown }).x : undefined;
+    const y = entry && typeof entry === 'object' ? (entry as { y?: unknown }).y : undefined;
+    if (!isFiniteNumber(x) || !isFiniteNumber(y)) return null;
+    out.push({ x, y });
+    if (out.length >= MAX_WAYPOINTS) break;
+  }
+
+  return out;
+}
+
+/**
+ * The pinned serialization for `edgeStyleSig`'s change-detection signature
+ * (FlowCanvas.rozie's `edgeStyleSig`/`:2766` — the highest-risk single line in
+ * this phase; see 84-CONTEXT.md D5). Returns the empty string for BOTH `null`
+ * and an empty array — absent and empty deliberately collapse to the SAME
+ * value because both mean "no route", so a connection that never had a route
+ * and one whose route was just cleared do not spuriously look "changed" to
+ * each other. Otherwise joins each point's coordinates with a comma and every
+ * point with a semicolon.
+ *
+ * Deliberately a hand-built delimited string, not `JSON.stringify`: it is
+ * order-of-keys independent, it cannot throw on an exotic consumer-supplied
+ * object shape, it is cheap, and it matches this file's own established
+ * `label + '|' + stroke + '|' + ...`-style hand-concatenated signature idiom
+ * rather than introducing a second serialization convention next to it.
+ */
+export function waypointsSignature(value: Waypoint[] | null | undefined): string {
+  if (!value || value.length === 0) return '';
+  return value.map((p) => `${p.x},${p.y}`).join(';');
+}
+
+/**
+ * Fresh-object builders for clearing/setting a connection's `waypoints`
+ * field — used instead of an inline object-rest or an assignment of an absent
+ * value because this file's established idiom for clearing a model field is
+ * always a fresh spread (`{ ...n, x, y }`, `{ ...g, nodes }`, etc.), and
+ * because a key whose VALUE is `undefined` survives some deep-clone/structured
+ * -clone strategies and not others — these helpers make the key genuinely
+ * ABSENT on every target, not merely nullish.
+ */
+export function withWaypoints<T extends Record<string, unknown>>(
+  conn: T,
+  points: Waypoint[],
+): T & { waypoints: Waypoint[] } {
+  return { ...conn, waypoints: points };
+}
+
+/**
+ * Returns the SAME object reference when `waypoints` is already absent (so a
+ * caller mapping a whole connection list can cheaply skip creating garbage
+ * for edges that never had a route), and a FRESH object with every other own
+ * key preserved and `waypoints` genuinely gone when present. Never mutates
+ * its input.
+ */
+export function withoutWaypoints<T extends Record<string, unknown>>(conn: T): T {
+  if (!conn || !Object.prototype.hasOwnProperty.call(conn, 'waypoints')) return conn;
+  const { waypoints: _waypoints, ...rest } = conn as Record<string, unknown>;
+  return rest as T;
+}
+
+/**
+ * Pure `d`-string generator for a waypoint-routed connection, matching the
+ * signature convention of the four generators already in `FlowCanvas.rozie`
+ * (`(start, end) -> d-string`) plus the one extra `points` parameter. Composes
+ * a single move-to plus one line-to per intermediate point plus a final
+ * line-to the end point — a plain multi-segment polyline, matching what ELK
+ * itself computed (its own routing style here IS a polyline). Numeric
+ * coordinates are interpolated into literal SVG path commands ONLY — this
+ * inherits the same no-injection discipline the existing generators already
+ * state (written via `setAttribute`, never `innerHTML` — T-84-01-2).
+ */
+export function waypointPathD(start: Waypoint, points: Waypoint[], end: Waypoint): string {
+  const all = [start, ...points, end];
+  return all.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ');
 }

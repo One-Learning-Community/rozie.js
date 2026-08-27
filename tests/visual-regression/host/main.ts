@@ -591,6 +591,17 @@ export const EXAMPLES = [
   // :width + resizable combination. The spec (rete-flow-fixed-width) asserts measured node
   // widths, so it is behavioral-only and owes no .png baseline.
   'FlowCanvasFixedWidth',
+  // Phase 84 (D-01/D-03/D-05, ELK-routed edges) — FlowCanvasRouting is the BEHAVIORAL cell
+  // (loader → examples/demos/FlowCanvasRoutingDemo.rozie): a a→b→c→d chain PLUS a labeled
+  // a→d skip edge, all four nodes seeded ON TOP of each other (fully tangled start — the
+  // skip edge's pre-arrange chord cuts through b and c). The spec (rete-flow-routing) proves
+  // autoArrange() writes a real multi-bendpoint route onto the skip edge (FR-02), that the
+  // ALREADY-RENDERED edge visibly redraws (FR-04, the edgeStyleSig gate), and that the
+  // rendered polyline geometrically clears both intermediate nodes (FR-03) — plus the
+  // label-midpoint behavior (FR-06) via the skip edge's `label`. Behavioral-only; NOT a
+  // screenshot cell (same precedent as FlowCanvasArrange — autoArrange is verb-only, so
+  // FlowCanvasScreenshot stays byte-identical).
+  'FlowCanvasRouting',
   // quick-260803-uwb (the 260702-wws dark deferral) — FlowCanvasDarkScreenshot is a PIXEL
   // cell (loader → examples/demos/FlowCanvasDarkScreenshotDemo.rozie): the same fixed
   // 3-node / 2-edge content-stable graph as FlowCanvasScreenshotDemo (identity transform,
@@ -1467,6 +1478,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasBodyResize: 'rozie-flow-canvas-body-resize',
   // 260825-mip — '-demo' appended by the entry → 'rozie-flow-canvas-fixed-width-demo'.
   FlowCanvasFixedWidth: 'rozie-flow-canvas-fixed-width',
+  // Phase 84 ELK-routed edges — '-demo' appended by the entry → 'rozie-flow-canvas-routing-demo'.
+  FlowCanvasRouting: 'rozie-flow-canvas-routing',
   // quick-260803-uwb dark pixel cell — '-demo' appended by the entry →
   // 'rozie-flow-canvas-dark-screenshot-demo' = kebab of FlowCanvasDarkScreenshotDemo.
   FlowCanvasDarkScreenshot: 'rozie-flow-canvas-dark-screenshot',
@@ -1955,6 +1968,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // 260825-mip — FlowCanvasFixedWidthDemo is self-contained (seeds its own 4-node graph,
   // one node per sizing leg). No parent props; no MODEL_PROPS entry.
   FlowCanvasFixedWidth: {},
+  // Phase 84 — FlowCanvasRoutingDemo is self-contained (seeds its own 4-node chain + skip
+  // edge graph; graph/zoom bound internally — the FlowCanvas precedent). No parent props.
+  FlowCanvasRouting: {},
   // quick-260803-uwb — FlowCanvasDarkScreenshotDemo is self-contained (hardcodes its own
   // fixed 3-node / 2-edge graph and pins zoom/interaction off). No parent props; no
   // MODEL_PROPS entry (graph is bound internally — the FlowCanvas precedent).

@@ -1,0 +1,145 @@
+<!--
+  FlowCanvasRoutingDemo.rozie — BEHAVIORAL consumer for Phase 84 T2 (D-01/D-03/D-05):
+  ELK-routed edges as `connection.waypoints`. Modeled on FlowCanvasArrangeDemo.rozie (same
+  components block, same arrange-button script shape, same self-contained bound graph,
+  `fit-on-mount` off, zoom 1) — this fixture is the SAME chain-of-4 + skip shape the
+  planning measurements (M3/M4/M7) and the elk-edge-sections.test.ts unit guard both use, so
+  the unit guard and this browser cell exercise ONE shape between them.
+
+  Seeds a→b→c→d chain PLUS a skip edge a→d, ALL FOUR nodes at the SAME x/y (fully tangled
+  start state — that is what makes the before/after assertion honest: the pre-arrange path
+  is a straight chord cutting through b and c). The skip edge also carries a `label`, so this
+  one fixture proves the label-midpoint behavior (FR-06) alongside the routing behavior
+  (FR-02/FR-03/FR-04).
+
+  `data-testid="node0-x".."node3-x"` read `Math.round($data.graph.nodes[i].x)` (the BOUND
+  model's x positions — a, b, c, d in seed order), matching the `node0-x`/`node1-x` naming
+  FlowCanvasArrangeDemo already established. `data-testid="skip-waypoint-count"` reads the
+  bound model's `connection.waypoints` length for the skip edge (0 before arrange; the spec
+  polls it after clicking `arrange-btn`).
+
+  Canvas wrapper sized generously (960×260): the arranged extent for this shape measured
+  ~910×95 graph units at zoom 1 (M7), and the spec samples rendered path geometry — nothing
+  may be clipped out of the canvas. Behavioral-only; NOT a screenshot cell (autoArrange is
+  verb-only → FlowCanvasScreenshot stays byte-identical, same precedent as
+  FlowCanvasArrangeDemo).
+-->
+
+<rozie name="FlowCanvasRoutingDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  // THE SINGLE SOURCE OF TRUTH — a→b→c→d chain PLUS a skip edge a→d, all four nodes seeded
+  // ON TOP of each other (same x/y) so the start state is fully tangled: a straight chord
+  // for the skip edge cuts directly through b and c. After autoArrange() the layered preset
+  // must separate the chain into non-overlapping columns AND route the skip edge around the
+  // two intermediate nodes (ORTHOGONAL — see arrangeGeometry.ts).
+  graph: {
+    nodes: [
+      { id: 'a', type: 'step', x: 80, y: 80, data: { label: 'A' } },
+      { id: 'b', type: 'step', x: 80, y: 80, data: { label: 'B' } },
+      { id: 'c', type: 'step', x: 80, y: 80, data: { label: 'C' } },
+      { id: 'd', type: 'step', x: 80, y: 80, data: { label: 'D' } },
+    ],
+    connections: [
+      { id: 'e-ab', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+      { id: 'e-bc', source: 'b', sourceOutput: 'out', target: 'c', targetInput: 'in' },
+      { id: 'e-cd', source: 'c', sourceOutput: 'out', target: 'd', targetInput: 'in' },
+      // the SKIP edge — the one whose route this fixture proves. Carries a label so the
+      // same fixture also proves the label-midpoint behavior (FR-06).
+      { id: 'e-skip', source: 'a', sourceOutput: 'out', target: 'd', targetInput: 'in', label: 'skip' },
+    ],
+  },
+}
+</data>
+
+<script>
+// Grab the FlowCanvas imperative handle ($refs.canvas) to drive autoArrange() — read in the
+// button handler (post-mount), never eagerly (ROZ123-safe). autoArrange() is async (elkjs
+// layout); we don't await in the handler — the bound `graph` re-binds when it resolves and
+// the node*-x / skip-waypoint-count readouts update (the spec waits on the settled readout).
+const doArrange = () => { const c = $refs.canvas; if (c && c.autoArrange) c.autoArrange() }
+
+// The skip edge's waypoint count, read off the BOUND model (not the engine) — the readout
+// the spec polls to prove autoArrange() actually wrote a route (FR-02) and that
+// reconcileConnections actually redrew it (FR-04, the edgeStyleSig gate).
+const skipWaypointCount = () => {
+  const conns = ($data.graph && $data.graph.connections) || []
+  const skip = conns.find((c) => c && c.id === 'e-skip')
+  return skip && Array.isArray(skip.waypoints) ? skip.waypoints.length : 0
+}
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — ELK-routed edges (behavioral)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="arrange-btn" @click="doArrange">arrange</button>
+    <span class="readout">A x: <b data-testid="node0-x">{{ Math.round($data.graph.nodes[0].x) }}</b></span>
+    <span class="readout">B x: <b data-testid="node1-x">{{ Math.round($data.graph.nodes[1].x) }}</b></span>
+    <span class="readout">C x: <b data-testid="node2-x">{{ Math.round($data.graph.nodes[2].x) }}</b></span>
+    <span class="readout">D x: <b data-testid="node3-x">{{ Math.round($data.graph.nodes[3].x) }}</b></span>
+    <span class="readout">skip waypoints: <b data-testid="skip-waypoint-count">{{ skipWaypointCount() }}</b></span>
+  </div>
+
+  <div class="flow-wrap" style="height: 260px; width: 960px">
+    <FlowCanvas
+      ref="canvas"
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+    >
+      <NodeType type="step">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+        <Port input="in" label="in" multiple />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 1000px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.controls button {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  background: #f8fafc;
+  cursor: pointer;
+}
+.controls .readout { font-size: 0.875rem; }
+.controls .readout b { font-variant-numeric: tabular-nums; }
+
+:root {
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

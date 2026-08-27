@@ -4919,3 +4919,175 @@ for (const target of TARGETS) {
     await expect.poll(async () => await widthOf('Sized'), { timeout: 5_000 }).toBe(240);
   });
 }
+
+/**
+ * 40. ELK-ROUTED EDGES — `autoArrange()` consumes ELK's own computed route instead of
+ * discarding it (Phase 84, D-01/D-03/D-05). `examples/demos/FlowCanvasRoutingDemo.rozie`
+ * seeds a a→b→c→d chain PLUS a labeled a→d SKIP edge, all four nodes tangled at the SAME
+ * x/y — the identical chain-of-4 + skip shape `elk-edge-sections.test.ts`'s unit guard
+ * uses (M3/M4/M7), so the unit guard and this browser cell exercise ONE shape between them.
+ *
+ * COUNT-ONLY OR EXISTENCE-ONLY ASSERTIONS ARE EXPLICITLY BANNED IN THIS CELL — a prior
+ * FlowCanvas VR regression (project_next_port_rete_flow) was once masked by exactly that
+ * shape of assertion. This cell's whole point is proving a REAL geometric route, not merely
+ * that something changed. Three independent AFTER-assertions are REQUIRED, each catching a
+ * DIFFERENT possible failure mode on its own:
+ *
+ *   (a) the `d` attribute actually CHANGED from its pre-arrange value. Catches a missed
+ *       `edgeStyleSig` extension: the model would carry the route correctly while
+ *       `reconcileConnections`'s `changed` gate never trips for this PRE-EXISTING edge, so
+ *       the canvas keeps drawing the OLD path forever — Phase 84's single highest-risk line.
+ *   (b) the new `d` is a multi-segment POLYLINE with AT LEAST as many line-to commands as
+ *       the model's own waypoint count. Catches a route dropped somewhere between `norm()`/
+ *       `connMeta` and the render branch (the model says "routed", the canvas draws a
+ *       bezier anyway — "the model changed" is asserted separately from "the pixels moved
+ *       correctly," and neither implies the other).
+ *   (c) GEOMETRIC: the path is densely re-sampled (via `getPointAtLength` + `getScreenCTM`,
+ *       so the area's pan/zoom transform is accounted for — the `rete-flow-align` idiom) and
+ *       mapped to page space; NO sample falls inside either intermediate node's bounding box
+ *       (with a small inward margin so a route that legitimately grazes a shared boundary
+ *       does not flake). Catches a route that changed SHAPE but still cuts through the very
+ *       nodes it was supposed to clear.
+ *
+ * The waypoint COUNT is asserted only as `>= 2` (proof of a real multi-segment route) —
+ * NEVER the exact authoritative count (4 for this shape under the shipped options, measured
+ * at planning time — see `elk-edge-sections.test.ts` / 84-CONTEXT.md M3). An exact-count
+ * assertion would make this cell brittle against a future spacing/placement tuning that is
+ * not itself a regression; the observed count is recorded in the SUMMARY instead.
+ *
+ * A BEFORE geometric assertion also has teeth: the pre-arrange bezier chord is asserted to
+ * fall inside an intermediate node's box — proving the "after" geometric clearance
+ * assertion is not vacuously true (there was something for the route to actually clear).
+ *
+ * BONUS (not one of the 3 required): the skip edge's label position is asserted to move
+ * off the pre-arrange chord midpoint after arrange — light coverage for the label-midpoint
+ * behavior (FR-06) this fixture's labeled skip edge also exercises.
+ *
+ * Behavioral-only — NO `toHaveScreenshot` (autoArrange is verb-only; matches the
+ * `rete-flow-arrange`/`rete-flow-large` precedent — arranged layout depends on measured,
+ * per-platform node dimensions, so no pixel baseline is owed).
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-routing [${target}]: autoArrange() routes an edge around intermediate nodes, proven geometrically`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasRouting&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(4);
+    await expect
+      .poll(async () => page.locator('.rozie-flow-connection__path').count(), { timeout: 15_000 })
+      .toBe(4);
+
+    // The skip edge's own <path> — identified by its per-connection marker id
+    // (`rozie-arrow-<connection.id>`, the SAME identifying attribute redraw()'s arrowhead
+    // already relies on), NOT by render-order index (which edges render first is not part
+    // of this feature's contract).
+    const skipPath = page.locator('.rozie-flow-connection__path[marker-end="url(#rozie-arrow-e-skip)"]');
+    await expect(skipPath).toHaveCount(1);
+    const skipLabel = page.locator('.rozie-flow-connection__label', { hasText: 'skip' });
+    await expect(skipLabel).toHaveCount(1);
+
+    // Give the watcher-driven redraw a moment to settle after mount (the rete-flow-align
+    // precedent) before the first geometry sample.
+    await page.waitForTimeout(800);
+
+    const nodeBox = async (label: string) => {
+      const box = await page.locator('.rozie-flow-node', { hasText: label }).first().boundingBox();
+      if (!box) throw new Error(`node ${label} bounding box unavailable`);
+      return box;
+    };
+    type Box = { x: number; y: number; width: number; height: number };
+    const insideBox = (pt: { x: number; y: number }, box: Box, margin = 3) =>
+      pt.x > box.x + margin &&
+      pt.x < box.x + box.width - margin &&
+      pt.y > box.y + margin &&
+      pt.y < box.y + box.height - margin;
+
+    // Dense-sample a <path> in PAGE space via getPointAtLength + getScreenCTM (accounts for
+    // the area's pan/zoom transform — same idiom as rete-flow-align).
+    const sampleGeometry = async (loc: typeof skipPath, samples: number) =>
+      loc.evaluate((path: SVGPathElement, count: number) => {
+        const total = path.getTotalLength();
+        const m = path.getScreenCTM();
+        if (!m) return [] as Array<{ x: number; y: number }>;
+        const pts: Array<{ x: number; y: number }> = [];
+        for (let i = 0; i <= count; i++) {
+          const len = (total * i) / count;
+          const p = path.getPointAtLength(len);
+          pts.push({ x: p.x * m.a + p.y * m.c + m.e, y: p.x * m.b + p.y * m.d + m.f });
+        }
+        return pts;
+      }, samples);
+
+    // ---- BEFORE: a bezier chord, and it genuinely cuts through an intermediate node ----
+    const dBefore = await skipPath.getAttribute('d');
+    expect(dBefore, 'pre-arrange path exists').toBeTruthy();
+    expect(
+      dBefore,
+      'pre-arrange path is a curve (classicConnectionPath emits M/C only, no line-to)',
+    ).not.toMatch(/\bL\b/);
+
+    const nodeBBox = await nodeBox('B');
+    const nodeCBox = await nodeBox('C');
+    const beforeSamples = await sampleGeometry(skipPath, 40);
+    const beforeHits = beforeSamples.some((p) => insideBox(p, nodeBBox) || insideBox(p, nodeCBox));
+    expect(
+      beforeHits,
+      'pre-arrange chord should cut through an intermediate node — proves the after-assertion is not vacuous',
+    ).toBe(true);
+
+    const labelXBefore = await skipLabel.getAttribute('x');
+    const labelYBefore = await skipLabel.getAttribute('y');
+
+    // ---- ARRANGE: click → the skip edge's waypoint readout settles to a REAL route ----
+    // Never assert the exact authoritative count (4 at planning time) — only that it is a
+    // genuine multi-segment route (>= 2). See docblock.
+    await page.getByTestId('arrange-btn').click();
+    const waypointReadout = page.getByTestId('skip-waypoint-count');
+    await expect
+      .poll(
+        async () => Number((await waypointReadout.textContent())?.trim() ?? '0'),
+        { timeout: 15_000, intervals: [100, 300, 600, 1000, 2000] },
+      )
+      .toBeGreaterThanOrEqual(2);
+    const waypointCount = Number((await waypointReadout.textContent())?.trim() ?? '0');
+
+    // ---- AFTER (a): the `d` attribute actually changed (the edgeStyleSig gate tripped) ----
+    await expect
+      .poll(async () => await skipPath.getAttribute('d'), { timeout: 10_000, intervals: [100, 300, 600, 1000, 2000] })
+      .not.toBe(dBefore);
+    const dAfter = await skipPath.getAttribute('d');
+
+    // ---- AFTER (b): a real multi-segment polyline, line-to count >= waypoint count ----
+    expect(dAfter, 'after-arrange path should be a polyline (contains line-to commands)').toMatch(/\bL\b/);
+    const lineToCount = (dAfter || '').split(/\s+/).filter((tok) => tok === 'L').length;
+    expect(
+      lineToCount,
+      `after-arrange line-to count (${lineToCount}) should be >= the model's waypoint count (${waypointCount})`,
+    ).toBeGreaterThanOrEqual(waypointCount);
+
+    // ---- AFTER (c): GEOMETRIC — the rendered route clears BOTH intermediate nodes ----
+    const nodeBBoxAfter = await nodeBox('B');
+    const nodeCBoxAfter = await nodeBox('C');
+    const afterSamples = await sampleGeometry(skipPath, 80);
+    const afterHits = afterSamples.some((p) => insideBox(p, nodeBBoxAfter) || insideBox(p, nodeCBoxAfter));
+    expect(afterHits, 'after-arrange route should geometrically clear both intermediate nodes').toBe(false);
+
+    // ---- BONUS (not one of the 3 required): the label moved off the old chord midpoint ----
+    const labelXAfter = await skipLabel.getAttribute('x');
+    const labelYAfter = await skipLabel.getAttribute('y');
+    expect(
+      labelXAfter !== labelXBefore || labelYAfter !== labelYBefore,
+      'label position should move onto the new route (FR-06)',
+    ).toBe(true);
+  });
+}

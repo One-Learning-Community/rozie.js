@@ -180,7 +180,13 @@ import { getDOMSocketPosition, classicConnectionPath } from 'rete-render-utils';
 // truthful measured-port-rect fallback). A RELATIVE specifier — codegen vendors
 // src/internal/ into every leaf (copyInternal) so this resolves verbatim on all six.
 // This is NOT the arrange plugin and does not weaken the lazy-import guarantee below.
-import { arrangeLayoutOptions, arrangePortRect } from './internal/arrangeGeometry';
+// Phase 84 (D-01/D-03/D-05) — the pure ELK-route waypoint helpers: sanitizing consumer-
+// authored route data, the edgeStyleSig-safe signature, the fresh-object connection builders,
+// and the waypoint `d`-string generator. Threaded through norm()/edgeStyleSig() (reconcile),
+// renderConnection's redraw() (render), and autoArrange()'s write-back (compute) — every one
+// CALLED directly, never handed to a third party as a bare function value (the Lit
+// unbound-prototype-method hazard from quick 260826-h7k does not recur here).
+import { arrangeLayoutOptions, arrangePortRect, sanitizeWaypoints, waypointPathD, waypointsFromElkEdges, waypointsSignature, withoutWaypoints, withWaypoints } from './internal/arrangeGeometry';
 // T2.6 — auto-layout (D-08, verb-only). The 3 deps (rete-auto-arrange-plugin / elkjs
 // @0.8.2 / web-worker) are OPTIONAL leaf peers, installed + bundle-smoked on all 6 in
 // Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
@@ -1550,10 +1556,12 @@ export async function autoArrange(opts: any) {
   // lastWrittenGraph, still the pre-arrange state). Gated on !programmatic + history.
   pushHistory();
   programmatic++;
+  let result: any = null;
   try {
-    await arrange.layout({
+    const layoutOutcome = await arrange.layout({
       options: arrangeLayoutOptions(opts && opts.options)
     });
+    result = layoutOutcome && layoutOutcome.result ? layoutOutcome.result : null;
   } finally {
     programmatic--;
   }
@@ -1572,9 +1580,21 @@ export async function autoArrange(opts: any) {
         y: v.position.y
       } : n;
     });
+    // Phase 84 (D-01/D-02/D-03) — write the route ELK just computed onto each connection it
+    // bent, and CLEAR it from every connection ELK left straight, so a re-arrange never
+    // leaves a stale route behind. `waypointsFromElkEdges` concatenates bendPoints across
+    // ALL of an edge's sections (never a hard sections[0]) and omits an edge that ELK left
+    // unbent, so "no entry in the map" means "no route" here too.
+    const routeById = waypointsFromElkEdges(result);
+    const connections = (g.connections || []).map((c: any) => {
+      if (!c || c.id == null) return c;
+      const points = routeById.get(String(c.id));
+      return points ? withWaypoints(c, points) : withoutWaypoints(c);
+    });
     commitGraph({
       ...g,
-      nodes
+      nodes,
+      connections
     });
   } finally {
     programmatic--;
@@ -2684,6 +2704,15 @@ onMount(() => {
     // entry, so it stays bezier too.
     const rawType = emeta && emeta.type != null ? String(emeta.type) : 'bezier';
     const edgeType = rawType === 'step' || rawType === 'smoothstep' || rawType === 'straight' ? rawType : 'bezier';
+    // ── ELK-routed edge (Phase 84, D-05) ─────────────────────────────────────────
+    // Resolved ONCE per render (not per redraw — the route doesn't change between socket
+    // moves). `emeta.waypoints` is already sanitized at norm() time, so this is a cheap
+    // presence check, not a re-validation. When present and non-empty, redraw() below draws
+    // a plain multi-segment polyline through the route instead of the edgeType dispatch;
+    // when absent (every connection today, and any edge autoArrange() hasn't routed), the
+    // existing four-way dispatch runs completely untouched — byte-identical to before this
+    // phase, which is what keeps every existing pixel baseline valid.
+    const route = emeta && Array.isArray(emeta.waypoints) && emeta.waypoints.length ? emeta.waypoints : null;
     // Arrowhead geometry (redraw): the head is oriented along the path's tangent
     // over its LAST `ARROW_LEN` (angled for a descending edge, aligned with where
     // the line actually meets the head — unlike the chord, which diverges from the
@@ -2708,9 +2737,14 @@ onMount(() => {
     const curvature$local = typeof curvature === 'number' ? curvature : 0.3;
     const redraw = () => {
       if (!start || !end) return;
-      // branch on the resolved edge type; default (bezier/unknown) stays
-      // classicConnectionPath UNCHANGED → byte-identical bezier output.
-      const d = edgeType === 'step' ? stepPath(start, end) : edgeType === 'smoothstep' ? smoothstepPath(start, end) : edgeType === 'straight' ? straightPath(start, end) : classicConnectionPath([start, end], curvature$local);
+      // ROUTE check FIRST (Phase 84, D-05): when autoArrange() wrote a route onto this
+      // connection, draw a plain multi-segment polyline through it — matching ELK's own
+      // routing style — using the socket-watcher start/end (NEVER ELK's own section
+      // endpoints, which sit ~14px outside the node box per M2). Otherwise fall through
+      // COMPLETELY UNCHANGED to the existing edgeType dispatch; default (bezier/unknown)
+      // stays classicConnectionPath UNCHANGED → byte-identical bezier output, so this
+      // fallthrough is what keeps every existing pixel baseline valid.
+      const d = route ? waypointPathD(start, route, end) : edgeType === 'step' ? stepPath(start, end) : edgeType === 'smoothstep' ? smoothstepPath(start, end) : edgeType === 'straight' ? straightPath(start, end) : classicConnectionPath([start, end], curvature$local);
       path.setAttribute('d', d);
       // Orient the head and trim the visible stroke back to the arrow base (solid
       // edges) so the line meets the head without poking through the tip.
@@ -2743,8 +2777,22 @@ onMount(() => {
         if (!isDashed) path.removeAttribute('stroke-dasharray');
       }
       if (labelEl) {
-        labelEl.setAttribute('x', String((start.x + end.x) / 2));
-        labelEl.setAttribute('y', String((start.y + end.y) / 2));
+        // A waypointed edge's true midpoint is a point ALONG the polyline, not the chord
+        // between its raw endpoints — using the chord would float the label off the
+        // rendered line (Phase 84, D-05/FR-06). Gated on a route being present AND the
+        // same pathLen guard already computed above; falls back to the chord midpoint
+        // when pathLen is 0 (the non-rendering test-environment case, e.g. jsdom). When NO
+        // route is present the two attribute writes stay EXACTLY as before — making this
+        // unconditional would move the label on every existing labelled edge and invalidate
+        // pixel baselines for no benefit.
+        if (route && pathLen > 0) {
+          const mid = path.getPointAtLength(pathLen / 2);
+          labelEl.setAttribute('x', String(mid.x));
+          labelEl.setAttribute('y', String(mid.y));
+        } else {
+          labelEl.setAttribute('x', String((start.x + end.x) / 2));
+          labelEl.setAttribute('y', String((start.y + end.y) / 2));
+        }
       }
     };
 
@@ -3368,7 +3416,10 @@ onMount(() => {
       const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
       const tgtIn = spec.targetInput != null ? spec.targetInput : 'in';
       const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`;
-      // carry the optional per-edge label/style (F3) through to connMeta → renderConnection.
+      // carry the optional per-edge label/style (F3) — and now the optional auto-layout
+      // ROUTE (Phase 84, D-01) — through to connMeta → renderConnection, the same way.
+      // sanitizeWaypoints defends against a consumer-authored graph pushing malformed
+      // geometry into the render path (null unless every entry is a finite {x,y}).
       return {
         id,
         source: spec.source,
@@ -3378,11 +3429,17 @@ onMount(() => {
         label: spec.label,
         stroke: spec.stroke,
         dashed: spec.dashed,
-        type: spec.type
+        type: spec.type,
+        waypoints: sanitizeWaypoints(spec.waypoints)
       };
     };
-    // cheap style signature so a label/style/type change on an EXISTING edge re-renders it.
-    const edgeStyleSig = (s: any) => s ? String(s.label) + '|' + String(s.stroke) + '|' + String(s.dashed) + '|' + String(s.type) : '';
+    // cheap style signature so a label/style/type/ROUTE change on an EXISTING edge re-renders
+    // it. waypointsSignature MUST be included here (Phase 84, D-05 — the highest-risk single
+    // line in this phase): omitting the route from this string means autoArrange() writes a
+    // correct route into the model while this signature stays unchanged for every PRE-EXISTING
+    // edge, so the `changed` gate below never trips and the canvas keeps drawing the OLD path —
+    // the exact silent no-op this phase exists to avoid.
+    const edgeStyleSig = (s: any) => s ? String(s.label) + '|' + String(s.stroke) + '|' + String(s.dashed) + '|' + String(s.type) + '|' + waypointsSignature(s.waypoints) : '';
     const merged = graphConns.map(norm).filter(Boolean);
     const want = [];
     programmatic++;
