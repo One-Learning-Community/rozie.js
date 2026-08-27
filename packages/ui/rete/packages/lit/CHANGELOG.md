@@ -1,5 +1,106 @@
 # @rozie-ui/rete-lit
 
+## 0.3.0
+
+### Minor Changes
+
+- 7847537: The auto-layout verb now keeps the route the layout engine computed for an edge and draws
+  the edge along it, instead of discarding that route and drawing a straight curve directly
+  between the two sockets. Previously, an edge that had to route around an in-between node
+  (for example, a "skip" connection spanning several nodes in a flow) would still be drawn as
+  a straight line cutting through whatever sat between its endpoints, even though the
+  underlying layout engine had already computed a path around it.
+
+  A connection may now carry an optional route on the bound graph model. Because the route
+  lives in the model the consumer owns and persists, it survives a page reload instead of
+  reverting to a straight line the next time the graph is loaded.
+
+  The layout engine's edge-routing mode has changed as part of this fix, and that change
+  affects more than edge rendering: it also affects where the auto-layout verb places nodes.
+  An edge the engine had to route around something now renders as a segmented
+  (elbow-cornered) path after auto-layout, where it previously rendered as a straight or
+  gently curved line. But the same mode change also feeds into the engine's own node
+  placement, so calling the auto-layout verb on an existing graph can shift computed node
+  positions too, not only add edge routes — if your app persists an auto-layout result or has
+  a snapshot test pinned to specific node coordinates, expect those positions to move after
+  upgrading. An edge the engine left straight is unchanged, and a graph that never calls the
+  auto-layout verb is unchanged. If you need the previous edge-routing AND node-placement
+  behavior for any reason, pass `elk.edgeRouting: 'POLYLINE'` in the auto-layout verb's own
+  options to restore it for that call.
+
+  Moving, resizing, or resetting a node's size back to automatic now drops the stored route
+  of every connection attached to that node, so those edges fall back to the plain
+  straight-line style rather than continuing to point at where the node used to be. A route
+  is only ever dropped for a connection whose endpoint actually moved, resized, or reset;
+  every other connection's route is left untouched.
+
+### Patch Changes
+
+- bcb40dd: Fixed `autoArrange()` producing a fixed per-hop y offset (a "staircase") on a
+  source→target chain, which also dragged intermediate nodes into a skip
+  edge's reserved lane so that edge visually cut through them. `autoArrange()`
+  now reports each socket's real measured geometry to elk instead of the
+  built-in preset's engine-default offsets (which matched rete's own default
+  node view, not FlowCanvas's, and could not be corrected via layout options
+  once elk pinned the port positions). A node whose sockets are not yet
+  measurable still arranges via a symmetric, vertically-centred fallback port
+  instead of throwing or collapsing.
+
+  `opts.options` passed to `autoArrange(opts)` now overrides the component's
+  tuned elk layout defaults (spacing / node placement strategy) key-by-key,
+  rather than replacing them outright — a caller-supplied key wins, and every
+  other tuned default still applies.
+
+- The `@example` blocks in the types you import now show markup for **your** framework, not the
+  `.rozie` authoring notation the component was written in.
+
+  Before this release, every target read the exact same example, in `.rozie`'s own dialect. A React
+  consumer of `@rozie-ui/combobox` saw:
+
+  ```
+  @example
+  <Combobox r-model:value="country" :options="countries" />
+  ```
+
+  which doesn't typecheck as React and isn't how you'd actually write it. That same prop's example
+  now reads, per package:
+
+  ```
+  // React
+  <Combobox value={country} onValueChange={setCountry} options={countries} />
+
+  // Vue — unchanged, this IS Vue's own v-model: form
+  <Combobox v-model:value="country" :options="countries" />
+
+  // Svelte
+  <Combobox bind:value={country} options={countries} />
+
+  // Solid
+  <Combobox value={country()} onValueChange={setCountry} options={countries} />
+
+  // Angular
+  <rozie-combobox [(value)]="country" [options]="countries" />
+
+  // Lit
+  <rozie-combobox .value=${country} @value-change=${(e) => country = e.detail} .options=${countries}></rozie-combobox>
+  ```
+
+  Two things worth calling out:
+  - **Angular and Lit also rewrite the tag itself.** Both compile to a custom element under the
+    hood, and their examples now show the actual tag you'd write in a template —
+    `<rozie-combobox>`, not `<Combobox>`.
+  - **The Lit example deliberately shows the in-template property/event binding form**
+    (`.value=${…}` / `@value-change=${…}`), even though the generated usage page for the same
+    component teaches the imperative `el.value = …` / `el.addEventListener(...)` form. Both are
+    correct Lit; the JSDoc example favors the form that reads closest to the original `.rozie`
+    markup, and the usage page favors the form most Lit consumers reach for first. This divergence
+    is intentional, not a drift bug.
+
+  **Nothing else changed.** No runtime behavior moved, no prop/event/slot signature changed, no
+  export was added or removed — every changed line in every regenerated file is a documentation
+  comment. If you were reading a `docs.description` (the free-text prose above the `@example`
+  block), that text is byte-identical to before; only the code sample beneath it changed.
+
 ## 0.2.2
 
 ### Patch Changes

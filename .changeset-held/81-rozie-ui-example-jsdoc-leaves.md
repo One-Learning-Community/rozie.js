@@ -77,12 +77,6 @@
 "@rozie-ui/pdf-solid": patch
 "@rozie-ui/pdf-svelte": patch
 "@rozie-ui/pdf-vue": patch
-"@rozie-ui/rete-angular": patch
-"@rozie-ui/rete-lit": patch
-"@rozie-ui/rete-react": patch
-"@rozie-ui/rete-solid": patch
-"@rozie-ui/rete-svelte": patch
-"@rozie-ui/rete-vue": patch
 "@rozie-ui/sortable-list-angular": patch
 "@rozie-ui/sortable-list-lit": patch
 "@rozie-ui/sortable-list-react": patch
