@@ -67,6 +67,21 @@ export interface TemplateInterpolation {
   /** Raw text between `{{` and `}}` (whitespace preserved verbatim). */
   rawExpr: string;
   loc: SourceLoc;
+  /**
+   * REQ-V13 (Phase 85 Plan 03) — set ONLY by parser error recovery in
+   * `parseTemplate.ts`'s unmatched-`{{`-opener branch, on a node spanning
+   * the opener through the end of its text run. Optional and additive so
+   * every existing construction site (and every well-formed interpolation)
+   * stays exactly as it was — `recovered` is simply absent, never `false`.
+   *
+   * Consumers that LOWER to IR (`ir/lowerers/lowerTemplate.ts`) MUST skip
+   * any node with `recovered: true` — that's what keeps a half-typed `{{`
+   * from moving a single byte of emitted output (T-85-09). Consumers that
+   * only READ the AST (the Volar language server) use it the opposite way:
+   * to offer completion at a caret sitting inside a still-being-typed
+   * interpolation, which is the entire payoff of REQ-V13.
+   */
+  recovered?: true;
 }
 
 export interface TemplateAST {

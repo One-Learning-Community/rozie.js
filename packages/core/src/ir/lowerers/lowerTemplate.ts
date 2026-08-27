@@ -1777,6 +1777,16 @@ function lowerNodeList(
     }
 
     if (node.type === 'TemplateInterpolation') {
+      // REQ-V13 (Phase 85 Plan 03) — parser error-recovery nodes are
+      // additive-only, produced for a half-typed `{{` so the language
+      // server can offer completion at that caret. They must NEVER reach
+      // codegen: skipping here is what keeps emitted output byte-identical
+      // to the pre-recovery compiler for every `.rozie` file (T-85-09). The
+      // file is already an error file (the malformed-mustache diagnostic
+      // still fired, unchanged, in parseTemplate.ts) whose output never
+      // ships — this skip is what makes that true at the IR layer too.
+      if (node.recovered) continue;
+
       const expr = tryParseExpression(node.rawExpr);
       const interp: TemplateInterpolationIR = {
         type: 'TemplateInterpolation',

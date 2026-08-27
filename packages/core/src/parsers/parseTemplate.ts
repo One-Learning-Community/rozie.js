@@ -238,6 +238,24 @@ export function parseTemplate(
         loc: { start: start + cursor, end },
       };
       out.push(t);
+      if (unmatched >= 0) {
+        // REQ-V13 — additive parser-error-recovery node. The diagnostic
+        // above and the TemplateText node above are BOTH unchanged from
+        // before this branch existed — same code, severity, message, range,
+        // and text. This node is purely additive: it spans the opener
+        // through the end of the run, carrying the partial expression text
+        // (everything after the opener, possibly empty), marked
+        // `recovered: true` so `lowerTemplate.ts` skips it and emitted
+        // output stays byte-identical (T-85-09) while an editor gets a
+        // usable node to answer completion at a half-typed `{{`.
+        const recoveredInterp: TemplateInterpolation = {
+          type: 'TemplateInterpolation',
+          rawExpr: tail.slice(unmatched + 2),
+          loc: { start: start + cursor + unmatched, end },
+          recovered: true,
+        };
+        out.push(recoveredInterp);
+      }
     }
     return out;
   };
