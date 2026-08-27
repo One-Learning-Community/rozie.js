@@ -18,15 +18,21 @@ A connection may now carry an optional route on the bound graph model. Because t
 lives in the model the consumer owns and persists, it survives a page reload instead of
 reverting to a straight line the next time the graph is loaded.
 
-The layout engine's edge-routing mode has changed as part of this fix, which changes what
-auto-layout produces visually: an edge the engine had to route around something now renders
-as a segmented (elbow-cornered) path after auto-layout, where it previously rendered as a
-straight or gently curved line. An edge the engine left straight is unchanged, and a graph
-that never calls the auto-layout verb is unchanged. If you need the previous edge-routing
+The layout engine's edge-routing mode has changed as part of this fix, and that change
+affects more than edge rendering: it also affects where the auto-layout verb places nodes.
+An edge the engine had to route around something now renders as a segmented
+(elbow-cornered) path after auto-layout, where it previously rendered as a straight or
+gently curved line. But the same mode change also feeds into the engine's own node
+placement, so calling the auto-layout verb on an existing graph can shift computed node
+positions too, not only add edge routes — if your app persists an auto-layout result or has
+a snapshot test pinned to specific node coordinates, expect those positions to move after
+upgrading. An edge the engine left straight is unchanged, and a graph that never calls the
+auto-layout verb is unchanged. If you need the previous edge-routing AND node-placement
 behavior for any reason, pass `elk.edgeRouting: 'POLYLINE'` in the auto-layout verb's own
 options to restore it for that call.
 
-Moving or resizing a node now drops the stored route of every connection attached to that
-node, so those edges fall back to the plain straight-line style rather than continuing to
-point at where the node used to be. A route is only ever dropped for a connection whose
-endpoint actually moved or resized; every other connection's route is left untouched.
+Moving, resizing, or resetting a node's size back to automatic now drops the stored route
+of every connection attached to that node, so those edges fall back to the plain
+straight-line style rather than continuing to point at where the node used to be. A route
+is only ever dropped for a connection whose endpoint actually moved, resized, or reset;
+every other connection's route is left untouched.
