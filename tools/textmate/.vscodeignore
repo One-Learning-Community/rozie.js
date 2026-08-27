@@ -12,3 +12,10 @@ pnpm-lock.yaml
 .gitignore
 media/icon.svg
 .turbo/**
+
+# NOT excluded: server/typescript/** ships the TypeScript library the language
+# server self-resolves at runtime (Phase 85 REQ-V16) — a future *.d.ts / lib/**
+# exclusion added above would silently ship a type-less server. `server/` is
+# gitignored (build output) but that does not affect vsce packaging: vsce only
+# honors .vscodeignore when one exists, never .gitignore. See bundle-server.mjs.
+!server/typescript/**
