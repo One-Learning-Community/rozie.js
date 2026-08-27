@@ -1,0 +1,80 @@
+<rozie name="ProbeSlotScope">
+
+<template>
+<div class="probe-slot-scope">
+
+  <!-- Sibling fill #1 — a named fill with one destructured param. The fill
+       element's OWN bound attribute (:data-node-id) must see the param too,
+       and the body carries an interpolation, an event handler, AND a bound
+       attribute inside it. -->
+  <List1>
+    <template #default="{ node }" :data-node-id="node.id">
+      {{ node.label }}
+      <button @click="node.select()" :disabled="node.disabled">Pick</button>
+    </template>
+  </List1>
+
+  <!-- Sibling fill #2 — a differently-named param on a different slot. Must
+       see only its own binding, never `node` from List1. -->
+  <List2>
+    <template #footer="{ total }">
+      {{ total }}
+    </template>
+  </List2>
+
+  <!-- Multi-name destructure — every top-level binding resolves. -->
+  <List3>
+    <template #row="{ rowValue, columnValue }">
+      {{ rowValue }} / {{ columnValue }}
+    </template>
+  </List3>
+
+  <!-- Default-slot fill via the `#default` marker, on its own component, one
+       param — binds the same way a named fill does. -->
+  <List4>
+    <template #default="{ soleParam }">
+      {{ soleParam }}
+    </template>
+  </List4>
+
+  <!-- No parameter expression at all — no scope block, body unchanged. -->
+  <List5>
+    <template #header>
+      <strong>Static header</strong>
+    </template>
+  </List5>
+
+  <!-- Malformed parameter expression (unbalanced braces) — no scope block,
+       generator must not throw, module must still compile. -->
+  <List6>
+    <template #broken="{ a, ">
+      <span>still compiles</span>
+    </template>
+  </List6>
+
+  <!-- Leak probes: each fill's param used OUTSIDE any fill body (including a
+       DIFFERENT fill's own body) must still error — proves sibling
+       isolation, not just "outside every fill." -->
+  <div>{{ node }}</div>
+  <div>{{ total }}</div>
+
+  <!-- Nested composition: r-if wrapping r-for wrapping a slot fill, with a
+       loop alias AND a slot param both live at the innermost caret. After
+       the loop closes (still inside the fill), the slot param is still in
+       scope but the loop alias is not. -->
+  <ListNested>
+    <template #default="{ group }">
+      <div r-if="group.visible">
+        <div r-for="rowItem in group.items">
+          {{ group.label }} :: {{ rowItem.id }}
+        </div>
+        {{ group.label }}
+        {{ rowItem.stale }}
+      </div>
+    </template>
+  </ListNested>
+
+</div>
+</template>
+
+</rozie>
