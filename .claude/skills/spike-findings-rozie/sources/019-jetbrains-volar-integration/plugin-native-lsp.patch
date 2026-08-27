@@ -1,0 +1,254 @@
+diff --git a/tools/intellij-plugin/build.gradle.kts b/tools/intellij-plugin/build.gradle.kts
+index 540060761..843d7ca96 100644
+--- a/tools/intellij-plugin/build.gradle.kts
++++ b/tools/intellij-plugin/build.gradle.kts
+@@ -39,6 +39,8 @@ dependencies {
+         // -PplatformVersion=2024.2.5 / 2025.3 to drive the parallel jobs.
+         intellijIdeaUltimate(providers.gradleProperty("platformVersion").orElse("2024.2.5"))
+         bundledPlugin("JavaScript")
++        // SPIKE 019: native platform LSP API (com.intellij.platform.lsp.*) lives in
++        // lib/product-backend.jar, already on the platform compile classpath.
+         bundledPlugin("com.intellij.css")
+         // LSP4IJ (Red Hat) — the LSP client the plugin uses to consume the
+         // shared @rozie/language-server brain (Option C). 0.19.4 declares
+diff --git a/tools/intellij-plugin/gradle.properties b/tools/intellij-plugin/gradle.properties
+index 252afccc0..6d41e4298 100644
+--- a/tools/intellij-plugin/gradle.properties
++++ b/tools/intellij-plugin/gradle.properties
+@@ -6,7 +6,7 @@ pluginVersion=0.3.0
+ # Platform target (D-14 floor + RESEARCH Pitfall 8)
+ pluginSinceBuild=242
+ # untilBuild deliberately unset (RESEARCH Pitfall 7 — JetBrains best practice)
+-platformVersion=2024.2.5
++platformVersion=2026.1
+ 
+ # Toolchain
+ javaVersion=21
+diff --git a/tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/lsp/RozieLanguageServerFactory.kt b/tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/lsp/RozieLanguageServerFactory.kt
+deleted file mode 100644
+index 33702ce8f..000000000
+--- a/tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/lsp/RozieLanguageServerFactory.kt
++++ /dev/null
+@@ -1,76 +0,0 @@
+-package js.rozie.intellij.lsp
+-
+-import com.intellij.openapi.project.Project
+-import com.intellij.psi.PsiFile
+-import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport
+-import com.redhat.devtools.lsp4ij.LanguageServerFactory
+-import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures
+-import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature
+-import com.redhat.devtools.lsp4ij.client.features.LSPDefinitionFeature
+-import com.redhat.devtools.lsp4ij.client.features.LSPDocumentSymbolFeature
+-import com.redhat.devtools.lsp4ij.client.features.LSPHoverFeature
+-import com.redhat.devtools.lsp4ij.client.features.LSPReferencesFeature
+-import com.redhat.devtools.lsp4ij.client.features.LSPRenameFeature
+-import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
+-
+-/**
+- * LSP4IJ factory wiring the IntelliJ plugin to the shared `@rozie/language-server`
+- * (Option C). The server owns the semantic surface — ROZ diagnostics today,
+- * cross-block navigation / member-aware completion / rename later — so those
+- * features track `@rozie/core` directly instead of being re-implemented in
+- * Kotlin.
+- *
+- * Implements [LanguageServerEnablementSupport]: the server is enabled only when
+- * its Node script is resolvable (see [RozieLanguageServerProvider.resolveServerScript]).
+- * When it is not — the CI-built plugin ships no bundle, and headless tests set
+- * no override — the server stays disabled and never starts, so it cannot log
+- * start failures into the test logger or surface errors to users who simply
+- * lack the server.
+- */
+-class RozieLanguageServerFactory : LanguageServerFactory, LanguageServerEnablementSupport {
+-
+-    override fun createConnectionProvider(project: Project): StreamConnectionProvider =
+-        RozieLanguageServerProvider()
+-
+-    /**
+-     * Scope the IntelliJ LSP to **diagnostics only**. Unlike VS Code (no native
+-     * layer), IntelliJ already serves completion / navigation / find-usages /
+-     * rename / structure natively over the injected-PSI tree — and crucially,
+-     * LSP4IJ's caret features do not reach carets *inside* injected fragments
+-     * (where Rozie's `$props.x`, `<Modal>`, etc. live), so the server's
+-     * completion/definition/hover/rename never fire there anyway, while its
+-     * host-level references/documentSymbol merely *duplicate* the native ones
+-     * (the duplicate Find-Usages hits observed in GUI testing). Disabling those
+-     * six features leaves diagnostics (the ROZ codes from @rozie/core, the one
+-     * thing only the server provides) as the LSP's job in IntelliJ. The full
+-     * LSP surface remains active in VS Code via the language client.
+-     */
+-    override fun createClientFeatures(): LSPClientFeatures =
+-        LSPClientFeatures()
+-            .setCompletionFeature(object : LSPCompletionFeature() {
+-                override fun isEnabled(file: PsiFile): Boolean = false
+-            })
+-            .setReferencesFeature(object : LSPReferencesFeature() {
+-                override fun isEnabled(file: PsiFile): Boolean = false
+-            })
+-            .setRenameFeature(object : LSPRenameFeature() {
+-                override fun isEnabled(file: PsiFile): Boolean = false
+-            })
+-            .setHoverFeature(object : LSPHoverFeature() {
+-                override fun isEnabled(file: PsiFile): Boolean = false
+-            })
+-            .setDefinitionFeature(object : LSPDefinitionFeature() {
+-                override fun isEnabled(file: PsiFile): Boolean = false
+-            })
+-            .setDocumentSymbolFeature(object : LSPDocumentSymbolFeature() {
+-                override fun isEnabled(file: PsiFile): Boolean = false
+-            })
+-
+-    override fun isEnabled(project: Project): Boolean =
+-        RozieLanguageServerProvider.resolveServerScript() != null
+-
+-    override fun setEnabled(enabled: Boolean, project: Project) {
+-        // Enablement is derived purely from server-script resolvability; there
+-        // is no user-toggled persisted state to store.
+-    }
+-}
+diff --git a/tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/lsp/RozieLanguageServerProvider.kt b/tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/lsp/RozieLanguageServerProvider.kt
+deleted file mode 100644
+index d40ab1095..000000000
+--- a/tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/lsp/RozieLanguageServerProvider.kt
++++ /dev/null
+@@ -1,91 +0,0 @@
+-package js.rozie.intellij.lsp
+-
+-import com.intellij.execution.configurations.GeneralCommandLine
+-import com.intellij.openapi.diagnostic.logger
+-import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider
+-import java.io.File
+-import java.nio.file.Files
+-import java.nio.file.StandardCopyOption
+-
+-/**
+- * Spawns the shared `@rozie/language-server` (the Option-C brain) as
+- * `node server-standalone.cjs --stdio`. LSP4IJ pipes the connection; the server
+- * publishes `@rozie/core` diagnostics (ROZ codes) for `.rozie` host files.
+- *
+- * The server script is resolved lazily and may be absent (no bundle, no
+- * override) — [RozieLanguageServerFactory] gates on
+- * [resolveServerScript] via LanguageServerEnablementSupport so the server is
+- * simply *disabled* when unresolvable, rather than failing loudly. That keeps
+- * headless tests and the server-less CI plugin build quiet.
+- */
+-class RozieLanguageServerProvider : OSProcessStreamConnectionProvider() {
+-
+-    init {
+-        val script = resolveServerScript()
+-        if (script != null) {
+-            setCommandLine(GeneralCommandLine(resolveNodeExe(), script.absolutePath, "--stdio"))
+-        }
+-    }
+-
+-    companion object {
+-        private val LOG = logger<RozieLanguageServerProvider>()
+-
+-        /** Standalone bundle path within the plugin's classpath resources. */
+-        private const val BUNDLED_RESOURCE = "/language-server/server-standalone.cjs"
+-
+-        @Volatile private var extractionAttempted = false
+-        @Volatile private var extractedServer: File? = null
+-
+-        /**
+-         * Resolve the Node script for the language server, or null when
+-         * unavailable. Order:
+-         *   1. explicit override — system property `rozie.languageServer.path`
+-         *      or env `ROZIE_LANGUAGE_SERVER` (monorepo dev: point at
+-         *      `packages/language-server/dist-standalone/server-standalone.cjs`);
+-         *   2. the standalone bundle shipped in plugin resources (zero-config,
+-         *      once a release build copies it in);
+-         *   3. null → the server is disabled.
+-         */
+-        fun resolveServerScript(): File? {
+-            val override = System.getProperty("rozie.languageServer.path")
+-                ?: System.getenv("ROZIE_LANGUAGE_SERVER")
+-            if (!override.isNullOrBlank()) {
+-                val file = File(override)
+-                if (file.isFile) return file
+-                LOG.warn("rozie.languageServer.path / ROZIE_LANGUAGE_SERVER='$override' is not a file; ignoring.")
+-            }
+-            return extractBundledServer()
+-        }
+-
+-        /** The Node executable: override via `rozie.node.path` / `ROZIE_NODE`, else PATH `node`. */
+-        fun resolveNodeExe(): String =
+-            System.getProperty("rozie.node.path")
+-                ?: System.getenv("ROZIE_NODE")
+-                ?: "node"
+-
+-        /**
+-         * Extract the bundled standalone server to a temp file once (it's a
+-         * multi-MB resource). Returns null when the resource is absent — the
+-         * case for the CI-built plugin, which ships without the Node bundle.
+-         */
+-        private fun extractBundledServer(): File? {
+-            if (extractionAttempted) return extractedServer
+-            synchronized(this) {
+-                if (extractionAttempted) return extractedServer
+-                extractionAttempted = true
+-                val stream = RozieLanguageServerProvider::class.java
+-                    .getResourceAsStream(BUNDLED_RESOURCE) ?: return null
+-                extractedServer = stream.use { input ->
+-                    val target = File(
+-                        System.getProperty("java.io.tmpdir"),
+-                        "rozie-language-server/server-standalone.cjs",
+-                    )
+-                    target.parentFile?.mkdirs()
+-                    Files.copy(input, target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+-                    target
+-                }
+-                return extractedServer
+-            }
+-        }
+-    }
+-}
+diff --git a/tools/intellij-plugin/src/main/resources/META-INF/plugin.xml b/tools/intellij-plugin/src/main/resources/META-INF/plugin.xml
+index f4d5f5ca0..4d93ee2a1 100644
+--- a/tools/intellij-plugin/src/main/resources/META-INF/plugin.xml
++++ b/tools/intellij-plugin/src/main/resources/META-INF/plugin.xml
+@@ -69,11 +69,7 @@
+     <depends>com.intellij.modules.xml</depends>
+     <depends>JavaScript</depends>
+     <depends>com.intellij.css</depends>
+-    <!-- LSP4IJ (Red Hat) — the LSP client used to consume the shared
+-         @rozie/language-server brain (Option C). Semantic features (ROZ
+-         diagnostics, and later cross-block nav / member completion / rename)
+-         are served by @rozie/core over LSP rather than re-implemented here. -->
+-    <depends>com.redhat.devtools.lsp4ij</depends>
++    <!-- LSP4IJ dependency retired (Spike 017/019, REQ-V2/V4) — native platform LSP only. -->
+ 
+     <extensions defaultExtensionNs="com.intellij">
+         <fileType
+@@ -418,17 +414,23 @@
+          the server when its Node script can't be resolved, so this stays inert
+          in headless tests and in CI-built plugins that ship without the
+          bundle. -->
++    <!-- SPIKE 019: native platform LSP client, replacing LSP4IJ.
++         LSP4IJ has zero injected-language awareness (Spike 017), so it can never
++         serve a caret inside an injected fragment. The native API unwraps
++         injections centrally. Same extension point JetBrains' own Vue plugin
++         uses (VueLspServerSupportProvider). -->
++    <extensions defaultExtensionNs="com.intellij">
++        <platform.lsp.serverSupportProvider
++            implementation="js.rozie.intellij.lsp.RozieLspServerSupportProvider"/>
++    </extensions>
++
++    <!-- LSP4IJ registration retired (REQ-V2/V4). Kept commented for the A/B.
+     <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+-        <server id="rozie"
+-                name="Rozie Language Server"
+-                factoryClass="js.rozie.intellij.lsp.RozieLanguageServerFactory">
+-            <description><![CDATA[
+-                Diagnostics (ROZ codes) for <code>.rozie</code> files, served by
+-                the shared <code>@rozie/core</code> analyzer over LSP.
+-            ]]></description>
+-        </server>
++        <server id="rozie" name="Rozie Language Server"
++                factoryClass="js.rozie.intellij.lsp.RozieLanguageServerFactory"/>
+         <languageMapping language="Rozie" serverId="rozie"/>
+     </extensions>
++    -->
+ 
+     <actions>
+         <!-- 0.3.0: "New > Rozie Component" entry in the project-view New menu. -->

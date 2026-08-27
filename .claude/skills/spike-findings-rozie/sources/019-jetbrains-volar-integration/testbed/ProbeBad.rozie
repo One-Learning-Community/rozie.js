@@ -1,0 +1,24 @@
+<rozie>
+<props>
+{
+  label: { type: String, default: 'Click me' },
+  count: { type: Number, default: 0 },
+}
+</props>
+
+<data>
+{ clicks: 0 }
+</data>
+
+<script>
+function bump() {
+  $data.clicks = $props.bogus;
+}
+</script>
+
+<template>
+  <button @click="bump()">
+    {{ $props.label.toFixed(2) }}
+  </button>
+</template>
+</rozie>

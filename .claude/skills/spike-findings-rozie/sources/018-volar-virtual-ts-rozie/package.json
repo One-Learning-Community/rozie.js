@@ -1,0 +1,11 @@
+{
+  "name": "spike-018-volar-virtual-ts-rozie",
+  "private": true,
+  "type": "module",
+  "description": "Spike 018 — Volar createVirtualCode for .rozie → virtual TS. Standalone; NOT a pnpm workspace member.",
+  "dependencies": {
+    "@volar/language-core": "2.4.28",
+    "@volar/typescript": "2.4.28",
+    "typescript": "5.6.3"
+  }
+}

@@ -1,0 +1,6 @@
+ M tools/intellij-plugin/build.gradle.kts
+ M tools/intellij-plugin/gradle.properties
+ D tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/lsp/RozieLanguageServerFactory.kt
+ D tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/lsp/RozieLanguageServerProvider.kt
+ M tools/intellij-plugin/src/main/resources/META-INF/plugin.xml
+?? tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/lsp/RozieLspServerSupportProvider.kt

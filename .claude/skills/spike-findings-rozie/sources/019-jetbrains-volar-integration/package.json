@@ -1,0 +1,18 @@
+{
+  "name": "spike-019-rozie-volar-language-server",
+  "private": true,
+  "type": "module",
+  "description": "Spike 019 — a real Volar-based LSP server for .rozie, consumed by the IntelliJ native platform LSP API. Standalone; NOT a pnpm workspace member.",
+  "scripts": {
+    "bundle": "esbuild server.mjs --bundle --platform=node --format=cjs --outfile=dist/rozie-server.cjs --external:typescript"
+  },
+  "dependencies": {
+    "@volar/language-core": "2.4.28",
+    "@volar/language-server": "2.4.28",
+    "@volar/language-service": "2.4.28",
+    "@volar/typescript": "2.4.28",
+    "volar-service-typescript": "0.0.71",
+    "typescript": "5.6.3"
+  },
+  "devDependencies": { "esbuild": "0.28.2" }
+}
