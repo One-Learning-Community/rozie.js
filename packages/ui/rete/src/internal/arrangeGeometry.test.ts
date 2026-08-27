@@ -17,10 +17,19 @@
  * failure IS the RED signal until Task 2 creates `./arrangeGeometry`.
  */
 import { describe, expect, it } from 'vitest';
-import { arrangeLayoutOptions, arrangePortRect } from './arrangeGeometry';
+import {
+  arrangeLayoutOptions,
+  arrangePortRect,
+  sanitizeWaypoints,
+  waypointPathD,
+  waypointsFromElkEdges,
+  waypointsSignature,
+  withoutWaypoints,
+  withWaypoints,
+} from './arrangeGeometry';
 
 describe('arrangeLayoutOptions', () => {
-  it('returns exactly the six tuned keys with their exact string values when called with no override', () => {
+  it('returns exactly the seven tuned keys with their exact string values when called with no override', () => {
     const opts = arrangeLayoutOptions(undefined);
     expect(opts).toEqual({
       'elk.spacing.nodeNode': '40',
@@ -29,12 +38,13 @@ describe('arrangeLayoutOptions', () => {
       'elk.layered.spacing.edgeNodeBetweenLayers': '30',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
       'elk.layered.thoroughness': '10',
+      'elk.edgeRouting': 'ORTHOGONAL',
     });
   });
 
-  it('sets NEITHER elk.edgeRouting NOR elk.algorithm — the plugin owns those', () => {
+  it('sets elk.edgeRouting to ORTHOGONAL (Phase 84 — consuming ELK\'s route requires it, see arrangeGeometry.ts docblock) but leaves elk.algorithm to the plugin', () => {
     const opts = arrangeLayoutOptions(undefined);
-    expect(Object.prototype.hasOwnProperty.call(opts, 'elk.edgeRouting')).toBe(false);
+    expect(opts['elk.edgeRouting']).toBe('ORTHOGONAL');
     expect(Object.prototype.hasOwnProperty.call(opts, 'elk.algorithm')).toBe(false);
   });
 
@@ -86,5 +96,134 @@ describe('arrangePortRect', () => {
     expect(Number.isFinite(rect.x)).toBe(true);
     expect(Number.isFinite(rect.y)).toBe(true);
     expect(rect.y).toBe(52 / 2 - 14 / 2);
+  });
+});
+
+describe('waypointsFromElkEdges', () => {
+  it('concatenates bendPoints across ALL sections of an edge, in order', () => {
+    const result = {
+      edges: [
+        {
+          id: 'e1',
+          sections: [
+            { bendPoints: [{ x: 1, y: 2 }] },
+            { bendPoints: [{ x: 3, y: 4 }] },
+          ],
+        },
+      ],
+    };
+    const map = waypointsFromElkEdges(result);
+    expect(map.get('e1')).toEqual([
+      { x: 1, y: 2 },
+      { x: 3, y: 4 },
+    ]);
+  });
+
+  it('an edge with zero bendpoints is ABSENT from the map (so "no route" is distinguishable from "some route")', () => {
+    const result = { edges: [{ id: 'e1', sections: [{ bendPoints: [] }] }, { id: 'e2' }] };
+    const map = waypointsFromElkEdges(result);
+    expect(map.has('e1')).toBe(false);
+    expect(map.has('e2')).toBe(false);
+    expect(map.size).toBe(0);
+  });
+
+  it('drops non-finite coordinates', () => {
+    const result = {
+      edges: [{ id: 'e1', sections: [{ bendPoints: [{ x: NaN, y: 2 }, { x: 5, y: 6 }] }] }],
+    };
+    const map = waypointsFromElkEdges(result);
+    expect(map.get('e1')).toEqual([{ x: 5, y: 6 }]);
+  });
+
+  it('a missing/nullish result yields an empty map rather than throwing', () => {
+    expect(waypointsFromElkEdges(null).size).toBe(0);
+    expect(waypointsFromElkEdges(undefined).size).toBe(0);
+    expect(waypointsFromElkEdges({}).size).toBe(0);
+  });
+});
+
+describe('sanitizeWaypoints', () => {
+  it('returns null for nullish, non-array, or empty-array input', () => {
+    expect(sanitizeWaypoints(null)).toBeNull();
+    expect(sanitizeWaypoints(undefined)).toBeNull();
+    expect(sanitizeWaypoints('not an array')).toBeNull();
+    expect(sanitizeWaypoints({})).toBeNull();
+    expect(sanitizeWaypoints([])).toBeNull();
+  });
+
+  it('returns null when ANY entry carries a non-finite x or y', () => {
+    expect(sanitizeWaypoints([{ x: 1, y: 2 }, { x: NaN, y: 4 }])).toBeNull();
+    expect(sanitizeWaypoints([{ x: 1, y: 2 }, { x: 3, y: 'not a number' }])).toBeNull();
+    expect(sanitizeWaypoints([{ x: 1, y: 2 }, null])).toBeNull();
+  });
+
+  it('returns FRESH {x,y} objects — never the caller\'s array or its elements', () => {
+    const input = [{ x: 1, y: 2 }, { x: 3, y: 4 }];
+    const out = sanitizeWaypoints(input);
+    expect(out).toEqual(input);
+    expect(out).not.toBe(input);
+    expect(out![0]).not.toBe(input[0]);
+  });
+
+  it('caps at the documented maximum length (client-side DoS guard, T-84-01-1)', () => {
+    const huge = Array.from({ length: 10_000 }, (_, i) => ({ x: i, y: i }));
+    const out = sanitizeWaypoints(huge);
+    expect(out!.length).toBeLessThan(huge.length);
+    expect(out!.length).toBeGreaterThan(0);
+  });
+});
+
+describe('waypointsSignature', () => {
+  it('returns the empty string for null AND for an empty array — absent and empty compare EQUAL (both mean "no route")', () => {
+    expect(waypointsSignature(null)).toBe('');
+    expect(waypointsSignature(undefined)).toBe('');
+    expect(waypointsSignature([])).toBe('');
+    expect(waypointsSignature(null)).toBe(waypointsSignature([]));
+  });
+
+  it('changes when a single coordinate changes', () => {
+    const a = waypointsSignature([{ x: 1, y: 2 }]);
+    const b = waypointsSignature([{ x: 1, y: 3 }]);
+    expect(a).not.toBe(b);
+  });
+});
+
+describe('withWaypoints / withoutWaypoints', () => {
+  it('withoutWaypoints returns the SAME object reference when the key is absent', () => {
+    const conn = { id: 'e1', source: 'a', target: 'b' };
+    expect(withoutWaypoints(conn)).toBe(conn);
+  });
+
+  it('withoutWaypoints returns a fresh object with every other own key preserved and waypoints genuinely gone when present', () => {
+    const conn = { id: 'e1', source: 'a', target: 'b', waypoints: [{ x: 1, y: 2 }] };
+    const out = withoutWaypoints(conn);
+    expect(out).not.toBe(conn);
+    expect(Object.prototype.hasOwnProperty.call(out, 'waypoints')).toBe(false);
+    expect(out.id).toBe('e1');
+    expect(out.source).toBe('a');
+    expect(out.target).toBe('b');
+    // Never mutates the input.
+    expect(Object.prototype.hasOwnProperty.call(conn, 'waypoints')).toBe(true);
+  });
+
+  it('withWaypoints returns a fresh object and never mutates its input', () => {
+    const conn = { id: 'e1', source: 'a', target: 'b' };
+    const points = [{ x: 1, y: 2 }];
+    const out = withWaypoints(conn, points);
+    expect(out).not.toBe(conn);
+    expect(out.waypoints).toBe(points);
+    expect(Object.prototype.hasOwnProperty.call(conn, 'waypoints')).toBe(false);
+  });
+});
+
+describe('waypointPathD', () => {
+  it('composes a move-to plus one line-to per intermediate point plus a final line-to the end point', () => {
+    const d = waypointPathD({ x: 0, y: 0 }, [{ x: 1, y: 1 }, { x: 2, y: 2 }], { x: 3, y: 3 });
+    expect(d).toBe('M 0 0 L 1 1 L 2 2 L 3 3');
+  });
+
+  it('with no intermediate points, composes a single move-to plus one line-to', () => {
+    const d = waypointPathD({ x: 0, y: 0 }, [], { x: 3, y: 3 });
+    expect(d).toBe('M 0 0 L 3 3');
   });
 });
