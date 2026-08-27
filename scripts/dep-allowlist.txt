@@ -666,6 +666,8 @@
 @vitest/spy
 @vitest/utils
 @volar/language-core
+@volar/language-server
+@volar/language-service
 @volar/source-map
 @volar/typescript
 @vue/babel-helper-vue-transform-on
@@ -1368,6 +1370,7 @@ remark-parse
 remark-rehype
 remark-smartypants
 remark-stringify
+request-light
 require-directory
 require-from-string
 requires-port
@@ -1510,6 +1513,7 @@ type-fest
 type-is
 typed-assert
 typescript
+typescript-auto-import-cache
 ufo
 ultrahtml
 unconfig-core
@@ -1556,11 +1560,13 @@ vite-plugin-vue-inspector
 vitefu
 vitepress
 vitest
+volar-service-typescript
 vscode-jsonrpc
 vscode-languageserver
 vscode-languageserver-protocol
 vscode-languageserver-textdocument
 vscode-languageserver-types
+vscode-nls
 vscode-oniguruma
 vscode-textmate
 vscode-uri
