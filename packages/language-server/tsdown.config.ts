@@ -20,5 +20,13 @@ export default defineConfig({
     'vscode-languageserver',
     'vscode-languageserver/node',
     'vscode-languageserver-textdocument',
+    'vscode-uri',
+    '@volar/language-core',
+    '@volar/language-server',
+    '@volar/language-server/node.js',
+    '@volar/language-service',
+    '@volar/typescript',
+    'volar-service-typescript',
+    'typescript',
   ],
 });

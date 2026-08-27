@@ -15,6 +15,11 @@ export default defineConfig({
   dts: false,
   clean: true,
   // Inline EVERYTHING (@rozie/core + @babel/* + postcss + htmlparser2 + the
-  // vscode-languageserver libs). Only Node built-ins stay external.
+  // vscode-languageserver libs + the @volar/* packages) EXCEPT `typescript`,
+  // which must stay a real directory on disk: `loadTsdkByPath` needs to read
+  // TypeScript's own `lib.*.d.ts` files from disk, not from an inlined
+  // bundle (see volar/tsdk.ts). Only Node built-ins and `typescript` stay
+  // external.
+  external: ['typescript'],
   noExternal: [/.*/],
 });

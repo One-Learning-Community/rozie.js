@@ -1,124 +1,72 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+/**
+ * Phase 85 (D1) — the Rozie language server, rebuilt on Volar's
+ * `createServer`.
+ *
+ * One binary, one process, one client config, hosting BOTH:
+ *   - `volar-service-typescript` — real TypeScript type intelligence for
+ *     `.rozie` files via the generated virtual code (`volar/languagePlugin.ts`).
+ *   - the ROZ service plugins (`volar/plugins/index.js`) — `@rozie/core`
+ *     diagnostics, ported in place. This is the existing capability from the
+ *     hand-rolled server this file replaces; Plan 85-02 ports the remaining
+ *     six providers (hover, definition, completion, references, rename,
+ *     document symbols) behind the same plugin composition.
+ *
+ * `createTypeScriptProject` discovers and honors the CONSUMER project's own
+ * `tsconfig` — this file never constructs `compilerOptions` and, above all,
+ * never injects a `strict` flag anywhere (REQ-V10). Imposing it measured a
+ * 7.3-fold diagnostic inflation on the same corpus.
+ *
+ * When TypeScript cannot be resolved through ANY layer of `resolveTsdkPath`'s
+ * chain (T-85-02 — the total-miss case, expected under some IntelliJ
+ * configurations per REQ-V16), the server degrades to `createSimpleProject`
+ * and serves ROZ diagnostics only, logging the miss rather than throwing. A
+ * dead server is worse than a server with no types.
+ */
 import {
   createConnection,
-  type InitializeResult,
-  ProposedFeatures,
-  TextDocuments,
-  TextDocumentSyncKind,
-} from 'vscode-languageserver/node';
-import { TextDocument } from 'vscode-languageserver-textdocument';
-import { computeDiagnostics } from './diagnostics.js';
-import { computeDocumentSymbols } from './outline.js';
-import {
-  computeCompletions,
-  computeDefinition,
-  type FeatureContext,
-  computeHover,
-  computePrepareRename,
-  computeReferences,
-  computeRename,
-} from './features.js';
+  createServer,
+  createSimpleProject,
+  createTypeScriptProject,
+  loadTsdkByPath,
+} from '@volar/language-server/node.js';
+import { create as createTypeScriptServices } from 'volar-service-typescript';
+import { rozieLanguagePlugin } from './volar/languagePlugin.js';
+import { createRozieServicePlugins } from './volar/plugins/index.js';
+import { resolveTsdkPath, type WorkspaceFolderLike } from './volar/tsdk.js';
 
-const ROZIE_EXTENSION = '.rozie';
-
-/**
- * Start the Rozie language server over the stdio connection (the transport the
- * editor clients — the VSCode extension and IntelliJ via LSP4IJ — spawn it
- * with).
- *
- * First slice: publishes `@rozie/core` diagnostics (ROZ codes → host ranges) on
- * open/change. Completion, navigation, hover, and rename will register as
- * additional capabilities here, each backed by the same shared analyzer.
- */
 export function startServer(): void {
-  const connection = createConnection(ProposedFeatures.all);
-  const documents = new TextDocuments(TextDocument);
+  const connection = createConnection();
+  const server = createServer(connection);
 
-  connection.onInitialize(
-    (): InitializeResult => ({
-      capabilities: {
-        textDocumentSync: TextDocumentSyncKind.Incremental,
-        // `.` after a `$props`/`$data`/`$refs` sigil triggers member completion;
-        // `<` triggers composed-component tag-name completion.
-        completionProvider: { triggerCharacters: ['.', '<'] },
-        definitionProvider: true,
-        hoverProvider: true,
-        referencesProvider: true,
-        renameProvider: { prepareProvider: true },
-        documentSymbolProvider: true,
-      },
-    }),
-  );
+  connection.onInitialize((params) => {
+    const workspaceFolders: WorkspaceFolderLike[] =
+      params.workspaceFolders?.map((folder) => ({ uri: folder.uri })) ??
+      (params.rootUri ? [{ uri: params.rootUri }] : []);
 
-  // Resolve a request's target document, guarding to .rozie files only.
-  const rozieDoc = (uri: string): TextDocument | undefined => {
-    const doc = documents.get(uri);
-    return doc && doc.uri.endsWith(ROZIE_EXTENSION) ? doc : undefined;
-  };
+    const tsdkPath = resolveTsdkPath(params, workspaceFolders);
 
-  // Cross-file source resolver: prefer the open (possibly unsaved) document,
-  // else read from disk. Returns null when neither is available.
-  const featureContext: FeatureContext = {
-    readDoc(uri) {
-      const open = documents.get(uri);
-      if (open) return open.getText();
-      try {
-        return readFileSync(fileURLToPath(uri), 'utf8');
-      } catch {
-        return null;
-      }
-    },
-  };
+    if (!tsdkPath) {
+      connection.console.error(
+        '[rozie] TypeScript could not be resolved through any layer of the tsdk chain ' +
+          '(client-supplied, ROZIE_TSDK, bundled, workspace, or server-module resolution). ' +
+          'Serving ROZ diagnostics only — no TypeScript type intelligence this session.',
+      );
+      return server.initialize(params, createSimpleProject([rozieLanguagePlugin]), createRozieServicePlugins());
+    }
 
-  connection.onCompletion((params) => {
-    const doc = rozieDoc(params.textDocument.uri);
-    return doc ? computeCompletions(doc, params.position, featureContext) : [];
+    const tsdk = loadTsdkByPath(tsdkPath, params.locale);
+    connection.console.log(`[rozie] language server up — tsdk: ${tsdkPath}`);
+
+    return server.initialize(
+      params,
+      createTypeScriptProject(tsdk.typescript, tsdk.diagnosticMessages, () => ({
+        languagePlugins: [rozieLanguagePlugin],
+      })),
+      [...createTypeScriptServices(tsdk.typescript), ...createRozieServicePlugins()],
+    );
   });
 
-  connection.onDefinition((params) => {
-    const doc = rozieDoc(params.textDocument.uri);
-    return doc ? computeDefinition(doc, params.position, featureContext) : null;
-  });
-
-  connection.onHover((params) => {
-    const doc = rozieDoc(params.textDocument.uri);
-    return doc ? computeHover(doc, params.position) : null;
-  });
-
-  connection.onDocumentSymbol((params) => {
-    const doc = rozieDoc(params.textDocument.uri);
-    return doc ? computeDocumentSymbols(doc) : [];
-  });
-
-  connection.onReferences((params) => {
-    const doc = rozieDoc(params.textDocument.uri);
-    return doc ? computeReferences(doc, params.position, params.context.includeDeclaration) : [];
-  });
-
-  connection.onPrepareRename((params) => {
-    const doc = rozieDoc(params.textDocument.uri);
-    return doc ? computePrepareRename(doc, params.position) : null;
-  });
-
-  connection.onRenameRequest((params) => {
-    const doc = rozieDoc(params.textDocument.uri);
-    return doc ? computeRename(doc, params.position, params.newName) : null;
-  });
-
-  const publish = (doc: TextDocument): void => {
-    // Only diagnose .rozie documents — the client registers us for the Rozie
-    // language, but guard defensively so a stray document never reaches parse().
-    if (!doc.uri.endsWith(ROZIE_EXTENSION)) return;
-    void connection.sendDiagnostics({
-      uri: doc.uri,
-      diagnostics: computeDiagnostics(doc),
-    });
-  };
-
-  documents.onDidOpen((event) => publish(event.document));
-  documents.onDidChangeContent((change) => publish(change.document));
-
-  documents.listen(connection);
+  connection.onInitialized(server.initialized);
+  connection.onShutdown(server.shutdown);
   connection.listen();
 }

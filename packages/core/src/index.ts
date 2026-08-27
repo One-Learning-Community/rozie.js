@@ -7,6 +7,14 @@
 // inside a type annotation.
 // @experimental — shape may change before v1.0
 export { isInTypePosition } from './ast/typePosition.js';
+// Phase 85 (REQ-V8) — the reserved `$`-prefixed sigil set, previously only
+// available inside the semantic validator that enforces it. Volar's virtual-TS
+// generator (packages/language-server/src/volar/sigils.ts) needs this set to
+// build its ambient-declaration map without forking the list. Pure additive
+// export — no behavior change, no emitted-code change. REQ-V9 (unifying this
+// with the second sigil list in reactivity/computeDeps.ts) is Plan 85-03's job.
+// @experimental — shape may change before v1.0
+export { RESERVED_SIGILS } from './semantic/validators/reservedIdentifierValidator.js';
 // AST contract types (Plan 01 + Plan 03 + Plan 04 — concrete shapes).
 export type {
   BlockEntry,
