@@ -32,11 +32,13 @@ jobs:
     name: Build (platform=${{ matrix.platform }})
     runs-on: ubuntu-latest
     strategy:
-      # Don't kill the 2024.2.5 (floor) job if 2025.3 (current) regresses, and vice versa.
       fail-fast: false
       matrix:
-        # D-14: 2024.2 floor + a current platform.
-        platform: ['2024.2.5', '2025.3']
+        # Phase 85/REQ-V1: single native-platform-LSP floor. The pre-migration
+        # 2024.2.5/2025.3 legs are retired, not augmented — this leg, the
+        # since-build property, the platformVersion default and the
+        # plugin-verifier IDE list all name the same 2026.1 floor.
+        platform: ['2026.1']
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -71,7 +73,7 @@ jobs:
         run: ./gradlew verifyPlugin -PplatformVersion=${{ matrix.platform }}
 
       - name: Upload plugin .zip artifact (one variant only)
-        if: matrix.platform == '2024.2.5'
+        if: matrix.platform == '2026.1'
         uses: actions/upload-artifact@v7
         with:
           name: rozie-intellij-plugin-zip
@@ -147,12 +149,21 @@ jobs:
           body: |
             Internal Rozie.js IntelliJ plugin build.
 
+            **Requires a paid JetBrains IDE at the 2026.1+ platform floor** — IDEA
+            Ultimate, WebStorm, PhpStorm, RubyMine, GoLand or another IDE that
+            bundles the JavaScript plugin. IntelliJ IDEA Community Edition and
+            Android Studio are **not supported**: the native platform LSP API this
+            plugin's language intelligence depends on does not exist there.
+            Community Edition users get the same diagnostics/hover/completion/
+            go-to-definition from the Rozie VS Code extension, which consumes the
+            identical `@rozie/language-server`.
+
             **Install:**
             1. Download the `.zip` below
-            2. In IDEA Ultimate / WebStorm / PhpStorm / RubyMine / GoLand 2024.2+:
+            2. In IDEA Ultimate / WebStorm / PhpStorm / RubyMine / GoLand 2026.1+:
                Settings → Plugins → ⚙ → Install Plugin from Disk → select the .zip
             3. Restart the IDE
-            4. Open any `.rozie` file — block tags, r-* directives, @event modifiers, :prop bindings, {{ }} interpolations should be highlighted; JS autocomplete should work inside `<script>`/`<props>`/`<data>`/`<listeners>`; HTML autocomplete inside `<template>`; CSS inside `<style>`.
+            4. Open any `.rozie` file — block tags, r-* directives, @event modifiers, :prop bindings, {{ }} interpolations should be highlighted; JS autocomplete should work inside `<script>`/`<props>`/`<data>`/`<listeners>`; HTML autocomplete inside `<template>`; CSS inside `<style>`; and typed diagnostics/hover/go-to-definition should arrive from the bundled language server.
 
             **Not for Marketplace distribution.** Internal dogfooding build only.
           files: tools/intellij-plugin/build/distributions/*.zip

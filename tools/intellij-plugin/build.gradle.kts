@@ -34,19 +34,14 @@ dependencies {
         // helper is not used here (RESEARCH Standard Stack note).
         //
         // Plan 08-05: -PplatformVersion=<version> overrides the gradle.properties value
-        // (Gradle CLI -P properties shadow gradle.properties). The .orElse("2024.2.5")
-        // makes the floor explicit if both sources are absent — the CI matrix passes
-        // -PplatformVersion=2024.2.5 / 2025.3 to drive the parallel jobs.
-        intellijIdeaUltimate(providers.gradleProperty("platformVersion").orElse("2024.2.5"))
+        // (Gradle CLI -P properties shadow gradle.properties). The .orElse("2026.1")
+        // makes the floor explicit if both sources are absent — Phase 85/REQ-V1 raised
+        // the floor from 2024.2.5 to the single 2026.1 leg the CI matrix now drives.
+        intellijIdeaUltimate(providers.gradleProperty("platformVersion").orElse("2026.1"))
         bundledPlugin("JavaScript")
         // SPIKE 019: native platform LSP API (com.intellij.platform.lsp.*) lives in
         // lib/product-backend.jar, already on the platform compile classpath.
         bundledPlugin("com.intellij.css")
-        // LSP4IJ (Red Hat) — the LSP client the plugin uses to consume the
-        // shared @rozie/language-server brain (Option C). 0.19.4 declares
-        // since-build 242 with no upper bound, so it spans both platform legs
-        // (2024.2.5 / 2025.3).
-        plugin("com.redhat.devtools.lsp4ij", "0.19.4")
         testFramework(TestFrameworkType.Platform)
     }
     testImplementation("junit:junit:4.13.2")
@@ -63,7 +58,7 @@ intellijPlatform {
         name = "Rozie.js"
         version = project.version.toString()
         ideaVersion {
-            sinceBuild = "242"
+            sinceBuild = "261"
             // upper-bound deliberately unset per Pitfall 7 — let plugin verifier gate forward compat
         }
         vendor {
@@ -72,8 +67,17 @@ intellijPlatform {
         }
         description = """
             Internal dogfooding build — not for Marketplace distribution.
-            Adds .rozie file type recognition with Rozie-aware syntax highlighting
-            and JS/HTML/CSS language injection into block bodies.
+            Adds .rozie file type recognition with Rozie-aware syntax highlighting,
+            JS/HTML/CSS language injection into block bodies, and TypeScript-backed
+            language intelligence (diagnostics, hover, completion, go-to-definition)
+            served over the native platform LSP API by the shared
+            @rozie/language-server (Phase 85).
+            Requires IntelliJ IDEA Ultimate, WebStorm, PhpStorm or another paid
+            JetBrains IDE at the 2026.1+ platform floor. IntelliJ IDEA Community
+            Edition and Android Studio are not supported — the native platform LSP
+            API this plugin depends on does not exist there. Community Edition
+            users get the same language intelligence from the Rozie VS Code
+            extension, which consumes the identical language server.
         """.trimIndent()
         // Explicit changeNotes (Rule 3 fix) — the changelog plugin's auto-render
         // path expects a CHANGELOG.md with an [Unreleased] section; we set the
@@ -140,8 +144,11 @@ intellijPlatform {
         ides {
             // IPGP 2.16 renamed `ide(...)` to `create(...)` for plugin-verifier IDE entries
             // (verified by javap on IntelliJPlatformExtension$PluginVerification$Ides — Rule 3 fix).
-            create(IntelliJPlatformType.IntellijIdeaUltimate, "2024.2.5")
-            create(IntelliJPlatformType.IntellijIdeaUltimate, "2025.3")
+            // Phase 85/REQ-V1: single 2026.1 floor — the two pre-migration legs
+            // (2024.2.5 / 2025.3) are gone, not augmented; sinceBuild, the
+            // platformVersion default, this list and the CI matrix all name
+            // the same floor.
+            create(IntelliJPlatformType.IntellijIdeaUltimate, "2026.1")
         }
     }
 
@@ -170,22 +177,38 @@ tasks.named("compileKotlin") { dependsOn("generateRozieLexer") }
 tasks.named("compileJava") { dependsOn("generateRozieLexer") }
 
 // ---------------------------------------------------------------------------
-// Zero-config language-server bundling (Option C).
+// Zero-config language-server bundling (native platform LSP, Phase 85).
 //
 // The plugin can ship the standalone @rozie/language-server bundle inside its
-// resources at /language-server/server-standalone.cjs; RozieLanguageServerProvider
-// extracts and spawns it with no user setup. The bundle is a build artifact of
+// resources at /language-server/server-standalone.cjs; RozieLspServerSupportProvider
+// resolves and spawns it with no user setup. The bundle is a build artifact of
 // the `@rozie/language-server` package (pnpm), so we copy the prebuilt file into
 // a generated resources dir that's wired into the main resource set.
+//
+// Task 2 (Phase 85/REQ-V16): TypeScript cannot be inlined into that single-file
+// bundle — it loads its own lib.*.d.ts declaration files through the filesystem,
+// and the tsdk resolution chain (packages/language-server/src/volar/tsdk.ts,
+// step 3) wants a real `typescript/lib` directory sitting BESIDE the running
+// server module. Alongside the bundle, this also stages the subset the server
+// actually loads — the library entry point (`typescript.js`) and the library
+// declaration files (`lib.*.d.ts`) — deliberately NOT the package's full
+// published tree: `tsc.js`/`tsserver.js`/locale directories/`typescript.d.ts`
+// are build/CLI/localization surface the running language service never
+// touches (the English diagnostic message table ships embedded in
+// `typescript.js` itself — no separate locale file is loaded for the default
+// locale). This keeps the staged subset roughly half the size of the full
+// `typescript/lib` (~11 MB vs ~22 MB at the pinned 5.6.3).
 //
 // Graceful by design (preserves the Node-free CI plugin build): the copy is
 // `onlyIf` the prebuilt bundle exists, and the pnpm (re)build runs only under
 // `-PbuildServer`. When no bundle is present the plugin simply ships without a
-// server and the provider disables the LSP — exactly today's behavior.
+// server and the provider stays inert — exactly today's behavior.
 // ---------------------------------------------------------------------------
 val repoRoot = layout.projectDirectory.dir("../..")
 val serverBundleFile =
     repoRoot.file("packages/language-server/dist-standalone/server-standalone.cjs")
+val typescriptLibDir =
+    repoRoot.dir("packages/language-server/node_modules/typescript/lib")
 val generatedResourcesDir = layout.buildDirectory.dir("generated-resources")
 
 val buildLanguageServerBundle =
@@ -199,9 +222,15 @@ val buildLanguageServerBundle =
 
 val bundleLanguageServer =
     tasks.register<Copy>("bundleLanguageServer") {
-        description = "Stage the language-server bundle into plugin resources (no-op when absent)."
+        description = "Stage the language-server bundle and the TypeScript runtime its tsdk " +
+            "self-resolution chain loads (REQ-V16) into plugin resources (no-op when absent)."
         dependsOn(buildLanguageServerBundle)
         from(serverBundleFile)
+        from(typescriptLibDir) {
+            include("typescript.js")
+            include("lib.*.d.ts")
+            into("typescript/lib")
+        }
         into(generatedResourcesDir.map { it.dir("language-server") })
         // No bundle (Node-free CI) → copy nothing → plugin ships server-less.
         onlyIf { serverBundleFile.asFile.exists() }
