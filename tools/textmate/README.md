@@ -3,7 +3,7 @@
 Two layers for `.rozie` Single-File Components:
 
 - **Syntactic** — a TextMate grammar (`syntaxes/rozie.tmLanguage.json`). Consumed by JetBrains IDEs via the built-in TextMate-bundle host, by the **Shiki**-powered docs site, and by this VS Code extension's `contributes.grammars` entry.
-- **Semantic** — a `vscode-languageclient` that starts the shared [`@rozie/language-server`](../../packages/language-server) (the same Option-C "brain" the IntelliJ plugin consumes via LSP4IJ). It provides diagnostics (ROZ codes), `$props`/`$data`/`$refs` member completion + go-to-definition + hover + find-references + rename, cross-file component prop/event/slot completion, component-tag and slot-fill navigation, `lang=` value completion, and the document outline. See **[Language server](#language-server-semantic-features)** below.
+- **Semantic** — a `vscode-languageclient` that starts the shared [`@rozie/language-server`](../../packages/language-server), the same Volar-based server the JetBrains plugin consumes over the native platform LSP API (Phase 85; LSP4IJ, which could never serve a caret inside an injected fragment, has been retired). It provides real TypeScript type intelligence for `$props`/`$data`/`$refs`/template expressions AND `@rozie/core`'s own diagnostics (ROZ codes), member completion + go-to-definition + hover + find-references + rename, cross-file component prop/event/slot completion, component-tag and slot-fill navigation, `lang=` value completion, and the document outline. See **[Language server](#language-server-semantic-features)** below.
 
 ## Install — VS Code (marketplace)
 
@@ -164,4 +164,6 @@ live build instead:
 
 ## Editor coverage
 
-The JetBrains IntelliJ-Platform plugin has shipped (Kotlin, custom PSI, JS/HTML/CSS language injection) — it is the richer story for the paid JetBrains IDEs; see [`tools/intellij-plugin`](../intellij-plugin). This TextMate grammar remains the color-only path for **VS Code**, **IDEA Community / PyCharm CE**, and the **Shiki**-powered docs site, and is maintained alongside the language — see [`CHANGELOG.md`](CHANGELOG.md).
+This bundle is not the color-only fallback its grammar-only siblings are. **VS Code gets the full language server** — the same real TypeScript type intelligence and `@rozie/core` diagnostics the JetBrains Ultimate/WebStorm/PhpStorm-family plugin serves, from the identical `@rozie/language-server` binary (Phase 85), plus this bundle's own TextMate grammar for syntax highlighting. Both editors are thin clients over one implementation — neither reimplements Rozie-specific logic.
+
+**IDEA Community Edition and Android Studio are served here too**, and this is where they land: the native platform LSP API the JetBrains plugin's language intelligence depends on does not exist in either edition (Phase 85 D4/REQ-V4), so CE/Android Studio users get the TextMate grammar loaded via **Settings → Editor → TextMate Bundles** (see "Install — JetBrains" above) — color-only, no language server, since JetBrains' own TextMate Bundle host has no LSP-client concept to attach one through. The **Shiki**-powered docs site also consumes this same grammar for syntax highlighting only. See [`tools/intellij-plugin`](../intellij-plugin) for the richer, LSP-backed story on paid JetBrains IDEs, and [`CHANGELOG.md`](CHANGELOG.md) for version history.

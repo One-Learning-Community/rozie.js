@@ -9,13 +9,15 @@ import {
 } from 'vscode-languageclient/node';
 
 /**
- * VSCode side of the Option-C architecture: this extension already ships the
- * syntactic layer (the TextMate grammar in `contributes.grammars`); here we add
- * the semantic layer by starting a `vscode-languageclient` against the shared
- * `@rozie/language-server` — the same brain the IntelliJ plugin consumes via
- * LSP4IJ. Diagnostics, completion, go-to-definition, hover, find-references,
- * rename, and the document outline all arrive from the server, so VSCode reaches
- * feature parity with IntelliJ without re-implementing anything per editor.
+ * VSCode side of the two-editor Volar architecture (Phase 85): this extension
+ * already ships the syntactic layer (the TextMate grammar in
+ * `contributes.grammars`); here we add the semantic layer by starting a
+ * `vscode-languageclient` against the shared `@rozie/language-server` — the
+ * same server the JetBrains plugin consumes over the native platform LSP API
+ * (`com.intellij.platform.lsp.*`), not the retired LSP4IJ client. Diagnostics,
+ * completion, go-to-definition, hover, find-references, rename, and the
+ * document outline all arrive from the server, so VSCode reaches feature
+ * parity with IntelliJ without re-implementing anything per editor.
  */
 
 let client: LanguageClient | undefined;
