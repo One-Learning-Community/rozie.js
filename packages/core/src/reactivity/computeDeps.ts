@@ -30,6 +30,7 @@ import type { BindingsTable } from '../semantic/types.js';
 import type { SignalRef } from './signalRef.js';
 import { detectMagicAccess } from '../semantic/visitors.js';
 import { isInTypePosition } from '../ast/typePosition.js';
+import { RESERVED_SIGILS } from '../semantic/validators/reservedIdentifierValidator.js';
 
 // Default-export interop: @babel/traverse ships a CJS default export that some
 // bundlers (incl. Vitest's ESM resolver) wrap into { default: fn }. Normalize
@@ -85,17 +86,31 @@ const MAGIC_ACCESSOR_NAMES = new Set([
 ]);
 
 /**
- * Stable identifiers that match ExhaustiveDeps's `isStableKnownHookValue` —
- * never appear as deps. `$refs.foo` is handled as a MemberExpression skip;
- * `$emit` and `$el` are handled as Identifier skips.
+ * REQ-V9 (Phase 85 Plan 03) — the sigil-named portion of `STABLE_IDENTIFIERS`
+ * below, composed FROM `@rozie/core`'s authoritative `RESERVED_SIGILS`
+ * (`semantic/validators/reservedIdentifierValidator.ts`) rather than
+ * re-listed as independent string literals. This is the exact fix for the
+ * drift REQ-V9 names: `$snapshot` and `$classSelector` used to live ONLY
+ * here, absent from `RESERVED_SIGILS`, so a `<data>` field or `r-for` alias
+ * shadowing either one compiled clean instead of erroring (ROZ202).
  *
- * Also includes the JS-literal-shaped globals (`undefined`, `null`, `NaN`,
- * `Infinity`) — Babel parses these as Identifier nodes but they're value
- * literals, not bindings to track. Without this exclusion a user-written
- * `return undefined` inside `$onMount` lifts `undefined` into the React
- * useEffect cleanup wrapper and dep array → runtime `(void 0)()` TypeError.
+ * This is deliberately a NAMED SUBSET of `RESERVED_SIGILS`, not the full
+ * set — most reserved sigils (`$props`, `$data`, `$refs`, `$slots`, `$model`,
+ * `$slotted`, `$event`, `$expose`, `$provide`, `$inject`) are OBJECT-shaped
+ * magic accessors whose bare identifier is skipped via `MAGIC_ACCESSOR_NAMES`
+ * above, or don't behave as a stable no-op read in expression position at
+ * all.
+ *
+ * `STABLE_SIGIL_ALLOWLIST` is the intended membership; `STABLE_SIGIL_NAMES`
+ * below FILTERS it against `RESERVED_SIGILS` — the actual composition step.
+ * Both are exported so `sigilListUnification.test.ts` can assert the filter
+ * dropped nothing (`STABLE_SIGIL_NAMES.length === STABLE_SIGIL_ALLOWLIST.length`)
+ * — the standing drift guard that keeps the two lists from silently
+ * diverging again. A name silently falling out of `RESERVED_SIGILS` would
+ * otherwise shrink this set at runtime with no error, exactly reproducing
+ * the REQ-V9 bug this plan closes.
  */
-const STABLE_IDENTIFIERS = new Set([
+export const STABLE_SIGIL_ALLOWLIST: readonly string[] = [
   '$emit',
   '$el',
   // `$snapshot` is a target-rewritten passthrough (`$snapshot(x)` lowers to
@@ -143,6 +158,35 @@ const STABLE_IDENTIFIERS = new Set([
   // `useEffect` / `useMemo` dep array → runtime `ReferenceError`. Dep tracking
   // happens on the argument (e.g., `$data.graph`), not the sigil.
   '$clone',
+];
+
+/**
+ * REQ-V9 — the actual composition step: `STABLE_SIGIL_ALLOWLIST` filtered
+ * against `@rozie/core`'s authoritative `RESERVED_SIGILS`. Every name in the
+ * allowlist above is expected to survive this filter untouched; the
+ * drift-guard test asserts exactly that (see the doc comment above).
+ */
+export const STABLE_SIGIL_NAMES: readonly string[] = STABLE_SIGIL_ALLOWLIST.filter((name) =>
+  RESERVED_SIGILS.has(name),
+);
+
+/**
+ * Stable identifiers that match ExhaustiveDeps's `isStableKnownHookValue` —
+ * never appear as deps. `$refs.foo` is handled as a MemberExpression skip;
+ * `$emit` and `$el` are handled as Identifier skips.
+ *
+ * Composed from `STABLE_SIGIL_NAMES` (the shared sigil source, see above)
+ * plus its own extras — the JS-literal-shaped globals (`undefined`, `null`,
+ * `NaN`, `Infinity`). These are NOT sigils and must never become reserved
+ * identifiers (a `<data>` field literally cannot be named `undefined`
+ * either, but that's JS syntax, not ROZ202's job) — Babel parses them as
+ * Identifier nodes but they're value literals, not bindings to track.
+ * Without this exclusion a user-written `return undefined` inside `$onMount`
+ * lifts `undefined` into the React useEffect cleanup wrapper and dep array →
+ * runtime `(void 0)()` TypeError.
+ */
+const STABLE_IDENTIFIERS = new Set<string>([
+  ...STABLE_SIGIL_NAMES,
   'undefined',
   'null',
   'NaN',

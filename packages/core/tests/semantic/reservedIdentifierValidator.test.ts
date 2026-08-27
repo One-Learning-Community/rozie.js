@@ -39,7 +39,7 @@ function roz202(diags: { code: string }[]) {
 }
 
 describe('reservedIdentifierValidator — ROZ202', () => {
-  it('reserved set matches the 16 documented sigils', () => {
+  it('reserved set matches the 18 documented sigils', () => {
     expect([...RESERVED_SIGILS].sort()).toEqual(
       // Phase 14 added `$attrs` — consumer-passed attribute cluster.
       // Phase 15 added `$listeners` — consumer-passed listener cluster.
@@ -50,8 +50,14 @@ describe('reservedIdentifierValidator — ROZ202', () => {
       // Phase 45 added `$clone` — target-rewritten deep-clone call-form sigil.
       // quick 260807-cor (D4) added `$slotted` — Lit-only assigned-elements
       // member sigil, compile-time constant `[]` on the other five targets.
+      // Phase 85 Plan 03 (REQ-V9) added `$snapshot` / `$classSelector` —
+      // target-rewritten passthrough sigils that were previously reserved
+      // ONLY in reactivity/computeDeps.ts's STABLE_IDENTIFIERS set, absent
+      // from RESERVED_SIGILS. See sigilListUnification.test.ts for the
+      // standing drift guard that keeps the two lists from diverging again.
       [
         '$attrs',
+        '$classSelector',
         '$clone',
         '$data',
         '$el',
@@ -67,6 +73,7 @@ describe('reservedIdentifierValidator — ROZ202', () => {
         '$restoreFocus',
         '$slots',
         '$slotted',
+        '$snapshot',
       ].sort(),
     );
   });

@@ -20,6 +20,20 @@
  *   $inject  — cross-component context inject sigil (Phase 36)
  *   $slotted — Lit-only assigned-elements member sigil, `[]` constant on the
  *              other five targets (quick 260807-cor, D4)
+ *   $snapshot — target-rewritten unwrap passthrough (Phase 45 sibling);
+ *              lowers to `$state.snapshot(x)` on Svelte, `x` elsewhere
+ *   $classSelector — target-rewritten class-selector passthrough; lowers to
+ *              a compile-time literal on five targets, a runtime expression
+ *              on React
+ *
+ * REQ-V9 (Phase 85 Plan 03): `$snapshot` and `$classSelector` were, until
+ * this change, real shipped sigils that lived ONLY in the dependency
+ * collector's `STABLE_IDENTIFIERS` set (`reactivity/computeDeps.ts`) —
+ * absent from THIS reserved set, so a `<data>` field or `r-for` alias named
+ * `$snapshot`/`$classSelector` compiled clean instead of erroring. Both are
+ * now first-class members here; `computeDeps.ts` composes its stable-
+ * identifier subset FROM this set rather than re-listing them, so the two
+ * lists cannot drift apart again (see `sigilListUnification.test.ts`).
  *
  * A user-authored identifier that shadows one of these — a `<data>` field
  * name or an `r-for` loop variable — would be silently captured by the
@@ -68,10 +82,19 @@ export const RESERVED_SIGILS: ReadonlySet<string> = new Set([
   '$inject', // Phase 36 — cross-component context inject sigil
   '$clone', // Phase 45 — target-rewritten deep-clone call-form sigil
   '$slotted', // quick 260807-cor (D4) — Lit-only assigned-elements member sigil
+  // REQ-V9 (Phase 85 Plan 03) — real, shipped, in-use target-rewritten
+  // passthrough sigils that were absent here and lived ONLY in
+  // reactivity/computeDeps.ts's STABLE_IDENTIFIERS set. Added so shadowing
+  // either one is caught as ROZ202, same as every other sigil.
+  '$snapshot',
+  '$classSelector',
 ]);
 
-const RESERVED_SIGIL_LIST =
-  '$el, $props, $data, $refs, $slots, $emit, $event, $attrs, $listeners, $restoreFocus, $model, $expose, $provide, $inject, $clone, $slotted';
+// Derived from the Set (not hand-typed) so the hint text below can never
+// disagree with the runtime reserved set — REQ-V9's drift-guard test asserts
+// this stays in sync with both RESERVED_SIGILS and the ROZ202 code-table
+// documentation in diagnostics/codes.ts.
+const RESERVED_SIGIL_LIST = Array.from(RESERVED_SIGILS).join(', ');
 
 function emitCollision(
   name: string,
