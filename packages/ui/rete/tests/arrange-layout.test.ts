@@ -74,3 +74,61 @@ describe('arrangeGeometry is vendored into every leaf (the truthful port geometr
     });
   }
 });
+
+/**
+ * Phase 84 (D-01/D-03/D-05) — ELK-routed edges (connection.waypoints). Two parallel
+ * leaf-structural guards, matching the file's existing style:
+ *
+ * 1. Every leaf's vendored `internal/arrangeGeometry.ts` must export the new waypoint
+ *    geometry helpers — a leaf whose vendored copy is missing them shipped from a stale
+ *    build (the same class of drift `arrangeGeometry is vendored into every leaf` above
+ *    guards).
+ * 2. Every leaf's EMITTED FlowCanvas source must call the signature helper
+ *    (`waypointsSignature`) inside its `edgeStyleSig` change-detection signature. This is
+ *    the six-target guard on the phase's single highest-risk line (84-CONTEXT.md D5): a
+ *    leaf that regenerated without it would silently ship the "autoArrange() writes a
+ *    correct route, but the canvas never redraws a pre-existing edge" no-op on THAT target
+ *    only, while the other five stayed correct — exactly the class of bug a same-source,
+ *    six-target compiler is supposed to make impossible, and exactly the class this test
+ *    would have caught before a single leaf shipped it.
+ *
+ * BUILD-BEFORE-TEST CONTRACT (see file header): these assertions read EMITTED / COMMITTED
+ * leaf output — `pnpm --filter @rozie-ui/rete build` MUST precede `pnpm --filter
+ * @rozie-ui/rete test`, or these reads are stale and this file gives a FALSE GREEN.
+ */
+const WAYPOINT_EXPORTS = [
+  'waypointsFromElkEdges',
+  'sanitizeWaypoints',
+  'waypointsSignature',
+  'withWaypoints',
+  'withoutWaypoints',
+  'waypointPathD',
+];
+
+describe('waypoint geometry helpers are vendored into every leaf, and edgeStyleSig consumes them (Phase 84)', () => {
+  for (const [target] of LEAVES) {
+    it(`${target}: vendored arrangeGeometry.ts exports every waypoint geometry helper`, () => {
+      const p = resolve(PKGS, target, 'src', 'internal', 'arrangeGeometry.ts');
+      const src = readFileSync(p, 'utf8');
+      const missing = WAYPOINT_EXPORTS.filter((name) => !src.includes(`export function ${name}`));
+      expect(
+        missing,
+        `${p} is missing ${missing.join(', ')} — codegen's copyInternal vendored a stale ` +
+          `arrangeGeometry.ts. Rebuild (pnpm --filter @rozie-ui/rete build) before re-running tests.`,
+      ).toEqual([]);
+    });
+  }
+
+  for (const [target, relPath] of LEAVES) {
+    it(`${target}: edgeStyleSig calls waypointsSignature (the no-op trap this phase exists to close)`, () => {
+      const src = readFileSync(resolve(PKGS, relPath), 'utf8');
+      const sigLine = src.split('\n').find((l) => l.includes('edgeStyleSig') && l.includes('=>'));
+      expect(
+        sigLine ? sigLine.includes('waypointsSignature') : false,
+        `${relPath}'s edgeStyleSig does not call waypointsSignature — autoArrange() would write a ` +
+          `correct route into the model while this target's reconcileConnections never sees it change, ` +
+          `so a PRE-EXISTING edge on ${target} would silently never redraw its route (84-CONTEXT.md D5).`,
+      ).toBe(true);
+    });
+  }
+});

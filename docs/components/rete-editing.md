@@ -115,6 +115,18 @@ await $refs.flow.autoArrange()
 await $refs.flow.autoArrange({ options: { 'elk.direction': 'RIGHT' } })
 ```
 
+### Edge routing
+
+`autoArrange()` now writes a **route** onto every connection it bent around an intermediate node — an optional `waypoints` field (`{x,y}[]`) on the bound `graph`'s connection object (see the [`graph` prop](/components/rete#props)). A straight edge stays a straight edge; a bent one renders as a multi-segment polyline through the points ELK actually computed, instead of a bezier chord cutting through whatever sits between its endpoints. The route lives in your own `graph` object, so it **persists across a reload** exactly like node positions do.
+
+A route is only ever as good as the layout it was computed against: dragging or resizing a node drops the stored route from every edge attached to it, and that edge falls back to its plain chord until the next `autoArrange()` call recomputes it.
+
+Restore the previous (unrouted) behavior per call via the same `opts.options` escape hatch:
+
+```js
+await $refs.flow.autoArrange({ options: { 'elk.edgeRouting': 'POLYLINE' } })
+```
+
 ## Connect-end-on-pane (quick-add menus)
 
 When a connection drag starts at an **output** socket and ends on **empty canvas** (no target socket), `FlowCanvas` fires **`@connect-end`** with `{ source, sourceOutput, position }` — `position` in graph coordinates. This is a **pure signal**, the React Flow `onConnectEnd` parity: the canvas creates no node and shows no menu. The consumer decides what happens — pop a node picker at `position`, quick-add a default node, or ignore the drop. Because `position` is already in graph space, a node you push into `graph` at that point lands exactly where the drag ended.
