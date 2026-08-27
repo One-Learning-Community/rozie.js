@@ -7,10 +7,18 @@
  * `rozie-source`-only guard `rozieDiagnostics.ts` established.
  */
 import type { LanguageServicePlugin } from '@volar/language-service';
+import { createRozieCompletionPlugin } from './rozieCompletion.js';
 import { createRozieDiagnosticsPlugin } from './rozieDiagnostics.js';
 import { createRozieHoverPlugin } from './rozieHover.js';
+import { createRozieNavigationPlugin } from './rozieNavigation.js';
 import { createRozieSymbolsPlugin } from './rozieSymbols.js';
 
 export function createRozieServicePlugins(): LanguageServicePlugin[] {
-  return [createRozieDiagnosticsPlugin(), createRozieHoverPlugin(), createRozieSymbolsPlugin()];
+  return [
+    createRozieDiagnosticsPlugin(),
+    createRozieHoverPlugin(),
+    createRozieSymbolsPlugin(),
+    createRozieNavigationPlugin(),
+    createRozieCompletionPlugin(),
+  ];
 }
