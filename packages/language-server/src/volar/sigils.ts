@@ -4,18 +4,22 @@
  * hand-forked copy (that copy is exactly what caused the drift risk this
  * barrel export closes).
  *
- * `RESERVED_SIGILS` covers the 16 sigils the compiler's semantic validator
- * enforces (`ROZ202`). A further set of call-form sigils are NOT reserved
- * identifiers in that sense — they are lifecycle/callable APIs a `<data>`
- * field name or `r-for` alias could never collide with — but still need an
- * ambient declaration so `<script>`/`<template>` type-checks. Those extra
- * entries are declared verbatim here, unchanged from the proven spike
+ * `RESERVED_SIGILS` covers the 18 sigils the compiler's semantic validator
+ * enforces (`ROZ202`) — as of Phase 85 Plan 03 (REQ-V9) that includes
+ * `$snapshot` and `$classSelector`, unified into `@rozie/core`'s single
+ * source of truth so this module never has to hand-fork them again. A
+ * further set of call-form sigils are NOT reserved identifiers in that
+ * sense — they are lifecycle/callable APIs a `<data>` field name or `r-for`
+ * alias could never collide with — but still need an ambient declaration so
+ * `<script>`/`<template>` type-checks. Those extra entries are declared
+ * verbatim here, unchanged from the proven spike
  * (`sources/018-volar-virtual-ts-rozie/rozie-virtual-code.mjs`'s
  * `AMBIENT_PREAMBLE`).
  *
- * REQ-V9 (unifying this with the second, incomplete sigil list in
- * `reactivity/computeDeps.ts` — `$snapshot`, `$classSelector`) is Plan
- * 85-03's job. This module only closes the barrel-export gap.
+ * `missingSigilDeclarations()` below is asserted empty by
+ * `__tests__/volar/recovery.test.ts` — the hard assertion that converts "the
+ * server forked the compiler's list" into "the server cannot fall out of
+ * sync with the compiler's list" (REQ-V8 + REQ-V9 together).
  */
 import { RESERVED_SIGILS } from '@rozie/core';
 
@@ -33,7 +37,7 @@ const VALUE_DECLARATIONS: Record<string, string> = {
   $slotted: 'declare const $slotted: any;',
 };
 
-/** Call-form (function) sigils. `$emit`/`$expose`/`$provide`/`$inject`/`$clone`/`$restoreFocus` ARE in `RESERVED_SIGILS`; the rest are lifecycle/callable APIs that never collide with an author-chosen identifier and so were never added to that set. */
+/** Call-form (function) sigils. `$emit`/`$expose`/`$provide`/`$inject`/`$clone`/`$restoreFocus`/`$snapshot`/`$classSelector` ARE in `RESERVED_SIGILS`; the rest are lifecycle/callable APIs that never collide with an author-chosen identifier and so were never added to that set. */
 const CALL_DECLARATIONS: Record<string, string> = {
   $emit: 'declare function $emit(event: string, ...args: any[]): void;',
   $expose: 'declare function $expose(obj: Record<string, unknown>): void;',
@@ -41,6 +45,12 @@ const CALL_DECLARATIONS: Record<string, string> = {
   $inject: 'declare function $inject<T = unknown>(key: string, fallback?: T): T;',
   $clone: 'declare function $clone<T>(v: T): T;',
   $restoreFocus: 'declare function $restoreFocus(): void;',
+  // Phase 85 Plan 03 (REQ-V9) — target-rewritten passthroughs, newly reserved
+  // in @rozie/core's RESERVED_SIGILS. `$snapshot` preserves the argument
+  // type (deep-clone-shaped, same generic form as `$clone` above);
+  // `$classSelector` always returns a string (the resolved CSS selector).
+  $snapshot: 'declare function $snapshot<T>(v: T): T;',
+  $classSelector: 'declare function $classSelector(name: string): string;',
   // Not in RESERVED_SIGILS — call-form APIs, not shadow-able identifiers.
   $computed: 'declare function $computed<T>(fn: () => T): T;',
   $watch: 'declare function $watch(...args: any[]): void;',

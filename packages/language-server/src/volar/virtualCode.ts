@@ -225,10 +225,30 @@ function generateVirtualTsUnsafe(source: string, filename: string): GenerateVirt
       }
 
       if (node.type === 'TemplateInterpolation') {
-        // loc spans `{{ ... }}`; rawExpr begins 2 chars in.
-        gen('void (');
-        mapped(node.rawExpr, node.loc.start + 2);
-        gen(');\n');
+        // Phase 85 Plan 03 (REQ-V13) — `node.recovered` marks a parser
+        // error-recovery node for an unterminated `{{`. loc spans `{{ ... }}`
+        // for a well-formed node, or the opener through the end of the text
+        // run for a recovered one — either way, the expression text begins
+        // 2 chars past `loc.start` (right after the opening braces).
+        if (node.recovered && node.rawExpr.trim() === '') {
+          // The caret sits immediately after a freshly-typed `{{`, with
+          // nothing typed yet — there is no expression to wrap. Emitting
+          // `void ();` would be a syntax error that breaks type-checking
+          // for the REST of the virtual module, so emit no code text at
+          // all. Still register a ZERO-LENGTH mapping at this exact source
+          // position (mapped('', ...) — pushes a mapping, appends nothing
+          // to `code`) so Volar can translate a completion request at that
+          // caret into a generated position. That generated position is
+          // wherever the emission cursor already is — i.e. whatever
+          // surrounding scope (an r-for loop body, or the top level) is
+          // currently open — so completion there resolves exactly the
+          // sigils/bindings in scope, same as a well-formed interpolation.
+          mapped('', node.loc.start + 2);
+        } else {
+          gen('void (');
+          mapped(node.rawExpr, node.loc.start + 2);
+          gen(');\n');
+        }
       }
 
       if (node.type === 'TemplateElement') {
