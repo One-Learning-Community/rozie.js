@@ -366,8 +366,16 @@ export interface Rect {
  * (passing straight through), and one endpoint exactly on a boundary — all covered by the
  * co-located unit tests. A degenerate zero-length segment (`a` equals `b`) falls back to a
  * plain point-in-rect check, since the parametric form below divides by the segment's delta.
+ *
+ * WR-02 (84-REVIEW.md) — matches every other exported helper in this module (`arrangePortRect`,
+ * `waypointsFromElkEdges`, `sanitizeWaypoints`) by guarding non-finite `a`/`b` coordinates
+ * up front: without it, a NaN coordinate makes every Liang-Barsky comparison below false
+ * (NaN comparisons are always false), falling through to `t0 <= t1` with `t0`/`t1` unchanged
+ * from their `0`/`1` initial values — silently returning `true` (a false "intersects")
+ * instead of `false`.
  */
 export function segmentIntersectsRect(a: Waypoint, b: Waypoint, rect: Rect, margin = 0): boolean {
+  if (!isFiniteNumber(a.x) || !isFiniteNumber(a.y) || !isFiniteNumber(b.x) || !isFiniteNumber(b.y)) return false;
   const minX = rect.x + margin;
   const maxX = rect.x + rect.width - margin;
   const minY = rect.y + margin;

@@ -263,6 +263,15 @@ describe('segmentIntersectsRect', () => {
     expect(segmentIntersectsRect({ x: 20, y: 20 }, { x: 20, y: 20 }, box)).toBe(true);
     expect(segmentIntersectsRect({ x: 0, y: 0 }, { x: 0, y: 0 }, box)).toBe(false);
   });
+
+  it('WR-02: a NaN/Infinity coordinate on either endpoint returns false, not a silently-true "intersects"', () => {
+    expect(segmentIntersectsRect({ x: NaN, y: 15 }, { x: 25, y: 25 }, box)).toBe(false);
+    expect(segmentIntersectsRect({ x: 15, y: NaN }, { x: 25, y: 25 }, box)).toBe(false);
+    expect(segmentIntersectsRect({ x: 15, y: 15 }, { x: NaN, y: 25 }, box)).toBe(false);
+    expect(segmentIntersectsRect({ x: 15, y: 15 }, { x: 25, y: NaN }, box)).toBe(false);
+    expect(segmentIntersectsRect({ x: Infinity, y: 15 }, { x: 25, y: 25 }, box)).toBe(false);
+    expect(segmentIntersectsRect({ x: 15, y: 15 }, { x: -Infinity, y: 25 }, box)).toBe(false);
+  });
 });
 
 describe('waypointPathD', () => {
