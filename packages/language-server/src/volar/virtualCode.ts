@@ -103,6 +103,87 @@ const R_FOR_PATTERN =
   /^\s*\(?\s*([A-Za-z_$][\w$]*)\s*(?:,\s*([A-Za-z_$][\w$]*)\s*)?\)?\s+(?:in|of)\s+([\s\S]+)$/;
 
 /**
+ * REQ-V11 — a `<template #name="{ a, b }">` (or `#default="{ a, b }"`) fill
+ * carries a scoped-params destructure as a plain attribute: parseTemplate.ts
+ * keeps every `#`-prefixed attribute at kind:'static', rawName verbatim
+ * (see lowerSlotFillers.ts's own `findFillAttr`, the compiler's identical
+ * check on the identical shape — read here, not re-derived).
+ */
+function findFillAttr(el: TemplateElement): TemplateAttr | undefined {
+  return el.attributes.find((a) => a.rawName.startsWith('#'));
+}
+
+/** One destructured slot-fill param, mapped back to its OWN offset in source. */
+interface SlotParamBinding {
+  /** The local binding name used inside the scope body (post-rename, if renamed). */
+  localName: string;
+  /** Absolute source offset where `localName` itself appears in the fill's attribute value. */
+  offset: number;
+}
+
+/**
+ * Simple identifier bindings only — `{ key }` or the rename shape
+ * `{ key: localName }`. Mirrors the compiler's own `parseScopedParams`
+ * (`lowerSlotFillers.ts`): non-identifier entries (spreads, nested
+ * destructures, computed keys, default expressions) are silently dropped
+ * rather than causing a parse failure, matching the compiler's own
+ * degrade-not-throw contract for this exact syntax.
+ */
+const SLOT_PARAM_ENTRY_PATTERN = /^([A-Za-z_$][\w$]*)(?:\s*:\s*([A-Za-z_$][\w$]*))?$/;
+
+/**
+ * Parse a fill's destructure text (`"{ a, b: c }"`, the raw attribute value
+ * — braces included, per parseTemplate.ts's `value` shape) into per-binding
+ * local names, each mapped back to its OWN offset inside that value rather
+ * than the whole attribute — mapping the whole attribute would make hover
+ * and navigation land on the braces instead of the name (T-85-19).
+ *
+ * Returns `[]` — the generator's "no scope block" degenerate path — for
+ * anything not wrapped in `{ ... }`, for unbalanced braces, and for an
+ * empty/whitespace-only destructure. Never throws.
+ */
+function parseSlotParamBindings(value: string, valueStart: number): SlotParamBinding[] {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return [];
+  const openIdx = value.indexOf('{');
+  const closeIdx = value.lastIndexOf('}');
+  if (openIdx === -1 || closeIdx === -1 || closeIdx <= openIdx) return [];
+
+  const inner = value.slice(openIdx + 1, closeIdx);
+  const innerStart = valueStart + openIdx + 1;
+  const bindings: SlotParamBinding[] = [];
+
+  const pushSegment = (raw: string, rawStart: number): void => {
+    const seg = raw.trim();
+    if (seg.length === 0) return;
+    const m = SLOT_PARAM_ENTRY_PATTERN.exec(seg);
+    if (!m) return; // spread / nested destructure / default / computed key — drop
+    const key = m[1] as string;
+    const rename = m[2];
+    const localName = rename ?? key;
+    const leading = raw.length - raw.trimStart().length;
+    const nameOffsetInSeg = rename ? seg.lastIndexOf(rename) : 0;
+    bindings.push({ localName, offset: rawStart + leading + nameOffsetInSeg });
+  };
+
+  // Split on top-level commas only — `{ a: { b } }`'s nested braces (a
+  // non-identifier value, dropped anyway) must not fracture the split.
+  let depth = 0;
+  let segStart = 0;
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i];
+    if (ch === '{' || ch === '[' || ch === '(') depth++;
+    else if (ch === '}' || ch === ']' || ch === ')') depth--;
+    else if (ch === ',' && depth === 0) {
+      pushSegment(inner.slice(segStart, i), innerStart + segStart);
+      segStart = i + 1;
+    }
+  }
+  pushSegment(inner.slice(segStart), innerStart + segStart);
+  return bindings;
+}
+
+/**
  * Generate virtual TypeScript for one `.rozie` source. Never throws — a
  * generator failure degrades to an empty module with empty mappings (T-85-01).
  */
@@ -198,6 +279,38 @@ function generateVirtualTsUnsafe(source: string, filename: string): GenerateVirt
   function walk(nodes: TemplateNode[] | undefined): void {
     if (!nodes) return;
     for (const node of nodes) {
+      // REQ-V11 — `<template #name="{ a, b }">` introduces bindings visible
+      // to every expression in the fill's own SUBTREE *and* to the fill
+      // element's own attribute expressions (a fill can bind an attribute
+      // off its own scoped params). Same shape as the r-for alias lowering
+      // just below: a real scope, opened before the element's own attribute
+      // expressions are emitted and closed after its children are walked.
+      // Getting that ordering wrong is the one thing no coarse test would
+      // catch — a param that resolves in the body but not on the fill
+      // element's own bound attribute.
+      if (node.type === 'TemplateElement') {
+        const fillAttr = findFillAttr(node);
+        if (fillAttr && fillAttr.value !== null && fillAttr.valueLoc) {
+          const bindings = parseSlotParamBindings(fillAttr.value, fillAttr.valueLoc.start);
+          if (bindings.length > 0) {
+            gen('{\n');
+            for (const b of bindings) {
+              gen('  const ');
+              mapped(b.localName, b.offset);
+              gen(' = (undefined as any);\n');
+              gen(`  void ${b.localName};\n`);
+            }
+            emitElement(node);
+            walk(node.children);
+            gen('}\n');
+            continue;
+          }
+          // No simple bindings survived (all dropped, or malformed) — fall
+          // through to normal handling. Never throws, never emits a scope
+          // block, changes nothing about the generated body (T-85-17).
+        }
+      }
+
       // `r-for="item in coll"` / `r-for="(item, i) in coll"` introduces bindings
       // that every expression in this element's SUBTREE can see. Emitting a real
       // `for (const item of (coll))` gives those aliases their true element type
