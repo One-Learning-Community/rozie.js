@@ -69,11 +69,7 @@
     <depends>com.intellij.modules.xml</depends>
     <depends>JavaScript</depends>
     <depends>com.intellij.css</depends>
-    <!-- LSP4IJ (Red Hat) — the LSP client used to consume the shared
-         @rozie/language-server brain (Option C). Semantic features (ROZ
-         diagnostics, and later cross-block nav / member completion / rename)
-         are served by @rozie/core over LSP rather than re-implemented here. -->
-    <depends>com.redhat.devtools.lsp4ij</depends>
+    <!-- LSP4IJ dependency retired (Spike 017/019, REQ-V2/V4) — native platform LSP only. -->
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType
@@ -418,17 +414,23 @@
          the server when its Node script can't be resolved, so this stays inert
          in headless tests and in CI-built plugins that ship without the
          bundle. -->
+    <!-- SPIKE 019: native platform LSP client, replacing LSP4IJ.
+         LSP4IJ has zero injected-language awareness (Spike 017), so it can never
+         serve a caret inside an injected fragment. The native API unwraps
+         injections centrally. Same extension point JetBrains' own Vue plugin
+         uses (VueLspServerSupportProvider). -->
+    <extensions defaultExtensionNs="com.intellij">
+        <platform.lsp.serverSupportProvider
+            implementation="js.rozie.intellij.lsp.RozieLspServerSupportProvider"/>
+    </extensions>
+
+    <!-- LSP4IJ registration retired (REQ-V2/V4). Kept commented for the A/B.
     <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
-        <server id="rozie"
-                name="Rozie Language Server"
-                factoryClass="js.rozie.intellij.lsp.RozieLanguageServerFactory">
-            <description><![CDATA[
-                Diagnostics (ROZ codes) for <code>.rozie</code> files, served by
-                the shared <code>@rozie/core</code> analyzer over LSP.
-            ]]></description>
-        </server>
+        <server id="rozie" name="Rozie Language Server"
+                factoryClass="js.rozie.intellij.lsp.RozieLanguageServerFactory"/>
         <languageMapping language="Rozie" serverId="rozie"/>
     </extensions>
+    -->
 
     <actions>
         <!-- 0.3.0: "New > Rozie Component" entry in the project-view New menu. -->

@@ -39,6 +39,8 @@ dependencies {
         // -PplatformVersion=2024.2.5 / 2025.3 to drive the parallel jobs.
         intellijIdeaUltimate(providers.gradleProperty("platformVersion").orElse("2024.2.5"))
         bundledPlugin("JavaScript")
+        // SPIKE 019: native platform LSP API (com.intellij.platform.lsp.*) lives in
+        // lib/product-backend.jar, already on the platform compile classpath.
         bundledPlugin("com.intellij.css")
         // LSP4IJ (Red Hat) — the LSP client the plugin uses to consume the
         // shared @rozie/language-server brain (Option C). 0.19.4 declares
