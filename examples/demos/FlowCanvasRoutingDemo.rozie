@@ -26,14 +26,18 @@
 
   Phase 84-02 (D-04, FR-05/FR-08) extensions: the `step` NodeType is marked `resizable`
   (min/max box matching FlowCanvasResizeDemo's convention) so a corner-drag handle exists
-  on every node — the `rete-flow-routing-resize` cell drags node C's `se` handle. An
-  `undo-btn` mirrors FlowCanvasUndoDemo's `ref="canvas"` + `doUndo()` shape verbatim, for
-  both the resize-invalidation cell's undo assertion and the dedicated undo/redo-composes-
-  with-routes cell. `edgeWaypointCount(id)` generalizes the original `skipWaypointCount`
-  reader to any connection id, read off the BOUND model exactly like the original — three
-  new readouts (`ab-waypoint-count`/`bc-waypoint-count`/`cd-waypoint-count`) let a cell
-  assert BOTH halves of scoped invalidation: the edges a gesture touched drop to 0 while an
-  untouched edge (the skip edge) keeps its count.
+  on every node — the `rete-flow-routing-resize` cell drags node D's `se` handle.
+  `undo-btn`/`redo-btn` mirror FlowCanvasUndoDemo's `ref="canvas"` + `doUndo()`/`doRedo()`
+  shape verbatim, for the dedicated undo/redo-composes-with-routes cell.
+  `edgeWaypointCount(id)` generalizes the original `skipWaypointCount` reader to any
+  connection id, read off the BOUND model exactly like the original — three new readouts
+  (`ab-waypoint-count`/`bc-waypoint-count`/`cd-waypoint-count`) exist for completeness, but
+  MEASURED against this fixture's actual ELK layout: only `e-skip` (the skip edge) is EVER
+  routed — the three chain edges sit on directly-adjacent layers and never bend, so their
+  waypoint count is always 0. The drag/resize/undo VR cells therefore prove BOTH halves of
+  scoped invalidation (a touched edge's route drops; an untouched edge's route survives)
+  entirely against `e-skip` itself, via two sequential gestures per cell — see each cell's
+  own docblock in `rete-flow.spec.ts` for why.
 -->
 
 <rozie name="FlowCanvasRoutingDemo">
