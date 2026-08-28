@@ -2406,8 +2406,15 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
     // are PURE (no $data write / engine call) — reads only. The block (return undefined)
     // stays UNCONDITIONAL so rejection is enforced on every path; only the EMIT is
-    // echo-guarded (a programmatic reconcile the rule would reject must not surface as a
-    // user-facing rejection — mirrors connection-created/connection-removed).
+    // echo-guarded, and the guard distinguishes WHICH programmatic path is running:
+    //   - props-driven RECONCILE stays suppressed — an edge in the bound graph that the
+    //     rule would reject is not a user-facing rejection, it is our own pass echoing
+    //     back (mirrors connection-created/connection-removed).
+    //   - the imperative $expose'd addConnection() verb DOES emit (`imperativeAdd`). The
+    //     consumer called it deliberately, on that tick, with those endpoints; swallowing
+    //     the rejection left it invisible on all three channels at once (the verb also
+    //     returned a truthy id — fixed in quick 260827-mtu). The reason discriminator is
+    //     resolved HERE, at the rule that rejected, and never re-derived by the caller.
     // ─── connection-validation gate (D2/D3 — typed-socket validation + override) ──
     // Cancels Rete's cancellable `connectioncreate` pre-event when the connection is
     // rejected. TWO independent reject paths, both surfacing `connection-rejected`:
@@ -2427,8 +2434,15 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
     // are PURE (no $data write / engine call) — reads only. The block (return undefined)
     // stays UNCONDITIONAL so rejection is enforced on every path; only the EMIT is
-    // echo-guarded (a programmatic reconcile the rule would reject must not surface as a
-    // user-facing rejection — mirrors connection-created/connection-removed).
+    // echo-guarded, and the guard distinguishes WHICH programmatic path is running:
+    //   - props-driven RECONCILE stays suppressed — an edge in the bound graph that the
+    //     rule would reject is not a user-facing rejection, it is our own pass echoing
+    //     back (mirrors connection-created/connection-removed).
+    //   - the imperative $expose'd addConnection() verb DOES emit (`imperativeAdd`). The
+    //     consumer called it deliberately, on that tick, with those endpoints; swallowing
+    //     the rejection left it invisible on all three channels at once (the verb also
+    //     returned a truthy id — fixed in quick 260827-mtu). The reason discriminator is
+    //     resolved HERE, at the rule that rejected, and never re-derived by the caller.
     this.editor.addPipe((context: any) => {
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
       if (context.type === 'connectioncreate') {
@@ -2446,7 +2460,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           const srcType = portTypeOf(c.source, 'output', c.sourceOutput);
           const tgtType = portTypeOf(c.target, 'input', c.targetInput);
           if (srcType != null && tgtType != null && srcType !== tgtType) {
-            if (!this.programmatic) this.dispatchEvent(new CustomEvent("connection-rejected", {
+            if (!this.programmatic || this.imperativeAdd) this.dispatchEvent(new CustomEvent("connection-rejected", {
               detail: {
                 ...conn,
                 reason: 'type-mismatch'
@@ -2459,7 +2473,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         }
         // 2. canConnect OVERRIDE (Phase-40 contract — custom rule, in addition).
         if (typeof this.canConnect === 'function' && this.canConnect(conn) === false) {
-          if (!this.programmatic) this.dispatchEvent(new CustomEvent("connection-rejected", {
+          if (!this.programmatic || this.imperativeAdd) this.dispatchEvent(new CustomEvent("connection-rejected", {
             detail: {
               ...conn,
               reason: 'can-connect'
@@ -4156,6 +4170,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   programmatic = 0;
 
+  imperativeAdd = 0;
+
   lastSelectionIds: any = null;
 
   selectedConnId: any = null;
@@ -4758,11 +4774,17 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     const conn = new ClassicPreset.Connection(sourceNode, srcOut, targetNode, tgtIn);
     if (spec.id != null) conn.id = spec.id;
     let added = false;
+    // BOTH counters: `programmatic` suppresses the write-back (an imperative edge is not
+    // graph-managed), `imperativeAdd` re-opens the connection-rejected emit for this path
+    // alone — see the connectioncreate pipe. Decremented in the same finally so a throw
+    // cannot strand either one.
     this.programmatic++;
+    this.imperativeAdd++;
     try {
       added = await this.editor.addConnection(conn);
     } finally {
       this.programmatic--;
+      this.imperativeAdd--;
     }
     if (added === false) {
       this.warnConn(`addConnection: connection from "${spec.source}"."${srcOut}" to "${spec.target}"."${tgtIn}" was rejected by connection validation.`);

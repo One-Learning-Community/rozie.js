@@ -22,6 +22,13 @@ phantom entry in the canvas's internal connection map that desynchronised
 the next graph reconcile. A bad port key no longer surfaces as a raw,
 unhandled rete exception.
 
-The `connection-rejected` event contract is unchanged — these new warnings
-are a console-only diagnostic channel. Consumers relying on that event see
-no difference in behavior.
+`connection-rejected` now also fires when an explicit `addConnection()` handle
+call is rejected by a connection rule, carrying the same `reason` discriminator
+(`'type-mismatch'` / `'can-connect'`) the drag path already carried. Previously
+that path was suppressed by the same echo-guard that silences props-driven
+reconcile, which conflated a deliberate consumer call with the canvas echoing
+its own pass. Reconcile stays suppressed and is unchanged. A consumer already
+handling `connection-rejected` may therefore see events from imperative calls
+that were previously swallowed — the payload shape is unchanged.
+
+The warnings themselves are a console-only diagnostic channel.

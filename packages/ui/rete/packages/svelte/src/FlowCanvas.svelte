@@ -499,6 +499,15 @@ let lastPropConnIds: any = null;
 // zoom must not bounce out as if the user did it — the MapLibre PROGRAMMATIC
 // eventData guard, in counter form so batched/nested ops never race).
 let programmatic = 0;
+// Raised (alongside `programmatic`) ONLY around the imperative $expose'd addConnection
+// verb's editor.addConnection call. `programmatic` still has to be raised there — it is
+// what stops an imperative add from writing back into the bound graph prop, which is the
+// documented escape-hatch contract (an imperatively added edge is NOT graph-managed and
+// is not reaped by reconcile). But a consumer calling addConnection() explicitly is NOT
+// an echo of our own reconcile, so a validation rejection on THAT path must still reach
+// them. This counter is how the connectioncreate pipe tells the two apart; it deliberately
+// does not gate connection-created / connection-removed, which stay fully suppressed.
+let imperativeAdd = 0;
 // Win 2: the last emitted selection id-set, joined to a stable string, so
 // @selection-change fires ONLY on an actual change (a repeated identical pick/unpick
 // set does not spam the consumer). `null` until the first emit (so the initial empty
@@ -1343,11 +1352,17 @@ export async function addConnection(spec: any) {
   const conn = new ClassicPreset.Connection(sourceNode, srcOut, targetNode, tgtIn);
   if (spec.id != null) conn.id = spec.id;
   let added = false;
+  // BOTH counters: `programmatic` suppresses the write-back (an imperative edge is not
+  // graph-managed), `imperativeAdd` re-opens the connection-rejected emit for this path
+  // alone — see the connectioncreate pipe. Decremented in the same finally so a throw
+  // cannot strand either one.
   programmatic++;
+  imperativeAdd++;
   try {
     added = await editor.addConnection(conn);
   } finally {
     programmatic--;
+    imperativeAdd--;
   }
   if (added === false) {
     warnConn(`addConnection: connection from "${spec.source}"."${srcOut}" to "${spec.target}"."${tgtIn}" was rejected by connection validation.`);
@@ -3070,8 +3085,15 @@ onMount(() => {
   // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
   // are PURE (no $data write / engine call) — reads only. The block (return undefined)
   // stays UNCONDITIONAL so rejection is enforced on every path; only the EMIT is
-  // echo-guarded (a programmatic reconcile the rule would reject must not surface as a
-  // user-facing rejection — mirrors connection-created/connection-removed).
+  // echo-guarded, and the guard distinguishes WHICH programmatic path is running:
+  //   - props-driven RECONCILE stays suppressed — an edge in the bound graph that the
+  //     rule would reject is not a user-facing rejection, it is our own pass echoing
+  //     back (mirrors connection-created/connection-removed).
+  //   - the imperative $expose'd addConnection() verb DOES emit (`imperativeAdd`). The
+  //     consumer called it deliberately, on that tick, with those endpoints; swallowing
+  //     the rejection left it invisible on all three channels at once (the verb also
+  //     returned a truthy id — fixed in quick 260827-mtu). The reason discriminator is
+  //     resolved HERE, at the rule that rejected, and never re-derived by the caller.
   editor.addPipe((context: any) => {
     if (!context || typeof context !== 'object' || !('type' in context)) return context;
     if (context.type === 'connectioncreate') {
@@ -3089,7 +3111,7 @@ onMount(() => {
         const srcType = portTypeOf(c.source, 'output', c.sourceOutput);
         const tgtType = portTypeOf(c.target, 'input', c.targetInput);
         if (srcType != null && tgtType != null && srcType !== tgtType) {
-          if (!programmatic) onconnectionrejected?.({
+          if (!programmatic || imperativeAdd) onconnectionrejected?.({
             ...conn,
             reason: 'type-mismatch'
           });
@@ -3098,7 +3120,7 @@ onMount(() => {
       }
       // 2. canConnect OVERRIDE (Phase-40 contract — custom rule, in addition).
       if (typeof canConnect === 'function' && canConnect(conn) === false) {
-        if (!programmatic) onconnectionrejected?.({
+        if (!programmatic || imperativeAdd) onconnectionrejected?.({
           ...conn,
           reason: 'can-connect'
         });

@@ -242,6 +242,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const onWindowBlurClearIncompatible = useRef<any>(null);
   const scheduleMinimapRedraw = useRef<any>(null);
   const activePick = useRef<any>(null);
+  const imperativeAdd = useRef(0);
   const dragGestureActive = useRef(false);
   const pendingDragSnapshot = useRef<any>(null);
   const edgeClickGuard = useRef(false);
@@ -1013,11 +1014,17 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     const conn = new ClassicPreset.Connection(sourceNode, srcOut, targetNode, tgtIn);
     if (spec.id != null) conn.id = spec.id;
     let added = false;
+    // BOTH counters: `programmatic` suppresses the write-back (an imperative edge is not
+    // graph-managed), `imperativeAdd` re-opens the connection-rejected emit for this path
+    // alone — see the connectioncreate pipe. Decremented in the same finally so a throw
+    // cannot strand either one.
     programmatic.current++;
+    imperativeAdd.current++;
     try {
       added = await editor.current.addConnection(conn);
     } finally {
       programmatic.current--;
+      imperativeAdd.current--;
     }
     if (added === false) {
       warnConn(`addConnection: connection from "${spec.source}"."${srcOut}" to "${spec.target}"."${tgtIn}" was rejected by connection validation.`);
@@ -2830,8 +2837,15 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
     // are PURE (no $data write / engine call) — reads only. The block (return undefined)
     // stays UNCONDITIONAL so rejection is enforced on every path; only the EMIT is
-    // echo-guarded (a programmatic reconcile the rule would reject must not surface as a
-    // user-facing rejection — mirrors connection-created/connection-removed).
+    // echo-guarded, and the guard distinguishes WHICH programmatic path is running:
+    //   - props-driven RECONCILE stays suppressed — an edge in the bound graph that the
+    //     rule would reject is not a user-facing rejection, it is our own pass echoing
+    //     back (mirrors connection-created/connection-removed).
+    //   - the imperative $expose'd addConnection() verb DOES emit (`imperativeAdd`). The
+    //     consumer called it deliberately, on that tick, with those endpoints; swallowing
+    //     the rejection left it invisible on all three channels at once (the verb also
+    //     returned a truthy id — fixed in quick 260827-mtu). The reason discriminator is
+    //     resolved HERE, at the rule that rejected, and never re-derived by the caller.
     editor.current.addPipe((context: any) => {
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
       if (context.type === 'connectioncreate') {
@@ -2849,7 +2863,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           const srcType = portTypeOf(c.source, 'output', c.sourceOutput);
           const tgtType = portTypeOf(c.target, 'input', c.targetInput);
           if (srcType != null && tgtType != null && srcType !== tgtType) {
-            if (!programmatic.current) _onConnectionRejectedRef.current && _onConnectionRejectedRef.current({
+            if (!programmatic.current || imperativeAdd.current) _onConnectionRejectedRef.current && _onConnectionRejectedRef.current({
               ...conn,
               reason: 'type-mismatch'
             });
@@ -2858,7 +2872,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         }
         // 2. canConnect OVERRIDE (Phase-40 contract — custom rule, in addition).
         if (typeof _canConnectRef.current === 'function' && _canConnectRef.current(conn) === false) {
-          if (!programmatic.current) _onConnectionRejectedRef.current && _onConnectionRejectedRef.current({
+          if (!programmatic.current || imperativeAdd.current) _onConnectionRejectedRef.current && _onConnectionRejectedRef.current({
             ...conn,
             reason: 'can-connect'
           });

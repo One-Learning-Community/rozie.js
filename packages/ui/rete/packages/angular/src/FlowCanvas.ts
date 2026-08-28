@@ -2146,8 +2146,15 @@ export class FlowCanvas {
     // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
     // are PURE (no $data write / engine call) — reads only. The block (return undefined)
     // stays UNCONDITIONAL so rejection is enforced on every path; only the EMIT is
-    // echo-guarded (a programmatic reconcile the rule would reject must not surface as a
-    // user-facing rejection — mirrors connection-created/connection-removed).
+    // echo-guarded, and the guard distinguishes WHICH programmatic path is running:
+    //   - props-driven RECONCILE stays suppressed — an edge in the bound graph that the
+    //     rule would reject is not a user-facing rejection, it is our own pass echoing
+    //     back (mirrors connection-created/connection-removed).
+    //   - the imperative $expose'd addConnection() verb DOES emit (`imperativeAdd`). The
+    //     consumer called it deliberately, on that tick, with those endpoints; swallowing
+    //     the rejection left it invisible on all three channels at once (the verb also
+    //     returned a truthy id — fixed in quick 260827-mtu). The reason discriminator is
+    //     resolved HERE, at the rule that rejected, and never re-derived by the caller.
     // ─── connection-validation gate (D2/D3 — typed-socket validation + override) ──
     // Cancels Rete's cancellable `connectioncreate` pre-event when the connection is
     // rejected. TWO independent reject paths, both surfacing `connection-rejected`:
@@ -2167,8 +2174,15 @@ export class FlowCanvas {
     // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
     // are PURE (no $data write / engine call) — reads only. The block (return undefined)
     // stays UNCONDITIONAL so rejection is enforced on every path; only the EMIT is
-    // echo-guarded (a programmatic reconcile the rule would reject must not surface as a
-    // user-facing rejection — mirrors connection-created/connection-removed).
+    // echo-guarded, and the guard distinguishes WHICH programmatic path is running:
+    //   - props-driven RECONCILE stays suppressed — an edge in the bound graph that the
+    //     rule would reject is not a user-facing rejection, it is our own pass echoing
+    //     back (mirrors connection-created/connection-removed).
+    //   - the imperative $expose'd addConnection() verb DOES emit (`imperativeAdd`). The
+    //     consumer called it deliberately, on that tick, with those endpoints; swallowing
+    //     the rejection left it invisible on all three channels at once (the verb also
+    //     returned a truthy id — fixed in quick 260827-mtu). The reason discriminator is
+    //     resolved HERE, at the rule that rejected, and never re-derived by the caller.
     this.editor.addPipe((context: any) => {
       const __canConnect = this.canConnect();
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
@@ -2187,7 +2201,7 @@ export class FlowCanvas {
           const srcType = portTypeOf(c.source, 'output', c.sourceOutput);
           const tgtType = portTypeOf(c.target, 'input', c.targetInput);
           if (srcType != null && tgtType != null && srcType !== tgtType) {
-            if (!this.programmatic) this.connectionRejected.emit({
+            if (!this.programmatic || this.imperativeAdd) this.connectionRejected.emit({
               ...conn,
               reason: 'type-mismatch'
             });
@@ -2196,7 +2210,7 @@ export class FlowCanvas {
         }
         // 2. canConnect OVERRIDE (Phase-40 contract — custom rule, in addition).
         if (typeof __canConnect === 'function' && __canConnect(conn) === false) {
-          if (!this.programmatic) this.connectionRejected.emit({
+          if (!this.programmatic || this.imperativeAdd) this.connectionRejected.emit({
             ...conn,
             reason: 'can-connect'
           });
@@ -3930,6 +3944,7 @@ export class FlowCanvas {
   lastPropNodeIds: any = null;
   lastPropConnIds: any = null;
   programmatic = 0;
+  imperativeAdd = 0;
   lastSelectionIds: any = null;
   selectedConnId: any = null;
   selectedPathEl: any = null;
@@ -4460,11 +4475,17 @@ export class FlowCanvas {
     const conn = new ClassicPreset.Connection(sourceNode, srcOut, targetNode, tgtIn);
     if (spec.id != null) conn.id = spec.id;
     let added = false;
+    // BOTH counters: `programmatic` suppresses the write-back (an imperative edge is not
+    // graph-managed), `imperativeAdd` re-opens the connection-rejected emit for this path
+    // alone — see the connectioncreate pipe. Decremented in the same finally so a throw
+    // cannot strand either one.
     this.programmatic++;
+    this.imperativeAdd++;
     try {
       added = await this.editor.addConnection(conn);
     } finally {
       this.programmatic--;
+      this.imperativeAdd--;
     }
     if (added === false) {
       this.warnConn(`addConnection: connection from "${spec.source}"."${srcOut}" to "${spec.target}"."${tgtIn}" was rejected by connection validation.`);
