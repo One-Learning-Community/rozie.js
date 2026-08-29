@@ -1227,10 +1227,21 @@ const scheduleSelectionEmit = () => {
     Promise.resolve().then(() => Promise.resolve().then(maybeEmitSelectionChange));
   }
 };
-// The $portals/$emit-capturing reconcilers are built INSIDE $onMount ($portals
-// referenced at top level fails the bundled-leaf strict typecheck — the CM/
-// TipTap/MapLibre portal discipline) and bridged here so the top-level $watch can
-// call them.
+// The reconcilers are built INSIDE $onMount and bridged here so the top-level
+// $watch can call them — but NOT because of `$portals` or `$emit` (quick
+// 260829-gbs: reclassified, correct-by-design; see class-a-sigil-scoping.md).
+// `reconcileNodes` -> `reconcileNodesPass` -> `renderNode` -> `flowToken`, and
+// `flowToken` reads `container`, where `const container = $refs.canvasEl` is
+// the very first statement of the SAME $onMount body (ROZ123: `$refs` is only
+// safe inside `$onMount`). `reconcileConnections` reaches the same root through
+// `renderConnection`. The `$portals`/`$emit` capture inside this closure graph
+// is incidental — hoisting the reconcilers would mean hoisting the ~2000-line
+// mount-local helper graph rooted in that `$refs` read, which ROZ123 forbids.
+// This bridge is a correct-by-design $refs-lifetime bridge, not a `$portals`
+// workaround; unlike the five sites unwound elsewhere in quick 260829-gbs, this
+// one stays. (Promoting `container` to a module-scope `let` assigned at mount —
+// as MapLibre does with `instance` and chartjs does with `canvasEl` — would make
+// the whole block hoistable; that is a deliberate deferral, not an oversight.)
 let reconcileNodes: any = null;
 let reconcileConnections: any = null;
 // Re-entrancy guard for reconcileNodes. The declarative-children path can fire the
