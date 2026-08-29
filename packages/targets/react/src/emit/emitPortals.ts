@@ -17,9 +17,14 @@
  *                                consumer render, unmounting just-scheduled-but-
  *                                not-yet-committed portal `createRoot()` calls).
  *   3. `closureBlock`          — `const portals = { X: (...) => {...} };` —
- *                                prepended to the FIRST mount-phase useEffect body
+ *                                pushed to hookLines (component scope, Quick
+ *                                260829-cd4 — NOT inside a mount-phase
+ *                                useEffect; see emitScript.ts's
+ *                                `portalsDisposalAttached` comment)
  *   4. `bulkDisposeBlock`      — `for (const root of portalRoots.current) root.unmount();`
- *                                prepended to the same useEffect's cleanup
+ *                                prepended to the FIRST mount-phase useEffect's
+ *                                cleanup, or a synthesized dispose-only effect
+ *                                when the component has no mount-phase hook
  *
  * The portal closure wraps React 18's imperative createRoot/render/unmount
  * mount-API in the `$portals.NAME(container, scope) => disposeFn` contract.

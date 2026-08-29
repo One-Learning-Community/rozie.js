@@ -2296,8 +2296,14 @@ export function emitScript(
   // scaffolding when ir.slots has any portal entries. Three artefacts
   // (see emitPortals.ts):
   //   - refDeclLine    → pushed to hookLines below (component-scope useRef)
-  //   - closureBlock   → prepended to the first mount-phase useEffect body
-  //   - bulkDispose    → prepended to the first mount-phase useEffect cleanup
+  //   - closureBlock   → pushed to hookLines below (component scope, Quick
+  //                      260829-cd4 — NOT inside a mount-phase useEffect
+  //                      anymore; see the `portalsDisposalAttached` comment
+  //                      further down for why disposal still rides the
+  //                      first mount-phase hook's cleanup)
+  //   - bulkDispose    → prepended to the first mount-phase useEffect
+  //                      cleanup, or a synthesized dispose-only effect when
+  //                      the component has no mount-phase hook at all
   const portalsEmit = emitPortals(ir, collectors, opts.portalScopeHash ?? '');
 
   // Phase 36 — cross-component context ($provide/$inject). Reads the
@@ -3462,6 +3468,22 @@ export function emitScript(
     hookLines.push(portalsEmit.rendererRefLines);
   }
 
+  // Quick 260829-cd4 — the `portals` closure is declared at COMPONENT scope
+  // (hook section), immediately after `rendererRefLines` (whose
+  // `_render<Pascal>Ref.current` reads the closure body consumes — order is
+  // load-bearing). Previously it was declared INSIDE the first mount-phase
+  // `useEffect`, which meant a top-level `<script>` helper (or a `$watch`
+  // body, which is NOT part of `ir.lifecycle` and therefore never got the
+  // closure at all) referencing `$portals.<name>` resolved to an
+  // out-of-scope `portals` — a silent `ReferenceError` at runtime and
+  // `TS2304` on the bundled-leaf strict typecheck. Recreating the closure
+  // object each render is harmless and intentional: it is a pure closure
+  // reading `<ref>.current`, so a stale capture still resolves the current
+  // renderer. See `.planning/notes/class-a-sigil-scoping.md` §3.
+  if (portalsEmit.hasPortals) {
+    hookLines.push(portalsEmit.closureBlock);
+  }
+
   // 5a. Hoisted useRef declarations (one per hoist instruction).
   //     `h.tsType` carries the explicit type argument when typeNeutralizeScript
   //     annotated the source `let` declarator (a null/undefined-initialised
@@ -3810,11 +3832,19 @@ export function emitScript(
       lifecycleEffectLines.push(`_${name}Ref.current = ${name};`);
     }
   }
-  // Portal-slot primitive (Spike 003) — inject the portals closure into the
-  // FIRST mount-phase lifecycle hook. The closure depends on `portalRoots`
-  // (hoisted in hookLines) and `props`, both in scope at useEffect-body
-  // position. Same hook gets the bulk-dispose prepended to its cleanup.
-  let portalsInjected = false;
+  // Portal-slot primitive (Spike 003) — the `portals` closure itself now
+  // lives at component scope (pushed into `hookLines` above, Quick
+  // 260829-cd4). What remains to attach here is DISPOSAL ONLY: the bulk-
+  // dispose block still rides the FIRST mount-phase lifecycle hook's cleanup
+  // (matching every other target's teardown timing). `portalsDisposalAttached`
+  // tracks whether that attachment has already happened, so a component with
+  // MULTIPLE `$onMount` hooks disposes exactly once. When the component has
+  // portals but ends up with NO mount-phase hook at all (a top-level helper
+  // or a bare `$watch`, neither of which contributes to `ir.lifecycle`), a
+  // dispose-only effect is synthesized after this loop (below) so unmount
+  // still bulk-disposes every portal root.
+  let portalsDisposalAttached = false;
+  let sawMountPhaseHook = false;
   ir.lifecycle.forEach((lh, idx) => {
     collectors.react.add('useEffect');
     const paired = lifecyclePairing.perHook[idx];
@@ -3952,8 +3982,13 @@ export function emitScript(
     // prop changes is owned by the sibling $watch hooks, never the mount
     // useEffect. So: mount → `[]`; update → keep the computed deps.
     const depsArr = lh.phase === 'mount' ? '[]' : renderDepArray(filteredSetupDeps, modelProps);
-    const injectPortalsHere = portalsEmit.hasPortals && !portalsInjected && lh.phase === 'mount';
-    if (injectPortalsHere) portalsInjected = true;
+    if (lh.phase === 'mount') sawMountPhaseHook = true;
+    // Quick 260829-cd4 — the closure DECLARATION no longer injects here (it
+    // is component-scope, above). This flag now gates DISPOSAL only: the
+    // bulk-dispose block still rides the first mount-phase hook's cleanup.
+    const attachPortalsDisposalHere =
+      portalsEmit.hasPortals && !portalsDisposalAttached && lh.phase === 'mount';
+    if (attachPortalsDisposalHere) portalsDisposalAttached = true;
 
     // Build the useEffect callback body.
     // setup may be Identifier (helper fn ref) or arrow/fn (inline body).
@@ -3975,16 +4010,9 @@ export function emitScript(
       setupInvocation = genCode(setupCloned) + ';';
     }
 
-    if (injectPortalsHere) {
-      // Prepend the `const portals = { ... };` closure to the setup body so
-      // user code's rewritten `portals.<name>(...)` references resolve.
-      setupInvocation = portalsEmit.closureBlock + '\n  ' + setupInvocation;
-    }
-
     // Quick 260806-w00 seam 4 (D-01/D-02) — prepend the stable-wrapper
-    // declaration(s) for every helper wrapped in THIS hook. Applied AFTER the
-    // portal-closure prepend above so the wrappers land FIRST-most (D-02):
-    // both `setupInvocation` and `cleanupInvocation` are inlined into the SAME
+    // declaration(s) for every helper wrapped in THIS hook (D-02): both
+    // `setupInvocation` and `cleanupInvocation` are inlined into the SAME
     // effect callback, so a `const` at the head of setup is in scope for the
     // returned cleanup, and `[]` deps mean it is constructed exactly once.
     // Sorted for snapshot determinism (D-08).
@@ -4016,27 +4044,27 @@ export function emitScript(
         const fnBody = cleanupCloned.body;
         if (t.isBlockStatement(fnBody)) {
           const innerStmts = genBlockInner(fnBody, '    ');
-          const cleanupBody = injectPortalsHere
+          const cleanupBody = attachPortalsDisposalHere
             ? portalsEmit.bulkDisposeBlock + '\n    ' + innerStmts
             : innerStmts;
           cleanupInvocation = `\n  return () => {\n    ${cleanupBody}\n  };`;
         } else {
-          const cleanupBody = injectPortalsHere
+          const cleanupBody = attachPortalsDisposalHere
             ? `{\n    ${portalsEmit.bulkDisposeBlock}\n    ${genCode(fnBody)};\n  }`
             : genCode(fnBody);
-          cleanupInvocation = injectPortalsHere
+          cleanupInvocation = attachPortalsDisposalHere
             ? `\n  return () => ${cleanupBody};`
             : `\n  return () => ${cleanupBody};`;
         }
       } else {
         const inner = `(${genCode(cleanupCloned)})()`;
-        if (injectPortalsHere) {
+        if (attachPortalsDisposalHere) {
           cleanupInvocation = `\n  return () => {\n    ${portalsEmit.bulkDisposeBlock}\n    ${inner};\n  };`;
         } else {
           cleanupInvocation = `\n  return () => ${inner};`;
         }
       }
-    } else if (injectPortalsHere) {
+    } else if (attachPortalsDisposalHere) {
       // No user cleanup but portals need bulk-dispose — synthesize one.
       cleanupInvocation = `\n  return () => {\n    ${portalsEmit.bulkDisposeBlock}\n  };`;
     }
@@ -4151,6 +4179,25 @@ export function emitScript(
       );
     }
   });
+
+  // Quick 260829-cd4 — the unmount-safety line the closure relocation
+  // exposes. Before this fix, the dispose-block only ever rode a mount-phase
+  // `useEffect`'s cleanup, and (because the OLD closure declaration was
+  // itself gated on that same hook existing) a component with NO mount-phase
+  // hook simply had no portals machinery at all — a `$watch`-only or
+  // top-level-helper-only consumer could never leak a portal root because it
+  // could never successfully call one either. Post-hoist, such a component
+  // CAN call a portal (the closure is always in scope), so it must also
+  // dispose one. When the component has portals and the lifecycle loop above
+  // never attached disposal to a mount-phase hook (either because there is
+  // no `ir.lifecycle` entry at all, or every entry is `phase === 'unmount'`),
+  // synthesize a dedicated dispose-only effect with `[]` deps.
+  if (portalsEmit.hasPortals && !sawMountPhaseHook) {
+    collectors.react.add('useEffect');
+    lifecycleEffectLines.push(
+      `useEffect(() => {\n  return () => {\n    ${portalsEmit.bulkDisposeBlock}\n  };\n}, []);`,
+    );
+  }
 
   // Quick plan 260515-u2b — emit one useEffect per WatchHook.
   //
