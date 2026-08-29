@@ -153,8 +153,23 @@ export interface PortalsEmit {
   templateAppend: string;
   /** Class field lines (template queries, anchor query, view-tracking Set). */
   fieldDecls: string[];
-  /** Closure block prepended to ngAfterViewInit body. */
+  /**
+   * Quick 260829-cd4 — the `portals` closure itself, reshaped from a
+   * `const` declaration into a private class-field declaration (`private
+   * portals = { ... };`). Consumed by emitScript.ts alongside `fieldDecls`,
+   * NOT prepended to `ngAfterViewInit()` anymore. The closure body reads
+   * nothing eagerly — `this.<name>Tpl()` / `this._portalAnchor()` are all
+   * signal reads INSIDE arrows — so field-initializer ordering is safe.
+   */
   closureBlock: string;
+  /**
+   * Quick 260829-cd4 — the `interface ReactivePortalHandle { ... }` that
+   * `closureBlock` used to carry inline (via `interfacePrefix`), split out
+   * because a TS `interface` is illegal inside a class body. '' when no
+   * portal slot is reactive. Routed by emitScript.ts into the module-scope
+   * `interfaceDecls` bucket (rendered above the `@Component` class).
+   */
+  interfaceDecl: string;
   /** Destroy registration appended to ngAfterViewInit body. */
   destroyRegister: string;
   /** When true, emitScript hoists `this.__rozieDestroyRef = inject(DestroyRef);`. */
@@ -171,6 +186,7 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
       templateAppend: '',
       fieldDecls: [],
       closureBlock: '',
+      interfaceDecl: '',
       destroyRegister: '',
       needsDestroyRefField: false,
       angularImports: [],
@@ -198,8 +214,12 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
 
   const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash)).join('\n');
   const hasReactive = portals.some((s) => s.isReactive === true);
-  const interfacePrefix = hasReactive ? REACTIVE_HANDLE_INTERFACE_ANGULAR + '\n' : '';
-  const closureBlock = `${interfacePrefix}const portals = {\n${methodLines}\n};`;
+  // Quick 260829-cd4 — the reactive-handle interface is split OUT of
+  // closureBlock (a TS `interface` cannot be declared inside a class body)
+  // and closureBlock itself is reshaped from `const portals = {...}` into a
+  // private class-field declaration `private portals = {...};`.
+  const interfaceDecl = hasReactive ? REACTIVE_HANDLE_INTERFACE_ANGULAR : '';
+  const closureBlock = `private portals = {\n${methodLines}\n};`;
 
   const destroyRegister =
     'this.__rozieDestroyRef.onDestroy(() => {\n' +
@@ -212,6 +232,7 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
     templateAppend,
     fieldDecls,
     closureBlock,
+    interfaceDecl,
     destroyRegister,
     needsDestroyRefField: true,
     angularImports: [

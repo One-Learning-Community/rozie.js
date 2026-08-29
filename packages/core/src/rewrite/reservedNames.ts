@@ -219,6 +219,10 @@ export const ANGULAR_LIFECYCLE_MEMBERS: ReadonlySet<string> = new Set([
 export const ANGULAR_EMITTER_MEMBERS: ReadonlySet<string> = new Set([
   '__rozieDestroyRef', 'templates', '__rozieCtxHost',
   'rozieToken', '__rozieTokenRegistry',
+  // Quick 260829-cd4 — `portals` is now a private class field (previously a
+  // `const` local scoped to ngAfterViewInit(), which could never collide
+  // with an author identifier since it was never in class scope).
+  'portals',
 ]);
 
 // collision-angular §2e — decorator / DI reserved tokens in class scope. A

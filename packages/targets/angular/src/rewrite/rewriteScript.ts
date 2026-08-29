@@ -1295,9 +1295,14 @@ export function rewriteRozieIdentifiers(
       }
       if (obj.name === '$portals' && portalSlotNames.has(prop.name)) {
         // Portal-slot primitive (Spike 003). $portals.<name> resolves to the
-        // synthesized local `portals` closure that emitScript injects at the
-        // top of the ngAfterViewInit() method body.
-        path.node.object = t.identifier('portals');
+        // synthesized `portals` class field emitScript declares alongside
+        // the component's other fields (Quick 260829-cd4 — the closure is
+        // no longer a `const` local scoped to ngAfterViewInit(), so a bare
+        // `portals` identifier would be unresolved outside that one method;
+        // the read must be `this.`-qualified). This edit is a MATCHED PAIR
+        // with the class-field placement in emitPortals.ts/emitScript.ts —
+        // landing either half alone emits broken code.
+        path.node.object = t.memberExpression(t.thisExpression(), t.identifier('portals'));
         return;
       }
       if (obj.name === '$slotted') {

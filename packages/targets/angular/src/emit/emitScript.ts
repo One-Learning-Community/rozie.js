@@ -1549,8 +1549,22 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   }
 
   // Portal-slot primitive (Spike 003) — synthesize portal scaffolding before
-  // we finalize lifecycleAfterViewInitLines / fieldLines so we can splice
-  // the closure + destroy registration into the same ngAfterViewInit block.
+  // we finalize lifecycleAfterViewInitLines / fieldLines.
+  //
+  // Quick 260829-cd4: the `portals` closure is now a private CLASS FIELD
+  // (`portalsEmit.closureBlock`), routed through `fieldLines` alongside the
+  // rest of `fieldDecls` — NOT unshifted into `ngAfterViewInit()` anymore. A
+  // class field is visible as `this.portals` from any class method (a
+  // class-field arrow helper included), unlike the old `const portals`
+  // local, which only a same-method reference could see. The reactive-handle
+  // interface (`portalsEmit.interfaceDecl`) is split into the module-scope
+  // `interfaceDecls` bucket (a TS `interface` is illegal inside a class
+  // body). Destroy registration still runs LAST in `ngAfterViewInit()` so
+  // the cleanup loop executes before user-registered cleanups (Angular runs
+  // onDestroy callbacks in registration order — last in, last out); that
+  // push alone keeps `lifecycleAfterViewInitLines` non-empty, so
+  // `ngAfterViewInit()` is still emitted unconditionally whenever the
+  // component has portals, even with no `$onMount` at all.
   const portalsEmit = emitPortals(ir, opts.portalScopeHash ?? '');
   if (portalsEmit.hasPortals) {
     for (const symName of portalsEmit.angularImports) {
@@ -1558,11 +1572,8 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
       (imports as { add: (n: string) => void }).add(symName);
     }
     for (const decl of portalsEmit.fieldDecls) fieldLines.push(decl);
-    // Closure runs FIRST in ngAfterViewInit so user lifecycle bodies below
-    // can reference `portals.<name>(...)`. Destroy registration runs LAST so
-    // the cleanup loop executes before user-registered cleanups (Angular runs
-    // onDestroy callbacks in registration order — last in, last out).
-    lifecycleAfterViewInitLines.unshift(portalsEmit.closureBlock);
+    fieldLines.push(portalsEmit.closureBlock);
+    if (portalsEmit.interfaceDecl) interfaceDecls.push(portalsEmit.interfaceDecl);
     lifecycleAfterViewInitLines.push(portalsEmit.destroyRegister);
     if (portalsEmit.needsDestroyRefField) {
       lifecycleNeedsDestroyRefField = true;
