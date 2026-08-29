@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
@@ -414,7 +414,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   // History extension. Structural/plumbing StarterKit keys (document, text,
   // dropcursor, gapcursor, listKeymap, trailingNode) are NOT node/mark
   // replacements and are intentionally excluded.
-  const STARTERKIT_COLLISION_MAP = {
+  const STARTERKIT_COLLISION_MAP = useMemo(() => ({
     bold: 'bold',
     italic: 'italic',
     strike: 'strike',
@@ -432,8 +432,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     underline: 'underline',
     undoRedo: 'undoRedo',
     history: 'undoRedo'
-  };
-
+  }), []);
   // Pure helper — returns `userConfig` extended so any StarterKit-bundled
   // node/mark the consumer replaced (a same-named entry in `exts`) is disabled
   // UNLESS the consumer already decided that key's fate in `userConfig` (an `in`

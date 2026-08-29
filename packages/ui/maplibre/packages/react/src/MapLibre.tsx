@@ -361,10 +361,9 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   // The eventData merged onto programmatic camera ops so the camera-lifecycle echo
   // handlers can ignore our own moves (the documented MapLibre echo-guard — robust
   // across batched ops where Leaflet's single boolean would race).
-  const PROGRAMMATIC = {
+  const PROGRAMMATIC = useMemo(() => ({
     rozieProgrammatic: true
-  };
-
+  }), []);
   // Live entry maps for the REACTIVE MULTI-INSTANCE portal slots — keyed by
   // entry.id ?? index. Each value: { engine, handle, el }. COMPONENT-scope (not
   // $onMount-local) so the $onMount-returned teardown — which the Solid emitter

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { clsx, rozieContext } from '@rozie/runtime-react';
 import './ThemeProvider.css';
@@ -14,11 +14,11 @@ export default function ThemeProvider(props: ThemeProviderProps): JSX.Element {
   const [color, setColor] = useState('red');
 
   // The cycle order. A plain module constant — never reassigned.
-  const NEXT = {
+  const NEXT = useMemo(() => ({
     red: 'green',
     green: 'blue',
     blue: 'red'
-  };
+  }), []);
   function cycle() {
     setColor(prev => NEXT[prev]);
   }
