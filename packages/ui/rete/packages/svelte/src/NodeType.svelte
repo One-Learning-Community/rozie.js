@@ -123,14 +123,45 @@ cv = canvas;
 // the controlled-graph analog of FlowCanvas's per-node $portals.node handle map.
 let bodyHandles: any = null;
 bodyHandles = new Set();
-// The body-mount closure, DEFINED INSIDE $onMount (below) so it captures the
-// emitter-synthesized `portals` local — which on React/Angular/Lit is scoped to the
-// mount effect body, NOT visible from a spec callback the canvas invokes later (that
-// escaped scope is exactly why a bare `$portals.body(...)` in the bodyRenderer
-// threw "portals is not defined" on those 3 targets). Stored in a module-scope `any`
-// so the spec's bodyRenderer — invoked by the canvas's renderNode from its own
-// render scope — can delegate to it. ZERO emitter change (just correct scoping).
-let mountBody: any = null;
+// The body-mount closure. Mounts an INDEPENDENT body root PER graph node (the
+// canvas calls this once per node of the type), so every instance keeps its OWN
+// #body — it must NOT dispose any sibling's handle (the bug: a single shared
+// handle torn down on each call left only the LAST node rendered). Each returned
+// { dispose } is wrapped to deregister ITSELF from `bodyHandles` when the canvas
+// disposes that node's projection (entry.bodyHandle on node unmount / port-resync);
+// a leftover handle is swept by the component teardown in $onMount. Historically
+// this closure was DEFINED INSIDE $onMount as a bridge for a mount-scoped `portals`
+// local on React/Angular/Lit — quick 260829-gbs removed that bridge after quick
+// 260829-cd4 hoisted the portals closure to component scope on all six targets, so
+// `$portals.body` now resolves correctly from this top-level closure directly.
+const mountBody = (host: any, scope: any) => {
+  if (!host) return null;
+  const s = scope || {};
+  const h = portals.body(host, {
+    node: s.node,
+    selected: s.selected,
+    emit: s.emit
+  });
+  if (!h) return null;
+  bodyHandles.add(h);
+  return {
+    update: (next: any) => {
+      if (h && h.update) {
+        try {
+          return h.update(next);
+        } catch (e: any) {}
+      }
+    },
+    dispose: () => {
+      bodyHandles.delete(h);
+      if (h && h.dispose) {
+        try {
+          h.dispose();
+        } catch (e: any) {}
+      }
+    }
+  };
+};
 // idempotency flag so a reactive late-context registration (Lit async first
 // paint, REQ-30) and the $onMount registration never double-register the type.
 let registered = false;
@@ -145,16 +176,13 @@ let registered = false;
 const buildSpec = () => ({
   type: type,
   // RENDER-BY-TYPE callback: the canvas hands the engine body host + scope; delegate
-  // to the mountBody closure (defined inside $onMount so it can see the emitter's
-  // mount-scoped `portals` local). Until $onMount has run, mountBody is null — but
-  // the canvas only invokes bodyRenderer AFTER reconcileNodes (post-register,
-  // post-mount), so mountBody is always set by then. Returns the { dispose } handle.
+  // to the top-level mountBody closure. Returns the { dispose } handle.
   bodyRenderer: (host: any, scope: any) => {
     // try/catch so a per-target portal-render hiccup (e.g. a Lit lit-html "cannot
     // find node" when re-rendering into an engine-owned host the area re-created)
     // can NEVER abort the canvas's renderNode loop — a thrown bodyRenderer would
     // propagate out of area.update/addNode and stop the whole graph from building.
-    if (host && mountBody) {
+    if (host) {
       try {
         return mountBody(host, scope);
       } catch (e: any) {}
@@ -183,41 +211,6 @@ setContext('rete:nodeType', {
 });
 
 onMount(() => {
-  // The body-mount closure — captures the mount-scoped `portals` local. Mounts an
-  // INDEPENDENT body root PER graph node (the canvas calls this once per node of the
-  // type), so every instance keeps its OWN #body — it must NOT dispose any sibling's
-  // handle (the bug: a single shared handle torn down on each call left only the LAST
-  // node rendered). The returned { dispose } is wrapped to deregister ITSELF from the
-  // live set when the canvas disposes that node's projection (entry.bodyHandle on node
-  // unmount / port-resync); a leftover handle is swept by the component teardown below.
-  mountBody = (host: any, scope: any) => {
-    if (!host) return null;
-    const s = scope || {};
-    const h = portals.body(host, {
-      node: s.node,
-      selected: s.selected,
-      emit: s.emit
-    });
-    if (!h) return null;
-    bodyHandles.add(h);
-    return {
-      update: (next: any) => {
-        if (h && h.update) {
-          try {
-            return h.update(next);
-          } catch (e: any) {}
-        }
-      },
-      dispose: () => {
-        bodyHandles.delete(h);
-        if (h && h.dispose) {
-          try {
-            h.dispose();
-          } catch (e: any) {}
-        }
-      }
-    };
-  };
   // register this TYPE's spec INCLUDING the bodyRenderer callback. The canvas's
   // renderNode resolves typeReg[node.type].bodyRenderer for every graph node of this
   // type and projects the body into the engine host. On Lit the injected canvas may
