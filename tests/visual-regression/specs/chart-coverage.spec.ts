@@ -283,27 +283,15 @@ for (const target of TARGETS) {
       await expect(mount.getByTestId('coverage-probe')).toContainText('labels=', { timeout: 5_000 });
 
       await mount.getByTestId('coverage-push-point-btn').click();
-      // EMITTER-BACKLOG (see .planning/todos/pending/) — on React specifically,
-      // ANY $data write on this page (including the hover above) re-renders
-      // the whole function component, and the rig's `lineOptions` object
-      // (deliberately plain, not `$computed` — see its own comment for why
-      // `$computed` was tried and rejected: it fixes this on React/Solid but
-      // breaks Lit's hover handling outright) is rebuilt fresh each render,
-      // giving Chart's `options` prop a new reference on every hover. That
-      // re-fires the wrapper's OWN `options` $watch (`update('none')`),
-      // which races the data-watch's genuine `update(undefined)` call and
-      // can leave 'none' as the last-observed mode even though the default
-      // (undefined) updateMode never explicitly threaded a 'none' string.
-      // This is a rig-observability limitation, not evidence that Chart.rozie
-      // itself defaults to 'none' — the SECOND assertion below (explicit
-      // none-mode toggle) is unconfounded on every target, including React,
-      // because both watches independently agree once none-mode is set.
-      if (target !== 'react') {
-        await expect(
-          mode,
-          'the default (undefined) updateMode must not render as the literal string "none"',
-        ).not.toContainText('mode=none', { timeout: 5_000 });
-      }
+      // Runs unconditionally on every target (Quick 260828-uyn re-enabled
+      // this on React: the pure object/array literal stabilization pass
+      // gives the rig's plain `lineOptions` object a stable reference across
+      // re-renders, so the wrapper's `options` $watch no longer re-fires
+      // `update('none')` on every hover).
+      await expect(
+        mode,
+        'the default (undefined) updateMode must not render as the literal string "none"',
+      ).not.toContainText('mode=none', { timeout: 5_000 });
 
       await mount.getByTestId('coverage-toggle-none-mode-btn').click();
       await expect(mount.getByTestId('coverage-none-mode-flag')).toContainText('noneMode=true');

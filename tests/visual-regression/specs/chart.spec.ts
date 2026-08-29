@@ -226,24 +226,12 @@ for (const target of TARGETS) {
     await mount.getByTestId('chart-toggle-series-btn').click();
     await expect(status).toContainText('visible=false');
 
-    // EMITTER-BACKLOG (see .planning/todos/pending/) — a SECOND, round-trip
-    // toggle (false -> true) is skipped on React specifically. Discovered
-    // red-first while repairing this leg: ChartBehaviorDemo's `:plugins`
-    // passthrough (`consumerPlugins`, a plain array whose entry carries a
-    // `beforeDraw` function) is rebuilt with a fresh reference on every React
-    // re-render — the SAME "an object/array containing a function isn't
-    // memoized without `$computed`" limitation the chart-coverage rig's
-    // `lineOptions` hit (see that file's own comment). Toggling
-    // `datasetVisible` re-renders the demo, which hands Chart a new
-    // `plugins` reference, which re-fires Chart.rozie's OWN (correct, by-
-    // design) `plugins` $watch — `recreate()` — wiping the just-set
-    // visibility state on a BRAND NEW Chart.js instance before the second
-    // click ever reads it. The first toggle above already proves the handle
-    // wiring works; this is a pre-existing demo-stability gap, not evidence
-    // against `setDatasetVisibility`/`isDatasetVisible` themselves.
-    if (target !== 'react') {
-      await mount.getByTestId('chart-toggle-series-btn').click();
-      await expect(status).toContainText('visible=true');
-    }
+    // Second, round-trip toggle (false -> true) — runs unconditionally on
+    // every target (Quick 260828-uyn re-enabled this on React: the pure
+    // object/array literal stabilization pass gives ChartBehaviorDemo's
+    // `consumerPlugins` a stable reference, so Chart.rozie's own `plugins`
+    // $watch no longer fires `recreate()` on every re-render).
+    await mount.getByTestId('chart-toggle-series-btn').click();
+    await expect(status).toContainText('visible=true');
   });
 }
