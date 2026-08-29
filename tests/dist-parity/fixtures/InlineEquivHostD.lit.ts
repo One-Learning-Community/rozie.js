@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { rozieDisplay, rozieListeners, rozieMemo, rozieSpread } from '@rozie/runtime-lit';
 import { clampD } from './wr01-helpers.js';
 
 @customElement('rozie-inline-equiv-host-d')
@@ -35,7 +35,7 @@ export default class InlineEquivHostD extends SignalWatcher(LitElement) {
 `;
   }
 
-  get inner() { return this.base + 10; }
+  get inner() { return rozieMemo(this, 'inner', [this.base], () => (this.base + 10)); }
 
   get outer() { return clampD(this.inner + this.base); }
 

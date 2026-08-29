@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { createLitControllableProperty, rozieListeners, rozieMemo, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-model-param-shadow')
 export default class ModelParamShadow extends SignalWatcher(LitElement) {
@@ -44,7 +44,7 @@ export default class ModelParamShadow extends SignalWatcher(LitElement) {
 `;
   }
 
-  get label() { return this._status.value + '!'; }
+  get label() { return rozieMemo(this, 'label', [this._status.value], () => (this._status.value + '!')); }
 
   solve = (token: any) => {
   this._tokenControllable.write(token);

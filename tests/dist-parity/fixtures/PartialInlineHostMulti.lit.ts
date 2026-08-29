@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { rozieDisplay, rozieListeners, rozieMemo, rozieSpread } from '@rozie/runtime-lit';
 import { clampB } from './partial-helpers.js';
 import { clampD } from './wr01-helpers.js';
 
@@ -55,7 +55,7 @@ export default class PartialInlineHostMulti extends SignalWatcher(LitElement) {
 
   columnChromeM = (k: number): number => clampB(this.tickM() + k);
 
-  get inner() { return this.base + 10; }
+  get inner() { return rozieMemo(this, 'inner', [this.base], () => (this.base + 10)); }
 
   get outerM() { return clampD(this.inner + this.base); }
 

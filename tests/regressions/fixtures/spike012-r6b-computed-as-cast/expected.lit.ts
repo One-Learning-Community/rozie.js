@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { rozieDisplay, rozieListeners, rozieMemo, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-computed-as-cast')
 export default class ComputedAsCast extends SignalWatcher(LitElement) {
@@ -32,7 +32,7 @@ export default class ComputedAsCast extends SignalWatcher(LitElement) {
 `;
   }
 
-  get label() { return (this.raw + '!') as string; }
+  get label() { return (rozieMemo(this, 'label', [this.raw], () => (this.raw + '!'))) as string; }
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the

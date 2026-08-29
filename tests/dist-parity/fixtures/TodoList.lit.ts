@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { RozieSlotDistributor, createLitControllableProperty, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { RozieSlotDistributor, createLitControllableProperty, rozieDisplay, rozieListeners, rozieMemo, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 interface RozieHeaderSlotCtx {
@@ -152,7 +152,7 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
 `;
   }
 
-  get remaining() { return this.items.filter((i: any) => !i.done).length; }
+  get remaining() { return rozieMemo(this, 'remaining', [this.items], () => (this.items.filter((i: any) => !i.done).length)); }
 
   add = () => {
   const text = this._draft.value.trim();

@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { debounce, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { debounce, rozieListeners, rozieMemo, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-computed-in-debounce-lift')
 export default class ComputedInDebounceLift extends SignalWatcher(LitElement) {
@@ -47,7 +47,7 @@ export default class ComputedInDebounceLift extends SignalWatcher(LitElement) {
 `;
   }
 
-  get label() { return 'x'; }
+  get label() { return rozieMemo(this, 'label', [], () => ('x')); }
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the

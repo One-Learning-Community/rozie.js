@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { debounce, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { debounce, rozieListeners, rozieMemo, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-search-input')
 export default class SearchInput extends SignalWatcher(LitElement) {
@@ -70,7 +70,7 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
 `;
   }
 
-  get isValid() { return this._query.value.length >= this.minLength; }
+  get isValid() { return rozieMemo(this, 'isValid', [this._query.value, this.minLength], () => (this._query.value.length >= this.minLength)); }
 
   onSearch = () => {
   if (this.isValid) this.dispatchEvent(new CustomEvent("search", {
