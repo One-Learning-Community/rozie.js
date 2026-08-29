@@ -1442,9 +1442,10 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   const { lines: lifecycleLines, consumedIndices } = emitLifecycleHooks(cloned, imports);
 
   // Portal-slot primitive (Spike 003) — synthesize setup-level scaffolding
-  // when ir.slots has any portal entries. Lines are spliced between residual
-  // and lifecycle sections below so the `portals` closure exists before user
-  // $onMount callbacks that capture it.
+  // when ir.slots has any portal entries. Quick 260829-cd4 (Task 5): the
+  // lines are spliced BEFORE the residual body (matching Solid), so a
+  // top-level helper INVOKED at top level — not just from a hook — can
+  // resolve `$portals.*` without a TDZ crash.
   const portalsEmit = emitPortals(ir, imports, opts.portalScopeHash ?? '');
 
   // Cross-component context primitive (Phase 36) — emit Vue native
@@ -1515,6 +1516,21 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   // it doesn't matter whether it's called before or after a `const` decl as
   // long as the const exists by the time `onMounted`'s argument is evaluated.
   const sections = [...preambleSections];
+  // Quick 260829-cd4 (Task 5) — portal scaffolding now precedes the residual
+  // body (matching Solid, the reference implementation), not just the
+  // lifecycle section. Report §3 hazard 1: a top-level helper INVOKED at top
+  // level (not from a hook) would otherwise hit the TDZ on Vue, since
+  // `portals` was declared AFTER the user script. `portalsEmit.setupLines`
+  // reads only `slots.<name>` (declared in `preambleSections` above via
+  // `useSlotsLine`, gated on the same `hasPortalSlots` condition) — never a
+  // residual-declared binding — so this placement is safe.
+  if (portalsEmit.hasPortals) sections.push(portalsEmit.setupLines);
+  // Residual body BEFORE lifecycle hooks — `onMounted(lockScroll)` references
+  // `lockScroll` which is a `const` declared in the residual body. Emitting
+  // lifecycle BEFORE residual triggered a JS TDZ crash at component mount
+  // time (Modal.rozie repro). Vue's onMounted just registers the callback;
+  // it doesn't matter whether it's called before or after a `const` decl as
+  // long as the const exists by the time `onMounted`'s argument is evaluated.
   if (residualCode.trim().length > 0) sections.push(residualCode);
   // Phase 36 — `provide('k', v)` calls emitted AFTER the residual body so a
   // provided value may reference residual-declared helpers (e.g.
@@ -1525,9 +1541,6 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   if (contextEmit.provideLines.length > 0) {
     sections.push(contextEmit.provideLines.join('\n'));
   }
-  // Portal-slot primitive — emit portal scaffolding BEFORE lifecycle so the
-  // `portals` closure is in scope when the user's onMounted callback fires.
-  if (portalsEmit.hasPortals) sections.push(portalsEmit.setupLines);
   if (lifecycleLines.length > 0) sections.push(lifecycleLines.join('\n'));
   // Quick plan 260515-u2b — emit watch() calls AFTER lifecycle calls so any
   // helpers referenced inside the watch callback (declared in residual body)

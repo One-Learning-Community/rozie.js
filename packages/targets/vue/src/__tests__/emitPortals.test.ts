@@ -14,6 +14,7 @@ import type { IRComponent, SlotDecl } from '@rozie/core';
 import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { describe, expect, it } from 'vitest';
 import { emitPortals } from '../emit/emitPortals.js';
+import { emitVue } from '../emitVue.js';
 import { VueImportCollector } from '../rewrite/collectVueImports.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -168,5 +169,39 @@ describe('emitPortals — Vue', () => {
     expect(result.setupLines).toContain('item: (container');
     expect(result.setupLines).toContain('const slotFn = slots.item;');
     expect(result.setupLines).not.toContain('default: (container');
+  });
+});
+
+// ── Quick 260829-cd4 (Task 5) — portals declared BEFORE the user script ────
+describe('emitPortals — Vue ordering (portals precede the residual user script)', () => {
+  it('a top-level helper invoked at TOP LEVEL (not from a hook) resolves $portals without a TDZ', () => {
+    const src = `<rozie name="TopLevelPortalCall">
+<script>
+const h = $portals.body(document.createElement('div'), {})
+</script>
+<template>
+<slot name="body" portal reactive />
+</template>
+</rozie>`;
+    const result = parse(src, { filename: 'TopLevelPortalCall.rozie' });
+    if (!result.ast) throw new Error('parse() returned null AST');
+    const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
+    if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
+    const { code, diagnostics } = emitVue(lowered.ir, {
+      filename: 'TopLevelPortalCall.rozie',
+      source: src,
+    });
+    expect(
+      diagnostics.filter((d) => d.severity === 'error'),
+      `unexpected emit errors: ${JSON.stringify(diagnostics)}`,
+    ).toEqual([]);
+    // The portals closure declaration must precede the top-level `const h =`
+    // user statement — otherwise `h`'s initializer reads `portals` before
+    // its declaration (a TDZ ReferenceError at module-eval / setup time).
+    const portalsIdx = code.indexOf('const portals = {');
+    const userStmtIdx = code.indexOf('const h = portals.body(');
+    expect(portalsIdx).toBeGreaterThanOrEqual(0);
+    expect(userStmtIdx).toBeGreaterThanOrEqual(0);
+    expect(portalsIdx).toBeLessThan(userStmtIdx);
   });
 });

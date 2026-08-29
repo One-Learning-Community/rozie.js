@@ -1790,21 +1790,28 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   // appears near the top of <script>; user-declared consts (e.g., handler
   // arrows) are visible to subsequent $derived / $effect references.
   const sections = [...preambleSections];
+  // Quick 260829-cd4 (Task 5) — portal scaffolding now precedes the residual
+  // body (matching Solid), not just the lifecycle section. Report §3 hazard
+  // 1: a top-level helper INVOKED at top level (not from a hook) would
+  // otherwise hit the TDZ on Svelte, since `portals` was declared AFTER the
+  // user script. `portalsEmit.setupLines` reads only `<propName>` (a Svelte
+  // `$props()` destructure, declared in `propsBlock` / preambleSections
+  // above) — never a residual-declared binding — and its own
+  // `$effect(() => () => {...})` disposal registration is legal at any
+  // top-level (component INIT scope) position, so this placement is safe.
+  if (portalsEmit.hasPortals) sections.push(portalsEmit.setupLines);
   if (residualCode.trim().length > 0) sections.push(residualCode);
   // Phase 36 (REQ-32) — `setContext('k', v)` calls emitted AFTER the residual
   // body so a provided value may reference residual-declared helpers (e.g.
   // `$provide('theme', { get color() {…}, cycle })` where `cycle` is a residual
   // `function`/`const`). CRITICAL: this is still component INIT scope — emitted
-  // BEFORE the portal/lifecycle (`onMount`/`$effect`) blocks below, NEVER
-  // inside a lifecycle callback, or Svelte throws "called outside component
+  // BEFORE the lifecycle (`onMount`/`$effect`) blocks below, NEVER inside a
+  // lifecycle callback, or Svelte throws "called outside component
   // initialization". The provided value carries the live getter/`$state`, so
   // descendants read reactive (D-3 / REQ-29).
   if (contextEmit.provideLines.length > 0) {
     sections.push(contextEmit.provideLines.join('\n'));
   }
-  // Portal-slot primitive — emit portal scaffolding before lifecycle so the
-  // `portals` closure is in scope when user $onMount callbacks fire.
-  if (portalsEmit.hasPortals) sections.push(portalsEmit.setupLines);
   if (derivedLines.length > 0) sections.push(derivedLines.join('\n'));
   if (lifecycleLines.length > 0) sections.push(lifecycleLines.join('\n'));
   // Quick plan 260515-u2b — watcher $effect blocks after lifecycle.
