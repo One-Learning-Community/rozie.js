@@ -39,6 +39,11 @@ import { arrangeLayoutOptions, arrangePortRect, sanitizeWaypoints, waypointArrow
 // .rozie-native fix (no lang="ts", no codegen type-aid). These are top-level lets
 // referenced from hooks → React auto-hoists each to a useRef. ──
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+
 const __rozieCtx_rete_canvas = createContext(Symbol.for("rozie:rete:canvas"));
 
 interface RozieNodeSlotCtx {
@@ -517,6 +522,44 @@ private __rozieWatchInitial_2 = true;
 private __rozieWatchInitial_3 = true;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
+private portals = {
+  node: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
+    const tpl = this.node;
+    if (typeof tpl !== 'function') return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-node', 'cd396d6a');
+    const renderScope = (s: { node: unknown; selected: unknown; emit: unknown }): void => {
+      render(tpl(s), container);
+    };
+    renderScope(scope);
+    this._portalContainers.add(container);
+    return {
+      update: (s: { node: unknown; selected: unknown; emit: unknown }): void => renderScope(s),
+      dispose: (): void => {
+        render(nothing, container);
+        this._portalContainers.delete(container);
+      },
+    };
+  },
+  toolbar: (container: HTMLElement, scope: { node: unknown; emit: unknown }): ReactivePortalHandle => {
+    const tpl = this.toolbar;
+    if (typeof tpl !== 'function') return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-toolbar', 'cd396d6a');
+    const renderScope = (s: { node: unknown; emit: unknown }): void => {
+      render(tpl(s), container);
+    };
+    renderScope(scope);
+    this._portalContainers.add(container);
+    return {
+      update: (s: { node: unknown; emit: unknown }): void => renderScope(s),
+      dispose: (): void => {
+        render(nothing, container);
+        this._portalContainers.delete(container);
+      },
+    };
+  },
+};
 private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __rozieCtx_rete_canvas, initialValue: ((__rozieCtxHost) => ({
   // Register/replace a node TYPE template. `spec` carries an optional
   // `bodyRenderer(host, { node })` — the render-by-type projection (mounted per graph
@@ -645,49 +688,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     adoptDocumentStyles(this);
 
     this._armListeners();
-
-    interface ReactivePortalHandle {
-      update(scope: unknown): void;
-      dispose(): void;
-    }
-    const portals = {
-      node: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
-        const tpl = this.node;
-        if (typeof tpl !== 'function') return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-node', 'cd396d6a');
-        const renderScope = (s: { node: unknown; selected: unknown; emit: unknown }): void => {
-          render(tpl(s), container);
-        };
-        renderScope(scope);
-        this._portalContainers.add(container);
-        return {
-          update: (s: { node: unknown; selected: unknown; emit: unknown }): void => renderScope(s),
-          dispose: (): void => {
-            render(nothing, container);
-            this._portalContainers.delete(container);
-          },
-        };
-      },
-      toolbar: (container: HTMLElement, scope: { node: unknown; emit: unknown }): ReactivePortalHandle => {
-        const tpl = this.toolbar;
-        if (typeof tpl !== 'function') return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-toolbar', 'cd396d6a');
-        const renderScope = (s: { node: unknown; emit: unknown }): void => {
-          render(tpl(s), container);
-        };
-        renderScope(scope);
-        this._portalContainers.add(container);
-        return {
-          update: (s: { node: unknown; emit: unknown }): void => renderScope(s),
-          dispose: (): void => {
-            render(nothing, container);
-            this._portalContainers.delete(container);
-          },
-        };
-      },
-    };
 
     this._disconnectCleanups.push((() => {
       if (this.onCanvasKeydown && this.keydownContainer && typeof this.keydownContainer.removeEventListener === 'function') {
@@ -1815,7 +1815,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         // reactive multi-instance portal — one handle per node, re-rendered in
         // place on meta change (the MapLibre marker discipline). Low-level escape
         // hatch: the consumer switches on node.type inside the single `#node` slot.
-        entry.handle = portals.node(body, {
+        entry.handle = this.portals.node(body, {
           node: meta,
           selected,
           emit
@@ -3383,7 +3383,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         if (this.toolbarHandle && this.toolbarHandle.update) {
           this.toolbarHandle.update(scope);
         } else {
-          this.toolbarHandle = portals.toolbar(this.toolbarHost, scope);
+          this.toolbarHandle = this.portals.toolbar(this.toolbarHost, scope);
         }
       }
       this.scheduleToolbarTrack();

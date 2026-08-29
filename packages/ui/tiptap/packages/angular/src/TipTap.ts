@@ -75,6 +75,11 @@ interface NodeViewCtx {
   contentDOM: any;
 }
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+
 @Component({
   selector: 'rozie-tip-tap',
   standalone: true,
@@ -362,6 +367,95 @@ export class TipTap {
   private _floatingMenuTpl = contentChild('floatingMenu', { read: TemplateRef });
   private _linkEditorTpl = contentChild('linkEditor', { read: TemplateRef });
   private _nodeViewTpl = contentChild('nodeView', { read: TemplateRef });
+  private portals = {
+    toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+      const tpl = this._toolbarTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+      const tpl = this._bubbleMenuTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+      const tpl = this._floatingMenuTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
+      const tpl = this._linkEditorTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return {
+        update: (s: unknown): void => {
+          Object.assign(view.context as object, s as object);
+          view.detectChanges();
+        },
+        dispose: (): void => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        },
+      };
+    },
+    nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
+      const tpl = this._nodeViewTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return {
+        update: (s: unknown): void => {
+          Object.assign(view.context as object, s as object);
+          view.detectChanges();
+        },
+        dispose: (): void => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        },
+      };
+    },
+  };
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
@@ -382,99 +476,6 @@ export class TipTap {
   }
 
   ngAfterViewInit() {
-    interface ReactivePortalHandle {
-      update(scope: unknown): void;
-      dispose(): void;
-    }
-    const portals = {
-      toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-        const tpl = this._toolbarTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-        const tpl = this._bubbleMenuTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-        const tpl = this._floatingMenuTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
-        const tpl = this._linkEditorTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return {
-          update: (s: unknown): void => {
-            Object.assign(view.context as object, s as object);
-            view.detectChanges();
-          },
-          dispose: (): void => {
-            view.destroy();
-            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-          },
-        };
-      },
-      nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
-        const tpl = this._nodeViewTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return {
-          update: (s: unknown): void => {
-            Object.assign(view.context as object, s as object);
-            view.detectChanges();
-          },
-          dispose: (): void => {
-            view.destroy();
-            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-          },
-        };
-      },
-    };
     const __nodeSpecs = this.nodeSpecs();
     const __placeholder = this.placeholder();
     const __bubbleMenuShouldShow = this.bubbleMenuShouldShow();
@@ -500,7 +501,7 @@ export class TipTap {
     // read ONCE here (setup-once — NOT a $watch); $portals.nodeView is captured
     // here inside the mount body and passed into the node factory, keeping the
     // reference scoped to the mount lifecycle (the toolbar-slot discipline).
-    const nodeViewExtensions = (this.nodeViewTpl ?? this.__rozieFillMap()['nodeView'] ?? this.templates()?.['nodeView']) && __nodeSpecs.length ? this.makeNodeViewExtensions(portals.nodeView, __nodeSpecs) : [];
+    const nodeViewExtensions = (this.nodeViewTpl ?? this.__rozieFillMap()['nodeView'] ?? this.templates()?.['nodeView']) && __nodeSpecs.length ? this.makeNodeViewExtensions(this.portals.nodeView, __nodeSpecs) : [];
 
     // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
     // (setup-once, like content/editable/autofocus — no reactivity required). The
@@ -732,7 +733,7 @@ export class TipTap {
     // strict typecheck, the FullCalendar/CodeMirror pattern). The host div is
     // r-if-gated on $slots.toolbar so $refs.toolbarEl exists exactly when filled.
     if ((this.toolbarTpl ?? this.__rozieFillMap()['toolbar'] ?? this.templates()?.['toolbar']) && this.toolbarEl()?.nativeElement) {
-      this.toolbarDispose = portals.toolbar(this.toolbarEl()!.nativeElement, {
+      this.toolbarDispose = this.portals.toolbar(this.toolbarEl()!.nativeElement, {
         editor: this.editor
       });
     }
@@ -752,12 +753,12 @@ export class TipTap {
     // strict-typecheck discipline). The element is created above only when the slot
     // is filled, so each portal fires exactly when its slot exists.
     if (this.bubbleMenuEl) {
-      this.bubbleMenuDispose = portals.bubbleMenu(this.bubbleMenuEl, {
+      this.bubbleMenuDispose = this.portals.bubbleMenu(this.bubbleMenuEl, {
         editor: this.editor
       });
     }
     if (this.floatingMenuEl) {
-      this.floatingMenuDispose = portals.floatingMenu(this.floatingMenuEl, {
+      this.floatingMenuDispose = this.portals.floatingMenu(this.floatingMenuEl, {
         editor: this.editor
       });
     }
@@ -781,7 +782,7 @@ export class TipTap {
         // same tick) — the same React stale-read avoidance as buildLinkScope's
         // other call site.
         const initialLinkAttrs = this.editor.getAttributes('link');
-        this.linkEditorHandle = portals.linkEditor(this.linkEditorEl, this.buildLinkScope(initialLinkAttrs.href || '', initialLinkAttrs));
+        this.linkEditorHandle = this.portals.linkEditor(this.linkEditorEl, this.buildLinkScope(initialLinkAttrs.href || '', initialLinkAttrs));
       } else {
         this.buildDefaultLinkEditor(this.linkEditorEl);
         // Prefill correction (D-04): the refreshLink() call above (right after

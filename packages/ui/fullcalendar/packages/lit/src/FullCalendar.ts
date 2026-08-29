@@ -120,6 +120,128 @@ export default class FullCalendar extends SignalWatcher(LitElement) {
 private __rozieWatchInitial_1 = true;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
+private portals = {
+  event: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const tpl = this.event;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-event', '5589629a');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  dayCell: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const tpl = this.dayCell;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-dayCell', '5589629a');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  dayHeader: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const tpl = this.dayHeader;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-dayHeader', '5589629a');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  slotLabel: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const tpl = this.slotLabel;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-slotLabel', '5589629a');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  weekNumber: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const tpl = this.weekNumber;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-weekNumber', '5589629a');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const tpl = this.nowIndicatorContent;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-nowIndicatorContent', '5589629a');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  moreLink: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const tpl = this.moreLink;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-moreLink', '5589629a');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  allDayContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const tpl = this.allDayContent;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-allDayContent', '5589629a');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  slotLaneContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const tpl = this.slotLaneContent;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-slotLaneContent', '5589629a');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  noEventsContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const tpl = this.noEventsContent;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-noEventsContent', '5589629a');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+};
 
   @state() private _hasSlotEvent = false;
   @queryAssignedElements({ slot: 'event', flatten: true }) private _slotEventElements!: Element[];
@@ -299,129 +421,6 @@ private _portalContainers = new Set<HTMLElement>();
     adoptDocumentStyles(this);
 
     this._armListeners();
-
-    const portals = {
-      event: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this.event;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-event', '5589629a');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      dayCell: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this.dayCell;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-dayCell', '5589629a');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      dayHeader: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this.dayHeader;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-dayHeader', '5589629a');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      slotLabel: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this.slotLabel;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-slotLabel', '5589629a');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      weekNumber: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this.weekNumber;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-weekNumber', '5589629a');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this.nowIndicatorContent;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-nowIndicatorContent', '5589629a');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      moreLink: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this.moreLink;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-moreLink', '5589629a');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      allDayContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this.allDayContent;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-allDayContent', '5589629a');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      slotLaneContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this.slotLaneContent;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-slotLaneContent', '5589629a');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      noEventsContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this.noEventsContent;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-noEventsContent', '5589629a');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-    };
 
     this._disconnectCleanups.push((() => this.instance?.destroy()));
 
@@ -635,7 +634,7 @@ private _portalContainers = new Set<HTMLElement>();
     if (this.event !== undefined) {
       opts.eventContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.event(node, {
+        const dispose = this.portals.event(node, {
           arg
         });
         return {
@@ -671,7 +670,7 @@ private _portalContainers = new Set<HTMLElement>();
     if (this.dayCell !== undefined) {
       opts.dayCellContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.dayCell(node, {
+        const dispose = this.portals.dayCell(node, {
           arg
         });
         return {
@@ -683,7 +682,7 @@ private _portalContainers = new Set<HTMLElement>();
     if (this.dayHeader !== undefined) {
       opts.dayHeaderContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.dayHeader(node, {
+        const dispose = this.portals.dayHeader(node, {
           arg
         });
         return {
@@ -695,7 +694,7 @@ private _portalContainers = new Set<HTMLElement>();
     if (this.slotLabel !== undefined) {
       opts.slotLabelContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.slotLabel(node, {
+        const dispose = this.portals.slotLabel(node, {
           arg
         });
         return {
@@ -707,7 +706,7 @@ private _portalContainers = new Set<HTMLElement>();
     if (this.weekNumber !== undefined) {
       opts.weekNumberContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.weekNumber(node, {
+        const dispose = this.portals.weekNumber(node, {
           arg
         });
         return {
@@ -719,7 +718,7 @@ private _portalContainers = new Set<HTMLElement>();
     if (this.nowIndicatorContent !== undefined) {
       opts.nowIndicatorContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.nowIndicatorContent(node, {
+        const dispose = this.portals.nowIndicatorContent(node, {
           arg
         });
         return {
@@ -731,7 +730,7 @@ private _portalContainers = new Set<HTMLElement>();
     if (this.moreLink !== undefined) {
       opts.moreLinkContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.moreLink(node, {
+        const dispose = this.portals.moreLink(node, {
           arg
         });
         return {
@@ -743,7 +742,7 @@ private _portalContainers = new Set<HTMLElement>();
     if (this.allDayContent !== undefined) {
       opts.allDayContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.allDayContent(node, {
+        const dispose = this.portals.allDayContent(node, {
           arg
         });
         return {
@@ -755,7 +754,7 @@ private _portalContainers = new Set<HTMLElement>();
     if (this.slotLaneContent !== undefined) {
       opts.slotLaneContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.slotLaneContent(node, {
+        const dispose = this.portals.slotLaneContent(node, {
           arg
         });
         return {
@@ -779,7 +778,7 @@ private _portalContainers = new Set<HTMLElement>();
     if (this.noEventsContent !== undefined) {
       opts.noEventsContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.noEventsContent(node, {
+        const dispose = this.portals.noEventsContent(node, {
           arg
         });
         return {

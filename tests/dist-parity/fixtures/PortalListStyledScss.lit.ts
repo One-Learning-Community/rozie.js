@@ -48,6 +48,20 @@ export default class PortalListStyledScss extends SignalWatcher(LitElement) {
   @property({ type: Array }) items: any[] = [];
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private _portalContainers = new Set<HTMLElement>();
+private portals = {
+  item: (container: HTMLElement, scope: { item: unknown }): (() => void) => {
+    const tpl = this.item;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-item', '860cc87e');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+};
 
   @state() private _hasSlotItem = false;
   @queryAssignedElements({ slot: 'item', flatten: true }) private _slotItemElements!: Element[];
@@ -91,21 +105,6 @@ private _portalContainers = new Set<HTMLElement>();
   firstUpdated(): void {
     this._armListeners();
 
-    const portals = {
-      item: (container: HTMLElement, scope: { item: unknown }): (() => void) => {
-        const tpl = this.item;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-item', '860cc87e');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-    };
-
     // Tiny inline "engine" — same shape as examples/PortalList.rozie but
     // with the inline-style ceremony removed. The engine now just creates
     // structural DOM; cosmetic styling is the wrapper's <style> block's job.
@@ -144,7 +143,7 @@ private _portalContainers = new Set<HTMLElement>();
       items: this.items,
       cellRenderer: (item: any) => {
         const node = document.createElement('div');
-        const dispose = portals.item(node, {
+        const dispose = this.portals.item(node, {
           item
         });
         return {

@@ -118,31 +118,31 @@ export class PortalListStyledScss {
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
   private _itemTpl = contentChild('item', { read: TemplateRef });
+  private portals = {
+    item: (container: HTMLElement, scope: { item: unknown }): (() => void) => {
+      const tpl = this._itemTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-item', '860cc87e');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+  };
   private __rozieDestroyRef = inject(DestroyRef);
 
   ngAfterViewInit() {
-    const portals = {
-      item: (container: HTMLElement, scope: { item: unknown }): (() => void) => {
-        const tpl = this._itemTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-item', '860cc87e');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-    };
     this.instance = new MiniListEngine(this.__rozieRoot()!.nativeElement, {
       items: this.items(),
       cellRenderer: (item: any) => {
         const node = document.createElement('div');
-        const dispose = portals.item(node, {
+        const dispose = this.portals.item(node, {
           item
         });
         return {

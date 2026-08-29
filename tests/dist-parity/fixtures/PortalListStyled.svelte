@@ -26,6 +26,28 @@ const item = $derived(__itemProp ?? snippets?.item);
 
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 
+const portalInstances = new Set<Record<string, unknown>>();
+const portals = {
+  item: (container: HTMLElement, scope: { item: unknown }): (() => void) => {
+    if (!item) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-item', '18e5aac6');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: item, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+};
+$effect(() => () => {
+  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
+  portalInstances.clear();
+});
+
 // Tiny inline "engine" — same shape as examples/PortalList.rozie but
 // with the inline-style ceremony removed. The engine now just creates
 // structural DOM; cosmetic styling is the wrapper's <style> block's job.
@@ -58,28 +80,6 @@ class MiniListEngine {
   }
 }
 let instance: any = null;
-
-const portalInstances = new Set<Record<string, unknown>>();
-const portals = {
-  item: (container: HTMLElement, scope: { item: unknown }): (() => void) => {
-    if (!item) return () => {};
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-item', '18e5aac6');
-    const inst = mount(PortalHost, {
-      target: container,
-      props: { snippet: item, scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return () => {
-      unmount(inst);
-      portalInstances.delete(inst as Record<string, unknown>);
-    };
-  },
-};
-$effect(() => () => {
-  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
-  portalInstances.clear();
-});
 
 onMount(() => {
   instance = new MiniListEngine(__rozieRoot!, {

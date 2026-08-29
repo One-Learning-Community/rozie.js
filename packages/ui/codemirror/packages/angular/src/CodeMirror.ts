@@ -56,6 +56,11 @@ interface DecorationCtx {
   view: any;
 }
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+
 @Component({
   selector: 'rozie-code-mirror',
   standalone: true,
@@ -209,6 +214,101 @@ export class CodeMirror {
   private _tooltipTpl = contentChild('tooltip', { read: TemplateRef });
   private _gutterTpl = contentChild('gutter', { read: TemplateRef });
   private _decorationTpl = contentChild('decoration', { read: TemplateRef });
+  private portals = {
+    panel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
+      const tpl = this._panelTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-panel', '34cfda5a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    topPanel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
+      const tpl = this._topPanelTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-topPanel', '34cfda5a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    tooltip: (container: HTMLElement, scope: { view: unknown; pos: unknown }): ReactivePortalHandle => {
+      const tpl = this._tooltipTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-tooltip', '34cfda5a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return {
+        update: (s: unknown): void => {
+          Object.assign(view.context as object, s as object);
+          view.detectChanges();
+        },
+        dispose: (): void => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        },
+      };
+    },
+    gutter: (container: HTMLElement, scope: { line: unknown; view: unknown }): ReactivePortalHandle => {
+      const tpl = this._gutterTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-gutter', '34cfda5a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return {
+        update: (s: unknown): void => {
+          Object.assign(view.context as object, s as object);
+          view.detectChanges();
+        },
+        dispose: (): void => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        },
+      };
+    },
+    decoration: (container: HTMLElement, scope: { from: unknown; to: unknown; view: unknown }): ReactivePortalHandle => {
+      const tpl = this._decorationTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-decoration', '34cfda5a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return {
+        update: (s: unknown): void => {
+          Object.assign(view.context as object, s as object);
+          view.detectChanges();
+        },
+        dispose: (): void => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        },
+      };
+    },
+  };
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
@@ -251,105 +351,6 @@ export class CodeMirror {
   }
 
   ngAfterViewInit() {
-    interface ReactivePortalHandle {
-      update(scope: unknown): void;
-      dispose(): void;
-    }
-    const portals = {
-      panel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
-        const tpl = this._panelTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-panel', '34cfda5a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      topPanel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
-        const tpl = this._topPanelTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-topPanel', '34cfda5a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      tooltip: (container: HTMLElement, scope: { view: unknown; pos: unknown }): ReactivePortalHandle => {
-        const tpl = this._tooltipTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-tooltip', '34cfda5a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return {
-          update: (s: unknown): void => {
-            Object.assign(view.context as object, s as object);
-            view.detectChanges();
-          },
-          dispose: (): void => {
-            view.destroy();
-            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-          },
-        };
-      },
-      gutter: (container: HTMLElement, scope: { line: unknown; view: unknown }): ReactivePortalHandle => {
-        const tpl = this._gutterTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-gutter', '34cfda5a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return {
-          update: (s: unknown): void => {
-            Object.assign(view.context as object, s as object);
-            view.detectChanges();
-          },
-          dispose: (): void => {
-            view.destroy();
-            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-          },
-        };
-      },
-      decoration: (container: HTMLElement, scope: { from: unknown; to: unknown; view: unknown }): ReactivePortalHandle => {
-        const tpl = this._decorationTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-decoration', '34cfda5a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return {
-          update: (s: unknown): void => {
-            Object.assign(view.context as object, s as object);
-            view.detectChanges();
-          },
-          dispose: (): void => {
-            view.destroy();
-            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-          },
-        };
-      },
-    };
     // One `panel` portal slot — mounted through CM6's `showPanel` facet. The
     // Panel's `dom` is the portal host node; $portals.panel(dom, scope) mounts the
     // consumer's framework-native fragment on Panel.mount() and the returned
@@ -377,7 +378,7 @@ export class CodeMirror {
           dom,
           top: false,
           mount: () => {
-            dispose = portals.panel(dom, scope);
+            dispose = this.portals.panel(dom, scope);
           },
           destroy: () => {
             dispose?.();
@@ -410,7 +411,7 @@ export class CodeMirror {
           dom,
           top: true,
           mount: () => {
-            dispose = portals.topPanel(dom, scope);
+            dispose = this.portals.topPanel(dom, scope);
           },
           destroy: () => {
             dispose?.();
@@ -479,7 +480,7 @@ export class CodeMirror {
           return {
             dom,
             mount: () => {
-              handle = portals.tooltip(dom, {
+              handle = this.portals.tooltip(dom, {
                 view: tipView,
                 pos: tipView.state.selection.main.head
               });
@@ -702,8 +703,8 @@ export class CodeMirror {
     // Bridge the mount-built factories to the top-level $watch reconfigures. Each
     // closes over the captured $portals helper so a prop change can rebuild the
     // extension without re-referencing $portals at top level.
-    this.rebuildGutterExt = () => makeGutterExt(portals.gutter);
-    this.rebuildDecorationExt = () => makeDecorationExt(portals.decoration);
+    this.rebuildGutterExt = () => makeGutterExt(this.portals.gutter);
+    this.rebuildDecorationExt = () => makeDecorationExt(this.portals.decoration);
     const buildState = (doc: any) => EditorState.create({
       doc,
       extensions: [this.baselineCompartment.of(this.baselineExt()), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly())), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), this.topPanelCompartment.of(topPanelExt()),

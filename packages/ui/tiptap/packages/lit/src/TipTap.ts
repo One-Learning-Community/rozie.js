@@ -31,6 +31,11 @@ import { CharacterCount } from '@tiptap/extension-character-count';
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+
 interface RozieCountSlotCtx {
   characters: any;
   words: any;
@@ -271,6 +276,80 @@ export default class TipTap extends SignalWatcher(LitElement) {
 private __rozieWatchInitial_0 = true;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
+private portals = {
+  toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+    const tpl = this.toolbar;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+    const tpl = this.bubbleMenu;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+    const tpl = this.floatingMenu;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
+    const tpl = this.linkEditor;
+    if (typeof tpl !== 'function') return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
+    const renderScope = (s: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): void => {
+      render(tpl(s), container);
+    };
+    renderScope(scope);
+    this._portalContainers.add(container);
+    return {
+      update: (s: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): void => renderScope(s),
+      dispose: (): void => {
+        render(nothing, container);
+        this._portalContainers.delete(container);
+      },
+    };
+  },
+  nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
+    const tpl = this.nodeView;
+    if (typeof tpl !== 'function') return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
+    const renderScope = (s: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): void => {
+      render(tpl(s), container);
+    };
+    renderScope(scope);
+    this._portalContainers.add(container);
+    return {
+      update: (s: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): void => renderScope(s),
+      dispose: (): void => {
+        render(nothing, container);
+        this._portalContainers.delete(container);
+      },
+    };
+  },
+};
 
   @state() private _hasSlotCount = false;
   @queryAssignedElements({ slot: 'count', flatten: true }) private _slotCountElements!: Element[];
@@ -391,85 +470,6 @@ private _portalContainers = new Set<HTMLElement>();
 
     this._armListeners();
 
-    interface ReactivePortalHandle {
-      update(scope: unknown): void;
-      dispose(): void;
-    }
-    const portals = {
-      toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-        const tpl = this.toolbar;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-        const tpl = this.bubbleMenu;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-        const tpl = this.floatingMenu;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
-        const tpl = this.linkEditor;
-        if (typeof tpl !== 'function') return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
-        const renderScope = (s: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): void => {
-          render(tpl(s), container);
-        };
-        renderScope(scope);
-        this._portalContainers.add(container);
-        return {
-          update: (s: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): void => renderScope(s),
-          dispose: (): void => {
-            render(nothing, container);
-            this._portalContainers.delete(container);
-          },
-        };
-      },
-      nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
-        const tpl = this.nodeView;
-        if (typeof tpl !== 'function') return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
-        const renderScope = (s: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): void => {
-          render(tpl(s), container);
-        };
-        renderScope(scope);
-        this._portalContainers.add(container);
-        return {
-          update: (s: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): void => renderScope(s),
-          dispose: (): void => {
-            render(nothing, container);
-            this._portalContainers.delete(container);
-          },
-        };
-      },
-    };
-
     this._disconnectCleanups.push((() => {
       this.toolbarDispose?.();
       this.toolbarDispose = null;
@@ -514,7 +514,7 @@ private _portalContainers = new Set<HTMLElement>();
     // read ONCE here (setup-once — NOT a $watch); $portals.nodeView is captured
     // here inside the mount body and passed into the node factory, keeping the
     // reference scoped to the mount lifecycle (the toolbar-slot discipline).
-    const nodeViewExtensions = this.nodeView !== undefined && this.nodeSpecs.length ? this.makeNodeViewExtensions(portals.nodeView, this.nodeSpecs) : [];
+    const nodeViewExtensions = this.nodeView !== undefined && this.nodeSpecs.length ? this.makeNodeViewExtensions(this.portals.nodeView, this.nodeSpecs) : [];
 
     // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
     // (setup-once, like content/editable/autofocus — no reactivity required). The
@@ -762,7 +762,7 @@ private _portalContainers = new Set<HTMLElement>();
     // strict typecheck, the FullCalendar/CodeMirror pattern). The host div is
     // r-if-gated on $slots.toolbar so $refs.toolbarEl exists exactly when filled.
     if (this.toolbar !== undefined && this._refToolbarEl) {
-      this.toolbarDispose = portals.toolbar(this._refToolbarEl, {
+      this.toolbarDispose = this.portals.toolbar(this._refToolbarEl, {
         editor: this.editor
       });
     }
@@ -782,12 +782,12 @@ private _portalContainers = new Set<HTMLElement>();
     // strict-typecheck discipline). The element is created above only when the slot
     // is filled, so each portal fires exactly when its slot exists.
     if (this.bubbleMenuEl) {
-      this.bubbleMenuDispose = portals.bubbleMenu(this.bubbleMenuEl, {
+      this.bubbleMenuDispose = this.portals.bubbleMenu(this.bubbleMenuEl, {
         editor: this.editor
       });
     }
     if (this.floatingMenuEl) {
-      this.floatingMenuDispose = portals.floatingMenu(this.floatingMenuEl, {
+      this.floatingMenuDispose = this.portals.floatingMenu(this.floatingMenuEl, {
         editor: this.editor
       });
     }
@@ -811,7 +811,7 @@ private _portalContainers = new Set<HTMLElement>();
         // same tick) — the same React stale-read avoidance as buildLinkScope's
         // other call site.
         const initialLinkAttrs = this.editor.getAttributes('link');
-        this.linkEditorHandle = portals.linkEditor(this.linkEditorEl, this.buildLinkScope(initialLinkAttrs.href || '', initialLinkAttrs));
+        this.linkEditorHandle = this.portals.linkEditor(this.linkEditorEl, this.buildLinkScope(initialLinkAttrs.href || '', initialLinkAttrs));
       } else {
         this.buildDefaultLinkEditor(this.linkEditorEl);
         // Prefill correction (D-04): the refreshLink() call above (right after

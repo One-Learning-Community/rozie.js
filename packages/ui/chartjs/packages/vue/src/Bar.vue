@@ -78,6 +78,29 @@ const slots = useSlots();
 
 const canvasElRef = ref<HTMLElement>();
 
+const portalContainers = new Set<HTMLElement>();
+const portals = {
+  tooltip: (container: HTMLElement, scope: { model: unknown }): (() => void) => {
+    const slotFn = slots.tooltip;
+    if (!slotFn) return () => {};
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // tooltip { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-tooltip', 'ed04b5ca');
+    const vnode = h(Fragment, null, slotFn(scope));
+    render(vnode, container);
+    portalContainers.add(container);
+    return () => {
+      render(null, container);
+      portalContainers.delete(container);
+    };
+  },
+};
+onBeforeUnmount(() => {
+  for (const container of portalContainers) render(null, container);
+  portalContainers.clear();
+});
+
 import { Chart as ChartJS, BarController, BarElement, LinearScale, CategoryScale, Legend, Tooltip, Colors } from 'chart.js';
 // Bar registers only its own Chart.js controller/element/scale set
 // (tree-shakable — importing this component does not pull every controller).
@@ -191,29 +214,6 @@ function getActiveElements() {
 function getDatasetMeta(datasetIndex: any) {
   return instance ? instance.getDatasetMeta(datasetIndex) : null;
 }
-
-const portalContainers = new Set<HTMLElement>();
-const portals = {
-  tooltip: (container: HTMLElement, scope: { model: unknown }): (() => void) => {
-    const slotFn = slots.tooltip;
-    if (!slotFn) return () => {};
-    // Spike 004: portal-scope attribute injection. Cascades the @portal
-    // tooltip { … } selectors from the unscoped <style> block below into
-    // the engine-owned subtree.
-    container.setAttribute('data-rozie-portal-tooltip', 'ed04b5ca');
-    const vnode = h(Fragment, null, slotFn(scope));
-    render(vnode, container);
-    portalContainers.add(container);
-    return () => {
-      render(null, container);
-      portalContainers.delete(container);
-    };
-  },
-};
-onBeforeUnmount(() => {
-  for (const container of portalContainers) render(null, container);
-  portalContainers.clear();
-});
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {

@@ -27,6 +27,11 @@ import { oneDark } from '@codemirror/theme-one-dark';
 // `let basicSetup`, Solid/React destructured `props.basicSetup`).
 import { basicSetup as basicSetupBundle } from 'codemirror';
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+
 interface RoziePanelSlotCtx {
   view: any;
 }
@@ -155,6 +160,86 @@ export default class CodeMirror extends SignalWatcher(LitElement) {
 private __rozieWatchInitial_0 = true;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
+private portals = {
+  panel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
+    const tpl = this.panel;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-panel', '34cfda5a');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  topPanel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
+    const tpl = this.topPanel;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-topPanel', '34cfda5a');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+  tooltip: (container: HTMLElement, scope: { view: unknown; pos: unknown }): ReactivePortalHandle => {
+    const tpl = this.tooltip;
+    if (typeof tpl !== 'function') return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-tooltip', '34cfda5a');
+    const renderScope = (s: { view: unknown; pos: unknown }): void => {
+      render(tpl(s), container);
+    };
+    renderScope(scope);
+    this._portalContainers.add(container);
+    return {
+      update: (s: { view: unknown; pos: unknown }): void => renderScope(s),
+      dispose: (): void => {
+        render(nothing, container);
+        this._portalContainers.delete(container);
+      },
+    };
+  },
+  gutter: (container: HTMLElement, scope: { line: unknown; view: unknown }): ReactivePortalHandle => {
+    const tpl = this.gutter;
+    if (typeof tpl !== 'function') return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-gutter', '34cfda5a');
+    const renderScope = (s: { line: unknown; view: unknown }): void => {
+      render(tpl(s), container);
+    };
+    renderScope(scope);
+    this._portalContainers.add(container);
+    return {
+      update: (s: { line: unknown; view: unknown }): void => renderScope(s),
+      dispose: (): void => {
+        render(nothing, container);
+        this._portalContainers.delete(container);
+      },
+    };
+  },
+  decoration: (container: HTMLElement, scope: { from: unknown; to: unknown; view: unknown }): ReactivePortalHandle => {
+    const tpl = this.decoration;
+    if (typeof tpl !== 'function') return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-decoration', '34cfda5a');
+    const renderScope = (s: { from: unknown; to: unknown; view: unknown }): void => {
+      render(tpl(s), container);
+    };
+    renderScope(scope);
+    this._portalContainers.add(container);
+    return {
+      update: (s: { from: unknown; to: unknown; view: unknown }): void => renderScope(s),
+      dispose: (): void => {
+        render(nothing, container);
+        this._portalContainers.delete(container);
+      },
+    };
+  },
+};
 
   @state() private _hasSlotPanel = false;
   @queryAssignedElements({ slot: 'panel', flatten: true }) private _slotPanelElements!: Element[];
@@ -260,91 +345,6 @@ private _portalContainers = new Set<HTMLElement>();
 
     this._armListeners();
 
-    interface ReactivePortalHandle {
-      update(scope: unknown): void;
-      dispose(): void;
-    }
-    const portals = {
-      panel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
-        const tpl = this.panel;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-panel', '34cfda5a');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      topPanel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
-        const tpl = this.topPanel;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-topPanel', '34cfda5a');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-      tooltip: (container: HTMLElement, scope: { view: unknown; pos: unknown }): ReactivePortalHandle => {
-        const tpl = this.tooltip;
-        if (typeof tpl !== 'function') return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-tooltip', '34cfda5a');
-        const renderScope = (s: { view: unknown; pos: unknown }): void => {
-          render(tpl(s), container);
-        };
-        renderScope(scope);
-        this._portalContainers.add(container);
-        return {
-          update: (s: { view: unknown; pos: unknown }): void => renderScope(s),
-          dispose: (): void => {
-            render(nothing, container);
-            this._portalContainers.delete(container);
-          },
-        };
-      },
-      gutter: (container: HTMLElement, scope: { line: unknown; view: unknown }): ReactivePortalHandle => {
-        const tpl = this.gutter;
-        if (typeof tpl !== 'function') return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-gutter', '34cfda5a');
-        const renderScope = (s: { line: unknown; view: unknown }): void => {
-          render(tpl(s), container);
-        };
-        renderScope(scope);
-        this._portalContainers.add(container);
-        return {
-          update: (s: { line: unknown; view: unknown }): void => renderScope(s),
-          dispose: (): void => {
-            render(nothing, container);
-            this._portalContainers.delete(container);
-          },
-        };
-      },
-      decoration: (container: HTMLElement, scope: { from: unknown; to: unknown; view: unknown }): ReactivePortalHandle => {
-        const tpl = this.decoration;
-        if (typeof tpl !== 'function') return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-decoration', '34cfda5a');
-        const renderScope = (s: { from: unknown; to: unknown; view: unknown }): void => {
-          render(tpl(s), container);
-        };
-        renderScope(scope);
-        this._portalContainers.add(container);
-        return {
-          update: (s: { from: unknown; to: unknown; view: unknown }): void => renderScope(s),
-          dispose: (): void => {
-            render(nothing, container);
-            this._portalContainers.delete(container);
-          },
-        };
-      },
-    };
-
     this._disconnectCleanups.push((() => this.view?.destroy()));
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.value)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => this.writeDoc(v))(__watchVal); }); }));
@@ -376,7 +376,7 @@ private _portalContainers = new Set<HTMLElement>();
           dom,
           top: false,
           mount: () => {
-            dispose = portals.panel(dom, scope);
+            dispose = this.portals.panel(dom, scope);
           },
           destroy: () => {
             dispose?.();
@@ -409,7 +409,7 @@ private _portalContainers = new Set<HTMLElement>();
           dom,
           top: true,
           mount: () => {
-            dispose = portals.topPanel(dom, scope);
+            dispose = this.portals.topPanel(dom, scope);
           },
           destroy: () => {
             dispose?.();
@@ -478,7 +478,7 @@ private _portalContainers = new Set<HTMLElement>();
           return {
             dom,
             mount: () => {
-              handle = portals.tooltip(dom, {
+              handle = this.portals.tooltip(dom, {
                 view: tipView,
                 pos: tipView.state.selection.main.head
               });
@@ -701,8 +701,8 @@ private _portalContainers = new Set<HTMLElement>();
     // Bridge the mount-built factories to the top-level $watch reconfigures. Each
     // closes over the captured $portals helper so a prop change can rebuild the
     // extension without re-referencing $portals at top level.
-    this.rebuildGutterExt = () => makeGutterExt(portals.gutter);
-    this.rebuildDecorationExt = () => makeDecorationExt(portals.decoration);
+    this.rebuildGutterExt = () => makeGutterExt(this.portals.gutter);
+    this.rebuildDecorationExt = () => makeDecorationExt(this.portals.decoration);
     const buildState = (doc: any) => EditorState.create({
       doc,
       extensions: [this.baselineCompartment.of(this.baselineExt()), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly)), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), this.topPanelCompartment.of(topPanelExt()),

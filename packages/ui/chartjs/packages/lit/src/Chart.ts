@@ -97,6 +97,20 @@ export default class Chart extends SignalWatcher(LitElement) {
   @query('[data-rozie-ref="canvasEl"]') private _refCanvasEl!: HTMLElement;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
+private portals = {
+  tooltip: (container: HTMLElement, scope: { model: unknown }): (() => void) => {
+    const tpl = this.tooltip;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-tooltip', '2228fabc');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+};
 
   @state() private _hasSlotFallback = false;
   @queryAssignedElements({ slot: 'fallback', flatten: true }) private _slotFallbackElements!: Element[];
@@ -155,21 +169,6 @@ private _portalContainers = new Set<HTMLElement>();
     adoptDocumentStyles(this);
 
     this._armListeners();
-
-    const portals = {
-      tooltip: (container: HTMLElement, scope: { model: unknown }): (() => void) => {
-        const tpl = this.tooltip;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-tooltip', '2228fabc');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-    };
 
     this._disconnectCleanups.push((() => {
       tooltipDispose?.();
@@ -304,7 +303,7 @@ private _portalContainers = new Set<HTMLElement>();
             opacity: tooltip.opacity
           }
         };
-        tooltipDispose = portals.tooltip(tooltipEl, scope);
+        tooltipDispose = this.portals.tooltip(tooltipEl, scope);
       }
       const {
         offsetLeft,

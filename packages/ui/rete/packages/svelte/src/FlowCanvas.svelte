@@ -172,6 +172,56 @@ let resizeHandleSwEl = $state<HTMLElement | undefined>(undefined);
 let resizeHandleSeEl = $state<HTMLElement | undefined>(undefined);
 let toolbarEl = $state<HTMLElement | undefined>(undefined);
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+const portalInstances = new Set<Record<string, unknown>>();
+const portals = {
+  node: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
+    if (!node$$slot) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-node', 'cd396d6a');
+    const inst = mount(PortalHostReactive, {
+      target: container,
+      props: { snippet: node$$slot, initialScope: scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return {
+      update: (s: unknown): void => {
+        (inst as unknown as { update(s: unknown): void }).update(s);
+      },
+      dispose: (): void => {
+        unmount(inst as Parameters<typeof unmount>[0]);
+        portalInstances.delete(inst as Record<string, unknown>);
+      },
+    };
+  },
+  toolbar: (container: HTMLElement, scope: { node: unknown; emit: unknown }): ReactivePortalHandle => {
+    if (!toolbar) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-toolbar', 'cd396d6a');
+    const inst = mount(PortalHostReactive, {
+      target: container,
+      props: { snippet: toolbar, initialScope: scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return {
+      update: (s: unknown): void => {
+        (inst as unknown as { update(s: unknown): void }).update(s);
+      },
+      dispose: (): void => {
+        unmount(inst as Parameters<typeof unmount>[0]);
+        portalInstances.delete(inst as Record<string, unknown>);
+      },
+    };
+  },
+};
+$effect(() => () => {
+  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
+  portalInstances.clear();
+});
+
 import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
 import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
@@ -1834,56 +1884,6 @@ setContext('rete:canvas', {
     const entry = nodeEntries.get(nodeId);
     return entry ? entry.body : null;
   }
-});
-
-interface ReactivePortalHandle {
-  update(scope: unknown): void;
-  dispose(): void;
-}
-const portalInstances = new Set<Record<string, unknown>>();
-const portals = {
-  node: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
-    if (!node$$slot) return { update() {}, dispose() {} };
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-node', 'cd396d6a');
-    const inst = mount(PortalHostReactive, {
-      target: container,
-      props: { snippet: node$$slot, initialScope: scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return {
-      update: (s: unknown): void => {
-        (inst as unknown as { update(s: unknown): void }).update(s);
-      },
-      dispose: (): void => {
-        unmount(inst as Parameters<typeof unmount>[0]);
-        portalInstances.delete(inst as Record<string, unknown>);
-      },
-    };
-  },
-  toolbar: (container: HTMLElement, scope: { node: unknown; emit: unknown }): ReactivePortalHandle => {
-    if (!toolbar) return { update() {}, dispose() {} };
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-toolbar', 'cd396d6a');
-    const inst = mount(PortalHostReactive, {
-      target: container,
-      props: { snippet: toolbar, initialScope: scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return {
-      update: (s: unknown): void => {
-        (inst as unknown as { update(s: unknown): void }).update(s);
-      },
-      dispose: (): void => {
-        unmount(inst as Parameters<typeof unmount>[0]);
-        portalInstances.delete(inst as Record<string, unknown>);
-      },
-    };
-  },
-};
-$effect(() => () => {
-  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
-  portalInstances.clear();
 });
 
 onMount(() => {

@@ -190,6 +190,158 @@ export class FullCalendar {
   private _allDayContentTpl = contentChild('allDayContent', { read: TemplateRef });
   private _slotLaneContentTpl = contentChild('slotLaneContent', { read: TemplateRef });
   private _noEventsContentTpl = contentChild('noEventsContent', { read: TemplateRef });
+  private portals = {
+    event: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const tpl = this._eventTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-event', '5589629a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    dayCell: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const tpl = this._dayCellTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-dayCell', '5589629a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    dayHeader: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const tpl = this._dayHeaderTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-dayHeader', '5589629a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    slotLabel: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const tpl = this._slotLabelTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-slotLabel', '5589629a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    weekNumber: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const tpl = this._weekNumberTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-weekNumber', '5589629a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const tpl = this._nowIndicatorContentTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-nowIndicatorContent', '5589629a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    moreLink: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const tpl = this._moreLinkTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-moreLink', '5589629a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    allDayContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const tpl = this._allDayContentTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-allDayContent', '5589629a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    slotLaneContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const tpl = this._slotLaneContentTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-slotLaneContent', '5589629a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+    noEventsContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const tpl = this._noEventsContentTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-noEventsContent', '5589629a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+  };
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
@@ -232,158 +384,6 @@ export class FullCalendar {
   }
 
   ngAfterViewInit() {
-    const portals = {
-      event: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this._eventTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-event', '5589629a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      dayCell: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this._dayCellTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-dayCell', '5589629a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      dayHeader: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this._dayHeaderTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-dayHeader', '5589629a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      slotLabel: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this._slotLabelTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-slotLabel', '5589629a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      weekNumber: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this._weekNumberTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-weekNumber', '5589629a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this._nowIndicatorContentTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-nowIndicatorContent', '5589629a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      moreLink: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this._moreLinkTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-moreLink', '5589629a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      allDayContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this._allDayContentTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-allDayContent', '5589629a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      slotLaneContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this._slotLaneContentTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-slotLaneContent', '5589629a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-      noEventsContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this._noEventsContentTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-noEventsContent', '5589629a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-    };
     const __options = this.options();
     const opts: Record<string, any> = {
       // :options passthrough spread FIRST — the curated keys below + the portal
@@ -544,7 +544,7 @@ export class FullCalendar {
     if ((this.eventTpl ?? this.__rozieFillMap()['event'] ?? this.templates()?.['event'])) {
       opts.eventContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.event(node, {
+        const dispose = this.portals.event(node, {
           arg
         });
         return {
@@ -580,7 +580,7 @@ export class FullCalendar {
     if ((this.dayCellTpl ?? this.__rozieFillMap()['dayCell'] ?? this.templates()?.['dayCell'])) {
       opts.dayCellContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.dayCell(node, {
+        const dispose = this.portals.dayCell(node, {
           arg
         });
         return {
@@ -592,7 +592,7 @@ export class FullCalendar {
     if ((this.dayHeaderTpl ?? this.__rozieFillMap()['dayHeader'] ?? this.templates()?.['dayHeader'])) {
       opts.dayHeaderContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.dayHeader(node, {
+        const dispose = this.portals.dayHeader(node, {
           arg
         });
         return {
@@ -604,7 +604,7 @@ export class FullCalendar {
     if ((this.slotLabelTpl ?? this.__rozieFillMap()['slotLabel'] ?? this.templates()?.['slotLabel'])) {
       opts.slotLabelContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.slotLabel(node, {
+        const dispose = this.portals.slotLabel(node, {
           arg
         });
         return {
@@ -616,7 +616,7 @@ export class FullCalendar {
     if ((this.weekNumberTpl ?? this.__rozieFillMap()['weekNumber'] ?? this.templates()?.['weekNumber'])) {
       opts.weekNumberContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.weekNumber(node, {
+        const dispose = this.portals.weekNumber(node, {
           arg
         });
         return {
@@ -628,7 +628,7 @@ export class FullCalendar {
     if ((this.nowIndicatorContentTpl ?? this.__rozieFillMap()['nowIndicatorContent'] ?? this.templates()?.['nowIndicatorContent'])) {
       opts.nowIndicatorContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.nowIndicatorContent(node, {
+        const dispose = this.portals.nowIndicatorContent(node, {
           arg
         });
         return {
@@ -640,7 +640,7 @@ export class FullCalendar {
     if ((this.moreLinkTpl ?? this.__rozieFillMap()['moreLink'] ?? this.templates()?.['moreLink'])) {
       opts.moreLinkContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.moreLink(node, {
+        const dispose = this.portals.moreLink(node, {
           arg
         });
         return {
@@ -652,7 +652,7 @@ export class FullCalendar {
     if ((this.allDayContentTpl ?? this.__rozieFillMap()['allDayContent'] ?? this.templates()?.['allDayContent'])) {
       opts.allDayContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.allDayContent(node, {
+        const dispose = this.portals.allDayContent(node, {
           arg
         });
         return {
@@ -664,7 +664,7 @@ export class FullCalendar {
     if ((this.slotLaneContentTpl ?? this.__rozieFillMap()['slotLaneContent'] ?? this.templates()?.['slotLaneContent'])) {
       opts.slotLaneContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.slotLaneContent(node, {
+        const dispose = this.portals.slotLaneContent(node, {
           arg
         });
         return {
@@ -688,7 +688,7 @@ export class FullCalendar {
     if ((this.noEventsContentTpl ?? this.__rozieFillMap()['noEventsContent'] ?? this.templates()?.['noEventsContent'])) {
       opts.noEventsContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.noEventsContent(node, {
+        const dispose = this.portals.noEventsContent(node, {
           arg
         });
         return {

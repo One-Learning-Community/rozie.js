@@ -11,6 +11,11 @@ interface BodyCtx {
 
 interface DefaultCtx {}
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+
 @Component({
   selector: 'rozie-node-type',
   standalone: true,
@@ -96,6 +101,29 @@ export class NodeType {
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
   private _bodyTpl = contentChild('body', { read: TemplateRef });
+  private portals = {
+    body: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
+      const tpl = this._bodyTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-body', '372f9492');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return {
+        update: (s: unknown): void => {
+          Object.assign(view.context as object, s as object);
+          view.detectChanges();
+        },
+        dispose: (): void => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        },
+      };
+    },
+  };
   canvas = inject(rozieToken('rete:canvas'));
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
@@ -140,33 +168,6 @@ export class NodeType {
   }
 
   ngAfterViewInit() {
-    interface ReactivePortalHandle {
-      update(scope: unknown): void;
-      dispose(): void;
-    }
-    const portals = {
-      body: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
-        const tpl = this._bodyTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-body', '372f9492');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return {
-          update: (s: unknown): void => {
-            Object.assign(view.context as object, s as object);
-            view.detectChanges();
-          },
-          dispose: (): void => {
-            view.destroy();
-            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-          },
-        };
-      },
-    };
     // The body-mount closure — captures the mount-scoped `portals` local. Mounts an
     // INDEPENDENT body root PER graph node (the canvas calls this once per node of the
     // type), so every instance keeps its OWN #body — it must NOT dispose any sibling's
@@ -177,7 +178,7 @@ export class NodeType {
     this.mountBody = (host: any, scope: any) => {
       if (!host) return null;
       const s = scope || {};
-      const h = portals.body(host, {
+      const h = this.portals.body(host, {
         node: s.node,
         selected: s.selected,
         emit: s.emit

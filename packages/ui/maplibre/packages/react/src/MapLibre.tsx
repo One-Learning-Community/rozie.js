@@ -216,6 +216,69 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   _renderPopupRef.current = props.renderPopup;
   const _renderControlRef = useRef(props.renderControl);
   _renderControlRef.current = props.renderControl;
+  interface ReactivePortalHandle {
+    update(scope: unknown): void;
+    dispose(): void;
+  }
+  const portals = {
+    marker: (container: HTMLElement, scope: { marker: unknown; index: unknown }): ReactivePortalHandle => {
+      const slot = _renderMarkerRef.current ?? props.slots?.['marker'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal marker { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-marker', 'f1ee1082');
+      const root = createRoot(container);
+      const renderScope = (s: { marker: unknown; index: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { marker: unknown; index: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+    popup: (container: HTMLElement, scope: { popup: unknown; index: unknown }): ReactivePortalHandle => {
+      const slot = _renderPopupRef.current ?? props.slots?.['popup'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal popup { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-popup', 'f1ee1082');
+      const root = createRoot(container);
+      const renderScope = (s: { popup: unknown; index: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { popup: unknown; index: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+    control: (container: HTMLElement, scope: { map: unknown }): (() => void) => {
+      const slot = _renderControlRef.current ?? props.slots?.['control'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal control { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-control', 'f1ee1082');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+  };
   const controlInstances = useRef<any>(null);
   const appliedLayerIds = useRef<any>(null);
   const appliedSourceIds = useRef<any>(null);
@@ -608,69 +671,6 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   _applyLayersRef.current = applyLayers;
   useEffect(() => {
     const _applyLayersStable: typeof _applyLayersRef.current = (...args) => _applyLayersRef.current(...args);
-    interface ReactivePortalHandle {
-    update(scope: unknown): void;
-    dispose(): void;
-  }
-  const portals = {
-    marker: (container: HTMLElement, scope: { marker: unknown; index: unknown }): ReactivePortalHandle => {
-      const slot = _renderMarkerRef.current ?? props.slots?.['marker'];
-      if (typeof slot !== 'function') return { update() {}, dispose() {} };
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal marker { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-marker', 'f1ee1082');
-      const root = createRoot(container);
-      const renderScope = (s: { marker: unknown; index: unknown }): void => {
-        flushSync(() => root.render(slot(s)));
-      };
-      renderScope(scope);
-      portalRoots.current.add(root);
-      return {
-        update: (s: { marker: unknown; index: unknown }): void => renderScope(s),
-        dispose: (): void => {
-          root.unmount();
-          portalRoots.current.delete(root);
-        },
-      };
-    },
-    popup: (container: HTMLElement, scope: { popup: unknown; index: unknown }): ReactivePortalHandle => {
-      const slot = _renderPopupRef.current ?? props.slots?.['popup'];
-      if (typeof slot !== 'function') return { update() {}, dispose() {} };
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal popup { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-popup', 'f1ee1082');
-      const root = createRoot(container);
-      const renderScope = (s: { popup: unknown; index: unknown }): void => {
-        flushSync(() => root.render(slot(s)));
-      };
-      renderScope(scope);
-      portalRoots.current.add(root);
-      return {
-        update: (s: { popup: unknown; index: unknown }): void => renderScope(s),
-        dispose: (): void => {
-          root.unmount();
-          portalRoots.current.delete(root);
-        },
-      };
-    },
-    control: (container: HTMLElement, scope: { map: unknown }): (() => void) => {
-      const slot = _renderControlRef.current ?? props.slots?.['control'];
-      if (typeof slot !== 'function') return () => {};
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal control { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-control', 'f1ee1082');
-      const root = createRoot(container);
-      flushSync(() => root.render(slot(scope)));
-      portalRoots.current.add(root);
-      return () => {
-        root.unmount();
-        portalRoots.current.delete(root);
-      };
-    },
-  };
     const el = containerEl.current;
 
     // seed the null-let tracking arrays (declared null so typeNeutralize types them

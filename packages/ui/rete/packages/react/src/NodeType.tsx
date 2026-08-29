@@ -66,6 +66,33 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
   };
   const _renderBodyRef = useRef(props.renderBody);
   _renderBodyRef.current = props.renderBody;
+  interface ReactivePortalHandle {
+    update(scope: unknown): void;
+    dispose(): void;
+  }
+  const portals = {
+    body: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
+      const slot = _renderBodyRef.current ?? props.slots?.['body'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal body { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-body', '372f9492');
+      const root = createRoot(container);
+      const renderScope = (s: { node: unknown; selected: unknown; emit: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { node: unknown; selected: unknown; emit: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+  };
   const mountBody = useRef<any>(null);
   const bodyHandles = useRef<any>(null);
   const cv = useRef<any>(null);
@@ -133,33 +160,6 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
   const _buildSpecRef = useRef(buildSpec);
   _buildSpecRef.current = buildSpec;
   useEffect(() => {
-    interface ReactivePortalHandle {
-    update(scope: unknown): void;
-    dispose(): void;
-  }
-  const portals = {
-    body: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
-      const slot = _renderBodyRef.current ?? props.slots?.['body'];
-      if (typeof slot !== 'function') return { update() {}, dispose() {} };
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal body { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-body', '372f9492');
-      const root = createRoot(container);
-      const renderScope = (s: { node: unknown; selected: unknown; emit: unknown }): void => {
-        flushSync(() => root.render(slot(s)));
-      };
-      renderScope(scope);
-      portalRoots.current.add(root);
-      return {
-        update: (s: { node: unknown; selected: unknown; emit: unknown }): void => renderScope(s),
-        dispose: (): void => {
-          root.unmount();
-          portalRoots.current.delete(root);
-        },
-      };
-    },
-  };
     // The body-mount closure — captures the mount-scoped `portals` local. Mounts an
     // INDEPENDENT body root PER graph node (the canvas calls this once per node of the
     // type), so every instance keeps its OWN #body — it must NOT dispose any sibling's
@@ -221,7 +221,7 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
       }
       if (cv.current) cv.current.unregisterType(_typeRef.current);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (registered.current) return;
     const live = canvas;

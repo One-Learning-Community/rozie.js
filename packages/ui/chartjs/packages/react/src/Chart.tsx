@@ -117,6 +117,23 @@ const Chart = forwardRef<ChartHandle, ChartProps>(function Chart(_props: ChartPr
   };
   const _renderTooltipRef = useRef(props.renderTooltip);
   _renderTooltipRef.current = props.renderTooltip;
+  const portals = {
+    tooltip: (container: HTMLElement, scope: { model: unknown }): (() => void) => {
+      const slot = _renderTooltipRef.current ?? props.slots?.['tooltip'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal tooltip { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-tooltip', '2228fabc');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+  };
   const buildConfig = useRef<any>(null);
   const instance = useRef<any>(null);
   const canvasEl$local = useRef<any>(null);
@@ -215,23 +232,6 @@ const Chart = forwardRef<ChartHandle, ChartProps>(function Chart(_props: ChartPr
   }
 
   useEffect(() => {
-    const portals = {
-    tooltip: (container: HTMLElement, scope: { model: unknown }): (() => void) => {
-      const slot = _renderTooltipRef.current ?? props.slots?.['tooltip'];
-      if (typeof slot !== 'function') return () => {};
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal tooltip { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-tooltip', '2228fabc');
-      const root = createRoot(container);
-      flushSync(() => root.render(slot(scope)));
-      portalRoots.current.add(root);
-      return () => {
-        root.unmount();
-        portalRoots.current.delete(root);
-      };
-    },
-  };
     canvasEl$local.current = canvasEl.current;
 
     // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────

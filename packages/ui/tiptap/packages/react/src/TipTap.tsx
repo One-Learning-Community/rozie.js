@@ -188,6 +188,99 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   _renderLinkEditorRef.current = props.renderLinkEditor;
   const _renderNodeViewRef = useRef(props.renderNodeView);
   _renderNodeViewRef.current = props.renderNodeView;
+  interface ReactivePortalHandle {
+    update(scope: unknown): void;
+    dispose(): void;
+  }
+  const portals = {
+    toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+      const slot = _renderToolbarRef.current ?? props.slots?.['toolbar'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal toolbar { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+    bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+      const slot = _renderBubbleMenuRef.current ?? props.slots?.['bubbleMenu'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal bubbleMenu { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+    floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+      const slot = _renderFloatingMenuRef.current ?? props.slots?.['floatingMenu'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal floatingMenu { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+    linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
+      const slot = _renderLinkEditorRef.current ?? props.slots?.['linkEditor'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal linkEditor { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
+      const root = createRoot(container);
+      const renderScope = (s: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+    nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
+      const slot = _renderNodeViewRef.current ?? props.slots?.['nodeView'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal nodeView { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
+      const root = createRoot(container);
+      const renderScope = (s: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+  };
   const lastHtml = useRef<any>(null);
   const bubbleMenuEl = useRef<any>(null);
   const floatingMenuEl = useRef<any>(null);
@@ -903,99 +996,6 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   useEffect(() => {
     const _handleDropStable: typeof _handleDropRef.current = (...args) => _handleDropRef.current(...args);
     const _handlePasteStable: typeof _handlePasteRef.current = (...args) => _handlePasteRef.current(...args);
-    interface ReactivePortalHandle {
-    update(scope: unknown): void;
-    dispose(): void;
-  }
-  const portals = {
-    toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-      const slot = _renderToolbarRef.current ?? props.slots?.['toolbar'];
-      if (typeof slot !== 'function') return () => {};
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal toolbar { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
-      const root = createRoot(container);
-      flushSync(() => root.render(slot(scope)));
-      portalRoots.current.add(root);
-      return () => {
-        root.unmount();
-        portalRoots.current.delete(root);
-      };
-    },
-    bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-      const slot = _renderBubbleMenuRef.current ?? props.slots?.['bubbleMenu'];
-      if (typeof slot !== 'function') return () => {};
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal bubbleMenu { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
-      const root = createRoot(container);
-      flushSync(() => root.render(slot(scope)));
-      portalRoots.current.add(root);
-      return () => {
-        root.unmount();
-        portalRoots.current.delete(root);
-      };
-    },
-    floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-      const slot = _renderFloatingMenuRef.current ?? props.slots?.['floatingMenu'];
-      if (typeof slot !== 'function') return () => {};
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal floatingMenu { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
-      const root = createRoot(container);
-      flushSync(() => root.render(slot(scope)));
-      portalRoots.current.add(root);
-      return () => {
-        root.unmount();
-        portalRoots.current.delete(root);
-      };
-    },
-    linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
-      const slot = _renderLinkEditorRef.current ?? props.slots?.['linkEditor'];
-      if (typeof slot !== 'function') return { update() {}, dispose() {} };
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal linkEditor { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
-      const root = createRoot(container);
-      const renderScope = (s: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): void => {
-        flushSync(() => root.render(slot(s)));
-      };
-      renderScope(scope);
-      portalRoots.current.add(root);
-      return {
-        update: (s: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): void => renderScope(s),
-        dispose: (): void => {
-          root.unmount();
-          portalRoots.current.delete(root);
-        },
-      };
-    },
-    nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
-      const slot = _renderNodeViewRef.current ?? props.slots?.['nodeView'];
-      if (typeof slot !== 'function') return { update() {}, dispose() {} };
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal nodeView { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
-      const root = createRoot(container);
-      const renderScope = (s: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): void => {
-        flushSync(() => root.render(slot(s)));
-      };
-      renderScope(scope);
-      portalRoots.current.add(root);
-      return {
-        update: (s: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): void => renderScope(s),
-        dispose: (): void => {
-          root.unmount();
-          portalRoots.current.delete(root);
-        },
-      };
-    },
-  };
     lastHtml.current = _htmlRef.current;
 
     // Register the reactive node-view nodes ONLY when the consumer fills the

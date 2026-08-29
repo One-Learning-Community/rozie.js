@@ -67,6 +67,37 @@ const children = $derived(__childrenProp ?? snippets?.children);
 
 const canvas = getContext('rete:canvas');
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+const portalInstances = new Set<Record<string, unknown>>();
+const portals = {
+  body: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
+    if (!body) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-body', '372f9492');
+    const inst = mount(PortalHostReactive, {
+      target: container,
+      props: { snippet: body, initialScope: scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return {
+      update: (s: unknown): void => {
+        (inst as unknown as { update(s: unknown): void }).update(s);
+      },
+      dispose: (): void => {
+        unmount(inst as Parameters<typeof unmount>[0]);
+        portalInstances.delete(inst as Record<string, unknown>);
+      },
+    };
+  },
+};
+$effect(() => () => {
+  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
+  portalInstances.clear();
+});
+
 // $inject is typed `unknown` (Phase 36 D-4: no rich type synthesis yet), which the
 // STRICT BUNDLED-LEAF tsc rejects on `.registerType(...)` (TS2339). The .rozie-native
 // fix is the null-let → `any` typeNeutralize idiom: alias the injected API through
@@ -149,37 +180,6 @@ setContext('rete:nodeType', {
   addPort: (side: any, key: any, portType: any, label: any, multiple: any, position: any) => {
     if (cv) cv.addTypePort(type, side, key, portType, label, multiple, position);
   }
-});
-
-interface ReactivePortalHandle {
-  update(scope: unknown): void;
-  dispose(): void;
-}
-const portalInstances = new Set<Record<string, unknown>>();
-const portals = {
-  body: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
-    if (!body) return { update() {}, dispose() {} };
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-body', '372f9492');
-    const inst = mount(PortalHostReactive, {
-      target: container,
-      props: { snippet: body, initialScope: scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return {
-      update: (s: unknown): void => {
-        (inst as unknown as { update(s: unknown): void }).update(s);
-      },
-      dispose: (): void => {
-        unmount(inst as Parameters<typeof unmount>[0]);
-        portalInstances.delete(inst as Record<string, unknown>);
-      },
-    };
-  },
-};
-$effect(() => () => {
-  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
-  portalInstances.clear();
 });
 
 onMount(() => {

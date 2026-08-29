@@ -219,6 +219,54 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   _renderNodeRef.current = props.renderNode;
   const _renderToolbarRef = useRef(props.renderToolbar);
   _renderToolbarRef.current = props.renderToolbar;
+  interface ReactivePortalHandle {
+    update(scope: unknown): void;
+    dispose(): void;
+  }
+  const portals = {
+    node: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
+      const slot = _renderNodeRef.current ?? props.slots?.['node'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal node { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-node', 'cd396d6a');
+      const root = createRoot(container);
+      const renderScope = (s: { node: unknown; selected: unknown; emit: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { node: unknown; selected: unknown; emit: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+    toolbar: (container: HTMLElement, scope: { node: unknown; emit: unknown }): ReactivePortalHandle => {
+      const slot = _renderToolbarRef.current ?? props.slots?.['toolbar'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal toolbar { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-toolbar', 'cd396d6a');
+      const root = createRoot(container);
+      const renderScope = (s: { node: unknown; emit: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { node: unknown; emit: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+  };
   const lastPropNodeIds = useRef<any>(null);
   const lastPropConnIds = useRef<any>(null);
   const editor = useRef<any>(null);
@@ -1591,54 +1639,6 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const _writeBackConnectionRemovedRef = useRef(writeBackConnectionRemoved);
   _writeBackConnectionRemovedRef.current = writeBackConnectionRemoved;
   useEffect(() => {
-    interface ReactivePortalHandle {
-    update(scope: unknown): void;
-    dispose(): void;
-  }
-  const portals = {
-    node: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
-      const slot = _renderNodeRef.current ?? props.slots?.['node'];
-      if (typeof slot !== 'function') return { update() {}, dispose() {} };
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal node { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-node', 'cd396d6a');
-      const root = createRoot(container);
-      const renderScope = (s: { node: unknown; selected: unknown; emit: unknown }): void => {
-        flushSync(() => root.render(slot(s)));
-      };
-      renderScope(scope);
-      portalRoots.current.add(root);
-      return {
-        update: (s: { node: unknown; selected: unknown; emit: unknown }): void => renderScope(s),
-        dispose: (): void => {
-          root.unmount();
-          portalRoots.current.delete(root);
-        },
-      };
-    },
-    toolbar: (container: HTMLElement, scope: { node: unknown; emit: unknown }): ReactivePortalHandle => {
-      const slot = _renderToolbarRef.current ?? props.slots?.['toolbar'];
-      if (typeof slot !== 'function') return { update() {}, dispose() {} };
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal toolbar { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-toolbar', 'cd396d6a');
-      const root = createRoot(container);
-      const renderScope = (s: { node: unknown; emit: unknown }): void => {
-        flushSync(() => root.render(slot(s)));
-      };
-      renderScope(scope);
-      portalRoots.current.add(root);
-      return {
-        update: (s: { node: unknown; emit: unknown }): void => renderScope(s),
-        dispose: (): void => {
-          root.unmount();
-          portalRoots.current.delete(root);
-        },
-      };
-    },
-  };
     const container = canvasEl.current;
 
     // Resolve a `--rozie-flow-*` token off the live canvas element for the imperative

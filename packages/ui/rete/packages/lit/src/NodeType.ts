@@ -3,6 +3,11 @@ import { customElement, property, queryAssignedElements, state } from 'lit/decor
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { ContextConsumer, ContextProvider, createContext } from '@lit/context';
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+
 const __rozieCtx_rete_nodeType = createContext(Symbol.for("rozie:rete:nodeType"));
 
 const __rozieCtx_rete_canvas = createContext(Symbol.for("rozie:rete:canvas"));
@@ -59,6 +64,26 @@ export default class NodeType extends SignalWatcher(LitElement) {
   @property({ type: Number, reflect: true }) maxHeight: number | null = null;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
+private portals = {
+  body: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
+    const tpl = this.body;
+    if (typeof tpl !== 'function') return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-body', '372f9492');
+    const renderScope = (s: { node: unknown; selected: unknown; emit: unknown }): void => {
+      render(tpl(s), container);
+    };
+    renderScope(scope);
+    this._portalContainers.add(container);
+    return {
+      update: (s: { node: unknown; selected: unknown; emit: unknown }): void => renderScope(s),
+      dispose: (): void => {
+        render(nothing, container);
+        this._portalContainers.delete(container);
+      },
+    };
+  },
+};
 private __rozieCtxProvider_rete_nodeType = new ContextProvider(this, { context: __rozieCtx_rete_nodeType, initialValue: ((__rozieCtxHost) => ({
   get type() {
     return __rozieCtxHost.type;
@@ -126,31 +151,6 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
   firstUpdated(): void {
     this._armListeners();
 
-    interface ReactivePortalHandle {
-      update(scope: unknown): void;
-      dispose(): void;
-    }
-    const portals = {
-      body: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
-        const tpl = this.body;
-        if (typeof tpl !== 'function') return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-body', '372f9492');
-        const renderScope = (s: { node: unknown; selected: unknown; emit: unknown }): void => {
-          render(tpl(s), container);
-        };
-        renderScope(scope);
-        this._portalContainers.add(container);
-        return {
-          update: (s: { node: unknown; selected: unknown; emit: unknown }): void => renderScope(s),
-          dispose: (): void => {
-            render(nothing, container);
-            this._portalContainers.delete(container);
-          },
-        };
-      },
-    };
-
     this.cv = this.canvas;
 
     // The live $portals.body handle ({ dispose }) returned by the parent-invoked
@@ -203,7 +203,7 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
     this.mountBody = (host: any, scope: any) => {
       if (!host) return null;
       const s = scope || {};
-      const h = portals.body(host, {
+      const h = this.portals.body(host, {
         node: s.node,
         selected: s.selected,
         emit: s.emit

@@ -27,6 +27,23 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
   })();
   const _renderItemRef = useRef(props.renderItem);
   _renderItemRef.current = props.renderItem;
+  const portals = {
+    item: (container: HTMLElement, scope: { item: unknown }): (() => void) => {
+      const slot = _renderItemRef.current ?? props.slots?.['item'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal item { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-item', '18e5aac6');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+  };
   const instance = useRef<any>(null);
   const _itemsRef = useRef(props.items);
   _itemsRef.current = props.items;
@@ -65,23 +82,6 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
   }
 
   useEffect(() => {
-    const portals = {
-    item: (container: HTMLElement, scope: { item: unknown }): (() => void) => {
-      const slot = _renderItemRef.current ?? props.slots?.['item'];
-      if (typeof slot !== 'function') return () => {};
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal item { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-item', '18e5aac6');
-      const root = createRoot(container);
-      flushSync(() => root.render(slot(scope)));
-      portalRoots.current.add(root);
-      return () => {
-        root.unmount();
-        portalRoots.current.delete(root);
-      };
-    },
-  };
     instance.current = new MiniListEngine(__rozieRoot.current!, {
       items: _itemsRef.current,
       cellRenderer: (item: any) => {
@@ -100,7 +100,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
   portalRoots.current.clear();
       instance.current?.destroy();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>

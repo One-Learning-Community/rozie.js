@@ -91,6 +91,28 @@ const tooltip = $derived(__tooltipProp ?? snippets?.tooltip);
 
 let canvasEl = $state<HTMLElement | undefined>(undefined);
 
+const portalInstances = new Set<Record<string, unknown>>();
+const portals = {
+  tooltip: (container: HTMLElement, scope: { model: unknown }): (() => void) => {
+    if (!tooltip) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-tooltip', '2228fabc');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: tooltip, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+};
+$effect(() => () => {
+  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
+  portalInstances.clear();
+});
+
 import { Chart as ChartJS } from 'chart.js';
 // Chart.js v3+ ships with no controllers/elements/scales pre-registered. The
 // generic Chart does NOT auto-register — the consumer registers only what they
@@ -201,28 +223,6 @@ export function getActiveElements() {
 export function getDatasetMeta(datasetIndex: any) {
   return instance ? instance.getDatasetMeta(datasetIndex) : null;
 }
-
-const portalInstances = new Set<Record<string, unknown>>();
-const portals = {
-  tooltip: (container: HTMLElement, scope: { model: unknown }): (() => void) => {
-    if (!tooltip) return () => {};
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-tooltip', '2228fabc');
-    const inst = mount(PortalHost, {
-      target: container,
-      props: { snippet: tooltip, scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return () => {
-      unmount(inst);
-      portalInstances.delete(inst as Record<string, unknown>);
-    };
-  },
-};
-$effect(() => () => {
-  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
-  portalInstances.clear();
-});
 
 onMount(() => {
   canvasEl$local = canvasEl;

@@ -131,6 +131,23 @@ export class Chart {
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
   private _tooltipTpl = contentChild('tooltip', { read: TemplateRef });
+  private portals = {
+    tooltip: (container: HTMLElement, scope: { model: unknown }): (() => void) => {
+      const tpl = this._tooltipTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-tooltip', '2228fabc');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+  };
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_1 = true;
   private __rozieWatchInitial_2 = true;
@@ -205,23 +222,6 @@ export class Chart {
   }
 
   ngAfterViewInit() {
-    const portals = {
-      tooltip: (container: HTMLElement, scope: { model: unknown }): (() => void) => {
-        const tpl = this._tooltipTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-tooltip', '2228fabc');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-    };
     this.canvasEl = this.canvasElRef()?.nativeElement;
 
     // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
@@ -329,7 +329,7 @@ export class Chart {
             opacity: tooltip.opacity
           }
         };
-        tooltipDispose = portals.tooltip(tooltipEl, scope);
+        tooltipDispose = this.portals.tooltip(tooltipEl, scope);
       }
       const {
         offsetLeft,

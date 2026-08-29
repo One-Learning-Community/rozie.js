@@ -149,6 +149,98 @@ let linkState = $state({
 let toolbarEl = $state<HTMLElement | undefined>(undefined);
 let editorEl = $state<HTMLElement | undefined>(undefined);
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+const portalInstances = new Set<Record<string, unknown>>();
+const portals = {
+  toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+    if (!toolbar) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: toolbar, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+  bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+    if (!bubbleMenu) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: bubbleMenu, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+  floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+    if (!floatingMenu) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: floatingMenu, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+  linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
+    if (!linkEditor) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
+    const inst = mount(PortalHostReactive, {
+      target: container,
+      props: { snippet: linkEditor, initialScope: scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return {
+      update: (s: unknown): void => {
+        (inst as unknown as { update(s: unknown): void }).update(s);
+      },
+      dispose: (): void => {
+        unmount(inst as Parameters<typeof unmount>[0]);
+        portalInstances.delete(inst as Record<string, unknown>);
+      },
+    };
+  },
+  nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
+    if (!nodeView) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
+    const inst = mount(PortalHostReactive, {
+      target: container,
+      props: { snippet: nodeView, initialScope: scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return {
+      update: (s: unknown): void => {
+        (inst as unknown as { update(s: unknown): void }).update(s);
+      },
+      dispose: (): void => {
+        unmount(inst as Parameters<typeof unmount>[0]);
+        portalInstances.delete(inst as Record<string, unknown>);
+      },
+    };
+  },
+};
+$effect(() => () => {
+  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
+  portalInstances.clear();
+});
+
 import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
@@ -930,98 +1022,6 @@ export function setLink(attrs: any) {
 export function unsetLink() {
   removeLink();
 }
-
-interface ReactivePortalHandle {
-  update(scope: unknown): void;
-  dispose(): void;
-}
-const portalInstances = new Set<Record<string, unknown>>();
-const portals = {
-  toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-    if (!toolbar) return () => {};
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
-    const inst = mount(PortalHost, {
-      target: container,
-      props: { snippet: toolbar, scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return () => {
-      unmount(inst);
-      portalInstances.delete(inst as Record<string, unknown>);
-    };
-  },
-  bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-    if (!bubbleMenu) return () => {};
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
-    const inst = mount(PortalHost, {
-      target: container,
-      props: { snippet: bubbleMenu, scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return () => {
-      unmount(inst);
-      portalInstances.delete(inst as Record<string, unknown>);
-    };
-  },
-  floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-    if (!floatingMenu) return () => {};
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
-    const inst = mount(PortalHost, {
-      target: container,
-      props: { snippet: floatingMenu, scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return () => {
-      unmount(inst);
-      portalInstances.delete(inst as Record<string, unknown>);
-    };
-  },
-  linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
-    if (!linkEditor) return { update() {}, dispose() {} };
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
-    const inst = mount(PortalHostReactive, {
-      target: container,
-      props: { snippet: linkEditor, initialScope: scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return {
-      update: (s: unknown): void => {
-        (inst as unknown as { update(s: unknown): void }).update(s);
-      },
-      dispose: (): void => {
-        unmount(inst as Parameters<typeof unmount>[0]);
-        portalInstances.delete(inst as Record<string, unknown>);
-      },
-    };
-  },
-  nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
-    if (!nodeView) return { update() {}, dispose() {} };
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
-    const inst = mount(PortalHostReactive, {
-      target: container,
-      props: { snippet: nodeView, initialScope: scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return {
-      update: (s: unknown): void => {
-        (inst as unknown as { update(s: unknown): void }).update(s);
-      },
-      dispose: (): void => {
-        unmount(inst as Parameters<typeof unmount>[0]);
-        portalInstances.delete(inst as Record<string, unknown>);
-      },
-    };
-  },
-};
-$effect(() => () => {
-  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
-  portalInstances.clear();
-});
 
 onMount(() => {
   lastHtml = html;

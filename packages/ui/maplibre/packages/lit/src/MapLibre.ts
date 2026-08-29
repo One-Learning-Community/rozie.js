@@ -5,6 +5,11 @@ import { adoptDocumentStyles, createLitControllableProperty, injectGlobalStyles,
 import { ContextProvider, createContext } from '@lit/context';
 import maplibregl from 'maplibre-gl';
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+
 const __rozieCtx_maplibre_sources = createContext(Symbol.for("rozie:maplibre:sources"));
 
 const __rozieCtx_maplibre_layers = createContext(Symbol.for("rozie:maplibre:layers"));
@@ -161,6 +166,56 @@ private __rozieWatchInitial_12 = true;
 private __rozieWatchInitial_13 = true;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
+private portals = {
+  marker: (container: HTMLElement, scope: { marker: unknown; index: unknown }): ReactivePortalHandle => {
+    const tpl = this.marker;
+    if (typeof tpl !== 'function') return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-marker', 'f1ee1082');
+    const renderScope = (s: { marker: unknown; index: unknown }): void => {
+      render(tpl(s), container);
+    };
+    renderScope(scope);
+    this._portalContainers.add(container);
+    return {
+      update: (s: { marker: unknown; index: unknown }): void => renderScope(s),
+      dispose: (): void => {
+        render(nothing, container);
+        this._portalContainers.delete(container);
+      },
+    };
+  },
+  popup: (container: HTMLElement, scope: { popup: unknown; index: unknown }): ReactivePortalHandle => {
+    const tpl = this.popup;
+    if (typeof tpl !== 'function') return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-popup', 'f1ee1082');
+    const renderScope = (s: { popup: unknown; index: unknown }): void => {
+      render(tpl(s), container);
+    };
+    renderScope(scope);
+    this._portalContainers.add(container);
+    return {
+      update: (s: { popup: unknown; index: unknown }): void => renderScope(s),
+      dispose: (): void => {
+        render(nothing, container);
+        this._portalContainers.delete(container);
+      },
+    };
+  },
+  control: (container: HTMLElement, scope: { map: unknown }): (() => void) => {
+    const tpl = this.control;
+    if (typeof tpl !== 'function') return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-control', 'f1ee1082');
+    render(tpl(scope), container);
+    this._portalContainers.add(container);
+    return () => {
+      render(nothing, container);
+      this._portalContainers.delete(container);
+    };
+  },
+};
 private __rozieCtxProvider_maplibre_sources = new ContextProvider(this, { context: __rozieCtx_maplibre_sources, initialValue: ((__rozieCtxHost) => ({
   register: (id: any, spec: any) => {
     __rozieCtxHost._sourceReg.value = {
@@ -291,61 +346,6 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
     adoptDocumentStyles(this);
 
     this._armListeners();
-
-    interface ReactivePortalHandle {
-      update(scope: unknown): void;
-      dispose(): void;
-    }
-    const portals = {
-      marker: (container: HTMLElement, scope: { marker: unknown; index: unknown }): ReactivePortalHandle => {
-        const tpl = this.marker;
-        if (typeof tpl !== 'function') return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-marker', 'f1ee1082');
-        const renderScope = (s: { marker: unknown; index: unknown }): void => {
-          render(tpl(s), container);
-        };
-        renderScope(scope);
-        this._portalContainers.add(container);
-        return {
-          update: (s: { marker: unknown; index: unknown }): void => renderScope(s),
-          dispose: (): void => {
-            render(nothing, container);
-            this._portalContainers.delete(container);
-          },
-        };
-      },
-      popup: (container: HTMLElement, scope: { popup: unknown; index: unknown }): ReactivePortalHandle => {
-        const tpl = this.popup;
-        if (typeof tpl !== 'function') return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-popup', 'f1ee1082');
-        const renderScope = (s: { popup: unknown; index: unknown }): void => {
-          render(tpl(s), container);
-        };
-        renderScope(scope);
-        this._portalContainers.add(container);
-        return {
-          update: (s: { popup: unknown; index: unknown }): void => renderScope(s),
-          dispose: (): void => {
-            render(nothing, container);
-            this._portalContainers.delete(container);
-          },
-        };
-      },
-      control: (container: HTMLElement, scope: { map: unknown }): (() => void) => {
-        const tpl = this.control;
-        if (typeof tpl !== 'function') return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-control', 'f1ee1082');
-        render(tpl(scope), container);
-        this._portalContainers.add(container);
-        return () => {
-          render(nothing, container);
-          this._portalContainers.delete(container);
-        };
-      },
-    };
 
     this._disconnectCleanups.push((() => {
       for (const [, entry] of this.markerEntries as any) {
@@ -647,7 +647,7 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
         } else {
           const node = document.createElement('div');
           node.className = 'rozie-maplibre-marker';
-          const handle = portals.marker(node, scope);
+          const handle = this.portals.marker(node, scope);
           const engine = new maplibregl.Marker({
             element: node,
             anchor: m.anchor,
@@ -691,7 +691,7 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
         } else {
           const node = document.createElement('div');
           node.className = 'rozie-maplibre-popup-body';
-          const handle = portals.popup(node, scope);
+          const handle = this.portals.popup(node, scope);
           const engine = new maplibregl.Popup({
             closeButton: p.closeButton !== undefined ? p.closeButton : true,
             closeOnClick: p.closeOnClick !== undefined ? p.closeOnClick : false,
@@ -760,7 +760,7 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
         }
       };
       this.instance.addControl(this.customControl, 'top-right');
-      this.controlDispose = portals.control(host, {
+      this.controlDispose = this.portals.control(host, {
         map: this.instance
       });
     }

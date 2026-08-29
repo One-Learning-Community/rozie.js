@@ -23,6 +23,11 @@ interface ControlCtx {
   map: any;
 }
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+
 @Component({
   selector: 'rozie-map-libre',
   standalone: true,
@@ -257,6 +262,65 @@ export class MapLibre {
   private _markerTpl = contentChild('marker', { read: TemplateRef });
   private _popupTpl = contentChild('popup', { read: TemplateRef });
   private _controlTpl = contentChild('control', { read: TemplateRef });
+  private portals = {
+    marker: (container: HTMLElement, scope: { marker: unknown; index: unknown }): ReactivePortalHandle => {
+      const tpl = this._markerTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-marker', 'f1ee1082');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return {
+        update: (s: unknown): void => {
+          Object.assign(view.context as object, s as object);
+          view.detectChanges();
+        },
+        dispose: (): void => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        },
+      };
+    },
+    popup: (container: HTMLElement, scope: { popup: unknown; index: unknown }): ReactivePortalHandle => {
+      const tpl = this._popupTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-popup', 'f1ee1082');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return {
+        update: (s: unknown): void => {
+          Object.assign(view.context as object, s as object);
+          view.detectChanges();
+        },
+        dispose: (): void => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        },
+      };
+    },
+    control: (container: HTMLElement, scope: { map: unknown }): (() => void) => {
+      const tpl = this._controlTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-control', 'f1ee1082');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return () => {
+        view.destroy();
+        this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+      };
+    },
+  };
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
@@ -357,69 +421,6 @@ export class MapLibre {
   }
 
   ngAfterViewInit() {
-    interface ReactivePortalHandle {
-      update(scope: unknown): void;
-      dispose(): void;
-    }
-    const portals = {
-      marker: (container: HTMLElement, scope: { marker: unknown; index: unknown }): ReactivePortalHandle => {
-        const tpl = this._markerTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-marker', 'f1ee1082');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return {
-          update: (s: unknown): void => {
-            Object.assign(view.context as object, s as object);
-            view.detectChanges();
-          },
-          dispose: (): void => {
-            view.destroy();
-            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-          },
-        };
-      },
-      popup: (container: HTMLElement, scope: { popup: unknown; index: unknown }): ReactivePortalHandle => {
-        const tpl = this._popupTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-popup', 'f1ee1082');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return {
-          update: (s: unknown): void => {
-            Object.assign(view.context as object, s as object);
-            view.detectChanges();
-          },
-          dispose: (): void => {
-            view.destroy();
-            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-          },
-        };
-      },
-      control: (container: HTMLElement, scope: { map: unknown }): (() => void) => {
-        const tpl = this._controlTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return () => {};
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-control', 'f1ee1082');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return () => {
-          view.destroy();
-          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-        };
-      },
-    };
     const el = this.containerEl()?.nativeElement;
 
     // seed the null-let tracking arrays (declared null so typeNeutralize types them
@@ -557,7 +558,7 @@ export class MapLibre {
         } else {
           const node = document.createElement('div');
           node.className = 'rozie-maplibre-marker';
-          const handle = portals.marker(node, scope);
+          const handle = this.portals.marker(node, scope);
           const engine = new maplibregl.Marker({
             element: node,
             anchor: m.anchor,
@@ -601,7 +602,7 @@ export class MapLibre {
         } else {
           const node = document.createElement('div');
           node.className = 'rozie-maplibre-popup-body';
-          const handle = portals.popup(node, scope);
+          const handle = this.portals.popup(node, scope);
           const engine = new maplibregl.Popup({
             closeButton: p.closeButton !== undefined ? p.closeButton : true,
             closeOnClick: p.closeOnClick !== undefined ? p.closeOnClick : false,
@@ -662,7 +663,7 @@ export class MapLibre {
         }
       };
       this.instance.addControl(this.customControl, 'top-right');
-      this.controlDispose = portals.control(host, {
+      this.controlDispose = this.portals.control(host, {
         map: this.instance
       });
     }

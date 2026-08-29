@@ -173,157 +173,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
   _renderSlotLaneContentRef.current = props.renderSlotLaneContent;
   const _renderNoEventsContentRef = useRef(props.renderNoEventsContent);
   _renderNoEventsContentRef.current = props.renderNoEventsContent;
-  const suppressViewSync = useRef(false);
-  const instance = useRef<any>(null);
-  const [view, setView] = useControllableState({
-    value: props.view,
-    defaultValue: props.defaultView ?? 'dayGridMonth',
-    onValueChange: props.onViewChange,
-  });
-  const _editableRef = useRef(props.editable);
-  _editableRef.current = props.editable;
-  const _eventsRef = useRef(props.events);
-  _eventsRef.current = props.events;
-  const _firstDayRef = useRef(props.firstDay);
-  _firstDayRef.current = props.firstDay;
-  const _headerToolbarRef = useRef(props.headerToolbar);
-  _headerToolbarRef.current = props.headerToolbar;
-  const _heightRef = useRef(props.height);
-  _heightRef.current = props.height;
-  const _localeRef = useRef(props.locale);
-  _localeRef.current = props.locale;
-  const _nowIndicatorRef = useRef(props.nowIndicator);
-  _nowIndicatorRef.current = props.nowIndicator;
-  const _onDateClickRef = useRef(props.onDateClick);
-  _onDateClickRef.current = props.onDateClick;
-  const _onDatesSetRef = useRef(props.onDatesSet);
-  _onDatesSetRef.current = props.onDatesSet;
-  const _onEventClickRef = useRef(props.onEventClick);
-  _onEventClickRef.current = props.onEventClick;
-  const _onEventDropRef = useRef(props.onEventDrop);
-  _onEventDropRef.current = props.onEventDrop;
-  const _onEventMouseEnterRef = useRef(props.onEventMouseEnter);
-  _onEventMouseEnterRef.current = props.onEventMouseEnter;
-  const _onEventMouseLeaveRef = useRef(props.onEventMouseLeave);
-  _onEventMouseLeaveRef.current = props.onEventMouseLeave;
-  const _onEventResizeRef = useRef(props.onEventResize);
-  _onEventResizeRef.current = props.onEventResize;
-  const _onEventsSetRef = useRef(props.onEventsSet);
-  _onEventsSetRef.current = props.onEventsSet;
-  const _onLoadingRef = useRef(props.onLoading);
-  _onLoadingRef.current = props.onLoading;
-  const _onSelectRef = useRef(props.onSelect);
-  _onSelectRef.current = props.onSelect;
-  const _onUnselectRef = useRef(props.onUnselect);
-  _onUnselectRef.current = props.onUnselect;
-  const _optionsRef = useRef(props.options);
-  _optionsRef.current = props.options;
-  const _selectableRef = useRef(props.selectable);
-  _selectableRef.current = props.selectable;
-  const _slotDurationRef = useRef(props.slotDuration);
-  _slotDurationRef.current = props.slotDuration;
-  const _weekendsRef = useRef(props.weekends);
-  _weekendsRef.current = props.weekends;
-  const _viewRef = useRef(view);
-  _viewRef.current = view;
-  const __rozieRoot = useRef<HTMLDivElement | null>(null);
-  const _watch0First = useRef(true);
-  const _watch1First = useRef(true);
-  const _watch2First = useRef(true);
-  const _watch3First = useRef(true);
-  const _watch4First = useRef(true);
-  const _watch5First = useRef(true);
-  const _watch6First = useRef(true);
-  const _watch7First = useRef(true);
-  const _watch8First = useRef(true);
-  const _watch9First = useRef(true);
-  const _watch10First = useRef(true);
-  const _watch11First = useRef(true);
-
-  const PLUGINS = useMemo(() => [dayGridPlugin, timeGridPlugin, interactionPlugin], []);
-  const normalizeEvent = useCallback((e: any) => {
-    // Object spread + template-literal default — common reconcile shape:
-    // pass user props through, but stamp a sensible title fallback and
-    // honor the wrapper's defaultColor only when the event omits one.
-    return {
-      ...e,
-      title: e.title || `Event ${e.id ?? '(no id)'}`,
-      color: e.color || props.defaultColor
-    };
-  }, [props.defaultColor]);
-  // Imperative handle (Phase 21 $expose). The 16 calendar verbs a consumer can't
-  // drive through props alone — exposed uniformly to all 6 targets
-  // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
-  // Angular+Lit public method / Solid callback ref). Each delegates to the
-  // underlying Calendar instance, which is null before $onMount and after
-  // destroy — callers handle the pre-mount null.
-  //
-  // Collision discipline (the load-bearing flatpickr lesson): no exposed name may
-  // collide with an emitted event (eventClick/dateClick/eventDrop/eventResize/
-  // datesSet/eventMouseEnter/eventMouseLeave/eventsSet/loading/select/unselect) or
-  // a declared prop. This is why the selection verbs are NAMED `selectRange`
-  // (CalendarApi.select) and `clearSelection` (CalendarApi.unselect) — bare
-  // `select`/`unselect` collide with the same-named emits (ROZ121), and `select`
-  // is also Lit-risky. getApi returns the raw Calendar instance (NOT guard-nulled).
-  //
-  // Read-back gap closed: getDate (current anchor — the `view` model only carries
-  // the view TYPE, datesSet only the visible RANGE) and getEvents (synchronous
-  // event read — eventsSet is push-only). scrollToTime/updateSize cover timeGrid
-  // scroll + container-resize relayout; prevYear/nextYear mirror prev/next.
-  function getApi() {
-    return instance.current;
-  }
-  function changeView(...a: any[]) {
-    return instance.current?.changeView(...a);
-  }
-  function addEvent(...a: any[]) {
-    return instance.current?.addEvent(...a);
-  }
-  function removeEvent(id: any) {
-    instance.current?.getEventById(id)?.remove();
-  }
-  function today() {
-    instance.current?.today();
-  }
-  function prev() {
-    instance.current?.prev();
-  }
-  function next() {
-    instance.current?.next();
-  }
-  function gotoDate(...a: any[]) {
-    instance.current?.gotoDate(...a);
-  }
-  function getDate() {
-    return instance.current ? instance.current.getDate() : null;
-  }
-  function getEvents() {
-    return instance.current ? instance.current.getEvents() : [];
-  }
-  function scrollToTime(...a: any[]) {
-    instance.current?.scrollToTime(...a);
-  }
-  function updateSize() {
-    instance.current?.updateSize();
-  }
-  function prevYear() {
-    instance.current?.prevYear();
-  }
-  function nextYear() {
-    instance.current?.nextYear();
-  }
-  function selectRange(...a: any[]) {
-    instance.current?.select(...a);
-  }
-  function clearSelection() {
-    instance.current?.unselect();
-  }
-
-  const _normalizeEventRef = useRef(normalizeEvent);
-  _normalizeEventRef.current = normalizeEvent;
-  useEffect(() => {
-    const _normalizeEventStable: typeof _normalizeEventRef.current = (...args) => _normalizeEventRef.current(...args);
-    const portals = {
+  const portals = {
     event: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
       const slot = _renderEventRef.current ?? props.slots?.['event'];
       if (typeof slot !== 'function') return () => {};
@@ -475,6 +325,156 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       };
     },
   };
+  const suppressViewSync = useRef(false);
+  const instance = useRef<any>(null);
+  const [view, setView] = useControllableState({
+    value: props.view,
+    defaultValue: props.defaultView ?? 'dayGridMonth',
+    onValueChange: props.onViewChange,
+  });
+  const _editableRef = useRef(props.editable);
+  _editableRef.current = props.editable;
+  const _eventsRef = useRef(props.events);
+  _eventsRef.current = props.events;
+  const _firstDayRef = useRef(props.firstDay);
+  _firstDayRef.current = props.firstDay;
+  const _headerToolbarRef = useRef(props.headerToolbar);
+  _headerToolbarRef.current = props.headerToolbar;
+  const _heightRef = useRef(props.height);
+  _heightRef.current = props.height;
+  const _localeRef = useRef(props.locale);
+  _localeRef.current = props.locale;
+  const _nowIndicatorRef = useRef(props.nowIndicator);
+  _nowIndicatorRef.current = props.nowIndicator;
+  const _onDateClickRef = useRef(props.onDateClick);
+  _onDateClickRef.current = props.onDateClick;
+  const _onDatesSetRef = useRef(props.onDatesSet);
+  _onDatesSetRef.current = props.onDatesSet;
+  const _onEventClickRef = useRef(props.onEventClick);
+  _onEventClickRef.current = props.onEventClick;
+  const _onEventDropRef = useRef(props.onEventDrop);
+  _onEventDropRef.current = props.onEventDrop;
+  const _onEventMouseEnterRef = useRef(props.onEventMouseEnter);
+  _onEventMouseEnterRef.current = props.onEventMouseEnter;
+  const _onEventMouseLeaveRef = useRef(props.onEventMouseLeave);
+  _onEventMouseLeaveRef.current = props.onEventMouseLeave;
+  const _onEventResizeRef = useRef(props.onEventResize);
+  _onEventResizeRef.current = props.onEventResize;
+  const _onEventsSetRef = useRef(props.onEventsSet);
+  _onEventsSetRef.current = props.onEventsSet;
+  const _onLoadingRef = useRef(props.onLoading);
+  _onLoadingRef.current = props.onLoading;
+  const _onSelectRef = useRef(props.onSelect);
+  _onSelectRef.current = props.onSelect;
+  const _onUnselectRef = useRef(props.onUnselect);
+  _onUnselectRef.current = props.onUnselect;
+  const _optionsRef = useRef(props.options);
+  _optionsRef.current = props.options;
+  const _selectableRef = useRef(props.selectable);
+  _selectableRef.current = props.selectable;
+  const _slotDurationRef = useRef(props.slotDuration);
+  _slotDurationRef.current = props.slotDuration;
+  const _weekendsRef = useRef(props.weekends);
+  _weekendsRef.current = props.weekends;
+  const _viewRef = useRef(view);
+  _viewRef.current = view;
+  const __rozieRoot = useRef<HTMLDivElement | null>(null);
+  const _watch0First = useRef(true);
+  const _watch1First = useRef(true);
+  const _watch2First = useRef(true);
+  const _watch3First = useRef(true);
+  const _watch4First = useRef(true);
+  const _watch5First = useRef(true);
+  const _watch6First = useRef(true);
+  const _watch7First = useRef(true);
+  const _watch8First = useRef(true);
+  const _watch9First = useRef(true);
+  const _watch10First = useRef(true);
+  const _watch11First = useRef(true);
+
+  const PLUGINS = useMemo(() => [dayGridPlugin, timeGridPlugin, interactionPlugin], []);
+  const normalizeEvent = useCallback((e: any) => {
+    // Object spread + template-literal default — common reconcile shape:
+    // pass user props through, but stamp a sensible title fallback and
+    // honor the wrapper's defaultColor only when the event omits one.
+    return {
+      ...e,
+      title: e.title || `Event ${e.id ?? '(no id)'}`,
+      color: e.color || props.defaultColor
+    };
+  }, [props.defaultColor]);
+  // Imperative handle (Phase 21 $expose). The 16 calendar verbs a consumer can't
+  // drive through props alone — exposed uniformly to all 6 targets
+  // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
+  // Angular+Lit public method / Solid callback ref). Each delegates to the
+  // underlying Calendar instance, which is null before $onMount and after
+  // destroy — callers handle the pre-mount null.
+  //
+  // Collision discipline (the load-bearing flatpickr lesson): no exposed name may
+  // collide with an emitted event (eventClick/dateClick/eventDrop/eventResize/
+  // datesSet/eventMouseEnter/eventMouseLeave/eventsSet/loading/select/unselect) or
+  // a declared prop. This is why the selection verbs are NAMED `selectRange`
+  // (CalendarApi.select) and `clearSelection` (CalendarApi.unselect) — bare
+  // `select`/`unselect` collide with the same-named emits (ROZ121), and `select`
+  // is also Lit-risky. getApi returns the raw Calendar instance (NOT guard-nulled).
+  //
+  // Read-back gap closed: getDate (current anchor — the `view` model only carries
+  // the view TYPE, datesSet only the visible RANGE) and getEvents (synchronous
+  // event read — eventsSet is push-only). scrollToTime/updateSize cover timeGrid
+  // scroll + container-resize relayout; prevYear/nextYear mirror prev/next.
+  function getApi() {
+    return instance.current;
+  }
+  function changeView(...a: any[]) {
+    return instance.current?.changeView(...a);
+  }
+  function addEvent(...a: any[]) {
+    return instance.current?.addEvent(...a);
+  }
+  function removeEvent(id: any) {
+    instance.current?.getEventById(id)?.remove();
+  }
+  function today() {
+    instance.current?.today();
+  }
+  function prev() {
+    instance.current?.prev();
+  }
+  function next() {
+    instance.current?.next();
+  }
+  function gotoDate(...a: any[]) {
+    instance.current?.gotoDate(...a);
+  }
+  function getDate() {
+    return instance.current ? instance.current.getDate() : null;
+  }
+  function getEvents() {
+    return instance.current ? instance.current.getEvents() : [];
+  }
+  function scrollToTime(...a: any[]) {
+    instance.current?.scrollToTime(...a);
+  }
+  function updateSize() {
+    instance.current?.updateSize();
+  }
+  function prevYear() {
+    instance.current?.prevYear();
+  }
+  function nextYear() {
+    instance.current?.nextYear();
+  }
+  function selectRange(...a: any[]) {
+    instance.current?.select(...a);
+  }
+  function clearSelection() {
+    instance.current?.unselect();
+  }
+
+  const _normalizeEventRef = useRef(normalizeEvent);
+  _normalizeEventRef.current = normalizeEvent;
+  useEffect(() => {
+    const _normalizeEventStable: typeof _normalizeEventRef.current = (...args) => _normalizeEventRef.current(...args);
     const opts: Record<string, any> = {
       // :options passthrough spread FIRST — the curated keys below + the portal
       // *Content handlers added after this object override any colliding key, so

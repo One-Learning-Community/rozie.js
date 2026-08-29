@@ -53,6 +53,11 @@ interface ToolbarCtx {
 
 interface DefaultCtx {}
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+
 @Component({
   selector: 'rozie-flow-canvas',
   standalone: true,
@@ -634,6 +639,50 @@ export class FlowCanvas {
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
   private _nodeTpl = contentChild('node', { read: TemplateRef });
   private _toolbarTpl = contentChild('toolbar', { read: TemplateRef });
+  private portals = {
+    node: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
+      const tpl = this._nodeTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-node', 'cd396d6a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return {
+        update: (s: unknown): void => {
+          Object.assign(view.context as object, s as object);
+          view.detectChanges();
+        },
+        dispose: (): void => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        },
+      };
+    },
+    toolbar: (container: HTMLElement, scope: { node: unknown; emit: unknown }): ReactivePortalHandle => {
+      const tpl = this._toolbarTpl();
+      const vcr = this._portalAnchor();
+      if (!tpl || !vcr) return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-toolbar', 'cd396d6a');
+      const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+      view.detectChanges();
+      for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+      this._portalViews.add(view as EmbeddedViewRef<unknown>);
+      return {
+        update: (s: unknown): void => {
+          Object.assign(view.context as object, s as object);
+          view.detectChanges();
+        },
+        dispose: (): void => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        },
+      };
+    },
+  };
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
@@ -697,54 +746,6 @@ export class FlowCanvas {
   }
 
   ngAfterViewInit() {
-    interface ReactivePortalHandle {
-      update(scope: unknown): void;
-      dispose(): void;
-    }
-    const portals = {
-      node: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
-        const tpl = this._nodeTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-node', 'cd396d6a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return {
-          update: (s: unknown): void => {
-            Object.assign(view.context as object, s as object);
-            view.detectChanges();
-          },
-          dispose: (): void => {
-            view.destroy();
-            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-          },
-        };
-      },
-      toolbar: (container: HTMLElement, scope: { node: unknown; emit: unknown }): ReactivePortalHandle => {
-        const tpl = this._toolbarTpl();
-        const vcr = this._portalAnchor();
-        if (!tpl || !vcr) return { update() {}, dispose() {} };
-        // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-toolbar', 'cd396d6a');
-        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
-        view.detectChanges();
-        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
-        this._portalViews.add(view as EmbeddedViewRef<unknown>);
-        return {
-          update: (s: unknown): void => {
-            Object.assign(view.context as object, s as object);
-            view.detectChanges();
-          },
-          dispose: (): void => {
-            view.destroy();
-            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
-          },
-        };
-      },
-    };
     const container = this.canvasEl()?.nativeElement;
 
     // Resolve a `--rozie-flow-*` token off the live canvas element for the imperative
@@ -1554,7 +1555,7 @@ export class FlowCanvas {
         // reactive multi-instance portal — one handle per node, re-rendered in
         // place on meta change (the MapLibre marker discipline). Low-level escape
         // hatch: the consumer switches on node.type inside the single `#node` slot.
-        entry.handle = portals.node(body, {
+        entry.handle = this.portals.node(body, {
           node: meta,
           selected,
           emit
@@ -3096,7 +3097,7 @@ export class FlowCanvas {
         if (this.toolbarHandle && this.toolbarHandle.update) {
           this.toolbarHandle.update(scope);
         } else {
-          this.toolbarHandle = portals.toolbar(this.toolbarHost, scope);
+          this.toolbarHandle = this.portals.toolbar(this.toolbarHost, scope);
         }
       }
       this.scheduleToolbarTrack();

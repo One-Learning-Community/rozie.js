@@ -134,6 +134,105 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   _renderGutterRef.current = props.renderGutter;
   const _renderDecorationRef = useRef(props.renderDecoration);
   _renderDecorationRef.current = props.renderDecoration;
+  interface ReactivePortalHandle {
+    update(scope: unknown): void;
+    dispose(): void;
+  }
+  const portals = {
+    panel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
+      const slot = _renderPanelRef.current ?? props.slots?.['panel'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal panel { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-panel', '34cfda5a');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+    topPanel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
+      const slot = _renderTopPanelRef.current ?? props.slots?.['topPanel'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal topPanel { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-topPanel', '34cfda5a');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+    tooltip: (container: HTMLElement, scope: { view: unknown; pos: unknown }): ReactivePortalHandle => {
+      const slot = _renderTooltipRef.current ?? props.slots?.['tooltip'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal tooltip { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-tooltip', '34cfda5a');
+      const root = createRoot(container);
+      const renderScope = (s: { view: unknown; pos: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { view: unknown; pos: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+    gutter: (container: HTMLElement, scope: { line: unknown; view: unknown }): ReactivePortalHandle => {
+      const slot = _renderGutterRef.current ?? props.slots?.['gutter'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal gutter { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-gutter', '34cfda5a');
+      const root = createRoot(container);
+      const renderScope = (s: { line: unknown; view: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { line: unknown; view: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+    decoration: (container: HTMLElement, scope: { from: unknown; to: unknown; view: unknown }): ReactivePortalHandle => {
+      const slot = _renderDecorationRef.current ?? props.slots?.['decoration'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal decoration { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-decoration', '34cfda5a');
+      const root = createRoot(container);
+      const renderScope = (s: { from: unknown; to: unknown; view: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { from: unknown; to: unknown; view: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+  };
   const rebuildGutterExt = useRef<any>(null);
   const rebuildDecorationExt = useRef<any>(null);
   const suppressEmit = useRef(false);
@@ -320,105 +419,6 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   const _themeExtRef = useRef(themeExt);
   _themeExtRef.current = themeExt;
   useEffect(() => {
-    interface ReactivePortalHandle {
-    update(scope: unknown): void;
-    dispose(): void;
-  }
-  const portals = {
-    panel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
-      const slot = _renderPanelRef.current ?? props.slots?.['panel'];
-      if (typeof slot !== 'function') return () => {};
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal panel { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-panel', '34cfda5a');
-      const root = createRoot(container);
-      flushSync(() => root.render(slot(scope)));
-      portalRoots.current.add(root);
-      return () => {
-        root.unmount();
-        portalRoots.current.delete(root);
-      };
-    },
-    topPanel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
-      const slot = _renderTopPanelRef.current ?? props.slots?.['topPanel'];
-      if (typeof slot !== 'function') return () => {};
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal topPanel { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-topPanel', '34cfda5a');
-      const root = createRoot(container);
-      flushSync(() => root.render(slot(scope)));
-      portalRoots.current.add(root);
-      return () => {
-        root.unmount();
-        portalRoots.current.delete(root);
-      };
-    },
-    tooltip: (container: HTMLElement, scope: { view: unknown; pos: unknown }): ReactivePortalHandle => {
-      const slot = _renderTooltipRef.current ?? props.slots?.['tooltip'];
-      if (typeof slot !== 'function') return { update() {}, dispose() {} };
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal tooltip { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-tooltip', '34cfda5a');
-      const root = createRoot(container);
-      const renderScope = (s: { view: unknown; pos: unknown }): void => {
-        flushSync(() => root.render(slot(s)));
-      };
-      renderScope(scope);
-      portalRoots.current.add(root);
-      return {
-        update: (s: { view: unknown; pos: unknown }): void => renderScope(s),
-        dispose: (): void => {
-          root.unmount();
-          portalRoots.current.delete(root);
-        },
-      };
-    },
-    gutter: (container: HTMLElement, scope: { line: unknown; view: unknown }): ReactivePortalHandle => {
-      const slot = _renderGutterRef.current ?? props.slots?.['gutter'];
-      if (typeof slot !== 'function') return { update() {}, dispose() {} };
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal gutter { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-gutter', '34cfda5a');
-      const root = createRoot(container);
-      const renderScope = (s: { line: unknown; view: unknown }): void => {
-        flushSync(() => root.render(slot(s)));
-      };
-      renderScope(scope);
-      portalRoots.current.add(root);
-      return {
-        update: (s: { line: unknown; view: unknown }): void => renderScope(s),
-        dispose: (): void => {
-          root.unmount();
-          portalRoots.current.delete(root);
-        },
-      };
-    },
-    decoration: (container: HTMLElement, scope: { from: unknown; to: unknown; view: unknown }): ReactivePortalHandle => {
-      const slot = _renderDecorationRef.current ?? props.slots?.['decoration'];
-      if (typeof slot !== 'function') return { update() {}, dispose() {} };
-      // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal decoration { … } selectors from the
-      // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-decoration', '34cfda5a');
-      const root = createRoot(container);
-      const renderScope = (s: { from: unknown; to: unknown; view: unknown }): void => {
-        flushSync(() => root.render(slot(s)));
-      };
-      renderScope(scope);
-      portalRoots.current.add(root);
-      return {
-        update: (s: { from: unknown; to: unknown; view: unknown }): void => renderScope(s),
-        dispose: (): void => {
-          root.unmount();
-          portalRoots.current.delete(root);
-        },
-      };
-    },
-  };
     // One `panel` portal slot — mounted through CM6's `showPanel` facet. The
     // Panel's `dom` is the portal host node; $portals.panel(dom, scope) mounts the
     // consumer's framework-native fragment on Panel.mount() and the returned

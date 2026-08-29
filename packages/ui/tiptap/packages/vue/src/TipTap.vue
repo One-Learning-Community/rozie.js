@@ -152,6 +152,103 @@ const linkState = ref({
 const toolbarElRef = ref<HTMLElement>();
 const editorElRef = ref<HTMLElement>();
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+const portalContainers = new Set<HTMLElement>();
+const portals = {
+  toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+    const slotFn = slots.toolbar;
+    if (!slotFn) return () => {};
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // toolbar { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
+    const vnode = h(Fragment, null, slotFn(scope));
+    render(vnode, container);
+    portalContainers.add(container);
+    return () => {
+      render(null, container);
+      portalContainers.delete(container);
+    };
+  },
+  bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+    const slotFn = slots.bubbleMenu;
+    if (!slotFn) return () => {};
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // bubbleMenu { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
+    const vnode = h(Fragment, null, slotFn(scope));
+    render(vnode, container);
+    portalContainers.add(container);
+    return () => {
+      render(null, container);
+      portalContainers.delete(container);
+    };
+  },
+  floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+    const slotFn = slots.floatingMenu;
+    if (!slotFn) return () => {};
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // floatingMenu { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
+    const vnode = h(Fragment, null, slotFn(scope));
+    render(vnode, container);
+    portalContainers.add(container);
+    return () => {
+      render(null, container);
+      portalContainers.delete(container);
+    };
+  },
+  linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
+    const slotFn = slots.linkEditor;
+    if (!slotFn) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // linkEditor { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
+    const renderScope = (s: unknown): void => {
+      render(h(Fragment, null, slotFn(s)), container);
+    };
+    renderScope(scope);
+    portalContainers.add(container);
+    return {
+      update: (s: unknown): void => renderScope(s),
+      dispose: (): void => {
+        render(null, container);
+        portalContainers.delete(container);
+      },
+    };
+  },
+  nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
+    const slotFn = slots.nodeView;
+    if (!slotFn) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // nodeView { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
+    const renderScope = (s: unknown): void => {
+      render(h(Fragment, null, slotFn(s)), container);
+    };
+    renderScope(scope);
+    portalContainers.add(container);
+    return {
+      update: (s: unknown): void => renderScope(s),
+      dispose: (): void => {
+        render(null, container);
+        portalContainers.delete(container);
+      },
+    };
+  },
+};
+onBeforeUnmount(() => {
+  for (const container of portalContainers) render(null, container);
+  portalContainers.clear();
+});
+
 import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
@@ -933,103 +1030,6 @@ function setLink(attrs: any) {
 function unsetLink() {
   removeLink();
 }
-
-interface ReactivePortalHandle {
-  update(scope: unknown): void;
-  dispose(): void;
-}
-const portalContainers = new Set<HTMLElement>();
-const portals = {
-  toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-    const slotFn = slots.toolbar;
-    if (!slotFn) return () => {};
-    // Spike 004: portal-scope attribute injection. Cascades the @portal
-    // toolbar { … } selectors from the unscoped <style> block below into
-    // the engine-owned subtree.
-    container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
-    const vnode = h(Fragment, null, slotFn(scope));
-    render(vnode, container);
-    portalContainers.add(container);
-    return () => {
-      render(null, container);
-      portalContainers.delete(container);
-    };
-  },
-  bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-    const slotFn = slots.bubbleMenu;
-    if (!slotFn) return () => {};
-    // Spike 004: portal-scope attribute injection. Cascades the @portal
-    // bubbleMenu { … } selectors from the unscoped <style> block below into
-    // the engine-owned subtree.
-    container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
-    const vnode = h(Fragment, null, slotFn(scope));
-    render(vnode, container);
-    portalContainers.add(container);
-    return () => {
-      render(null, container);
-      portalContainers.delete(container);
-    };
-  },
-  floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
-    const slotFn = slots.floatingMenu;
-    if (!slotFn) return () => {};
-    // Spike 004: portal-scope attribute injection. Cascades the @portal
-    // floatingMenu { … } selectors from the unscoped <style> block below into
-    // the engine-owned subtree.
-    container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
-    const vnode = h(Fragment, null, slotFn(scope));
-    render(vnode, container);
-    portalContainers.add(container);
-    return () => {
-      render(null, container);
-      portalContainers.delete(container);
-    };
-  },
-  linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
-    const slotFn = slots.linkEditor;
-    if (!slotFn) return { update() {}, dispose() {} };
-    // Spike 004: portal-scope attribute injection. Cascades the @portal
-    // linkEditor { … } selectors from the unscoped <style> block below into
-    // the engine-owned subtree.
-    container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
-    const renderScope = (s: unknown): void => {
-      render(h(Fragment, null, slotFn(s)), container);
-    };
-    renderScope(scope);
-    portalContainers.add(container);
-    return {
-      update: (s: unknown): void => renderScope(s),
-      dispose: (): void => {
-        render(null, container);
-        portalContainers.delete(container);
-      },
-    };
-  },
-  nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
-    const slotFn = slots.nodeView;
-    if (!slotFn) return { update() {}, dispose() {} };
-    // Spike 004: portal-scope attribute injection. Cascades the @portal
-    // nodeView { … } selectors from the unscoped <style> block below into
-    // the engine-owned subtree.
-    container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
-    const renderScope = (s: unknown): void => {
-      render(h(Fragment, null, slotFn(s)), container);
-    };
-    renderScope(scope);
-    portalContainers.add(container);
-    return {
-      update: (s: unknown): void => renderScope(s),
-      dispose: (): void => {
-        render(null, container);
-        portalContainers.delete(container);
-      },
-    };
-  },
-};
-onBeforeUnmount(() => {
-  for (const container of portalContainers) render(null, container);
-  portalContainers.clear();
-});
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {

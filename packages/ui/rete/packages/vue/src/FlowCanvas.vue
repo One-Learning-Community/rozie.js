@@ -159,6 +159,58 @@ const resizeHandleSwElRef = ref<HTMLElement>();
 const resizeHandleSeElRef = ref<HTMLElement>();
 const toolbarElRef = ref<HTMLElement>();
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+const portalContainers = new Set<HTMLElement>();
+const portals = {
+  node: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
+    const slotFn = slots.node;
+    if (!slotFn) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // node { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-node', 'cd396d6a');
+    const renderScope = (s: unknown): void => {
+      render(h(Fragment, null, slotFn(s)), container);
+    };
+    renderScope(scope);
+    portalContainers.add(container);
+    return {
+      update: (s: unknown): void => renderScope(s),
+      dispose: (): void => {
+        render(null, container);
+        portalContainers.delete(container);
+      },
+    };
+  },
+  toolbar: (container: HTMLElement, scope: { node: unknown; emit: unknown }): ReactivePortalHandle => {
+    const slotFn = slots.toolbar;
+    if (!slotFn) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // toolbar { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-toolbar', 'cd396d6a');
+    const renderScope = (s: unknown): void => {
+      render(h(Fragment, null, slotFn(s)), container);
+    };
+    renderScope(scope);
+    portalContainers.add(container);
+    return {
+      update: (s: unknown): void => renderScope(s),
+      dispose: (): void => {
+        render(null, container);
+        portalContainers.delete(container);
+      },
+    };
+  },
+};
+onBeforeUnmount(() => {
+  for (const container of portalContainers) render(null, container);
+  portalContainers.clear();
+});
+
 import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
 import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
@@ -1821,58 +1873,6 @@ provide('rete:canvas', {
     const entry = nodeEntries.get(nodeId);
     return entry ? entry.body : null;
   }
-});
-
-interface ReactivePortalHandle {
-  update(scope: unknown): void;
-  dispose(): void;
-}
-const portalContainers = new Set<HTMLElement>();
-const portals = {
-  node: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
-    const slotFn = slots.node;
-    if (!slotFn) return { update() {}, dispose() {} };
-    // Spike 004: portal-scope attribute injection. Cascades the @portal
-    // node { … } selectors from the unscoped <style> block below into
-    // the engine-owned subtree.
-    container.setAttribute('data-rozie-portal-node', 'cd396d6a');
-    const renderScope = (s: unknown): void => {
-      render(h(Fragment, null, slotFn(s)), container);
-    };
-    renderScope(scope);
-    portalContainers.add(container);
-    return {
-      update: (s: unknown): void => renderScope(s),
-      dispose: (): void => {
-        render(null, container);
-        portalContainers.delete(container);
-      },
-    };
-  },
-  toolbar: (container: HTMLElement, scope: { node: unknown; emit: unknown }): ReactivePortalHandle => {
-    const slotFn = slots.toolbar;
-    if (!slotFn) return { update() {}, dispose() {} };
-    // Spike 004: portal-scope attribute injection. Cascades the @portal
-    // toolbar { … } selectors from the unscoped <style> block below into
-    // the engine-owned subtree.
-    container.setAttribute('data-rozie-portal-toolbar', 'cd396d6a');
-    const renderScope = (s: unknown): void => {
-      render(h(Fragment, null, slotFn(s)), container);
-    };
-    renderScope(scope);
-    portalContainers.add(container);
-    return {
-      update: (s: unknown): void => renderScope(s),
-      dispose: (): void => {
-        render(null, container);
-        portalContainers.delete(container);
-      },
-    };
-  },
-};
-onBeforeUnmount(() => {
-  for (const container of portalContainers) render(null, container);
-  portalContainers.clear();
 });
 
 let _cleanup_0: (() => void) | undefined;

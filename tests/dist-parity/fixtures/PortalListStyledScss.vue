@@ -22,6 +22,29 @@ const slots = useSlots();
 
 const __rozieRootRef = ref<HTMLElement>();
 
+const portalContainers = new Set<HTMLElement>();
+const portals = {
+  item: (container: HTMLElement, scope: { item: unknown }): (() => void) => {
+    const slotFn = slots.item;
+    if (!slotFn) return () => {};
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // item { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-item', '860cc87e');
+    const vnode = h(Fragment, null, slotFn(scope));
+    render(vnode, container);
+    portalContainers.add(container);
+    return () => {
+      render(null, container);
+      portalContainers.delete(container);
+    };
+  },
+};
+onBeforeUnmount(() => {
+  for (const container of portalContainers) render(null, container);
+  portalContainers.clear();
+});
+
 // Tiny inline "engine" — same shape as examples/PortalList.rozie but
 // with the inline-style ceremony removed. The engine now just creates
 // structural DOM; cosmetic styling is the wrapper's <style> block's job.
@@ -54,29 +77,6 @@ class MiniListEngine {
   }
 }
 let instance: any = null;
-
-const portalContainers = new Set<HTMLElement>();
-const portals = {
-  item: (container: HTMLElement, scope: { item: unknown }): (() => void) => {
-    const slotFn = slots.item;
-    if (!slotFn) return () => {};
-    // Spike 004: portal-scope attribute injection. Cascades the @portal
-    // item { … } selectors from the unscoped <style> block below into
-    // the engine-owned subtree.
-    container.setAttribute('data-rozie-portal-item', '860cc87e');
-    const vnode = h(Fragment, null, slotFn(scope));
-    render(vnode, container);
-    portalContainers.add(container);
-    return () => {
-      render(null, container);
-      portalContainers.delete(container);
-    };
-  },
-};
-onBeforeUnmount(() => {
-  for (const container of portalContainers) render(null, container);
-  portalContainers.clear();
-});
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {

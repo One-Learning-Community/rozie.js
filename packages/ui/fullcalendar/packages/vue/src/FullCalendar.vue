@@ -114,91 +114,6 @@ const slots = useSlots();
 
 const __rozieRootRef = ref<HTMLElement>();
 
-import { Calendar } from '@fullcalendar/core';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
-let instance: any = null;
-let suppressViewSync = false;
-const PLUGINS = [dayGridPlugin, timeGridPlugin, interactionPlugin];
-const normalizeEvent = (e: any) => {
-  // Object spread + template-literal default — common reconcile shape:
-  // pass user props through, but stamp a sensible title fallback and
-  // honor the wrapper's defaultColor only when the event omits one.
-  return {
-    ...e,
-    title: e.title || `Event ${e.id ?? '(no id)'}`,
-    color: e.color || props.defaultColor
-  };
-};
-// Imperative handle (Phase 21 $expose). The 16 calendar verbs a consumer can't
-// drive through props alone — exposed uniformly to all 6 targets
-// (Vue defineExpose / React useImperativeHandle / Svelte instance export /
-// Angular+Lit public method / Solid callback ref). Each delegates to the
-// underlying Calendar instance, which is null before $onMount and after
-// destroy — callers handle the pre-mount null.
-//
-// Collision discipline (the load-bearing flatpickr lesson): no exposed name may
-// collide with an emitted event (eventClick/dateClick/eventDrop/eventResize/
-// datesSet/eventMouseEnter/eventMouseLeave/eventsSet/loading/select/unselect) or
-// a declared prop. This is why the selection verbs are NAMED `selectRange`
-// (CalendarApi.select) and `clearSelection` (CalendarApi.unselect) — bare
-// `select`/`unselect` collide with the same-named emits (ROZ121), and `select`
-// is also Lit-risky. getApi returns the raw Calendar instance (NOT guard-nulled).
-//
-// Read-back gap closed: getDate (current anchor — the `view` model only carries
-// the view TYPE, datesSet only the visible RANGE) and getEvents (synchronous
-// event read — eventsSet is push-only). scrollToTime/updateSize cover timeGrid
-// scroll + container-resize relayout; prevYear/nextYear mirror prev/next.
-function getApi() {
-  return instance;
-}
-function changeView(...a: any[]) {
-  return instance?.changeView(...a);
-}
-function addEvent(...a: any[]) {
-  return instance?.addEvent(...a);
-}
-function removeEvent(id: any) {
-  instance?.getEventById(id)?.remove();
-}
-function today() {
-  instance?.today();
-}
-function prev() {
-  instance?.prev();
-}
-function next() {
-  instance?.next();
-}
-function gotoDate(...a: any[]) {
-  instance?.gotoDate(...a);
-}
-function getDate() {
-  return instance ? instance.getDate() : null;
-}
-function getEvents() {
-  return instance ? instance.getEvents() : [];
-}
-function scrollToTime(...a: any[]) {
-  instance?.scrollToTime(...a);
-}
-function updateSize() {
-  instance?.updateSize();
-}
-function prevYear() {
-  instance?.prevYear();
-}
-function nextYear() {
-  instance?.nextYear();
-}
-function selectRange(...a: any[]) {
-  instance?.select(...a);
-}
-function clearSelection() {
-  instance?.unselect();
-}
-
 const portalContainers = new Set<HTMLElement>();
 const portals = {
   event: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
@@ -356,6 +271,91 @@ onBeforeUnmount(() => {
   for (const container of portalContainers) render(null, container);
   portalContainers.clear();
 });
+
+import { Calendar } from '@fullcalendar/core';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
+let instance: any = null;
+let suppressViewSync = false;
+const PLUGINS = [dayGridPlugin, timeGridPlugin, interactionPlugin];
+const normalizeEvent = (e: any) => {
+  // Object spread + template-literal default — common reconcile shape:
+  // pass user props through, but stamp a sensible title fallback and
+  // honor the wrapper's defaultColor only when the event omits one.
+  return {
+    ...e,
+    title: e.title || `Event ${e.id ?? '(no id)'}`,
+    color: e.color || props.defaultColor
+  };
+};
+// Imperative handle (Phase 21 $expose). The 16 calendar verbs a consumer can't
+// drive through props alone — exposed uniformly to all 6 targets
+// (Vue defineExpose / React useImperativeHandle / Svelte instance export /
+// Angular+Lit public method / Solid callback ref). Each delegates to the
+// underlying Calendar instance, which is null before $onMount and after
+// destroy — callers handle the pre-mount null.
+//
+// Collision discipline (the load-bearing flatpickr lesson): no exposed name may
+// collide with an emitted event (eventClick/dateClick/eventDrop/eventResize/
+// datesSet/eventMouseEnter/eventMouseLeave/eventsSet/loading/select/unselect) or
+// a declared prop. This is why the selection verbs are NAMED `selectRange`
+// (CalendarApi.select) and `clearSelection` (CalendarApi.unselect) — bare
+// `select`/`unselect` collide with the same-named emits (ROZ121), and `select`
+// is also Lit-risky. getApi returns the raw Calendar instance (NOT guard-nulled).
+//
+// Read-back gap closed: getDate (current anchor — the `view` model only carries
+// the view TYPE, datesSet only the visible RANGE) and getEvents (synchronous
+// event read — eventsSet is push-only). scrollToTime/updateSize cover timeGrid
+// scroll + container-resize relayout; prevYear/nextYear mirror prev/next.
+function getApi() {
+  return instance;
+}
+function changeView(...a: any[]) {
+  return instance?.changeView(...a);
+}
+function addEvent(...a: any[]) {
+  return instance?.addEvent(...a);
+}
+function removeEvent(id: any) {
+  instance?.getEventById(id)?.remove();
+}
+function today() {
+  instance?.today();
+}
+function prev() {
+  instance?.prev();
+}
+function next() {
+  instance?.next();
+}
+function gotoDate(...a: any[]) {
+  instance?.gotoDate(...a);
+}
+function getDate() {
+  return instance ? instance.getDate() : null;
+}
+function getEvents() {
+  return instance ? instance.getEvents() : [];
+}
+function scrollToTime(...a: any[]) {
+  instance?.scrollToTime(...a);
+}
+function updateSize() {
+  instance?.updateSize();
+}
+function prevYear() {
+  instance?.prevYear();
+}
+function nextYear() {
+  instance?.nextYear();
+}
+function selectRange(...a: any[]) {
+  instance?.select(...a);
+}
+function clearSelection() {
+  instance?.unselect();
+}
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {

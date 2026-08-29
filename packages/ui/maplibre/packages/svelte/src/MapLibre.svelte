@@ -211,6 +211,70 @@ let layerReg = $state({});
 
 let containerEl = $state<HTMLElement | undefined>(undefined);
 
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+const portalInstances = new Set<Record<string, unknown>>();
+const portals = {
+  marker: (container: HTMLElement, scope: { marker: unknown; index: unknown }): ReactivePortalHandle => {
+    if (!marker) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-marker', 'f1ee1082');
+    const inst = mount(PortalHostReactive, {
+      target: container,
+      props: { snippet: marker, initialScope: scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return {
+      update: (s: unknown): void => {
+        (inst as unknown as { update(s: unknown): void }).update(s);
+      },
+      dispose: (): void => {
+        unmount(inst as Parameters<typeof unmount>[0]);
+        portalInstances.delete(inst as Record<string, unknown>);
+      },
+    };
+  },
+  popup: (container: HTMLElement, scope: { popup: unknown; index: unknown }): ReactivePortalHandle => {
+    if (!popup) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-popup', 'f1ee1082');
+    const inst = mount(PortalHostReactive, {
+      target: container,
+      props: { snippet: popup, initialScope: scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return {
+      update: (s: unknown): void => {
+        (inst as unknown as { update(s: unknown): void }).update(s);
+      },
+      dispose: (): void => {
+        unmount(inst as Parameters<typeof unmount>[0]);
+        portalInstances.delete(inst as Record<string, unknown>);
+      },
+    };
+  },
+  control: (container: HTMLElement, scope: { map: unknown }): (() => void) => {
+    if (!control) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-control', 'f1ee1082');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: control, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+};
+$effect(() => () => {
+  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
+  portalInstances.clear();
+});
+
 import maplibregl from 'maplibre-gl';
 let instance: any = null;
 // MapLibre's official no-token demo tiles — the zero-config `mapStyle` fallback
@@ -541,70 +605,6 @@ setContext('maplibre:layers', {
     delete n[id];
     layerReg = n;
   }
-});
-
-interface ReactivePortalHandle {
-  update(scope: unknown): void;
-  dispose(): void;
-}
-const portalInstances = new Set<Record<string, unknown>>();
-const portals = {
-  marker: (container: HTMLElement, scope: { marker: unknown; index: unknown }): ReactivePortalHandle => {
-    if (!marker) return { update() {}, dispose() {} };
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-marker', 'f1ee1082');
-    const inst = mount(PortalHostReactive, {
-      target: container,
-      props: { snippet: marker, initialScope: scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return {
-      update: (s: unknown): void => {
-        (inst as unknown as { update(s: unknown): void }).update(s);
-      },
-      dispose: (): void => {
-        unmount(inst as Parameters<typeof unmount>[0]);
-        portalInstances.delete(inst as Record<string, unknown>);
-      },
-    };
-  },
-  popup: (container: HTMLElement, scope: { popup: unknown; index: unknown }): ReactivePortalHandle => {
-    if (!popup) return { update() {}, dispose() {} };
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-popup', 'f1ee1082');
-    const inst = mount(PortalHostReactive, {
-      target: container,
-      props: { snippet: popup, initialScope: scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return {
-      update: (s: unknown): void => {
-        (inst as unknown as { update(s: unknown): void }).update(s);
-      },
-      dispose: (): void => {
-        unmount(inst as Parameters<typeof unmount>[0]);
-        portalInstances.delete(inst as Record<string, unknown>);
-      },
-    };
-  },
-  control: (container: HTMLElement, scope: { map: unknown }): (() => void) => {
-    if (!control) return () => {};
-    // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-control', 'f1ee1082');
-    const inst = mount(PortalHost, {
-      target: container,
-      props: { snippet: control, scope },
-    });
-    portalInstances.add(inst as Record<string, unknown>);
-    return () => {
-      unmount(inst);
-      portalInstances.delete(inst as Record<string, unknown>);
-    };
-  },
-};
-$effect(() => () => {
-  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
-  portalInstances.clear();
 });
 
 onMount(() => {
