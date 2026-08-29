@@ -79,7 +79,7 @@ function extractMethodBody(code: string, methodSignature: string): string | null
 const PROBE_A = `<rozie name="ProbeA">
 <props>{ n: { type: Number, default: 0 } }</props>
 <script>
-mountBody = (host) => { return $portals.body(host, {}) }
+const mountBody = (host) => { return $portals.body(host, {}) }
 $onMount(() => { mountBody($refs.hostEl) })
 </script>
 <template>
@@ -91,7 +91,7 @@ $onMount(() => { mountBody($refs.hostEl) })
 const PROBE_B = `<rozie name="ProbeB">
 <props>{ n: { type: Number, default: 0 } }</props>
 <script>
-mountBody = (host) => { return $portals.body(host, {}) }
+const mountBody = (host) => { return $portals.body(host, {}) }
 </script>
 <template>
 <div ref="hostEl"></div>

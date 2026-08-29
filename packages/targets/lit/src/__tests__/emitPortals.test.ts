@@ -172,7 +172,13 @@ describe('emitPortals — Lit', () => {
   it('reactive portal slot → returns { update, dispose } + ReactivePortalHandle', () => {
     const ir = buildMinimalIR({ slots: [reactivePortalSlot('nodeView', ['node', 'selected'])] });
     const result = emitPortals(ir);
-    expect(result.closureBlock).toContain('interface ReactivePortalHandle');
+    // Quick 260829-cd4 — the reactive-handle interface is split OUT of
+    // closureBlock into its own `interfaceDecl` field (a TS `interface`
+    // cannot be declared inside a class body; closureBlock is now a private
+    // class-field declaration).
+    expect(result.interfaceDecl).toContain('interface ReactivePortalHandle');
+    expect(result.closureBlock).not.toContain('interface ReactivePortalHandle');
+    expect(result.closureBlock).toContain('private portals = {');
     expect(result.closureBlock).toContain('nodeView: (container');
     expect(result.closureBlock).toContain('ReactivePortalHandle => {');
     // renderScope/update type their param as the slot's scopeType (NOT bare

@@ -182,6 +182,10 @@ export const LIT_EMITTER_MEMBERS: ReadonlySet<string> = new Set([
   'render', 'connectedCallback', 'disconnectedCallback', 'firstUpdated',
   'updated', 'attributeChangedCallback',
   '_portalContainers',
+  // Quick 260829-cd4 — `portals` is now a private class field (previously a
+  // `const` local scoped to firstUpdated(), which could never collide with
+  // an author identifier since it was never in class scope).
+  'portals',
 ]);
 
 // ============================================================================

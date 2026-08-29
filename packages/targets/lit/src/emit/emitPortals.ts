@@ -5,9 +5,13 @@
  * uses `<slot name="X" portal />`. Three artefacts:
  *
  *   1. `fieldDecl`         — `private _portalContainers = new Set<HTMLElement>();`
- *   2. `closureBlock`      — `const portals = { X: (...) => {...} };` — placed
- *                            at the top of `firstUpdated()` body
- *   3. `disconnectedBlock` — bulk-dispose loop placed in `disconnectedCallback()`
+ *   2. `closureBlock`      — `private portals = { X: (...) => {...} };` —
+ *                            a private class field (Quick 260829-cd4 — NOT
+ *                            inside `firstUpdated()` anymore)
+ *   3. `interfaceDecl`     — `interface ReactivePortalHandle { ... }`, split
+ *                            out of closureBlock (illegal inside a class
+ *                            body); routed to module scope
+ *   4. `disconnectedBlock` — bulk-dispose loop placed in `disconnectedCallback()`
  *
  * Per Spike 002 Demo.lit.ts: Lit's shadow-DOM `<slot>` element cannot be
  * invoked imperatively, so portal slots come through as function-typed
@@ -122,8 +126,23 @@ export interface PortalsEmit {
   hasPortals: boolean;
   /** Class field declaration (goes alongside other fieldDecls). */
   fieldDecl: string;
-  /** Closure block prepended to firstUpdated body. */
+  /**
+   * Quick 260829-cd4 — the `portals` closure itself, reshaped from a
+   * `const` declaration into a private class-field declaration (`private
+   * portals = { ... };`). Consumed alongside `fieldDecl`, NOT prepended to
+   * `firstUpdated()` anymore. Every read inside the closure body is inside
+   * an arrow (`this.<memberName>` / `this._portalContainers`), so field
+   * ordering is not a hazard.
+   */
   closureBlock: string;
+  /**
+   * Quick 260829-cd4 — the `interface ReactivePortalHandle { ... }` that
+   * `closureBlock` used to carry inline, split out because a TS `interface`
+   * is illegal inside a class body. '' when no portal slot is reactive.
+   * Routed by emitScript.ts into `hoistedTypeDecls` (module scope, above
+   * the class).
+   */
+  interfaceDecl: string;
   /** Bulk-dispose lines prepended to disconnectedCallback body. */
   disconnectedBlock: string;
 }
@@ -135,6 +154,7 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
       hasPortals: false,
       fieldDecl: '',
       closureBlock: '',
+      interfaceDecl: '',
       disconnectedBlock: '',
     };
   }
@@ -142,8 +162,12 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
   const fieldDecl = 'private _portalContainers = new Set<HTMLElement>();';
   const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash, ir)).join('\n');
   const hasReactive = portals.some((s) => s.isReactive === true);
-  const interfacePrefix = hasReactive ? REACTIVE_HANDLE_INTERFACE_LIT + '\n' : '';
-  const closureBlock = `${interfacePrefix}const portals = {\n${methodLines}\n};`;
+  // Quick 260829-cd4 — the reactive-handle interface is split OUT of
+  // closureBlock (a TS `interface` cannot be declared inside a class body)
+  // and closureBlock itself is reshaped from `const portals = {...}` into a
+  // private class-field declaration `private portals = {...};`.
+  const interfaceDecl = hasReactive ? REACTIVE_HANDLE_INTERFACE_LIT : '';
+  const closureBlock = `private portals = {\n${methodLines}\n};`;
   const disconnectedBlock =
     'for (const container of this._portalContainers) render(nothing, container);\n' +
     'this._portalContainers.clear();';
@@ -152,6 +176,7 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
     hasPortals: true,
     fieldDecl,
     closureBlock,
+    interfaceDecl,
     disconnectedBlock,
   };
 }

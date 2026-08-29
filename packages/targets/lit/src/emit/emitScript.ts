@@ -1681,17 +1681,25 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
   }
 
   // Portal-slot primitive (Spike 003) — synthesize the per-component
-  // portal scaffolding. Three artefacts:
+  // portal scaffolding. Quick 260829-cd4 reshaped `closureBlock` from a
+  // `const` prepended into `firstUpdated()` into a private CLASS FIELD, so
+  // it is visible as `this.portals` from any class member (a class-field
+  // arrow helper included), not just from inside `firstUpdated()` itself.
+  // Four artefacts:
   //   - fieldDecl       → pushed alongside other class fields
-  //   - closureBlock    → prepended to the firstUpdated body so user code
-  //                       (which got `$portals.X` rewritten to `portals.X`)
-  //                       has the closure in scope
+  //   - closureBlock    → ALSO pushed alongside other class fields (a
+  //                       private `portals = { ... };` field)
+  //   - interfaceDecl   → routed into `hoistedTypeDecls` (module scope,
+  //                       above the class — a TS `interface` is illegal
+  //                       inside a class body)
   //   - disconnectedBlock → prepended to disconnectedCallback body
   const portalsEmit = emitPortals(ir, opts.portalScopeHash ?? '');
   if (portalsEmit.hasPortals) {
     opts.lit.add('render');
     opts.lit.add('nothing');
     fieldLines.push(portalsEmit.fieldDecl);
+    fieldLines.push(portalsEmit.closureBlock);
+    if (portalsEmit.interfaceDecl) hoistedTypeDecls.push(portalsEmit.interfaceDecl);
   }
 
   // Phase 36 (R10) — cross-component context primitive. Read the $provide value
@@ -1719,7 +1727,6 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
   //    cleanup pushes — they MUST fire at first paint so the @lit-labs/preact-signals
   //    effect subscribes before any user interaction.
   const mountSegments: string[] = [];
-  if (portalsEmit.hasPortals) mountSegments.push(portalsEmit.closureBlock);
   if (freeStatements.trim()) mountSegments.push(freeStatements);
   if (cleanupPushes.length > 0) mountSegments.push(cleanupPushes.join('\n'));
   if (watcherCleanupPushes.length > 0) mountSegments.push(watcherCleanupPushes.join('\n'));
