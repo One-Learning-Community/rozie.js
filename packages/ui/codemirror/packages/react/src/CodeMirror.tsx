@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
@@ -258,18 +258,18 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   // `view.dispatch({ effects: compartment.reconfigure(newExt) })` without
   // rebuilding the entire EditorState. Each runtime-updatable prop gets one so
   // prop changes don't lose cursor/history/scroll position.
-  const baselineCompartment = new Compartment();
-  const langCompartment = new Compartment();
-  const themeCompartment = new Compartment();
-  const readOnlyCompartment = new Compartment();
-  const placeholderCompartment = new Compartment();
-  const extensionsCompartment = new Compartment();
-  const panelCompartment = new Compartment();
+  const baselineCompartment = useMemo(() => new Compartment(), []);
+  const langCompartment = useMemo(() => new Compartment(), []);
+  const themeCompartment = useMemo(() => new Compartment(), []);
+  const readOnlyCompartment = useMemo(() => new Compartment(), []);
+  const placeholderCompartment = useMemo(() => new Compartment(), []);
+  const extensionsCompartment = useMemo(() => new Compartment(), []);
+  const panelCompartment = useMemo(() => new Compartment(), []);
   // topPanel is the top-docked sibling of `panel` — a SECOND mount-once portal
   // slot (G5 wave 1) wired through the same `showPanel` facet with `top: true`.
   // topPanel is the top-docked sibling of `panel` — a SECOND mount-once portal
   // slot (G5 wave 1) wired through the same `showPanel` facet with `top: true`.
-  const topPanelCompartment = new Compartment();
+  const topPanelCompartment = useMemo(() => new Compartment(), []);
   // gutter / decoration are the REACTIVE MULTI-INSTANCE portal slots (G5 wave 2) —
   // one portal handle per visible marker/widget (the TipTap nodeView template).
   // Each owns a compartment so its driving prop (`gutterLines` / `decorations`)
@@ -286,8 +286,8 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   // capture $portals.gutter / $portals.decoration are declared inline inside the
   // top-level makeGutterExt/makeDecorationExt factories below — no mount-scope
   // bridge needed; these compartments are filled directly from those factories.
-  const gutterCompartment = new Compartment();
-  const decorationCompartment = new Compartment();
+  const gutterCompartment = useMemo(() => new Compartment(), []);
+  const decorationCompartment = useMemo(() => new Compartment(), []);
   // tooltip is CodeMirror's FIRST REACTIVE portal slot (G5 wave 1) — a
   // cursor-anchored tooltip via the `showTooltip` facet. Driven by a StateField
   // (`tooltipField`, a top-level factory) so it tracks the caret; the reactive
@@ -295,7 +295,6 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   // than remounting it each keystroke. NO compartment — a StateField is the
   // idiomatic showTooltip source and there is no runtime prop to reconfigure it
   // against (slot presence is decided once at mount).
-
   // language is a convenience prop mapping to the ONE bundled language
   // (@codemirror/lang-javascript). Any other value → [] (plain text, no syntax
   // highlighting); consumers add other languages via :extensions (D-03). This

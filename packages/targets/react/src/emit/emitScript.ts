@@ -606,7 +606,23 @@ function tryWrapEscapingConstUseMemo(
   const initDeps = computeHelperBodyDeps(init, ir, allHelperNames, constName);
   const depsLiteral = renderDepArrayWithIR(initDeps, ir);
 
-  return `const ${constName} = useMemo(${arrowBody(init)}, ${depsLiteral});`;
+  // Quick 260829-j18 — preserve the statement's own leading/trailing
+  // comments, same rationale and mechanism as `tryWrapPureLiteralUseMemo`
+  // (`renderStatementComments`). Before the transitive closure (Task 3) this
+  // pass only ever claimed a const DIRECTLY seeded from an effect/listener —
+  // a narrow class. The expansion now routes many more corpus consts through
+  // here (CodeMirror's ten heavily-documented CM6 `Compartment`s among them);
+  // without this, every one of those author/maintainer doc comments would
+  // silently vanish from the emitted output the moment the const first
+  // qualifies for this wrap — the exact "wrapped statements are emitted as
+  // strings, not AST, so Babel's comment-attachment machinery never runs on
+  // them" gap this function always had, previously masked because so few
+  // sites went through it.
+  const mainLine = `const ${constName} = useMemo(${arrowBody(init)}, ${depsLiteral});`;
+  const leading = renderStatementComments(stmt.leadingComments);
+  const trailing = renderStatementComments(stmt.trailingComments);
+  if (!leading && !trailing) return mainLine;
+  return [leading, mainLine, trailing].filter((p): p is string => p !== null).join('\n');
 }
 
 /**
