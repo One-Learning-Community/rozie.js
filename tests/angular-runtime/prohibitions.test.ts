@@ -104,31 +104,33 @@ function readExample(name: string): string {
 
 /**
  * The byte-identity baseline for every tracked Angular fixture (prohibition
- * 4b). Advanced by Phase 82 Plan 05 to `179dbf03447ec44a9828924e3bfd24d4b661d1bb` — that plan's own `pnpm
- * --filter dist-parity bootstrap` re-bless commit, which added
- * `tests/dist-parity/fixtures/ElementPlusSlotFallthrough.angular.ts` (the
- * element-plus-slots single-root dist-parity fixture) and touched zero
- * existing fixture bytes. This IS the owed prohibition-5 hand-diff for this
- * advance (performed, not deferred): `git diff --name-only
- * 1b1d444cb2d23b022559d7b694df23b1394e8894 179dbf03447ec44a9828924e3bfd24d4b661d1bb` scoped to the same
- * three globs `listAngularFixtureFiles()` below tracks returned exactly one
- * path, `tests/dist-parity/fixtures/ElementPlusSlotFallthrough.angular.ts` —
- * a NEW file, not a changed one, out of 137 tracked fixtures. Nothing in the
- * pre-existing tracked corpus silently drifted, corroborated independently
- * by the Plan 05 bootstrap's own three-bucket ledger (0 changed / 8 new / 555
- * unchanged across all 74 registered dist-parity examples). The freshly
+ * 4b). Advanced by Quick task 260829-cd4 to
+ * `ba42bc291c7e32fca77cd1f015578b1d84bcda8a` — that quick task's own `pnpm
+ * --filter dist-parity bootstrap` re-bless commit, which hoisted the
+ * `$portals` closure to component/class scope on react/angular/lit (Task 3's
+ * emitter fix: the closure moves from a `const` local scoped to
+ * `ngAfterViewInit()` into a private class field, `this.`-qualified). This IS
+ * the owed prohibition-5 hand-diff for this advance (performed, not
+ * deferred): `git diff --name-only 179dbf03447ec44a9828924e3bfd24d4b661d1bb
+ * ba42bc291c7e32fca77cd1f015578b1d84bcda8a` scoped to the same three globs
+ * `listAngularFixtureFiles()` below tracks returned exactly two paths,
+ * `tests/dist-parity/fixtures/PortalListStyled.angular.ts` and
+ * `tests/dist-parity/fixtures/PortalListStyledScss.angular.ts` — precisely
+ * the two tracked fixtures that declare a portal slot, out of 139 tracked
+ * fixtures. Nothing else in the tracked corpus silently drifted. The freshly
  * advanced baseline again makes prohibition 5's machine-checkable half
  * vacuous by construction; the next advance owes this same by-hand diff.
- * Previously advanced by Phase 81 Plan 06 to
- * `1b1d444cb2d23b022559d7b694df23b1394e8894` (see prior paragraph, now
- * superseded) — before that, Quick task 260819-sg9 (Tier 2, Task 3 STEP 10).
+ * Previously advanced by Phase 82 Plan 05 to
+ * `179dbf03447ec44a9828924e3bfd24d4b661d1bb` (see prior paragraph, now
+ * superseded) — before that, Phase 81 Plan 06 to
+ * `1b1d444cb2d23b022559d7b694df23b1394e8894`.
  */
 // NOTE: reading this commit requires real git history. CI must check out with
 // `fetch-depth: 0` — actions/checkout's default depth-1 shallow clone does not
 // contain this object, and every gate below then fails with
 // "Command failed: git show …" (134 of 144 tests, one root cause). The
 // angular-matrix workflow sets it explicitly; keep them in sync.
-const BASELINE_COMMIT = '179dbf03447ec44a9828924e3bfd24d4b661d1bb';
+const BASELINE_COMMIT = 'ba42bc291c7e32fca77cd1f015578b1d84bcda8a';
 
 /** `git show <commit>:<path>` — throws if the path did not exist at that commit. */
 function readAtBaseline(relPath: string): string {
