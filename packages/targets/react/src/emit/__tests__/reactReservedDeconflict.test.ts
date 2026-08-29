@@ -129,8 +129,15 @@ describe('Phase 61-05 risk D + Plan 09 — synthesized-internal program-scope-on
     // GENUINE collision: the user TOP-LEVEL `const attrs = { role: 'group' }`
     // redeclares the synthesized fallthrough `const attrs = props as Record<…>`
     // → renamed to `attrs$local`. The synthesized one keeps the bare name.
+    //
+    // Quick 260828-uyn: `attrs$local`'s initializer is a pure object literal
+    // (no reactive read, no disallowed reference) — the new
+    // `tryWrapPureLiteralUseMemo` pass stabilizes it with `useMemo(…, [])`,
+    // same as it would on any other qualifying top-level literal. The rename
+    // contract under test here is orthogonal and unaffected: the memo wrap
+    // still binds the RENAMED `attrs$local` name, not the bare `attrs`.
     expect(code).toContain('attrs$local');
-    expect(code).toContain('const attrs$local = {');
+    expect(code).toContain('const attrs$local = useMemo(() => ({');
     // The synthesized fallthrough binding keeps the bare `attrs` name.
     expect(code).toContain('const attrs = props as Record');
 

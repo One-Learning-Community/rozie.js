@@ -768,6 +768,259 @@ function tryWrapMutatedInstanceUseMemo(
 }
 
 /**
+ * Quick 260828-uyn (Finding 1 of
+ * `react-object-prop-stability-vs-lit-computed-getter.md`) — collect the free
+ * bare identifiers an object/array literal cites, EXCLUDING identifiers bound
+ * INSIDE the literal itself (method/arrow params, block locals) and
+ * property-KEY / non-computed `.property` positions (never real reference
+ * sites). Companion to `collectPureLiteralBinders`'s Gate 2.
+ *
+ * Mirrors `computeHelperBodyDeps`'s `isLocallyBound` technique: wrap `init`
+ * in a synthetic top-level function so Babel's scope chain has nothing ABOVE
+ * it to resolve against. A name the chain resolves locally is bound inside
+ * the literal; anything else is FREE — either a genuine global (`Math`,
+ * `console`) or a name bound at the top level of the REAL `cloned` program.
+ * `collectPureLiteralBinders` tells those two apart by checking `free`
+ * against the real top-level binder set.
+ */
+function collectFreeTopLevelIdentifiers(init: t.Expression): Set<string> {
+  const free = new Set<string>();
+  const wrappedFn = t.functionDeclaration(
+    t.identifier('__rozie_pure_literal_probe'),
+    [],
+    t.blockStatement([t.expressionStatement(init)]),
+    false,
+    false,
+  );
+  const file = t.file(t.program([wrappedFn]));
+
+  traverse(file, {
+    Identifier(path) {
+      const name = path.node.name;
+      // Gate 1 (computeHelperBodyDeps) already classifies magic-accessor /
+      // stable-identifier reads; a candidate only reaches Gate 2 once Gate 1
+      // has returned zero deps, so these forms cannot be reactive here — skip
+      // them the same way computeHelperBodyDeps does so they never masquerade
+      // as an unresolved top-level reference.
+      if (name === '$emit' || name === '$el') return;
+      if (name === '$props' || name === '$data' || name === '$refs' || name === '$slots') return;
+      if (name === 'props') return;
+
+      if (
+        (t.isMemberExpression(path.parent) || t.isOptionalMemberExpression(path.parent)) &&
+        path.parent.property === path.node &&
+        !path.parent.computed
+      ) {
+        return;
+      }
+      if (t.isVariableDeclarator(path.parent) && path.parent.id === path.node) return;
+      if (
+        t.isObjectProperty(path.parent) &&
+        path.parent.key === path.node &&
+        !path.parent.computed
+      ) {
+        return;
+      }
+      if (
+        (t.isObjectMethod(path.parent) || t.isClassMethod(path.parent)) &&
+        path.parent.key === path.node &&
+        !path.parent.computed
+      ) {
+        return;
+      }
+      if (t.isFunctionDeclaration(path.parent) && path.parent.id === path.node) return;
+      if (t.isFunctionExpression(path.parent) && path.parent.id === path.node) return;
+
+      // Bound INSIDE the literal (method/arrow param, block local) — the
+      // synthetic wrapper has nothing above it, so a resolved binding here
+      // can only be local to the literal itself.
+      if (path.scope.getBinding(name)) return;
+
+      free.add(name);
+    },
+  });
+
+  return free;
+}
+
+/**
+ * Quick 260828-uyn — pre-scan for the THIRD `useMemo(…, [])` stabilization
+ * class: top-level `const X = { … }` / `const X = [ … ]` initializers that
+ * read nothing reactive and cite nothing unstable. Companion to
+ * `collectMutatedInstanceBinders` (mutated fresh instances — cross-render
+ * MUTABLE state) and `tryWrapEscapingConstUseMemo` (a const escaping into an
+ * effect, keyed on its REAL reactive deps). This pass targets a PURE literal:
+ * empty deps, `[]` regardless of whether the const escapes anywhere.
+ *
+ * Motivation: authors hoist a value to a top-level const specifically to get
+ * referential stability. The five setup-once targets (Vue/Svelte setup body,
+ * Angular/Lit class fields, Solid's once-run component function) build it
+ * exactly once. React re-runs the whole component body every render, so a
+ * plain `const PLUGINS = [dayGridPlugin]` silently gets a fresh identity on
+ * every render — authors get the stability on five targets and silently do
+ * not get it on React.
+ *
+ * Two gates, BOTH must pass:
+ *
+ *   GATE 1 (purity) — `computeHelperBodyDeps(init, ir, allHelperNames, name)`
+ *   returns an EMPTY SignalRef[]. Reuses the SAME analyzer the escaping-const
+ *   wrap already calls above; no second dep-computation is written.
+ *
+ *   GATE 2 (allowed-reference set — the ordering hazard) — `allHelperNames`
+ *   contains ONLY arrow/function-expression consts and `function`
+ *   declarations (built in the pre-scan above this point), so Gate 1 ALONE
+ *   returns EMPTY for `const b = { inner: a }` where `a` is another
+ *   top-level OBJECT const: a plain-object reference is invisible to
+ *   `computeHelperBodyDeps` (it isn't a prop/data/computed/ref/helper name).
+ *   Gate 2 walks the literal for free identifiers
+ *   (`collectFreeTopLevelIdentifiers`) and rejects the candidate if any of
+ *   them is bound at the top level of `cloned` and is NOT one of:
+ *     1. a module-scope import binding (`importedNames`) — already
+ *        partitioned out of `cloned.program.body` by `partitionUserImports`
+ *        before this pre-scan runs, so this class is a defensive no-op
+ *        today; kept for the contract's own documentation value and in case
+ *        a future pass changes the partition order.
+ *     2. a name in `hoistResult.hoisted` (`hoistedRefNames`) — a module-`let`
+ *        already lowered to `useRef`, read as `X.current`. Same
+ *        already-removed reasoning as (1): `hoistModuleLet` deletes the
+ *        ORIGINAL `let` statement from `cloned.program.body`, so a hoisted
+ *        name is never top-level-bound in `cloned` by the time this
+ *        pre-scan runs.
+ *     3. an `ir.refs` name (`refNames`) — stable per D-21b.
+ *     4. an EARLIER literal already admitted to the returned set. Candidates
+ *        are processed in declaration order, so a candidate may only cite
+ *        earlier-admitted candidates — matching JS TDZ reality, no fixpoint
+ *        iteration needed.
+ *   Anything else top-level-bound in `cloned` — a `function` declaration, an
+ *   arrow const, a non-hoisted `let`, a non-literal const, a destructured
+ *   binder — is a BAIL. A name that resolves to NOTHING top-level-bound in
+ *   `cloned` (a genuine global like `Math`/`console`, OR — per the
+ *   already-removed notes above — a hoisted-ref/import name) is allowed by
+ *   construction: it simply never appears in `topLevelBoundNames`.
+ *
+ * Why `useMemo(…, [])` and not module-scope hoisting: module scope would
+ * share ONE object across ALL component instances; every other target
+ * builds it per-instance. `useMemo(…, [])` is per-instance and stable, and
+ * safe even if something later mutates the object.
+ *
+ * SCOPE FENCE (deliberate, this pass only): object/array literal
+ * initializers ONLY. Arrow consts, `function` declarations, `NewExpression`
+ * inits and scalars are each a different existing/deferred class — see
+ * `.planning/todos/pending/react-object-prop-stability-vs-lit-computed-getter.md`
+ * for the deferred arrow-function-helper remainder and its measurement.
+ */
+function collectPureLiteralBinders(
+  cloned: t.File,
+  ir: IRComponent,
+  allHelperNames: Set<string>,
+  hoistedRefNames: ReadonlySet<string>,
+  importedNames: ReadonlySet<string>,
+  lifecycleConsumedIndices: ReadonlySet<number>,
+  watcherConsumedIndices: ReadonlySet<number>,
+): Set<string> {
+  const refNames = new Set(ir.refs.map((r) => r.name));
+
+  // All names bound at the top level of `cloned` (post import-partition,
+  // post module-let hoist) — function/class declarations and every
+  // let/const/var declarator identifier, including destructured ones.
+  const topLevelBoundNames = new Set<string>();
+  for (const s of cloned.program.body) {
+    if (t.isVariableDeclaration(s)) {
+      for (const d of s.declarations) {
+        for (const n of Object.keys(t.getBindingIdentifiers(d.id))) topLevelBoundNames.add(n);
+      }
+    } else if (t.isFunctionDeclaration(s) && s.id) {
+      topLevelBoundNames.add(s.id.name);
+    } else if (t.isClassDeclaration(s) && s.id) {
+      topLevelBoundNames.add(s.id.name);
+    }
+  }
+
+  const admitted = new Set<string>();
+
+  for (let i = 0; i < cloned.program.body.length; i++) {
+    if (lifecycleConsumedIndices.has(i)) continue;
+    if (watcherConsumedIndices.has(i)) continue;
+    const stmt = cloned.program.body[i]!;
+    if (!t.isVariableDeclaration(stmt)) continue;
+    if (stmt.kind !== 'const') continue;
+    if (stmt.declarations.length !== 1) continue;
+    const decl = stmt.declarations[0]!;
+    if (!t.isIdentifier(decl.id)) continue;
+    if (!decl.init) continue;
+    // Detect the init shape after unwrapping any TS cast wrapper, so a
+    // literal carrying an author cast (`{ … } as const`) is still
+    // recognized. Rendering (tryWrapPureLiteralUseMemo) uses the ORIGINAL
+    // `decl.init`, preserving the cast in the emitted memo body.
+    const unwrappedInit = unwrapTsCast(decl.init);
+    if (!t.isObjectExpression(unwrappedInit) && !t.isArrayExpression(unwrappedInit)) continue;
+    const name = decl.id.name;
+
+    // Gate 1 — purity. Walk the ORIGINAL (possibly cast-wrapped) init; a TS
+    // cast node is a transparent single-child wrapper, so traversal reaches
+    // the same reads either way.
+    const deps = computeHelperBodyDeps(decl.init, ir, allHelperNames, name);
+    if (deps.length > 0) continue;
+
+    // Gate 2 — allowed-reference set.
+    const free = collectFreeTopLevelIdentifiers(decl.init);
+    let allReferencesAllowed = true;
+    for (const ref of free) {
+      if (!topLevelBoundNames.has(ref)) continue; // global, or already-removed import/hoisted-ref
+      if (
+        importedNames.has(ref) ||
+        hoistedRefNames.has(ref) ||
+        refNames.has(ref) ||
+        admitted.has(ref)
+      ) {
+        continue;
+      }
+      allReferencesAllowed = false;
+      break;
+    }
+    if (!allReferencesAllowed) continue;
+
+    admitted.add(name);
+  }
+
+  return admitted;
+}
+
+/**
+ * Quick 260828-uyn — wrap a top-level pure object/array literal `const X =
+ * init` in `useMemo(() => init, [])` so it is constructed ONCE per component
+ * instance (setup-once parity with the other five targets). Candidate
+ * detection lives in `collectPureLiteralBinders`. Returns the rendered line,
+ * or null when the binder isn't a stabilization target.
+ *
+ * Distinct from the two existing `useMemo` wraps: `tryWrapMutatedInstance
+ * UseMemo` targets cross-render MUTABLE state (member-mutated fresh
+ * instances); `tryWrapEscapingConstUseMemo` targets a const that escapes
+ * into an effect, keyed on the const's REAL reactive deps. This pass targets
+ * a PURE literal that reads nothing reactive at all — always `[]`.
+ */
+function tryWrapPureLiteralUseMemo(
+  stmt: t.Statement,
+  pureLiteralNames: ReadonlySet<string>,
+  collectors: { react: ReactImportCollector; runtime: RuntimeReactImportCollector },
+): string | null {
+  if (!t.isVariableDeclaration(stmt)) return null;
+  if (stmt.kind !== 'const') return null;
+  if (stmt.declarations.length !== 1) return null;
+  const decl = stmt.declarations[0]!;
+  if (!t.isIdentifier(decl.id)) return null;
+  const init = decl.init;
+  if (!init) return null;
+  if (!pureLiteralNames.has(decl.id.name)) return null;
+
+  collectors.react.add('useMemo');
+  // Preserve an author declarator annotation, same rationale as the sibling
+  // mutated-instance wrap.
+  const declTypeSuffix = renderDeclaratorTypeSuffix(decl.id);
+  return `const ${decl.id.name}${declTypeSuffix} = useMemo(${arrowBody(init)}, []);`;
+}
+
+/**
  * Find all distinct `props.onX` names that appear in CALL position inside
  * `body`. Returns the set of names (without the `on` prefix? no — keep raw
  * since the destructure binds the same name, e.g. `const { onClose } = props`).
@@ -3961,6 +4214,29 @@ export function emitScript(
   // guard resets → render side-effects re-fire → infinite re-render → VR hang.
   const mutatedInstanceNames = collectMutatedInstanceBinders(cloned);
 
+  // 6a''. Quick 260828-uyn — pre-scan for the THIRD `useMemo(…, [])`
+  // stabilization class: pure top-level object/array literal consts. See
+  // `collectPureLiteralBinders`'s own doc comment for the two-gate contract.
+  // `importedNames` derives from `userImportNodes` (partitioned OUT of
+  // `cloned.program.body` in step 1b, above); `hoistedRefNames` derives from
+  // `hoistResult.hoisted` (module-lets already lowered to `useRef` in step 2).
+  const importedNames = new Set<string>();
+  for (const imp of userImportNodes) {
+    for (const spec of imp.specifiers) {
+      importedNames.add(spec.local.name);
+    }
+  }
+  const hoistedRefNames = new Set(hoistResult.hoisted.map((h) => h.name));
+  const pureLiteralNames = collectPureLiteralBinders(
+    cloned,
+    ir,
+    allHelperNames,
+    hoistedRefNames,
+    importedNames,
+    lifecyclePairing.consumedIndices,
+    watcherPairing.consumedIndices,
+  );
+
   // 6b. Helper-name pre-scan (`allHelperNames` / `helperLocByName`) is built
   // earlier — hoisted above the lifecycle + watcher loops in Round 4 of
   // 260519 linechart-watch-recreate so the watcher loop's callback-body walk
@@ -4172,6 +4448,19 @@ export function emitScript(
     );
     if (memoWrapped) {
       userArrowsLines.push(memoWrapped);
+      // Same source-map exclusion rationale as the useCallback wrap above.
+      continue;
+    }
+
+    // Quick 260828-uyn — pure object/array literal → useMemo(() => init, []).
+    // Runs AFTER the escaping-const wrap above so a const that both escapes
+    // AND is pure keeps the escaping branch's dep array (byte-identical to
+    // `[]` for a zero-dep literal anyway, but the escaping branch's semantics
+    // — "keyed on real reactive deps" — take precedence when both could
+    // apply). See `tryWrapPureLiteralUseMemo` / `collectPureLiteralBinders`.
+    const pureLiteralWrapped = tryWrapPureLiteralUseMemo(stmt, pureLiteralNames, collectors);
+    if (pureLiteralWrapped) {
+      userArrowsLines.push(pureLiteralWrapped);
       // Same source-map exclusion rationale as the useCallback wrap above.
       continue;
     }
