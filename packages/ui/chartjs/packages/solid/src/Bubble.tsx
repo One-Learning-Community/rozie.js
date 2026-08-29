@@ -356,10 +356,19 @@ export default function Bubble(_props: BubbleProps): JSX.Element {
   // $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
   // captured node so no $refs read ever executes outside the mount hook.
   let canvasEl: any = null;
-  // buildConfig is DEFINED inside $onMount (so its $emit/$portals/$slots
-  // references are bound in the mount-lifecycle scope the per-target emitters
-  // provide — mirrors FullCalendar's mount-built opts + CodeMirror's panelExt
-  // note) and stored here so the top-level re-create $watches can call it.
+  // buildConfig is DEFINED inside $onMount because it reads $portals.tooltip.
+  // $portals ALONE forces this: React/Angular/Lit emit the `portals` object
+  // INSIDE the mount body (useEffect / ngAfterViewInit / firstUpdated), so a
+  // top-level reference is a SILENT bad emit — TS2304 on the bundled leaf,
+  // ReferenceError at runtime, and no diagnostic fires. Vue/Svelte/Solid emit
+  // it at component scope and are unaffected.
+  // $emit and $slots do NOT impose this constraint — both lower to
+  // component-scope constructs on ALL SIX targets and are safe to reference
+  // from a top-level helper (measured 2026-08-29; the earlier
+  // "$emit/$portals/$slots" phrasing here was over-broad and had been
+  // copy-propagated into all 8 generated variants). Do not relocate a helper
+  // into $onMount for $emit/$slots alone.
+  // Stored in this `let` so the top-level re-create $watches can call it.
   let buildConfig: any = null;
   // Re-create the live instance. Chart.js exposes no stable runtime type-swap or
   // plugin-swap, so `type`/`plugins`/`redraw`-driven changes re-create. Uses the
