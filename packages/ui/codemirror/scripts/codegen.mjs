@@ -435,17 +435,13 @@ function main() {
     // `themeExt`'s return `: any` here — a pure type annotation, zero runtime
     // change. Vue/Svelte/Angular are type-neutral and never see it; Lit is
     // already covered by the `themeExt = (): any =>` aid above.
-    //
-    // React's declaration form for `themeExt` changed after quick 260829-gbs
-    // hoisted buildState + the panel/tooltip/gutter/decoration factories out of
-    // $onMount to top level (removing the last $portals mount-scope workaround
-    // in this file): React no longer needs a `useCallback`-wrapped `themeExt`
-    // once `buildState` itself becomes a top-level `useCallback` closing over it
-    // directly — the emitter now lowers it to a plain `function themeExt() {}`,
-    // the SAME shape Solid already used. One token now covers both.
     if (cfg.dir === 'react' || cfg.dir === 'solid') {
-      const themeToken = 'function themeExt()';
-      const themeAnnotated = 'function themeExt(): any';
+      const themeToken =
+        cfg.dir === 'react' ? 'const themeExt = useCallback(() =>' : 'function themeExt()';
+      const themeAnnotated =
+        cfg.dir === 'react'
+          ? 'const themeExt = useCallback((): any =>'
+          : 'function themeExt(): any';
       if (!code.includes(themeToken)) {
         throw new Error(
           `codegen ${cfg.dir}: expected to annotate \`themeExt\`'s return \`: any\` (G3 widened-theme ` +

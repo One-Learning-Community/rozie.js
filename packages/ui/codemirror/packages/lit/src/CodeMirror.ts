@@ -349,8 +349,382 @@ private portals = {
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.value)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => this.writeDoc(v))(__watchVal); }); }));
 
+    // One `panel` portal slot — mounted through CM6's `showPanel` facet. The
+    // Panel's `dom` is the portal host node; $portals.panel(dom, scope) mounts the
+    // consumer's framework-native fragment on Panel.mount() and the returned
+    // dispose runs in Panel.destroy(). Empty extension ([]) when the consumer
+    // doesn't fill the slot.
+    // NOTE: the Panel's mount/destroy are ARROW-FUNCTION properties (not object
+    // `mount() {}` methods) and the panel host element + view are captured in
+    // plain `const`s. The object-method form gives each method its own `this`
+    // scope, and the Lit emitter's component-field rewrite walks INTO that method
+    // body and rewrites a closure-captured `view` reference to `this.view`
+    // (TS2339 "Property 'view' does not exist on type 'Panel'"). Arrow-function
+    // properties share the enclosing lexical scope, so the captured `panelView`
+    // const resolves correctly on every target. CM6 calls `panel.mount()` /
+    // `panel.destroy()` either way.
+    const panelExt = () => {
+      if (!(this.panel !== undefined)) return [];
+      return showPanel.of((panelView: any) => {
+        const dom = document.createElement('div');
+        dom.className = 'rozie-cm-panel';
+        const scope = {
+          view: panelView
+        };
+        let dispose: any = null;
+        return {
+          dom,
+          top: false,
+          mount: () => {
+            dispose = this.portals.panel(dom, scope);
+          },
+          destroy: () => {
+            dispose?.();
+            dispose = null;
+          }
+        };
+      });
+    };
+
+    // topPanel — the TOP-docked mount-once sibling of `panel` (G5 wave 1). Same
+    // `showPanel` facet, same arrow-function-property mount/destroy form (NOT
+    // object-method `mount() {}` — the Lit field-rewrite caveat documented on
+    // panelExt above applies identically), differing ONLY in `top: true` and the
+    // `.rozie-cm-panel-top` host class. Empty ([]) when the slot is unfilled.
+    // topPanel — the TOP-docked mount-once sibling of `panel` (G5 wave 1). Same
+    // `showPanel` facet, same arrow-function-property mount/destroy form (NOT
+    // object-method `mount() {}` — the Lit field-rewrite caveat documented on
+    // panelExt above applies identically), differing ONLY in `top: true` and the
+    // `.rozie-cm-panel-top` host class. Empty ([]) when the slot is unfilled.
+    const topPanelExt = () => {
+      if (!(this.topPanel !== undefined)) return [];
+      return showPanel.of((panelView: any) => {
+        const dom = document.createElement('div');
+        dom.className = 'rozie-cm-panel-top';
+        const scope = {
+          view: panelView
+        };
+        let dispose: any = null;
+        return {
+          dom,
+          top: true,
+          mount: () => {
+            dispose = this.portals.topPanel(dom, scope);
+          },
+          destroy: () => {
+            dispose?.();
+            dispose = null;
+          }
+        };
+      });
+    };
+
+    // tooltip — CodeMirror's FIRST REACTIVE portal slot (G5 wave 1). A
+    // cursor-anchored tooltip provided through the `showTooltip` facet via a
+    // StateField that yields ONE Tooltip at the main selection head whenever the
+    // `tooltip` slot is filled.
+    //
+    // UPDATE-IN-PLACE reconciliation (verified against the installed
+    // @codemirror/view@6.43 tooltip source, TooltipViewManager.update): CM reuses
+    // an existing TooltipView — calling TooltipView.update(viewUpdate) instead of
+    // destroy+create — when the new Tooltip's `create` is REFERENCE-EQUAL to the
+    // old one's (`other.create == tip.create`); and when the whole showTooltip
+    // facet INPUT is unchanged it skips matching entirely and calls update() on
+    // every live view. We satisfy BOTH by holding ONE module-stable Tooltip object
+    // (`stableTooltip`, stable `create`) and returning that SAME object from the
+    // field's `update` while the head only moved. So the consumer fragment mounts
+    // ONCE (TooltipView.mount → $portals.tooltip → reactive {update,dispose}) and
+    // every caret move flows through TooltipView.update → handle.update(scope) —
+    // re-rendering the fragment IN PLACE, never remounting it.
+    // tooltip — CodeMirror's FIRST REACTIVE portal slot (G5 wave 1). A
+    // cursor-anchored tooltip provided through the `showTooltip` facet via a
+    // StateField that yields ONE Tooltip at the main selection head whenever the
+    // `tooltip` slot is filled.
+    //
+    // UPDATE-IN-PLACE reconciliation (verified against the installed
+    // @codemirror/view@6.43 tooltip source, TooltipViewManager.update): CM reuses
+    // an existing TooltipView — calling TooltipView.update(viewUpdate) instead of
+    // destroy+create — when the new Tooltip's `create` is REFERENCE-EQUAL to the
+    // old one's (`other.create == tip.create`); and when the whole showTooltip
+    // facet INPUT is unchanged it skips matching entirely and calls update() on
+    // every live view. We satisfy BOTH by holding ONE module-stable Tooltip object
+    // (`stableTooltip`, stable `create`) and returning that SAME object from the
+    // field's `update` while the head only moved. So the consumer fragment mounts
+    // ONCE (TooltipView.mount → $portals.tooltip → reactive {update,dispose}) and
+    // every caret move flows through TooltipView.update → handle.update(scope) —
+    // re-rendering the fragment IN PLACE, never remounting it.
+    const tooltipField = () => {
+      if (!(this.tooltip !== undefined)) return [];
+      // The reactive portal handle for the SINGLE live tooltip view. Hoisted to
+      // the field's closure so create()/update()/destroy() share it across the
+      // tooltip's lifetime.
+      let handle: any = null;
+      // Stable Tooltip object — its `create` reference never changes, so CM
+      // reuses the TooltipView across caret moves (update-in-place, no remount).
+      // NOTE: `create` is an ARROW-FUNCTION property and its param is named
+      // `tipView` (NOT `view`) — both for the SAME Lit reason documented on
+      // panelExt: an object-method `create(view) {}` would get its own `this`,
+      // and the Lit emitter's component-field rewrite walks into the body and
+      // rewrites a `view`-named token (matching the top-level `let view`) to
+      // `this.view`. An arrow property shares the enclosing scope, and the
+      // non-colliding param name keeps the caret-view reference correct on every
+      // target. CM calls `tooltip.create(view)` either way.
+      const stableTooltip = {
+        pos: 0,
+        above: true,
+        create: (tipView: any) => {
+          const dom = document.createElement('div');
+          dom.className = 'rozie-cm-tooltip';
+          return {
+            dom,
+            mount: () => {
+              handle = this.portals.tooltip(dom, {
+                view: tipView,
+                pos: tipView.state.selection.main.head
+              });
+            },
+            // Reactive in-place update — fired by CM on every ViewUpdate while the
+            // tooltip view is reused. Re-renders the consumer fragment with the
+            // fresh caret position; the fragment is NOT remounted (REQ — verified
+            // empirically via the demo's mount/update counters).
+            update: (u: any) => {
+              handle?.update({
+                view: u.view,
+                pos: u.state.selection.main.head
+              });
+            },
+            destroy: () => {
+              handle?.dispose();
+              handle = null;
+            }
+          };
+        }
+      };
+      // NOTE: the StateField.update callback's first param is named `cur` (NOT the
+      // idiomatic `value`): a `value` model prop makes the React emitter rewrite a
+      // local `value` binding into the prop-state ref (`_valueRef.current`) — it
+      // walks into this callback and corrupts the field's accumulator
+      // (TS2339 "Property 'pos' does not exist on type 'string'"). Same collision
+      // class as the setValue→replaceValue $expose rename (ROZ524). `cur` is
+      // collision-free across all 6 targets.
+      return StateField.define({
+        create: (state: any) => ({
+          ...stableTooltip,
+          pos: state.selection.main.head
+        }),
+        update: (cur: any, tr: any) => {
+          // Keep the SAME stable `create`; only the head moves. Reuse the existing
+          // object when the head is unchanged so the facet input is identity-stable.
+          const head = tr.state.selection.main.head;
+          if (cur && cur.pos === head) return cur;
+          return {
+            ...stableTooltip,
+            pos: head
+          };
+        },
+        provide: (f: any) => showTooltip.from(f)
+      });
+    };
+
+    // gutter — a custom-gutter REACTIVE MULTI-INSTANCE portal slot (G5 wave 2).
+    // Each line in `gutterLines` gets a `RozieGutterMarker` whose `toDOM` mounts
+    // the consumer fragment via $portals.gutter(dom, scope) — ONE live portal
+    // handle PER VISIBLE marker (CM calls toDOM when the line scrolls into view and
+    // destroy() when it scrolls out; the reactive handle disposes cleanly). This is
+    // the TipTap nodeView multi-instance template: the GutterMarker class captures
+    // $portals.gutter and is therefore defined inside this $onMount-invoked factory.
+    //
+    // The GutterMarker subclass is declared inline (GutterMarker REQUIRES
+    // subclassing), but its per-marker state (`line`, the live portal handle) lives
+    // in CLOSURE — `makeGutterMarker(line)` captures them — NOT in `this` fields.
+    // This is deliberate for the strict-tsc bundled leaves (react/solid/lit): ES
+    // class fields assigned only in the constructor (`this.line = …`) without a
+    // declaration trip TS2339 under those leaves' strict tsc, and the emitter passes
+    // the class through verbatim (a class-field type aid is an emitter concern, OUT
+    // OF SCOPE). Closure capture has zero `this`-field surface, so it typechecks
+    // cleanly across all six. The overriding CM methods (toDOM/destroy) cannot carry
+    // the TS-only `override` keyword — the `<script>` is plain JS (no `lang="ts"`),
+    // so `override` is unparseable — so the three bundled leaves relax
+    // `noImplicitOverride` in their tsconfig (the Lit leaf already did; react/solid
+    // now match). The `view` param is named `mView` — the Lit field-rewrite walks
+    // into a method body and rewrites a bare `view` token (matching the top-level
+    // `let view`) to `this.view`; `mView` is collision-free. (The panelExt lesson.)
+    // gutter — a custom-gutter REACTIVE MULTI-INSTANCE portal slot (G5 wave 2).
+    // Each line in `gutterLines` gets a `RozieGutterMarker` whose `toDOM` mounts
+    // the consumer fragment via $portals.gutter(dom, scope) — ONE live portal
+    // handle PER VISIBLE marker (CM calls toDOM when the line scrolls into view and
+    // destroy() when it scrolls out; the reactive handle disposes cleanly). This is
+    // the TipTap nodeView multi-instance template: the GutterMarker class captures
+    // $portals.gutter and is therefore defined inside this $onMount-invoked factory.
+    //
+    // The GutterMarker subclass is declared inline (GutterMarker REQUIRES
+    // subclassing), but its per-marker state (`line`, the live portal handle) lives
+    // in CLOSURE — `makeGutterMarker(line)` captures them — NOT in `this` fields.
+    // This is deliberate for the strict-tsc bundled leaves (react/solid/lit): ES
+    // class fields assigned only in the constructor (`this.line = …`) without a
+    // declaration trip TS2339 under those leaves' strict tsc, and the emitter passes
+    // the class through verbatim (a class-field type aid is an emitter concern, OUT
+    // OF SCOPE). Closure capture has zero `this`-field surface, so it typechecks
+    // cleanly across all six. The overriding CM methods (toDOM/destroy) cannot carry
+    // the TS-only `override` keyword — the `<script>` is plain JS (no `lang="ts"`),
+    // so `override` is unparseable — so the three bundled leaves relax
+    // `noImplicitOverride` in their tsconfig (the Lit leaf already did; react/solid
+    // now match). The `view` param is named `mView` — the Lit field-rewrite walks
+    // into a method body and rewrites a bare `view` token (matching the top-level
+    // `let view`) to `this.view`; `mView` is collision-free. (The panelExt lesson.)
+    const makeGutterExt = (gv: any) => {
+      if (!(this.gutter !== undefined)) return [];
+      const makeGutterMarker = (line: any) => {
+        let handle: any = null;
+        return new class extends GutterMarker {
+          toDOM(mView: any) {
+            const dom = document.createElement('div');
+            dom.className = 'rozie-cm-gutter-marker';
+            handle = gv(dom, {
+              line,
+              view: mView
+            });
+            return dom;
+          }
+          destroy() {
+            handle?.dispose();
+            handle = null;
+          }
+        }();
+      };
+      // Recompute the marker RangeSet from `gutterLines` against the live doc —
+      // one marker at the START of each in-range line. RangeSet.of REQUIRES the
+      // ranges sorted by `from`, so sort the resolved positions.
+      const buildMarkers = (mView: any): any => {
+        const doc = mView.state.doc;
+        const ranges = [];
+        for (const n of this.gutterLines as any) {
+          if (typeof n !== 'number' || n < 1 || n > doc.lines) continue;
+          ranges.push(makeGutterMarker(n).range(doc.line(n).from));
+        }
+        ranges.sort((a: any, b: any) => a.from - b.from);
+        return RangeSet.of(ranges);
+      };
+      return gutterExt({
+        class: 'rozie-cm-gutter',
+        markers: (mView: any) => buildMarkers(mView)
+      });
+    };
+
+    // decoration — an inline-widget REACTIVE MULTI-INSTANCE portal slot (G5 wave
+    // 2). Each `{ from, to? }` in `decorations` gets a `RozieWidget` whose `toDOM`
+    // mounts the consumer fragment via $portals.decoration(dom, scope) — ONE live
+    // portal handle PER VISIBLE widget. The decoration set is provided through a
+    // compartment-wrapped facet so the `decorations` prop reconfigures it live.
+    // The WidgetType class captures $portals.decoration, so it is defined inside
+    // this $onMount-invoked factory (the bundled-leaf typecheck discipline).
+    // decoration — an inline-widget REACTIVE MULTI-INSTANCE portal slot (G5 wave
+    // 2). Each `{ from, to? }` in `decorations` gets a `RozieWidget` whose `toDOM`
+    // mounts the consumer fragment via $portals.decoration(dom, scope) — ONE live
+    // portal handle PER VISIBLE widget. The decoration set is provided through a
+    // compartment-wrapped facet so the `decorations` prop reconfigures it live.
+    // The WidgetType class captures $portals.decoration, so it is defined inside
+    // this $onMount-invoked factory (the bundled-leaf typecheck discipline).
+    const makeDecorationExt = (dv: any) => {
+      // Unfilled slot → EMPTY EXTENSION (`[]`), NOT `Decoration.none`. The latter
+      // is a DecorationSet (a RangeSet), which is NOT a valid Extension; placing it
+      // in the extensions array (via `decorationCompartment.of(...)`) makes
+      // EditorState.create throw at runtime — the editor never mounts. Only the
+      // browser surfaces this (CM's facet types are loose, so build/typecheck pass).
+      if (!(this.decoration !== undefined)) return [];
+      // The WidgetType subclass is declared inline (WidgetType REQUIRES subclassing)
+      // but its per-widget state (`from`/`to`, the live portal handle) lives in
+      // CLOSURE — `makeWidget(from, to)` captures them — NOT in `this` fields, for
+      // the same strict-tsc-bundled-leaf reason as the gutter marker (undeclared
+      // `this` fields trip TS2339; the overriding methods can't carry the TS-only
+      // `override` keyword from plain-JS `<script>`, so the bundled leaves relax
+      // `noImplicitOverride`). No `eq` override is needed: the decoration set is
+      // rebuilt from the prop on every reconfigure, so default reference-`eq`
+      // (always "different") correctly remounts each widget instead of reusing stale
+      // DOM. The `view` param is `dView` (the Lit field-rewrite lesson).
+      const makeWidget = (from: any, to: any) => {
+        let handle: any = null;
+        return new class extends WidgetType {
+          toDOM(dView: any) {
+            const dom = document.createElement('span');
+            dom.className = 'rozie-cm-decoration';
+            handle = dv(dom, {
+              from,
+              to,
+              view: dView
+            });
+            return dom;
+          }
+          destroy() {
+            handle?.dispose();
+            handle = null;
+          }
+          // Inline widgets must not be considered editable content.
+          ignoreEvent() {
+            return false;
+          }
+        }();
+      };
+      // Build the DecorationSet from `decorations` against the live doc. Each entry
+      // is a point widget at `from` (side: 1 — after the position); out-of-range
+      // offsets are clamped to the doc length and skipped if `from` is invalid.
+      // Decoration.set REQUIRES the ranges sorted by `from`.
+      const buildSet = (state: any) => {
+        const len = state.doc.length;
+        const ranges = [];
+        for (const d of this.decorations as any) {
+          if (!d || typeof d.from !== 'number') continue;
+          const from = Math.max(0, Math.min(d.from, len));
+          const to = typeof d.to === 'number' ? Math.max(0, Math.min(d.to, len)) : from;
+          ranges.push(Decoration.widget({
+            widget: makeWidget(from, to),
+            side: 1
+          }).range(from));
+        }
+        ranges.sort((a: any, b: any) => a.from - b.from);
+        return Decoration.set(ranges);
+      };
+      // A StateField yields the DecorationSet and provides it to EditorView.
+      // decorations. The set is rebuilt on every prop-driven reconfigure (the
+      // $watch dispatches decorationCompartment.reconfigure(makeDecorationExt(…))),
+      // and tracked across local doc edits via mapping so widget positions follow.
+      return StateField.define({
+        create: (state: any) => buildSet(state),
+        update: (deco: any, tr: any) => tr.docChanged ? deco.map(tr.changes) : deco,
+        provide: (f: any) => EditorView.decorations.from(f)
+      });
+    };
+
+    // Bridge the mount-built factories to the top-level $watch reconfigures. Each
+    // closes over the captured $portals helper so a prop change can rebuild the
+    // extension without re-referencing $portals at top level.
+    // Bridge the mount-built factories to the top-level $watch reconfigures. Each
+    // closes over the captured $portals helper so a prop change can rebuild the
+    // extension without re-referencing $portals at top level.
+    this.rebuildGutterExt = () => makeGutterExt(this.portals.gutter);
+    this.rebuildDecorationExt = () => makeDecorationExt(this.portals.decoration);
+    const buildState = (doc: any) => EditorState.create({
+      doc,
+      extensions: [this.baselineCompartment.of(this.baselineExt()), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly)), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), this.topPanelCompartment.of(topPanelExt()),
+      // gutter / decoration — the REACTIVE MULTI-INSTANCE portal slots (G5 wave
+      // 2). Each lives in a compartment so its driving prop (gutterLines /
+      // decorations) reconfigures live; the factory captures the per-target
+      // $portals helper (gutter / decoration) here in the mount scope.
+      this.gutterCompartment.of(this.rebuildGutterExt()), this.decorationCompartment.of(this.rebuildDecorationExt()),
+      // tooltipField() returns a StateField extension (or [] when the slot is
+      // unfilled); no compartment — it is a one-shot mount-time decision.
+      tooltipField(), EditorView.updateListener.of((update: any) => {
+        if (!update.docChanged) return;
+        if (this.suppressEmit) return;
+        // Push the new doc out through the model:true emit path. Consumers
+        // bound via `r-model:value="$data.x"` receive the change.
+        this._valueControllable.write(update.state.doc.toString());
+      }),
+      // Consumer extensions LAST so they win CM6's last-registered-wins facets.
+      this.extensionsCompartment.of(this.extensions)]
+    });
     this.view = new EditorView({
-      state: this.buildState(this.value),
+      state: buildState(this.value),
       parent: this._refHostEl
     });
   }
@@ -375,9 +749,11 @@ private portals = {
       this.scheduleReconfigure(this.baselineCompartment, this.baselineExt);
     })(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('gutterLines'))) { const __watchVal = (() => this.gutterLines)(); (() => {
+      if (!this.rebuildGutterExt) return;
       this.scheduleReconfigure(this.gutterCompartment, () => this.rebuildGutterExt());
     })(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('decorations'))) { const __watchVal = (() => this.decorations)(); (() => {
+      if (!this.rebuildDecorationExt) return;
       this.scheduleReconfigure(this.decorationCompartment, () => this.rebuildDecorationExt());
     })(); }
     this.__rozieFirstUpdateDone = true;
@@ -442,6 +818,10 @@ private portals = {
 
   decorationCompartment = new Compartment();
 
+  rebuildGutterExt: any = null;
+
+  rebuildDecorationExt: any = null;
+
   langExt = (): any => this.language === 'javascript' ? javascript() : [];
 
   themeExt = (): any => {
@@ -458,259 +838,6 @@ private portals = {
   phExt = (): any => this.placeholder ? placeholderExt(this.placeholder) : [];
 
   baselineExt = () => this.basicSetup ? [basicSetupBundle] : [lineNumbers(), history(), keymap.of([...defaultKeymap, ...historyKeymap])];
-
-  panelExt = () => {
-  if (!(this.panel !== undefined)) return [];
-  return showPanel.of((panelView: any) => {
-    const dom = document.createElement('div');
-    dom.className = 'rozie-cm-panel';
-    const scope = {
-      view: panelView
-    };
-    let dispose: any = null;
-    return {
-      dom,
-      top: false,
-      mount: () => {
-        dispose = this.portals.panel(dom, scope);
-      },
-      destroy: () => {
-        dispose?.();
-        dispose = null;
-      }
-    };
-  });
-};
-
-  topPanelExt = () => {
-  if (!(this.topPanel !== undefined)) return [];
-  return showPanel.of((panelView: any) => {
-    const dom = document.createElement('div');
-    dom.className = 'rozie-cm-panel-top';
-    const scope = {
-      view: panelView
-    };
-    let dispose: any = null;
-    return {
-      dom,
-      top: true,
-      mount: () => {
-        dispose = this.portals.topPanel(dom, scope);
-      },
-      destroy: () => {
-        dispose?.();
-        dispose = null;
-      }
-    };
-  });
-};
-
-  tooltipField = () => {
-  if (!(this.tooltip !== undefined)) return [];
-  // The reactive portal handle for the SINGLE live tooltip view. Hoisted to
-  // the field's closure so create()/update()/destroy() share it across the
-  // tooltip's lifetime.
-  let handle: any = null;
-  // Stable Tooltip object — its `create` reference never changes, so CM
-  // reuses the TooltipView across caret moves (update-in-place, no remount).
-  // NOTE: `create` is an ARROW-FUNCTION property and its param is named
-  // `tipView` (NOT `view`) — both for the SAME Lit reason documented on
-  // panelExt: an object-method `create(view) {}` would get its own `this`,
-  // and the Lit emitter's component-field rewrite walks into the body and
-  // rewrites a `view`-named token (matching the top-level `let view`) to
-  // `this.view`. An arrow property shares the enclosing scope, and the
-  // non-colliding param name keeps the caret-view reference correct on every
-  // target. CM calls `tooltip.create(view)` either way.
-  const stableTooltip = {
-    pos: 0,
-    above: true,
-    create: (tipView: any) => {
-      const dom = document.createElement('div');
-      dom.className = 'rozie-cm-tooltip';
-      return {
-        dom,
-        mount: () => {
-          handle = this.portals.tooltip(dom, {
-            view: tipView,
-            pos: tipView.state.selection.main.head
-          });
-        },
-        // Reactive in-place update — fired by CM on every ViewUpdate while the
-        // tooltip view is reused. Re-renders the consumer fragment with the
-        // fresh caret position; the fragment is NOT remounted (REQ — verified
-        // empirically via the demo's mount/update counters).
-        update: (u: any) => {
-          handle?.update({
-            view: u.view,
-            pos: u.state.selection.main.head
-          });
-        },
-        destroy: () => {
-          handle?.dispose();
-          handle = null;
-        }
-      };
-    }
-  };
-  // NOTE: the StateField.update callback's first param is named `cur` (NOT the
-  // idiomatic `value`): a `value` model prop makes the React emitter rewrite a
-  // local `value` binding into the prop-state ref (`_valueRef.current`) — it
-  // walks into this callback and corrupts the field's accumulator
-  // (TS2339 "Property 'pos' does not exist on type 'string'"). Same collision
-  // class as the setValue→replaceValue $expose rename (ROZ524). `cur` is
-  // collision-free across all 6 targets.
-  return StateField.define({
-    create: (state: any) => ({
-      ...stableTooltip,
-      pos: state.selection.main.head
-    }),
-    update: (cur: any, tr: any) => {
-      // Keep the SAME stable `create`; only the head moves. Reuse the existing
-      // object when the head is unchanged so the facet input is identity-stable.
-      const head = tr.state.selection.main.head;
-      if (cur && cur.pos === head) return cur;
-      return {
-        ...stableTooltip,
-        pos: head
-      };
-    },
-    provide: (f: any) => showTooltip.from(f)
-  });
-};
-
-  makeGutterExt = (gv: any) => {
-  if (!(this.gutter !== undefined)) return [];
-  const makeGutterMarker = (line: any) => {
-    let handle: any = null;
-    return new class extends GutterMarker {
-      toDOM(mView: any) {
-        const dom = document.createElement('div');
-        dom.className = 'rozie-cm-gutter-marker';
-        handle = gv(dom, {
-          line,
-          view: mView
-        });
-        return dom;
-      }
-      destroy() {
-        handle?.dispose();
-        handle = null;
-      }
-    }();
-  };
-  // Recompute the marker RangeSet from `gutterLines` against the live doc —
-  // one marker at the START of each in-range line. RangeSet.of REQUIRES the
-  // ranges sorted by `from`, so sort the resolved positions.
-  const buildMarkers = (mView: any): any => {
-    const doc = mView.state.doc;
-    const ranges = [];
-    for (const n of this.gutterLines as any) {
-      if (typeof n !== 'number' || n < 1 || n > doc.lines) continue;
-      ranges.push(makeGutterMarker(n).range(doc.line(n).from));
-    }
-    ranges.sort((a: any, b: any) => a.from - b.from);
-    return RangeSet.of(ranges);
-  };
-  return gutterExt({
-    class: 'rozie-cm-gutter',
-    markers: (mView: any) => buildMarkers(mView)
-  });
-};
-
-  makeDecorationExt = (dv: any) => {
-  // Unfilled slot → EMPTY EXTENSION (`[]`), NOT `Decoration.none`. The latter
-  // is a DecorationSet (a RangeSet), which is NOT a valid Extension; placing it
-  // in the extensions array (via `decorationCompartment.of(...)`) makes
-  // EditorState.create throw at runtime — the editor never mounts. Only the
-  // browser surfaces this (CM's facet types are loose, so build/typecheck pass).
-  if (!(this.decoration !== undefined)) return [];
-  // The WidgetType subclass is declared inline (WidgetType REQUIRES subclassing)
-  // but its per-widget state (`from`/`to`, the live portal handle) lives in
-  // CLOSURE — `makeWidget(from, to)` captures them — NOT in `this` fields, for
-  // the same strict-tsc-bundled-leaf reason as the gutter marker (undeclared
-  // `this` fields trip TS2339; the overriding methods can't carry the TS-only
-  // `override` keyword from plain-JS `<script>`, so the bundled leaves relax
-  // `noImplicitOverride`). No `eq` override is needed: the decoration set is
-  // rebuilt from the prop on every reconfigure, so default reference-`eq`
-  // (always "different") correctly remounts each widget instead of reusing stale
-  // DOM. The `view` param is `dView` (the Lit field-rewrite lesson).
-  const makeWidget = (from: any, to: any) => {
-    let handle: any = null;
-    return new class extends WidgetType {
-      toDOM(dView: any) {
-        const dom = document.createElement('span');
-        dom.className = 'rozie-cm-decoration';
-        handle = dv(dom, {
-          from,
-          to,
-          view: dView
-        });
-        return dom;
-      }
-      destroy() {
-        handle?.dispose();
-        handle = null;
-      }
-      // Inline widgets must not be considered editable content.
-      ignoreEvent() {
-        return false;
-      }
-    }();
-  };
-  // Build the DecorationSet from `decorations` against the live doc. Each entry
-  // is a point widget at `from` (side: 1 — after the position); out-of-range
-  // offsets are clamped to the doc length and skipped if `from` is invalid.
-  // Decoration.set REQUIRES the ranges sorted by `from`.
-  const buildSet = (state: any) => {
-    const len = state.doc.length;
-    const ranges = [];
-    for (const d of this.decorations as any) {
-      if (!d || typeof d.from !== 'number') continue;
-      const from = Math.max(0, Math.min(d.from, len));
-      const to = typeof d.to === 'number' ? Math.max(0, Math.min(d.to, len)) : from;
-      ranges.push(Decoration.widget({
-        widget: makeWidget(from, to),
-        side: 1
-      }).range(from));
-    }
-    ranges.sort((a: any, b: any) => a.from - b.from);
-    return Decoration.set(ranges);
-  };
-  // A StateField yields the DecorationSet and provides it to EditorView.
-  // decorations. The set is rebuilt on every prop-driven reconfigure (the
-  // $watch dispatches decorationCompartment.reconfigure(makeDecorationExt(…))),
-  // and tracked across local doc edits via mapping so widget positions follow.
-  return StateField.define({
-    create: (state: any) => buildSet(state),
-    update: (deco: any, tr: any) => tr.docChanged ? deco.map(tr.changes) : deco,
-    provide: (f: any) => EditorView.decorations.from(f)
-  });
-};
-
-  rebuildGutterExt = () => this.makeGutterExt(this.portals.gutter);
-
-  rebuildDecorationExt = () => this.makeDecorationExt(this.portals.decoration);
-
-  buildState = (doc: any) => EditorState.create({
-  doc,
-  extensions: [this.baselineCompartment.of(this.baselineExt()), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly)), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(this.panelExt()), this.topPanelCompartment.of(this.topPanelExt()),
-  // gutter / decoration — the REACTIVE MULTI-INSTANCE portal slots (G5 wave
-  // 2). Each lives in a compartment so its driving prop (gutterLines /
-  // decorations) reconfigures live; rebuildGutterExt/rebuildDecorationExt
-  // read $portals.gutter/$portals.decoration directly (top-level, no bridge).
-  this.gutterCompartment.of(this.rebuildGutterExt()), this.decorationCompartment.of(this.rebuildDecorationExt()),
-  // tooltipField() returns a StateField extension (or [] when the slot is
-  // unfilled); no compartment — it is a one-shot mount-time decision.
-  this.tooltipField(), EditorView.updateListener.of((update: any) => {
-    if (!update.docChanged) return;
-    if (this.suppressEmit) return;
-    // Push the new doc out through the model:true emit path. Consumers
-    // bound via `r-model:value="$data.x"` receive the change.
-    this._valueControllable.write(update.state.doc.toString());
-  }),
-  // Consumer extensions LAST so they win CM6's last-registered-wins facets.
-  this.extensionsCompartment.of(this.extensions)]
-});
 
   writeDoc = (v: any) => {
   if (!this.view) return;
