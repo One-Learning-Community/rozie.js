@@ -115,6 +115,8 @@ interface Props {
   popup?: Snippet<[{ popup: any; index: any }]>;
   control?: Snippet<[{ map: any }]>;
   snippets?: Record<string, any>;
+  onmouseenter?: (...args: unknown[]) => void;
+  onmouseleave?: (...args: unknown[]) => void;
   onload?: (...args: unknown[]) => void;
   onidle?: (...args: unknown[]) => void;
   onmove?: (...args: unknown[]) => void;
@@ -133,8 +135,6 @@ interface Props {
   onzoomend?: (...args: unknown[]) => void;
   onrotateend?: (...args: unknown[]) => void;
   onpitchend?: (...args: unknown[]) => void;
-  onmouseenter?: (...args: unknown[]) => void;
-  onmouseleave?: (...args: unknown[]) => void;
   [key: string]: unknown;
 }
 
@@ -178,6 +178,8 @@ let {
   popup: __popupProp,
   control: __controlProp,
   snippets,
+  onmouseenter,
+  onmouseleave,
   onload,
   onidle,
   onmove,
@@ -196,8 +198,6 @@ let {
   onzoomend,
   onrotateend,
   onpitchend,
-  onmouseenter,
-  onmouseleave,
   ...__rozieAttrs
 }: Props = $props();
 
@@ -320,12 +320,6 @@ const featureListeners = new Map();
 // the dropped ones.
 let appliedLayerIds: any = null;
 let appliedSourceIds: any = null;
-// The $portals/$emit-capturing reconcilers are built INSIDE $onMount (a top-level
-// $portals reference fails the bundled-leaf strict typecheck — the CM/TipTap
-// portal discipline) and bridged here so the top-level $watch can call them.
-let reconcileMarkers: any = null;
-let reconcilePopups: any = null;
-let reconcileInteractive: any = null;
 // ─── pure helpers (no sigils → safe at top level) ───────────────────────────
 const sameCenter = (a: any, b: any) => Array.isArray(a) && Array.isArray(b) && a[0] === b[0] && a[1] === b[1];
 // structured pointer-event payload — stable across targets, avoids handing the
@@ -352,8 +346,10 @@ const buildControl = (spec: any) => {
   if (type === 'attribution') return new maplibregl.AttributionControl(opts);
   return null;
 };
-// Standard controls reconcile — no $portals/$emit, so top-level. Remove-all +
-// re-add from the config (controls rarely change; cheap and order-correct).
+// Standard controls reconcile — no reactive-portal handle to manage here, so
+// nothing ever needed mount scope (this was never a $portals/$emit constraint —
+// $emit never forces mount scope on any target). Remove-all + re-add from the
+// config (controls rarely change; cheap and order-correct).
 const applyControls = () => {
   if (!instance) return;
   for (const c of controlInstances as any) instance.removeControl(c);
@@ -495,6 +491,120 @@ const applyLayers = () => {
   }
   appliedLayerIds = wantLayerIds;
   appliedSourceIds = wantSourceIds;
+};
+// ─── REACTIVE MULTI-INSTANCE marker portal slot ───────────────────────────
+// One reactive portal handle per markers[] entry, reconciled keep/update/dispose
+// on prop change. The `!instance` guard is the pre-mount fence — these three
+// reconcilers are called from top-level $watches with no other downstream guard
+// and their bodies touch `instance` unconditionally (`.addTo(instance)`,
+// `instance.off(...)`, `instance.on(...)`).
+const reconcileMarkers = (list: any) => {
+  if (!instance) return;
+  if (!marker) return;
+  const arr = Array.isArray(list) ? list : [];
+  const seen = new Set();
+  arr.forEach((m: any, index: any) => {
+    if (!m || typeof m.lng !== 'number' || typeof m.lat !== 'number') return;
+    const key = m.id != null ? m.id : index;
+    seen.add(key);
+    const scope = {
+      marker: m,
+      index
+    };
+    const entry = markerEntries.get(key);
+    if (entry) {
+      entry.engine.setLngLat([m.lng, m.lat]);
+      entry.handle.update(scope);
+    } else {
+      const node = document.createElement('div');
+      node.className = 'rozie-maplibre-marker';
+      const handle = portals.marker(node, scope);
+      const engine = new maplibregl.Marker({
+        element: node,
+        anchor: m.anchor,
+        offset: m.offset,
+        draggable: m.draggable
+      }).setLngLat([m.lng, m.lat]).addTo(instance);
+      markerEntries.set(key, {
+        engine,
+        handle,
+        el: node
+      });
+    }
+  });
+  for (const [key, entry] of markerEntries as any) {
+    if (!seen.has(key)) {
+      entry.handle.dispose();
+      entry.engine.remove();
+      markerEntries.delete(key);
+    }
+  }
+};
+// ─── REACTIVE MULTI-INSTANCE popup portal slot ────────────────────────────
+const reconcilePopups = (list: any) => {
+  if (!instance) return;
+  if (!popup) return;
+  const arr = Array.isArray(list) ? list : [];
+  const seen = new Set();
+  arr.forEach((p: any, index: any) => {
+    if (!p || typeof p.lng !== 'number' || typeof p.lat !== 'number') return;
+    const key = p.id != null ? p.id : index;
+    seen.add(key);
+    const scope = {
+      popup: p,
+      index
+    };
+    const entry = popupEntries.get(key);
+    if (entry) {
+      entry.engine.setLngLat([p.lng, p.lat]);
+      entry.handle.update(scope);
+    } else {
+      const node = document.createElement('div');
+      node.className = 'rozie-maplibre-popup-body';
+      const handle = portals.popup(node, scope);
+      const engine = new maplibregl.Popup({
+        closeButton: p.closeButton !== undefined ? p.closeButton : true,
+        closeOnClick: p.closeOnClick !== undefined ? p.closeOnClick : false,
+        anchor: p.anchor,
+        offset: p.offset
+      }).setLngLat([p.lng, p.lat]).setDOMContent(node).addTo(instance);
+      popupEntries.set(key, {
+        engine,
+        handle,
+        el: node
+      });
+    }
+  });
+  for (const [key, entry] of popupEntries as any) {
+    if (!seen.has(key)) {
+      entry.handle.dispose();
+      entry.engine.remove();
+      popupEntries.delete(key);
+    }
+  }
+};
+// ─── layer-scoped feature mouseenter/mouseleave (needs a layer id) ────────
+const reconcileInteractive = (ids: any) => {
+  if (!instance) return;
+  const want = (Array.isArray(ids) ? ids : []).filter(Boolean);
+  for (const [id, l] of featureListeners as any) {
+    if (!want.includes(id)) {
+      instance.off('mouseenter', id, l.enter);
+      instance.off('mouseleave', id, l.leave);
+      featureListeners.delete(id);
+    }
+  }
+  for (const id of want as any) {
+    if (featureListeners.has(id)) continue;
+    const enter = (e: any) => onmouseenter?.(payload(e));
+    const leave = (e: any) => onmouseleave?.(payload(e));
+    instance.on('mouseenter', id, enter);
+    instance.on('mouseleave', id, leave);
+    featureListeners.set(id, {
+      enter,
+      leave
+    });
+  }
 };
 // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
 // 15 verbs. Collision-clear across all 3 classes: NOT a React model-setter
@@ -700,118 +810,6 @@ onMount(() => {
     if (p !== pitch) pitch = p;
   });
 
-  // ─── REACTIVE MULTI-INSTANCE marker portal slot ─────────────────────────
-  // One reactive portal handle per markers[] entry, reconciled keep/update/dispose
-  // on prop change. Built here so $portals.marker is in the mount scope; bridged
-  // to the top-level $watch via reconcileMarkers (CM rebuildGutterExt discipline).
-  reconcileMarkers = (list: any) => {
-    if (!marker) return;
-    const arr = Array.isArray(list) ? list : [];
-    const seen = new Set();
-    arr.forEach((m: any, index: any) => {
-      if (!m || typeof m.lng !== 'number' || typeof m.lat !== 'number') return;
-      const key = m.id != null ? m.id : index;
-      seen.add(key);
-      const scope = {
-        marker: m,
-        index
-      };
-      const entry = markerEntries.get(key);
-      if (entry) {
-        entry.engine.setLngLat([m.lng, m.lat]);
-        entry.handle.update(scope);
-      } else {
-        const node = document.createElement('div');
-        node.className = 'rozie-maplibre-marker';
-        const handle = portals.marker(node, scope);
-        const engine = new maplibregl.Marker({
-          element: node,
-          anchor: m.anchor,
-          offset: m.offset,
-          draggable: m.draggable
-        }).setLngLat([m.lng, m.lat]).addTo(instance);
-        markerEntries.set(key, {
-          engine,
-          handle,
-          el: node
-        });
-      }
-    });
-    for (const [key, entry] of markerEntries as any) {
-      if (!seen.has(key)) {
-        entry.handle.dispose();
-        entry.engine.remove();
-        markerEntries.delete(key);
-      }
-    }
-  };
-
-  // ─── REACTIVE MULTI-INSTANCE popup portal slot ──────────────────────────
-  reconcilePopups = (list: any) => {
-    if (!popup) return;
-    const arr = Array.isArray(list) ? list : [];
-    const seen = new Set();
-    arr.forEach((p: any, index: any) => {
-      if (!p || typeof p.lng !== 'number' || typeof p.lat !== 'number') return;
-      const key = p.id != null ? p.id : index;
-      seen.add(key);
-      const scope = {
-        popup: p,
-        index
-      };
-      const entry = popupEntries.get(key);
-      if (entry) {
-        entry.engine.setLngLat([p.lng, p.lat]);
-        entry.handle.update(scope);
-      } else {
-        const node = document.createElement('div');
-        node.className = 'rozie-maplibre-popup-body';
-        const handle = portals.popup(node, scope);
-        const engine = new maplibregl.Popup({
-          closeButton: p.closeButton !== undefined ? p.closeButton : true,
-          closeOnClick: p.closeOnClick !== undefined ? p.closeOnClick : false,
-          anchor: p.anchor,
-          offset: p.offset
-        }).setLngLat([p.lng, p.lat]).setDOMContent(node).addTo(instance);
-        popupEntries.set(key, {
-          engine,
-          handle,
-          el: node
-        });
-      }
-    });
-    for (const [key, entry] of popupEntries as any) {
-      if (!seen.has(key)) {
-        entry.handle.dispose();
-        entry.engine.remove();
-        popupEntries.delete(key);
-      }
-    }
-  };
-
-  // ─── layer-scoped feature mouseenter/mouseleave (needs a layer id) ───────
-  reconcileInteractive = (ids: any) => {
-    const want = (Array.isArray(ids) ? ids : []).filter(Boolean);
-    for (const [id, l] of featureListeners as any) {
-      if (!want.includes(id)) {
-        instance.off('mouseenter', id, l.enter);
-        instance.off('mouseleave', id, l.leave);
-        featureListeners.delete(id);
-      }
-    }
-    for (const id of want as any) {
-      if (featureListeners.has(id)) continue;
-      const enter = (e: any) => onmouseenter?.(payload(e));
-      const leave = (e: any) => onmouseleave?.(payload(e));
-      instance.on('mouseenter', id, enter);
-      instance.on('mouseleave', id, leave);
-      featureListeners.set(id, {
-        enter,
-        leave
-      });
-    }
-  };
-
   // ─── mount-once custom CONTROL portal slot ──────────────────────────────
   if (control) {
     const host = document.createElement('div');
@@ -914,13 +912,9 @@ $effect(() => { const __watchVal = (() => maxBounds)(); untrack(() => { if (__ro
   if (instance) instance.setMaxBounds($state.snapshot(v) || null);
 })(__watchVal); }); });
 let __rozieWatchInitial_8 = true;
-$effect(() => { const __watchVal = (() => markers)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } ((v: any) => {
-  if (reconcileMarkers) reconcileMarkers(v);
-})(__watchVal); }); });
+$effect(() => { const __watchVal = (() => markers)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } ((v: any) => reconcileMarkers(v))(__watchVal); }); });
 let __rozieWatchInitial_9 = true;
-$effect(() => { const __watchVal = (() => popups)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } ((v: any) => {
-  if (reconcilePopups) reconcilePopups(v);
-})(__watchVal); }); });
+$effect(() => { const __watchVal = (() => popups)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } ((v: any) => reconcilePopups(v))(__watchVal); }); });
 let __rozieWatchInitial_10 = true;
 $effect(() => { (() => sources)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } (() => applyLayers())(); }); });
 let __rozieWatchInitial_11 = true;
@@ -930,9 +924,7 @@ $effect(() => { (() => sourceReg)(); untrack(() => { if (__rozieWatchInitial_12)
 let __rozieWatchInitial_13 = true;
 $effect(() => { (() => layerReg)(); untrack(() => { if (__rozieWatchInitial_13) { __rozieWatchInitial_13 = false; return; } (() => applyLayers())(); }); });
 let __rozieWatchInitial_14 = true;
-$effect(() => { const __watchVal = (() => interactiveLayerIds)(); untrack(() => { if (__rozieWatchInitial_14) { __rozieWatchInitial_14 = false; return; } ((v: any) => {
-  if (reconcileInteractive) reconcileInteractive(v);
-})(__watchVal); }); });
+$effect(() => { const __watchVal = (() => interactiveLayerIds)(); untrack(() => { if (__rozieWatchInitial_14) { __rozieWatchInitial_14 = false; return; } ((v: any) => reconcileInteractive(v))(__watchVal); }); });
 let __rozieWatchInitial_15 = true;
 $effect(() => { (() => controls)(); untrack(() => { if (__rozieWatchInitial_15) { __rozieWatchInitial_15 = false; return; } (() => applyControls())(); }); });
 let __rozieWatchInitial_16 = true;

@@ -137,6 +137,8 @@ interface MapLibreProps {
    * The raw `MapOptions` passthrough — spread into the `Map` constructor **before** the curated keys, so explicit props win. The MapLibre analog of an options bag for anything the curated surface doesn't special-case.
    */
   options?: Record<string, any>;
+  onMouseenter?: (...args: unknown[]) => void;
+  onMouseleave?: (...args: unknown[]) => void;
   onLoad?: (...args: unknown[]) => void;
   onIdle?: (...args: unknown[]) => void;
   onMove?: (...args: unknown[]) => void;
@@ -155,8 +157,6 @@ interface MapLibreProps {
   onZoomend?: (...args: unknown[]) => void;
   onRotateend?: (...args: unknown[]) => void;
   onPitchend?: (...args: unknown[]) => void;
-  onMouseenter?: (...args: unknown[]) => void;
-  onMouseleave?: (...args: unknown[]) => void;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   markerSlot?: (ctx: () => MarkerSlotCtx) => JSX.Element;
@@ -186,7 +186,7 @@ export interface MapLibreHandle {
 
 export default function MapLibre(_props: MapLibreProps): JSX.Element {
   const _merged = mergeProps({ mapStyle: undefined, minZoom: 0, maxZoom: 22, maxBounds: undefined, bounds: undefined, fitBoundsOptions: (() => ({}))() as Record<string, any>, dragPan: true, dragRotate: true, scrollZoom: true, doubleClickZoom: true, boxZoom: true, keyboard: true, touchZoomRotate: true, touchPitch: true, markers: (() => [])() as any[], popups: (() => [])() as any[], sources: (() => [])() as any[], layers: (() => [])() as any[], interactiveLayerIds: (() => [])() as any[], controls: (() => [])() as any[], options: (() => ({}))() as Record<string, any> }, _props);
-  const [local, attrs] = splitProps(_merged, ['center', 'zoom', 'bearing', 'pitch', 'mapStyle', 'minZoom', 'maxZoom', 'maxBounds', 'bounds', 'fitBoundsOptions', 'dragPan', 'dragRotate', 'scrollZoom', 'doubleClickZoom', 'boxZoom', 'keyboard', 'touchZoomRotate', 'touchPitch', 'markers', 'popups', 'sources', 'layers', 'interactiveLayerIds', 'controls', 'options', 'children', 'ref', 'onLoad', 'onIdle', 'onMove', 'onRotate', 'onDragstart', 'onDrag', 'onDragend', 'onClick', 'onDblclick', 'onContextmenu', 'onMousemove', 'onError', 'onStyledata', 'onSourcedata', 'onMoveend', 'onZoomend', 'onRotateend', 'onPitchend', 'onMouseenter', 'onMouseleave']);
+  const [local, attrs] = splitProps(_merged, ['center', 'zoom', 'bearing', 'pitch', 'mapStyle', 'minZoom', 'maxZoom', 'maxBounds', 'bounds', 'fitBoundsOptions', 'dragPan', 'dragRotate', 'scrollZoom', 'doubleClickZoom', 'boxZoom', 'keyboard', 'touchZoomRotate', 'touchPitch', 'markers', 'popups', 'sources', 'layers', 'interactiveLayerIds', 'controls', 'options', 'children', 'ref', 'onMouseenter', 'onMouseleave', 'onLoad', 'onIdle', 'onMove', 'onRotate', 'onDragstart', 'onDrag', 'onDragend', 'onClick', 'onDblclick', 'onContextmenu', 'onMousemove', 'onError', 'onStyledata', 'onSourcedata', 'onMoveend', 'onZoomend', 'onRotateend', 'onPitchend']);
   const resolved = () => local.children;
   onMount(() => { local.ref?.({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize, queryRenderedFeatures, project, unproject, getBounds, zoomIn, zoomOut, panBy }); });
 
@@ -351,118 +351,6 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
       if (p !== pitch()) setPitch(p);
     });
 
-    // ─── REACTIVE MULTI-INSTANCE marker portal slot ─────────────────────────
-    // One reactive portal handle per markers[] entry, reconciled keep/update/dispose
-    // on prop change. Built here so $portals.marker is in the mount scope; bridged
-    // to the top-level $watch via reconcileMarkers (CM rebuildGutterExt discipline).
-    reconcileMarkers = (list: any) => {
-      if (!(_props.markerSlot ?? _props.slots?.["marker"])) return;
-      const arr = Array.isArray(list) ? list : [];
-      const seen = new Set();
-      arr.forEach((m: any, index: any) => {
-        if (!m || typeof m.lng !== 'number' || typeof m.lat !== 'number') return;
-        const key = m.id != null ? m.id : index;
-        seen.add(key);
-        const scope = {
-          marker: m,
-          index
-        };
-        const entry = markerEntries.get(key);
-        if (entry) {
-          entry.engine.setLngLat([m.lng, m.lat]);
-          entry.handle.update(scope);
-        } else {
-          const node = document.createElement('div');
-          node.className = 'rozie-maplibre-marker';
-          const handle = portals.marker(node, scope);
-          const engine = new maplibregl.Marker({
-            element: node,
-            anchor: m.anchor,
-            offset: m.offset,
-            draggable: m.draggable
-          }).setLngLat([m.lng, m.lat]).addTo(instance);
-          markerEntries.set(key, {
-            engine,
-            handle,
-            el: node
-          });
-        }
-      });
-      for (const [key, entry] of markerEntries as any) {
-        if (!seen.has(key)) {
-          entry.handle.dispose();
-          entry.engine.remove();
-          markerEntries.delete(key);
-        }
-      }
-    };
-
-    // ─── REACTIVE MULTI-INSTANCE popup portal slot ──────────────────────────
-    reconcilePopups = (list: any) => {
-      if (!(_props.popupSlot ?? _props.slots?.["popup"])) return;
-      const arr = Array.isArray(list) ? list : [];
-      const seen = new Set();
-      arr.forEach((p: any, index: any) => {
-        if (!p || typeof p.lng !== 'number' || typeof p.lat !== 'number') return;
-        const key = p.id != null ? p.id : index;
-        seen.add(key);
-        const scope = {
-          popup: p,
-          index
-        };
-        const entry = popupEntries.get(key);
-        if (entry) {
-          entry.engine.setLngLat([p.lng, p.lat]);
-          entry.handle.update(scope);
-        } else {
-          const node = document.createElement('div');
-          node.className = 'rozie-maplibre-popup-body';
-          const handle = portals.popup(node, scope);
-          const engine = new maplibregl.Popup({
-            closeButton: p.closeButton !== undefined ? p.closeButton : true,
-            closeOnClick: p.closeOnClick !== undefined ? p.closeOnClick : false,
-            anchor: p.anchor,
-            offset: p.offset
-          }).setLngLat([p.lng, p.lat]).setDOMContent(node).addTo(instance);
-          popupEntries.set(key, {
-            engine,
-            handle,
-            el: node
-          });
-        }
-      });
-      for (const [key, entry] of popupEntries as any) {
-        if (!seen.has(key)) {
-          entry.handle.dispose();
-          entry.engine.remove();
-          popupEntries.delete(key);
-        }
-      }
-    };
-
-    // ─── layer-scoped feature mouseenter/mouseleave (needs a layer id) ───────
-    reconcileInteractive = (ids: any) => {
-      const want = (Array.isArray(ids) ? ids : []).filter(Boolean);
-      for (const [id, l] of featureListeners as any) {
-        if (!want.includes(id)) {
-          instance.off('mouseenter', id, l.enter);
-          instance.off('mouseleave', id, l.leave);
-          featureListeners.delete(id);
-        }
-      }
-      for (const id of want as any) {
-        if (featureListeners.has(id)) continue;
-        const enter = (e: any) => _props.onMouseenter?.(payload(e));
-        const leave = (e: any) => _props.onMouseleave?.(payload(e));
-        instance.on('mouseenter', id, enter);
-        instance.on('mouseleave', id, leave);
-        featureListeners.set(id, {
-          enter,
-          leave
-        });
-      }
-    };
-
     // ─── mount-once custom CONTROL portal slot ──────────────────────────────
     if ((_props.controlSlot ?? _props.slots?.["control"])) {
       const host = document.createElement('div');
@@ -557,19 +445,13 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
   createEffect(on(() => (() => local.maxBounds)(), (v) => untrack(() => ((v: any) => {
     if (instance) instance.setMaxBounds(v || null);
   })(v)), { defer: true }));
-  createEffect(on(() => (() => local.markers)(), (v) => untrack(() => ((v: any) => {
-    if (reconcileMarkers) reconcileMarkers(v);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.popups)(), (v) => untrack(() => ((v: any) => {
-    if (reconcilePopups) reconcilePopups(v);
-  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.markers)(), (v) => untrack(() => ((v: any) => reconcileMarkers(v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.popups)(), (v) => untrack(() => ((v: any) => reconcilePopups(v))(v)), { defer: true }));
   createEffect(on(() => (() => local.sources)(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
   createEffect(on(() => (() => local.layers)(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
   createEffect(on(() => (() => sourceReg())(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
   createEffect(on(() => (() => layerReg())(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
-  createEffect(on(() => (() => local.interactiveLayerIds)(), (v) => untrack(() => ((v: any) => {
-    if (reconcileInteractive) reconcileInteractive(v);
-  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.interactiveLayerIds)(), (v) => untrack(() => ((v: any) => reconcileInteractive(v))(v)), { defer: true }));
   createEffect(on(() => (() => local.controls)(), (v) => untrack(() => (() => applyControls())()), { defer: true }));
   createEffect(on(() => (() => local.dragPan)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
   createEffect(on(() => (() => local.dragRotate)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
@@ -630,13 +512,6 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
   let appliedLayerIds: any = null;
   let appliedSourceIds: any = null;
 
-  // The $portals/$emit-capturing reconcilers are built INSIDE $onMount (a top-level
-  // $portals reference fails the bundled-leaf strict typecheck — the CM/TipTap
-  // portal discipline) and bridged here so the top-level $watch can call them.
-  let reconcileMarkers: any = null;
-  let reconcilePopups: any = null;
-  let reconcileInteractive: any = null;
-
   // ─── pure helpers (no sigils → safe at top level) ───────────────────────────
   function sameCenter(a: any, b: any) {
     return Array.isArray(a) && Array.isArray(b) && a[0] === b[0] && a[1] === b[1];
@@ -669,8 +544,10 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
     return null;
   }
 
-  // Standard controls reconcile — no $portals/$emit, so top-level. Remove-all +
-  // re-add from the config (controls rarely change; cheap and order-correct).
+  // Standard controls reconcile — no reactive-portal handle to manage here, so
+  // nothing ever needed mount scope (this was never a $portals/$emit constraint —
+  // $emit never forces mount scope on any target). Remove-all + re-add from the
+  // config (controls rarely change; cheap and order-correct).
   function applyControls() {
     if (!instance) return;
     for (const c of controlInstances as any) instance.removeControl(c);
@@ -814,6 +691,123 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
     }
     appliedLayerIds = wantLayerIds;
     appliedSourceIds = wantSourceIds;
+  }
+
+  // ─── REACTIVE MULTI-INSTANCE marker portal slot ───────────────────────────
+  // One reactive portal handle per markers[] entry, reconciled keep/update/dispose
+  // on prop change. The `!instance` guard is the pre-mount fence — these three
+  // reconcilers are called from top-level $watches with no other downstream guard
+  // and their bodies touch `instance` unconditionally (`.addTo(instance)`,
+  // `instance.off(...)`, `instance.on(...)`).
+  function reconcileMarkers(list: any) {
+    if (!instance) return;
+    if (!(_props.markerSlot ?? _props.slots?.["marker"])) return;
+    const arr = Array.isArray(list) ? list : [];
+    const seen = new Set();
+    arr.forEach((m: any, index: any) => {
+      if (!m || typeof m.lng !== 'number' || typeof m.lat !== 'number') return;
+      const key = m.id != null ? m.id : index;
+      seen.add(key);
+      const scope = {
+        marker: m,
+        index
+      };
+      const entry = markerEntries.get(key);
+      if (entry) {
+        entry.engine.setLngLat([m.lng, m.lat]);
+        entry.handle.update(scope);
+      } else {
+        const node = document.createElement('div');
+        node.className = 'rozie-maplibre-marker';
+        const handle = portals.marker(node, scope);
+        const engine = new maplibregl.Marker({
+          element: node,
+          anchor: m.anchor,
+          offset: m.offset,
+          draggable: m.draggable
+        }).setLngLat([m.lng, m.lat]).addTo(instance);
+        markerEntries.set(key, {
+          engine,
+          handle,
+          el: node
+        });
+      }
+    });
+    for (const [key, entry] of markerEntries as any) {
+      if (!seen.has(key)) {
+        entry.handle.dispose();
+        entry.engine.remove();
+        markerEntries.delete(key);
+      }
+    }
+  }
+
+  // ─── REACTIVE MULTI-INSTANCE popup portal slot ────────────────────────────
+  function reconcilePopups(list: any) {
+    if (!instance) return;
+    if (!(_props.popupSlot ?? _props.slots?.["popup"])) return;
+    const arr = Array.isArray(list) ? list : [];
+    const seen = new Set();
+    arr.forEach((p: any, index: any) => {
+      if (!p || typeof p.lng !== 'number' || typeof p.lat !== 'number') return;
+      const key = p.id != null ? p.id : index;
+      seen.add(key);
+      const scope = {
+        popup: p,
+        index
+      };
+      const entry = popupEntries.get(key);
+      if (entry) {
+        entry.engine.setLngLat([p.lng, p.lat]);
+        entry.handle.update(scope);
+      } else {
+        const node = document.createElement('div');
+        node.className = 'rozie-maplibre-popup-body';
+        const handle = portals.popup(node, scope);
+        const engine = new maplibregl.Popup({
+          closeButton: p.closeButton !== undefined ? p.closeButton : true,
+          closeOnClick: p.closeOnClick !== undefined ? p.closeOnClick : false,
+          anchor: p.anchor,
+          offset: p.offset
+        }).setLngLat([p.lng, p.lat]).setDOMContent(node).addTo(instance);
+        popupEntries.set(key, {
+          engine,
+          handle,
+          el: node
+        });
+      }
+    });
+    for (const [key, entry] of popupEntries as any) {
+      if (!seen.has(key)) {
+        entry.handle.dispose();
+        entry.engine.remove();
+        popupEntries.delete(key);
+      }
+    }
+  }
+
+  // ─── layer-scoped feature mouseenter/mouseleave (needs a layer id) ────────
+  function reconcileInteractive(ids: any) {
+    if (!instance) return;
+    const want = (Array.isArray(ids) ? ids : []).filter(Boolean);
+    for (const [id, l] of featureListeners as any) {
+      if (!want.includes(id)) {
+        instance.off('mouseenter', id, l.enter);
+        instance.off('mouseleave', id, l.leave);
+        featureListeners.delete(id);
+      }
+    }
+    for (const id of want as any) {
+      if (featureListeners.has(id)) continue;
+      const enter = (e: any) => _props.onMouseenter?.(payload(e));
+      const leave = (e: any) => _props.onMouseleave?.(payload(e));
+      instance.on('mouseenter', id, enter);
+      instance.on('mouseleave', id, leave);
+      featureListeners.set(id, {
+        enter,
+        leave
+      });
+    }
   }
   // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
   // 15 verbs. Collision-clear across all 3 classes: NOT a React model-setter

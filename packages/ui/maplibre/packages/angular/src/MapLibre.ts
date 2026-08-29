@@ -221,6 +221,8 @@ export class MapLibre {
   sourceReg = signal({});
   layerReg = signal({});
   containerEl = viewChild<ElementRef<HTMLDivElement>>('containerEl');
+  mouseenter = output<unknown>();
+  mouseleave = output<unknown>();
   load = output<unknown>();
   idle = output<unknown>();
   move = output<unknown>();
@@ -239,8 +241,6 @@ export class MapLibre {
   zoomend = output<unknown>();
   rotateend = output<unknown>();
   pitchend = output<unknown>();
-  mouseenter = output<unknown>();
-  mouseleave = output<unknown>();
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('marker', { read: TemplateRef }) markerTpl?: TemplateRef<MarkerCtx>;
   @ContentChild('popup', { read: TemplateRef }) popupTpl?: TemplateRef<PopupCtx>;
@@ -396,19 +396,13 @@ export class MapLibre {
     effect(() => { const __watchVal = (() => this.maxBounds())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } ((v: any) => {
       if (this.instance) this.instance.setMaxBounds(v || null);
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.markers())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } ((v: any) => {
-      if (this.reconcileMarkers) this.reconcileMarkers(v);
-    })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.popups())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } ((v: any) => {
-      if (this.reconcilePopups) this.reconcilePopups(v);
-    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.markers())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } ((v: any) => this.reconcileMarkers(v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.popups())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } ((v: any) => this.reconcilePopups(v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.sources())(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } (() => this.applyLayers())(); }); });
     effect(() => { const __watchVal = (() => this.layers())(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } (() => this.applyLayers())(); }); });
     effect(() => { const __watchVal = (() => this.sourceReg())(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } (() => this.applyLayers())(); }); });
     effect(() => { const __watchVal = (() => this.layerReg())(); untracked(() => { if (this.__rozieWatchInitial_13) { this.__rozieWatchInitial_13 = false; return; } (() => this.applyLayers())(); }); });
-    effect(() => { const __watchVal = (() => this.interactiveLayerIds())(); untracked(() => { if (this.__rozieWatchInitial_14) { this.__rozieWatchInitial_14 = false; return; } ((v: any) => {
-      if (this.reconcileInteractive) this.reconcileInteractive(v);
-    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.interactiveLayerIds())(); untracked(() => { if (this.__rozieWatchInitial_14) { this.__rozieWatchInitial_14 = false; return; } ((v: any) => this.reconcileInteractive(v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.controls())(); untracked(() => { if (this.__rozieWatchInitial_15) { this.__rozieWatchInitial_15 = false; return; } (() => this.applyControls())(); }); });
     effect(() => { const __watchVal = (() => this.dragPan())(); untracked(() => { if (this.__rozieWatchInitial_16) { this.__rozieWatchInitial_16 = false; return; } (() => this.applyInteractionToggles())(); }); });
     effect(() => { const __watchVal = (() => this.dragRotate())(); untracked(() => { if (this.__rozieWatchInitial_17) { this.__rozieWatchInitial_17 = false; return; } (() => this.applyInteractionToggles())(); }); });
@@ -531,124 +525,6 @@ export class MapLibre {
       if (p !== this.pitch()) this.pitch.set(p);
     });
 
-    // ─── REACTIVE MULTI-INSTANCE marker portal slot ─────────────────────────
-    // One reactive portal handle per markers[] entry, reconciled keep/update/dispose
-    // on prop change. Built here so $portals.marker is in the mount scope; bridged
-    // to the top-level $watch via reconcileMarkers (CM rebuildGutterExt discipline).
-    // ─── REACTIVE MULTI-INSTANCE marker portal slot ─────────────────────────
-    // One reactive portal handle per markers[] entry, reconciled keep/update/dispose
-    // on prop change. Built here so $portals.marker is in the mount scope; bridged
-    // to the top-level $watch via reconcileMarkers (CM rebuildGutterExt discipline).
-    this.reconcileMarkers = (list: any) => {
-      if (!(this.markerTpl ?? this.__rozieFillMap()['marker'] ?? this.templates()?.['marker'])) return;
-      const arr = Array.isArray(list) ? list : [];
-      const seen = new Set();
-      arr.forEach((m: any, index: any) => {
-        if (!m || typeof m.lng !== 'number' || typeof m.lat !== 'number') return;
-        const key = m.id != null ? m.id : index;
-        seen.add(key);
-        const scope = {
-          marker: m,
-          index
-        };
-        const entry = this.markerEntries.get(key);
-        if (entry) {
-          entry.engine.setLngLat([m.lng, m.lat]);
-          entry.handle.update(scope);
-        } else {
-          const node = document.createElement('div');
-          node.className = 'rozie-maplibre-marker';
-          const handle = this.portals.marker(node, scope);
-          const engine = new maplibregl.Marker({
-            element: node,
-            anchor: m.anchor,
-            offset: m.offset,
-            draggable: m.draggable
-          }).setLngLat([m.lng, m.lat]).addTo(this.instance);
-          this.markerEntries.set(key, {
-            engine,
-            handle,
-            el: node
-          });
-        }
-      });
-      for (const [key, entry] of this.markerEntries as any) {
-        if (!seen.has(key)) {
-          entry.handle.dispose();
-          entry.engine.remove();
-          this.markerEntries.delete(key);
-        }
-      }
-    };
-
-    // ─── REACTIVE MULTI-INSTANCE popup portal slot ──────────────────────────
-    // ─── REACTIVE MULTI-INSTANCE popup portal slot ──────────────────────────
-    this.reconcilePopups = (list: any) => {
-      if (!(this.popupTpl ?? this.__rozieFillMap()['popup'] ?? this.templates()?.['popup'])) return;
-      const arr = Array.isArray(list) ? list : [];
-      const seen = new Set();
-      arr.forEach((p: any, index: any) => {
-        if (!p || typeof p.lng !== 'number' || typeof p.lat !== 'number') return;
-        const key = p.id != null ? p.id : index;
-        seen.add(key);
-        const scope = {
-          popup: p,
-          index
-        };
-        const entry = this.popupEntries.get(key);
-        if (entry) {
-          entry.engine.setLngLat([p.lng, p.lat]);
-          entry.handle.update(scope);
-        } else {
-          const node = document.createElement('div');
-          node.className = 'rozie-maplibre-popup-body';
-          const handle = this.portals.popup(node, scope);
-          const engine = new maplibregl.Popup({
-            closeButton: p.closeButton !== undefined ? p.closeButton : true,
-            closeOnClick: p.closeOnClick !== undefined ? p.closeOnClick : false,
-            anchor: p.anchor,
-            offset: p.offset
-          }).setLngLat([p.lng, p.lat]).setDOMContent(node).addTo(this.instance);
-          this.popupEntries.set(key, {
-            engine,
-            handle,
-            el: node
-          });
-        }
-      });
-      for (const [key, entry] of this.popupEntries as any) {
-        if (!seen.has(key)) {
-          entry.handle.dispose();
-          entry.engine.remove();
-          this.popupEntries.delete(key);
-        }
-      }
-    };
-
-    // ─── layer-scoped feature mouseenter/mouseleave (needs a layer id) ───────
-    // ─── layer-scoped feature mouseenter/mouseleave (needs a layer id) ───────
-    this.reconcileInteractive = (ids: any) => {
-      const want = (Array.isArray(ids) ? ids : []).filter(Boolean);
-      for (const [id, l] of this.featureListeners as any) {
-        if (!want.includes(id)) {
-          this.instance.off('mouseenter', id, l.enter);
-          this.instance.off('mouseleave', id, l.leave);
-          this.featureListeners.delete(id);
-        }
-      }
-      for (const id of want as any) {
-        if (this.featureListeners.has(id)) continue;
-        const enter = (e: any) => this.mouseenter.emit(this.payload(e));
-        const leave = (e: any) => this.mouseleave.emit(this.payload(e));
-        this.instance.on('mouseenter', id, enter);
-        this.instance.on('mouseleave', id, leave);
-        this.featureListeners.set(id, {
-          enter,
-          leave
-        });
-      }
-    };
-
     // ─── mount-once custom CONTROL portal slot ──────────────────────────────
     // ─── mount-once custom CONTROL portal slot ──────────────────────────────
     if ((this.controlTpl ?? this.__rozieFillMap()['control'] ?? this.templates()?.['control'])) {
@@ -715,9 +591,6 @@ export class MapLibre {
   featureListeners = new Map();
   appliedLayerIds: any = null;
   appliedSourceIds: any = null;
-  reconcileMarkers: any = null;
-  reconcilePopups: any = null;
-  reconcileInteractive: any = null;
   sameCenter = (a: any, b: any) => Array.isArray(a) && Array.isArray(b) && a[0] === b[0] && a[1] === b[1];
   payload = (e: any) => ({
     lngLat: e.lngLat ? {
@@ -878,6 +751,112 @@ export class MapLibre {
     }
     this.appliedLayerIds = wantLayerIds;
     this.appliedSourceIds = wantSourceIds;
+  };
+  reconcileMarkers = (list: any) => {
+    if (!this.instance) return;
+    if (!(this.markerTpl ?? this.__rozieFillMap()['marker'] ?? this.templates()?.['marker'])) return;
+    const arr = Array.isArray(list) ? list : [];
+    const seen = new Set();
+    arr.forEach((m: any, index: any) => {
+      if (!m || typeof m.lng !== 'number' || typeof m.lat !== 'number') return;
+      const key = m.id != null ? m.id : index;
+      seen.add(key);
+      const scope = {
+        marker: m,
+        index
+      };
+      const entry = this.markerEntries.get(key);
+      if (entry) {
+        entry.engine.setLngLat([m.lng, m.lat]);
+        entry.handle.update(scope);
+      } else {
+        const node = document.createElement('div');
+        node.className = 'rozie-maplibre-marker';
+        const handle = this.portals.marker(node, scope);
+        const engine = new maplibregl.Marker({
+          element: node,
+          anchor: m.anchor,
+          offset: m.offset,
+          draggable: m.draggable
+        }).setLngLat([m.lng, m.lat]).addTo(this.instance);
+        this.markerEntries.set(key, {
+          engine,
+          handle,
+          el: node
+        });
+      }
+    });
+    for (const [key, entry] of this.markerEntries as any) {
+      if (!seen.has(key)) {
+        entry.handle.dispose();
+        entry.engine.remove();
+        this.markerEntries.delete(key);
+      }
+    }
+  };
+  reconcilePopups = (list: any) => {
+    if (!this.instance) return;
+    if (!(this.popupTpl ?? this.__rozieFillMap()['popup'] ?? this.templates()?.['popup'])) return;
+    const arr = Array.isArray(list) ? list : [];
+    const seen = new Set();
+    arr.forEach((p: any, index: any) => {
+      if (!p || typeof p.lng !== 'number' || typeof p.lat !== 'number') return;
+      const key = p.id != null ? p.id : index;
+      seen.add(key);
+      const scope = {
+        popup: p,
+        index
+      };
+      const entry = this.popupEntries.get(key);
+      if (entry) {
+        entry.engine.setLngLat([p.lng, p.lat]);
+        entry.handle.update(scope);
+      } else {
+        const node = document.createElement('div');
+        node.className = 'rozie-maplibre-popup-body';
+        const handle = this.portals.popup(node, scope);
+        const engine = new maplibregl.Popup({
+          closeButton: p.closeButton !== undefined ? p.closeButton : true,
+          closeOnClick: p.closeOnClick !== undefined ? p.closeOnClick : false,
+          anchor: p.anchor,
+          offset: p.offset
+        }).setLngLat([p.lng, p.lat]).setDOMContent(node).addTo(this.instance);
+        this.popupEntries.set(key, {
+          engine,
+          handle,
+          el: node
+        });
+      }
+    });
+    for (const [key, entry] of this.popupEntries as any) {
+      if (!seen.has(key)) {
+        entry.handle.dispose();
+        entry.engine.remove();
+        this.popupEntries.delete(key);
+      }
+    }
+  };
+  reconcileInteractive = (ids: any) => {
+    if (!this.instance) return;
+    const want = (Array.isArray(ids) ? ids : []).filter(Boolean);
+    for (const [id, l] of this.featureListeners as any) {
+      if (!want.includes(id)) {
+        this.instance.off('mouseenter', id, l.enter);
+        this.instance.off('mouseleave', id, l.leave);
+        this.featureListeners.delete(id);
+      }
+    }
+    for (const id of want as any) {
+      if (this.featureListeners.has(id)) continue;
+      const enter = (e: any) => this.mouseenter.emit(this.payload(e));
+      const leave = (e: any) => this.mouseleave.emit(this.payload(e));
+      this.instance.on('mouseenter', id, enter);
+      this.instance.on('mouseleave', id, leave);
+      this.featureListeners.set(id, {
+        enter,
+        leave
+      });
+    }
   };
   getMap = () => {
     return this.instance;

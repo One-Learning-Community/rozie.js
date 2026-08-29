@@ -77,6 +77,8 @@ export function Demo() {
 
 | Event | Description |
 | --- | --- |
+| `mouseenter` | |
+| `mouseleave` | |
 | `load` | |
 | `idle` | |
 | `move` | |
@@ -95,8 +97,6 @@ export function Demo() {
 | `zoomend` | |
 | `rotateend` | |
 | `pitchend` | |
-| `mouseenter` | |
-| `mouseleave` | |
 
 ## Imperative handle
 

@@ -74,6 +74,8 @@ const zoom = ref(2);
 
 | Event | Description |
 | --- | --- |
+| `mouseenter` | |
+| `mouseleave` | |
 | `load` | |
 | `idle` | |
 | `move` | |
@@ -92,8 +94,6 @@ const zoom = ref(2);
 | `zoomend` | |
 | `rotateend` | |
 | `pitchend` | |
-| `mouseenter` | |
-| `mouseleave` | |
 
 ## Imperative handle
 

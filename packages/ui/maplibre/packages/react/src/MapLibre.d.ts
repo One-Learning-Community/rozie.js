@@ -113,6 +113,8 @@ export interface MapLibreProps {
    * The raw `MapOptions` passthrough — spread into the `Map` constructor **before** the curated keys, so explicit props win. The MapLibre analog of an options bag for anything the curated surface doesn't special-case.
    */
   options?: Record<string, unknown>;
+  onMouseenter?: (...args: unknown[]) => void;
+  onMouseleave?: (...args: unknown[]) => void;
   onLoad?: (...args: unknown[]) => void;
   onIdle?: (...args: unknown[]) => void;
   onMove?: (...args: unknown[]) => void;
@@ -131,8 +133,6 @@ export interface MapLibreProps {
   onZoomend?: (...args: unknown[]) => void;
   onRotateend?: (...args: unknown[]) => void;
   onPitchend?: (...args: unknown[]) => void;
-  onMouseenter?: (...args: unknown[]) => void;
-  onMouseleave?: (...args: unknown[]) => void;
   children?: ReactNode;
   renderMarker?: (params: { marker: unknown; index: unknown }) => ReactNode;
   renderPopup?: (params: { popup: unknown; index: unknown }) => ReactNode;

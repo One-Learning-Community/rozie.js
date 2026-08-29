@@ -68,6 +68,8 @@ el.addEventListener('click', (e) => console.log(e.detail.lngLat));
 
 | Event | Description |
 | --- | --- |
+| `mouseenter` | |
+| `mouseleave` | |
 | `load` | |
 | `idle` | |
 | `move` | |
@@ -86,8 +88,6 @@ el.addEventListener('click', (e) => console.log(e.detail.lngLat));
 | `zoomend` | |
 | `rotateend` | |
 | `pitchend` | |
-| `mouseenter` | |
-| `mouseleave` | |
 
 ## Imperative handle
 

@@ -124,6 +124,8 @@ interface MapLibreProps {
    * The raw `MapOptions` passthrough — spread into the `Map` constructor **before** the curated keys, so explicit props win. The MapLibre analog of an options bag for anything the curated surface doesn't special-case.
    */
   options?: Record<string, any>;
+  onMouseenter?: (...args: any[]) => void;
+  onMouseleave?: (...args: any[]) => void;
   onLoad?: (...args: any[]) => void;
   onIdle?: (...args: any[]) => void;
   onMove?: (...args: any[]) => void;
@@ -142,8 +144,6 @@ interface MapLibreProps {
   onZoomend?: (...args: any[]) => void;
   onRotateend?: (...args: any[]) => void;
   onPitchend?: (...args: any[]) => void;
-  onMouseenter?: (...args: any[]) => void;
-  onMouseleave?: (...args: any[]) => void;
   children?: ReactNode;
   renderMarker?: (ctx: MarkerCtx) => ReactNode;
   renderPopup?: (ctx: PopupCtx) => ReactNode;
@@ -206,8 +206,8 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     options: _props.options ?? __defaultOptions,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { center, zoom, bearing, pitch, mapStyle, minZoom, maxZoom, maxBounds, bounds, fitBoundsOptions, dragPan, dragRotate, scrollZoom, doubleClickZoom, boxZoom, keyboard, touchZoomRotate, touchPitch, markers, popups, sources, layers, interactiveLayerIds, controls, options, defaultValue, onCenterChange, defaultCenter, onZoomChange, defaultZoom, onBearingChange, defaultBearing, onPitchChange, defaultPitch, onLoad, onIdle, onMove, onRotate, onDragstart, onDrag, onDragend, onClick, onDblclick, onContextmenu, onMousemove, onError, onStyledata, onSourcedata, onMoveend, onZoomend, onRotateend, onPitchend, onMouseenter, onMouseleave, ...rest } = _props as MapLibreProps & Record<string, unknown>;
-    void center; void zoom; void bearing; void pitch; void mapStyle; void minZoom; void maxZoom; void maxBounds; void bounds; void fitBoundsOptions; void dragPan; void dragRotate; void scrollZoom; void doubleClickZoom; void boxZoom; void keyboard; void touchZoomRotate; void touchPitch; void markers; void popups; void sources; void layers; void interactiveLayerIds; void controls; void options; void defaultValue; void onCenterChange; void defaultCenter; void onZoomChange; void defaultZoom; void onBearingChange; void defaultBearing; void onPitchChange; void defaultPitch; void onLoad; void onIdle; void onMove; void onRotate; void onDragstart; void onDrag; void onDragend; void onClick; void onDblclick; void onContextmenu; void onMousemove; void onError; void onStyledata; void onSourcedata; void onMoveend; void onZoomend; void onRotateend; void onPitchend; void onMouseenter; void onMouseleave;
+    const { center, zoom, bearing, pitch, mapStyle, minZoom, maxZoom, maxBounds, bounds, fitBoundsOptions, dragPan, dragRotate, scrollZoom, doubleClickZoom, boxZoom, keyboard, touchZoomRotate, touchPitch, markers, popups, sources, layers, interactiveLayerIds, controls, options, defaultValue, onCenterChange, defaultCenter, onZoomChange, defaultZoom, onBearingChange, defaultBearing, onPitchChange, defaultPitch, onMouseenter, onMouseleave, onLoad, onIdle, onMove, onRotate, onDragstart, onDrag, onDragend, onClick, onDblclick, onContextmenu, onMousemove, onError, onStyledata, onSourcedata, onMoveend, onZoomend, onRotateend, onPitchend, ...rest } = _props as MapLibreProps & Record<string, unknown>;
+    void center; void zoom; void bearing; void pitch; void mapStyle; void minZoom; void maxZoom; void maxBounds; void bounds; void fitBoundsOptions; void dragPan; void dragRotate; void scrollZoom; void doubleClickZoom; void boxZoom; void keyboard; void touchZoomRotate; void touchPitch; void markers; void popups; void sources; void layers; void interactiveLayerIds; void controls; void options; void defaultValue; void onCenterChange; void defaultCenter; void onZoomChange; void defaultZoom; void onBearingChange; void defaultBearing; void onPitchChange; void defaultPitch; void onMouseenter; void onMouseleave; void onLoad; void onIdle; void onMove; void onRotate; void onDragstart; void onDrag; void onDragend; void onClick; void onDblclick; void onContextmenu; void onMousemove; void onError; void onStyledata; void onSourcedata; void onMoveend; void onZoomend; void onRotateend; void onPitchend;
     return rest;
   })();
   const _renderMarkerRef = useRef(props.renderMarker);
@@ -283,9 +283,6 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   const appliedLayerIds = useRef<any>(null);
   const appliedSourceIds = useRef<any>(null);
   const instance = useRef<any>(null);
-  const reconcileMarkers = useRef<any>(null);
-  const reconcilePopups = useRef<any>(null);
-  const reconcileInteractive = useRef<any>(null);
   const customControl = useRef<any>(null);
   const controlDispose = useRef<any>(null);
   const [center, setCenter] = useControllableState({
@@ -352,10 +349,6 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   _onIdleRef.current = props.onIdle;
   const _onLoadRef = useRef(props.onLoad);
   _onLoadRef.current = props.onLoad;
-  const _onMouseenterRef = useRef(props.onMouseenter);
-  _onMouseenterRef.current = props.onMouseenter;
-  const _onMouseleaveRef = useRef(props.onMouseleave);
-  _onMouseleaveRef.current = props.onMouseleave;
   const _onMousemoveRef = useRef(props.onMousemove);
   _onMousemoveRef.current = props.onMousemove;
   const _onMoveRef = useRef(props.onMove);
@@ -595,6 +588,113 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     appliedLayerIds.current = wantLayerIds;
     appliedSourceIds.current = wantSourceIds;
   }, [layerReg, props.layers, props.sources, sourceReg]);
+  const reconcileMarkers = useCallback((list: any) => {
+    if (!instance.current) return;
+    if (!(props.renderMarker ?? props.slots?.["marker"])) return;
+    const arr = Array.isArray(list) ? list : [];
+    const seen = new Set();
+    arr.forEach((m: any, index: any) => {
+      if (!m || typeof m.lng !== 'number' || typeof m.lat !== 'number') return;
+      const key = m.id != null ? m.id : index;
+      seen.add(key);
+      const scope = {
+        marker: m,
+        index
+      };
+      const entry = markerEntries.get(key);
+      if (entry) {
+        entry.engine.setLngLat([m.lng, m.lat]);
+        entry.handle.update(scope);
+      } else {
+        const node = document.createElement('div');
+        node.className = 'rozie-maplibre-marker';
+        const handle = portals.marker(node, scope);
+        const engine = new maplibregl.Marker({
+          element: node,
+          anchor: m.anchor,
+          offset: m.offset,
+          draggable: m.draggable
+        }).setLngLat([m.lng, m.lat]).addTo(instance.current);
+        markerEntries.set(key, {
+          engine,
+          handle,
+          el: node
+        });
+      }
+    });
+    for (const [key, entry] of markerEntries as any) {
+      if (!seen.has(key)) {
+        entry.handle.dispose();
+        entry.engine.remove();
+        markerEntries.delete(key);
+      }
+    }
+  }, [props.renderMarker]);
+  const reconcilePopups = useCallback((list: any) => {
+    if (!instance.current) return;
+    if (!(props.renderPopup ?? props.slots?.["popup"])) return;
+    const arr = Array.isArray(list) ? list : [];
+    const seen = new Set();
+    arr.forEach((p: any, index: any) => {
+      if (!p || typeof p.lng !== 'number' || typeof p.lat !== 'number') return;
+      const key = p.id != null ? p.id : index;
+      seen.add(key);
+      const scope = {
+        popup: p,
+        index
+      };
+      const entry = popupEntries.get(key);
+      if (entry) {
+        entry.engine.setLngLat([p.lng, p.lat]);
+        entry.handle.update(scope);
+      } else {
+        const node = document.createElement('div');
+        node.className = 'rozie-maplibre-popup-body';
+        const handle = portals.popup(node, scope);
+        const engine = new maplibregl.Popup({
+          closeButton: p.closeButton !== undefined ? p.closeButton : true,
+          closeOnClick: p.closeOnClick !== undefined ? p.closeOnClick : false,
+          anchor: p.anchor,
+          offset: p.offset
+        }).setLngLat([p.lng, p.lat]).setDOMContent(node).addTo(instance.current);
+        popupEntries.set(key, {
+          engine,
+          handle,
+          el: node
+        });
+      }
+    });
+    for (const [key, entry] of popupEntries as any) {
+      if (!seen.has(key)) {
+        entry.handle.dispose();
+        entry.engine.remove();
+        popupEntries.delete(key);
+      }
+    }
+  }, [props.renderPopup]);
+  const { onMouseenter: _rozieProp_onMouseenter, onMouseleave: _rozieProp_onMouseleave } = props;
+    const reconcileInteractive = useCallback((ids: any) => {
+    if (!instance.current) return;
+    const want = (Array.isArray(ids) ? ids : []).filter(Boolean);
+    for (const [id, l] of featureListeners as any) {
+      if (!want.includes(id)) {
+        instance.current.off('mouseenter', id, l.enter);
+        instance.current.off('mouseleave', id, l.leave);
+        featureListeners.delete(id);
+      }
+    }
+    for (const id of want as any) {
+      if (featureListeners.has(id)) continue;
+      const enter = (e: any) => _rozieProp_onMouseenter && _rozieProp_onMouseenter(payload(e));
+      const leave = (e: any) => _rozieProp_onMouseleave && _rozieProp_onMouseleave(payload(e));
+      instance.current.on('mouseenter', id, enter);
+      instance.current.on('mouseleave', id, leave);
+      featureListeners.set(id, {
+        enter,
+        leave
+      });
+    }
+  }, [_rozieProp_onMouseenter, _rozieProp_onMouseleave, payload]);
   // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
   // 15 verbs. Collision-clear across all 3 classes: NOT a React model-setter
   // (setCenter/setZoom/setBearing/setPitch are the auto-gen'd ones — none here);
@@ -669,6 +769,12 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   _applyInteractionTogglesRef.current = applyInteractionToggles;
   const _applyLayersRef = useRef(applyLayers);
   _applyLayersRef.current = applyLayers;
+  const _reconcileInteractiveRef = useRef(reconcileInteractive);
+  _reconcileInteractiveRef.current = reconcileInteractive;
+  const _reconcileMarkersRef = useRef(reconcileMarkers);
+  _reconcileMarkersRef.current = reconcileMarkers;
+  const _reconcilePopupsRef = useRef(reconcilePopups);
+  _reconcilePopupsRef.current = reconcilePopups;
   useEffect(() => {
     const _applyLayersStable: typeof _applyLayersRef.current = (...args) => _applyLayersRef.current(...args);
     const el = containerEl.current;
@@ -763,118 +869,6 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
       if (p !== _pitchRef.current) setPitch(p);
     });
 
-    // ─── REACTIVE MULTI-INSTANCE marker portal slot ─────────────────────────
-    // One reactive portal handle per markers[] entry, reconciled keep/update/dispose
-    // on prop change. Built here so $portals.marker is in the mount scope; bridged
-    // to the top-level $watch via reconcileMarkers (CM rebuildGutterExt discipline).
-    reconcileMarkers.current = (list: any) => {
-      if (!(props.renderMarker ?? props.slots?.["marker"])) return;
-      const arr = Array.isArray(list) ? list : [];
-      const seen = new Set();
-      arr.forEach((m: any, index: any) => {
-        if (!m || typeof m.lng !== 'number' || typeof m.lat !== 'number') return;
-        const key = m.id != null ? m.id : index;
-        seen.add(key);
-        const scope = {
-          marker: m,
-          index
-        };
-        const entry = markerEntries.get(key);
-        if (entry) {
-          entry.engine.setLngLat([m.lng, m.lat]);
-          entry.handle.update(scope);
-        } else {
-          const node = document.createElement('div');
-          node.className = 'rozie-maplibre-marker';
-          const handle = portals.marker(node, scope);
-          const engine = new maplibregl.Marker({
-            element: node,
-            anchor: m.anchor,
-            offset: m.offset,
-            draggable: m.draggable
-          }).setLngLat([m.lng, m.lat]).addTo(instance.current);
-          markerEntries.set(key, {
-            engine,
-            handle,
-            el: node
-          });
-        }
-      });
-      for (const [key, entry] of markerEntries as any) {
-        if (!seen.has(key)) {
-          entry.handle.dispose();
-          entry.engine.remove();
-          markerEntries.delete(key);
-        }
-      }
-    };
-
-    // ─── REACTIVE MULTI-INSTANCE popup portal slot ──────────────────────────
-    reconcilePopups.current = (list: any) => {
-      if (!(props.renderPopup ?? props.slots?.["popup"])) return;
-      const arr = Array.isArray(list) ? list : [];
-      const seen = new Set();
-      arr.forEach((p: any, index: any) => {
-        if (!p || typeof p.lng !== 'number' || typeof p.lat !== 'number') return;
-        const key = p.id != null ? p.id : index;
-        seen.add(key);
-        const scope = {
-          popup: p,
-          index
-        };
-        const entry = popupEntries.get(key);
-        if (entry) {
-          entry.engine.setLngLat([p.lng, p.lat]);
-          entry.handle.update(scope);
-        } else {
-          const node = document.createElement('div');
-          node.className = 'rozie-maplibre-popup-body';
-          const handle = portals.popup(node, scope);
-          const engine = new maplibregl.Popup({
-            closeButton: p.closeButton !== undefined ? p.closeButton : true,
-            closeOnClick: p.closeOnClick !== undefined ? p.closeOnClick : false,
-            anchor: p.anchor,
-            offset: p.offset
-          }).setLngLat([p.lng, p.lat]).setDOMContent(node).addTo(instance.current);
-          popupEntries.set(key, {
-            engine,
-            handle,
-            el: node
-          });
-        }
-      });
-      for (const [key, entry] of popupEntries as any) {
-        if (!seen.has(key)) {
-          entry.handle.dispose();
-          entry.engine.remove();
-          popupEntries.delete(key);
-        }
-      }
-    };
-
-    // ─── layer-scoped feature mouseenter/mouseleave (needs a layer id) ───────
-    reconcileInteractive.current = (ids: any) => {
-      const want = (Array.isArray(ids) ? ids : []).filter(Boolean);
-      for (const [id, l] of featureListeners as any) {
-        if (!want.includes(id)) {
-          instance.current.off('mouseenter', id, l.enter);
-          instance.current.off('mouseleave', id, l.leave);
-          featureListeners.delete(id);
-        }
-      }
-      for (const id of want as any) {
-        if (featureListeners.has(id)) continue;
-        const enter = (e: any) => _onMouseenterRef.current && _onMouseenterRef.current(payload(e));
-        const leave = (e: any) => _onMouseleaveRef.current && _onMouseleaveRef.current(payload(e));
-        instance.current.on('mouseenter', id, enter);
-        instance.current.on('mouseleave', id, leave);
-        featureListeners.set(id, {
-          enter,
-          leave
-        });
-      }
-    };
-
     // ─── mount-once custom CONTROL portal slot ──────────────────────────────
     if ((props.renderControl ?? props.slots?.["control"])) {
       const host = document.createElement('div');
@@ -898,9 +892,9 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     _applyInteractionTogglesRef.current();
 
     // markers/popups/interactive are DOM/event overlays — no style-load gate.
-    reconcileMarkers.current(_markersRef.current);
-    reconcilePopups.current(_popupsRef.current);
-    reconcileInteractive.current(_interactiveLayerIdsRef.current);
+    _reconcileMarkersRef.current(_markersRef.current);
+    _reconcilePopupsRef.current(_popupsRef.current);
+    _reconcileInteractiveRef.current(_interactiveLayerIdsRef.current);
 
     // sources/layers need the style loaded.
     if (instance.current.isStyleLoaded()) _applyLayersRef.current();else instance.current.on('load', _applyLayersStable);
@@ -988,13 +982,13 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   useEffect(() => {
     if (_watch8First.current) { _watch8First.current = false; return; }
     const v = props.markers;
-    if (reconcileMarkers.current) reconcileMarkers.current(v);
-  }, [props.markers]);
+    reconcileMarkers(v);
+  }, [props.markers]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch9First.current) { _watch9First.current = false; return; }
     const v = props.popups;
-    if (reconcilePopups.current) reconcilePopups.current(v);
-  }, [props.popups]);
+    reconcilePopups(v);
+  }, [props.popups]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch10First.current) { _watch10First.current = false; return; }
     applyLayers();
@@ -1014,8 +1008,8 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   useEffect(() => {
     if (_watch14First.current) { _watch14First.current = false; return; }
     const v = props.interactiveLayerIds;
-    if (reconcileInteractive.current) reconcileInteractive.current(v);
-  }, [props.interactiveLayerIds]);
+    reconcileInteractive(v);
+  }, [props.interactiveLayerIds]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch15First.current) { _watch15First.current = false; return; }
     applyControls();

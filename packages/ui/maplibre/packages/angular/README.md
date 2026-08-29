@@ -81,6 +81,8 @@ export class DemoComponent {
 
 | Event | Description |
 | --- | --- |
+| `mouseenter` | |
+| `mouseleave` | |
 | `load` | |
 | `idle` | |
 | `move` | |
@@ -99,8 +101,6 @@ export class DemoComponent {
 | `zoomend` | |
 | `rotateend` | |
 | `pitchend` | |
-| `mouseenter` | |
-| `mouseleave` | |
 
 ## Imperative handle
 

@@ -73,6 +73,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 | Event | Description |
 | --- | --- |
+| `mouseenter` | |
+| `mouseleave` | |
 | `load` | |
 | `idle` | |
 | `move` | |
@@ -91,8 +93,6 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 | `zoomend` | |
 | `rotateend` | |
 | `pitchend` | |
-| `mouseenter` | |
-| `mouseleave` | |
 
 ## Imperative handle
 
