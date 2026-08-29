@@ -603,6 +603,33 @@ export const RozieErrorCode = {
   // covered here; see propEmitCallbackCollisionValidator.ts.
   PROP_EMIT_CALLBACK_NAME_COLLISION: 'ROZ148', // error — a <props> key equal to the on<Pascal> callback field React/Solid synthesize for a declared emit; both fields land on one props interface with different types (TS2300). Rename the prop or the emit.
 
+  // Quick 260829-cd4 — ROZ149 is the next free code after ROZ148 in the 100
+  // semantic-binding cluster (ROZ144 is RETIRED/burned — see the note above
+  // ROZ145 — and is never reused). `.planning/notes/class-a-sigil-scoping.md`
+  // proved `$portals.<name>` reads the synthesized `portals` closure, which on
+  // every target degrades an early call to an inert `{ update(){},
+  // dispose(){} }` handle rather than crashing — a SILENT wrong result, not a
+  // throw, so nothing before this diagnostic ever warned about it. The
+  // Quick 260829-cd4 emitter fix hoists the closure to component scope on
+  // react/angular/lit (closing the "dropped entirely" / "wrong scope" failure
+  // shapes), but four positions stay wrong on EVERY target even after that
+  // fix, because the portal anchor genuinely does not exist yet at those
+  // points: <script> Program top level (no enclosing function), a
+  // `$computed(...)` body, the `$watch(getter, cb)` GETTER (argument[0] —
+  // mirrors ROZ123's $watch-getter verdict), and the four render-time
+  // <template> positions (`binding`/`directive` for if/show/text/html, the
+  // `r-for` ITERABLE, and a `{{ }}` interpolation). Modeled directly on
+  // `refsPreMountValidator.ts` (ROZ123), which solves the identical class of
+  // problem for `$refs`. Severity: error, mirroring ROZ123 — a call that can
+  // only ever return a no-op handle is never useful to compile silently.
+  // Scope fence: computed access `$portals['x']` is ROZ106's concern (same
+  // precedent as ROZ123); `@event` handlers, `<listeners>` handlers, the
+  // `$watch` CALLBACK (argument[1]), and `$onMount`/`$onUnmount`/`$onUpdate`
+  // bodies are DO-NOT-FLAG — they all run post-mount, which is the entire
+  // point of the Quick 260829-cd4 emitter fix; re-flagging them here would
+  // re-teach the tax that fix removes.
+  PORTAL_CALL_BEFORE_MOUNT: 'ROZ149', // error — $portals.<name> evaluated during setup/render (script Program top level, a $computed body, a $watch GETTER, or a template binding/directive/r-for-iterable/interpolation) — the portal anchor does not exist yet, so the call can only ever return an inert { update(){}, dispose(){} } handle. Move the call into $onMount, $onUpdate, a $watch CALLBACK, or an ordinary function body invoked post-mount.
+
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // error — SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
   WRITE_TO_REF: 'ROZ201', // error — $refs.foo = … (refs are read-only DOM-element wrappers)

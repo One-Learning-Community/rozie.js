@@ -141,7 +141,13 @@ describe('portal-slot primitive — Spike 003', () => {
         });
         const errors = result.diagnostics.filter((d) => d.severity === 'error');
         expect(errors).toEqual([]);
-        expect(result.code).toContain('const portals = {');
+        // Quick 260829-cd4 — react/vue/svelte/solid still emit `const
+        // portals = {` (component/setup scope, unchanged shape); angular
+        // and lit now emit `private portals = {` (a class field, so the
+        // closure is visible as `this.portals` outside the one lifecycle
+        // method that used to declare it). Assert the object literal
+        // itself, not the declaration keyword.
+        expect(result.code).toMatch(/(?:const|private) portals = \{/);
         expect(result.code).toContain('portals.event(node,');
         // Each target uses a different bulk-dispose container variable name;
         // assert one of the known patterns exists. (Loose match — fixture-
@@ -217,7 +223,13 @@ describe('portal-slot primitive — Spike 003', () => {
         });
         const errors = result.diagnostics.filter((d) => d.severity === 'error');
         expect(errors).toEqual([]);
-        expect(result.code).toContain('const portals = {');
+        // Quick 260829-cd4 — react/vue/svelte/solid still emit `const
+        // portals = {` (component/setup scope, unchanged shape); angular
+        // and lit now emit `private portals = {` (a class field, so the
+        // closure is visible as `this.portals` outside the one lifecycle
+        // method that used to declare it). Assert the object literal
+        // itself, not the declaration keyword.
+        expect(result.code).toMatch(/(?:const|private) portals = \{/);
         // The closure object KEY is the reserved `default`, NOT the empty string.
         expect(result.code).toContain('default: (container');
         // The script-side `$portals.default(...)` rewrote to `portals.default(...)`.

@@ -39,6 +39,7 @@ import { runExposeValidator } from './validators/exposeValidator.js';
 import { runContextValidator } from './validators/contextValidator.js';
 import { runEmitNameValidator } from './validators/emitNameValidator.js';
 import { runRefsPreMountValidator } from './validators/refsPreMountValidator.js';
+import { runPortalsPreMountValidator } from './validators/portalsPreMountValidator.js';
 import { runStructuredCloneReactiveValidator } from './validators/structuredCloneReactiveValidator.js';
 import { runExposeReservedMemberValidator } from './validators/exposeReservedMemberValidator.js';
 import { runReservedNameCollisionValidator } from './validators/reservedNameCollisionValidator.js';
@@ -83,6 +84,12 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   runEmitNameValidator(ast, diagnostics);
   // Quick 260602-dv1 — ROZ123: $refs read in a pre-mount eval position ($computed body / $watch getter / template binding/interpolation/r-if/r-show/r-for-iterable expr). No binding dependency.
   runRefsPreMountValidator(ast, diagnostics);
+  // Quick 260829-cd4 — ROZ149: $portals.<x> read in a setup/render eval
+  // position (script Program top level / $computed body / $watch getter /
+  // template binding|interpolation|r-if|r-show|r-for-iterable). No binding
+  // dependency. Registered immediately adjacent to ROZ123's runner so the
+  // two pre-mount validators read together.
+  runPortalsPreMountValidator(ast, diagnostics);
   // Phase 45 (D-02) — ROZ135 (warning): structuredClone($data.x/$props.x/$model.x)
   // throws on Vue reactive()/Svelte $state proxies — steer authors to $clone(x).
   // No binding dependency.
