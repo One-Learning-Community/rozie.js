@@ -58,6 +58,7 @@ import {
   rewriteRozieIdentifiers,
 } from '../rewrite/rewriteScript.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { computeEscapingNames } from './computeEscapingNames.js';
 import { computeHelperBodyDeps } from './computeHelperDeps.js';
 import { emitContext } from './emitContext.js';
 import { emitPortals } from './emitPortals.js';
@@ -2381,6 +2382,13 @@ export function emitScript(
     }
   }
 
+  // Quick 260829-j18 Task 2 — the ONE computation of the escaping-binding
+  // name set, consumed by BOTH the `useCallbackHelperNames` eligibility
+  // filter directly below and section 6a's wrap-pass loop further down. See
+  // `computeEscapingNames`'s own doc comment for why this used to be two
+  // independent (and driftable) computations.
+  const escapingHelperNames = computeEscapingNames(ir);
+
   // Quick 260803-w7b seam 3 — which top-level helpers are STALENESS-CAPABLE
   // when called from a `[]`-dep mount effect.
   //
@@ -2433,23 +2441,13 @@ export function emitScript(
   // (number-field's `stopHold`, popover's `stopTracking`) IS, despite having a
   // stable identity, because the rule wants every component-scope binding in
   // the array. This mirrors the wrap condition in section 6a
-  // (`escapingHelperNames`) intersected with the arrow / function-EXPRESSION
-  // declaration form that `tryWrapEscapingHelperUseCallback` accepts; it is
-  // recomputed locally rather than hoisted so section 6a is left untouched.
+  // (`escapingHelperNames`, quick 260829-j18 Task 2 — now the SAME shared
+  // computation, not a re-derivation) intersected with the arrow /
+  // function-EXPRESSION declaration form that `tryWrapEscapingHelperUseCallback`
+  // accepts.
   const useCallbackHelperNames = new Set<string>();
   {
-    const escaping = new Set<string>();
-    for (const listener of ir.listeners) {
-      for (const dep of listener.deps) {
-        if (dep.scope === 'closure') escaping.add(dep.identifier);
-      }
-    }
-    for (const lh of ir.lifecycle) {
-      for (const dep of lh.setupDeps) {
-        if (dep.scope === 'closure') escaping.add(dep.identifier);
-      }
-    }
-    for (const name of escaping) {
+    for (const name of escapingHelperNames) {
       if (!allHelperNames.has(name)) continue;
       if (helperIsFunctionDecl.has(name)) continue;
       useCallbackHelperNames.add(name);
@@ -4377,18 +4375,11 @@ export function emitScript(
   // Helpers whose names DON'T appear in any escaping-deps set are emitted as
   // plain function-decls (hoisted, no useCallback overhead).
 
-  // 6a. Collect the escaping-helper-name set from listener+lifecycle deps.
-  const escapingHelperNames = new Set<string>();
-  for (const listener of ir.listeners) {
-    for (const dep of listener.deps) {
-      if (dep.scope === 'closure') escapingHelperNames.add(dep.identifier);
-    }
-  }
-  for (const lh of ir.lifecycle) {
-    for (const dep of lh.setupDeps) {
-      if (dep.scope === 'closure') escapingHelperNames.add(dep.identifier);
-    }
-  }
+  // 6a. `escapingHelperNames` (quick 260829-j18 Task 2 — `computeEscapingNames`)
+  // is already bound above, immediately after the `allHelperNames` pre-scan,
+  // so the `useCallbackHelperNames` eligibility filter and this section's
+  // wrap-pass loop read the identical set — the wrap decision and the seam-3
+  // staleness classification can never silently diverge.
 
   // 6a'. Phase 35 follow-up (feedback_react_const_mutinstance_not_stabilized) —
   // collect top-level fresh-instance const/let binders that are member-mutated
