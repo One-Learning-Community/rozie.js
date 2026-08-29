@@ -1,27 +1,22 @@
 ---
-"@rozie-ui/tiptap": patch
 "@rozie-ui/tiptap-react": patch
 "@rozie-ui/tiptap-vue": patch
 "@rozie-ui/tiptap-svelte": patch
 "@rozie-ui/tiptap-angular": patch
 "@rozie-ui/tiptap-solid": patch
 "@rozie-ui/tiptap-lit": patch
-"@rozie-ui/rete": patch
 "@rozie-ui/rete-react": patch
 "@rozie-ui/rete-vue": patch
 "@rozie-ui/rete-svelte": patch
 "@rozie-ui/rete-angular": patch
 "@rozie-ui/rete-solid": patch
 "@rozie-ui/rete-lit": patch
-"@rozie-ui/maplibre": patch
-"@rozie-ui/codemirror": patch
 "@rozie-ui/codemirror-react": patch
 "@rozie-ui/codemirror-vue": patch
 "@rozie-ui/codemirror-svelte": patch
 "@rozie-ui/codemirror-angular": patch
 "@rozie-ui/codemirror-solid": patch
 "@rozie-ui/codemirror-lit": patch
-"@rozie-ui/chartjs": patch
 "@rozie-ui/chartjs-react": patch
 "@rozie-ui/chartjs-vue": patch
 "@rozie-ui/chartjs-svelte": patch
@@ -58,3 +53,5 @@ Several stale comments across these files claimed `$emit` and/or `$slots` also f
 scope. Neither ever did, on any target — those comments are corrected too.
 
 No emitter code changed in this patch. `@rozie/core` is not bumped.
+
+**Why no `@rozie-ui/<family>` umbrella entries.** Those six packages are `private: true`, so changesets treats them as ignored; a changeset that mixes ignored and non-ignored packages is rejected outright (`Mixed changesets that contain both ignored and not ignored packages are not allowed`), failing `changeset status` and any release run. Only the published, consumer-installed per-framework leaves are listed.

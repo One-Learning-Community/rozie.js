@@ -1,11 +1,30 @@
 ---
 "@rozie/core": patch
-"@rozie-ui/chartjs": patch
-"@rozie-ui/codemirror": patch
-"@rozie-ui/fullcalendar": patch
-"@rozie-ui/maplibre": patch
-"@rozie-ui/rete": patch
-"@rozie-ui/tiptap": patch
+"@rozie-ui/chartjs-react": patch
+"@rozie-ui/chartjs-vue": patch
+"@rozie-ui/chartjs-svelte": patch
+"@rozie-ui/chartjs-angular": patch
+"@rozie-ui/chartjs-lit": patch
+"@rozie-ui/codemirror-react": patch
+"@rozie-ui/codemirror-vue": patch
+"@rozie-ui/codemirror-svelte": patch
+"@rozie-ui/codemirror-angular": patch
+"@rozie-ui/codemirror-lit": patch
+"@rozie-ui/fullcalendar-react": patch
+"@rozie-ui/fullcalendar-vue": patch
+"@rozie-ui/fullcalendar-svelte": patch
+"@rozie-ui/fullcalendar-angular": patch
+"@rozie-ui/fullcalendar-lit": patch
+"@rozie-ui/rete-react": patch
+"@rozie-ui/rete-vue": patch
+"@rozie-ui/rete-svelte": patch
+"@rozie-ui/rete-angular": patch
+"@rozie-ui/rete-lit": patch
+"@rozie-ui/tiptap-react": patch
+"@rozie-ui/tiptap-vue": patch
+"@rozie-ui/tiptap-svelte": patch
+"@rozie-ui/tiptap-angular": patch
+"@rozie-ui/tiptap-lit": patch
 ---
 
 On React, Angular, and Lit, the synthesized `$portals` closure now lives at COMPONENT scope
@@ -53,3 +72,7 @@ The workaround bridges those five packages carry to route `$portals` calls into 
 (null-let bridges, a "must not be called before mount" invariant, a relocated code block)
 are now unnecessary and can be unwound at leisure as an independent, opt-in follow-up — not
 part of this change.
+
+**Changeset scope note.** The six `@rozie-ui/<family>` umbrella packages are `private: true` and the repo sets `privatePackages.version: false`, so listing them alone versions nothing. The published, consumer-installed artifacts are the per-framework pre-compiled leaves (`@rozie-ui/<family>-<target>`), and they carry no dependency on `@rozie/core` — a core bump does not cascade to them. Since this change rewrites their emitted source, they are bumped explicitly. `@rozie-ui/maplibre-*` is omitted deliberately: those leaves are in the changeset config's `ignore` list. `-solid` leaves are omitted because Solid already emitted the closure at component scope and its output is unchanged.
+
+**Why no `@rozie-ui/<family>` umbrella entries.** Those six packages are `private: true`, so changesets treats them as ignored; a changeset that mixes ignored and non-ignored packages is rejected outright (`Mixed changesets that contain both ignored and not ignored packages are not allowed`), failing `changeset status` and any release run. Only the published, consumer-installed per-framework leaves are listed.

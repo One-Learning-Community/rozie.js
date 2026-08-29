@@ -1,6 +1,5 @@
 ---
 "@rozie/core": patch
-"@rozie-ui/maplibre-react": patch
 "@rozie-ui/tiptap-react": patch
 ---
 
@@ -23,3 +22,5 @@ gets the new `useMemo(..., [])` wrap.
 No other `@rozie-ui/*-react` leaf package changes: across the full shipped component surface, only
 `@rozie-ui/maplibre-react`'s `PROGRAMMATIC` and `@rozie-ui/tiptap-react`'s
 `STARTERKIT_COLLISION_MAP` qualify for the new stabilization.
+
+**Changeset scope note.** `@rozie-ui/maplibre-react` was removed from this changeset: it is in the changeset config's `ignore` list, and changesets rejects a changeset that mixes ignored and non-ignored packages (`Mixed changesets that contain both ignored and not ignored packages are not allowed`), which made `changeset status` — and any release run — fail outright. The maplibre leaves are deliberately unpublished, so nothing consumer-facing is lost by the removal.
