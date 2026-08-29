@@ -56,6 +56,7 @@ export default defineConfig({
       'collision/**/*.test.ts',
       'dynamic-slot-name-rfor.test.ts',
       'example-jsdoc-authoring-notation-guard.test.ts',
+      'roz138-corpus-precision.test.ts',
       '**/*.test.tsx',
     ],
     testTimeout: 30000,

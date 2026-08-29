@@ -165,4 +165,82 @@ function fireSearch(q) { return q }
     const hits = roz138(analyzeSource(src));
     expect(hits.length, JSON.stringify(hits)).toBe(1);
   });
+
+  // ── quick-260829-8w1: control-flow narrowing (A) abrupt-completion and
+  // (B) branch exclusivity, plus two positive controls that must NEVER stop
+  // firing (R5's guard against the rejected "enclosing block contains the
+  // read" shortcut, which would also zero these but silently). See
+  // .planning/notes/roz138-triage.md for the corpus this is modelled on.
+
+  it('SUPPRESS-A: does NOT fire when the only preceding write is in a branch that returns before the read (SortableList shape)', () => {
+    const src = `<rozie name="X">
+<data>{ liftedIndex: null }</data>
+<script>
+function onRowKeyDown(index) {
+  if (index === null) {
+    $data.liftedIndex = index
+    return
+  }
+  const at = $data.liftedIndex
+}
+</script>
+<template><div></div></template>
+</rozie>`;
+    const hits = roz138(analyzeSource(src));
+    expect(hits.length, JSON.stringify(hits)).toBe(0);
+  });
+
+  it('SUPPRESS-B: does NOT fire when the write is in the .consequent and the read is in the .alternate of the same IfStatement', () => {
+    const src = `<rozie name="X">
+<data>{ x: 0 }</data>
+<script>
+function onEvent(cond) {
+  if (cond) {
+    $data.x = 1
+  } else {
+    const y = $data.x
+  }
+}
+</script>
+<template><div></div></template>
+</rozie>`;
+    const hits = roz138(analyzeSource(src));
+    expect(hits.length, JSON.stringify(hits)).toBe(0);
+  });
+
+  it('CONTROL-A: STILL fires on the genuine conditional-write shape — write inside a non-abrupt if, read after it (R5 guard)', () => {
+    const src = `<rozie name="X">
+<data>{ x: 0 }</data>
+<script>
+function onEvent(cond) {
+  if (cond) {
+    $data.x = 1
+  }
+  use($data.x)
+}
+function use(v) { return v }
+</script>
+<template><div></div></template>
+</rozie>`;
+    const hits = roz138(analyzeSource(src));
+    expect(hits.length, JSON.stringify(hits)).toBe(1);
+  });
+
+  it('CONTROL-B: STILL fires on a same-arm write-then-read (R5 guard)', () => {
+    const src = `<rozie name="X">
+<data>{ x: 0 }</data>
+<script>
+function onEvent(cond) {
+  if (cond) {
+    $data.x = 1
+    use($data.x)
+  }
+}
+function use(v) { return v }
+</script>
+<template><div></div></template>
+</rozie>`;
+    const hits = roz138(analyzeSource(src));
+    expect(hits.length, JSON.stringify(hits)).toBe(1);
+  });
 });
