@@ -6,8 +6,9 @@
   "scripts": {
     "build": "node scripts/build-cells.mjs",
     "build:debug": "ROZIE_VR_SOURCEMAP=inline ROZIE_VR_MINIFY=false node scripts/build-cells.mjs",
-    "preview": "vite preview --config vite.preview.config.ts",
-    "test:visual": "playwright test"
+    "preview": "node scripts/serve-dist.mjs",
+    "test:visual": "playwright test",
+    "preview:vite": "vite preview --config vite.preview.config.ts"
   },
   "dependencies": {
     "@angular/common": "^19.0.0",
