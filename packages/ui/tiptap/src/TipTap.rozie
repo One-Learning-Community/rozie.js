@@ -593,12 +593,14 @@ const dedupeExtensionsByName = (exts) => {
 // originally by the editable-callout recipe (Spike 008 / REQ-23), now shipped
 // as a `nodeSpecs` entry in the example demos.
 //
-// $portals.nodeView is referenced ONLY inside $onMount/the addNodeView closures
-// (the $refs-only-in-onMount + bundled-leaf strict-typecheck discipline — the
-// same constraint the toolbar slot follows). `makeNodeViewExtensions` is invoked
-// from inside $onMount so the `nv` closure (capturing $portals.nodeView) is
-// constructed within the mount lifecycle.
-const makeNodeView = (nv, spec) => (props) => {
+// $portals.nodeView is read directly inside the top-level `addNodeView`
+// closure below — the emitter resolves the synthesized portals object at
+// component scope on all six targets (quick 260829-cd4), so no mount-lifecycle
+// capture is needed here. ROZ149 guards the one remaining hazard: a
+// `$portals.*` read evaluated during setup/render rather than at call time.
+// (Unrelated: $refs stays $onMount-only per ROZ123 — not a constraint on this
+// closure, which reads no $refs.)
+const makeNodeView = (spec) => (props) => {
   const { node, getPos, editor: ed } = props
   // hasContentDOM derives from the spec, not a bare boolean: an editable node
   // is one that is NOT an atom and declares `content` (e.g. 'inline*').
@@ -624,12 +626,12 @@ const makeNodeView = (nv, spec) => (props) => {
     updateAttributes,
     getPos,
     editor: ed,
-    ...(contentDOM ? { contentDOM } : {}),
+    contentDOM,
   })
 
   // Reactive handle — { update, dispose }. The fragment mounts ONCE; every
   // engine transaction re-invokes handle.update(scope) re-rendering IN PLACE.
-  const handle = nv(dom, buildScope(node, false))
+  const handle = $portals.nodeView(dom, buildScope(node, false))
 
   // contentDOM graft bridge (Spike 008 / REQ-23). For an EDITABLE node the
   // consumer fragment renders chrome WRAPPING a `[data-rozie-hole]` placeholder;
@@ -708,11 +710,11 @@ const parseTagSelector = (selector) => {
 }
 
 // Build ONE custom Node per consumer-supplied spec, all bound to the SAME
-// reactive nodeView portal (ask B, D-02). Takes the per-target
-// `$portals.nodeView` (captured here so the reference stays inside the mount
-// lifecycle — never top-level, per the bundled-leaf typecheck rule) and the
-// `nodeSpecs` prop array (read once at mount — setup-once, not reactive).
-const makeNodeViewExtensions = (nv, specs) => specs.map((spec) => {
+// reactive nodeView portal (ask B, D-02). Takes the `nodeSpecs` prop array
+// (read once at mount — setup-once, not reactive); `$portals.nodeView` is read
+// directly inside `makeNodeView`'s `addNodeView` closure, not passed through
+// here.
+const makeNodeViewExtensions = (specs) => specs.map((spec) => {
   // hasContentDOM decides the renderHTML hole: an editable (non-atom,
   // content-bearing) node gets a trailing `0` content hole; a leaf/atom node
   // must NOT (ProseMirror's DOMSerializer throws "Content hole not allowed in
@@ -734,7 +736,7 @@ const makeNodeViewExtensions = (nv, specs) => specs.map((spec) => {
       hasContentDOM
         ? [el, { ...(attr ? { [attr]: value } : {}), ...HTMLAttributes }, 0]
         : [el, { ...(attr ? { [attr]: value } : {}), ...HTMLAttributes }],
-    addNodeView: () => makeNodeView(nv, spec),
+    addNodeView: () => makeNodeView(spec),
   })
 })
 
@@ -810,11 +812,10 @@ $onMount(() => {
   // `nodeView` slot AND supplies one or more `nodeSpecs` (D-05 — BOTH halves
   // required). A stock <TipTap> with no nodeSpecs (or an unfilled slot) adds
   // NO custom nodes — zero overhead, no consumer-node-shaped parse rules
-  // registered, no unused $portals.nodeView reference fired. $props.nodeSpecs is
-  // read ONCE here (setup-once — NOT a $watch); $portals.nodeView is captured
-  // here inside the mount body and passed into the node factory, keeping the
-  // reference scoped to the mount lifecycle (the toolbar-slot discipline).
-  const nodeViewExtensions = ($slots.nodeView && $props.nodeSpecs.length) ? makeNodeViewExtensions($portals.nodeView, $props.nodeSpecs) : []
+  // registered. $props.nodeSpecs is read ONCE here (setup-once — NOT a
+  // $watch); `$portals.nodeView` is read directly inside `makeNodeView`'s
+  // top-level closure, not threaded through this call.
+  const nodeViewExtensions = ($slots.nodeView && $props.nodeSpecs.length) ? makeNodeViewExtensions($props.nodeSpecs) : []
 
   // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
   // (setup-once, like content/editable/autofocus — no reactivity required). The

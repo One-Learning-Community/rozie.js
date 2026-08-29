@@ -555,7 +555,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     }
     return [...byKey.values()];
   }, []);
-  function makeNodeView(nv: any, spec: any) {
+  function makeNodeView(spec: any) {
     return (props: any) => {
       const {
         node,
@@ -587,14 +587,12 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         updateAttributes,
         getPos,
         editor: ed,
-        ...(contentDOM ? {
-          contentDOM
-        } : {})
+        contentDOM
       });
 
       // Reactive handle — { update, dispose }. The fragment mounts ONCE; every
       // engine transaction re-invokes handle.update(scope) re-rendering IN PLACE.
-      const handle = nv(dom, buildScope(node, false));
+      const handle = portals.nodeView(dom, buildScope(node, false));
 
       // contentDOM graft bridge (Spike 008 / REQ-23). For an EDITABLE node the
       // consumer fragment renders chrome WRAPPING a `[data-rozie-hole]` placeholder;
@@ -671,7 +669,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       value
     };
   }
-  const makeNodeViewExtensions = useCallback((nv: any, specs: any) => specs.map((spec: any) => {
+  const makeNodeViewExtensions = useCallback((specs: any) => specs.map((spec: any) => {
     // hasContentDOM decides the renderHTML hole: an editable (non-atom,
     // content-bearing) node gets a trailing `0` content hole; a leaf/atom node
     // must NOT (ProseMirror's DOMSerializer throws "Content hole not allowed in
@@ -710,7 +708,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         } : {}),
         ...HTMLAttributes
       }],
-      addNodeView: () => makeNodeView(nv, spec)
+      addNodeView: () => makeNodeView(spec)
     });
   }), [makeNodeView, parseTagSelector]);
   function findImageFile(files: any) {
@@ -1002,11 +1000,10 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // `nodeView` slot AND supplies one or more `nodeSpecs` (D-05 — BOTH halves
     // required). A stock <TipTap> with no nodeSpecs (or an unfilled slot) adds
     // NO custom nodes — zero overhead, no consumer-node-shaped parse rules
-    // registered, no unused $portals.nodeView reference fired. $props.nodeSpecs is
-    // read ONCE here (setup-once — NOT a $watch); $portals.nodeView is captured
-    // here inside the mount body and passed into the node factory, keeping the
-    // reference scoped to the mount lifecycle (the toolbar-slot discipline).
-    const nodeViewExtensions = (props.renderNodeView ?? props.slots?.["nodeView"]) && _nodeSpecsRef.current.length ? _makeNodeViewExtensionsRef.current(portals.nodeView, _nodeSpecsRef.current) : [];
+    // registered. $props.nodeSpecs is read ONCE here (setup-once — NOT a
+    // $watch); `$portals.nodeView` is read directly inside `makeNodeView`'s
+    // top-level closure, not threaded through this call.
+    const nodeViewExtensions = (props.renderNodeView ?? props.slots?.["nodeView"]) && _nodeSpecsRef.current.length ? _makeNodeViewExtensionsRef.current(_nodeSpecsRef.current) : [];
 
     // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
     // (setup-once, like content/editable/autofocus — no reactivity required). The

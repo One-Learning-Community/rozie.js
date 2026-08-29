@@ -377,11 +377,10 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     // `nodeView` slot AND supplies one or more `nodeSpecs` (D-05 — BOTH halves
     // required). A stock <TipTap> with no nodeSpecs (or an unfilled slot) adds
     // NO custom nodes — zero overhead, no consumer-node-shaped parse rules
-    // registered, no unused $portals.nodeView reference fired. $props.nodeSpecs is
-    // read ONCE here (setup-once — NOT a $watch); $portals.nodeView is captured
-    // here inside the mount body and passed into the node factory, keeping the
-    // reference scoped to the mount lifecycle (the toolbar-slot discipline).
-    const nodeViewExtensions = (_props.nodeViewSlot ?? _props.slots?.["nodeView"]) && local.nodeSpecs.length ? makeNodeViewExtensions(portals.nodeView, local.nodeSpecs) : [];
+    // registered. $props.nodeSpecs is read ONCE here (setup-once — NOT a
+    // $watch); `$portals.nodeView` is read directly inside `makeNodeView`'s
+    // top-level closure, not threaded through this call.
+    const nodeViewExtensions = (_props.nodeViewSlot ?? _props.slots?.["nodeView"]) && local.nodeSpecs.length ? makeNodeViewExtensions(local.nodeSpecs) : [];
 
     // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
     // (setup-once, like content/editable/autofocus — no reactivity required). The
@@ -1007,12 +1006,14 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
   // originally by the editable-callout recipe (Spike 008 / REQ-23), now shipped
   // as a `nodeSpecs` entry in the example demos.
   //
-  // $portals.nodeView is referenced ONLY inside $onMount/the addNodeView closures
-  // (the $refs-only-in-onMount + bundled-leaf strict-typecheck discipline — the
-  // same constraint the toolbar slot follows). `makeNodeViewExtensions` is invoked
-  // from inside $onMount so the `nv` closure (capturing $portals.nodeView) is
-  // constructed within the mount lifecycle.
-  function makeNodeView(nv: any, spec: any) {
+  // $portals.nodeView is read directly inside the top-level `addNodeView`
+  // closure below — the emitter resolves the synthesized portals object at
+  // component scope on all six targets (quick 260829-cd4), so no mount-lifecycle
+  // capture is needed here. ROZ149 guards the one remaining hazard: a
+  // `$portals.*` read evaluated during setup/render rather than at call time.
+  // (Unrelated: $refs stays $onMount-only per ROZ123 — not a constraint on this
+  // closure, which reads no $refs.)
+  function makeNodeView(spec: any) {
     return (props: any) => {
       const {
         node,
@@ -1044,14 +1045,12 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
         updateAttributes,
         getPos,
         editor: ed,
-        ...(contentDOM ? {
-          contentDOM
-        } : {})
+        contentDOM
       });
 
       // Reactive handle — { update, dispose }. The fragment mounts ONCE; every
       // engine transaction re-invokes handle.update(scope) re-rendering IN PLACE.
-      const handle = nv(dom, buildScope(node, false));
+      const handle = portals.nodeView(dom, buildScope(node, false));
 
       // contentDOM graft bridge (Spike 008 / REQ-23). For an EDITABLE node the
       // consumer fragment renders chrome WRAPPING a `[data-rozie-hole]` placeholder;
@@ -1139,11 +1138,11 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
   }
 
   // Build ONE custom Node per consumer-supplied spec, all bound to the SAME
-  // reactive nodeView portal (ask B, D-02). Takes the per-target
-  // `$portals.nodeView` (captured here so the reference stays inside the mount
-  // lifecycle — never top-level, per the bundled-leaf typecheck rule) and the
-  // `nodeSpecs` prop array (read once at mount — setup-once, not reactive).
-  function makeNodeViewExtensions(nv: any, specs: any) {
+  // reactive nodeView portal (ask B, D-02). Takes the `nodeSpecs` prop array
+  // (read once at mount — setup-once, not reactive); `$portals.nodeView` is read
+  // directly inside `makeNodeView`'s `addNodeView` closure, not passed through
+  // here.
+  function makeNodeViewExtensions(specs: any) {
     return specs.map((spec: any) => {
       // hasContentDOM decides the renderHTML hole: an editable (non-atom,
       // content-bearing) node gets a trailing `0` content hole; a leaf/atom node
@@ -1183,7 +1182,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
           } : {}),
           ...HTMLAttributes
         }],
-        addNodeView: () => makeNodeView(nv, spec)
+        addNodeView: () => makeNodeView(spec)
       });
     });
   }
