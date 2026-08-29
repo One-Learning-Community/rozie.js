@@ -538,32 +538,47 @@ function renderDeclaratorTypeSuffix(id: t.LVal): string {
 }
 
 /**
- * Plan 07.7 follow-up — wrap a top-level NON-FUNCTION `const X = init`
- * declaration in `useMemo(() => init, [...initDeps])` when the binding
- * escapes into a useEffect (i.e., its identifier appears as a `closure`
- * SignalRef in any Listener.deps / LifecycleHook.setupDeps / WatchHook.getterDeps).
+ * Plan 07.7 follow-up, transitive closure per quick 260829-j18 — wrap a
+ * top-level NON-FUNCTION `const X = init` declaration in
+ * `useMemo(() => init, [...initDeps])` when the binding escapes into a
+ * useEffect: its name is a member of `escapingHelperNames`
+ * (`computeEscapingNames.ts`), which as of quick 260829-j18 is a TRANSITIVE
+ * closure — `X` may be referenced DIRECTLY from a `Listener.deps` /
+ * `LifecycleHook.setupDeps` closure entry, OR only through one or more
+ * top-level HELPER bodies an effect/listener reaches (a `new Compartment()`
+ * behind `buildState()` behind `$onMount`, to a fixpoint). `WatchHook.
+ * getterDeps` is a seed source only if quick 260829-j18 Task 4 landed — see
+ * `computeEscapingNames.ts`'s own doc comment for whether it did.
  *
  * Why useMemo? A bare `const X = [a, b, c]` inside the component function
  * is re-evaluated on every render, producing a fresh value identity
  * (`Object.is(prev, curr) === false`) and re-firing every useEffect that
- * lists X in its dep array. The "engine wrapper" pattern (FullCalendar /
- * AG-Grid / Swiper / Flatpickr — Vue/Svelte-flavored module-scoped consts
- * read from `$onMount`) trips this every time: the engine destroys +
- * recreates on every consumer render → portal `createRoot()` work
- * unmounted before commit. `useMemo(() => init, [...initDeps])` gives the
- * const stable identity across renders (modulo its real reactive deps).
+ * lists X in its dep array — or, for the transitive case, silently no-oping
+ * any imperative call keyed on X's identity (CodeMirror's
+ * `scheduleReconfigure(compartment, ...)` against an instance the currently-
+ * mounted `EditorState` never saw). The "engine wrapper" pattern
+ * (FullCalendar / AG-Grid / Swiper / Flatpickr — Vue/Svelte-flavored
+ * module-scoped consts read from `$onMount`) trips this every time: the
+ * engine destroys + recreates on every consumer render → portal
+ * `createRoot()` work unmounted before commit. `useMemo(() => init,
+ * [...initDeps])` gives the const stable identity across renders (modulo its
+ * real reactive deps — the dep array is computed from the const's OWN
+ * initializer, unaffected by how many helper hops reached it).
  *
  * The companion case (function-shaped escapees → useCallback) is handled
  * by `tryWrapEscapingHelperUseCallback` above. The companion-companion
  * (top-level mutable `let X` referenced from a lifecycle hook → useRef
- * via `hoistModuleLet`) is handled in `hoistModuleLet.ts`.
+ * via `hoistModuleLet`) is handled in `hoistModuleLet.ts`. A helper NAME
+ * reached only as an intermediate hop is NEVER promoted into
+ * `escapingHelperNames` by the transitive walk (F-06) — only a non-function
+ * top-level `const` binder is; see `computeEscapingNames.ts` for the bound.
  *
  * Returns the rendered `const X = useMemo(...);` line on success, or null
  * when:
  *   - stmt isn't a single-declarator initializer,
  *   - OR init IS an arrow/fn (handled by tryWrapEscapingHelperUseCallback),
  *   - OR the binding's name isn't in `escapingHelperNames` (no wrap needed —
- *     the binding doesn't escape into any effect).
+ *     the binding doesn't escape into any effect, directly or transitively).
  */
 function tryWrapEscapingConstUseMemo(
   stmt: t.Statement,
@@ -2345,6 +2360,19 @@ export function emitScript(
   // consts). Only the latter are ever wrapped in `useCallback`, and only a
   // `useCallback` helper is flagged by `react-hooks/exhaustive-deps`.
   const helperIsFunctionDecl = new Set<string>();
+  // Quick 260829-j18 Task 3 — top-level `const` declarators whose init is
+  // PRESENT and is NOT an arrow/function-expression (i.e. every candidate
+  // `tryWrapEscapingConstUseMemo` itself could ever accept). This is the
+  // traversal TARGET set for the transitive escaping-name walk below: helper
+  // BODIES are the traversal medium, but only a name in THIS set may be
+  // ADDED to the escaping-const result (F-06 — promoting a helper NAME here
+  // would flip a hoisted `function` declaration into a non-hoisted
+  // `useCallback` const, re-opening the TDZ class the plain-hoist branch
+  // exists to close). Restricted to `const` because
+  // `tryWrapEscapingConstUseMemo` only ever accepts `const`, and a
+  // reassigned top-level `let` is already filtered out of `cloned.program.body`
+  // by the module-let-to-`useRef` hoist that ran above this point (step 2).
+  const stabilizableConstNames = new Set<string>();
   for (let i = 0; i < cloned.program.body.length; i++) {
     if (lifecyclePairing.consumedIndices.has(i)) continue;
     // Quick plan 260515-u2b - $watch lines were emitted as useEffects.
@@ -2364,11 +2392,8 @@ export function emitScript(
     }
     if (t.isVariableDeclaration(stmt)) {
       for (const d of stmt.declarations) {
-        if (
-          t.isIdentifier(d.id) &&
-          d.init &&
-          (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init))
-        ) {
+        if (!t.isIdentifier(d.id) || !d.init) continue;
+        if (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init)) {
           allHelperNames.add(d.id.name);
           helperBodyByName.set(d.id.name, d.init.body);
           if (d.id.loc) {
@@ -2377,17 +2402,28 @@ export function emitScript(
               end: d.id.loc.end.index ?? 0,
             });
           }
+          continue;
+        }
+        if (stmt.kind === 'const') {
+          stabilizableConstNames.add(d.id.name);
         }
       }
     }
   }
 
-  // Quick 260829-j18 Task 2 — the ONE computation of the escaping-binding
+  // Quick 260829-j18 Task 2/3 — the ONE computation of the escaping-binding
   // name set, consumed by BOTH the `useCallbackHelperNames` eligibility
-  // filter directly below and section 6a's wrap-pass loop further down. See
-  // `computeEscapingNames`'s own doc comment for why this used to be two
-  // independent (and driftable) computations.
-  const escapingHelperNames = computeEscapingNames(ir);
+  // filter directly below and section 6a's wrap-pass loop further down. As
+  // of Task 3 this is a TRANSITIVE closure through helper bodies to a
+  // fixpoint (bounded to `stabilizableConstNames` — see
+  // `computeEscapingNames`'s own doc comment for the full contract and the
+  // F-06 narrowness rationale).
+  const escapingHelperNames = computeEscapingNames({
+    ir,
+    allHelperNames,
+    helperBodyByName,
+    stabilizableConstNames,
+  });
 
   // Quick 260803-w7b seam 3 — which top-level helpers are STALENESS-CAPABLE
   // when called from a `[]`-dep mount effect.
