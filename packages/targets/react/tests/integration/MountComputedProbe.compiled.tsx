@@ -34,15 +34,15 @@
 //   </template>
 //   </rozie>
 //
-// Demonstrates the mount-frozen-computed defect: `read.current` is assigned
-// ONCE inside a `[]`-dep mount effect, and its body reads `doubled` (a plain
-// `useMemo` destructured const) BARE. `doubled` recomputes on every `tick`
-// change, but the mount closure never sees the recomputation — it captured
-// the FIRST render's `doubled` (0) forever. Clicking "bump" moves `doubled`
-// to 2 in the DOM (`data-testid="doubled"`), but clicking "invoke" still
-// writes the FROZEN value into `observed`. Post-fix, `read.current`'s body
-// reads `_doubledRef.current` instead, so "invoke" observes the CURRENT
-// value. See `../mount-computed-live.test.tsx`.
+// FIXED (Quick 260829-8lz, Task 2): `read.current`'s body now reads
+// `_doubledRef.current` instead of the bare `doubled` `useMemo` const, so a
+// callback registered ONCE inside the `[]`-dep mount effect observes the
+// CURRENT computed value on every invocation, not just the first render's.
+// `_doubledRef` is declared AFTER `doubled`'s own `useMemo` (avoids the
+// temporal-dead-zone hazard — see `emitScript.ts` section 5e-bis). The
+// mount effect's `exhaustive-deps` disable directive is also gone: refs are
+// exempt from the rule, so the body no longer trips it. See
+// `../mount-computed-live.test.tsx`.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { rozieDisplay } from '@rozie/runtime-react';
 
@@ -54,6 +54,8 @@ export default function MountComputedProbe(props: MountComputedProbeProps): JSX.
   const [tick, setTick] = useState(0);
   const [observed, setObserved] = useState(0);
   const doubled = useMemo(() => tick * 2, [tick]);
+  const _doubledRef = useRef(doubled);
+  _doubledRef.current = doubled;
 
   const invokeRead = useCallback(() => {
     if (read.current) read.current();
@@ -61,9 +63,9 @@ export default function MountComputedProbe(props: MountComputedProbeProps): JSX.
 
   useEffect(() => {
     read.current = () => {
-      setObserved(doubled);
+      setObserved(_doubledRef.current);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>

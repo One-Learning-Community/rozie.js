@@ -1199,6 +1199,13 @@ function rewriteWatchedPropReads(
       if (synthesizedIdentifiers.has(path.node)) return;
       const name = path.node.name;
       if (!watchedModelProps.has(name)) return;
+      // Quick 260829-8lz — same shadow-rewrite gap as `findRefsInBody`'s
+      // discovery walk (this function's REWRITE counterpart): a name locally
+      // declared inside the body being rewritten HAS a binding in this
+      // Program-rooted synthetic scope; the outer reactive name does not.
+      // `path.scope.getBinding(name)` is the same "correct, machinery-free
+      // shadow test" already documented for `rewriteMountHelperCalls`'s D-11.
+      if (path.scope.getBinding(name)) return;
       const parent = path.parent;
       // Skip property positions of MemberExpressions: `obj.X` — X is a property,
       // not a real reference.
@@ -2639,12 +2646,55 @@ export function emitScript(
   //   - `ir.state`  → `useState` destructure  → bare `<name>`
   //   - model props → `useControllableState` destructure → bare `<name>`
   // so they slot into `rewriteWatchedPropReads`'s model-set (bare-identifier)
-  // path. `ir.computed` is intentionally EXCLUDED — a `useMemo` value is
-  // recomputed by React and a fresh closure already sees it; only the
-  // `useState`/`useControllableState` destructured frozen consts are at risk.
+  // path.
+  //
+  // CORRECTED (Quick 260829-8lz) — `ir.computed` was previously excluded here
+  // on the reasoning "a `useMemo` value is recomputed by React and a fresh
+  // closure already sees it." That reasoning is TRUE only for a closure React
+  // RE-CREATES (an `$onUpdate` hook with a real dep array — CONTROL A in
+  // `mountComputedLiveRef.test.ts`). It is FALSE for a `[]`-dep MOUNT-ONCE
+  // closure: that closure is never re-created, so it never observes a
+  // recomputed `useMemo` — it captures the FIRST render's value forever, the
+  // identical freeze class `ir.state`/model props above were fixed for.
+  // `ir.computed` names read bare inside a mount-phase body now join the same
+  // live-ref treatment via `mountReactiveComputedNames` below, routed into
+  // their OWN `actuallyRewrittenComputed` set (deliberately NOT merged into
+  // `actuallyRewrittenModelProps`) with a DEFERRED ref-decl emit placed AFTER
+  // the `ir.computed` `useMemo` loop (section 5e-bis) — see that set's
+  // declaration for the temporal-dead-zone hazard this ordering avoids.
   const mountReactiveStateNames = new Set<string>();
   for (const s of ir.state) mountReactiveStateNames.add(s.name);
   for (const name of modelProps) mountReactiveStateNames.add(name);
+
+  // Quick 260829-8lz — the mount-scoped `$computed` discovery set. Guarded by
+  // the same collision check `mountReadablePropNames` (below) and the D-10
+  // helper-ref guard use: skip any computed whose `_<name>Ref` ident could
+  // collide with a prop / state / template-ref name or a portal
+  // `_render<Pascal>Ref`. A duplicate `const _<X>Ref` would be TS2451 and
+  // would fail typecheck (GATE 5); this bails that computed out of the
+  // live-ref treatment instead, leaving it byte-identical.
+  const mountReactiveComputedNames = new Set<string>();
+  {
+    const pascalCase = (name: string): string =>
+      name
+        .split(/[-_]/)
+        .filter(Boolean)
+        .map((p) => capitalize(p))
+        .join('');
+    const reservedNames = new Set<string>();
+    for (const p of ir.props) reservedNames.add(p.name);
+    for (const s of ir.state) reservedNames.add(s.name);
+    for (const r of ir.refs) reservedNames.add(r.name);
+    const reservedRefIdents = new Set<string>();
+    for (const key of portalsEmit.portalSlotNames) {
+      reservedRefIdents.add(`_render${pascalCase(key)}Ref`);
+    }
+    for (const c of ir.computed) {
+      if (reservedNames.has(c.name)) continue;
+      if (reservedRefIdents.has(`_${c.name}Ref`)) continue;
+      mountReactiveComputedNames.add(c.name);
+    }
+  }
 
   // Quick 260803-swj seam 2 — the two sets above still leave a hole: a plain
   // DECLARED prop read inside a `$onMount`-created closure. Ref synthesis was
@@ -2744,6 +2794,16 @@ export function emitScript(
   // share this one set; section 5b-bis emits one ref decl per entry.
   const actuallyRewrittenModelProps = new Set<string>();
   const actuallyRewrittenNonModelProps = new Set<string>();
+  // Quick 260829-8lz — mount-scoped `ir.computed` names discovered as bare
+  // reads live in their OWN set, deliberately NOT merged into
+  // `actuallyRewrittenModelProps`. That set's ref decls are emitted in
+  // section 5b-bis, which runs BEFORE the `ir.computed` `useMemo` loop
+  // (section 5e) — seeding `useRef(doubled)` there would reference a const
+  // still in its temporal dead zone, a render-time ReferenceError for every
+  // consumer (T-2608298LZ-01). This set gets its own DEFERRED emit (section
+  // 5e-bis) placed immediately after the `useMemo` loop, mirroring 5c-bis's
+  // deferral of `ir.state` refs past `useState`.
+  const actuallyRewrittenComputed = new Set<string>();
   // Quick 260803-swj seam 2 — the newly-discovered mount-scoped prop names live
   // in their OWN set, deliberately NOT merged into
   // `actuallyRewrittenNonModelProps`. That set's dep filter (see the lifecycle
@@ -2774,6 +2834,7 @@ export function emitScript(
     (watchedModelPropNames.size > 0 ||
       watchedNonModelPropNames.size > 0 ||
       mountReactiveStateNames.size > 0 ||
+      mountReactiveComputedNames.size > 0 ||
       mountReadablePropNames.size > 0 ||
       // Quick 260803-w7b seam 3 — a component with NO declared props and no
       // reactive state can still have a staleness-capable helper (e.g. one that
@@ -2815,6 +2876,20 @@ export function emitScript(
         Identifier(p) {
           const name = p.node.name;
           if (!bareNames.has(name)) return;
+          // Quick 260829-8lz — pre-existing shadow-discovery gap, found while
+          // building CONTROL C for the computed live-ref fixture: this walk
+          // is scope-aware (traverses a Program-rooted synthetic file, same
+          // as `rewriteMountHelperCalls`'s D-11 shadow test) but never
+          // consulted that scope. A `const doubled = 99` inside the SAME
+          // mount body shadows the outer `ir.computed`/state/model name, and
+          // pre-fix this walk still discovered `doubled` as "referenced" —
+          // it just happened to be invisible because nothing routed
+          // `ir.computed` through this path yet. `path.scope.getBinding(name)`
+          // is the identical "correct, machinery-free shadow test" already
+          // documented for the helper-rewrite pass: a locally-declared name
+          // HAS a binding in this synthetic scope; a real outer reactive name
+          // does NOT.
+          if (p.scope.getBinding(name)) return;
           const parent = p.parent;
           if (
             (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
@@ -2845,9 +2920,16 @@ export function emitScript(
       // Watched props are rewritten regardless of phase (their existing
       // contract); reactive state names join the bare-identifier set only
       // here, for `phase === 'mount'`.
+      // Quick 260829-8lz — same phase gate for `ir.computed` names: joins the
+      // bare-identifier set only for `phase === 'mount'`, where the `[]` dep
+      // array freezes a bare `useMemo` read forever.
       const bareNamesForHook =
         lh.phase === 'mount'
-          ? new Set<string>([...watchedModelPropNames, ...mountReactiveStateNames])
+          ? new Set<string>([
+              ...watchedModelPropNames,
+              ...mountReactiveStateNames,
+              ...mountReactiveComputedNames,
+            ])
           : watchedModelPropNames;
       // Quick 260803-swj seam 2 — same phase gate for the `props.<X>`
       // MemberExpression flavour: watched props are rewritten regardless of
@@ -2945,7 +3027,19 @@ export function emitScript(
       // 5b-bis ref-decl emit iterates that one set, and because it is a `Set`
       // a name that is BOTH a watched prop and a mount-state read emits
       // exactly once.
-      for (const n of localModel) actuallyRewrittenModelProps.add(n);
+      //
+      // Quick 260829-8lz — route by ORIGIN here too. A name discovered via
+      // `mountReactiveComputedNames` goes to its OWN `actuallyRewrittenComputed`
+      // set instead: 5b-bis (which `actuallyRewrittenModelProps` drives) runs
+      // BEFORE the `ir.computed` `useMemo` loop, so seeding `useRef(doubled)`
+      // there would be a TDZ ReferenceError (T-2608298LZ-01). The two sets are
+      // disjoint by construction — `mountReactiveComputedNames`'s collision
+      // guard already excludes any computed name that collides with a prop /
+      // state / template-ref name.
+      for (const n of localModel) {
+        if (mountReactiveComputedNames.has(n)) actuallyRewrittenComputed.add(n);
+        else actuallyRewrittenModelProps.add(n);
+      }
       // Quick 260803-swj seam 2 — route by ORIGIN, not by hook. A watch-sourced
       // name keeps its existing component-wide semantics; a name discovered
       // only via the mount-phase widening goes to the mount-scoped set so the
@@ -3628,6 +3722,18 @@ export function emitScript(
     // original TS wrapper around the callback's return value (see its doc).
     const cast = clonedComputedCasts.get(c.name);
     hookLines.push(`const ${c.name} = useMemo(${renderComputedArrow(body, cast)}, ${depsArr});`);
+  }
+
+  // 5e-bis. Quick 260829-8lz — synced refs for `ir.computed` names read from a
+  // mount-phase hook body, deferred from section 5b-bis so they land AFTER
+  // the `useMemo` declarations they reference (avoids a TDZ ReferenceError at
+  // render — mirrors section 5c-bis's deferral of `ir.state` refs past
+  // `useState`, T-2608298LZ-01). Same shape as the model-prop/state refs:
+  // `const _<C>Ref = useRef(<C>); _<C>Ref.current = <C>;`. Sorted
+  // alphabetically for snapshot determinism, matching 5b-bis/5c-bis.
+  for (const name of [...actuallyRewrittenComputed].sort()) {
+    collectors.react.add('useRef');
+    hookLines.push(`const _${name}Ref = useRef(${name});\n` + `_${name}Ref.current = ${name};`);
   }
 
   // 5f. useEffect for each paired LifecycleHook — Plan 04-04: split into a
