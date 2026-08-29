@@ -23,6 +23,7 @@ import type {
   LifecycleHook,
   PropDecl,
   PropTypeAnnotation,
+  SignalRef,
   WatchHook,
 } from '@rozie/core';
 import { buildPropJsdoc } from '@rozie/core';
@@ -986,10 +987,64 @@ function renderDeclaratorTypeSuffix(id: t.LVal): string {
   return `: ${generate(ann.typeAnnotation, GEN_OPTS).code}`;
 }
 
+/**
+ * Quick 260828-sdw — map one `$computed` declaration's resolved `SignalRef[]`
+ * deps to rendered read expressions for `rozieMemo`'s dep array, or `null` to
+ * signal "cannot key this one, bail to the pre-existing uncached getter".
+ *
+ * Routes every dep through `rewriteTemplateExpression` (rather than hand-
+ * building `this.X` / `this._X.value` strings) so model props, signal-backed
+ * data, and computed-to-computed chaining all resolve through the ONE
+ * lowering that already owns those shapes — no risk of drifting from it.
+ *
+ * `props` / `data` / `computed` scopes are memoizable; an empty `path` on any
+ * of those, or a `slots` / `slotted` / `closure` dep, is NOT (a closure dep is
+ * opaque at the body boundary; a slots/slotted dep is Lit-shadow-DOM-live and
+ * has no single stable read expression to key on) — return `null`.
+ *
+ * An empty `SignalRef[]` yields an empty array (NOT `null`) — that is the
+ * "compute once, cache forever" case that fixes the reported footgun.
+ *
+ * Rendered strings are deduped, preserving first-seen order (a computed body
+ * may read the same dep root more than once).
+ */
+function renderComputedDeps(deps: SignalRef[], ir: IRComponent): string[] | null {
+  const rendered: string[] = [];
+  for (const dep of deps) {
+    if (dep.scope === 'props') {
+      if (dep.path.length === 0) return null;
+      rendered.push(
+        rewriteTemplateExpression(
+          t.memberExpression(t.identifier('$props'), t.identifier(dep.path[0]!)),
+          ir,
+        ),
+      );
+    } else if (dep.scope === 'data') {
+      if (dep.path.length === 0) return null;
+      rendered.push(
+        rewriteTemplateExpression(
+          t.memberExpression(t.identifier('$data'), t.identifier(dep.path[0]!)),
+          ir,
+        ),
+      );
+    } else if (dep.scope === 'computed') {
+      if (dep.path.length === 0) return null;
+      rendered.push(rewriteTemplateExpression(t.identifier(dep.path[0]!), ir));
+    } else {
+      // 'slots' | 'slotted' | 'closure' — conservative bail.
+      return null;
+    }
+  }
+  return [...new Set(rendered)];
+}
+
 function classBodyFromStatements(
   stmts: t.Statement[],
   computedNames: Set<string>,
+  ir: IRComponent,
+  runtime: RuntimeLitImportCollector,
 ): { methods: string; freeStatements: string } {
+  const computedDepsByName = new Map(ir.computed.map((c) => [c.name, c.deps] as const));
   const methodChunks: string[] = [];
   const freeChunks: string[] = [];
 
@@ -1021,6 +1076,31 @@ function classBodyFromStatements(
           const arrow = computedCall.arguments[0]!;
           if (t.isArrowFunctionExpression(arrow) || t.isFunctionExpression(arrow)) {
             const cast = computeTsCastWrapText(decl.init, (node) => generate(node, GEN_OPTS).code);
+            // Quick 260828-sdw — memoize on the IR's already-resolved dep set
+            // when every dep can be rendered as a read; bail to the
+            // pre-existing uncached getter (byte-identical) otherwise.
+            const rawDeps = computedDepsByName.get(name);
+            const renderedDeps = rawDeps !== undefined ? renderComputedDeps(rawDeps, ir) : null;
+            if (renderedDeps !== null) {
+              runtime.add('rozieMemo');
+              const depsLiteral = `[${renderedDeps.join(', ')}]`;
+              if (t.isExpression(arrow.body)) {
+                methodChunks.push(
+                  `  get ${name}() { return ${cast.prefix}rozieMemo(this, '${name}', ${depsLiteral}, () => (${renderExpression(arrow.body)}))${cast.suffix}; }`,
+                );
+              } else if (t.isBlockStatement(arrow.body)) {
+                const bodyCode = arrow.body.body.map((s) => generate(s, GEN_OPTS).code).join('\n');
+                // Memoization always wraps the block body in a `rozieMemo`
+                // arrow (whether or not a cast is present) — the non-cast
+                // block-body form loses its bare-block shape and becomes a
+                // memoized arrow, mirroring the shape the cast-block path
+                // already used pre-memoization.
+                methodChunks.push(
+                  `  get ${name}() { return ${cast.prefix}rozieMemo(this, '${name}', ${depsLiteral}, () => {\n${indent(bodyCode, 4)}\n  })${cast.suffix}; }`,
+                );
+              }
+              continue;
+            }
             if (t.isExpression(arrow.body)) {
               methodChunks.push(
                 `  get ${name}() { return ${cast.prefix}${renderExpression(arrow.body)}${cast.suffix}; }`,
@@ -1316,6 +1396,8 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
   const { methods: classMethodsFromScript, freeStatements } = classBodyFromStatements(
     partition.classLevelStmts,
     computedNames,
+    ir,
+    opts.runtime,
   );
 
   // 4. Model-prop getter/setter pair → methods.

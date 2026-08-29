@@ -228,7 +228,17 @@ export type RuntimeLitImport =
    * non-portal component's `@rozie/runtime-lit` import line stays
    * byte-identical.
    */
-  | 'rozieResolvePortalledRef';
+  | 'rozieResolvePortalledRef'
+  /**
+   * Quick 260828-sdw — `rozieMemo`, the dep-keyed memoization helper for
+   * `$computed`, shipped from `@rozie/runtime-lit`. Added by `emitScript.ts`'s
+   * `classBodyFromStatements` ONLY when at least one `$computed` declaration
+   * is memoizable (its `SignalRef[]` deps can all be rendered as reads — see
+   * the `renderComputedDeps` bail rule for `closure`/`slots`/`slotted`), so a
+   * component with no `$computed` (or with only bailed computeds) keeps a
+   * byte-identical `@rozie/runtime-lit` import line.
+   */
+  | 'rozieMemo';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();
