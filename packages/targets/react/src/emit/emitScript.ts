@@ -987,6 +987,33 @@ function collectPureLiteralBinders(
 }
 
 /**
+ * Quick 260828-uyn — render a statement's own attached comments (NOT any
+ * neighbour's) as standalone `//`/`/* *\/` lines, verbatim. Used only by
+ * `tryWrapPureLiteralUseMemo`: unlike its two siblings, this pass's
+ * candidates were — until intercepted here — headed for the plain
+ * `genCode(emitted)` fallthrough at the bottom of the emission loop, which
+ * prints a statement's `leadingComments`/`trailingComments` as a matter of
+ * course. Skipping this would silently drop real author documentation the
+ * moment a commented literal starts qualifying for the memo wrap (observed
+ * on `MapLibre.rozie`'s `PROGRAMMATIC` and `TipTap.rozie`'s
+ * `STARTERKIT_COLLISION_MAP`, both carrying multi-line doc comments).
+ *
+ * Deliberately hand-formats each comment on its own line rather than
+ * attaching the original `t.Comment` nodes to a synthetic AST node and
+ * calling `genCode` on it: @babel/generator's comment placement leans on the
+ * commented node's `.loc` to decide spacing, and a synthetic node (no
+ * `.loc`, matching every other synthetic wrap in this file) prints a
+ * trailing comment squashed onto the statement's own line instead of below
+ * it.
+ */
+function renderStatementComments(comments: readonly t.Comment[] | null | undefined): string | null {
+  if (!comments || comments.length === 0) return null;
+  return comments
+    .map((c) => (c.type === 'CommentLine' ? `//${c.value}` : `/*${c.value}*/`))
+    .join('\n');
+}
+
+/**
  * Quick 260828-uyn — wrap a top-level pure object/array literal `const X =
  * init` in `useMemo(() => init, [])` so it is constructed ONCE per component
  * instance (setup-once parity with the other five targets). Candidate
@@ -1017,7 +1044,11 @@ function tryWrapPureLiteralUseMemo(
   // Preserve an author declarator annotation, same rationale as the sibling
   // mutated-instance wrap.
   const declTypeSuffix = renderDeclaratorTypeSuffix(decl.id);
-  return `const ${decl.id.name}${declTypeSuffix} = useMemo(${arrowBody(init)}, []);`;
+  const mainLine = `const ${decl.id.name}${declTypeSuffix} = useMemo(${arrowBody(init)}, []);`;
+  const leading = renderStatementComments(stmt.leadingComments);
+  const trailing = renderStatementComments(stmt.trailingComments);
+  if (!leading && !trailing) return mainLine;
+  return [leading, mainLine, trailing].filter((p): p is string => p !== null).join('\n');
 }
 
 /**
