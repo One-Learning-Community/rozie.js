@@ -121,25 +121,151 @@ let instance: any = null;
 // $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
 // captured node so no $refs read ever executes outside the mount hook.
 let canvasEl: any = null;
-// buildConfig is DEFINED inside $onMount because it reads $portals.tooltip.
-// $portals ALONE forces this: React/Angular/Lit emit the `portals` object
-// INSIDE the mount body (useEffect / ngAfterViewInit / firstUpdated), so a
-// top-level reference is a SILENT bad emit — TS2304 on the bundled leaf,
-// ReferenceError at runtime, and no diagnostic fires. Vue/Svelte/Solid emit
-// it at component scope and are unaffected.
-// $emit and $slots do NOT impose this constraint — both lower to
-// component-scope constructs on ALL SIX targets and are safe to reference
-// from a top-level helper (measured 2026-08-29; the earlier
+// ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
+// Chart.js calls onClick/onHover with (event, activeElements, chart). We call
+// any consumer-supplied handler first (read off $props.options), then emit a
+// structured payload resolving the hit element(s) via getElementsAtEventForMode.
+const composedOnClick = (e: any, activeEls: any, chart: any) => {
+  const userOnClick = props.options?.onClick;
+  if (typeof userOnClick === 'function') userOnClick(e, activeEls, chart);
+  const nearest = chart.getElementsAtEventForMode(e, 'nearest', {
+    intersect: true
+  }, false);
+  emit('click', {
+    event: e,
+    elements: nearest,
+    chart
+  });
+  const dataset = chart.getElementsAtEventForMode(e, 'dataset', {
+    intersect: true
+  }, false);
+  if (dataset.length) {
+    emit('datasetClick', {
+      event: e,
+      elements: dataset,
+      datasetIndex: dataset[0].datasetIndex,
+      chart
+    });
+  }
+};
+const composedOnHover = (e: any, activeEls: any, chart: any) => {
+  const userOnHover = props.options?.onHover;
+  if (typeof userOnHover === 'function') userOnHover(e, activeEls, chart);
+  emit('hover', {
+    event: e,
+    elements: activeEls,
+    chart
+  });
+};
+// ─── external-HTML tooltip portal slot ─────────────────────────────────────
+// Only active when the consumer fills <slot name="tooltip">. The external
+// handler positions a container over the canvas and mounts the consumer's
+// framework-native fragment through $portals.tooltip(dom, scope). The scope
+// carries the live tooltip model (title/body/dataPoints/position). Chart.js
+// throttles external calls to active-element changes, so the dispose+remount
+// on body-change is cheap. enabled:false suppresses the built-in canvas
+// tooltip when we take over.
+//
+// MODULE-scope `let`s (not $onMount-locals) — this reverses the earlier
+// deliberate mount-local narrowing (emitter-hardening backlog item #2,
+// project_emitter_hardening_backlog): tooltipExternal is moving out of
+// $onMount to top level (quick 260829-gbs), so its state can no longer live
+// as a closure-captured mount-local. Required, not just convenient — and
+// harmless: a module-scope `let` in `.rozie` lowers to per-instance
+// component state on all six targets (a React/Angular/Lit class field or
+// component-scope ref, not a shared global). The $onMount teardown below
+// still reads tooltipDispose/tooltipEl directly, unchanged.
+let tooltipEl: any = null;
+let tooltipDispose: any = null;
+let tooltipKey = '';
+const tooltipExternal = (context: any) => {
+  const {
+    chart,
+    tooltip
+  } = context;
+  if (!tooltipEl) {
+    tooltipEl = document.createElement('div');
+    tooltipEl.className = 'rozie-chart-tooltip';
+    tooltipEl.style.position = 'absolute';
+    tooltipEl.style.pointerEvents = 'none';
+    tooltipEl.style.transition = 'opacity 0.1s ease';
+    chart.canvas.parentNode.appendChild(tooltipEl);
+  }
+  if (tooltip.opacity === 0) {
+    tooltipEl.style.opacity = '0';
+    return;
+  }
+  const title = (tooltip.title || []).join(' ');
+  const body = (tooltip.body || []).map((b: any) => b.lines.join(' ')).join(' | ');
+  const key = `${title}::${body}`;
+  if (key !== tooltipKey) {
+    tooltipKey = key;
+    tooltipDispose?.();
+    // The scope MUST match the slot's declared param (`model`): the consumer's
+    // <slot name="tooltip"> receives a single `model` scoped value.
+    const scope = {
+      model: {
+        title: tooltip.title || [],
+        body: (tooltip.body || []).map((b: any) => b.lines),
+        dataPoints: tooltip.dataPoints || [],
+        opacity: tooltip.opacity
+      }
+    };
+    tooltipDispose = portals.tooltip(tooltipEl, scope);
+  }
+  const {
+    offsetLeft,
+    offsetTop
+  } = chart.canvas;
+  tooltipEl.style.opacity = '1';
+  tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`;
+  tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`;
+};
+// ─── config builder ────────────────────────────────────────────────────────
+// buildConfig is a top-level factory now that quick 260829-cd4 hoists the
+// portals closure to component scope on all six targets; $portals.tooltip
+// (referenced inside tooltipExternal below) resolves directly with no
+// mount-scope bridge — the earlier rationale here ("buildConfig is DEFINED
+// inside $onMount because it reads $portals.tooltip") no longer applies.
+// $emit and $slots never needed this bridge either — both lower to
+// component-scope constructs on all six targets (the earlier
 // "$emit/$portals/$slots" phrasing here was over-broad and had been
-// copy-propagated into all 8 generated variants). Do not relocate a helper
-// into $onMount for $emit/$slots alone.
-// Stored in this `let` so the top-level re-create $watches can call it.
-let buildConfig: any = null;
+// copy-propagated into all 8 generated variants).
+// $snapshot strips Svelte 5's $state proxy first; Chart.js redefines property
+// descriptors on whatever object it is handed.
+const buildConfig = (): any => {
+  const userOpts = props.options || {};
+  const tooltipOpt = slots.tooltip ? {
+    ...(userOpts.plugins?.tooltip || {}),
+    enabled: false,
+    external: tooltipExternal
+  } : userOpts.plugins?.tooltip;
+  return {
+    type: 'line',
+    data: props.data,
+    // per-instance plugins[] — the consumer-extensibility passthrough.
+    plugins: props.plugins,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        duration: 250
+      },
+      ...userOpts,
+      onClick: composedOnClick,
+      onHover: composedOnHover,
+      plugins: {
+        ...(userOpts.plugins || {}),
+        tooltip: tooltipOpt
+      }
+    }
+  };
+};
 // Re-create the live instance. Chart.js exposes no stable runtime type-swap or
 // plugin-swap, so `type`/`plugins`/`redraw`-driven changes re-create. Uses the
 // captured canvasEl (never re-reads $refs outside $onMount).
 const recreate = () => {
-  if (!buildConfig || !canvasEl) return;
+  if (!canvasEl) return;
   instance?.destroy();
   instance = new ChartJS(canvasEl, buildConfig());
 };
@@ -218,136 +344,6 @@ function getDatasetMeta(datasetIndex: any) {
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
   canvasEl = canvasElRef.value;
-
-  // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
-  // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
-  // any consumer-supplied handler first (read off $props.options), then emit a
-  // structured payload resolving the hit element(s) via getElementsAtEventForMode.
-  const composedOnClick = (e: any, activeEls: any, chart: any) => {
-    const userOnClick = props.options?.onClick;
-    if (typeof userOnClick === 'function') userOnClick(e, activeEls, chart);
-    const nearest = chart.getElementsAtEventForMode(e, 'nearest', {
-      intersect: true
-    }, false);
-    emit('click', {
-      event: e,
-      elements: nearest,
-      chart
-    });
-    const dataset = chart.getElementsAtEventForMode(e, 'dataset', {
-      intersect: true
-    }, false);
-    if (dataset.length) {
-      emit('datasetClick', {
-        event: e,
-        elements: dataset,
-        datasetIndex: dataset[0].datasetIndex,
-        chart
-      });
-    }
-  };
-  const composedOnHover = (e: any, activeEls: any, chart: any) => {
-    const userOnHover = props.options?.onHover;
-    if (typeof userOnHover === 'function') userOnHover(e, activeEls, chart);
-    emit('hover', {
-      event: e,
-      elements: activeEls,
-      chart
-    });
-  };
-
-  // ─── external-HTML tooltip portal slot ─────────────────────────────────────
-  // Only active when the consumer fills <slot name="tooltip">. The external
-  // handler positions a container over the canvas and mounts the consumer's
-  // framework-native fragment through $portals.tooltip(dom, scope). The scope
-  // carries the live tooltip model (title/body/dataPoints/position). Chart.js
-  // throttles external calls to active-element changes, so the dispose+remount
-  // on body-change is cheap. enabled:false suppresses the built-in canvas
-  // tooltip when we take over.
-  //
-  // Mount-locals (not top-level script `let`s) — read only by tooltipExternal
-  // and the returned teardown below, both defined in THIS $onMount closure.
-  // Emitter-hardening backlog item #2 (project_emitter_hardening_backlog):
-  // every target keeps a $onMount setup-local in scope for its own returned
-  // teardown, so these no longer need the prior COMPONENT-scope workaround.
-  let tooltipEl: any = null;
-  let tooltipDispose: any = null;
-  let tooltipKey = '';
-  const tooltipExternal = (context: any) => {
-    const {
-      chart,
-      tooltip
-    } = context;
-    if (!tooltipEl) {
-      tooltipEl = document.createElement('div');
-      tooltipEl.className = 'rozie-chart-tooltip';
-      tooltipEl.style.position = 'absolute';
-      tooltipEl.style.pointerEvents = 'none';
-      tooltipEl.style.transition = 'opacity 0.1s ease';
-      chart.canvas.parentNode.appendChild(tooltipEl);
-    }
-    if (tooltip.opacity === 0) {
-      tooltipEl.style.opacity = '0';
-      return;
-    }
-    const title = (tooltip.title || []).join(' ');
-    const body = (tooltip.body || []).map((b: any) => b.lines.join(' ')).join(' | ');
-    const key = `${title}::${body}`;
-    if (key !== tooltipKey) {
-      tooltipKey = key;
-      tooltipDispose?.();
-      // The scope MUST match the slot's declared param (`model`): the consumer's
-      // <slot name="tooltip"> receives a single `model` scoped value.
-      const scope = {
-        model: {
-          title: tooltip.title || [],
-          body: (tooltip.body || []).map((b: any) => b.lines),
-          dataPoints: tooltip.dataPoints || [],
-          opacity: tooltip.opacity
-        }
-      };
-      tooltipDispose = portals.tooltip(tooltipEl, scope);
-    }
-    const {
-      offsetLeft,
-      offsetTop
-    } = chart.canvas;
-    tooltipEl.style.opacity = '1';
-    tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`;
-    tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`;
-  };
-
-  // ─── config builder ────────────────────────────────────────────────────────
-  // $snapshot strips Svelte 5's $state proxy first; Chart.js redefines property
-  // descriptors on whatever object it is handed.
-  buildConfig = () => {
-    const userOpts = props.options || {};
-    const tooltipOpt = slots.tooltip ? {
-      ...(userOpts.plugins?.tooltip || {}),
-      enabled: false,
-      external: tooltipExternal
-    } : userOpts.plugins?.tooltip;
-    return {
-      type: 'line',
-      data: props.data,
-      // per-instance plugins[] — the consumer-extensibility passthrough.
-      plugins: props.plugins,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: {
-          duration: 250
-        },
-        ...userOpts,
-        onClick: composedOnClick,
-        onHover: composedOnHover,
-        plugins: {
-          ...(userOpts.plugins || {}),
-          tooltip: tooltipOpt
-        }
-      }
-    };
-  };
   instance = new ChartJS(canvasEl, buildConfig());
   _cleanup_0 = () => {
     tooltipDispose?.();
@@ -423,7 +419,7 @@ watch(() => props.data, (v: any) => {
   instance.update(props.updateMode);
 }, { immediate: true, flush: 'post' });
 watch(() => props.options, () => {
-  if (!instance || !buildConfig) return;
+  if (!instance) return;
   instance.options = buildConfig().options;
   instance.update('none');
 }, { flush: 'post' });

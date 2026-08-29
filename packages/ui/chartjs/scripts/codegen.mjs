@@ -231,6 +231,53 @@ function kebab(name) {
 }
 
 /**
+ * React/Solid/Vue/Angular-only type aid: annotate `buildConfig`'s return type
+ * as `any`.
+ *
+ * `buildConfig` builds the `ChartConfiguration` object handed to `new
+ * ChartJS(...)`; its `type` field is a plain string literal (`'line'`, the
+ * generic `$props.type`, etc.). Before quick 260829-gbs, `buildConfig` was
+ * assigned inside `$onMount` to a pre-declared module-scope `let buildConfig =
+ * null` — the project's own null-let -> `any` typeNeutralize idiom — so
+ * `buildConfig`'s inferred type (and therefore its return type) was `any` on
+ * every bundled leaf, and `new ChartJS(canvasEl, buildConfig())` never hit
+ * chart.js's strict `ChartConfiguration<keyof ChartTypeRegistry, ...>` check.
+ * 260829-gbs hoisted `buildConfig` to a real top-level declaration (removing
+ * the $portals mount-scope bridge the null-let was ALSO incidentally
+ * providing $portals for) — TypeScript now infers its return type
+ * structurally, which widens the `type: 'line'` (or `type: $props.type`)
+ * literal property to `string`, tripping `TS2345` on react/solid/vue/angular
+ * (lit is unaffected — its `noImplicitAny: false` tsconfig does not surface
+ * this one). The runtime value IS a valid `ChartConfiguration` — chart.js's
+ * generic constraint is stricter than the plain-JS `.rozie` source can express
+ * without emitter-level return-type synthesis (OUT OF SCOPE, SCOPE FENCE); as
+ * the sanctioned in-scope per-leaf aid (the CodeMirror `themeExt(): any`
+ * analog), annotate `buildConfig`'s return `: any` here — a pure type
+ * annotation, zero runtime change. Applied to BOTH the generic Chart output
+ * and all 8 per-type variants (each carries its own `buildConfig`).
+ */
+function applyBuildConfigTypeAid(code, target) {
+  const TOKENS = {
+    react: ['buildConfig = useCallback(() => {', 'buildConfig = useCallback((): any => {'],
+    solid: ['function buildConfig() {', 'function buildConfig(): any {'],
+    vue: ['const buildConfig = () => {', 'const buildConfig = (): any => {'],
+    angular: ['buildConfig = () => {', 'buildConfig = (): any => {'],
+  };
+  const pair = TOKENS[target];
+  if (!pair) return code; // lit/svelte: no aid needed today
+  const [token, annotated] = pair;
+  if (!code.includes(token)) {
+    throw new Error(
+      `codegen ${target}: expected to annotate \`buildConfig\`'s return \`: any\` (chart.js's ` +
+        `ChartConfiguration<keyof ChartTypeRegistry, ...> rejects the widened \`type: string\` a ` +
+        `plain-JS return infers) but the token \`${token}\` was not found — the ${target} emit shape ` +
+        `changed. Re-derive the type-gate aid (SCOPE FENCE: do NOT edit the emitter).`,
+    );
+  }
+  return code.replace(token, annotated);
+}
+
+/**
  * BUNDLED-LEAF PACKAGING (react/solid/lit only): keep `tsdown.config.ts`
  * `entry` and `package.json` `exports` in lockstep with the VARIANTS list so a
  * consumer can `import Line from '@rozie-ui/chartjs-<fw>/line'` and pull ONLY
@@ -387,6 +434,7 @@ function main() {
 
     // ── generic Chart ────────────────────────────────────────────────────────
     const r = compileClean(source, target, FILENAME);
+    r.code = applyBuildConfigTypeAid(r.code, target);
     writeFileSync(resolve(leafSrc, cfg.file), r.code);
     if (target === 'react') {
       if (r.css) writeFileSync(resolve(leafSrc, 'Chart.css'), r.css);
@@ -409,7 +457,7 @@ function main() {
     // ── 8 per-type variants ──────────────────────────────────────────────────
     for (const v of variantSources) {
       const vr = compileClean(v.source, target, `${v.name}.rozie`);
-      let code = vr.code;
+      let code = applyBuildConfigTypeAid(vr.code, target);
       // React: every variant emits `import "./<Name>.css"`; rewrite to the single
       // shared `Chart.css` (the styles are identical) so we ship one stylesheet,
       // not nine. The tsdown css-external + copy handles `Chart.css` already.

@@ -213,7 +213,7 @@ export class Radar {
       this.instance.update(__updateMode);
     })(__watchVal)); });
     effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
-      if (!this.instance || !this.buildConfig) return;
+      if (!this.instance) return;
       this.instance.options = this.buildConfig().options;
       this.instance.update('none');
     })(); }); });
@@ -222,162 +222,11 @@ export class Radar {
 
   ngAfterViewInit() {
     this.canvasEl = this.canvasElRef()?.nativeElement;
-
-    // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
-    // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
-    // any consumer-supplied handler first (read off $props.options), then emit a
-    // structured payload resolving the hit element(s) via getElementsAtEventForMode.
-    // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
-    // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
-    // any consumer-supplied handler first (read off $props.options), then emit a
-    // structured payload resolving the hit element(s) via getElementsAtEventForMode.
-    const composedOnClick = (e: any, activeEls: any, chart: any) => {
-      const userOnClick = this.options()?.onClick;
-      if (typeof userOnClick === 'function') userOnClick(e, activeEls, chart);
-      const nearest = chart.getElementsAtEventForMode(e, 'nearest', {
-        intersect: true
-      }, false);
-      this.click.emit({
-        event: e,
-        elements: nearest,
-        chart
-      });
-      const dataset = chart.getElementsAtEventForMode(e, 'dataset', {
-        intersect: true
-      }, false);
-      if (dataset.length) {
-        this.datasetClick.emit({
-          event: e,
-          elements: dataset,
-          datasetIndex: dataset[0].datasetIndex,
-          chart
-        });
-      }
-    };
-    const composedOnHover = (e: any, activeEls: any, chart: any) => {
-      const userOnHover = this.options()?.onHover;
-      if (typeof userOnHover === 'function') userOnHover(e, activeEls, chart);
-      this.hover.emit({
-        event: e,
-        elements: activeEls,
-        chart
-      });
-    };
-
-    // ─── external-HTML tooltip portal slot ─────────────────────────────────────
-    // Only active when the consumer fills <slot name="tooltip">. The external
-    // handler positions a container over the canvas and mounts the consumer's
-    // framework-native fragment through $portals.tooltip(dom, scope). The scope
-    // carries the live tooltip model (title/body/dataPoints/position). Chart.js
-    // throttles external calls to active-element changes, so the dispose+remount
-    // on body-change is cheap. enabled:false suppresses the built-in canvas
-    // tooltip when we take over.
-    //
-    // Mount-locals (not top-level script `let`s) — read only by tooltipExternal
-    // and the returned teardown below, both defined in THIS $onMount closure.
-    // Emitter-hardening backlog item #2 (project_emitter_hardening_backlog):
-    // every target keeps a $onMount setup-local in scope for its own returned
-    // teardown, so these no longer need the prior COMPONENT-scope workaround.
-    // ─── external-HTML tooltip portal slot ─────────────────────────────────────
-    // Only active when the consumer fills <slot name="tooltip">. The external
-    // handler positions a container over the canvas and mounts the consumer's
-    // framework-native fragment through $portals.tooltip(dom, scope). The scope
-    // carries the live tooltip model (title/body/dataPoints/position). Chart.js
-    // throttles external calls to active-element changes, so the dispose+remount
-    // on body-change is cheap. enabled:false suppresses the built-in canvas
-    // tooltip when we take over.
-    //
-    // Mount-locals (not top-level script `let`s) — read only by tooltipExternal
-    // and the returned teardown below, both defined in THIS $onMount closure.
-    // Emitter-hardening backlog item #2 (project_emitter_hardening_backlog):
-    // every target keeps a $onMount setup-local in scope for its own returned
-    // teardown, so these no longer need the prior COMPONENT-scope workaround.
-    let tooltipEl: any = null;
-    let tooltipDispose: any = null;
-    let tooltipKey = '';
-    const tooltipExternal = (context: any) => {
-      const {
-        chart,
-        tooltip
-      } = context;
-      if (!tooltipEl) {
-        tooltipEl = document.createElement('div');
-        tooltipEl.className = 'rozie-chart-tooltip';
-        tooltipEl.style.position = 'absolute';
-        tooltipEl.style.pointerEvents = 'none';
-        tooltipEl.style.transition = 'opacity 0.1s ease';
-        chart.canvas.parentNode.appendChild(tooltipEl);
-      }
-      if (tooltip.opacity === 0) {
-        tooltipEl.style.opacity = '0';
-        return;
-      }
-      const title = (tooltip.title || []).join(' ');
-      const body = (tooltip.body || []).map((b: any) => b.lines.join(' ')).join(' | ');
-      const key = `${title}::${body}`;
-      if (key !== tooltipKey) {
-        tooltipKey = key;
-        tooltipDispose?.();
-        // The scope MUST match the slot's declared param (`model`): the consumer's
-        // <slot name="tooltip"> receives a single `model` scoped value.
-        const scope = {
-          model: {
-            title: tooltip.title || [],
-            body: (tooltip.body || []).map((b: any) => b.lines),
-            dataPoints: tooltip.dataPoints || [],
-            opacity: tooltip.opacity
-          }
-        };
-        tooltipDispose = this.portals.tooltip(tooltipEl, scope);
-      }
-      const {
-        offsetLeft,
-        offsetTop
-      } = chart.canvas;
-      tooltipEl.style.opacity = '1';
-      tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`;
-      tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`;
-    };
-
-    // ─── config builder ────────────────────────────────────────────────────────
-    // $snapshot strips Svelte 5's $state proxy first; Chart.js redefines property
-    // descriptors on whatever object it is handed.
-    // ─── config builder ────────────────────────────────────────────────────────
-    // $snapshot strips Svelte 5's $state proxy first; Chart.js redefines property
-    // descriptors on whatever object it is handed.
-    this.buildConfig = () => {
-      const userOpts = this.options() || {};
-      const tooltipOpt = (this.tooltipTpl ?? this.__rozieFillMap()['tooltip'] ?? this.templates()?.['tooltip']) ? {
-        ...(userOpts.plugins?.tooltip || {}),
-        enabled: false,
-        external: tooltipExternal
-      } : userOpts.plugins?.tooltip;
-      return {
-        type: 'radar',
-        data: this.data(),
-        // per-instance plugins[] — the consumer-extensibility passthrough.
-        plugins: this.plugins(),
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: {
-            duration: 250
-          },
-          ...userOpts,
-          onClick: composedOnClick,
-          onHover: composedOnHover,
-          plugins: {
-            ...(userOpts.plugins || {}),
-            tooltip: tooltipOpt
-          }
-        }
-      };
-    };
     this.instance = new ChartJS(this.canvasEl, this.buildConfig());
     this.__rozieDestroyRef.onDestroy(() => {
       const __destroyDelay = this.destroyDelay();
-      tooltipDispose?.();
-      tooltipEl?.remove();
+      this.tooltipDispose?.();
+      this.tooltipEl?.remove();
       // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
       // can finish. The captured `dying` instance is destroyed after the grace;
       // 0 (default) destroys synchronously.
@@ -396,9 +245,114 @@ export class Radar {
 
   instance: any = null;
   canvasEl: any = null;
-  buildConfig: any = null;
+  composedOnClick = (e: any, activeEls: any, chart: any) => {
+    const userOnClick = this.options()?.onClick;
+    if (typeof userOnClick === 'function') userOnClick(e, activeEls, chart);
+    const nearest = chart.getElementsAtEventForMode(e, 'nearest', {
+      intersect: true
+    }, false);
+    this.click.emit({
+      event: e,
+      elements: nearest,
+      chart
+    });
+    const dataset = chart.getElementsAtEventForMode(e, 'dataset', {
+      intersect: true
+    }, false);
+    if (dataset.length) {
+      this.datasetClick.emit({
+        event: e,
+        elements: dataset,
+        datasetIndex: dataset[0].datasetIndex,
+        chart
+      });
+    }
+  };
+  composedOnHover = (e: any, activeEls: any, chart: any) => {
+    const userOnHover = this.options()?.onHover;
+    if (typeof userOnHover === 'function') userOnHover(e, activeEls, chart);
+    this.hover.emit({
+      event: e,
+      elements: activeEls,
+      chart
+    });
+  };
+  tooltipEl: any = null;
+  tooltipDispose: any = null;
+  tooltipKey = '';
+  tooltipExternal = (context: any) => {
+    const {
+      chart,
+      tooltip
+    } = context;
+    if (!this.tooltipEl) {
+      this.tooltipEl = document.createElement('div');
+      this.tooltipEl.className = 'rozie-chart-tooltip';
+      this.tooltipEl.style.position = 'absolute';
+      this.tooltipEl.style.pointerEvents = 'none';
+      this.tooltipEl.style.transition = 'opacity 0.1s ease';
+      chart.canvas.parentNode.appendChild(this.tooltipEl);
+    }
+    if (tooltip.opacity === 0) {
+      this.tooltipEl.style.opacity = '0';
+      return;
+    }
+    const title = (tooltip.title || []).join(' ');
+    const body = (tooltip.body || []).map((b: any) => b.lines.join(' ')).join(' | ');
+    const key = `${title}::${body}`;
+    if (key !== this.tooltipKey) {
+      this.tooltipKey = key;
+      this.tooltipDispose?.();
+      // The scope MUST match the slot's declared param (`model`): the consumer's
+      // <slot name="tooltip"> receives a single `model` scoped value.
+      const scope = {
+        model: {
+          title: tooltip.title || [],
+          body: (tooltip.body || []).map((b: any) => b.lines),
+          dataPoints: tooltip.dataPoints || [],
+          opacity: tooltip.opacity
+        }
+      };
+      this.tooltipDispose = this.portals.tooltip(this.tooltipEl, scope);
+    }
+    const {
+      offsetLeft,
+      offsetTop
+    } = chart.canvas;
+    this.tooltipEl.style.opacity = '1';
+    this.tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`;
+    this.tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`;
+  };
+  buildConfig = (): any => {
+    const userOpts = this.options() || {};
+    const tooltipOpt = (this.tooltipTpl ?? this.__rozieFillMap()['tooltip'] ?? this.templates()?.['tooltip']) ? {
+      ...(userOpts.plugins?.tooltip || {}),
+      enabled: false,
+      external: this.tooltipExternal
+    } : userOpts.plugins?.tooltip;
+    return {
+      type: 'radar',
+      data: this.data(),
+      // per-instance plugins[] — the consumer-extensibility passthrough.
+      plugins: this.plugins(),
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+          duration: 250
+        },
+        ...userOpts,
+        onClick: this.composedOnClick,
+        onHover: this.composedOnHover,
+        plugins: {
+          ...(userOpts.plugins || {}),
+          tooltip: tooltipOpt
+        }
+      }
+    };
+  };
   recreate = () => {
-    if (!this.buildConfig || !this.canvasEl) return;
+    if (!this.canvasEl) return;
     this.instance?.destroy();
     this.instance = new ChartJS(this.canvasEl, this.buildConfig());
   };
