@@ -57,8 +57,7 @@ jobs:
 
       # Seed from the most recent prior build so unchanged packages hit turbo's
       # content-addressed cache. A `packages/core` change still invalidates the
-      # whole downstream graph and rebuilds it — that is intended, and nothing
-      # here introduces a `--filter` assumption about target independence.
+      # whole downstream graph and rebuilds it — that is intended.
       - name: Restore turbo cache
         uses: actions/cache/restore@v6
         with:
@@ -68,8 +67,36 @@ jobs:
             ${{ runner.os }}-turbo-react-
             ${{ runner.os }}-turbo-
 
+      # Quick 260829-t8t: narrowed from a bare `pnpm turbo run build` (520
+      # tasks) to the consumer-demo closure plus the swipe suite (63 tasks,
+      # -88%) — the `@rozie-ui/<family>-<target>` leaves (~240 tasks) are built
+      # by no step in this workflow. `{./examples/consumers/*}...` is a glob
+      # over every consumer demo plus its dependency closure, so a new demo is
+      # picked up automatically rather than rotting out of a hardcoded list.
+      # This still pulls in all six `@rozie/target-*` packages (via
+      # `@rozie/unplugin`'s devDeps), which the swipe canary's emit tests and
+      # the dts-identity test below need to see every target's `dist/`.
+      # The swipe test package gets its own filter term, not covered by the
+      # demo glob: `react-matrix` runs `vitest --root tests/plugins/swipe`
+      # (the swipe MOD-05 dogfood) against that package directly.
+      #
+      # The demo set is NOT trimmable to `react-vite-demo` alone: the
+      # `react-matrix` job's WR-03 step (`check-sidecar-staleness.mjs
+      # --require-complete`) walks ALL of `examples/consumers/`, not just the
+      # React demo, and hard-fails on any `.rozie` with no sidecar next to it.
+      # `angular-analogjs-demo` is the one exclusion, mirroring that gate's own
+      # `skipDirs: ['angular-analogjs']` — its sidecars are never required, and
+      # it is the single expensive (ngtsc AOT) build in the set.
+      #
+      # All three `turbo run build` invocations in this file (here, in
+      # `react-matrix` below, and in `preact-compat`) MUST carry the identical
+      # filter: this job is the turbo-cache producer both cells restore from
+      # (quick 260825-hp3), so a narrower producer set would force them to
+      # rebuild the difference and break the producer/consumer contract.
+      # `preact-compat` carries this filter for that cache-contract reason —
+      # it does not itself run the swipe suite.
       - name: Build all packages
-        run: pnpm turbo run build
+        run: pnpm turbo run build --filter='{./examples/consumers/*}...' --filter='!angular-analogjs-demo' --filter='rozie-plugin-swipe-test...'
 
       # Hoisted out of the matrix cells (quick 260825-n4y). These two suites are
       # framework-agnostic — nothing in either varies with this workflow's matrix
@@ -138,10 +165,12 @@ jobs:
             ${{ runner.os }}-turbo-react-
             ${{ runner.os }}-turbo-
 
-      # Build the whole workspace via turbo. The swipe canary's emit tests
+      # Build the workspace via turbo. The swipe canary's emit tests
       # (Plan 07.1-03) import @rozie/target-{angular,svelte,solid,lit} and the
       # dts-identity test reads every target's dist/index.d.mts, so all 6
-      # targets must be built before the unit-test step runs.
+      # targets must be built before the unit-test step runs. That still holds
+      # under the narrowed filter below, because `@rozie/unplugin` devDepends
+      # on all six `@rozie/target-*` packages.
       #
       # Phase 22 / REQ-6 (sidecar generation BEFORE typecheck): `turbo run build`
       # includes `react-vite-demo#build` (`vite build`), whose @rozie/unplugin
@@ -150,8 +179,22 @@ jobs:
       # fresh checkout they are absent — this step GENERATES them, and it runs
       # BEFORE the "Typecheck demo" step below, closing the cold-checkout race
       # (tsc must never resolve a `.rozie` import before its sidecar exists).
+      #
+      # Quick 260829-t8t: filtered identically to the `build` job's producer
+      # step above (520 -> 63 tasks, -88%; the ~240 unread `@rozie-ui/*-target`
+      # leaves are dropped). The swipe test package filter term is required
+      # here because the unit-test step below runs
+      # `vitest --root tests/plugins/swipe` — dropping it would leave that
+      # package unbuilt. The demo filter must cover every consumer demo, not
+      # just `react-vite-demo`: the WR-03 step further down
+      # (`check-sidecar-staleness.mjs --require-complete`) walks ALL of
+      # `examples/consumers/` and hard-fails on any `.rozie` with no sidecar
+      # beside it. `angular-analogjs-demo` is excluded because that gate's own
+      # walk already skips `angular-analogjs`. This invocation must stay
+      # identical to the `build` job's, which is the turbo-cache producer this
+      # one restores from.
       - name: Build all packages (generates .d.rozie.ts sidecars before typecheck — REQ-6)
-        run: pnpm turbo run build
+        run: pnpm turbo run build --filter='{./examples/consumers/*}...' --filter='!angular-analogjs-demo' --filter='rozie-plugin-swipe-test...'
 
       # 260825-n4y Tier 2: the Vue target/runtime suites used to run here too.
       # They were inherited when this workflow was created (e304d30b4), not
@@ -271,8 +314,16 @@ jobs:
       # Phase 22 / REQ-6: `turbo run build` includes react-vite-demo#build
       # (vite build), whose @rozie/unplugin buildStart hook emits the per-module
       # <Name>.d.rozie.ts sidecars BEFORE the typecheck step below.
+      #
+      # Quick 260829-t8t: carries the SAME filter as the `build` job's producer
+      # step and the `react-matrix` cell above (520 -> 63 tasks) — including
+      # the swipe test package filter term, even though this job never runs
+      # the swipe suite itself. This job is a cache CONSUMER of the `build`
+      # job (quick 260825-hp3); if its own filter's task set were a strict
+      # subset, this step would rebuild the difference instead of replaying
+      # from cache.
       - name: Build all packages (generates .d.rozie.ts sidecars before typecheck — REQ-6)
-        run: pnpm turbo run build
+        run: pnpm turbo run build --filter='{./examples/consumers/*}...' --filter='!angular-analogjs-demo' --filter='rozie-plugin-swipe-test...'
 
       # WR-03: a .rozie with no fresh sidecar after the build means buildStart
       # silently failed to emit it — a hard CI failure with --require-complete.
