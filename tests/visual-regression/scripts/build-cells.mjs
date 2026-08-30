@@ -12,6 +12,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, copyFileSync, readdirSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -825,6 +826,28 @@ const failures = [];
 
 for (const target of TARGETS) {
   process.stdout.write(`\n[visual-regression] building target: ${target}\n`);
+  // Clear THIS target's output before rebuilding it.
+  //
+  // vite.config.ts sets `emptyOutDir: false` so a sub-build cannot wipe its
+  // SIBLING targets' output — a real constraint, since `ROZIE_VR_TARGETS=lit`
+  // must leave the other five dirs intact. But that setting also meant nothing
+  // ever removed a target's OWN superseded output, and Vite content-hashes
+  // every chunk filename, so each rebuild deposited a complete new generation
+  // alongside all the old ones. Measured before this fix: dist/ held 57,391
+  // files / 1.8GB, of which one live build was 5,735 files / 145MB — ~92% dead
+  // weight spanning ten days of accumulated builds, with ~50 hash-distinct
+  // copies of every chunk (maplibre-gl x50, rete-auto-arrange-plugin x47).
+  //
+  // Removing only `dist/<target>` keeps the sibling guarantee exactly (each
+  // sub-build owns its own subdirectory) while bounding dist/ to one
+  // generation. `dist/index.html` + `dist/compare.html` live at the dist ROOT,
+  // not under a target dir, so they are untouched here and rewritten below.
+  //
+  // Stale output was never SERVED — nothing requests those URLs — so this is
+  // not a test-runtime win; it is disk, the host->container rsync in
+  // tools/ci-repro/vr.sh, Docker mount IO, and the preview server's startup
+  // pre-compression pass, which was compressing 1.67GB to serve ~145MB.
+  rmSync(resolve(ROOT, 'dist', target), { recursive: true, force: true });
   const result = spawnSync(
     'pnpm',
     ['exec', 'vite', 'build', '--config', 'vite.config.ts'],
@@ -844,6 +867,36 @@ for (const target of TARGETS) {
   // runtime). Cleanup-between-targets isolates each sub-build.
   if (target === 'angular') {
     cleanupCrossTreeAngularArtifacts();
+  }
+  // Leaflet's default marker icons, placed where Leaflet actually asks for them.
+  //
+  // `examples/LeafletMap.rozie` calls `L.marker(...)`, which uses
+  // `L.Icon.Default`. Leaflet resolves that icon's URLs at RUNTIME relative to
+  // the document, so the browser requests `/<target>/host/marker-icon.png` and
+  // `/<target>/host/marker-shadow.png`. Nothing emitted those files, so both
+  // 404ed — the demo has been drawing markers with broken icons.
+  //
+  // It went unnoticed because `vite preview` answers ANY unmatched path with
+  // `index.html` at 200 (SPA fallback, extension or not), so the browser got
+  // HTML where it expected a PNG, failed silently, and logged nothing. The
+  // multi-process host in scripts/serve-dist.mjs returns an honest 404, which
+  // made leaflet-map.spec.ts's long-standing `consoleErrors` assertion fire on
+  // all six targets. The assertion was right; the 200 was the bug.
+  //
+  // Copying the real images from the installed leaflet package is the narrow
+  // fix: it changes no `.rozie` source, so no emitted target output and no
+  // dist-parity fixture moves. NOTE the consumer-facing caveat this does NOT
+  // address — an app importing LeafletMap.rozie through its own bundler hits
+  // the same well-known Leaflet-plus-bundler icon gotcha and must set
+  // `L.Icon.Default.mergeOptions({...})` with bundler-resolved URLs. That
+  // belongs in the example's docs, not in the VR host.
+  const leafletImages = dirname(
+    createRequire(import.meta.url).resolve('leaflet/dist/images/marker-icon.png'),
+  );
+  const hostDir = resolve(ROOT, 'dist', target, 'host');
+  mkdirSync(hostDir, { recursive: true });
+  for (const img of ['marker-icon.png', 'marker-icon-2x.png', 'marker-shadow.png']) {
+    copyFileSync(resolve(leafletImages, img), resolve(hostDir, img));
   }
   if (result.status !== 0) {
     if (SOFT_FAIL_TARGETS.has(target)) {
