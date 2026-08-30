@@ -61,8 +61,9 @@ jobs:
 
       # Seed from the most recent prior build so unchanged packages hit turbo's
       # content-addressed cache. A `packages/core` change still invalidates the
-      # whole downstream graph and rebuilds it — that is intended, and nothing
-      # here introduces a `--filter` assumption about target independence.
+      # whole downstream graph and rebuilds it — that is intended. (This claim
+      # was never repo-wide even before this change: `integration-build`,
+      # further down this same file, has always built through a `--filter`.)
       - name: Restore turbo cache
         uses: actions/cache/restore@v6
         with:
@@ -72,8 +73,46 @@ jobs:
             ${{ runner.os }}-turbo-angular-
             ${{ runner.os }}-turbo-
 
+      # Quick 260829-t8t: narrowed from a bare `pnpm turbo run build` (520
+      # tasks) to the consumer-demo closure (63 tasks, -88%) — the
+      # `@rozie-ui/<family>-<target>` leaves (~240 tasks) are built by no step
+      # in this workflow. `{./examples/consumers/*}...` is a glob over every
+      # consumer demo plus its dependency closure, so a new demo is picked up
+      # automatically rather than rotting out of a hardcoded list. This still
+      # pulls in all six `@rozie/target-*` packages (via `@rozie/unplugin`'s
+      # devDeps), which the swipe canary's emit tests and the dts-identity
+      # test need to see every target's `dist/`.
+      #
+      # This file DELIBERATELY OMITS the `!angular-analogjs-demo` exclusion
+      # that the other five matrix workflows carry: the `angular-matrix` job
+      # below typechecks, builds and Playwright-e2e's `angular-analogjs-demo`
+      # itself, so excluding it here would delete the workflow's own subject.
+      # Both `angular-analogjs-demo` and `@rozie/runtime-angular` are verified
+      # present inside this closure.
+      #
+      # The demo set is NOT trimmable to `angular-analogjs-demo` alone: the
+      # `angular-matrix` job's WR-03 step (`check-sidecar-staleness.mjs
+      # --require-complete`) walks ALL of `examples/consumers/` and hard-fails
+      # on any non-Angular `.rozie` with no sidecar next to it.
+      #
+      # Both `turbo run build` invocations in this file (here and in
+      # `angular-matrix` below) MUST carry the identical filter: this job is
+      # the turbo-cache producer the cell restores from (quick 260825-hp3), so
+      # a narrower producer set would force the cell to rebuild the difference
+      # and break the producer/consumer contract. `integration-build`'s own
+      # `--filter @rozie/unplugin --filter @rozie/runtime-angular` (further
+      # down this file) is a separate, pre-existing, narrower filter — its
+      # task set is a subset of this closure, so it still replays from the
+      # cache this job produces; see the comment above that step.
+      #
+      # ANGULAR EXCEPTION (post-Phase-22 regression fix, 2026-06-02): the
+      # Angular target gets NO `.d.rozie.ts` sidecars — a type-only declaration
+      # next to a `.rozie` source shadows the disk-cache `.rozie.ts` in
+      # ngtsc's resolution and silently kills AOT ("JIT compiler unavailable").
+      # The disk-cache class IS the Angular typed-import surface. See
+      # packages/unplugin/src/emitSidecar.ts ANGULAR EXCEPTION.
       - name: Build all packages
-        run: pnpm turbo run build
+        run: pnpm turbo run build --filter='{./examples/consumers/*}...'
 
       # Hoisted out of the matrix cells (quick 260825-n4y). These two suites are
       # framework-agnostic — nothing in either varies with this workflow's matrix
@@ -157,10 +196,12 @@ jobs:
             ${{ runner.os }}-turbo-angular-
             ${{ runner.os }}-turbo-
 
-      # Build the whole workspace via turbo. The swipe canary's emit tests
+      # Build the workspace via turbo. The swipe canary's emit tests
       # (Plan 07.1-03) import every target's dist/ and the dts-identity test
       # reads every target's dist/index.d.mts — so all 6 targets must be built
-      # even on Angular-only CI runs.
+      # even on Angular-only CI runs. That still holds under the narrowed
+      # filter below, because `@rozie/unplugin` devDepends on all six
+      # `@rozie/target-*` packages.
       #
       # Phase 22 / REQ-6: `turbo run build` includes `angular-analogjs-demo#build`
       # (`vite build`), whose @rozie/unplugin configResolved prebuild writes the
@@ -174,8 +215,16 @@ jobs:
       # and silently kills AOT ("JIT compiler unavailable"). The disk-cache class
       # IS the Angular typed-import surface. See
       # packages/unplugin/src/emitSidecar.ts ANGULAR EXCEPTION.
+      #
+      # Quick 260829-t8t: filtered identically to the `build` job's producer
+      # step above (520 -> 63 tasks, -88%). This file deliberately omits the
+      # `!angular-analogjs-demo` exclusion the other five matrix workflows
+      # carry, because this job builds, typechecks and e2e's that demo itself
+      # (see the comment above the `build` job's producer step for the full
+      # rationale). This invocation must stay identical to the `build` job's,
+      # which is the turbo-cache producer this one restores from.
       - name: Build all packages (generates .rozie.ts disk-cache before typecheck — REQ-6)
-        run: pnpm turbo run build
+        run: pnpm turbo run build --filter='{./examples/consumers/*}...'
 
       # 260825-n4y Tier 2: the svelte/vue/react target suites and the vue/react
       # runtime suites used to run here. All six arrived in this workflow's own
@@ -347,8 +396,13 @@ jobs:
       # packages) are built first — `pnpm --filter @rozie/unplugin run
       # build` builds ONLY the unplugin and Vite then crashes loading
       # dist/src-*.mjs with `Cannot find module '@rozie/core/dist/index.mjs'`
-      # because the leaf dep was never produced. Mirror the angular-matrix
-      # job above which uses `pnpm turbo run build`.
+      # because the leaf dep was never produced. Quick 260829-t8t: the
+      # `angular-matrix` job above now builds through the consumer-demo
+      # closure (`--filter='{./examples/consumers/*}...'`) rather than a bare
+      # `pnpm turbo run build`; this job keeps its own narrower two-package
+      # filter below. That narrower set is a SUBSET of the closure the
+      # `angular-matrix`/`build` jobs produce, so this step still replays from
+      # the same restored turbo cache rather than rebuilding.
       #
       # `@rozie/runtime-angular` needs its OWN filter. It is a direct dependency
       # of the integration project, NOT of @rozie/unplugin, so it is absent from
