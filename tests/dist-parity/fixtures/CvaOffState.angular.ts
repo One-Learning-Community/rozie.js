@@ -22,6 +22,10 @@ import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runti
 export class CvaOffState {
   value = model<string>('');
 
+  // Producer-side write to the `value` model prop: writing `$model.value`
+  // lowers to each target's two-way emit (Vue `emit('update:value', …)`,
+  // React `onValueChange?.(…)`, Angular `valueChange.emit(…)`, etc.). This is
+  // the single-model shape Phase 23's CVA auto-wires the Angular accessor onto.
   onInput = (e: any) => {
     this.value.set(e.target.value);
   };

@@ -145,17 +145,27 @@ export class NumberField {
     });
   }
 
+  // ---- top-level mutable handles (hook-referenced → React useRef hoist) -------
+  // The press-hold repeat timer + its current interval (the ramp). Declared at the
+  // top level so React hoists them to useRef and the Solid onMount/onCleanup split
+  // sees them in teardown. `null`/0 when no repeat is running.
   holdTimer: any = null;
   holdInterval = 0;
+  // Scrub-on-drag state (also top-level so teardown sees it).
   scrubbing = false;
   scrubStartX = 0;
   scrubStartValue = 0;
+  // ---- numeric helpers (plain functions, uniform ×6) -------------------------
+  // The current value as a real number, or null when empty. Named readValue, NOT
+  // valueOf — a `valueOf` binding cascades TS1240/1271 across the Lit class via
+  // Object.prototype.
   readValue = () => {
     const v = this.modelValue();
     return typeof v === 'number' && !Number.isNaN(v) ? v : null;
   };
   hasMin = () => typeof this.min() === 'number' && !Number.isNaN(this.min());
   hasMax = () => typeof this.max() === 'number' && !Number.isNaN(this.max());
+  // Clamp n to [min, max] (whichever bounds are set).
   clampValue = (n: any) => {
     const __min = this.min();
     const __max = this.max();
@@ -164,6 +174,7 @@ export class NumberField {
     if (this.hasMax() && out > __max) out = __max;
     return out;
   };
+  // Snap n to the nearest multiple of `step` measured from `min` (or 0).
   snapValue = (n: any) => {
     const __step = this.step();
     const stepSize = typeof __step === 'number' && __step > 0 ? __step : 1;
@@ -173,6 +184,7 @@ export class NumberField {
     const decimals = (String(stepSize).split('.')[1] || '').length;
     return decimals > 0 ? Number(snapped.toFixed(decimals)) : snapped;
   };
+  // ---- locale formatting (plain functions, uniform ×6) -----------------------
   formatter = () => {
     try {
       return new Intl.NumberFormat(undefined, this.formatOptions() || {});
@@ -180,10 +192,14 @@ export class NumberField {
       return new Intl.NumberFormat();
     }
   };
+  // The value formatted for display (empty string when null).
   formatted = () => {
     const n = this.readValue();
     return n === null ? '' : this.formatter().format(n);
   };
+  // Parse a user-typed string back to a number, or null when it is not a number.
+  // Strips grouping separators + any non-numeric currency/percent chrome, keeping
+  // digits, a sign, a decimal point, and an exponent.
   parseText = (raw: any) => {
     if (raw == null) return null;
     const s = String(raw).trim();
@@ -192,11 +208,18 @@ export class NumberField {
     const n = Number.parseFloat(cleaned);
     return Number.isNaN(n) ? null : n;
   };
+  // What the <input> should show: the live edit buffer while focused, otherwise
+  // the locale-formatted value. A plain function (read in the template + handlers).
   displayText = () => this.focused() ? this.text() : this.formatted();
+  // ---- aria helpers (numbers/strings bound cleanly) --------------------------
   ariaText = () => {
     const n = this.readValue();
     return n === null ? '' : this.formatted();
   };
+  // ---- write funnel (single $emit site) --------------------------------------
+  // Clamp + snap, write the model, mirror into the edit buffer, emit change. Named
+  // commitValue (NOT writeValue) so it does not collide with the generated Angular
+  // ControlValueAccessor.writeValue (TS2300).
   commitValue = (n: any) => {
     let next = n;
     if (next !== null) {
@@ -210,6 +233,8 @@ export class NumberField {
       value: next
     });
   };
+  // Step by a signed multiple of `step` (used by buttons + arrows). A null value
+  // seeds from min (or 0) so the first step lands on a sensible number.
   stepBy = (dir: any, size: any) => {
     const __step = this.step();
     if ((this.disabled() || this.__rozieCvaDisabled()) || this.readonly()) return;
@@ -218,6 +243,8 @@ export class NumberField {
     const base = cur === null ? this.hasMin() ? this.min() : 0 : cur;
     this.commitValue(base + dir * stepSize);
   };
+  // ---- press-hold acceleration ----------------------------------------------
+  // Stop any running repeat (pointerup / pointerleave / unmount).
   stopHold = () => {
     if (this.holdTimer !== null) {
       clearTimeout(this.holdTimer);
@@ -225,6 +252,7 @@ export class NumberField {
     }
     this.holdInterval = 0;
   };
+  // Start a repeating step that ramps from slow to fast while the button is held.
   startHold = (dir: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled()) || this.readonly()) return;
     this.stopHold();
@@ -238,11 +266,13 @@ export class NumberField {
     };
     this.holdTimer = setTimeout(tick, this.holdInterval);
   };
+  // ---- input + keyboard handlers ---------------------------------------------
   onInput = (e: any) => {
     if (this.readonly()) return;
     const raw = e && e.target ? e.target.value : '';
     this.text.set(raw);
   };
+  // Commit the edit buffer on blur: parse → commit (or clear to null when empty).
   onBlur = () => {
     this.focused.set(false);
     const parsed = this.parseText(this.text());
@@ -288,6 +318,13 @@ export class NumberField {
       this.commitValue(parsed);
     }
   };
+  // ---- scrub-on-drag (opt-in) ------------------------------------------------
+  // Uses POINTER CAPTURE on the input element itself (set on pointerdown) so the
+  // pointermove/pointerup keep firing on the same element through the whole drag,
+  // even when the pointer leaves the element — no document-level <listeners> (which
+  // would also avoid the React-effect `$event`-in-deps emitter edge). The handlers
+  // are bound directly on the <input> in the template, where `@event` passes a
+  // properly-typed `$event`.
   onScrubDown = (e: any) => {
     if (!this.allowScrub() || (this.disabled() || this.__rozieCvaDisabled()) || this.readonly()) return;
     this.scrubbing = true;
@@ -314,6 +351,10 @@ export class NumberField {
   onScrubUp = () => {
     this.scrubbing = false;
   };
+  // ---- lifecycle + imperative handle -----------------------------------------
+  // focus() — move DOM focus to the input. DELIBERATELY overrides
+  // HTMLElement.focus on Lit (ROZ137 warn, accepted). increment()/decrement() —
+  // step once by `step`. clear() — set the value to null and clear the buffer.
   focus = () => {
     const el = this.input()?.nativeElement;
     // NOTE: $refs.input types to the generic HTMLElement on the tsdown/vue leaves

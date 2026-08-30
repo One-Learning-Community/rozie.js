@@ -20,6 +20,11 @@ export class PartialInlineHostK {
   base = input<number>(1);
 
   tickK = () => this.base() * 2;
+  // columnChromeK — the run-LEADING comment that flows directly below the host `const tickK`
+  // arrow const (gap-0 seam; no hoisted import — the arrow bodies close over host scope, the
+  // real DataTable columnChrome shape). This block is the partial's first surviving decl's
+  // leading comment; it transfers into the host verbatim (doubled on svelte/vue per-statement),
+  // so the inline oracle carries the IDENTICAL block directly below its own `const tickK`.
   ariaSortK = (n: number): number => this.tickK() + n;
   sortIndicatorK = (n: number): number => this.ariaSortK(n) + 1;
 

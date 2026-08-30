@@ -42,11 +42,6 @@ export class Port {
 
   constructor() {
     this.nt = this.injectedType;
-
-    // Derive side + key from which of output=/input= is set. output wins if both are
-    // (mis)set. `output`/`input` are ordinary identifiers (NOT reserved words) so they
-    // read normally — no member-access-only workaround needed. null key (neither set) ⇒
-    // addPort no-ops on the canvas side (key == null guard).
     effect(() => () => {
       if (this.added) return;
       const live = this.injectedType;
@@ -68,9 +63,21 @@ export class Port {
     }
   }
 
+  // $inject is typed `unknown` (Phase 36 D-4), which the STRICT BUNDLED-LEAF tsc
+  // rejects on `.addPort(...)` (TS2339). The .rozie-native fix is the null-let → `any`
+  // typeNeutralize idiom: alias through a MODULE-SCOPE `let nt = null` so it is in
+  // scope from the Solid hoisted onCleanup teardown (the MapLibre Source/Layer
+  // lesson). ZERO emitter change.
   nt: any = null;
+  // Derive side + key from which of output=/input= is set. output wins if both are
+  // (mis)set. `output`/`input` are ordinary identifiers (NOT reserved words) so they
+  // read normally — no member-access-only workaround needed. null key (neither set) ⇒
+  // addPort no-ops on the canvas side (key == null guard).
   portSide = () => this.output() != null ? 'output' : 'input';
   portKey = () => this.output() != null ? this.output() : this.input();
+  // idempotency flag so the $onMount addPort and the late-context $onUpdate path
+  // (Lit async, REQ-30) never double-add the port. (addTypePort is also idempotent —
+  // same `type::side::key` key, same value — so this is belt-and-suspenders.)
   added = false;
 }
 

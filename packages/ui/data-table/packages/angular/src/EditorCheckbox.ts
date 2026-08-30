@@ -38,6 +38,8 @@ export class EditorCheckbox {
    */
   cancel = input<((...args: any[]) => any) | null>(null);
 
+  // Immediate-commit-on-change: read .checked the global-filter way, coerce to a
+  // real boolean, and commit it directly.
   onChange = (e: any) => {
     const __commit = this.commit();
     __commit && __commit(!!(e && e.target ? e.target.checked : false));

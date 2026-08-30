@@ -26,6 +26,13 @@ import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runti
 export class Counter {
   value = model<number>(0);
 
+  // 07-01 carry-forward (rozie-counter tag collision): pins the deterministic
+  // Angular selector / Lit @customElement tag a component named `Counter` emits
+  // — `rozie-counter`. The collision surfaced in 07-01's counter.spec.ts was a
+  // demo-fixture namespace clash (the Lit interop fixture reused this tag), NOT
+  // an emitter bug; the fix namespaced the Lit interop fixture to
+  // `rozie-lit-counter`. This fixture guards that the emitter's selector
+  // derivation stays stable.
   bump = () => {
     this.value.set(this.value() + 1), this.__rozieCvaOnChange(this.value() + 1);
   };

@@ -136,6 +136,11 @@ export class TodoList {
     } : i));
     this.toggle.emit(id);
   };
+  // Internal method renamed from `remove` to `removeItem` to avoid colliding
+  // with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
+  // methods as class fields and the resulting `remove(id)` signature is
+  // incompatible with the inherited `remove(): void`. Public API is unchanged:
+  // the slot param is still `:remove`, the emitted event is still `'remove'`.
   removeItem = (id: any) => {
     this.items.set(this.items().filter((i: any) => i.id !== id)), this.__rozieCvaOnChange(this.items().filter((i: any) => i.id !== id));
     this.remove.emit(id);

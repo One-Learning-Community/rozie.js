@@ -335,6 +335,9 @@ export class Slider {
     };
   });
 
+  // ---- numeric helpers ---------------------------------------------------
+  // A plain function (not `$computed`) so it reads uniformly across all six
+  // targets — it is called from both the fill $computed and the keyboard augment.
   pct = (v: any) => {
     const __min = this.min();
     const span = this.max() - __min;
@@ -344,6 +347,8 @@ export class Slider {
     if (p > 100) return 100;
     return p;
   };
+  // Clamp a raw number into [min,max] and quantize to `step` (guarding against a
+  // non-finite or zero step). Returns a finite number bounded by the scale.
   clampStep = (raw: any) => {
     const __min = this.min();
     const __max = this.max();
@@ -360,15 +365,22 @@ export class Slider {
     }
     return v;
   };
+  // The current range pair, defaulting to the full span when `value` is not yet a
+  // 2-tuple. Read into a stable local before destructuring — `$props.value`
+  // lowers to a `value()` accessor on Solid, so narrowing one local is uniform.
   rangePair = () => {
     const cur = this.value();
     if (Array.isArray(cur) && cur.length === 2) return [cur[0], cur[1]];
     return [this.min(), this.max()];
   };
+  // The single (scalar) value, defaulting to min when not yet a number.
   singleValue = () => {
     const cur = this.value();
     return typeof cur === 'number' && Number.isFinite(cur) ? cur : this.min();
   };
+  // The marks list, normalised to { value, label } objects. A bare value[] entry
+  // becomes { value, label: String(value) }. A plain function (not $computed) so
+  // it reads uniformly and can be called in the r-for.
   normalizedMarks = () => {
     const __marks = this.marks();
     const list = Array.isArray(__marks) ? __marks : [];
@@ -385,19 +397,29 @@ export class Slider {
       };
     });
   };
+  // Format a value for the bubble / aria-valuetext. A plain function: `$props.x`
+  // reads uniformly inside it.
   display = (v: any) => {
     const __formatValue = this.formatValue();
     if (__formatValue !== null) return __formatValue(v);
     return String(v);
   };
+  // ---- write-back (single emit funnel) -----------------------------------
+  // The SOLE `$emit('change')` site, called from every commit path so the React
+  // prop-destructure for `onChange` hoists exactly once.
   fireChange = (value: any) => this.change.emit({
     value: this.value()
   });
+  // Single-mode commit: capture the fresh number, write the scalar, emit. Never
+  // re-read $data after the write (ROZ138: React setState is async).
   commitSingle = (raw: any) => {
     const v = this.clampStep(raw);
     this.value.set(v), this.__rozieCvaOnChange(v);
     this.fireChange(v);
   };
+  // Range-mode commit: keep the [lo, hi] array SORTED and clamp each thumb at its
+  // neighbour, then write a FRESH array (in-place mutation is dropped on
+  // React/Solid/Lit/Angular change detectors — listbox precedent).
   commitRange = (which: any, raw: any) => {
     const pair = this.rangePair();
     let lo = pair[0];
@@ -408,9 +430,16 @@ export class Slider {
     this.value.set(next), this.__rozieCvaOnChange(next);
     this.fireChange(next);
   };
+  // ---- native input handlers ---------------------------------------------
+  // Single input. `valueAsNumber` is a number (never the string `.value`).
   onInputSingle = ($event: any) => this.commitSingle($event.target.valueAsNumber);
+  // Range inputs (lo / hi).
   onInputLo = ($event: any) => this.commitRange('lo', $event.target.valueAsNumber);
   onInputHi = ($event: any) => this.commitRange('hi', $event.target.valueAsNumber);
+  // ---- PageUp / PageDown augment (Open Q1 / RESEARCH A3) ------------------
+  // Native PageUp/PageDown uses the browser's default large step, which may not
+  // equal `pageStep`. Augment ONLY those two keys: apply ±pageStep (null → step×10),
+  // quantize + clamp via clampStep, write back. Arrows / Home / End stay native.
   effectivePageStep = () => {
     const __step = this.step();
     const ps = this.pageStep();
@@ -434,7 +463,12 @@ export class Slider {
     const base = which === 'lo' ? pair[0] : pair[1];
     this.commitRange(which, base + delta);
   };
+  // ---- imperative handle (D-05) ------------------------------------------
+  // `focus` reads $refs in a post-mount callback (called via the handle) — safe,
+  // never eager (ROZ123). It DELIBERATELY overrides HTMLElement.focus on Lit
+  // (ROZ137 warns; accepted — see header).
   focus = () => this.inputEl()?.nativeElement?.focus();
+  // Step a thumb by ±step. In range mode `thumb` selects 'lo' | 'hi' (default 'lo').
   increment = (thumb: any) => {
     const __step = this.step();
     if (this.range()) {

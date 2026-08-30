@@ -34,15 +34,21 @@ export class ModelParamShadow {
 
   label = computed(() => this.status() + '!');
 
+  // solve(token): param == the model prop name. `$model.token = token` lowers on
+  // Vue to `token.value = token` (param shadows the defineModel ref) pre-fix.
   solve = (token: any) => {
     this.token.set(token), this.__rozieCvaOnChange(token);
     this.verify.emit({
       token: this.token()
     });
   };
+  // setStatus(status): param == the $data key. `$data.status = status` lowers on
+  // Vue to `status.value = status` (param shadows the state ref) pre-fix.
   setStatus = (status: any) => {
     this.status.set(status);
   };
+  // logLabel(label): param == the $computed name. The bare `label` read lowers on
+  // Vue to `label.value` (reads the computed ref, not the param) pre-fix.
   logLabel = (label: any) => {
     this.verify.emit({
       token: label

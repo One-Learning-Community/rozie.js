@@ -51,6 +51,12 @@ export class Tabs {
     return map;
   });
 
+  // NOTE: this helper is intentionally NOT named `setActive` — React
+  // auto-generates a `setActive` setter for the `$data.active` state field, and a
+  // same-named user function collides with it (ROZ524: "already declared" +
+  // infinite recursion when `$data.active = v` rewrites to `setActive(v)`). The
+  // PROVIDED key is still `setActive` (the consumer-facing API); only the local
+  // implementation name differs.
   selectActive = (index: any) => {
     this.active.set(index);
   };

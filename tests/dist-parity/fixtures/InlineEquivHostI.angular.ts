@@ -22,6 +22,7 @@ export class InlineEquivHostI {
 
   headI = (n: number): number => n + 1;
   rangeTransitionI = this.headI(1);
+  // after-side: comment trails the host let rangeTransitionI and leads the spliced afterDeclI below
   afterDeclI = (k: number): number => k * 2;
   fillDragUpI = this.afterDeclI(1);
 

@@ -289,12 +289,25 @@ export class Waveform {
   }
 
   ws: any = null;
+  // Regions plugin instance + its two guards (all top-level for the Solid teardown
+  // scope, same reason as `ws`). `regionsReady` gates the reconcile until the audio
+  // is decoded (addRegion needs a known duration). `reconciling` is the re-entrancy
+  // guard: while a controlled reconcile mutates the engine, the region-event
+  // handlers must NOT emit or write back (that would fight the incoming update) —
+  // only genuine USER edits (outside reconcile) drive the model + emits.
   regionsPlugin: any = null;
   regionsReady = false;
   reconciling = false;
+  // timelinePlugin / hoverPlugin (live plugin-presence toggling) — top-level so
+  // the $watch(timeline)/$watch(hover) blocks below can register/unregister them
+  // on the running engine. wsReady tracks "the engine has decoded audio and
+  // fired `ready`", independent of whether a regions plugin exists — it gates
+  // the rare async-window lazy-registration case in the `ready` handler below.
   timelinePlugin: any = null;
   hoverPlugin: any = null;
   wsReady = false;
+  // Serialize an engine Region to the plain descriptor shape the two-way `regions`
+  // model carries. Pure (no sigils) — safe at top level.
   serializeRegion = (r: any) => ({
     id: r.id,
     start: r.start,
@@ -304,6 +317,9 @@ export class Waveform {
     drag: r.drag,
     resize: r.resize
   });
+  // Value-equality guard (by id + rounded start/end) that stops the
+  // user-edit → writeback → $model.regions → $watch → reconcile loop from
+  // oscillating (the Cropper `sameData` idiom, generalized to a list).
   sameRegions = (list: any, engineRegions: any) => {
     if (!Array.isArray(list) || list.length !== engineRegions.length) return false;
     const key = (r: any) => `${r.id}:${Math.round((r.start ?? 0) * 1000)}:${Math.round((r.end ?? 0) * 1000)}`;
@@ -311,10 +327,17 @@ export class Waveform {
     const b = engineRegions.map(key).sort();
     return a.every((k: any, i: any) => k === b[i]);
   };
+  // Push the live engine regions back into the two-way `regions` model (serialized).
+  // No-op while `reconciling` — a controlled update must not echo back onto itself.
   writeBackRegions = () => {
     if (!this.regionsPlugin || this.reconciling) return;
     this.regions.set(this.regionsPlugin.getRegions().map(this.serializeRegion));
   };
+  // Reconcile the live engine regions to match a consumer-provided descriptor list:
+  // update-by-id, add the new, remove the missing. Guarded by `reconciling` so the
+  // add/remove/setOptions calls don't trigger writeBackRegions mid-flight. If any
+  // region was added WITHOUT a consumer id, echo the engine state (now carrying the
+  // assigned ids) back once so the two-way binding gains them.
   reconcileRegions = (list: any) => {
     if (!this.regionsPlugin || !Array.isArray(list)) return;
     const current = this.regionsPlugin.getRegions();
@@ -359,6 +382,13 @@ export class Waveform {
     this.reconciling = false;
     if (addedWithoutId) this.writeBackRegions();
   };
+  // Attach the 6 region-event listeners to a live RegionsPlugin instance — shared
+  // by the construction-time path (buildWaveSurfer) and the lazy path
+  // (ensureRegionsPlugin) so both register identical behavior through one code
+  // path. Each writeback/emit is a no-op during a controlled reconcile (the
+  // `reconciling` guard) so a programmatic add/update/remove does not echo back
+  // or double-emit; only genuine user gestures (drag-create, drag/resize,
+  // delete) drive the model + emits.
   wireRegionsPluginEvents = (plugin: any) => {
     plugin.on('region-created', (region: any) => {
       if (this.reconciling) return;
@@ -388,6 +418,11 @@ export class Waveform {
       this.regionOut.emit(this.serializeRegion(region));
     });
   };
+  // Lazily register the Regions plugin on the LIVE engine (idempotent — a no-op
+  // if it already exists or the engine isn't built yet). Shared by the `ready`
+  // handler's async-window catch-up and the $watch(regions) transition-to-array
+  // path, so `regions` flipping from null/undefined to an array after mount
+  // registers the plugin without a remount.
   ensureRegionsPlugin = () => {
     if (this.regionsPlugin || !this.ws) return this.regionsPlugin;
     this.regionsPlugin = RegionsPlugin.create();
@@ -400,6 +435,9 @@ export class Waveform {
     }
     return this.regionsPlugin;
   };
+  // Build the engine. The whole config object is untyped (ws is `any`) so the
+  // constructor's options + event-callback params are unchecked against wavesurfer's
+  // strict types (the Cropper buildCropper idiom).
   buildWaveSurfer = () => {
     const __peaks = this.peaks();
     const __duration = this.duration();
@@ -490,6 +528,11 @@ export class Waveform {
     // lazy registration wire identical listener behavior through one function.
     if (this.regionsPlugin) this.wireRegionsPluginEvents(this.regionsPlugin);
   };
+  // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
+  // Collision-clear across all six targets: canonical media verbs play/pause/
+  // playPause kept (the emits were renamed playing/paused/finished to dodge ROZ121);
+  // no setCurrentTime (React model auto-setter, ROZ524 — use setTime); no Lit
+  // reserved lifecycle name (update/render/firstUpdated/updated/willUpdate/requestUpdate).
   play = () => {
     if (this.ws) this.ws.play();
   };
@@ -532,6 +575,10 @@ export class Waveform {
   getWaveSurfer = () => {
     return this.ws;
   };
+  // Regions imperative surface (active only when the `regions` array registered the
+  // plugin). `addRegion` returns the created engine Region; NO `setRegions` verb
+  // (the React `regions`-model auto-setter, ROZ524 — drive the list via the two-way
+  // binding instead).
   addRegion = (opts: any) => {
     return this.regionsPlugin ? this.regionsPlugin.addRegion(opts) : null;
   };

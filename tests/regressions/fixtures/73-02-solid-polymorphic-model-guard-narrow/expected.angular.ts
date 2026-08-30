@@ -26,6 +26,10 @@ import { createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozi
 export class PolymorphicModelGuardNarrow {
   value = model<string | Record<string, any>>('');
 
+  // project_solid_polymorphic_model_typeof_narrow_gap / emitter-hardening
+  // backlog item #11: capturing the guard-and-reread pattern directly (no
+  // author-side workaround) — the emitter must bind a local before the guard
+  // so the narrowing holds uniformly on all six targets.
   selected = (): string => {
     const v = this.value();
     return typeof v === 'string' ? v : '';

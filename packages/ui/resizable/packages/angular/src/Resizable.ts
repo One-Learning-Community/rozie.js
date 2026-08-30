@@ -187,9 +187,14 @@ export class Resizable {
     return clampPercent(raw, __min, this.max());
   };
   isVertical = () => this.direction() === 'vertical';
+  // Inline CSS custom property positioning the panels. Read BARE in the template
+  // via :style — a plain object literal, recomputed each render.
   sizeStyle = () => ({
     '--rozie-resizable-size': this.currentSize() + '%'
   });
+  // ---- write funnel (single $emit site) ----------------------------------
+  // Clamp, write the model, emit resize. The SOLE $emit('resize') site so the
+  // React prop-destructure for onResize hoists exactly once.
   commitSize = (raw: any) => {
     const next = clampPercent(raw, this.min(), this.max());
     this.size.set(next), this.__rozieCvaOnChange(next);
@@ -197,6 +202,8 @@ export class Resizable {
       size: next
     });
   };
+  // ---- pointer drag (template @event + pointer capture) ------------------
+  // $refs.root is post-mount-only (ROZ123-safe): read inside these handlers.
   onPointerDown = (e: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
     if (e && e.preventDefault) e.preventDefault();
@@ -224,6 +231,9 @@ export class Resizable {
       }
     }
   };
+  // ---- keyboard (role="separator") ---------------------------------------
+  // Arrow keys nudge by 1% (toward/away from the start panel along the axis);
+  // Home/End jump to min/max. Matches the WAI-ARIA window-splitter pattern.
   onKeydown = (e: any) => {
     const __min = this.min();
     const __max = this.max();
@@ -246,6 +256,17 @@ export class Resizable {
       this.commitSize(__max);
     }
   };
+  // ---- imperative handle -------------------------------------------------
+  // applySize(percent) — set the split programmatically (clamped + emits resize).
+  // reset() — recentre to the midpoint of [min, max].
+  // COLLISION NOTE: the verb is `applySize`, NOT the natural `setSize` — the model
+  // prop is `size`, so the React emitter auto-generates a `setSize` state setter.
+  // A `$expose` verb named `setSize` collapses onto that setter ident and trips
+  // ROZ524 (it fires as an INTERNAL diagnostic because the Phase-46 deconfliction
+  // pass does NOT rename inside an `$expose`-verb closure — see the emitter-gap
+  // note in the family README). `apply<X>` is the listbox/data-table precedent for
+  // dodging a generated React setter. It is also NOT `resize` (→ ROZ121 emit clash)
+  // and NOT a host-element member.
   applySize = (percent: any) => this.commitSize(percent);
   reset = () => this.commitSize((this.min() + this.max()) / 2);
 

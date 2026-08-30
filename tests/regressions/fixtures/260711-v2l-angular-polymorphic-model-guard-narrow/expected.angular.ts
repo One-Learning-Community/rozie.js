@@ -26,6 +26,10 @@ import { createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozi
 export class AngularPolymorphicModelGuardNarrow {
   value = model<string | Record<string, any>>('');
 
+  // project_angular_typeof_narrow_gap / quick task 260711-v2l: capturing the
+  // guard-and-reread pattern directly (no author-side workaround) — the
+  // emitter must bind a local before the guard so the narrowing holds
+  // uniformly on all six targets.
   selected = (): string => {
     const v = this.value();
     return typeof v === 'string' ? v : '';

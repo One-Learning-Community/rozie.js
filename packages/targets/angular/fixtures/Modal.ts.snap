@@ -145,6 +145,8 @@ export class Modal {
     this.open.set(false), this.__rozieCvaOnChange(false);
     this.close.emit();
   };
+  // Body-scroll-lock state lives outside reactive data because it tracks DOM
+  // rather than UI; managed entirely via lifecycle and listeners.
   savedBodyOverflow = '';
   lockScroll = () => {
     if (!this.lockBodyScroll() || !this.open()) return;

@@ -49,9 +49,6 @@ export class EditorText {
     // Seed the draft once at setup from the incoming value (setup-once, NOT in the
     // template). Normalize null/undefined to '' so the input value binds to a string.
     this.draft.set(this.value() != null ? String(this.value()) : '');
-
-    // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
-    // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
     effect(() => { const __watchVal = (() => this.autofocus())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
       if (v) this.inputEl()?.nativeElement?.focus();
     })(__watchVal); }); });
@@ -61,9 +58,12 @@ export class EditorText {
     if (this.autofocus()) this.inputEl()?.nativeElement?.focus();
   }
 
+  // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
+  // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
   onInput = (e: any) => {
     this.draft.set(e && e.target ? e.target.value : '');
   };
+  // commit/cancel are Function props (default null) — guard before calling.
   doCommit = () => {
     const __commit = this.commit();
     __commit && __commit(this.draft());

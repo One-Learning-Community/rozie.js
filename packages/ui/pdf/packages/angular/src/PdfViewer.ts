@@ -243,19 +243,49 @@ export class PdfViewer {
     });
   }
 
+  // pdfjs is DYNAMICALLY imported in $onMount, NOT a top-level import: pdfjs's main
+  // build evaluates browser globals (DOMMatrix, …) at module-load time, which
+  // crashes SSR (Next / Nuxt / SvelteKit / Analog / VitePress). Lazy-importing it on
+  // mount makes the component SSR-safe for ALL consumers AND code-splits the ~1MB
+  // engine out of the initial bundle. `pdfjsLib` is a null-let → typeNeutralize
+  // `any` (so pdfjsLib.getDocument / .TextLayer / .GlobalWorkerOptions are unchecked).
   pdfjsLib: any = null;
+  // version-locked jsDelivr CDN base for the workerSrc/standardFontDataUrl
+  // defaults — built from pdfjsLib.version (read at runtime off the dynamically
+  // imported engine, once resolved) rather than a hand-typed version string, so
+  // the default can never drift from the pdfjs-dist actually installed. NOT
+  // `new URL(..., import.meta.url)`: that idiom is left unresolved by the
+  // Angular (analogjs) AOT pipeline and trips ngtsc into a JIT fallback (see the
+  // PdfViewerDemo `?url`-worker note) — a plain CDN string works uniformly across
+  // every target's own build tooling AND every downstream consumer bundler.
   cdnBase = () => {
     return 'https://cdn.jsdelivr.net/npm/pdfjs-dist@' + this.pdfjsLib.version;
   };
+  // more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
+  // the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
+  // containerEl is the scroll host, observer is the continuous-mode scroll spy,
+  // resizeObserver is the autoFit resize sensor (separate from `observer` — that
+  // one is IntersectionObserver-typed, this one ResizeObserver-typed).
   instance: any = null;
   containerEl: any = null;
   observer: any = null;
   resizeObserver: any = null;
+  // the PDFDocumentLoadingTask — it (NOT the PDFDocumentProxy, which has no
+  // destroy() in pdfjs v6) owns teardown of the worker + document. Held so a
+  // src/password change or unmount can tear the previous load down.
   loadingTask: any = null;
+  // monotonic token cancels stale async loads/renders (src can change mid-render,
+  // pages render async — the SortableList rebuild-cancel discipline).
   renderToken = 0;
+  // find/search state. findQuery is the active lowercased query (''=inactive);
+  // findMatches is a flat per-OCCURRENCE list [{ page }] (drives the count + the
+  // next/prev cycle); findIndex is the current match (-1=none). TOP-LEVEL lets (not
+  // $onMount-local) so renderPage's coarse highlight pass + the find verbs can read
+  // them across renders.
   findQuery = '';
   findMatches = [];
   findIndex = -1;
+  // ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
   buildSource = () => {
     const __password = this.password();
     let cfg: any = null;
@@ -291,6 +321,7 @@ export class PdfViewer {
     cfg.standardFontDataUrl = this.standardFontDataUrl() || this.cdnBase() + '/standard_fonts/';
     return cfg;
   };
+  // ─── render one page (canvas + optional text layer) into the container ───────
   renderPage = async (pdf: any, pageNum: any, container: any) => {
     const __zoom = this.zoom();
     const __rot = this.rot();
@@ -357,6 +388,17 @@ export class PdfViewer {
     });
     return pageDiv;
   };
+  // continuous-mode scroll spy — reflect the most-visible page into $data.current.
+  // It ONLY writes $data.current (which echoes to $model.page + the `pagechange`
+  // event via the $data.current $watch); it deliberately does NOT scroll. The
+  // scroll-into-view lives at the navigation origins (goToPage + the `page`-prop
+  // $watch) so an observer-driven page change never snaps the view back under the
+  // user's own scroll. This is the origin-distinguishing fix for the render-all-
+  // pages scroll fight: a suppress flag set here and read by the ASYNC $data.current
+  // effect is defeated by flush timing (the flag is already reset by the time the
+  // deferred effect runs — true on Vue's flush:'pre' and every other target's
+  // deferred-effect model), so origin is encoded by WHERE scrollToPage is called,
+  // not by a boolean held across a flush.
   setupScrollSpy = () => {
     if (this.observer) {
       this.observer.disconnect();
@@ -390,6 +432,7 @@ export class PdfViewer {
       behavior: 'auto'
     });
   };
+  // ─── render the current view (single page, or all pages) ─────────────────────
   renderView = async () => {
     const __renderAllPages = this.renderAllPages();
     if (!this.instance || !this.containerEl) return;
@@ -415,6 +458,7 @@ export class PdfViewer {
     if (__renderAllPages) this.setupScrollSpy();
     this.pagesrendered.emit();
   };
+  // ─── load the document ───────────────────────────────────────────────────────
   _load = async () => {
     if (!this.pdfjsLib) return;
     const token = ++this.renderToken;
@@ -470,6 +514,27 @@ export class PdfViewer {
     const ch = this.containerEl.clientHeight - 24;
     if (mode === 'width') this.zoom.set(cw / vp.width);else this.zoom.set(Math.min(cw / vp.width, ch / vp.height));
   };
+  // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
+  // 20 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
+  // ROZ524 — use goToPage); none equals an emit name (load/error/pagechange/
+  // pagesrendered/pagerendered/passwordrequest/progress/findresult); none is a Lit
+  // reserved lifecycle. The navigation/zoom/rotate verbs drive $data (not the props),
+  // so they work whether or not the consumer binds `page`. The document-level verbs
+  // below are cheap passthroughs over the held PDFDocumentProxy (`instance`) that a
+  // consumer can't reach otherwise without `getDocument()` + pdf.js knowledge:
+  //   - download(filename?): save the original PDF bytes (instance.getData() ->
+  //     Blob -> anchor click) — the single most-expected viewer affordance.
+  //   - getMetadata(): document title/author/page-labels (tab title / info panel).
+  //   - getOutline(): the bookmark/TOC tree (powers a navigation sidebar; outline
+  //     dests map onto goToPage).
+  //   - getPageElement(n): the rendered `.rozie-pdf-page[data-page]` DOM node for
+  //     page n, or null if it isn't currently rendered — the documented mount
+  //     point for a consumer overlay (see the DOM contract docs), paired with the
+  //     `pagerendered` event for reactive geometry. NOT stable across zoom/
+  //     rotation/mode changes — re-acquire per `pagerendered` firing, don't cache.
+  // The four find verbs (find/findNext/findPrev/clearFind) drive the coarse
+  // span-level highlight pass + emit `findresult`. `find/findNext/findPrev/clearFind`
+  // are collision-vetted (no Lit reserved lifecycle, no `page`-model auto-setter clash).
   getDocument = () => {
     return this.instance;
   };
@@ -513,6 +578,8 @@ export class PdfViewer {
   rotateCCW = () => {
     this.rot.set((this.rot() + 270) % 360);
   };
+  // Save the original PDF bytes. getData() resolves the raw Uint8Array; wrap in a
+  // Blob and trigger a download via a transient anchor. Resolves false before mount.
   download = async (filename: any) => {
     if (!this.instance) return false;
     const bytes = await this.instance.getData();
@@ -528,15 +595,28 @@ export class PdfViewer {
     URL.revokeObjectURL(url);
     return true;
   };
+  // Document info (title/author/page labels) — resolves null before mount.
   getMetadata = () => {
     return this.instance ? this.instance.getMetadata() : null;
   };
+  // Bookmark / table-of-contents tree — resolves null when absent or before mount.
   getOutline = () => {
     return this.instance ? this.instance.getOutline() : null;
   };
+  // The rendered page's DOM node (see the DOM contract docs), or null if page n
+  // isn't currently rendered (single-page mode viewing a different page, or
+  // before any render). Mirrors scrollToPage's own lookup.
   getPageElement = (n: any) => {
     return this.containerEl ? this.containerEl.querySelector('[data-page="' + n + '"]') : null;
   };
+  // ─── text find/search (coarse span-level highlight) ──────────────────────────
+  // find(query) scans EVERY page's extracted text for occurrences, navigates to +
+  // highlights the first match, returns the match count, and emits `findresult`. The
+  // highlight is COARSE / span-level: renderPage adds .rozie-pdf-find to whole
+  // text-layer spans that CONTAIN the query (a query straddling two spans won't
+  // highlight). findNext/findPrev cycle (wrap) through the per-occurrence match list;
+  // clearFind resets the query + highlights. All async-safe over the `any`
+  // PDFDocumentProxy (`instance`); no-op / return 0 before the document loads.
   find = async (query: any) => {
     const q = (query == null ? '' : String(query)).trim().toLowerCase();
     this.findQuery = q;

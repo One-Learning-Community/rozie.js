@@ -33,9 +33,12 @@ export class PartialInlineHostMulti {
 
   headM = (n: number): number => n + 1;
   editTransitionM = 1;
+  // after-side: comment trails the host let editTransitionM and leads the spliced editorBindingsM below
   editorBindingsM = (k: number): number => k * 2;
+  // trailing-seam: the inline host successor trails the spliced editorBindingsM
   hostTailM = (n: number): number => this.editorBindingsM(1) + this.headM(n);
   tickM = (): number => this.base() * 2;
+  // gap-0 leading: stays with the extracted columnChromeM, must NOT float to the hoisted import
   columnChromeM = (k: number): number => clampB(this.tickM() + k);
 
   private __rozieDestroyRef = inject(DestroyRef);

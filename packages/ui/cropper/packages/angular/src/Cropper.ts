@@ -181,11 +181,30 @@ export class Cropper {
 
   instance: any = null;
   imgEl: any = null;
+  // Gate that suppresses the engine's SETUP-time `crop` events from writing the
+  // two-way `$model.data`. Cropper fires an initial `crop` with its OWN default box
+  // (autoCropArea) BEFORE the `ready` callback runs, and the `setData($props.data)`
+  // inside `ready` fires another. Writing those transient engine-internal boxes to
+  // `$model.data` is wrong — and on unified-model targets (Vue defineModel / Svelte
+  // $bindable / Angular model() signal, where the model read and write share ONE
+  // local) the pre-ready write CLOBBERS the very `$props.data` that `ready` then
+  // reads, so the consumer's initial `:data` crop box is lost and the default box is
+  // applied instead. (React/Solid read the external prop and Lit's property binding
+  // is controlled, so the write doesn't change their read — which is why only the
+  // template-emit family regressed.) We flip this true at the END of `ready`, after
+  // the initial box is applied, so only genuine post-init user crops drive the model.
   cropReady = false;
+  // pure crop-box equality (rounded px + exact transform) — no sigils, safe at top
+  // level. The round-trip guard that stops the setData→crop→$model.data→$watch loop.
   sameData = (a: any, b: any) => {
     if (!a || !b) return false;
     return Math.round(a.x) === Math.round(b.x) && Math.round(a.y) === Math.round(b.y) && Math.round(a.width) === Math.round(b.width) && Math.round(a.height) === Math.round(b.height) && a.rotate === b.rotate && a.scaleX === b.scaleX && a.scaleY === b.scaleY;
   };
+  // Construct (or, on a future option change, re-construct) the engine. The whole
+  // options object is a null-let `any` so the constructor's 2nd arg is unchecked —
+  // the event-callback `e` params (CustomEvent) would otherwise fail the strict
+  // react/solid/lit tsc against Cropper's Options callback types (the MapLibre
+  // mapOptions idiom). restoreData re-applies the crop box if we ever rebuild.
   buildCropper = (restoreData: any) => {
     let cfg: any = null;
     cfg = {
@@ -249,6 +268,16 @@ export class Cropper {
     };
     this.instance = new CropperEngine(this.imgEl, cfg);
   };
+  // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
+  // 27 verbs, all collision-clear across the three classes documented at the top:
+  // no bare `crop`/`zoom` (event⇄verb ROZ121 — exposed as showCropBox/zoomTo/zoomBy),
+  // no `setData` (React data-model auto-setter ROZ524 — set via two-way `data`; the new
+  // setCanvasData/setCropBoxData are DISTINCT names, NOT the model auto-setter), and
+  // none match a Lit reserved lifecycle name (update/render/firstUpdated/updated/
+  // willUpdate/requestUpdate). The added geometry getters (getCanvasData/getCropBoxData/
+  // getImageData/getContainerData) and movement setters (setCanvasData/setCropBoxData/
+  // moveTo/move/scale) expose v1's full canvas/crop-box geometry surface; getData and
+  // zoomTo gain their optional v1 args (rounded, pivot).
   getCropper = () => {
     return this.instance;
   };

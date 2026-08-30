@@ -79,9 +79,6 @@ export class Column {
 
   constructor() {
     this.reg = this.registry;
-
-    // idempotency flag so a reactive late-context registration (Lit async first paint,
-    // REQ-30) and the $onMount registration never double-register the column.
     effect(() => () => {
       if (this.registered) return;
       const live = this.registry;
@@ -108,8 +105,20 @@ export class Column {
     });
   }
 
+  // $inject is typed `unknown` (Phase 36 D-4: no rich type synthesis yet), which the
+  // STRICT BUNDLED-LEAF tsc rejects on `.registerColumn(...)` (TS2339). The .rozie-native
+  // fix is the null-let → `any` typeNeutralize idiom: alias the injected API through a
+  // MODULE-SCOPE `let reg = null` (typeNeutralize types it `any`). Module-scope (not
+  // hook-local) so the alias is in scope from the Solid teardown — which the Solid
+  // emitter hoists into a sibling onCleanup() OUTSIDE the mount closure. ZERO emitter
+  // change.
   reg: any = null;
+  // idempotency flag so a reactive late-context registration (Lit async first paint,
+  // REQ-30) and the $onMount registration never double-register the column.
   registered = false;
+  // the column SPEC builder — shared by the $onMount register and the late-context
+  // $onUpdate below. Carries METADATA ONLY (no cell/header render callbacks — D-A moved
+  // per-cell rendering to the parent's #cell/#header scoped slot, dispatched by columnId).
   colId = () => this.id() !== '' ? this.id() : this.field();
   buildSpec = () => ({
     id: this.colId(),

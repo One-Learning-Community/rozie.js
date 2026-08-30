@@ -28,6 +28,10 @@ export class PartialInlineHostM {
     const active = rIdx + cIdx;
     return active;
   };
+  // the row-selection slice tracks which rows are checked
+  // across header-group and body rows alike
+  // inRange(rIdx, cIdx) gates the active cell within the
+  // current 2-D selection range before a keydown commits
   refreshRowModelM = 0;
 
   private __rozieDestroyRef = inject(DestroyRef);

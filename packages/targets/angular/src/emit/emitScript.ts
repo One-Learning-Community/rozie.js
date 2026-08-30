@@ -1732,11 +1732,95 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   // so we can generate a single-program source map (for devtools line accuracy).
   const residualStmts: t.Statement[] = [];
 
+  // Quick task 260830-j53 — printed-comment ledger for the class-body lift.
+  // Every class member below is emitted as a hand-built STRING
+  // (`genCode(d.init)` / `genCode(d)` / a rebuilt arrow), none of which carries
+  // the STATEMENT's own comments, so an author's documentation on a promoted
+  // declaration was dropped outright (1370 comments across the Angular corpus).
+  //
+  // Keyed on comment OBJECT IDENTITY, never offsets: a `.rzts` partial is parsed
+  // as its own file and its offsets collide with unrelated host comments.
+  //
+  // Angular has THREE printers over one statement list — this loop's strings,
+  // the module-level import block, and the single `generate(t.program(
+  // residualStmts))` below — each with its own dedup set. The ledger spans them:
+  // seeded from what the import block actually emitted, and UNCLAIMING (below)
+  // whenever a statement turns out to produce no class member, so the residual
+  // program's own printing still stands and nothing is lost.
+  const printedComments = new WeakSet<t.Comment>();
+  const renderOneComment = (c: t.Comment): string =>
+    c.type === 'CommentLine' ? `//${c.value}` : `/*${c.value}*/`;
+  for (const node of userImportNodes) {
+    for (const c of [...(node.leadingComments ?? []), ...(node.trailingComments ?? [])]) {
+      if (userImports.includes(renderOneComment(c))) printedComments.add(c);
+    }
+  }
+  // Render a statement WITHOUT its own comments — the ledger above owns them and
+  // prints them exactly once. Passing the node through verbatim would print them
+  // a SECOND time, since @babel/generator has its own dedup set that cannot see
+  // the ledger (measured: 155 duplicates corpus-wide before this).
+  const genCodeCommentFree = (stmt: t.Statement): string =>
+    genCode({ ...stmt, leadingComments: [], trailingComments: [] } as t.Statement);
+  const takeUnprintedComments = (comments: readonly t.Comment[] | null | undefined): t.Comment[] => {
+    if (!comments || comments.length === 0) return [];
+    const fresh: t.Comment[] = [];
+    for (const c of comments) {
+      if (printedComments.has(c)) continue;
+      printedComments.add(c);
+      fresh.push(c);
+    }
+    return fresh;
+  };
+
+  let pendingComments: { claimed: t.Comment[]; atMethod: number; atCtor: number } | null = null;
+  const flushPendingComments = (): void => {
+    if (pendingComments === null) return;
+    const { claimed, atMethod, atCtor } = pendingComments;
+    pendingComments = null;
+    if (claimed.length === 0) return;
+    const text = claimed.map(renderOneComment).join('\n');
+    // A statement lands in exactly one of the two emitted arrays. Both are
+    // hand-built strings whose nodes are generated comment-free (see the
+    // constructor pushes below), so the ledger is the ONLY printer for either.
+    if (classMethodLines.length > atMethod) {
+      classMethodLines[atMethod] = `${text}\n${classMethodLines[atMethod]}`;
+      return;
+    }
+    if (constructorExpressionLines.length > atCtor) {
+      constructorExpressionLines[atCtor] = `${text}\n${constructorExpressionLines[atCtor]}`;
+      return;
+    }
+    // Produced no output at all (consumed by another pass — a $computed, a
+    // lifecycle hook, a $provide directive). UNCLAIM so any other printer still
+    // renders them: claiming without emitting is how a ledger silently DROPS
+    // comments, which is strictly worse than double-printing.
+    for (const c of claimed) printedComments.delete(c);
+  };
+
+  let prevLiftedStmt: t.Statement | null = null;
   for (let i = 0; i < cloned.program.body.length; i++) {
     if (lifecyclePairing.consumedIndices.has(i)) continue;
     // Quick plan 260515-u2b — $watch lines emitted into constructor above.
     if (watcherConsumedIndices.has(i)) continue;
     const stmt = cloned.program.body[i]!;
+
+    // Claim the PREVIOUS statement's still-unclaimed trailing comments and this
+    // statement's own leading comments, rendered ABOVE this member. Looking back
+    // is what makes an inline host and a `.rzts` partial-inlined host agree:
+    // inline, one parse gives the same comment object to prev-as-trailing and
+    // this-as-leading; across a splice boundary the successor comes from a
+    // DIFFERENT parse with nothing attached, so the comment exists ONLY on the
+    // previous statement's trailing side.
+    flushPendingComments();
+    pendingComments = {
+      claimed: [
+        ...(prevLiftedStmt === null ? [] : takeUnprintedComments(prevLiftedStmt.trailingComments)),
+        ...takeUnprintedComments(stmt.leadingComments),
+      ],
+      atMethod: classMethodLines.length,
+      atCtor: constructorExpressionLines.length,
+    };
+    prevLiftedStmt = stmt;
 
     // Skip $computed VariableDeclarations (consumed above).
     // ROZ-cast-blindness fix — `d.init` unwraps through any TS wrapper before
@@ -1782,7 +1866,8 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
       for (const d of stmt.declarations) {
         if (!t.isIdentifier(d.id) || !d.init) {
           // Multi-declarator non-identifier — fall back to constructor.
-          constructorExpressionLines.push(genCode(stmt));
+          // Comment-free: this array is ledger-owned (see `flushPendingComments`).
+          constructorExpressionLines.push(genCodeCommentFree(stmt));
           residualStmts.push(stmt);
           break;
         }
@@ -1856,6 +1941,9 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
     // (Vue/React/Svelte/Solid/Lit emit class declarations into the same
     // scope as the lifecycle hook bodies).
     if (t.isClassDeclaration(stmt) && stmt.id) {
+      // NOT ledger-owned: `interfaceDecls` is a third array `flushPendingComments`
+      // does not inspect, so it finds no target, UNCLAIMS, and this `genCode`
+      // prints the comments itself — exactly once.
       interfaceDecls.push(genCode(stmt));
       continue;
     }
@@ -1893,15 +1981,21 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
       }
       // Already filtered $onMount/$onUnmount/$onUpdate above (consumed).
       // Remaining ExpressionStatements: e.g., `console.log("hello from rozie")`.
-      constructorExpressionLines.push(genCode(stmt));
+      constructorExpressionLines.push(genCodeCommentFree(stmt));
       residualStmts.push(stmt);
       continue;
     }
 
     // Fallback: emit verbatim into constructor.
-    constructorExpressionLines.push(genCode(stmt));
+    constructorExpressionLines.push(genCodeCommentFree(stmt));
     residualStmts.push(stmt);
   }
+  // The LAST statement's claimed comments have no following iteration to flush
+  // them. Without this they are claimed and then silently dropped — which is
+  // exactly how a commented declaration written last in the `<script>` lost its
+  // documentation (caught by the prohibition-4b baseline hand-diff, not by any
+  // automated gate).
+  flushPendingComments();
 
   // 10. Assemble the constructor body.
   // Order:

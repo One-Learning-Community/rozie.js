@@ -3837,20 +3837,82 @@ export class FlowCanvas {
   area: any = null;
   connectionPlugin: any = null;
   socketWatcher: any = null;
+  // ISSUE-8 — ONE canvas-scope ResizeObserver over every node's `box`. A node auto-sizes to
+  // its `#body`, and getDOMSocketPosition stores a socket's position ONLY on a `rendered`
+  // socket signal (renderSocketInto, the FRESH-BUILD path); renderNode's in-place branch
+  // deliberately leaves sockets alone, so without this the position store kept its
+  // first-paint coordinates for the life of the node and every attached connection stayed
+  // pinned to them. Observing the BOX is the mechanism-correct trigger — "the box changed
+  // size", regardless of WHY — so it covers a #body data change, a NodeResizer drag, an
+  // image or webfont landing late, and a consumer component in the slot that resizes itself,
+  // with no per-target assumption about when a portal patch has laid out (Lit's and
+  // Angular's updates are not synchronous). Module-scope so the Solid-hoisted teardown can
+  // disconnect it.
   nodeResizeObserver: any = null;
+  // ISSUE-8 — node `box` element → its nodeEntries entry, so the ResizeObserver callback can
+  // resolve the resized box to its per-socket re-measure closures in O(1). A WeakMap because
+  // the key IS the DOM node: a culled node drops out on its own, with no disposal owed.
   boxEntries = new WeakMap();
   renderScope: any = null;
   selector: any = null;
+  // T2.6 — the AutoArrangePlugin instance (elkjs-backed). COMPONENT-scope (NOT $onMount-local)
+  // so the top-level autoArrange() verb sees it (the editor/area discipline). null until the
+  // FIRST autoArrange() call lazily imports + installs it (quick-260823-qgi) — $onMount no
+  // longer constructs it, because doing so is what forced elkjs into every consumer's bundle.
   arrange: any = null;
+  // The in-flight (or settled) lazy-load promise for the arrange engine. Memoized on the
+  // PROMISE, not on `arrange` — two autoArrange() calls in the same tick would both see a
+  // still-null `arrange` and race into two imports, two plugin instances and two area.use()
+  // installs. Awaiting one shared promise makes the second caller wait for the first's install.
   arrangeReady: any = null;
+  // Win 1: the Delete/Backspace keydown listener + its host container. COMPONENT-scope
+  // (NOT $onMount-local) so the $onMount-returned teardown — which the Solid emitter
+  // hoists into a sibling onCleanup() OUTSIDE the mount IIFE — can still see them to
+  // removeEventListener (the same component-scope discipline as nodeInstances below).
   keydownContainer: any = null;
   onCanvasKeydown: any = null;
+  // ISSUE-6 incompatible-port hint — the marking logic needs portTypeOf, which is
+  // defined INSIDE $onMount (for React-liveness reasons — see portTypeOf's own
+  // comment), but the connectionpick/connectiondrop pipe is registered at component-
+  // setup time. So the pipe calls through these component-scope bridge `let`s,
+  // assigned during mount, exactly like scheduleMinimapRedraw above. Component scope
+  // also keeps them visible to the Solid-hoisted teardown.
   markIncompatibleSockets: any = null;
   clearIncompatibleSockets: any = null;
+  // WR-03 fix: the picked socket's `{nodeId, side, key}` for the CURRENTLY active
+  // pick, or null when no pick is in flight. Set at the top of markIncompatibleSockets
+  // (so it tracks the pick regardless of whether validateTypes/pickedType end up
+  // marking anything) and cleared at the top of clearIncompatibleSockets — so it
+  // stays in lockstep with every existing path that already clears the marking
+  // (connectiondrop, the three D-14 abort listeners, unmount). This lets a
+  // `portsAdded` reconcile mid-gesture (FlowCanvas.rozie's reconcileNodesPass) re-run
+  // the SAME marking pass after it disposes+rebuilds a node's socket DOM, so a still-
+  // genuinely-incompatible socket doesn't silently lose its dimming just because its
+  // DOM element was recreated. Component-scope, non-reactive `let` — same idiom as
+  // the two bridges above and the socketReg/incompatibleMarked Maps/Sets below;
+  // re-invoked SYNCHRONOUSLY within the same async reconcile pass that just rebuilt
+  // the DOM, never deferred to a later reactive flush (the cross-flush
+  // suppress-flag antipattern — see feedback_cross_flush_suppress_flag_antipattern).
   activePick: any = null;
+  // D-14: defensive teardown so no abort path can leave sockets permanently dimmed.
+  // COMPONENT-scope (not $onMount-local) so the Solid-hoisted teardown can detach
+  // them. `window` — not the canvas container — is the right scope for all three:
+  // the connection drag itself is driven by `window`-level pointer listeners inside
+  // rete's own usePointerListener, and focus during a pointer-driven drag is not
+  // guaranteed to be inside the canvas container, so a container-scoped Escape would
+  // silently fail exactly in the abort case this exists to cover.
   onWindowPointerCancelClearIncompatible: any = null;
   onWindowKeydownClearIncompatible: any = null;
   onWindowBlurClearIncompatible: any = null;
+  // Phase 42 MiniMap (opt-in :minimap) — the absolute SVG overlay host + its imperative
+  // SVG layer + the pointer-pan listeners. COMPONENT-scope (NOT $onMount-local) so the
+  // $onMount-returned teardown — which the Solid emitter hoists into a sibling
+  // onCleanup() OUTSIDE the mount IIFE — can still removeEventListener them (the same
+  // keydown / nodeInstances discipline). `minimapMap` is the live minimap-px ↔ graph-
+  // coord mapping the pointer-pan handlers read; `scheduleMinimapRedraw` is the bridge
+  // the top-level $watch + the engine pipes call (assigned inside $onMount, like the
+  // reconcilers). minimapRedrawRaf coalesces the viewport-rect redraw to one per frame
+  // (the drag-write-back discipline — the viewport rect redraws on every pan/zoom).
   minimapHost: any = null;
   minimapSvg: any = null;
   minimapRedrawRaf = 0;
@@ -3860,6 +3922,13 @@ export class FlowCanvas {
   onMinimapPointerMove: any = null;
   onMinimapPointerUp: any = null;
   scheduleMinimapRedraw: any = null;
+  // T2.4 MARQUEE select (mode:'select') — the programmatic-select handle captured from
+  // AreaExtensions.selectableNodes ({ select(id, accumulate), unselect(id) }), the rubber-
+  // band overlay box (component-template DOM, scoped CSS), and the capture-phase pointerdown
+  // guard + window pointer listeners that draw the box in select mode. COMPONENT-scope (NOT
+  // $onMount-local) so the Solid-hoisted teardown can removeEventListener them (the keydown /
+  // minimap discipline). `marqueeBox` is the absolute overlay <div>; `marqueeActive` gates the
+  // in-progress drag; `marqueeStart`/`marqueeCur` are container-relative px corners.
   nodeSelectApi: any = null;
   marqueeBox: any = null;
   marqueeActive = false;
@@ -3868,17 +3937,58 @@ export class FlowCanvas {
   onCanvasPointerDownCapture: any = null;
   onMarqueePointerMove: any = null;
   onMarqueePointerUp: any = null;
+  // T2.8 NodeToolbar (opt-in :node-toolbar) — a floating component-template overlay (scoped
+  // CSS, like the marquee box + Controls) over the SELECTED node, positioned from the engine
+  // node-view element's rect relative to the canvas container + the area transform. COMPONENT-
+  // scope (NOT $onMount-local) so the Solid-hoisted teardown sees them. `toolbarHost` is the
+  // absolute overlay <div> (the $refs.toolbarEl element); `toolbarSelectedId` is the id of the
+  // node the toolbar currently tracks (the SINGLE selected node — null when nothing or >1 is
+  // selected, or selection is empty); `toolbarHandle` is the optional `#toolbar` reactive-
+  // portal handle ({ update, dispose }) when the consumer fills the slot; `scheduleToolbarTrack`
+  // is the rAF-coalesced reposition bridge (assigned in $onMount, called by the area pipes +
+  // the selection emit, like scheduleMinimapRedraw); `toolbarTrackRaf` coalesces it to one per
+  // frame. `toolbarDeleteBtn`/`toolbarDuplicateBtn` are the default buttons (kept so teardown
+  // can removeEventListener them); their pointerup handlers are `onToolbarDelete`/`onToolbarDup`.
   toolbarHost: any = null;
   toolbarSelectedId: any = null;
   toolbarHandle: any = null;
   scheduleToolbarTrack: any = null;
+  // component-scope bridge to the $onMount-local syncToolbar (the scheduleMinimapRedraw
+  // discipline) — called from maybeEmitSelectionChange + the area pipes so a pick/unpick /
+  // pan / zoom / drag re-tracks the toolbar over the selected node.
   syncToolbarSelection: any = null;
   toolbarTrackRaf = 0;
   toolbarDeleteBtn: any = null;
   toolbarDuplicateBtn: any = null;
   onToolbarDelete: any = null;
   onToolbarDup: any = null;
+  // Phase 74-03 — NodeResizer (D-05..D-17). Corner-anchored pointer-drag resize for a
+  // SELECTED node whose TYPE was registered `resizable` (NodeType.rozie, 74-02). Follows
+  // the SAME module-scope-not-$onMount-local discipline as the NodeToolbar/Marquee state
+  // above (the Solid-hoisted teardown must still see these after $onMount returns).
+  // `pendingResizeSizes` is the resize analog of `pendingDragPositions` — id → the latest
+  // clamped `{ width, height, x?, y? }` during a gesture (`x`/`y` are set ONLY for a
+  // west/north-anchored corner — nw/ne/sw — per the opposite-corner-anchored resize
+  // semantics; `se` never touches position). `resizerTrackedId` is the SINGLE
+  // selected+resizable node id the 4 handles currently track (the resize analog of
+  // `toolbarSelectedId`) — null when nothing/multiple is selected or the selected node's
+  // type isn't resizable. `resizeHandle{Nw,Ne,Sw,Se}` are the 4 overlay div refs.
+  // `pendingResizeSnapshot` stashes the pre-gesture history snapshot on pointerdown
+  // (mirrors `pendingDragSnapshot`) — committed on the FIRST clamp-changed pointermove,
+  // not on pointerdown itself, so a pointerdown+pointerup with no move creates no history
+  // entry. `lastHandlePointerUpAt` is a module-scope timestamp for double-click-via-
+  // pointerup-timing detection (Rete swallows real clicks during node interaction — the
+  // file's existing pointerup-not-click discipline, e.g. the NodeToolbar buttons above).
+  // Initialized to -Infinity (NOT 0): `performance.now()` is relative to the page's
+  // navigation start, so a `0` sentinel means the very FIRST-EVER pointerup on a freshly
+  // mounted canvas is erroneously treated as "within 400ms of a prior click" whenever the
+  // whole mount+gesture sequence itself completes within 400ms of page load — a real bug
+  // (not test flakiness) found via 74-05's Task 2 Linux VR gate: the very first resize
+  // gesture's pointerup was immediately undoing its own resize by misfiring
+  // resetNodeSize(). -Infinity guarantees `now - lastHandlePointerUpAt` is always Infinity
+  // (never < 400) until a REAL prior pointerup has actually happened.
   pendingResizeSizes = new Map();
+  // id → { width, height, x?, y? } (latest during a resize)
   resizeFlushRaf = 0;
   resizeGestureActive = false;
   pendingResizeSnapshot: any = null;
@@ -3889,6 +3999,12 @@ export class FlowCanvas {
   resizerTrackedId: any = null;
   resizerTrackRaf = 0;
   lastHandlePointerUpAt = -Infinity;
+  // Persistent (never-removed-mid-gesture) pointerdown listener refs on each handle, kept so
+  // teardown can removeEventListener them (the toolbarDeleteBtn/onToolbarDelete discipline).
+  // Only ONE resize gesture is ever in flight at a time (a user drags one corner), so a
+  // SINGLE shared onResizeHandleMove/onResizeHandleUp pair (rebound per-gesture) plus
+  // `resizeActiveHandleEl` (which handle they're currently attached to) is enough — mirrors
+  // the marquee's single pointermove/pointerup pair for its one drag surface.
   onResizeNwDown: any = null;
   onResizeNeDown: any = null;
   onResizeSwDown: any = null;
@@ -3896,24 +4012,71 @@ export class FlowCanvas {
   onResizeHandleMove: any = null;
   onResizeHandleUp: any = null;
   resizeActiveHandleEl: any = null;
+  // component-scope bridges to the $onMount-local trackResizer/syncResizerSelection,
+  // mirroring scheduleToolbarTrack/syncToolbarSelection — called from
+  // maybeEmitSelectionChange + the 3 area pipes (nodetranslated/translated/zoomed) so a
+  // pick/unpick / pan / zoom / drag re-tracks the resize handles over the selected node.
   scheduleResizerTrack: any = null;
   syncResizerSelection: any = null;
+  // MiniMap geometry (px) — MUST match the .rozie-flow-minimap CSS box below.
   MINIMAP_W = 200;
   MINIMAP_H = 150;
+  // Fallback node-rect dims when a node-view element isn't measurable yet (Lit async
+  // first paint, REQ-30) — re-measured on the next render (the render pipe re-schedules).
   MINIMAP_DEFAULT_NODE_W = 140;
   MINIMAP_DEFAULT_NODE_H = 52;
+  // Phase 74-03 (D-17) — the resize floor when a resizable NodeType declares no
+  // minWidth/minHeight: a small sane default so an unconstrained drag can't shrink a
+  // node to 0px (belt-and-suspenders with the double-click-to-auto-size reset, D-08).
   RESIZE_MIN_FALLBACK = 40;
+  // WR-02: types whose maxWidth/maxHeight has already been warned-about as inverted
+  // (below the effective minWidth/minHeight) — a one-time-per-type warning, not a
+  // per-pointermove spam during a live resize drag.
   clampInversionWarnedTypes = new Set();
   SVGNS = 'http://www.w3.org/2000/svg';
+  // One Socket shared by every port (Rete sockets gate compatibility by identity;
+  // a single socket = "anything connects to anything", the common editor default).
   SOCKET = new ClassicPreset.Socket('flow');
+  // Live engine bookkeeping — COMPONENT-scope (NOT $onMount-local) so the
+  // $onMount-returned teardown, which the Solid emitter hoists into a sibling
+  // onCleanup() OUTSIDE the mount IIFE, keeps them in scope (the MapLibre
+  // markerEntries lesson).
+  //   nodeInstances : id → live ClassicPreset.Node          (engine truth)
+  //   nodeMeta      : id → the consumer's node spec object  (for the slot scope)
+  //   connInstances : id → live ClassicPreset.Connection    (engine truth)
+  //   nodeEntries   : id → { element, bodyHost, handle, socketDisposers }
+  //   connEntries   : id → { element, dispose }
+  //   socketReg     : "nodeId::side::key" → the live socket <div> element (ISSUE-6
+  //                   incompatible-port hint). INSTANCE-keyed and NON-reactive — do
+  //                   NOT confuse with portReg (TYPE-keyed, reactive, "type::side::key",
+  //                   defined inside $onMount for React-liveness). They must never share
+  //                   a variable or a key shape.
   nodeInstances = new Map();
   nodeMeta = new Map();
   connInstances = new Map();
   nodeEntries = new Map();
   connEntries = new Map();
   socketReg = new Map();
+  // incompatibleMarked : the Set of socket elements CURRENTLY carrying
+  // rozie-flow-socket--incompatible, so clearIncompatibleSockets is O(marked) and a
+  // no-op clear costs nothing.
   incompatibleMarked = new Set();
+  // connMeta : id → the consumer's connection spec ({ …, label?, stroke?, dashed? }) — the
+  // connection-side analog of nodeMeta, read by renderConnection for per-edge label/styling (F3).
   connMeta = new Map();
+  // ─── connection-drop diagnostics (quick 260827-mtu) ────────────────────────────
+  // Console-only visibility for the five paths that used to silently drop a connection.
+  // The imperative addConnection verb (Site A) warns synchronously — the caller named
+  // that exact pair of endpoints in that exact call, so there is no legitimate
+  // transient to wait out. reconcileConnections' three guards (Site B) route through
+  // this shared debounced flush instead: reconcile can run mid-cascade, before a
+  // later-declared <NodeType>/<Port> has registered, so an inline warn there would
+  // false-positive on an ordinary multi-pass settle. Debouncing (re-arming the timer
+  // on every queue call) waits for the cascade to quiesce, and re-checking
+  // connInstances at flush time drops the warn for any edge a later pass went on to
+  // place. The settle delay is 500ms rather than 0 because a late port registration
+  // lands through a reactive write that arrives in a LATER macrotask (a React commit
+  // / Angular CD tick), not just the microtask queue a 0ms timeout would clear.
   CONN_WARN_SETTLE_MS = 500;
   warnConn = (msg: any) => {
     if (typeof console !== 'undefined' && console.warn) {
@@ -3922,6 +4085,12 @@ export class FlowCanvas {
   };
   pendingConnWarns = new Map();
   warnedConnIds = new Set();
+  // connWarnTimer inits to null (not 0), matching the debounce-timer convention already
+  // established by holdTimer (NumberField.rozie) / debounceTimerId (CommandPalette.rozie) /
+  // remeasureTimer (Carousel.rozie): a `let x = 0` gets TS's fixed `number` inference, which
+  // the Angular leaf's Node-typed `setTimeout` (returning `Timeout`, not `number`) then fails
+  // to satisfy under strict typecheck; `let x = null` gets TS's "evolving any" inference
+  // instead, which accepts either return shape on all six targets.
   connWarnTimer: any = null;
   flushConnWarns = () => {
     this.connWarnTimer = null;
@@ -3942,31 +4111,178 @@ export class FlowCanvas {
     }
     if (typeof setTimeout === 'function') this.connWarnTimer = setTimeout(this.flushConnWarns, this.CONN_WARN_SETTLE_MS);else Promise.resolve().then(this.flushConnWarns);
   };
+  // ids last applied FROM THE BOUND GRAPH, so reconcile removes only graph-managed
+  // entities — an imperative $expose addNode/addConnection is NOT auto-reaped on the
+  // next graph change (the power-user escape hatch stays alive). MapLibre reconciles
+  // every marker because markers are purely prop-driven; a flow editor also accepts
+  // imperative edits, so it tracks provenance. (Phase 41: nodes/connections now come
+  // ONLY from the single `graph` model — the per-instance declarative-children
+  // registries are gone; node TYPE templates + port schemas live in typeReg/portReg.)
   lastPropNodeIds: any = null;
   lastPropConnIds: any = null;
+  // Re-entrant suppression counter: while > 0 the editor/area event handlers skip
+  // echoing back into $emit / $model (our own programmatic add/remove/translate/
+  // zoom must not bounce out as if the user did it — the MapLibre PROGRAMMATIC
+  // eventData guard, in counter form so batched/nested ops never race).
   programmatic = 0;
+  // Raised (alongside `programmatic`) ONLY around the imperative $expose'd addConnection
+  // verb's editor.addConnection call. `programmatic` still has to be raised there — it is
+  // what stops an imperative add from writing back into the bound graph prop, which is the
+  // documented escape-hatch contract (an imperatively added edge is NOT graph-managed and
+  // is not reaped by reconcile). But a consumer calling addConnection() explicitly is NOT
+  // an echo of our own reconcile, so a validation rejection on THAT path must still reach
+  // them. This counter is how the connectioncreate pipe tells the two apart; it deliberately
+  // does not gate connection-created / connection-removed, which stay fully suppressed.
   imperativeAdd = 0;
+  // Win 2: the last emitted selection id-set, joined to a stable string, so
+  // @selection-change fires ONLY on an actual change (a repeated identical pick/unpick
+  // set does not spam the consumer). `null` until the first emit (so the initial empty
+  // selection does not emit on mount). COMPONENT-scope so it survives across area events.
   lastSelectionIds: any = null;
+  // T1.1 — EDGE SELECTION (D-08). The currently-selected CONNECTION id, or null. Lives
+  // PURELY in component script (the selectedNodeIds echo-safety discipline) — NEVER
+  // written into $model.graph, so the controlled-graph write-back assertions are
+  // unaffected (Threat T-44-01-2: no spurious model write). COMPONENT-scope so it
+  // survives across area events + so the Solid-hoisted teardown can clear it. The
+  // `.is-selected` class is toggled imperatively on the engine-DOM __path; this id is the
+  // source of truth the Delete branch reads. `selectedPathEl` caches the live <path>
+  // element so a background-click clear (and re-select) can drop `.is-selected` without
+  // re-walking the DOM. `edgeClickGuard` is a one-shot flag the area-background pointerup
+  // branch checks so an edge click (which fires its own pointerup on the path AND lets the
+  // area's background pointerup run) does not immediately clear the selection it just made
+  // — reset on the next microtask, after the gesture settles.
   selectedConnId: any = null;
   selectedPathEl: any = null;
   edgeClickGuard = false;
+  // T1.3 — UNDO / REDO (D-02 on-by-default, D-03 per-gesture graph-only scope, D-04
+  // echo-guarded restore). A CAPPED snapshot stack over the BOUND GRAPH only — nodes
+  // (incl x/y) + connections — and explicitly NOT the viewport (pan/zoom is excluded,
+  // D-03). One entry is pushed per COMPLETED gesture: a drag = ONE entry (snapshot taken
+  // on pointer-down, committed on the first translate — never per pointermove frame), a
+  // connect / disconnect / delete = one each. A push is gated on `!programmatic` so a
+  // restore-driven write (which runs INSIDE the programmatic guard) never re-enters the
+  // history (D-04). Pushing clears the redo branch and drops the oldest entry beyond the
+  // cap (Threat T-44-03-1: bounded memory). Snapshots are deep clones of the consumer's own
+  // serializable graph JSON (Pattern 7; the `$clone` sigil — a deep, de-proxied copy
+  // that strips the Vue/Svelte reactivity Proxy that a bare `structuredClone` THROWS
+  // on) — no external input, so the restore (T-44-03-2 accept)
+  // cannot loop (it rides the programmatic guard + the existing $watch(graph) reconcile).
+  // Undo is ALWAYS on for v1; `:history=false` (the `history` prop) is the cheap escape
+  // hatch that skips every push (the stacks stay empty → undo/redo are no-ops).
+  // COMPONENT-scope so the stack survives across area events + the Solid-hoisted teardown.
   HISTORY_CAP = 100;
+  // Two-stack model (simpler + correct than a single cursor): `historyStack` holds
+  // PRE-gesture snapshots (the states to UNDO back to, newest last); `redoStack` holds
+  // snapshots an undo popped off (the states to REDO forward to, newest last). A new
+  // gesture (pushHistory) snapshots the PRE-gesture graph onto historyStack and CLEARS
+  // redoStack (a fresh edit discards the redo branch). undo() pops historyStack → pushes
+  // the CURRENT (pre-undo) graph onto redoStack → restores the popped snapshot. redo()
+  // pops redoStack → pushes the current graph back onto historyStack → restores it.
   historyStack = [];
   redoStack = [];
+  // One-shot per-drag guard: a drag fires `nodetranslated` (→ flushDragWriteBack) on EVERY
+  // pointermove frame, so a push-per-flush would record many entries for ONE gesture. We
+  // snapshot the PRE-drag graph on `nodepicked` (pointer-DOWN, definitively before any
+  // movement — capturing it on the first `nodetranslated` is too late: the engine has
+  // already applied the initial delta + may have flushed a write-back, so $props.graph no
+  // longer holds the start position), stash it in `pendingDragSnapshot`, and COMMIT it to
+  // the history stack on the FIRST `nodetranslated` of the gesture (a pick WITHOUT a drag
+  // must not create a history entry). `dragGestureActive` then holds until the drag-ending
+  // `pointerup` resets it. D-03: a drag = ONE undo step.
   dragGestureActive = false;
   pendingDragSnapshot: any = null;
+  // One-shot per-NATIVE-EVENT guard for `contextmenu` (quick-260803-uwb, found by VR).
+  // rete-area-plugin@2.1.5 attaches TWO `contextmenu` DOM listeners that both bubble from
+  // the same native event and neither of which stops propagation:
+  //   - NodeView / ConnectionView attach one on their OWN element and emit the SPECIFIC
+  //     signal `{ event, context: <node|connection> }` (rete-area-plugin.esm.js:637, :782),
+  //   - AreaPlugin attaches one on the CONTAINER and emits `{ event, context: 'root' }`
+  //     (rete-area-plugin.esm.js:1519-1530).
+  // So ONE right-click on a node fires the specific signal FIRST and the generic 'root' one
+  // immediately after — which used to surface as TWO `@context-menu` emits whose second
+  // carried `id: null` and CLOBBERED the node id. We remember the native event object of the
+  // signal we already surfaced and ignore any later signal carrying the SAME event, keeping
+  // the FIRST (most specific) one: one right-click = one emit. `preventDefault()` still runs
+  // on every pass (idempotent, and the native menu must be suppressed either way).
   lastContextMenuEvent: any = null;
+  // T2.5 — RECONNECT coalescing (D-08 reconnectable edges, D-03 one-gesture-one-entry).
+  // Dragging an existing edge endpoint to a new socket is a SINGLE user gesture, but the
+  // shipped `Presets.classic.setup()` implements it as `editor.removeConnection(old)` then
+  // `editor.addConnection(new)` — so the write-back pipe sees a `connectionremoved` followed
+  // by a `connectioncreated`, which would push TWO history entries (Pitfall 2: two Ctrl+Z to
+  // undo one drag). The fix is to COALESCE: the ConnectionPlugin emits `connectionpick` when
+  // the user grabs a socket and `connectiondrop` when they release. While a reconnect is in
+  // flight (`reconnectInFlight > 0`) we SUPPRESS the per-event history pushes that
+  // writeBackConnectionRemoved / writeBackConnectionCreated normally do (the graph write-back
+  // itself STILL runs — the controlled graph stays correct), capturing the PRE-gesture
+  // snapshot ONCE on connectionpick (`reconnectPreSnapshot`). On `connectiondrop` we push that
+  // single snapshot (whether the drop landed on a new socket → `created:true` = a real
+  // reconnect, OR on an empty pane → `created:false` = the edge was removed with no re-add)
+  // and clear the flag. A plain drag-to-connect from an UNCONNECTED output socket also fires
+  // connectionpick/drop, but there is no remove in that gesture — the single `connectioncreated`
+  // write-back's own pushHistory is suppressed and the one coalesced snapshot is pushed on drop
+  // instead, so the per-gesture count stays exactly one either way. Counter form (not a bool)
+  // so a re-pick mid-gesture can't desync. COMPONENT-scope (survives across area events).
   reconnectInFlight = 0;
   reconnectPreSnapshot: any = null;
+  // Set true if a write-back (remove or add) actually ran during the in-flight window, so a
+  // connectionpick→drop that changed NOTHING (e.g. clicking a socket then releasing on the
+  // pane with no edge created/removed) does NOT push an empty history entry.
   reconnectDidWriteBack = false;
+  // One-shot guard for the DEFERRED close (the drop fires BEFORE the trailing remove+add
+  // writeBacks, so the window must close on a macrotask AFTER they settle — see the
+  // connectiondrop branch). A re-pick before the deferred close runs cancels it.
   reconnectCloseScheduled = false;
+  // ─── controlled-graph write-back (D4 — the central NEW capability) ─────────────
+  // On every drag/connect/disconnect the canvas emits a FRESH top-level
+  // `{ nodes, connections }` object via `$model.graph` — immutable React-Flow
+  // applyNodeChanges style (Wave-0-proven 6/6; in-place deep mutation is SILENT on
+  // React/Solid/Lit/Angular). Echo-guarded by the `programmatic` counter + the
+  // no-op-diff property: the write-back value already matches engine truth (the node
+  // is already at x/y; the edge already exists) so the consumer's re-bind →
+  // $watch(graph) → reconcile is a no-op diff.
+  //
+  // DRAG COALESCING (Pitfall 2): `nodetranslated` fires on every pointermove during a
+  // drag; emitting a fresh graph + full reconcile per frame is a rebuild storm. We
+  // accumulate the latest position per node (pendingDragPositions) and flush ONE fresh
+  // graph write per animation frame (dragFlushRaf), plus a final flush so the last
+  // position always lands. requestAnimationFrame coalesces multiple moves in a frame
+  // into a single $model.graph emit.
   pendingDragPositions = new Map();
+  // id → { x, y } (latest during a drag)
   dragFlushRaf = 0;
+  // The current bound graph — NEVER mutated in place.
   currentGraph = () => this.graph() || {
     nodes: [],
     connections: []
   };
+  // T1.3 — deep-clone a graph snapshot. The graph is serializable JSON (nodes/connections of
+  // primitives), so JSON round-trip is the robust path: it strips framework reactivity
+  // wrappers — a Vue `reactive()` Proxy / Svelte `$state` proxy that a bare
+  // `structuredClone` THROWS on ("could not be cloned"), the silent vue/svelte-only
+  // failure that left the history stack empty. Phase 45 replaced the hand-rolled
+  // JSON-first clone helper with the `$clone(x)` sigil at every call site below: it
+  // lowers to `rozieDeepClone(x)` on Vue (Phase 45-07 — a recursive proxy-safe deep
+  // clone in @rozie/runtime-vue that de-proxies nested INDEPENDENT reactive members,
+  // not just the top level), `$state.snapshot(x)` on Svelte, and `structuredClone(x)`
+  // on the other four — a deep, independent, de-proxied copy on all six (and
+  // `$clone(null)` → `null` on all six, preserving the old `g == null` early-return
+  // implicitly). The Rete graph is JSON-serializable, so `$clone` never throws here;
+  // the former null-return fallbacks at the call sites are now dead but harmless.
+  // T1.3 — the canvas's OWN last-written graph. Every write-back funnels through
+  // `commitGraph`, which sets `$model.graph` AND records the written value here. undo/redo
+  // use THIS (not the round-tripped `$props.graph`) as the "current" state to push onto the
+  // opposite stack — `$props.graph` lags a drag write-back on React/Vue/Svelte (the
+  // two-way re-bind is async / batched), so reading it at undo time captured an
+  // INTERMEDIATE drag position. `lastWrittenGraph` is exact + synchronous. Seeded from the
+  // bound graph in $onMount.
   lastWrittenGraph: any = null;
+  // Funnel for every component-driven graph write: record the value, then emit it. A deep
+  // clone is stored so a later consumer mutation of the live bound object can't corrupt the
+  // recorded state. (Echo-guarding is the CALLER's responsibility — restoreGraph wraps this
+  // in the programmatic guard.) `selfWriteInFlight` suppresses the resulting $watch(graph)
+  // tick from clobbering `lastWrittenGraph` with the (possibly still-stale, async) bound
+  // prop value — the value we just wrote IS the truth.
   selfWriteInFlight = false;
   commitGraph = (g: any) => {
     const c = structuredClone(g);
@@ -3974,11 +4290,20 @@ export class FlowCanvas {
     this.selfWriteInFlight = true;
     this.graph.set(g);
   };
+  // Capture the canvas's current graph state (its own last write, falling back to the bound
+  // prop before the first write). Always a fresh deep clone.
   snapshotCurrent = () => {
     const src = this.lastWrittenGraph != null ? this.lastWrittenGraph : this.currentGraph();
     return structuredClone(src);
   };
+  // The BASE graph a write-back builds its fresh object from: the canvas's own last write if
+  // present (immune to the async prop re-bind lag), else the bound prop. This keeps a rapid
+  // gesture sequence (e.g. drag then immediately disconnect) consistent even before the
+  // consumer's two-way re-bind has propagated the prior write back into `$props.graph`.
   baseGraph = () => this.lastWrittenGraph != null ? this.lastWrittenGraph : this.currentGraph();
+  // Commit an ALREADY-CAPTURED snapshot onto the undo stack (caps + clears redo). Gated on
+  // the `history` prop. Used by both the synchronous-commit path (connect/disconnect/delete)
+  // and the drag gesture (pre-move snapshot taken on pointer-down, committed on first translate).
   pushHistorySnapshot = (snap: any) => {
     if (this.history() === false) return;
     if (!snap) return;
@@ -3988,11 +4313,21 @@ export class FlowCanvas {
     }
     this.redoStack = [];
   };
+  // Snapshot the canvas's CURRENT graph state + commit it onto the undo stack (the connect /
+  // disconnect / delete path — called BEFORE the write-back so the snapshot is the
+  // pre-gesture state). Gated on `!programmatic` (echo-guard) + history. D-03: one per gesture.
   pushHistory = () => {
     if (this.programmatic) return;
     if (this.history() === false) return;
     this.pushHistorySnapshot(this.snapshotCurrent());
   };
+  // T2.5 — close the reconnect coalesce window. Called on a DEFERRED macrotask after a
+  // connectiondrop, so the trailing connectionremoved + connectioncreated writeBacks (which
+  // the classic preset fires AFTER the drop) have all run with the window still open
+  // (suppressing their per-event pushHistory, flagging reconnectDidWriteBack). Pushes the
+  // SINGLE pre-gesture snapshot iff the gesture actually changed the graph, then resets the
+  // per-gesture state. Idempotent + gated on the one-shot scheduled flag so a re-pick can
+  // cancel a pending close.
   closeReconnectGesture = () => {
     if (!this.reconnectCloseScheduled) return;
     this.reconnectCloseScheduled = false;
@@ -4003,11 +4338,19 @@ export class FlowCanvas {
     this.reconnectPreSnapshot = null;
     this.reconnectDidWriteBack = false;
   };
+  // Schedule the deferred close on a macrotask (setTimeout 0) — runs after the synchronous +
+  // microtask writeBack signals settle. Falls back to a microtask where setTimeout is absent.
   scheduleReconnectClose = () => {
     if (this.reconnectCloseScheduled) return;
     this.reconnectCloseScheduled = true;
     if (typeof setTimeout === 'function') setTimeout(this.closeReconnectGesture, 0);else Promise.resolve().then(this.closeReconnectGesture);
   };
+  // T1.3 — restore a captured snapshot by writing a FRESH `{ nodes, connections }` via
+  // `commitGraph` (→ `$model.graph`), wrapped in the `programmatic` guard so the consumer's
+  // re-bind → $watch(graph) → reconcile applies it WITHOUT re-entering history (D-04 —
+  // pushHistory / the write-back helpers all bail while `programmatic` is raised). Recorded
+  // in `lastWrittenGraph` so a following undo/redo sees the restored state as "current".
+  // Graph-ONLY (D-03): the viewport transform is untouched.
   restoreGraph = (snap: any) => {
     if (!snap) return;
     // Cancel any in-flight drag write-back so a queued frame can't clobber the restore with
@@ -4036,6 +4379,8 @@ export class FlowCanvas {
       this.programmatic--;
     }
   };
+  // undo() — pop the newest PRE-gesture snapshot, push the CURRENT graph onto the redo
+  // stack, and restore the snapshot. No-op when nothing to undo.
   undo = () => {
     if (this.historyStack.length === 0) return;
     const cur = this.snapshotCurrent();
@@ -4043,6 +4388,8 @@ export class FlowCanvas {
     if (cur) this.redoStack.push(cur);
     this.restoreGraph(snap);
   };
+  // redo() — pop the newest redo snapshot, push the CURRENT graph back onto the undo
+  // stack, and restore it. No-op when nothing to redo.
   redo = () => {
     if (this.redoStack.length === 0) return;
     const cur = this.snapshotCurrent();
@@ -4052,6 +4399,8 @@ export class FlowCanvas {
   };
   canUndo = () => this.historyStack.length > 0;
   canRedo = () => this.redoStack.length > 0;
+  // Flush the coalesced drag positions: one fresh graph object with every pending
+  // node's x/y applied. Echo-guarded. Clears the pending map.
   flushDragWriteBack = () => {
     this.dragFlushRaf = 0;
     if (this.programmatic) {
@@ -4086,6 +4435,8 @@ export class FlowCanvas {
       connections
     });
   };
+  // Schedule a coalesced drag write-back (rAF; falls back to a microtask where rAF is
+  // unavailable — e.g. a non-DOM test env).
   scheduleDragFlush = () => {
     if (this.dragFlushRaf) return;
     if (typeof requestAnimationFrame === 'function') {
@@ -4095,6 +4446,13 @@ export class FlowCanvas {
       Promise.resolve().then(this.flushDragWriteBack);
     }
   };
+  // Phase 74-03 (D-09) — resize write-back triad, copying flushDragWriteBack/
+  // scheduleDragFlush's Map-accumulate → one commitGraph per rAF frame → clear-map shape
+  // verbatim (renamed drag→resize). `x`/`y` on a pending entry are OPTIONAL — present only
+  // for a west/north-anchored corner (Task 2's pointermove handler), omitted for `se` — so
+  // an `se`-only resize never touches the node's position. Phase 84-02 (D-04) — the route
+  // invalidation below is an identical parallel too: a resize moves sockets exactly as a
+  // drag does, so it is an equally first-class invalidating gesture, not a secondary one.
   flushResizeWriteBack = () => {
     this.resizeFlushRaf = 0;
     if (this.programmatic) {
@@ -4135,6 +4493,10 @@ export class FlowCanvas {
       Promise.resolve().then(this.flushResizeWriteBack);
     }
   };
+  // Phase 74-03 (D-16/D-17) — clamp a live resize delta to the type's declared
+  // minWidth/minHeight/maxWidth/maxHeight, falling back to RESIZE_MIN_FALLBACK (40px)
+  // when a bound isn't declared. Reads only its own arguments (plus the module-scope
+  // clampInversionWarnedTypes one-time-warn dedup set, WR-02 — the only side effect).
   clampResizeSize = (typeSpec: any, w: any, h: any) => {
     const minW = typeSpec && typeSpec.minWidth != null ? typeSpec.minWidth : this.RESIZE_MIN_FALLBACK;
     const minH = typeSpec && typeSpec.minHeight != null ? typeSpec.minHeight : this.RESIZE_MIN_FALLBACK;
@@ -4169,6 +4531,10 @@ export class FlowCanvas {
       height: Math.min(maxH, Math.max(minH, h))
     };
   };
+  // Phase 74-03 (D-08) — double-click-a-handle reset: clear a node's explicit
+  // width/height back to undefined (auto-size), through the SAME pushHistory/baseGraph/
+  // commitGraph path as every other write-back (one history entry, gated !readonly, D-10)
+  // — never a special-cased direct $model.graph write.
   resetNodeSize = (id: any) => {
     if (this.programmatic) return;
     if (!this.selectable() || this.readonly()) return;
@@ -4191,6 +4557,7 @@ export class FlowCanvas {
       connections
     });
   };
+  // CONNECT — append a fresh connection into a fresh graph object. Echo-guarded.
   writeBackConnectionCreated = (c: any) => {
     if (this.programmatic) return;
     // T1.3 — one history entry per CONNECT gesture (BEFORE the write so the snapshot is the
@@ -4212,6 +4579,7 @@ export class FlowCanvas {
       connections: [...(g.connections || []), conn]
     });
   };
+  // DISCONNECT — filter the id out into a fresh graph object. Echo-guarded.
   writeBackConnectionRemoved = (id: any) => {
     if (this.programmatic) return;
     // T1.3 — one history entry per DISCONNECT / edge-delete gesture (BEFORE the write).
@@ -4224,6 +4592,18 @@ export class FlowCanvas {
       connections: (g.connections || []).filter((e: any) => e && e.id !== id)
     });
   };
+  // T1.1 — EDGE SELECTION helpers (D-08). Selection state is kept PURELY in script
+  // (selectedConnId / selectedPathEl) and surfaced to the consumer via @edge-click /
+  // @edge-selected — never written into $model.graph (echo-safe like selectedNodeIds).
+  //
+  // `clearEdgeSelection` drops `.is-selected` from the live <path> (if still attached) and
+  // nulls the selection. `selectEdge` is invoked from the per-edge pointerup listener: it
+  // clears any prior selection, marks THIS path `.is-selected`, records the id + element,
+  // raises the one-shot `edgeClickGuard` (so the area's own background-pointerup branch
+  // does not immediately clear what this click just selected — the same pointerup gesture
+  // fires on the path AND lets the area pipe run), and emits BOTH @edge-click and
+  // @edge-selected ({ id }). The guard self-resets on the next microtask once the gesture
+  // has settled.
   clearEdgeSelection = () => {
     if (this.selectedPathEl && this.selectedPathEl.classList) {
       try {
@@ -4254,6 +4634,19 @@ export class FlowCanvas {
       id
     });
   };
+  // CASCADING DELETE (the PUBLIC controlled-graph node delete — Win 1). Distinct from
+  // the engine-only `removeNode` $expose verb: `removeNode` operates directly on the
+  // editor and is NOT written back to the model (the provenance-tracked imperative
+  // escape hatch); `deleteNode` is the BLESSED controlled-graph delete — it filters the
+  // node AND every incident connection out of FRESH arrays and writes ONE fresh
+  // top-level `{ ...g, nodes, connections }` object via `$model.graph` (the Phase-41
+  // write-back contract — in-place mutation is silently dropped on React/Solid/Lit/
+  // Angular). The wrapper's own `$watch(graph)` reconcile then reaps the live engine
+  // node + edges — we do NOT call editor.removeNode here (a double-remove would race the
+  // reconcile into Rete's "cannot find node"; the controlled-model filter is the single
+  // removal path). NOT echo-guarded with `programmatic` — this is a CONSUMER-driven write
+  // that SHOULD update the bound model (mirrors the demo's per-node ✕ filter). Returns
+  // true if a node was removed. The id-coerce-to-String mirrors the demo's onRemoveClick.
   deleteNode = (id: any) => {
     if (id == null) return false;
     const g = this.baseGraph();
@@ -4270,6 +4663,10 @@ export class FlowCanvas {
     });
     return true;
   };
+  // T2.8 — a fresh unique node id for a duplicated node. Derived from the source id + an
+  // incrementing suffix, skipping any id already present in the live graph so a repeated
+  // duplicate never collides (Threat T-44-06-2: a NEW unique id, never a forged/colliding
+  // one). String ids only (mirrors the graph contract).
   freshNodeId = (baseId: any, existing: any) => {
     const taken = new Set((existing || []).map((n: any) => n && n.id != null ? String(n.id) : ''));
     const root = baseId != null ? String(baseId) : 'node';
@@ -4281,6 +4678,17 @@ export class FlowCanvas {
     }
     return candidate;
   };
+  // T2.8 — the PURE duplicate kernel: given a graph object `g` and a node id, return a FRESH
+  // `{ graph: { ...g, nodes:[...g.nodes, clone] }, newId }` (the controlled-graph write-back
+  // contract — never an in-place push), or null if the source isn't found. The clone carries a
+  // NEW unique id and a small offset; its `data` is deep-cloned ($clone strips any reactivity
+  // proxy) so the copy is independent of the source. Connections are NOT cloned (a duplicate is
+  // an isolated node — the React-Flow default).
+  //
+  // This helper performs NO history push and NO commit — history/commit are the CALLER's, so a
+  // single-node gesture and a batch gesture each own their own coalescing (quick-260803-qwh:
+  // origin is encoded by CALL SITE, never by a mutable "suppress history" flag — a sync-set
+  // flag read on a later frame is a known-dead pattern here).
   duplicateInto = (g: any, id: any) => {
     if (g == null || id == null) return null;
     const sid = String(id);
@@ -4308,6 +4716,10 @@ export class FlowCanvas {
       newId
     };
   };
+  // T2.8 — DUPLICATE the given node (the public verb + the NodeToolbar's Duplicate button).
+  // One history entry per duplicate gesture (pushHistory, gated on !programmatic + history).
+  // Returns the new id, or null if the source isn't found. NOT echo-guarded — a duplicate
+  // SHOULD update the model.
   duplicateNode = (id: any) => {
     if (id == null) return null;
     const r = this.duplicateInto(this.baseGraph(), id);
@@ -4316,6 +4728,12 @@ export class FlowCanvas {
     this.commitGraph(r.graph);
     return r.newId;
   };
+  // DUPLICATE a SET of nodes as ONE gesture (the Ctrl/Cmd+D path — script-internal, NOT an
+  // exposed verb). Folds every id through a ROLLING `g` so `freshNodeId` sees the clones minted
+  // earlier in the same batch and cannot collide within it, then pushes the SINGLE pre-gesture
+  // snapshot + commits ONCE — the component's "one gesture = one undo step" contract (D-03),
+  // using the same snapshotCurrent/pushHistorySnapshot primitive the reconnect gesture
+  // coalesces with. Returns the new ids ([] when nothing was duplicated — no history, no write).
   duplicateNodes = (ids: any) => {
     if (!ids || ids.length === 0) return [];
     const snap = this.snapshotCurrent();
@@ -4332,6 +4750,10 @@ export class FlowCanvas {
     this.commitGraph(g);
     return newIds;
   };
+  // Collect the currently-SELECTED node ids from the live selector (Win 1 + Win 2). The
+  // AreaExtensions.selector() `entities` Map holds the picked entities ({ label, id });
+  // for selectable nodes each entity's `id` is the node id. Empty when nothing is picked
+  // or selection is disabled. Read-only — no $data / engine write.
   selectedNodeIds = () => {
     if (!this.selector || !this.selector.entities) return [];
     const ids = [];
@@ -4340,6 +4762,14 @@ export class FlowCanvas {
     }
     return ids;
   };
+  // Win 2: surface selection changes to the consumer via @selection-change ({ ids }).
+  // Computes the current selected-id set, dedupes against the last-emitted set (joined
+  // string), and emits only on an ACTUAL change. Echo-guarded by `programmatic` so a
+  // PROGRAMMATIC unselect (clear/deleteNode may unpick) does not surface as a user
+  // selection. Selection is kept PURELY in the emit — never written into the graph model
+  // — so the controlled-graph echo-safety (the drag write-back assertions) is unaffected.
+  // Sorted before joining so the dedup key is order-independent (the selector Map order
+  // is not guaranteed stable across pick/unpick).
   maybeEmitSelectionChange = () => {
     if (this.programmatic) return;
     const ids = this.selectedNodeIds();
@@ -4358,6 +4788,12 @@ export class FlowCanvas {
     // the single selected+resizable node; hides on multi-select / empty / non-resizable).
     if (this.syncResizerSelection) this.syncResizerSelection();
   };
+  // Schedule the selection recompute AFTER the engine's own async selection update has
+  // settled. AreaExtensions.selectableNodes does its pick / unselectAll via AWAITED
+  // area.update() calls, so a bare microtask can run before `selector.entities` reflects
+  // the new state. A microtask AND an rAF together guarantee we recompute once the engine
+  // chain has flushed (the dedup collapses the pair to at most one emit). Falls back to a
+  // double microtask where rAF is unavailable (non-DOM test env).
   scheduleSelectionEmit = () => {
     Promise.resolve().then(this.maybeEmitSelectionChange);
     if (typeof requestAnimationFrame === 'function') {
@@ -4366,10 +4802,38 @@ export class FlowCanvas {
       Promise.resolve().then(() => Promise.resolve().then(this.maybeEmitSelectionChange));
     }
   };
+  // The reconcilers are built INSIDE $onMount and bridged here so the top-level
+  // $watch can call them — but NOT because of `$portals` or `$emit` (quick
+  // 260829-gbs: reclassified, correct-by-design; see class-a-sigil-scoping.md).
+  // `reconcileNodes` -> `reconcileNodesPass` -> `renderNode` -> `flowToken`, and
+  // `flowToken` reads `container`, where `const container = $refs.canvasEl` is
+  // the very first statement of the SAME $onMount body (ROZ123: `$refs` is only
+  // safe inside `$onMount`). `reconcileConnections` reaches the same root through
+  // `renderConnection`. The `$portals`/`$emit` capture inside this closure graph
+  // is incidental — hoisting the reconcilers would mean hoisting the ~2000-line
+  // mount-local helper graph rooted in that `$refs` read, which ROZ123 forbids.
+  // This bridge is a correct-by-design $refs-lifetime bridge, not a `$portals`
+  // workaround; unlike the five sites unwound elsewhere in quick 260829-gbs, this
+  // one stays. (Promoting `container` to a module-scope `let` assigned at mount —
+  // as MapLibre does with `instance` and chartjs does with `canvasEl` — would make
+  // the whole block hoistable; that is a deliberate deferral, not an oversight.)
   reconcileNodes: any = null;
   reconcileConnections: any = null;
+  // Re-entrancy guard for reconcileNodes. The declarative-children path can fire the
+  // node reconcile RE-ENTRANTLY on async-context targets (Lit): a <FlowNode>'s
+  // $onMount register starts reconcile #1, and its late-context $onUpdate registration
+  // (REQ-30) — or the registry $watch the register triggers — starts reconcile #2 while
+  // #1's awaits (editor.addNode / area.translate / area.update) are still pending. Two
+  // overlapping reconciles racing the same engine throw Rete's "cannot find node" (one
+  // updates/translates a node-view the other just rebuilt), which aborts the whole graph
+  // build (only the config-array `cfg` node survives on Lit). This flag serializes them:
+  // a reconcile requested while one is running sets a "run again" bit and returns; the
+  // in-flight reconcile re-runs once it finishes, so every registry mutation is folded
+  // into a fresh non-overlapping pass. The config-array-only path never re-enters (props
+  // change once per tick), so this is byte-transparent to its behavior.
   reconcileNodesRunning = false;
   reconcileNodesPending = false;
+  // ── pure helpers (no sigils → safe at top level) ──
   serializeConn = (c: any) => ({
     id: c.id,
     source: c.source,
@@ -4377,6 +4841,10 @@ export class FlowCanvas {
     target: c.target,
     targetInput: c.targetInput
   });
+  // Resolve a node TYPE's port schema from the flat per-TYPE portReg — the entries
+  // whose key starts `type + '::'`. Returns { inputs:[{key,label,multiple,portType}],
+  // outputs:[…] }. Pure (no $data write) so buildNode / buildSocketRow can call it on
+  // every run regardless of the order the <NodeType> vs its <Port> children registered.
   portSchemaForType = (type: any, portReg: any) => {
     const inputs = [];
     const outputs = [];
@@ -4402,6 +4870,13 @@ export class FlowCanvas {
       outputs
     };
   };
+  // Build a live Rete node from a graph-node spec ({ id, type, x, y, data }). The
+  // consumer's `id` is assigned onto the node so positions, portal keys, and
+  // connection source/target ids all align with the author's identifiers (Rete would
+  // otherwise auto-generate ids). Sockets come from the node's TYPE port schema
+  // (portReg keyed `type::side::key`) — a type's ports declared ONCE apply to every
+  // instance (render-by-type). The single shared SOCKET still gates compatibility by
+  // identity; the per-port `portType` drives typed VALIDATION, not socket identity.
   buildNode = (spec: any, portReg: any) => {
     const label = spec.data && spec.data.label != null ? String(spec.data.label) : '';
     const node = new ClassicPreset.Node(label);
@@ -4420,6 +4895,16 @@ export class FlowCanvas {
     }
     return node;
   };
+  // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
+  // Collision discipline (ROZ121/ROZ524/Lit-lifecycle):
+  //   - NO `setZoom` — `zoom` is a model prop, so React auto-generates a `setZoom`
+  //     state setter (the MapLibre setCenter/setZoom lesson); the verb is `zoomTo`.
+  //   - NONE equals a Lit reserved lifecycle name (update/render/firstUpdated/
+  //     updated/willUpdate/requestUpdate) — note `clear` and `getNodes` are safe.
+  //   - NONE equals an emitted event name (node-moved/node-picked/connection-*
+  //     /translated/context-menu/node-action) or a prop name.
+  // addNode/addConnection/removeNode/removeConnection operate on the engine
+  // directly and are NOT reaped by props reconcile (provenance-tracked).
   getEditor = () => {
     return this.editor;
   };
@@ -4546,6 +5031,20 @@ export class FlowCanvas {
     }
     if (k !== this.zoom()) this.zoom.set(k);
   };
+  // ─── viewport API (Phase 42 — the T11 gap + what the pannable minimap needs) ─────
+  // Both write the AreaPlugin transform via the CONFIRMED Rete v2 area API: with the
+  // origin omitted `area.area.zoom(k)` leaves x/y unchanged (transform.x += 0·d), and
+  // `area.area.translate(x, y)` sets the pan ABSOLUTELY (verified against rete-area-
+  // plugin@2.1.5). Echo-guarded with `programmatic` so the transform write doesn't loop
+  // back through the zoomed/nodetranslated write-back (the `translated` emit stays
+  // UNCONDITIONAL, so @translated still surfaces a programmatic recenter — a real
+  // viewport change the consumer asked for). After, echo `$model.zoom` (mirrors zoomTo).
+  // Collision discipline: setCenter/setViewport are NOT Lit lifecycle names, NOT emit
+  // names, NOT prop names, NOT React model-setters (`graph`/`zoom` → setGraph/setZoom),
+  // and NOT inherited DOM methods (the Embla scrollTo lesson) — clean on all 6.
+  //
+  // setViewport({ x, y, k }) — set the raw transform (any field omitted keeps its
+  // current value).
   setViewport = async (vp: any) => {
     if (!this.area || !vp || typeof vp !== 'object') return;
     const tf = this.area.area.transform;
@@ -4561,6 +5060,10 @@ export class FlowCanvas {
     }
     if (k !== this.zoom()) this.zoom.set(k);
   };
+  // setCenter(x, y, opts?) — center the viewport on graph-coords (x, y), optionally
+  // setting zoom (`opts.zoom`). The transform that puts graph point (x,y) at the canvas
+  // center is tx = W/2 − x·k, ty = H/2 − y·k (screen = graph·k + transform). W/H are the
+  // engine container's pixel dims (area.container — public on AreaPlugin, no $refs read).
   setCenter = async (x: any, y: any, opts: any) => {
     if (!this.area || typeof x !== 'number' || typeof y !== 'number') return;
     const k = opts && typeof opts.zoom === 'number' ? opts.zoom : this.area.area.transform.k;
@@ -4578,6 +5081,12 @@ export class FlowCanvas {
     }
     if (k !== this.zoom()) this.zoom.set(k);
   };
+  // ─── built-in Controls overlay handlers (Win 4) ──────────────────────────────
+  // Wired to the in-template zoom in / out / fit buttons (gated r-if="$props.controls").
+  // They REUSE the zoomTo / zoomToFit verbs (one implementation — no logic duplication),
+  // clamping the step to [minZoom, maxZoom] so a button never exceeds the restrictor
+  // bounds. Zoom/fit are view-only, so they stay enabled even when readonly (they do not
+  // edit the graph). A no-op before the area mounts.
   ZOOM_STEP = 1.2;
   clampZoom = (k: any) => {
     const __minZoom = this.minZoom();
@@ -4599,6 +5108,8 @@ export class FlowCanvas {
   controlFit = () => {
     this.zoomToFit();
   };
+  // T2.4 — the gated 4th Controls button toggles the two-way mode (pan ↔ select). Writes
+  // $model.mode (model:true); the consumer's r-model:mode (or the internal demo state) updates.
   toggleMode = () => {
     this.mode.set(this.mode() === 'select' ? 'pan' : 'select');
   };
@@ -4626,6 +5137,16 @@ export class FlowCanvas {
       k: this.area.area.transform.k
     } : null;
   };
+  // screenToFlowPosition(clientX, clientY) → { x, y } in GRAPH coords (Phase 43 — the
+  // palette-drop / no-code-builder primitive, the React-Flow `screenToFlowPosition`
+  // parity). The INVERSE of the area transform: a graph point projects to the screen as
+  // `screen = containerOrigin + transform.{x,y} + graph·k`, so
+  // `graph = (client − containerOrigin − transform) / k`. `area.container` is public on
+  // the AreaPlugin (no $refs read). Returns null before the area mounts. The component
+  // owns ONLY this projection — the consumer owns the drag/drop (a palette item's
+  // `draggable` + the canvas `@dragover.prevent`/`@drop`) and writes the new node into the
+  // bound `graph` at the returned coords, exactly like React Flow (which does not own the
+  // palette either).
   screenToFlowPosition = (clientX: any, clientY: any) => {
     if (!this.area || typeof clientX !== 'number' || typeof clientY !== 'number') return null;
     const el = this.area.container;
@@ -4638,6 +5159,21 @@ export class FlowCanvas {
       y: (clientY - rect.top - t.y) / k
     };
   };
+  // 260826-h7k — arrangePort(data): the LOCAL preset's port() callback, reporting each
+  // socket's REAL measured geometry to elk instead of the plugin's built-in classic preset —
+  // whose port offsets match rete's own DEFAULT node view, not ours, and are unfixable via
+  // preset options once elk hard-pins portConstraints: FIXED_POS on every node (the root
+  // cause of the fixed per-hop y staircase this fix removes). Component-scope (closes over
+  // `area` + `socketReg`), so it stays in the .rozie exactly like screenToFlowPosition — NOT
+  // extracted to src/internal/ (arrangeGeometry.ts holds only the pure math).
+  //
+  // The socket rect is measured via getBoundingClientRect() deltas against the node element,
+  // divided by the canvas zoom `k`: the area is CSS-transform scaled, so both rects come back
+  // in SCREEN space, and offsetTop/offsetLeft do NOT work here because a socket's
+  // offsetParent is not its owning node element. A null `measured` (either element missing,
+  // or the socket rect not yet laid out — the same unmeasured-first-paint class
+  // MINIMAP_DEFAULT_NODE_W/H at :549-550 already covers, notably Lit's async first paint)
+  // falls through to arrangePortRect's symmetric centred fallback.
   arrangePort = (data: any) => {
     const nodeView = this.area && this.area.nodeViews ? this.area.nodeViews.get(data.nodeId) : null;
     const nodeEl = nodeView && nodeView.element ? nodeView.element : null;
@@ -4659,6 +5195,32 @@ export class FlowCanvas {
     }
     return arrangePortRect(data.side, data.width, data.height, measured);
   };
+  // T2.6 — autoArrange(opts?) — relayout the graph into a non-overlapping LAYERED arrangement
+  // (D-08, verb-only, NO auto-trigger — the MapLibre verb-first stance). Runs the
+  // AutoArrangePlugin with a LOCAL preset (`arrangePort` above) reporting each socket's real
+  // measured geometry, then READS the arranged positions BACK into a FRESH
+  // `{ nodes, connections }` object written through `$model.graph` (the controlled-graph
+  // contract — the engine is never the source of truth, mirroring the drag write-back).
+  //
+  // PITFALL 3 (Plan 00 / RESEARCH): elkjs needs each node's `width`/`height`; our nodes are
+  // plain `ClassicPreset.Node` with no dimensions, so without dims the classic preset collapses
+  // every node to (0,0). We set `node.width`/`node.height` from the MEASURED engine node-view
+  // element (area.nodeViews.get(id).element offsetW/H — target-agnostic, the measureNodeSize
+  // discipline) BEFORE layout, falling back to MINIMAP_DEFAULT_NODE_W/H for Lit's unmeasured
+  // first paint. (measureNodeSize itself is $onMount-local; the verb is top-level, so the same
+  // measure is inlined here over the component-scope `area` + `nodeInstances`.)
+  //
+  // Echo-guarded (programmatic++ around layout AND the write-back) so the engine relayout and
+  // the resulting $model.graph re-bind → $watch(graph) → reconcile don't re-enter; ONE history
+  // snapshot is pushed for the whole gesture (D-03, gated on !programmatic + history). Layout
+  // options are always the component's tuned elk defaults (src/internal/arrangeGeometry.ts's
+  // arrangeLayoutOptions — spacing / node-placement strategy) merged OVER with the caller's
+  // `opts.options`, key-by-key — a caller-supplied key wins, an untouched default survives.
+  //
+  // Collision discipline: `autoArrange` is NOT a Lit lifecycle name (update/render/firstUpdated/
+  // updated/willUpdate/requestUpdate), NOT an inherited DOM method (the Embla scrollTo lesson),
+  // NOT an emit (node-*/connection-*/translated/context-menu/selection-change/edge-*/node-action),
+  // NOT a prop, NOT a React model-setter (graph/zoom → setGraph/setZoom) — clean on all 6.
   autoArrange = async (opts: any) => {
     if (!this.area) return;
     // Lazily pull in the engine (quick-260823-qgi). The dynamic import is the ONLY reference to
@@ -4754,15 +5316,34 @@ export class FlowCanvas {
       this.programmatic--;
     }
   };
+  // ─── imperative selection control ────────────────────────────────────────────
+  // Selection was previously PUSH-ONLY (the `selection-change` emit fires on change,
+  // but a consumer couldn't READ or DRIVE selection). These reuse the internal
+  // `selector` / `nodeSelectApi` (AreaExtensions.selector + selectableNodes) already
+  // wired for the marquee — no new engine state. All no-op when selection is off
+  // (readonly / !selectable, when `nodeSelectApi` is null). Each schedules the same
+  // post-settle `selection-change` recompute the marquee uses, so an imperative
+  // select keeps the consumer's bound state in sync (the zoomTo→$model.zoom echo
+  // stance). Collision discipline: `selectNode` is NOT bare `select` — `select` is
+  // an inherited HTMLElement method (Lit shadow, the Embla scrollTo lesson) AND a
+  // FullCalendar-style emit hazard; getSelectedNodes/clearSelection/selectAll/
+  // centerOnNode are NOT emits (selection-change/node-*/edge-*), NOT props, NOT
+  // React model-setters (graph/zoom → setGraph/setZoom), NOT Lit lifecycle.
+  //
+  // getSelectedNodes() — the currently-selected nodes as { id, label, x, y } (the
+  // getNodes() shape, filtered to the live selection). Empty when nothing selected.
   getSelectedNodes = () => {
     const sel = new Set(this.selectedNodeIds().map((x: any) => String(x)));
     return this.getNodes().filter((n: any) => sel.has(String(n.id)));
   };
+  // selectNode(id, accumulate?) — programmatically select a node (sidebar/search →
+  // highlight). accumulate=true adds to the current selection; falsy replaces it.
   selectNode = (id: any, accumulate: any) => {
     if (!this.nodeSelectApi || id == null) return;
     this.nodeSelectApi.select(id, !!accumulate);
     this.scheduleSelectionEmit();
   };
+  // clearSelection() — unselect every selected node (and any selected edge).
   clearSelection = () => {
     if (this.nodeSelectApi) {
       for (const id of this.selectedNodeIds() as any) this.nodeSelectApi.unselect(id);
@@ -4770,6 +5351,9 @@ export class FlowCanvas {
     this.clearEdgeSelection();
     this.scheduleSelectionEmit();
   };
+  // selectAll() — select every node. Also the verb behind Ctrl/Cmd+A, which the canvas
+  // keydown handler binds to it (the marquee only ever covers a dragged region).
+  // Mirrors the marquee's first-replaces / rest-accumulate pattern.
   selectAll = () => {
     if (!this.nodeSelectApi) return;
     let first = true;
@@ -4779,6 +5363,10 @@ export class FlowCanvas {
     }
     this.scheduleSelectionEmit();
   };
+  // centerOnNode(id, opts?) — pan (and optionally zoom via opts.zoom) to center the
+  // viewport on a node by id. setCenter is coordinate-based; this measures the node
+  // to compute its center in GRAPH coords (position is the top-left; offsetW/H are
+  // unscaled graph units), falling back to the minimap default dims pre-measure.
   centerOnNode = async (id: any, opts: any) => {
     if (!this.area || id == null) return;
     const view = this.area.nodeViews ? this.area.nodeViews.get(id) : null;

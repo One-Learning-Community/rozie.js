@@ -45,18 +45,21 @@ export class FilterNumberRange {
     // Seed both drafts once at setup from the incoming [min,max] tuple (setup-once).
     this.minDraft.set(Array.isArray(this.value()) && this.value()[0] != null ? String(this.value()[0]) : '');
     this.maxDraft.set(Array.isArray(this.value()) && this.value()[1] != null ? String(this.value()[1]) : '');
-
-    // Untyped handler params neutralize to `any` (the global-filter idiom).
   }
 
+  // Untyped handler params neutralize to `any` (the global-filter idiom).
   onMinInput = (e: any) => {
     this.minDraft.set(e && e.target ? e.target.value : '');
   };
   onMaxInput = (e: any) => {
     this.maxDraft.set(e && e.target ? e.target.value : '');
   };
+  // Plain string-coercion functions for the placeholders (NOT $computed — the
+  // EditorSelect/listbox lesson; opaque slot-scope props rejected by strict leaf tsc).
   minPlaceholder = () => Array.isArray(this.minMax()) && this.minMax()[0] != null ? String(this.minMax()[0]) : '';
   maxPlaceholder = () => Array.isArray(this.minMax()) && this.minMax()[1] != null ? String(this.minMax()[1]) : '';
+  // Convert a draft to a Number or undefined (empty string → undefined so a
+  // one-sided range works). Both undefined → clear the filter.
   applyRange = () => {
     const __minDraft = this.minDraft();
     const __maxDraft = this.maxDraft();

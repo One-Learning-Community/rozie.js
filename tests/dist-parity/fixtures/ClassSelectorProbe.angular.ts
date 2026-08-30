@@ -34,6 +34,9 @@ export class ClassSelectorProbe {
     this.ready.set(true);
   }
 
+  // script-position class-selector helper call — exercises the rewriteScript.ts
+  // hook. Lowers per-target: ".grip" literal (Vue/Svelte/Solid/Angular/Lit) or
+  // "." + styles.grip (React).
   gripSelector = ".grip";
 
   private __rozieDestroyRef = inject(DestroyRef);

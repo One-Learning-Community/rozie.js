@@ -35,14 +35,14 @@ export class FilterText {
     // Seed the draft once at setup from the incoming value (setup-once, NOT in the
     // template). Normalize null/undefined to '' so the input value binds to a string.
     this.draft.set(this.value() != null ? String(this.value()) : '');
-
-    // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
-    // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
   }
 
+  // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
+  // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
   onInput = (e: any) => {
     this.draft.set(e && e.target ? e.target.value : '');
   };
+  // setFilter is a Function prop (default null) — guard before calling.
   applyFilter = () => {
     const __setFilter = this.setFilter();
     __setFilter && __setFilter(this.columnId(), this.draft());

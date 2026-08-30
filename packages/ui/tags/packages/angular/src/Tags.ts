@@ -201,17 +201,28 @@ export class Tags {
     return map;
   });
 
+  // ---- derived view (plain functions, uniform ×6) ------------------------
+  // The committed tokens, normalized to a string[].
   tokens = () => Array.isArray(this.modelValue()) ? this.modelValue() : [];
+  // The configured commit keys, normalized to a string[].
   commitKeys = () => Array.isArray(this.delimiters()) ? this.delimiters() : [',', 'Enter'];
+  // The non-Enter delimiters act as split characters for paste.
   splitChars = () => this.commitKeys().filter((k: any) => k !== 'Enter');
+  // Whether the control has reached its token cap.
   atMax = () => typeof this.max() === 'number' && this.tokens().length >= this.max();
+  // Whether new input is accepted at all.
   canEdit = () => !(this.disabled() || this.__rozieCvaDisabled()) && !this.readonly();
+  // ---- write funnel (single $emit site) ----------------------------------
+  // Write the model and emit change. Every committed-list mutation funnels here.
   commitTokens = (next: any) => {
     this.modelValue.set(next), this.__rozieCvaOnChange(next);
     this.change.emit({
       value: next
     });
   };
+  // ---- add / remove ------------------------------------------------------
+  // Normalize → validate → dedup → cap a candidate, then commit + emit add.
+  // Returns true if it was added (so the caller can clear the draft).
   addToken = (raw: any) => {
     const __validate = this.validate();
     const __max = this.max();
@@ -235,6 +246,7 @@ export class Tags {
     });
     return true;
   };
+  // Remove the token at `idx`, commit, and emit remove.
   removeAt = (idx: any) => {
     if (!this.canEdit()) return;
     const cur = this.tokens();
@@ -248,15 +260,24 @@ export class Tags {
       tokens: next
     });
   };
+  // ---- focus (container ref, post-mount only) ----------------------------
+  // Read $refs.root only here / in $onMount / in $expose verbs (post-mount →
+  // ROZ123-safe). querySelector reaches the input inside Lit's shadow root too.
   focusTheInput = () => {
     const root = this.root()?.nativeElement;
     if (!root) return;
     const el = root.querySelector('input');
     if (el) el.focus();
   };
+  // ---- input handlers ----------------------------------------------------
+  // Mirror the typed text into the draft buffer. Capture the fresh local value
+  // (do NOT re-read $data.draft in the same handler — React setState is async and
+  // would read the pre-write value).
   onInput = (e: any) => {
     this.draft.set(e && e.target ? e.target.value : '');
   };
+  // A delimiter key commits the current draft; Backspace in an empty input
+  // deletes the previous token.
   onKeydown = (e: any) => {
     if (!this.canEdit()) return;
     const key = e ? e.key : '';
@@ -274,11 +295,13 @@ export class Tags {
       }
     }
   };
+  // Commit any leftover draft when the input loses focus (a common chips UX).
   onBlur = (e: any) => {
     if (!this.canEdit()) return;
     const value = e && e.target ? e.target.value : '';
     if (value && this.addToken(value)) this.draft.set('');
   };
+  // Paste: split on the configured delimiter characters and bulk-add.
   onPaste = (e: any) => {
     if (!this.canEdit()) return;
     const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
@@ -305,16 +328,23 @@ export class Tags {
     }
     if (addedAny) this.draft.set('');
   };
+  // ---- per-element attribute helpers -------------------------------------
   removeLabel = (t: any) => 'Remove ' + String(t);
   countLabel = () => {
     const n = this.tokens().length;
     return n === 1 ? '1 tag' : n + ' tags';
   };
+  // ---- lifecycle + imperative handle -------------------------------------
+  // clear() — remove every token (emits change with []) and focus the input.
   clear = () => {
     this.commitTokens([]);
     this.draft.set('');
     this.focusTheInput();
   };
+  // focus() — move DOM focus to the text input. DELIBERATELY overrides the
+  // inherited HTMLElement.focus on the Lit custom element (warn-only ROZ137,
+  // accepted — the public focus() handle is the intended semantics; otp/slider
+  // precedent, consistent with NumberField which also exposes `focus`).
   focus = () => this.focusTheInput();
 
   private __rozieCvaOnChange: (v: any[]) => void = () => {};

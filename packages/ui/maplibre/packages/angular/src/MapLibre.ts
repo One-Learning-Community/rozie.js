@@ -579,19 +579,41 @@ export class MapLibre {
   }
 
   instance: any = null;
+  // MapLibre's official no-token demo tiles — the zero-config `mapStyle` fallback
+  // (the prop default is `undefined`; see the prop note).
   DEFAULT_STYLE = 'https://demotiles.maplibre.org/style.json';
+  // The eventData merged onto programmatic camera ops so the camera-lifecycle echo
+  // handlers can ignore our own moves (the documented MapLibre echo-guard — robust
+  // across batched ops where Leaflet's single boolean would race).
   PROGRAMMATIC = {
     rozieProgrammatic: true
   };
+  // Live entry maps for the REACTIVE MULTI-INSTANCE portal slots — keyed by
+  // entry.id ?? index. Each value: { engine, handle, el }. COMPONENT-scope (not
+  // $onMount-local) so the $onMount-returned teardown — which the Solid emitter
+  // hoists into a sibling onCleanup() OUTSIDE the mount IIFE — keeps them in scope.
   markerEntries = new Map();
   popupEntries = new Map();
+  // standard-control instances (so a controls-prop change can remove + re-add) and
+  // the mount-once custom-control portal dispose. controlInstances is a null-let
+  // (→ typeNeutralize `any`) initialized to [] in $onMount: a bare `let x = []`
+  // infers `never[]` under the strict framework-typecheck harness and rejects the
+  // `any` control instances pushed into it.
   controlInstances: any = null;
   controlDispose: any = null;
   customControl: any = null;
+  // layer-scoped feature listeners, registered per interactiveLayerId so they can
+  // be unregistered on change. id → { enter, leave }.
   featureListeners = new Map();
+  // previously-applied source/layer ids (null-lets → `any`, [] in $onMount; same
+  // never[] reason as controlInstances) so a sources/layers prop change can remove
+  // the dropped ones.
   appliedLayerIds: any = null;
   appliedSourceIds: any = null;
+  // ─── pure helpers (no sigils → safe at top level) ───────────────────────────
   sameCenter = (a: any, b: any) => Array.isArray(a) && Array.isArray(b) && a[0] === b[0] && a[1] === b[1];
+  // structured pointer-event payload — stable across targets, avoids handing the
+  // raw engine event (with its circular `target: Map`) to consumers.
   payload = (e: any) => ({
     lngLat: e.lngLat ? {
       lng: e.lngLat.lng,
@@ -614,6 +636,10 @@ export class MapLibre {
     if (type === 'attribution') return new maplibregl.AttributionControl(opts);
     return null;
   };
+  // Standard controls reconcile — no reactive-portal handle to manage here, so
+  // nothing ever needed mount scope (this was never a $portals/$emit constraint —
+  // $emit never forces mount scope on any target). Remove-all + re-add from the
+  // config (controls rarely change; cheap and order-correct).
   applyControls = () => {
     if (!this.instance) return;
     for (const c of this.controlInstances as any) this.instance.removeControl(c);
@@ -627,6 +653,7 @@ export class MapLibre {
       this.controlInstances.push(ctrl);
     }
   };
+  // Interaction-toggle reconcile — each toggle maps to a runtime handler object.
   applyInteractionToggles = () => {
     if (!this.instance) return;
     const set = (name: any, on: any) => {
@@ -642,6 +669,9 @@ export class MapLibre {
     set('touchZoomRotate', this.touchZoomRotate());
     set('touchPitch', this.touchPitch());
   };
+  // Style-load-gated source/layer reconcile. Order matters: drop removed layers
+  // FIRST, then add/update sources, then add/update layers, then drop removed
+  // sources (after their layers are gone).
   applyLayers = () => {
     if (!this.instance || !this.instance.isStyleLoaded()) return;
 
@@ -752,6 +782,12 @@ export class MapLibre {
     this.appliedLayerIds = wantLayerIds;
     this.appliedSourceIds = wantSourceIds;
   };
+  // ─── REACTIVE MULTI-INSTANCE marker portal slot ───────────────────────────
+  // One reactive portal handle per markers[] entry, reconciled keep/update/dispose
+  // on prop change. The `!instance` guard is the pre-mount fence — these three
+  // reconcilers are called from top-level $watches with no other downstream guard
+  // and their bodies touch `instance` unconditionally (`.addTo(instance)`,
+  // `instance.off(...)`, `instance.on(...)`).
   reconcileMarkers = (list: any) => {
     if (!this.instance) return;
     if (!(this.markerTpl ?? this.__rozieFillMap()['marker'] ?? this.templates()?.['marker'])) return;
@@ -794,6 +830,7 @@ export class MapLibre {
       }
     }
   };
+  // ─── REACTIVE MULTI-INSTANCE popup portal slot ────────────────────────────
   reconcilePopups = (list: any) => {
     if (!this.instance) return;
     if (!(this.popupTpl ?? this.__rozieFillMap()['popup'] ?? this.templates()?.['popup'])) return;
@@ -836,6 +873,7 @@ export class MapLibre {
       }
     }
   };
+  // ─── layer-scoped feature mouseenter/mouseleave (needs a layer id) ────────
   reconcileInteractive = (ids: any) => {
     if (!this.instance) return;
     const want = (Array.isArray(ids) ? ids : []).filter(Boolean);
@@ -858,6 +896,26 @@ export class MapLibre {
       });
     }
   };
+  // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
+  // 15 verbs. Collision-clear across all 3 classes: NOT a React model-setter
+  // (setCenter/setZoom/setBearing/setPitch are the auto-gen'd ones — none here);
+  // NOT a Lit lifecycle name (update/render/firstUpdated/updated/willUpdate/
+  // requestUpdate); NOT an emitted event name (move/zoom/rotate/pitch/drag/click/
+  // idle/error — getCenter/getZoom/resize/flyTo/easeTo/jumpTo/fitBounds/getMap all
+  // differ; zoomIn/zoomOut differ from the `zoomend` emit). The camera verbs
+  // deliberately omit PROGRAMMATIC so an imperative move echoes into $model (the
+  // prop $watch then no-ops, getCenter already matching).
+  //
+  // Camera control is well-covered above; the read/hit-test/projection family
+  // below is what a consumer needs to build custom controls, overlays, and click
+  // interactivity — none reachable via prop/model/event:
+  //   - queryRenderedFeatures: hit-test "what's under this pixel/box" (click-to-
+  //     inspect, selection beyond per-layer mouseenter/leave).
+  //   - project / unproject: convert geo<->screen for positioning framework DOM
+  //     overlays over map coordinates.
+  //   - getBounds: read the live visible viewport bbox (lazy-fetch data for the
+  //     current view) — distinct from the construction-only `bounds` prop.
+  //   - zoomIn / zoomOut / panBy: ergonomic nudges for a consumer's own controls.
   getMap = () => {
     return this.instance;
   };

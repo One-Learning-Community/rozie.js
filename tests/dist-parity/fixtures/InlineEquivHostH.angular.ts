@@ -26,6 +26,7 @@ export class InlineEquivHostH {
   }
 
   editTransitionH = 1;
+  // leading: stays with the extracted decl, must NOT float to the hoisted import
   editorBindingsH = (k: number): number => clampH(k * 2);
 
   private __rozieDestroyRef = inject(DestroyRef);

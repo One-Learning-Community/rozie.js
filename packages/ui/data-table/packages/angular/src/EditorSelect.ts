@@ -52,13 +52,13 @@ export class EditorSelect {
     // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
     // to '' so the <select> binds to a string.
     this.draft.set(this.value() != null ? String(this.value()) : '');
-
-    // Picking/arrow-cycling an option updates the draft only — no commit.
   }
 
+  // Picking/arrow-cycling an option updates the draft only — no commit.
   onChange = (e: any) => {
     this.draft.set(e && e.target ? e.target.value : '');
   };
+  // commit/cancel are Function props (default null) — guard before calling.
   doCommit = () => {
     const __commit = this.commit();
     __commit && __commit(this.draft());

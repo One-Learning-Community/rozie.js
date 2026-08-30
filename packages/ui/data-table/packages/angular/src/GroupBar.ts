@@ -116,29 +116,44 @@ export class GroupBar {
   dragKind = signal('');
   dropKey = signal('');
 
+  // Untyped handler params neutralize to `any` so the native drag-event shapes
+  // (dataTransfer / preventDefault) typecheck across all six strict leaves — the
+  // global-filter idiom (see FilterText.rozie). NEVER annotate these params.
+  // A palette CHIP started dragging → this is an ADD-a-new-column drag.
   onChipDragStart = (e: any, id: any) => {
     this.draggingId.set(id);
     this.dragKind.set('chip');
     if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', id);
   };
+  // An active TOKEN started dragging → this is a REORDER drag.
   onTokenDragStart = (e: any, gk: any) => {
     this.draggingId.set(gk);
     this.dragKind.set('token');
     if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', gk);
   };
+  // MUST preventDefault — native HTML5 DnD never fires @drop on a zone that does not
+  // cancel the dragover default. Also raises the drop-target highlight.
   onDragOver = (e: any) => {
     if (e) e.preventDefault();
     this.isOver.set(true);
   };
+  // While reordering, record the token under the pointer as the insertion anchor
+  // (we drop BEFORE it). preventDefault so the zone still accepts the drop. Ignored
+  // for chip drags — those just append at the end.
   onTokenDragOver = (e: any, gk: any) => {
     if (e) e.preventDefault();
     if (this.dragKind() === 'token') this.dropKey.set(gk);
   };
+  // Clear the highlight only on a REAL leave: dragleave ALSO fires when the pointer
+  // crosses onto a child token, so ignore leaves whose relatedTarget is still inside
+  // the zone (prevents flicker as you hover over existing grouping tokens).
   onDragLeave = (e: any) => {
     if (e && e.currentTarget && e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
     this.isOver.set(false);
     this.dropKey.set('');
   };
+  // Single reset for all ephemeral drag bookkeeping — called on drop AND on dragend
+  // (so an aborted drag, dropped outside the zone, still clears the marker/highlight).
   resetDrag = () => {
     this.draggingId.set('');
     this.dragKind.set('');
@@ -186,6 +201,9 @@ export class GroupBar {
     const __clearGrouping = this.clearGrouping();
     __clearGrouping && __clearGrouping();
   };
+  // Resolve a grouping key to its column's friendly label (falls back to the raw
+  // key). Used for both the token text and the remove button's aria-label so the
+  // bar reads in human terms, not internal column ids. Untyped like the handlers.
   labelFor = (key: any) => {
     const col = this.groupableColumns().find((c: any) => c.id === key);
     return col && col.label || key;

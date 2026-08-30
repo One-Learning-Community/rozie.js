@@ -97,6 +97,10 @@ export class Captcha {
 
   api: any = null;
   widgetId: any = null;
+  // The render config shared across all three providers. The hyphenated
+  // `expired-callback` / `error-callback` keys are the common option names each
+  // provider's render() accepts. `tabindex` is omitted unless set; `options`
+  // (the escape hatch) is merged last so a consumer can override any key.
   buildConfig = () => ({
     sitekey: this.sitekey(),
     theme: this.theme(),
@@ -129,13 +133,17 @@ export class Captcha {
     },
     ...this.options()
   });
+  // Imperative handle. Each guards on a live widget (null before render / after
+  // teardown). reset clears the two-way token to match the cleared widget.
   reset = () => {
     if (this.widgetId != null && this.api && typeof this.api.reset === 'function') this.api.reset(this.widgetId);
     this.token.set(''), this.__rozieCvaOnChange('');
   };
+  // Invisible / programmatic challenge (size="invisible"). No-op until rendered.
   execute = () => {
     if (this.widgetId != null && this.api && typeof this.api.execute === 'function') this.api.execute(this.widgetId);
   };
+  // Read the current response token on demand (e.g. just before form submit).
   getResponse = () => {
     return this.widgetId != null && this.api && typeof this.api.getResponse === 'function' ? this.api.getResponse(this.widgetId) : '';
   };

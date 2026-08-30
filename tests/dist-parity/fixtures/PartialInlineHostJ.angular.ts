@@ -28,6 +28,7 @@ export class PartialInlineHostJ {
     const next = colId + value;
     return next;
   };
+  // Re-read the row model + header groups into $data
   refreshRowModelJ = 0;
 
   private __rozieDestroyRef = inject(DestroyRef);

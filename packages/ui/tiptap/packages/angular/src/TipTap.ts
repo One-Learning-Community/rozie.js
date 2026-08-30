@@ -819,17 +819,58 @@ export class TipTap {
   }
 
   editor: any = null;
+  // The raw HTML string the editor currently reflects. Compared against in the
+  // $props.html reconciler so the watcher's mount-time fire is a no-op: the
+  // editor is created with `content: $props.html`, so right after mount the bound
+  // model already matches and setContent must NOT re-run (re-running it replaces
+  // the whole ProseMirror document and resets the selection — the official
+  // @tiptap/* wrappers guard the same way against the *raw* value, never against
+  // the normalized `editor.getHTML()`). This is the CodeMirror suppress-echo
+  // guard in HTML-string form (flatpickr lineage).
   lastHtml: any = null;
+  // The `toolbar` portal slot's dispose handle. COMPONENT-scope (top-level let),
+  // NOT a $onMount-local — the Solid emitter hoists the $onMount-returned cleanup
+  // into a sibling onCleanup() OUTSIDE the mount-body IIFE, so a mount-local would
+  // lose scope there (the Chart.js tooltipEl/tooltipDispose hoist lesson).
   toolbarDispose: any = null;
+  // The `bubbleMenu` / `floatingMenu` portal-slot dispose handles + the imperatively
+  // created menu host elements. COMPONENT-scope for the same hoist reason as
+  // toolbarDispose — and the host els must be reachable from BOTH the pre-`new
+  // Editor` extension build (the menu extension needs its `element` at construction)
+  // AND the post-construction portal mount, so they live here too (not $onMount
+  // locals). Each stays null when its slot is unfilled (zero overhead, no $portals
+  // reference fired — the nodeView discipline).
   bubbleMenuEl: any = null;
   bubbleMenuDispose: any = null;
   floatingMenuEl: any = null;
   floatingMenuDispose: any = null;
+  // ── Link editor (#2) surface. Its OWN dedicated bubble-menu instance (distinct
+  // `pluginKey: 'rozieLinkEditor'`) with a link-aware trigger, orthogonal to the
+  // general `bubbleMenu` slot. `linkEditorEl` is the imperatively-created host handed
+  // to that BubbleMenu extension (the bubbleMenuEl discipline — engine owns
+  // positioning). COMPONENT-scope for the same hoist reason as the menu els.
+  //   - When the consumer fills the `#linkEditor` slot → `linkEditorHandle` is the
+  //     REACTIVE portal handle ({ update, dispose }); refreshLink() re-renders it in
+  //     place (Spike 016 proved a reactive portal survives the bubble-menu
+  //     extension's element.remove()/appendChild detach-reattach cycles).
+  //   - Otherwise → the component builds its OWN default form imperatively into
+  //     `linkEditorEl` (`linkInputEl` = its URL <input>); refreshLink() imperatively
+  //     refreshes the input value. Pure-script ⇒ byte-identical across all 6 targets,
+  //     no framework-reconciliation risk, and no portal default-content (the emitter
+  //     renders none for an unfilled portal slot).
+  // `openFlag` = the toolbar Link button's create-mode trigger (set true on click,
+  // cleared on Apply/Remove/Cancel/blur); the link-aware shouldShow shows the editor
+  // when `editor.isActive('link')` (edit mode) OR `openFlag` (create mode).
   linkEditorEl: any = null;
   linkEditorHandle: any = null;
   linkInputEl: any = null;
   openFlag = false;
+  // Last link state refreshLink() reflected, as a compare key — lets refreshLink
+  // early-return when the link mark is unchanged (a keystroke fires BOTH onUpdate
+  // and onSelectionUpdate, so refreshLink would otherwise run — and re-render the
+  // #linkEditor fragment — twice per keystroke).
   lastLinkKey: any = null;
+  // Recompute the internal toolbar's active-mark booleans from the live editor.
   refreshActive = () => {
     if (!this.editor) return;
     this.active.set({
@@ -847,6 +888,24 @@ export class TipTap {
       link: this.editor.isActive('link')
     });
   };
+  // ── Link editor (#2) command helpers + reactive refresh. TOP-LEVEL const arrows
+  // (siblings of refreshActive/refreshCount) so every `editor` read sits at the same
+  // shallow, proven-safe depth — never nested inside an object-literal method (the
+  // redirectNestedThis gap [[project_emitter_redirect_nested_this_gap]]). The link
+  // scope's setLink/unsetLink/close are these top-level fns, referenced by identity
+  // from buildLinkScope so the consumer fragment (and the built-in form) call the
+  // SAME verbs. `extendMarkRange('link')` widens the selection to the whole link so
+  // an edit/removal applies to the entire mark, not just the caret word.
+  //
+  // DECLARATION ORDER IS LOAD-BEARING (topological, leaves first): apply/remove/close
+  // → buildLinkScope → refreshLink → openLinkEditor. The React/Solid/Lit emitters lift
+  // reactive closures into useCallback/memo with eager dependency ARRAYS, so a forward
+  // reference to a later-declared reactive const is a hard TS2448 (use-before-decl) —
+  // unlike a deferred function BODY, which is fine. apply/removeLink therefore do NOT
+  // call refreshLink (which would make them depend on it and re-introduce a cycle):
+  // the setLink/unsetLink chain dispatches a transaction that fires onSelectionUpdate +
+  // onUpdate, both of which already call refreshLink. Only openLinkEditor (safely last)
+  // calls it, for immediate prefill on the create affordance.
   applyLink = (attrs: any) => {
     // A link mark requires a non-empty href — ignore an empty Apply (built-in form)
     // or a hrefless consumer setLink rather than writing a degenerate `<a href="">`.
@@ -858,6 +917,25 @@ export class TipTap {
     this.editor?.chain().focus().extendMarkRange('link').unsetLink().run();
     this.openFlag = false;
   };
+  // Force the link-editor BubbleMenu to open/close right now, matching openFlag
+  // (bug fix — quick 260809-6zp). `editor?.commands.focus()` alone is NOT
+  // sufficient: TipTap's `focus` command early-returns with NO dispatch whenever
+  // `view.hasFocus() && position === null` (the whole document is already
+  // focused — the COMMON case once the create/close affordance is invoked from
+  // a `@mousedown.prevent`-guarded control, which deliberately never blurs the
+  // editor). And even a dispatched but otherwise-INERT transaction (no doc/
+  // selection change) is not enough either: @tiptap/extension-bubble-menu's own
+  // `update()` short-circuits with `isSame = !selectionChanged && !docChanged`
+  // BEFORE it ever re-runs `shouldShow` — so a no-op dispatch is silently
+  // swallowed by the extension's OWN guard, not just TipTap's `focus` command.
+  // The extension's `transactionHandler` (its own doc comment: "This allows
+  // external code to trigger ... via `editor.view.dispatch(editor.state.tr
+  // .setMeta(pluginKey, 'updatePosition'))`") is the official escape hatch: a
+  // transaction tagged with THIS surface's own `pluginKey` ('rozieLinkEditor')
+  // calls `show()`/`hide()` directly, bypassing both guards. This bit both
+  // `openLinkEditor` (create-mode toolbar button) and `closeLink` (built-in
+  // Cancel AND any consumer `close()`), on every target, whenever the editor
+  // was already focused. `editor` is the raw TipTap `Editor` instance on all 6.
   forceMenuRecheck = () => {
     if (!this.editor) return;
     const visible = this.editor.isEditable && (this.editor.isActive('link') || this.openFlag);
@@ -873,6 +951,20 @@ export class TipTap {
     this.editor?.commands.focus();
     this.forceMenuRecheck();
   };
+  // The reactive `#linkEditor` slot scope — keys EXACTLY { editor, href, attrs,
+  // setLink, unsetLink, close } (spec §5.3). `attrs` is the raw link mark attrs
+  // object so a consumer can read custom attrs (e.g. data-course-link); setLink
+  // forwards whatever attrs object it is handed VERBATIM (REQ-42 — persistence of a
+  // custom attr is the consumer's Link.extend concern, not this wrapper's).
+  //
+  // Takes `href`/`attrs` as PARAMETERS rather than reading `$data.linkState` —
+  // every caller has just computed (or is about to compute) these values
+  // directly from the live editor, and reading them back off `$data`
+  // immediately after a same-tick write hits the React setState-is-async
+  // stale-read trap (the D-04 prefill fix's own class of bug, here on the
+  // ONGOING reactive-refresh path rather than the one-time mount path). Passing
+  // them straight through keeps every target reading the value that was ACTUALLY
+  // just computed, not a framework-buffered echo of it.
   buildLinkScope = (href: any, attrs: any) => ({
     editor: this.editor,
     href,
@@ -881,6 +973,10 @@ export class TipTap {
     unsetLink: this.removeLink,
     close: this.closeLink
   });
+  // Recompute link state from the live editor + drive the surface. Called from
+  // onSelectionUpdate + onUpdate (and after content sets). When the consumer slot is
+  // filled, re-render the reactive portal in place; otherwise refresh the built-in
+  // form's input value — but NOT while the user is typing in it (don't stomp mid-edit).
   refreshLink = () => {
     if (!this.editor) return;
     const a = this.editor.getAttributes('link');
@@ -907,12 +1003,21 @@ export class TipTap {
       this.linkInputEl.value = href;
     }
   };
+  // Toolbar Link button (create affordance, ask C's deferred button): flip the
+  // open flag so the link-aware shouldShow surfaces the editor on the current
+  // selection, prefilled with any existing href. Declared AFTER refreshLink so its
+  // reactive dep array references an already-declared const (see order note above).
   openLinkEditor = () => {
     this.openFlag = true;
     this.editor?.commands.focus();
     this.refreshLink();
     this.forceMenuRecheck();
   };
+  // Build the batteries-included default link-editor form imperatively into the
+  // engine-managed host (the bubble-menu extension owns positioning). Vanilla DOM
+  // so it is byte-identical across all 6 targets and the framework never reconciles
+  // it. Enter = Apply, Escape = Cancel. Used ONLY when the `#linkEditor` slot is
+  // unfilled; a filled slot renders the consumer fragment via the reactive portal.
   buildDefaultLinkEditor = (el: any) => {
     const input = document.createElement('input');
     input.type = 'text';
@@ -956,6 +1061,11 @@ export class TipTap {
     el.appendChild(cancel);
     this.linkInputEl = input;
   };
+  // Recompute the character/word counter from the live editor (D-05). Robust to
+  // CharacterCount being absent (maxLength unset, no #count slot): reads
+  // `editor.storage.characterCount` when the extension is registered, else falls
+  // back to a plain text derivation so `getCharacterCount`/`getWordCount` and the
+  // #count slot's numbers are never stale.
   refreshCount = () => {
     if (!this.editor) return;
     const storage = this.editor.storage.characterCount;
@@ -964,6 +1074,22 @@ export class TipTap {
       words: storage ? storage.words() : this.editor.getText().split(/\s+/).filter(Boolean).length
     });
   };
+  // ── StarterKit collision-aware config (ask A). StarterKit bundles several
+  // node/mark extensions INTERNALLY (invisible to a top-level array dedup) —
+  // e.g. its own `Link`. A consumer supplying a custom same-named extension via
+  // `extensions` therefore collides with StarterKit's copy and TipTap warns
+  // "Duplicate extension names found" while keeping BOTH; only
+  // `StarterKit.configure({ link:false })` actually disables StarterKit's. This
+  // map + helper make "consumer wins" true by auto-disabling the StarterKit key
+  // whenever the consumer supplies a same-named extension AND has not already
+  // decided that key's fate via the `starterKit` prop. Identity for the 15
+  // node/mark keys StarterKit exposes as `Partial<Options> | false`, plus the
+  // undo/redo option key `undoRedo` — mapped from BOTH its actual installed
+  // `.name` (`'undoRedo'`, verified against `@tiptap/extensions@3.23.5`) and the
+  // TipTap v2 alias `'history'` as a safety net for a consumer porting a v2
+  // History extension. Structural/plumbing StarterKit keys (document, text,
+  // dropcursor, gapcursor, listKeymap, trailingNode) are NOT node/mark
+  // replacements and are intentionally excluded.
   STARTERKIT_COLLISION_MAP = {
     bold: 'bold',
     italic: 'italic',
@@ -983,6 +1109,13 @@ export class TipTap {
     undoRedo: 'undoRedo',
     history: 'undoRedo'
   };
+  // Pure helper — returns `userConfig` extended so any StarterKit-bundled
+  // node/mark the consumer replaced (a same-named entry in `exts`) is disabled
+  // UNLESS the consumer already decided that key's fate in `userConfig` (an `in`
+  // presence check, so an explicit `false` OR an explicit options object both
+  // count as "consumer decided" — D-02, consumer wins unless configured
+  // explicitly). Never invokes consumer code — only reads `.name` and does key
+  // presence checks (guards a non-object/missing `.name` entry by skipping it).
   buildStarterKitConfig = (userConfig: any, exts: any) => {
     const effective = {
       ...userConfig
@@ -995,6 +1128,11 @@ export class TipTap {
     }
     return effective;
   };
+  // Pure helper — D-03 last-wins safety net over the FINAL assembled extension
+  // array. Dedupes by `.name`, keeping the LAST occurrence (later = consumer).
+  // A nameless/unnamed entry is never collapsed against another nameless entry
+  // — each survives, keyed by a per-entry unique fallback rather than a shared
+  // `undefined` key.
   dedupeExtensionsByName = (exts: any) => {
     const byKey = new Map();
     let anonSeq = 0;
@@ -1005,6 +1143,39 @@ export class TipTap {
     }
     return [...byKey.values()];
   };
+  // ── Reactive node-view portal slot (Phase 33 — the FIRST shipped `reactive`
+  // portal slot, the marquee TipTap differentiator; generalized in Phase
+  // 260719-d9e / ask B). When the consumer fills the `nodeView` slot AND
+  // supplies one or more `nodeSpecs`, each spec becomes its own custom
+  // ProseMirror node rendering the SAME consumer fragment as a custom node
+  // *in-engine*, re-rendering it in place on every transaction via the
+  // reactive handle `$portals.nodeView(dom, scope) => { update, dispose }`
+  // (REQ-22). The fragment dispatches on `scope.node.type.name` to tell the
+  // specs apart (D-03 — single-slot-dispatch, no dynamic per-type slot names).
+  //
+  // A spec with NO `content` (typically `atom:true`) is a NON-EDITABLE node —
+  // no contentDOM — driven purely by selectNode/deselectNode/update(node) →
+  // handle.update so the fragment re-renders in place (engine-driven; no Rozie
+  // reactive loop). Proven originally by the @mention-chip recipe (Spike 009 /
+  // REQ-26), now shipped as a `nodeSpecs` entry in the example demos.
+  //
+  // A spec WITH `content` (e.g. `'inline*'`) is an EDITABLE BLOCK — it HAS a
+  // contentDOM. ProseMirror owns the editable hole; the consumer fragment
+  // renders chrome wrapping a [data-rozie-hole] placeholder and the per-target
+  // portal bridge grafts contentDOM into that hole — native-ref on
+  // React/Solid/Lit, querySelector-after-render on Vue/Svelte/Angular. The
+  // .rozie source merely passes `contentDOM` in scope; the graft mechanism is
+  // PER-TARGET and lives in the emitted portal bridge, not here. Proven
+  // originally by the editable-callout recipe (Spike 008 / REQ-23), now shipped
+  // as a `nodeSpecs` entry in the example demos.
+  //
+  // $portals.nodeView is read directly inside the top-level `addNodeView`
+  // closure below — the emitter resolves the synthesized portals object at
+  // component scope on all six targets (quick 260829-cd4), so no mount-lifecycle
+  // capture is needed here. ROZ149 guards the one remaining hazard: a
+  // `$portals.*` read evaluated during setup/render rather than at call time.
+  // (Unrelated: $refs stays $onMount-only per ROZ123 — not a constraint on this
+  // closure, which reads no $refs.)
   makeNodeView = (spec: any) => (props: any) => {
     const {
       node,
@@ -1099,6 +1270,14 @@ export class TipTap {
       }
     };
   };
+  // Pure helper (ask B, D-02) — extracts { el, attr, value } from a parseHTML
+  // tag selector string, e.g. 'span[data-x]' → { el: 'span', attr: 'data-x',
+  // value: '' } or 'div[data-x=y]' → { el: 'div', attr: 'data-x', value: 'y' }.
+  // Drives renderHTML's marker attribute so the serialized element reproduces
+  // the exact shape the parseHTML rule expects. MUST NOT throw on a
+  // malformed/empty selector (T-d9e-01 — a bad selector degrades only that one
+  // node's render, never crashes the editor): falls back to el = the raw
+  // selector (or 'span' if falsy), attr = null (no marker), value = ''.
   parseTagSelector = (selector: any) => {
     const raw = typeof selector === 'string' ? selector : '';
     const elMatch = raw.match(/^[a-zA-Z][a-zA-Z0-9-]*/);
@@ -1117,6 +1296,11 @@ export class TipTap {
       value
     };
   };
+  // Build ONE custom Node per consumer-supplied spec, all bound to the SAME
+  // reactive nodeView portal (ask B, D-02). Takes the `nodeSpecs` prop array
+  // (read once at mount — setup-once, not reactive); `$portals.nodeView` is read
+  // directly inside `makeNodeView`'s `addNodeView` closure, not passed through
+  // here.
   makeNodeViewExtensions = (specs: any) => specs.map((spec: any) => {
     // hasContentDOM decides the renderHTML hole: an editable (non-atom,
     // content-bearing) node gets a trailing `0` content hole; a leaf/atom node
@@ -1159,6 +1343,8 @@ export class TipTap {
       addNodeView: () => this.makeNodeView(spec)
     });
   });
+  // Shared image-file finder for the upload handlers below — the first
+  // `image/*` File in a FileList, else undefined. Guards a missing FileList.
   findImageFile = (files: any) => {
     if (!files) return undefined;
     for (let i = 0; i < files.length; i++) {
@@ -1167,6 +1353,24 @@ export class TipTap {
     }
     return undefined;
   };
+  // uploadImage paste/drop fallbacks (ask D / D-04) — ProseMirror `editorProps`
+  // handlers. TOP-LEVEL functions (siblings of `refreshActive`/the $expose
+  // verbs below), NOT nested inside $onMount's ternary/object-literal — a
+  // closure reading the component-scope `editor` from several function-levels
+  // deep inside $onMount (object-literal method → `.then` callback) hits a
+  // `this`-rebinding gap on the class-based targets (Angular/Lit) that the
+  // emitter's nested-`this` repair does not reach at that depth
+  // (emitter-backlog). A top-level function is only ONE level removed from the
+  // promoted-`this` boundary — the same shallow depth as the `onUpdate` /
+  // `$watch` callbacks elsewhere in this file, which already compile clean —
+  // so referencing `editor` here needs no repair at all. Each handler claims
+  // ONLY an image/* payload: returns `true` SYNCHRONOUSLY (claiming the
+  // paste/drop now — never awaits inside the handler) and inserts the resolved
+  // URL once the consumer's uploadImage promise settles; a rejection is
+  // swallowed (`.catch(() => {})`) so a failed upload never crashes the editor
+  // (T-e7i-01). Returns `false` for a non-image payload — or, for drop, an
+  // internal node move — so ProseMirror (or a consumer editorProps handler,
+  // which still wins via the LAST spread) processes it normally.
   handlePaste = (view: any, event: any, slice: any) => {
     // Captured into a local (not repeated `$props.uploadImage` member reads) so
     // the null-check narrows the type on every target — including Lit, where
@@ -1210,6 +1414,24 @@ export class TipTap {
     }).catch(() => {});
     return true;
   };
+  // ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
+  // the marquee surface: 25 verbs over the live Editor, uniform across all 6
+  // targets. Each guards the pre-mount / destroyed `editor = null`.
+  //
+  // Collision discipline:
+  //   - The content setter is named `setContent`, NOT `setHtml` — an `html` model
+  //     prop makes React auto-generate a `setHtml` state setter, so a `setHtml`
+  //     $expose verb would collide on the React target (ROZ524). (CodeMirror's
+  //     setValue→replaceValue lesson, html edition.)
+  //   - None of the 25 names collide with LitElement reserved lifecycle methods
+  //     (update/render/firstUpdated/updated/willUpdate/requestUpdate).
+  //   - The focus/blur COMMANDS are named `focusEditor`/`blurEditor`, NOT
+  //     `focus`/`blur` — the component emits `focus`/`blur` EVENTS, and on
+  //     class-based targets (Angular) an output field and a method cannot share a
+  //     name (ROZ121). The diagnostic's own guidance: rename the method, keep the
+  //     event's public name. (The expose-verb-vs-event-name collision lesson.)
+  //   - None equals a prop name (html/editable/placeholder/autofocus/editorClass/
+  //     ariaLabel/editorProps/extensions).
   getEditor = () => {
     return this.editor;
   };
@@ -1225,9 +1447,15 @@ export class TipTap {
   getJSON = () => {
     return this.editor ? this.editor.getJSON() : null;
   };
+  // Plain-text extraction — word/char counts, search indexing, plaintext export.
+  // Mirrors getHTML/getJSON (empty string before mount). Was advertised by intent
+  // alongside getHTML/getJSON but never wired; now first-class.
   getText = () => {
     return this.editor ? this.editor.getText() : '';
   };
+  // setContent routes through the SAME suppress-echo bookkeeping as $watch(html):
+  // update lastHtml first, set with emitUpdate:false (no onUpdate bounce), then
+  // reflect into the model so a programmatic set keeps the bound state in sync.
   setContent = (next: any) => {
     if (!this.editor) return;
     const v = next ?? '';
@@ -1284,9 +1512,20 @@ export class TipTap {
     this.editor?.chain().focus().redo().run();
     this.refreshActive();
   };
+  // Power-user escape hatch — returns a pre-focused command chain (TipTap idiom:
+  // chain().focus().toggleBold().setColor('#f00').run()). null before mount.
   chain = () => {
     return this.editor ? this.editor.chain().focus() : null;
   };
+  // Read-side toolbar primitives. These are precisely what a bring-your-own
+  // toolbar (the `toolbar`/`bubbleMenu`/`floatingMenu` portal slots) needs and
+  // the component already computes internally via refreshActive() — exposing them
+  // removes the per-consumer "drop to getEditor() and re-derive" boilerplate.
+  //   - isActive(name, attrs?): is a mark/node active in the current selection
+  //     (drive toolbar button active styling). False before mount.
+  //   - can(): the command-availability chain (editor.can().chain()…run()) for
+  //     enable/disable of toolbar buttons. null before mount (mirrors chain()).
+  //   - isEmpty(): document-empty (submit-gating / empty-state). true before mount.
   isActive = (name: any, attrs: any) => {
     return this.editor ? this.editor.isActive(name, attrs) : false;
   };
@@ -1296,6 +1535,10 @@ export class TipTap {
   isEmpty = () => {
     return this.editor ? this.editor.isEmpty : true;
   };
+  // Character/word count reads (D-04). Prefer the CharacterCount extension's live
+  // storage when registered (maxLength set or #count slot filled); otherwise a
+  // text-based fallback so these ALWAYS return a number — 0 before mount, and a
+  // correct count even on a stock <TipTap> that never registered CharacterCount.
   getCharacterCount = () => {
     if (!this.editor) return 0;
     return this.editor.storage.characterCount ? this.editor.storage.characterCount.characters() : this.editor.getText().length;
@@ -1304,6 +1547,25 @@ export class TipTap {
     if (!this.editor) return 0;
     return this.editor.storage.characterCount ? this.editor.storage.characterCount.words() : this.editor.getText().split(/\s+/).filter(Boolean).length;
   };
+  // setLink(attrs) / unsetLink() (D-03, residual 3) — thin delegates to the SAME
+  // applyLink/removeLink the #linkEditor slot scope hands a consumer fragment
+  // (buildLinkScope above), so the imperative handle and the slot-scope verb
+  // implementation cannot disagree. Four-way collision check:
+  //   - not a prop name — the 14 props are html / editable / placeholder /
+  //     autofocus / editorClass / ariaLabel / editorProps / extensions /
+  //     starterKit / nodeSpecs / uploadImage / maxLength / enforceMaxLength /
+  //     bubbleMenuShouldShow;
+  //   - not an emitted event name — the 4 events are update / selectionUpdate /
+  //     focus / blur (the ROZ121 Angular output-field-vs-method rule);
+  //   - not an existing $expose verb — the 23 names already in the object below;
+  //   - not a React auto-generated model setter — the only model prop is
+  //     `html`, whose setter is `setHtml` (the ROZ524 rule that forced
+  //     `setContent`), and not a LitElement lifecycle method (update / render /
+  //     firstUpdated / updated / willUpdate / requestUpdate).
+  // applyLink already ignores an attrs object without a non-empty string href
+  // (no degenerate empty-href anchor is ever written), and both verbs no-op
+  // before mount / after destroy through the `editor?.` guards already inside
+  // applyLink/removeLink — no second validation path is introduced.
   setLink = (attrs: any) => {
     this.applyLink(attrs);
   };

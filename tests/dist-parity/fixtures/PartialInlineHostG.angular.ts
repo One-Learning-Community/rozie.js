@@ -26,8 +26,10 @@ export class PartialInlineHostG {
   selectAllBoxG = this.headG(1);
   afterDeclG = (k: number): number => k * 2;
   midDeclG = (k: number): number => k + 3;
+  // before-side: the sandwiched host let trails the spliced midDeclG above
   rangeTransitionG = this.midDeclG(1);
   beforeDeclG = (k: number): number => k * 5;
+  // before-side: the sandwiched host let trails the spliced beforeDeclG above
   fillDragUpG = this.beforeDeclG(1);
 
   private __rozieDestroyRef = inject(DestroyRef);
