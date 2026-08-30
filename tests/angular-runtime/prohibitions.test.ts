@@ -130,7 +130,7 @@ function readExample(name: string): string {
 // contain this object, and every gate below then fails with
 // "Command failed: git show …" (134 of 144 tests, one root cause). The
 // angular-matrix workflow sets it explicitly; keep them in sync.
-const BASELINE_COMMIT = 'ba42bc291c7e32fca77cd1f015578b1d84bcda8a';
+const BASELINE_COMMIT = '7bbca75dd';
 
 /** `git show <commit>:<path>` — throws if the path did not exist at that commit. */
 function readAtBaseline(relPath: string): string {
