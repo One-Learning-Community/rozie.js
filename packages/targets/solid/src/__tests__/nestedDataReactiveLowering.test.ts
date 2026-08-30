@@ -78,9 +78,67 @@ describe('Solid nested-$data reactive lowering (covered subset)', () => {
     expect(code).not.toMatch(/items\(\)\.splice\(/);
   });
 
-  // NEGATIVE — stay non-reactive (ROZ207 fail-loud owns them).
-  it('NEGATIVE dynamic index `$data.reg[id] = 5` is NOT lowered', () => {
+  // quick 260830-m30 — CW-DYNKEY / CW-DYNDELETE + the D2 initializer gate.
+  // Solid keeps its VALUE-form setter with a getter read (no `prev =>` arrow),
+  // and the delete lowers to a bare BlockStatement replacing the parent
+  // ExpressionStatement so the clone-then-delete statements have a home.
+  it('CW-DYNKEY object: `$data.reg[id] = 5` -> `setReg({ ...reg(), [id]: 5 })`', () => {
     const code = emit('{ reg: {} }', 'const id = "k"; $data.reg[id] = 5;');
+    expect(code).toMatch(/setReg\(\{/);
+    expect(code).toContain('...reg()');
+    expect(code).toMatch(/\[id\]: 5/);
+    expect(code).not.toMatch(/reg\(\)\[id\]\s*=\s*5/);
+  });
+
+  it('CW-DYNKEY string key: `$data.reg["k"] = 5` -> computed-key spread', () => {
+    const code = emit('{ reg: {} }', '$data.reg["k"] = 5;');
+    expect(code).toMatch(/setReg\(\{/);
+    expect(code).toContain('...reg()');
+    expect(code).toMatch(/\["k"\]: 5/);
+  });
+
+  it('CW-DYNKEY array: `$data.arr[i] = 9` -> `setArr(arr().map(`', () => {
+    const code = emit('{ arr: [1, 2] }', 'const i = 1; $data.arr[i] = 9;');
+    expect(code).toContain('setArr(arr().map(');
+    expect(code).toMatch(/=== i \?/);
+    expect(code).not.toMatch(/arr\(\)\[i\]\s*=\s*9/);
+  });
+
+  it('CW-INDEX RETROFIT: `$data.obj[0] = 9` with `obj: {}` takes the OBJECT lowering', () => {
+    const code = emit('{ obj: {} }', '$data.obj[0] = 9;');
+    expect(code).toMatch(/setObj\(\{/);
+    expect(code).toContain('...obj()');
+    expect(code).toMatch(/\[0\]: 9/);
+    expect(code).not.toContain('.map(');
+  });
+
+  it('CW-DYNDELETE: `delete $data.reg[id]` -> clone-then-delete + `setReg(__next)`', () => {
+    const code = emit('{ reg: {} }', 'const id = "k"; delete $data.reg[id];');
+    expect(code).toContain('const __next = {');
+    expect(code).toContain('...reg()');
+    expect(code).toContain('delete __next[id]');
+    expect(code).toContain('setReg(__next)');
+    expect(code).not.toMatch(/delete reg\(\)\[id\]/);
+  });
+
+  // NEGATIVE — stay non-reactive (ROZ207 fail-loud owns them).
+  it('NEGATIVE array delete `delete $data.arr[i]` is NOT lowered (hole semantics)', () => {
+    const code = emit('{ arr: [] }', 'const i = 0; delete $data.arr[i];');
+    expect(code).not.toMatch(/setArr\(/);
+  });
+
+  it('NEGATIVE impure key `$data.reg[k()] = 5` is NOT lowered', () => {
+    const code = emit('{ reg: {} }', 'function k(){ return "a"; } $data.reg[k()] = 5;');
+    expect(code).not.toMatch(/setReg\(/);
+  });
+
+  it('NEGATIVE non-literal initializer `{ reg: null }` + `$data.reg[0] = 5` is NOT lowered', () => {
+    const code = emit('{ reg: null }', '$data.reg[0] = 5;');
+    expect(code).not.toMatch(/setReg\(/);
+  });
+
+  it('NEGATIVE expression-context delete is NOT lowered (D4 statement-context only)', () => {
+    const code = emit('{ reg: {} }', 'const id = "k"; const ok = delete $data.reg[id]; void ok;');
     expect(code).not.toMatch(/setReg\(/);
   });
 

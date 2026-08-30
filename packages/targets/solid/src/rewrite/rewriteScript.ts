@@ -166,6 +166,44 @@ function immutableIndexValue(
   return t.callExpression(t.memberExpression(mkPrev(), t.identifier('map')), [arrow]);
 }
 
+/**
+ * quick 260830-m30 — the INITIALIZER GATE (D2). See the React target for the
+ * full decision table and rationale. Classify each declared `<data>` key by its
+ * literal initializer so a computed depth-2 write resolves to the object form,
+ * the array form, or NOT COVERED — instead of guessing from the key's literal
+ * type (which emitted `{}.map(...)` for an object-initialized key).
+ */
+type DataInitKind = 'object' | 'array' | 'other';
+
+function collectDataInitKinds(ir: IRComponent): ReadonlyMap<string, DataInitKind> {
+  const kinds = new Map<string, DataInitKind>();
+  for (const decl of ir.state) {
+    const init: t.Node | undefined = decl.initializer;
+    kinds.set(
+      decl.name,
+      t.isObjectExpression(init) ? 'object' : t.isArrayExpression(init) ? 'array' : 'other',
+    );
+  }
+  return kinds;
+}
+
+/** quick 260830-m30 (D1) — side-effect-free computed keys only. See React. */
+function isPureKeyExpr(node: t.Node): node is t.Identifier | t.StringLiteral | t.NumericLiteral {
+  return t.isIdentifier(node) || t.isStringLiteral(node) || t.isNumericLiteral(node);
+}
+
+/** CW-DYNKEY object form: `{ ...key(), [<key>]: rhs }` (COMPUTED property). */
+function immutableDynKeyValue(
+  mkPrev: () => t.Expression,
+  keyExpr: t.Expression,
+  rhs: t.Expression,
+): t.Expression {
+  return t.objectExpression([
+    t.spreadElement(mkPrev()),
+    t.objectProperty(keyExpr, rhs, /* computed */ true),
+  ]);
+}
+
 /** null → not lowerable (leave to ROZ207). */
 function immutableArrayValue(
   mkPrev: () => t.Expression,
@@ -202,17 +240,20 @@ function immutableArrayValue(
 }
 
 /**
- * Detect a COVERED nested `$data` assignment (CW-MEMBER / CW-INDEX). See the
- * React target for the full predicate. Statement-context + plain `=` only;
- * `$data.<key>.<field>` (both non-computed) or `$data.<key>[<n>]` (numeric
- * literal index). Everything else → null (ROZ207 owns it).
+ * Detect a COVERED nested `$data` assignment (CW-MEMBER / CW-INDEX / CW-DYNKEY).
+ * See the React target for the full predicate. Statement-context + plain `=`
+ * only; `$data.<key>.<field>` (both non-computed) or `$data.<key>[<k>]` with a
+ * PURE key expression resolved through the quick 260830-m30 initializer gate.
+ * Everything else → null (ROZ207 owns it).
  */
 function detectCoveredNestedAssign(
   path: NodePath<t.AssignmentExpression>,
   dataNames: ReadonlySet<string>,
+  initKinds: ReadonlyMap<string, DataInitKind>,
 ):
   | { kind: 'member'; key: string; field: string }
   | { kind: 'index'; key: string; index: t.Expression }
+  | { kind: 'dynkey'; key: string; keyExpr: t.Expression }
   | null {
   const node = path.node;
   if (node.operator !== '=') return null;
@@ -229,8 +270,41 @@ function detectCoveredNestedAssign(
     if (!t.isIdentifier(left.property)) return null;
     return { kind: 'member', key, field: left.property.name };
   }
-  if (!t.isNumericLiteral(left.property)) return null;
-  return { kind: 'index', key, index: left.property };
+  // quick 260830-m30 — computed depth-2 property, resolved by the D2 gate.
+  if (!isPureKeyExpr(left.property)) return null;
+  const initKind = initKinds.get(key) ?? 'other';
+  if (initKind === 'object') return { kind: 'dynkey', key, keyExpr: left.property };
+  if (initKind === 'array') {
+    if (t.isStringLiteral(left.property)) return null; // never an array index
+    return { kind: 'index', key, index: left.property };
+  }
+  return null; // 'other' — no sound single-key replace exists.
+}
+
+/**
+ * quick 260830-m30 — detect a COVERED dynamic-key DELETE (CW-DYNDELETE):
+ * `delete $data.<key>[<pure-key>]` as an ExpressionStatement on an
+ * object-initialized `<data>` key. An array-initialized key is NOT covered
+ * (`delete arr[i]` leaves a hole). See the React target for the full predicate.
+ */
+function detectCoveredDynDelete(
+  path: NodePath<t.UnaryExpression>,
+  dataNames: ReadonlySet<string>,
+  initKinds: ReadonlyMap<string, DataInitKind>,
+): { key: string; keyExpr: t.Expression } | null {
+  if (path.node.operator !== 'delete') return null;
+  if (!path.parentPath?.isExpressionStatement()) return null; // D4
+  const arg = path.node.argument;
+  if (!t.isMemberExpression(arg) || !arg.computed) return null;
+  const base = arg.object;
+  if (!t.isMemberExpression(base) || base.computed) return null;
+  if (!t.isIdentifier(base.object) || base.object.name !== '$data') return null;
+  if (!t.isIdentifier(base.property)) return null;
+  const key = base.property.name;
+  if (!dataNames.has(key)) return null;
+  if (!isPureKeyExpr(arg.property)) return null;
+  if ((initKinds.get(key) ?? 'other') !== 'object') return null;
+  return { key, keyExpr: arg.property };
 }
 
 /**
@@ -652,6 +726,8 @@ export function rewriteRozieIdentifiers(
       .map((p) => p.name),
   );
   const dataNames = new Set(ir.state.map((s) => s.name));
+  // quick 260830-m30 — declared-initializer classification for the D2 gate.
+  const dataInitKinds = collectDataInitKinds(ir);
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   const portalSlotNames = new Set(
@@ -820,6 +896,52 @@ export function rewriteRozieIdentifiers(
       path.skip();
     },
 
+    /**
+     * quick 260830-m30 — CW-DYNDELETE. `delete $data.<key>[<pure-key>]` on an
+     * object-initialized `<data>` key lowers to a reactive clone-then-delete.
+     * There was NO `UnaryExpression` visitor here before, so this shape emitted
+     * a bare `delete reg()[id]` — silently non-reactive.
+     *
+     * Solid's write is VALUE-form (`setKey(v)`), which cannot host the clone and
+     * the delete inline, so we replace the PARENT ExpressionStatement with a bare
+     * BlockStatement. That is legal anywhere an ExpressionStatement is (including
+     * a brace-less `if (x) delete …;` body) and block-scopes `__next`, so two
+     * deletes in one function cannot collide. Keeps the file's getter-read style
+     * — no `prev =>` arrow (solid lint).
+     */
+    UnaryExpression(path) {
+      if (path.node.operator !== 'delete') return;
+      const dyn = detectCoveredDynDelete(path, dataNames, dataInitKinds);
+      if (dyn === null) return; // uncovered → ROZ207 owns fail-loud in core
+      const stmtPath = path.parentPath;
+      if (!stmtPath.isExpressionStatement()) return;
+      stmtPath.replaceWith(
+        t.blockStatement([
+          t.variableDeclaration('const', [
+            t.variableDeclarator(
+              t.identifier('__next'),
+              t.objectExpression([
+                t.spreadElement(t.callExpression(t.identifier(dyn.key), [])),
+              ]),
+            ),
+          ]),
+          t.expressionStatement(
+            t.unaryExpression(
+              'delete',
+              t.memberExpression(t.identifier('__next'), dyn.keyExpr, /* computed */ true),
+            ),
+          ),
+          t.expressionStatement(
+            t.callExpression(t.identifier('set' + capitalize(dyn.key)), [t.identifier('__next')]),
+          ),
+        ]),
+      );
+      // D5 — no skip: `<key>` may hold `$data.Y` reads that still need lowering.
+      // The synthesized `delete __next[E]` is re-visited and rejected (`__next`
+      // is not `$data`); the synthesized `setKey(__next)` has a bare-Identifier
+      // callee so `detectCoveredArrayMutation` cannot match it either.
+    },
+
     // Handle assignment expressions: $data.x = v → setX(v)
     // $data.x += n → setX(prev => prev + n)
     // $props.x = v (model) → setX(v)
@@ -829,13 +951,15 @@ export function rewriteRozieIdentifiers(
 
       // quick 260718-uvq — COVERED nested-$data reactive lowering (CW-MEMBER /
       // CW-INDEX). Getter-read immutable form, no `prev =>` arrow (solid lint).
-      const covered = detectCoveredNestedAssign(path, dataNames);
+      const covered = detectCoveredNestedAssign(path, dataNames, dataInitKinds);
       if (covered !== null) {
         const mkPrev = (): t.Expression => t.callExpression(t.identifier(covered.key), []);
         const value =
           covered.kind === 'member'
             ? immutableMemberValue(mkPrev, covered.field, node.right)
-            : immutableIndexValue(mkPrev, covered.index, node.right);
+            : covered.kind === 'index'
+              ? immutableIndexValue(mkPrev, covered.index, node.right)
+              : immutableDynKeyValue(mkPrev, covered.keyExpr, node.right);
         const setterCall = t.callExpression(t.identifier('set' + capitalize(covered.key)), [value]);
         path.replaceWith(setterCall);
         // No skip — descend so `$data.Y` reads inside the rhs still lower.
