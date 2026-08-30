@@ -39,6 +39,8 @@ export default class InlineEquivHostC extends SignalWatcher(LitElement) {
 
   double = (n: number): number => n * 2;
 
+  // trailing: doubles its input
+  // leading: the used $computed export (comment immediately above)
   get usedName() { return clamp(this.double(this.base)); }
 
   /**

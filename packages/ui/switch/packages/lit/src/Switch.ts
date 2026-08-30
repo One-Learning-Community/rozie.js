@@ -153,8 +153,17 @@ export default class Switch extends SignalWatcher(LitElement) {
 `;
   }
 
+  // ---- derived view (plain function, uniform ×6) -----------------------------
+  // The current on/off state as a real boolean. Named isChecked, NOT a bare
+  // `checked` (which would become a Lit class field colliding with inherited DOM)
+  // nor `valueOf` (which cascades TS1240/1271 across the Lit class). A plain
+  // function (read in the template AND inside handlers/verbs) — never $computed,
+  // whose value-vs-accessor form diverges between React and Solid.
   isChecked = () => this.modelValue === true;
 
+  // ---- write funnel (single $emit site) --------------------------------------
+  // Write the model and emit change. Named commitValue (NOT writeValue) so it does
+  // not collide with the generated Angular ControlValueAccessor.writeValue (TS2300).
   commitValue = (next: any) => {
   const v = next === true;
   this._modelValueControllable.write(v);
@@ -167,15 +176,20 @@ export default class Switch extends SignalWatcher(LitElement) {
   }));
 };
 
+  // Flip the state, unless disabled / readonly. The public toggle verb + the
+  // click/keyboard handlers all funnel through here.
   toggle = () => {
   if (this.disabled || this.readonly) return;
   this.commitValue(!this.isChecked());
 };
 
+  // ---- pointer + keyboard handlers -------------------------------------------
   onClick = () => {
   this.toggle();
 };
 
+  // Space and Enter toggle the switch (the WAI-ARIA switch keyboard pattern).
+  // preventDefault on Space so the page does not scroll.
   onKeydown = (e: any) => {
   if (this.disabled || this.readonly) return;
   const key = e ? e.key : '';
@@ -185,8 +199,18 @@ export default class Switch extends SignalWatcher(LitElement) {
   }
 };
 
+  // ---- focusability helper (plain function, uniform ×6) ----------------------
+  // tabindex is 0 when interactive, dropped (null → attribute omitted) when
+  // disabled. Returns number | null; rozieAttr drops the attr on null.
   controlTabindex = () => this.disabled ? null : 0;
 
+  // ---- imperative handle -----------------------------------------------------
+  // focus() — move DOM focus to the control. DELIBERATELY overrides
+  // HTMLElement.focus on Lit (ROZ137 warn, accepted; the public focus() handle is
+  // intended). Reads $refs in a post-mount handle call (ROZ123-safe). $refs.control
+  // types to the generic HTMLElement on the tsdown/vue leaves, so we only touch
+  // HTMLElement members here (`focus`). toggle() — flip the state (same funnel as
+  // the UI), a no-op when disabled / readonly.
   focus = () => {
   const el = this._refControl;
   if (el && el.focus) el.focus();

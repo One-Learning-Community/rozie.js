@@ -1352,22 +1352,86 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   table: any = null;
 
+  // ── Vertical row windowing instance state (phase 53) ──────────────────────────────────
+  // Mutable top-level instances (the `let table` precedent — React hoists to useRef; do NOT
+  // const). NULL until $onMount, and ONLY constructed when $props.virtual. virtualizerCleanup
+  // holds the _didMount() teardown for $onUnmount; gridScrollEl is the captured .rdt-scroll div
+  // the virtualizer observes.
   virtualizer: any = null;
 
   virtualizerCleanup: any = null;
 
   gridScrollEl: any = null;
 
+  // CR-01 remeasure scheduling state. remeasurePending dedupes the deferred sweep — at most ONE
+  // rAF is in flight, so a burst of onChange ticks (a fast scroll) collapses to a single measure
+  // pass per frame instead of piling up rAF callbacks that fire mid-gesture. The piled-up
+  // callbacks were what broke the Solid scroll-then-focus seam (D-12 focusActiveCell →
+  // scrollToIndex → double-rAF focus): a stray remeasure firing inside that focus deferral
+  // disrupted the focus landing. The sweep ALSO bails while virtual-core is mid-scroll
+  // (virtualizer.isScrolling), so a measure can't run during scrollToIndex; the next settled
+  // onChange re-measures the now-stable window. Scroll-driven recycling (the CR-01 case, measured
+  // once motion settles between scroll steps) is unaffected.
   remeasurePending = false;
 
+  // ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
+  // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
+  // via the same focusActiveCell() scroll-into-view seam — kept a top-level const so that
+  // later change is a one-line edit.
   GRID_PAGE_STEP = 10;
 
+  // The stable table-root element, captured in $onMount (the ONLY ROZ123-safe place to read
+  // $el / query DOM across all six). focusActiveCell() resolves cells off this root; it is
+  // shadow-safe because the query runs from INSIDE the component's own scope (the listbox
+  // querySelector-off-root precedent, proven ×6 by plan 01's probe). NEVER read in a
+  // computed/template binding (ROZ123).
   gridRoot: any = null;
 
+  // Echo-guard: while WE are writing a slice back, the re-feed watcher must not re-enter
+  // the funnel. A counter (not a boolean) so nested writes are safe.
   programmatic = 0;
 
+  // Focus-intent epoch (#9) — a monotonic counter bumped at every focus-INTENT entry point
+  // (focusActiveCell / focusCell+focusAbsCellWhenReady arm / a genuine active-cell-moving
+  // focusin in syncActiveFromEvent). The two async focus-recovery polls (focusWhenReady for the
+  // virtual off-window scroll, focusAbsCellWhenReady for the paginated page-switch) CAPTURE this
+  // value at arm time (AFTER their own bump) and abort at the top of each iteration if it has since
+  // changed — so a LATER user nav (ArrowKey / click) supersedes a stale poll instead of the poll
+  // yanking focus back frames later. A naive guardMoved "abort if focus moved" check is WRONG here:
+  // both polls arm while focus still sits on the OLD/being-left cell BY DESIGN (scroll-to /
+  // page-switch), so an epoch — bumped only by a NEWER intent — is the correct abort signal.
   focusIntentEpoch = 0;
 
+  // ── Grid-wide undo/redo (260709-8ct) — history STATE lives in top-level `let` (mirroring
+  // `programmatic` above), NOT $data: recording a snapshot on every keystroke must not trigger
+  // a reactive re-render. React hoists each to useRef. undoStack/redoStack hold `data` array
+  // REFERENCES (never deep copies — see undoHistory.rzts's header comment on the shared-row
+  // invariant). restoringHistory suppresses re-recording while an undo()/redo() replay is
+  // in flight.
+  //
+  // The external-swap history reset keys on data ORIGIN, not a timing window. Every internal
+  // writeback stamps its fresh `data` array with a durable, non-enumerable marker under
+  // DATA_WRITE_TOKEN_KEY (see writeData in writeFunnels.rzts); the reset (maybeClearHistoryOnExternal
+  // Swap, below) clears history ONLY when a newly-supplied `$props.data` carries no marker — it did
+  // not come from us, so it is a genuine external dataset swap. Presence of the marker ⟺ "descends
+  // from one of our writes", and it survives EVERYTHING that defeated the four flag/timer variants:
+  //   1. A raw-reference latch (`lastWrittenData === currentData()`) — Vue `reactive()` / Svelte 5
+  //      `$state` / Solid store re-wrap a written array in a NEW Proxy on its way back through props,
+  //      so `===` never holds. (A non-enumerable own PROPERTY, by contrast, is forwarded through
+  //      every target's reactive Proxy via `Reflect.get` — readable through the wrap.)
+  //   2. A single-consume boolean — the re-feed watch fires MULTIPLE times per write; the first pass
+  //      consumed the flag, a later pass wrongly cleared.
+  //   3. A content signature (`JSON.stringify`) — the watch can fire with a TRANSIENTLY STALE
+  //      `currentData()` mid-settle (Solid/Lit), a real-but-older value → false mismatch.
+  //   4. A deferred settle-window flag (rAF, then a 96ms macrotask) — a slow re-feed on a LARGE
+  //      controlled table OUTRAN the window (#8); no fixed timeout can be correct (re-feed latency
+  //      scales with dataset size).
+  // A STRING key (not a JS Symbol) is deliberate: it is stable BY VALUE on all six targets with ZERO
+  // caching, whereas a `Symbol()` needs a per-instance memo to hold one identity — and Lit lowers
+  // `$computed(() => Symbol())` to a plain getter that RE-MINTS the Symbol on every read, so writeData
+  // and the reset would stamp/read DIFFERENT symbols and the marker would never match. Non-enumerable
+  // → invisible to JSON.stringify / spread / Object.keys (the consumer's data stays clean); namespaced
+  // so a consumer array never collides.
   DATA_WRITE_TOKEN_KEY = '__rozieDataWriteToken';
 
   undoStack: unknown[] = [];
@@ -1376,10 +1440,37 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   restoringHistory: boolean = false;
 
+  // Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
+  // has not bound `expanded` and has not yet toggled any group, group-header rows default to
+  // EXPANDED (so the grouped subtree is visible — the standard grouped-grid affordance + the
+  // roundout-VR leaf-visible baseline). The FIRST group/row toggle sets this true (in
+  // writeExpanded), after which the user's expanded state wins. Stays false (untouched) on the
+  // non-grouping path → byte-identical-off (the `expanded` slice resolves to $data.expandedDefault
+  // exactly as before, both for the plain table AND the expandable-rows feature).
   expandedTouched = false;
 
+  // groupingActiveDefault(): is grouping currently engaged (a non-empty ordered key list)? Reads
+  // the same source order as currentState().grouping ($props.grouping ?? $data.groupingDefault) so
+  // the expanded auto-default below tracks the live grouping state on every target.
   groupingActiveDefault = () => ((this.grouping != null ? this.grouping : this._groupingDefault.value) || []).length > 0;
 
+  // effectiveColumnPinning(): the auto-injected select/expander chrome columns are a STRUCTURAL
+  // left-pinned rail — they ALWAYS lead the pinned-left group so the checkbox/chevron stay the
+  // leftmost body cells in EVERY case (fresh, pinned, AND grouped). Two forces would otherwise
+  // push a data column ahead of the checkbox:
+  //   1. Pinning — a consumer pinning `name` left makes it left-pinned; getVisibleCells() returns
+  //      [left-pinned, center, right-pinned], so an unpinned (center) checkbox renders AFTER it.
+  //   2. Grouping — table-core's groupedColumnMode defaults to 'reorder', which moves a grouped
+  //      column to the FRONT of the order, ahead of an unpinned center checkbox.
+  // Pinning the rail left beats BOTH: the left group always precedes the (grouped-reordered)
+  // center group. We prepend SELECT_COL_ID then EXPANDER_COL_ID (matching the tableColumns
+  // injection order [select, expander, ...userCols]) ahead of any consumer left-pins.
+  // REQUIRES: the chrome column defs carry an explicit `size` (columnBuilders.rzts) — pinStyle's
+  // sticky offset is col.getStart('left') = Σ preceding pinned SIZES, so a size-less chrome column
+  // (table-core's 150px default) would inflate every real pinned column's `left` and overlap.
+  // The consumer's columnPinning model never sees these ids: writeColumnPinning() strips them
+  // on the way back out (writeFunnels.rzts). Note: this ALWAYS-pin makes the default (no-pin)
+  // checkbox a sticky-left rail — an intentional baseline change (VR/snapshot baselines drift).
   effectiveColumnPinning = (): any => {
   const base = this.columnPinning != null ? this.columnPinning : this._columnPinningDefault.value;
   const rail: string[] = [];
@@ -1394,6 +1485,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   };
 };
 
+  // Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
+  // All NINE slices are wired (each ?? its own $data.<slice>Default). table-core reads
+  // this whole object as `state`. Return type annotated `any`: the inferred object-literal
+  // type does not structurally match table-core's `Partial<TableState>` under the strict
+  // bundled-leaf tsc (the columnSizingInfo/pagination shapes widen to Record) — the
+  // runtime shape is correct; `any` sidesteps the over-strict structural check (the
+  // deferred-items strict-tsc #2 / leaf-output-strict-typecheck close).
   currentState = (): any => ({
   sorting: this.sorting != null ? this.sorting : this._sortingDefault.value,
   globalFilter: this.globalFilter != null ? this.globalFilter : this._globalFilterDefault.value,
@@ -1429,10 +1527,28 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   columnSizingInfo: this._columnSizingInfo.value
 });
 
+  // The live row data (Phase 51 req-4): the bound `data` prop when controlled, else the
+  // uncontrolled $data.dataDefault fallback (mirrors currentState's per-slice ?? pattern).
+  // A committed edit funnels a FRESH array through writeData, which writes BOTH sinks; the
+  // re-feed sources here so editing works whether or not the consumer binds r-model:data.
   currentData = (): any => this.data != null ? this.data : this._dataDefault.value;
 
+  // Prototype-safe id-keyed column resolution (T-48-PP): the `:columns` config array is
+  // applied FIRST (lower precedence), then the <Column> registry OVERRIDES by id (LWW).
+  // byId is a null-prototype object so a consumer column id of "__proto__"/"constructor"
+  // cannot pollute Object.prototype. Returns the table-core ColumnDef[]. (No per-column
+  // render callbacks — cells render via the single #cell/#header scoped slot on this
+  // component, dispatched by columnId; <Column> carries metadata only.)
   isSafeKey = (k: any) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
 
+  // wrapAggregationFn (phase 50 req-5, D-05, threat T-50-04): resolve a per-column
+  // aggregationFn straight onto the ColumnDef (no component-side switch — RESEARCH
+  // anti-pattern). A built-in NAME string ('sum'/'min'/'max'/'extent'/'mean'/'median'/
+  // 'unique'/'uniqueCount'/'count') passes through verbatim — table-core resolves it from its
+  // built-in `aggregationFns` map. A CUSTOM function `(columnId, leafRows, childRows) => any`
+  // is DEFENSIVELY WRAPPED (the runValidator precedent): a consumer fn runs per group, so a
+  // throw is coerced to `undefined` and can never crash getGroupedRowModel (DoS guard).
+  // Anything else → undefined (no aggregation; the cell renders as a placeholder).
   wrapAggregationFn = (fn: any) => {
   if (typeof fn === 'string') return fn;
   if (typeof fn !== 'function') return undefined;
@@ -1445,6 +1561,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   };
 };
 
+  // Build the table-core ColumnDef for ONE config-array entry. A LEAF entry
+  // ({ id?, field, header?, … }) maps to an accessor ColumnDef; a GROUP entry
+  // ({ id?, header, columns: [...] }) maps to a multi-level header GROUP column
+  // whose children are built recursively (B12 — grouped/multi-level column headers).
+  // Returns null for an unusable entry (no id/field, unsafe key, empty group).
   buildConfigDef = (c: any) => {
   if (!c) return null;
   // Grouped (multi-level) header column: an entry carrying a `columns` array. table-core's
@@ -1556,10 +1677,24 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return out;
 };
 
+  // The constant id of the auto-injected leading checkbox column (D-04). Distinct from
+  // any consumer column id (the registry/config guard never produces a leading "__").
   SELECT_COL_ID = '__rdt_select';
 
+  // The constant id of the auto-injected leading chevron expander column (phase 50, D-04).
+  // Distinct from any consumer column id (the registry/config guard never produces a leading
+  // "__"). Injected AFTER the select column (so order is [select, expander, ...userCols]).
   EXPANDER_COL_ID = '__rdt_expander';
 
+  // The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
+  // user columns, PLUS a LEADING checkbox column when selectionMode is 'single' OR
+  // 'multiple' (D-04). The select column carries enableSorting/enableColumnFilter:false
+  // and an isSelectColumn marker the template uses to render checkbox chrome (NOT an
+  // accessor value). 'none' injects nothing. In 'single' mode the per-row checkbox
+  // renders but the select-all HEADER checkbox is suppressed (selecting a row caps at
+  // ≤1 via enableMultiRowSelection:false) — a single-select needs a per-row control,
+  // not a select-all, so without injecting the column single mode would expose NO
+  // selection UI at all.
   selectionEnabled = () => this.selectionMode === 'single' || this.selectionMode === 'multiple';
 
   tableColumns = () => {
@@ -1607,6 +1742,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return withExpander;
 };
 
+  // ── sorting slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──────────
+  // table-core hands an Updater<SortingState> = value | (old)=>new; the onSortingChange
+  // callback applies it against the CURRENT sorting, then this funnel writes a FRESH
+  // array to the uncontrolled default + the two-way model + fires the change event
+  // REGARDLESS of binding. STATIC key (`$data.sortingDefault` / `$model.sorting`) — a
+  // dynamic-key funnel is ROZ106 on all six. The remaining 8 slices each get their own
+  // such funnel in Plans 04/05.
   writeSorting = (next: any) => {
   if (this.programmatic) return;
   this.programmatic++;
@@ -1622,6 +1764,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   applyUpdater = (updater: any, current: any) => typeof updater === 'function' ? updater(current) : updater;
 
+  // ── expanded slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────────
+  // table-core hands an Updater<ExpandedState> = value | (old)=>new; onExpandedChange
+  // applies it against the CURRENT expanded, then this funnel writes a FRESH value to the
+  // uncontrolled default + the two-way model + fires `expanded-change` REGARDLESS of binding.
+  // `next` may be the `true` expand-all literal OR a { [rowId]: true } object — written
+  // verbatim (Pitfall 2). One emit per change (the shared `programmatic` guard dedups the
+  // React multi-render re-entry, D-07). STATIC key ($data.expandedDefault / $model.expanded).
   writeExpanded = (next: any) => {
   if (this.programmatic) return;
   this.programmatic++;
@@ -1645,6 +1794,17 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic--;
 };
 
+  // ── grouping slice: STATIC-KEY fresh-array echo-guarded write funnel (phase 50 reqs 4-7) ──
+  // table-core hands an Updater<GroupingState> = value | (old)=>new; onGroupingChange applies it
+  // against the CURRENT grouping, then this funnel writes a FRESH ordered array to the
+  // uncontrolled default + the two-way model + fires `group-change` REGARDLESS of binding. One
+  // emit per change (the shared `programmatic` guard dedups the React multi-render re-entry, D-07).
+  // STATIC key ($data.groupingDefault / $model.grouping). Event stem is `group-change`, NOT
+  // `grouping-change`: the model:true `grouping` prop auto-generates an `onGroupingChange` callback
+  // on the React/Solid flat Props interface, and a `grouping-change` event would camelCase to the
+  // SAME identifier → duplicate-identifier TS2300 (the model-prop==emit-name collision class 50-02
+  // hit with expanded/expanded-change → expand-change). Every sibling slice stems off a DISTINCT
+  // name (sorting→sort-change, rowSelection→selection-change); grouping→group-change follows suit.
   writeGrouping = (next: any) => {
   if (this.programmatic) return;
   this.programmatic++;
@@ -1658,6 +1818,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic--;
 };
 
+  // ── globalFilter slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────
+  // A fresh string (primitive) to the uncontrolled default + the two-way model + fires
+  // `filter-change` REGARDLESS of binding.
   writeGlobalFilter = (next: any) => {
   if (this.programmatic) return;
   this.programmatic++;
@@ -1673,6 +1836,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic--;
 };
 
+  // ── columnFilters slice: STATIC-KEY fresh-array echo-guarded write funnel (A4) ─────
+  // table-core hands ColumnFiltersState = [{ id, value }]; write a FRESH array (never
+  // in-place push) + fire `filter-change`. globalFilter + columnFilters both surface
+  // through `filter-change` (per the plan: filter-change fires regardless of binding).
   writeColumnFilters = (next: any) => {
   if (this.programmatic) return;
   this.programmatic++;
@@ -1688,6 +1855,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic--;
 };
 
+  // ── pagination slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ───────
+  // table-core hands { pageIndex, pageSize }; write a FRESH object + fire `page-change`.
   writePagination = (next: any) => {
   if (this.programmatic) return;
   this.programmatic++;
@@ -1701,6 +1870,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic--;
 };
 
+  // ── rowSelection slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ─────
+  // table-core hands RowSelectionState = { [rowId]: true }; write a FRESH object (never
+  // in-place key-set) + fire `selection-change` REGARDLESS of binding.
   writeRowSelection = (next: any) => {
   if (this.programmatic) return;
   this.programmatic++;
@@ -1714,6 +1886,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic--;
 };
 
+  // ── columnVisibility slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──
+  // table-core hands VisibilityState = { [colId]: boolean }; write a FRESH object (never
+  // in-place key-set) + fire `visibility-change` REGARDLESS of binding.
   writeColumnVisibility = (next: any) => {
   if (this.programmatic) return;
   this.programmatic++;
@@ -1727,6 +1902,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic--;
 };
 
+  // ── columnSizing slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──────
+  // table-core hands ColumnSizingState = { [colId]: number }; the pointer-drag resize
+  // handle funnels a FRESH sizing object + fires `resize-change` REGARDLESS of binding.
   writeColumnSizing = (next: any) => {
   if (this.programmatic) return;
   this.programmatic++;
@@ -1740,6 +1918,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic--;
 };
 
+  // ── columnOrder slice: STATIC-KEY fresh-array echo-guarded write funnel (A4) ────────
+  // table-core hands ColumnOrderState = string[]; write a FRESH order array (never an
+  // in-place splice) + fire `reorder-change` REGARDLESS of binding.
   writeColumnOrder = (next: any) => {
   if (this.programmatic) return;
   this.programmatic++;
@@ -1753,6 +1934,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic--;
 };
 
+  // ── columnPinning slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ─────
+  // table-core hands ColumnPinningState = { left: string[], right: string[] }; write a
+  // FRESH object (never in-place push into left/right) + fire `pin-change` REGARDLESS of
+  // binding.
   writeColumnPinning = (next: any) => {
   if (this.programmatic) return;
   // effectiveColumnPinning() forces the auto-injected chrome ids (select/expander) into the
@@ -1776,6 +1961,38 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic--;
 };
 
+  // ── data slice: STATIC-KEY fresh-array echo-guarded write funnel (Phase 51 req-4) ──
+  // A committed cell/row edit (or paste/fill in a later wave) replaces ONE row object in
+  // a FRESH array and funnels it here. Writes the uncontrolled default + the two-way
+  // model so editing works controlled OR uncontrolled. CRITICAL: writeData does NOT emit —
+  // unlike the 9 state slices (each has one change event fired inside its funnel), the
+  // `data` slice's commit event (`cell-edit-commit`) carries a PER-CELL payload and fires
+  // from the SINGLE commitEdit call site so the count stays exactly one per commit (React
+  // multi-emit dedup, D-07). Echo-guarded by the shared `programmatic` counter so the
+  // re-feed watch never re-enters mid-write.
+  //
+  // 260709-8ct (grid-wide undo/redo): record the PRE-mutation snapshot BEFORE writing, but
+  // ONLY when `$props.undoable` is on AND we are not mid-replay (`!restoringHistory` — an
+  // undo()/redo() call routes back through THIS SAME writeData to reuse the two-way model +
+  // re-feed watch; without the guard the replay would re-record itself and corrupt the
+  // stack). `emitHistoryChangeIfEdged` fires `history-change` only when canUndo/canRedo
+  // availability actually flipped (a long streak of edits that doesn't change availability
+  // must not spam consumers).
+  //
+  // External-swap origin marker: stamp EVERY array we write (undoable or not, incl. an undo/
+  // redo replay) with the durable, non-enumerable marker under DATA_WRITE_TOKEN_KEY. The reset
+  // (maybeClearHistoryOnExternalSwap in DataTable.rozie) clears history only when a new $props.data
+  // lacks the marker → it did not come from us → a genuine external swap. This replaces the
+  // `dataWriteSettling` settle-window flag that a slow re-feed on a large controlled table outran
+  // (#8) — see DATA_WRITE_TOKEN_KEY's declaration in DataTable.rozie for the four flag/timer
+  // variants it supersedes and why the marker is timing-independent. Stamped on the fresh `next`
+  // array (never the consumer's original), non-enumerable so JSON.stringify / spread / Object.keys
+  // never see it. We write a FRESH RAW shallow copy (`fresh`) so the marker lands on an UNWRAPPED
+  // array: an undo/redo replay reuses a snapshot that, in controlled mode, is a framework reactive
+  // PROXY (svelte `$state`, vue `reactive`) — and `Object.defineProperty` does NOT reliably stick
+  // through a proxy's trap, so stamping the raw copy (never the possibly-proxied `next`) keeps the
+  // marker readable. Normal edits already pass a fresh array; the copy shares row references (cheap).
+  // `try` guards the (never-expected) frozen/sealed-array case.
   writeData = (next: any) => {
   if (this.programmatic) return;
   if (this.undoable && !this.restoringHistory) {
@@ -1799,12 +2016,18 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic--;
 };
 
+  // Read the live columnFilters value for a given column id (string-safe; drives the
+  // per-column filter input's bound value). Reads currentState() (NOT a $data re-read
+  // of a just-written key → React stale-read safe).
   columnFilterValue = (colId: any) => {
   const cf = this.currentState().columnFilters || [];
   for (const f of cf as any) if (f && f.id === colId) return f.value != null ? f.value : '';
   return '';
 };
 
+  // Apply a per-column filter value: build a FRESH ColumnFiltersState array (drop the
+  // column's prior entry, append the new one unless empty) and funnel it. Never mutate
+  // the existing array in place (silent on React/Solid/Angular/Lit).
   setColumnFilter = (colId: any, value: any) => {
   const prev = this.currentState().columnFilters || [];
   const next = [];
@@ -1816,6 +2039,25 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.writeColumnFilters(next);
 };
 
+  // ── grid-wide undo/redo (260709-8ct) — snapshot-stack history engine ──────────────────────
+  // Per the approved design (docs/superpowers/specs/2026-07-09-data-table-undo-history-design.md,
+  // decisions 1-6, LOCKED). A pure, unit-testable buffer over the FOUR history lets declared
+  // top-level in DataTable.rozie beside `let programmatic = 0` (undoStack/redoStack/
+  // restoringHistory/lastPropsData — NOT $data, so recording an edit causes no reactive
+  // re-render churn on every keystroke). This module holds the FUNCTIONS only; it references
+  // those component-scope lets + `$props`, `$emit`, `writeData`, `currentData` BARE (by name,
+  // zero ES imports) — the SAME inlined-partial pattern writeFunnels.rzts uses for
+  // `programmatic`/`$data`/`$model` (DataTable.rozie is the ONLY place that ES-imports across
+  // .rzts partials; a cross-import between writeFunnels and undoHistory would create an ES
+  // cycle and/or a TDZ on the inlined lets).
+  //
+  // Collision-safe (ROZ121/124/137): none of undo/redo/canUndo/canRedo/clearHistory are
+  // HTMLElement methods, model props, or React auto-generated setters.
+  // Push the PRE-mutation snapshot (a `data` array reference — never a deep copy; unchanged
+  // rows are shared across every retained snapshot because every write funnel already builds a
+  // fresh array reusing unchanged row references, per the design's Memory analysis). Evict the
+  // oldest snapshot once the stack exceeds `undoLimit` (default 100 — DataTable.rozie prop).
+  // Any NEW recording invalidates the redo stack (standard undo semantics).
   recordSnapshot = (current: any) => {
   this.undoStack.push(current);
   const limit = this.undoLimit != null ? this.undoLimit : 100;
@@ -1827,11 +2069,17 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   canRedo = () => this.redoStack.length > 0;
 
+  // Both stacks empty — the external-swap latch (DataTable.rozie reFeed) and the
+  // clearHistory() $expose verb share this single implementation.
   clearHistory = () => {
   this.undoStack = [];
   this.redoStack = [];
 };
 
+  // `$emit('history-change', { canUndo, canRedo })` — the imperative/keyboard $expose verb
+  // contract. Unconditional (used by undo()/redo() themselves, which always fire exactly once
+  // per call per the design — NOT edge-gated there; only the writeData-triggered recording path
+  // below is edge-gated, since a routine sequence of edits would otherwise spam the event).
   emitHistoryChange = () => {
   this.dispatchEvent(new CustomEvent("history-change", {
     detail: {
@@ -1843,12 +2091,22 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }));
 };
 
+  // Fire `history-change` ONLY when canUndo/canRedo availability flipped since `prevU`/`prevR`
+  // were captured (BEFORE recordSnapshot ran). Called from writeData's recording hook so a
+  // long streak of edits that doesn't change availability (canUndo already true, redo already
+  // empty) does not spam consumers with a no-op event per keystroke.
   emitHistoryChangeIfEdged = (prevU: any, prevR: any) => {
   const nextU = this.canUndo();
   const nextR = this.canRedo();
   if (nextU !== prevU || nextR !== prevR) this.emitHistoryChange();
 };
 
+  // undo(): pop the most recent pre-mutation snapshot, push the CURRENT data onto the redo
+  // stack (so redo can restore it), then replay the popped snapshot through the SAME writeData
+  // seam — under `restoringHistory = true` so writeData's own recording hook does not
+  // re-capture this replay (which would corrupt the stack). Replaying through writeData
+  // (rather than writing $data/$model directly) is deliberate: the two-way $model.data
+  // writeback, the re-feed $watch, and the echo guard all keep working with zero new code.
   undo = () => {
   if (!this.canUndo()) return;
   const prev = this.undoStack.pop();
@@ -1859,6 +2117,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.emitHistoryChange();
 };
 
+  // redo(): symmetric — pop the redo stack, push the CURRENT data back onto the undo stack,
+  // replay through the same guarded writeData seam.
   redo = () => {
   if (!this.canRedo()) return;
   const next = this.redoStack.pop();
@@ -1869,8 +2129,21 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.emitHistoryChange();
 };
 
+  // Re-read the row model + header groups into $data (fresh arrays → the template
+  // re-renders). A plain fn (NOT a $computed — getRowModel() must be pulled AFTER a
+  // setOptions re-feed, imperatively). Defined inside $onMount so it captures the live
+  // `table`.
   refreshRowModel: any = null;
 
+  // PER-SLICE callbacks hoisted to top-level consts (NOT inlined in createTable) so the
+  // re-feed $watch can re-pass them on every setOptions. On React the createTable
+  // callbacks would otherwise capture the MOUNT-render's currentState() closure (table
+  // instance is built once in $onMount); table-core's setOptions keeps the prior
+  // callbacks unless new ones are supplied, so a stale callback applied each updater
+  // against the mount-time empty slice → the sort cycle never advances + multi-row
+  // selection collapses to the last row (React stale-closure, F6). Re-passing these
+  // fresh (recreated each render on React, reading fresh currentState) in the re-feed
+  // keeps the Updater base value current. No-op cost on the other five.
   onSortingChangeCb = (updater: any) => {
   this.writeSorting(this.applyUpdater(updater, this.currentState().sorting));
 };
@@ -1920,12 +2193,50 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._columnSizingInfo.value = next != null ? next : this._columnSizingInfo.value;
 };
 
+  // ══ Vertical row windowing (phase 53, req-1/2/3/6/9/10) — the virtual-core bridge ════════
+  // virtual-core is a pure state machine EXACTLY like table-core: constructed once in $onMount
+  // (ONLY when $props.virtual), its imperative onChange push converted to per-target reactivity
+  // via the SEPARATE $data.windowVer tick, re-fed via setOptions()+_willUpdate() in the
+  // refreshRowModel path (NEVER a render helper — Pitfall 1). Every runtime reference is guarded
+  // so the virtual=false emitted path is dead (req-1).
+  //
+  // Phase 64 (D-04): the PURE windowing math (windowedRows / padTop / padBottom / pmIndexInWindow /
+  // rowIsOutsideWindow / virtualizerOptions / virtualItemKey) now lives in the shared, target-agnostic
+  // `@rozie-ui/headless-core/windowing.rzts` partial and is re-exported below — this file is now the
+  // thin DATA-TABLE HOST SHELL holding only the impure, per-consumer pieces (the table-bound row
+  // source + the DOM/refs/virtualizer-instance machinery + the D-05 edit-pinning hook). The math
+  // dissolves in via inlineScriptPartials() byte-identically; behavior is unchanged (the B13 specs +
+  // dist-parity are the net). The host satisfies the windowing.rzts contract by convention:
+  // windowSource() (the row source), pinnedEditIndex()/pinnedMeasurement() (the D-05 pin hook),
+  // scheduleRemeasure(), and the gridScrollEl/virtualizer/virtual-core-fn references.
+  // windowSource(): the rows fed to the virtualizer AND held in $data.rows — the windowing.rzts
+  // host-contract source. When virtual, the FULL filtered+sorted PRE-PAGINATION model
+  // (A2-verified table.getPrePaginationRowModel()) so windowing REPLACES client pagination (req-9);
+  // else the normal (paginated) row model — the non-virtual path is byte-unchanged.
   windowSource = () => {
   if (!this.table) return [];
   if (this.virtual) return this.table.getPrePaginationRowModel().rows;
   return this.table.getRowModel().rows;
 };
 
+  // Defer remeasureWindow() until AFTER the framework commits the recycled window (onChange fires
+  // BEFORE React/Solid commit), falling back to a microtask/timeout where rAF is unavailable (SSR /
+  // test envs). DEDUPED via remeasurePending so a scroll burst queues at most one in-flight sweep
+  // (piled-up rAF sweeps broke the Solid scroll-then-focus seam — and the focus seam itself now
+  // polls for its target cell, so it no longer depends on remeasure timing).
+  //
+  // TWO deferred passes (microtask THEN rAF), both behind the single in-flight flag:
+  //   - Solid's <For> / Svelte's {#each} commit the recycled <tr> set SYNCHRONOUSLY in the reactive
+  //     tick that the windowVer bump triggers, so the recycled nodes already exist by the next
+  //     microtask — measuring there observes them while they are still connected, BEFORE the next
+  //     fast-scroll step recycles them away. A single rAF (a full frame later) was too late on the
+  //     fine-grained targets under a 40ms-per-step scroll: many rows mounted-and-recycled within one
+  //     frame, so the once-per-frame rAF sweep observed only a fraction of them and the measured
+  //     total under-converged (the Solid ~23.5k-vs-≥24k residual). The microtask catches them.
+  //   - React's setState→reconcile→commit is async (a microtask is too early — the new window is not
+  //     committed yet), so the rAF pass is what observes React's recycled rows.
+  // Each pass only OBSERVES + measures the live window; measureElement is idempotent on an
+  // already-observed node, so running both is cheap and loop-free.
   scheduleRemeasure = () => {
   if (this.remeasurePending) return;
   this.remeasurePending = true;
@@ -1944,18 +2255,38 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) this.remeasurePending = false;else setTimeout(rafPass, 0);
 };
 
+  // pinnedEditIndex(): the FULL-MODEL row index of the row currently in edit (D-02 pin-row),
+  // or -1 when no editor is open. Under virtualization `$data.rows` is the FULL pre-pagination
+  // model, so editingRow (single-cell) / editingRowIndex (full-row) — both in that index space —
+  // ARE the full-model index. The pinned row must never recycle while editing (req-9): it is
+  // unioned into the windowed slice when it scrolls off-window and its height is subtracted from
+  // the appropriate spacer so the total stays exactly getTotalSize() (the 51-01-proven mechanism).
+  // This is the data-table half of the D-05 windowing.rzts pin-extension hook (listbox provides none).
   pinnedEditIndex = () => {
   if (this._editingRow.value >= 0) return this._editingRow.value;
   if (this._editingRowIndex.value != null) return this._editingRowIndex.value;
   return -1;
 };
 
+  // pinnedMeasurement(pin): the virtual-core measurement { index, start, size, end, key } for the
+  // pinned full-model index — its measured (or estimated) height + offset, used to (a) decide
+  // whether it sits above/below the rendered window and (b) subtract its height from the right
+  // spacer. Null when out of range / not virtual.
   pinnedMeasurement = (pin: any) => {
   if (!this.virtualizer || pin < 0) return null;
   const ms = this.virtualizer.getMeasurements();
   return ms && ms[pin] ? ms[pin] : null;
 };
 
+  // measureElement sweep (D-10 / CR-01): refine estimated heights to MEASURED ones. The off-root
+  // querySelector idiom (chartjs/cropper/embla precedent — no per-row callback ref). Each rendered
+  // <tr> MUST be handed to virtualizer.measureElement on every window commit for it to be observed:
+  // virtual-core does NOT auto-register rendered rows — measureElement is the SOLE caller of its
+  // internal ResizeObserver's observe() (virtual-core@3.17.1 dist/esm/index.js:794-817), keyed by
+  // getItemKey. So this sweep must run not just once at mount but on every onChange tick (via
+  // scheduleRemeasure), or recycled rows keep the estimateRowHeight seed forever. measureElement is
+  // idempotent on an already-observed node (the `prevNode !== node` guard), so re-sweeping the
+  // visible window each commit is cheap and loop-free.
   remeasureWindow = () => {
   if (!this.virtualizer || !this.gridRoot) return;
   // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
@@ -1970,11 +2301,48 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   for (const tr of trs as any) this.virtualizer.measureElement(tr);
 };
 
+  // D-04: this shell exports ONLY the impure, data-table-specific host pieces. The pure windowing
+  // math (windowedRows / padTop / padBottom / pmIndexInWindow / rowIsOutsideWindow / virtualizerOptions
+  // / virtualItemKey) is imported DIRECTLY by the host (DataTable.rozie) from
+  // `@rozie-ui/headless-core/windowing.rzts` via bare specifier — the P0-proven cross-package inline
+  // path that DISSOLVES the partial into the leaf (a re-export-from THROUGH this shell would survive as
+  // a runtime import, not inline — verified). The math closes over these host symbols by convention.
+  // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
+  // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
+  // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
+  // in the host (ROZ123). It is a compile-time `.rzts` script-partial: it dissolves into each consumer's
+  // compiled leaf via inlineScriptPartials() before IR lowering — leaving zero runtime dependency.
+  //
+  // HOST CONTRACT (symbols the consuming host MUST define before importing — the same implicit
+  // by-convention mixin contract the DataTable host's other partials already use for `$data.windowVer`):
+  //   - windowSource(): T[]   — the full list to window (the KEY generalization; the DataTable host
+  //                             returns its pre-pagination row model, listbox/combobox return the
+  //                             filtered options). This partial MUST NOT reach into the host data engine
+  //                             directly — rows arrive ONLY through windowSource().
+  //   - $props.estimateRowHeight — per-item size estimate (kept aliased for DataTable back-compat).
+  //   - $data.windowVer / $data.editVer — window/edit-version reactivity bumps.
+  //   - gridScrollEl              — the scroll-container element handle.
+  //   - virtualizer               — the host virtual-core instance (built in $onMount from the ref).
+  //   - observeElementRect / observeElementOffset / elementScroll / measureElement — virtual-core fns.
+  //   - scheduleRemeasure()       — the host's rAF/microtask remeasure defer.
+  //   - pinnedEditIndex() / pinnedMeasurement(pin) — the D-05 OPTIONAL pin-extension hook (host-provided,
+  //                             defaulting to no-op): the DataTable host passes its edit-pinning hooks;
+  //                             listbox passes nothing. Routing pinning through this host hook (NOT
+  //                             inlining it) keeps DataTable's B13 edit-pinning behavior byte-identical.
+  // getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
+  // React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
+  // id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).
   virtualItemKey = (i: any) => {
   const src = this.windowSource();
   return src && src[i] ? src[i].id : undefined;
 };
 
+  // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
+  // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
+  // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
+  // Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
+  // on virtual-core's generic option inference. onChange uses the `$data.x = $data.x + 1`
+  // increment the React emitter lowers to functional setState — correct even from a mount closure.
   virtualizerOptions = (): any => ({
   count: this.windowSource().length,
   getScrollElement: () => this.gridScrollEl,
@@ -2002,6 +2370,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 });
 
+  // pinMeasurement(pin): the D-05 pin-hook read, RE-TYPED at the windowing layer so the
+  // shared math is strict-clean across every host. The host-provided pinnedMeasurement() has
+  // two shapes: the DataTable host returns a real virtual-core measurement; the listbox/combobox
+  // no-op host returns bare `null` (inferred `(pin) => null`). Calling it directly makes
+  // `const pm = pinnedMeasurement(pin)` flow-narrow to `null`, so the downstream `pm && pm.start`
+  // guard collapses the object branch to `never` (TS2339, Class 3). Reading the hook through this
+  // thin wrapper with an EXPLICIT return type (a return-type annotation is NOT flow-narrowed)
+  // gives the measurement a real object-or-null shape, so `pm && pm.start` keeps the object branch.
+  // Typing-only: the runtime value (a measurement or null) is unchanged.
   pinMeasurement = (pin: number): {
   start: number;
   size: number;
@@ -2009,6 +2386,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   end: number;
 } | null => this.pinnedMeasurement(pin);
 
+  // windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
+  // { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
+  // $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
+  // full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
+  // `rows` binding → TS2448 self-shadow, line ~1149 lesson).
   windowedRows = () => {
   // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
   // early return — so Solid's <For>/Svelte's {#each} accessor subscribes to it on its FIRST eval,
@@ -2079,6 +2461,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return out;
 };
 
+  // Spacer-<tr> heights (D-03): the leading spacer occupies items[0].start; the trailing spacer
+  // the gap between the last rendered item's end and getTotalSize(). Both windowVer-gated reads
+  // (the `$data.windowVer` touch re-derives them as the window/measurements change). 0 when off.
   padTop = () => {
   // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer + editVer at the TOP so the
   // spacer-<td> :style binding subscribes on the fine-grained targets before the early return,
@@ -2131,11 +2516,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return pad < 0 ? 0 : pad;
 };
 
+  // pmIndexInWindow: is full-model index `idx` present in the rendered virtual window?
   pmIndexInWindow = (items: any, idx: any) => {
   for (let i = 0; i < items.length; i++) if (items[i].index === idx) return true;
   return false;
 };
 
+  // rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
+  // window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
   rowIsOutsideWindow = (r: any) => {
   if (!this.virtual || !this.virtualizer) return false;
   const items = this.virtualizer.getVirtualItems();
@@ -2143,6 +2531,19 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return true;
 };
 
+  // ── Sort/filter live-announcement (#14) ─────────────────────────────────────────────
+  // A polite aria-live announcement whenever the consumer changes sorting or filtering, so a
+  // screen-reader user hears that the rows were reordered / narrowed (which is otherwise silent).
+  // announceState holds the last-seen references so the lazy watch below can tell WHICH slice
+  // changed (sort vs filter) and pick the message. It is a top-level mutable const → stabilized
+  // once per instance on all six targets (React useMemo-wraps a mutable instance; the others run
+  // setup once), so it PERSISTS across renders — unlike a top-level `let`, which React resets per
+  // render. Seeded from the initial state in $onMount so the first (post-mount) change compares
+  // against the true starting values, not a null sentinel.
+  // Typed as `unknown` members: these hold opaque last-seen references compared only by
+  // identity (!==) below, never read in a typed context — the annotation keeps the null seed
+  // from narrowing the members to `null` (which would reject the real reassignments under
+  // strictNullChecks in the emitted leaves).
   announceState: {
   sorting: unknown;
   columnFilters: unknown;
@@ -2153,12 +2554,18 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   globalFilter: null
 };
 
+  // Effective (controlled-or-uncontrolled) reads of the sort/filter slices: the bound prop when
+  // the consumer bound the matching r-model, else the uncontrolled $data default (mirrors currentState()).
   effectiveSorting = () => this.sorting != null ? this.sorting : this._sortingDefault.value;
 
   effectiveColumnFilters = () => this.columnFilters != null ? this.columnFilters : this._columnFiltersDefault.value;
 
   effectiveGlobalFilter = () => this.globalFilter != null ? this.globalFilter : this._globalFilterDefault.value;
 
+  // Build the polite message for a sort/filter change and advance announceState. Sort takes
+  // precedence when the sorting reference changed; otherwise a filter changed → the post-filter
+  // result count (the FILTERED total via totalRowCount(), NOT the page slice). Returns '' when
+  // neither actually changed (a no-op watch tick — do not re-announce).
   buildSortFilterAnnounce = () => {
   const nextSorting = this.effectiveSorting();
   const nextColumnFilters = this.effectiveColumnFilters();
@@ -2181,6 +2588,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return '';
 };
 
+  // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
+  // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
   reFeed = () => {
   if (!this.table) return;
   // NOTE: the external-swap history reset does NOT live here. reFeed() fires on EVERY watched
@@ -2246,6 +2655,28 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (this.refreshRowModel) this.refreshRowModel();
 };
 
+  // LIT (+ any fine-grained target whose effect-tracked watch does NOT observe the plain
+  // `data` PROPERTY): the re-feed $watch reads `(this.data||[]).length` inside a
+  // preact-signals effect, but `data` is a Lit @property (not a signal) so the effect
+  // never re-runs when the consumer pushes new rows post-mount (the sticky demo seeds 20
+  // rows in its own $onMount AFTER the child mounted empty → the body stayed at 0). The
+  // slice models DO re-pull (their $data.<slice>Default signals are effect-tracked), so
+  // only a raw `data` reference/length change slips through. $onUpdate (Lit updated())
+  // fires on ANY property change incl `data`; guard with a stored last-seen data ref +
+  // length so it re-feeds ONLY on a real data change (no churn). On the coarse-render
+  // targets the watch already covers it; this is a cheap idempotent backstop.
+  // External-swap history reset (grid-wide undo/redo, 260709-8ct; #8 fix). Keyed on the CONTROLLED
+  // `$props.data` REFERENCE changing — deliberately NOT on `currentData()` inside reFeed. An internal
+  // writeback changes `$data.dataDefault` SYNCHRONOUSLY and only LATER round-trips into `$props.data`;
+  // keying on `$props.data`'s OWN change means we never observe the transient window where a fine-
+  // grained target's reFeed reads a stale, unstamped `$props.data` mid-write and wrongly wipes a
+  // just-recorded edit's history (the stale-read false-clear — the SAME failure that broke the
+  // content-signature variant — that regressed Solid/Lit when this clear lived in reFeed). When
+  // `$props.data` genuinely changes: a new array carrying DATA_WRITE_TOKEN round-tripped from one of
+  // OUR writes → keep; one without it is a dataset the consumer handed us → external swap → clear. A
+  // non-data tick (sort/filter/pagination) never touches `$props.data` → never clears. Called from
+  // BOTH the coarse re-feed watch AND the $onUpdate backstop (Lit's @property `data` the effect-
+  // tracked watch can't observe); both are ref-gated so the redundant call is an idempotent no-op.
   lastPropsData: unknown = null;
 
   maybeClearHistoryOnExternalSwap = () => {
@@ -2261,6 +2692,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   lastDataLen = -1;
 
+  // Header click → toggle sort. Shift-click → ADD a secondary sort (multi-sort). Driven
+  // through table-core's column API so the onSortingChange funnel emits the fresh state.
   onHeaderSort = (colId: any, evt: any) => {
   if (!this.table) return;
   const col = this.table.getColumn(colId);
@@ -2270,8 +2703,20 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   col.toggleSorting(undefined, multi);
 };
 
+  // aria-sort string for a column header: 'ascending' | 'descending' | 'none'. Reads
+  // Reactive tick: read $data.rowModelVer (bumped by every refreshRowModel) so a
+  // template binding that calls a table-READING chrome helper (pagination/sort/pin/
+  // visibility predicates below) re-evaluates when the row model changes. On the
+  // coarse-render targets (Vue/React/Angular) the whole template re-runs anyway so this
+  // is a no-op; on the FINE-GRAINED targets (Solid/Lit) a helper that only reads the
+  // non-reactive `table` let would be computed ONCE (when table is still null → the
+  // default branch) and never update — pagination would read "Page 1 of 1" forever,
+  // aria-sort never flips, the pin position never sticks. Touching rowModelVer puts each
+  // helper in the reactive scope. The chrome helpers prefix `tick()` in their guard.
   tick = () => this._rowModelVer.value;
 
+  // the live sort direction off the table-core column (string-safe — never a bound
+  // boolean, the listbox aria lesson).
   ariaSortFor = (colId: any) => {
   if (this.tick() < 0 || !this.table) return 'none';
   const col = this.table.getColumn(colId);
@@ -2282,6 +2727,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return 'none';
 };
 
+  // A small sort-direction glyph for the header (▲/▼/empty). Decorative — aria-hidden.
   sortIndicator = (colId: any) => {
   if (this.tick() < 0 || !this.table) return '';
   const col = this.table.getColumn(colId);
@@ -2292,36 +2738,63 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return '';
 };
 
+  // Template helpers reading the resolved column-def metadata by id (plain fns — used
+  // in template predicates + interpolation; uniform on all 6, no $computed alias trap).
   defFor = (colId: any) => {
   const defs = this.columnDefs();
   for (const d of defs as any) if (d.id === colId) return d;
   return null;
 };
 
+  // Per-row visible cells for the body loop. table-core memoizes row objects by id,
+  // so a re-pull after a column change (visibility/reorder/pin, or the late <Column>
+  // registry on first mount) returns the SAME row references with a different cell
+  // set. On Solid the row loop keeps the existing <tr> across that pull (`:key="row.id"`
+  // is stable, so the emitter's `<Key>` reconciler holds the node), and Solid will NOT
+  // re-run a child loop whose `each` reads no signal — so a bare `row.getVisibleCells()`
+  // goes stale (header reorders, cells don't). Reading `$data.rowModelVer` (bumped by every
+  // refreshRowModel) inside the `each` puts the inner loop in the reactive scope, so it
+  // re-derives the cells on every row-model change. No-op on the coarse-render targets.
   visibleCellsFor = (row: any) => this._rowModelVer.value >= 0 ? row.getVisibleCells() : [];
 
+  // ── Editable-cell column-meta accessors (phase 51 req-1/2/5) ───────────────────────
+  // editMetaOf: the resolved ColumnDef.meta for a column id (the editable config carried
+  // from <Column>/`:columns` via columnDefs). Null-safe — an unknown/non-editable column
+  // returns null and every predicate below short-circuits to the read-only path.
   editMetaOf = (colId: any) => {
   const d = this.defFor(colId);
   return d && d.meta ? d.meta : null;
 };
 
+  // columnEditable: whether this column opted into editing (req-1). Drives every editor
+  // gate; false → the cell stays the read-only #cell display (byte-identical-off).
   columnEditable = (colId: any) => {
   const m = this.editMetaOf(colId);
   return !!(m && m.editable === true);
 };
 
+  // editorTypeOf: the built-in editor kind ('text'|'number'|'select'|'checkbox') OR
+  // 'custom' (the #editor scoped-slot escape hatch, req-2). Defaults to 'text'.
   editorTypeOf = (colId: any) => {
   const m = this.editMetaOf(colId);
   return m && m.editor != null ? m.editor : 'text';
 };
 
+  // editorOptionsOf: the select-editor options ([{ value, label }]) for editor='select'.
   editorOptionsOf = (colId: any) => {
   const m = this.editMetaOf(colId);
   return m && m.editorOptions != null ? m.editorOptions : [];
 };
 
+  // hasEditorSlot: this column routes through the consumer's #editor scoped slot (req-2)
+  // — true only when the column declared editor='custom' AND the consumer actually
+  // provided an #editor slot. Falls through to the built-in editor otherwise (e.g. a
+  // column marked 'custom' with no slot supplied degrades to the text editor, never blank).
   hasEditorSlot = (colId: any) => this.editorTypeOf(colId) === 'custom' && !!(this._hasSlotEditor || this.editor !== undefined);
 
+  // hasFilterSlot: the consumer supplied a #filter scoped slot, so it OWNS the per-column
+  // filter UI (re-added in 72-05 alongside the dedicated filter row's `<slot name="filter">`
+  // host — see the 72-03 removal note in that plan's SUMMARY for why this was briefly gone).
   hasFilterSlot = () => !!(this._hasSlotFilter || this.filter !== undefined);
 
   columnIsFilterable = (colId: any) => {
@@ -2334,6 +2807,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return d ? d.header : colId;
 };
 
+  // ── Column-management chrome (req-8/9/10/11) ────────────────────────────────────────
+  // Live header width (px) for a column — drives the <th> :style width binding. Reads the
+  // table-core column size (post-mount) with a fallback to undefined (auto width).
   headerWidth = (colId: any) => {
   if (this.tick() < 0 || !this.table) return null;
   const col = this.table.getColumn(colId);
@@ -2342,6 +2818,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return w != null && w > 0 ? w + 'px' : null;
 };
 
+  // Pointer-drag resize handler for a resizable header — table-core's getResizeHandler()
+  // returns a function bound to a pointerdown/touchstart event that drives the column
+  // size through onColumnSizingChange (our writeColumnSizing funnel) under
+  // columnResizeMode:'onChange'. Pure delegation; no scratch gesture state held in a
+  // top-level const (the React fragile-binding rule — table-core owns the gesture state).
   onResizeStart = (colId: any, evt: any) => {
   // stop here (NOT a `.stop` modifier) — the Angular `.stop`-in-@for hoist is broken (F5).
   if (evt && evt.stopPropagation) evt.stopPropagation();
@@ -2352,6 +2833,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (handler) handler(evt);
 };
 
+  // Find the live header object for a column id across the rendered header groups.
   findHeader = (colId: any) => {
   const groups = this._headerGroups.value || [];
   for (const hg of groups as any) {
@@ -2367,6 +2849,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return !!(header && header.column && header.column.getIsResizing && header.column.getIsResizing());
 };
 
+  // Visibility toggle (req-8) — drive table-core's column.toggleVisibility so the
+  // onColumnVisibilityChange funnel emits the fresh state.
   columnIsVisible = (colId: any) => {
   if (this.tick() < 0 || !this.table) return true;
   const col = this.table.getColumn(colId);
@@ -2379,6 +2863,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (col && col.toggleVisibility) col.toggleVisibility();
 };
 
+  // The full set of leaf columns (for the visibility-toggle menu) — id + header label +
+  // current visibility. Excludes the auto-injected CHROME columns (select + expander) —
+  // neither is a data column: they carry no header label (so they'd surface their raw
+  // internal id, e.g. '__rdt_expander') and their presence is governed by the
+  // selectionMode/expandable props, not user-toggleable visibility.
   allLeafColumns = () => {
   if (this.tick() < 0 || !this.table) return [];
   const cols = this.table.getAllLeafColumns ? this.table.getAllLeafColumns() : [];
@@ -2394,6 +2883,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return out;
 };
 
+  // Pinning (req-11) — drive table-core's column.pin('left'|'right'|false) so the
+  // onColumnPinningChange funnel emits a fresh state. Sticky offsets read the live column
+  // start/after positions (table-core computes them from the pinned column sizes).
   columnPinSide = (colId: any) => {
   if (this.tick() < 0 || !this.table) return false;
   const col = this.table.getColumn(colId);
@@ -2401,6 +2893,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return col.getIsPinned();
 };
 
+  // NOTE: the event is stopped HERE (evt.stopPropagation()) rather than via a `.stop`
+  // template modifier. The Angular emitter, hoisting a `.stop`-modified handler that
+  // lives INSIDE an `@for` loop into a class-field wrapper, drops the component `this.`
+  // qualifier (→ `onPinColumn(...)` bare ReferenceError) and fails to capture the loop
+  // var — so a `@click.stop="onPinColumn(...)"` inside the header `@for` breaks on
+  // Angular (F5). Stopping inside the handler sidesteps the broken hoist on all six.
   onPinColumn = (colId: any, side: any, evt: any) => {
   if (evt && evt.stopPropagation) evt.stopPropagation();
   if (!this.table) return;
@@ -2408,6 +2906,22 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (col && col.pin) col.pin(side);
 };
 
+  // Sticky inline style for a pinned header/cell — position:sticky + the computed left or
+  // right offset. Returns '' (no sticky) for unpinned columns. Returned as a STRING (the
+  // :style binding is value-driven — never an eval'd attr).
+  //
+  // `zIndex` (phase 72 fix, default 1 — body <td> / filter-row <th> layer): an INLINE style
+  // ALWAYS wins over the stylesheet's `.rozie-data-table.rdt-sticky .rdt-thead .rdt-th
+  // { z-index: var(--rdt-sticky-z, 2) }` rule, so a pinned header cell that unconditionally
+  // got `z-index:1` here (same as the pinned body/filter-row cells) silently DOWNGRADED the
+  // intended sticky-header stacking level from 2 to 1 — tying it with the dedicated filter
+  // row's own pinned <th> (72-05), which sits LATER in DOM order (a sibling <tr> beneath the
+  // header row) and therefore visually/interactively covers the header's ⋯ menu (phase 72,
+  // z-index:1000 relative to Popover's OWN local stacking context — capped by the pinned
+  // header <th>'s z-index, since a `position:fixed` descendant does not escape an ancestor's
+  // stacking context, only its layout containing block) whenever that SAME column is both
+  // pinned and filterable. thStyle() (the header caller) passes zIndex=2 so the header layer
+  // always wins ties against the filter-row/body layers, which keep the default of 1.
   pinStyle = (colId: any, zIndex = 1) => {
   if (this.tick() < 0 || !this.table) return '';
   const col = this.table.getColumn(colId);
@@ -2424,6 +2938,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return '';
 };
 
+  // Combined inline style for a <th> (width + pin) and a <td> (pin). Plain string concat —
+  // uniform on all 6, no bound-object trap. zIndex=2 (see pinStyle) so a pinned header cell
+  // — which hosts the ⋯ menu's floating content — always stacks above the pinned filter-row
+  // cell for the same column (zIndex=1, its own default).
   thStyle = (colId: any) => {
   let s = '';
   const w = this.headerWidth(colId);
@@ -2432,6 +2950,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return s;
 };
 
+  // ── Filter chrome handlers ─────────────────────────────────────────────────────────
+  // Global search input → funnel through table-core's setGlobalFilter so the
+  // onGlobalFilterChange callback fires the echo-guarded writer. Capture the fresh local
+  // value (never re-read a just-written $data key — React stale-read).
   onGlobalFilterInput = (evt: any) => {
   const value = evt && evt.target ? evt.target.value : '';
   if (this.table) {
@@ -2441,16 +2963,21 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.writeGlobalFilter(value);
 };
 
+  // Per-column filter input → setColumnFilter (fresh-array funnel).
   onColumnFilterInput = (colId: any, evt: any) => {
   const value = evt && evt.target ? evt.target.value : '';
   this.setColumnFilter(colId, value);
 };
 
+  // The live global filter value (bound to the search <input>, value-driven NOT eval'd).
   globalFilterValue = () => {
   const v = this.currentState().globalFilter;
   return v != null ? v : '';
 };
 
+  // ── Pagination chrome ────────────────────────────────────────────────────────────
+  // Read the live pagination state off table-core (post-mount) with a currentState()
+  // fallback (pre-mount / SSR). All string-safe (no bound booleans).
   pageIndex = () => {
   if (this.tick() >= 0 && this.table) return this.table.getState().pagination.pageIndex;
   const p = this.currentState().pagination;
@@ -2463,6 +2990,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return p && p.pageSize != null ? p.pageSize : 10;
 };
 
+  // Renamed from `pageCount` → `displayPageCount`: `pageCount` is now a public prop
+  // (server-side manual pagination), and a same-named top-level helper collides with the
+  // destructured prop on Svelte and the @Input/@property class field on Angular/Lit. This
+  // reader is internal (drives the "Page X of Y" chrome) and reads table-core's live
+  // getPageCount(), which now reflects rowCount/pageCount when manual.
   displayPageCount = () => {
   if (this.tick() < 0 || !this.table) return 1;
   const c = this.table.getPageCount();
@@ -2488,16 +3020,44 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.table.setPageSize(Number.isFinite(n) && n > 0 ? n : 10);
 };
 
+  // ── Row-selection chrome (req-7) ───────────────────────────────────────────────────
+  // Detect the auto-injected leading checkbox column by its constant id (template uses
+  // this to render checkbox chrome instead of an accessor value).
   isSelectColumn = (colId: any) => colId === this.SELECT_COL_ID;
 
+  // ── Expandable-rows template helpers (phase 50, D-04) ──────────────────────────────
+  // isExpanderColumn: the auto-injected leading chevron column predicate (mirrors
+  // isSelectColumn). rowIsExpanded / rowCanExpand read table-core row handles THROUGH the
+  // reactive tick (rowModelVer) so the chevron glyph + aria-expanded + the #detail r-if
+  // re-derive on a re-pull on the fine-grained targets (Solid/Lit) — same discipline as
+  // visibleCellsFor. `!!`-coerced so a bound aria-expanded emits an UNWRAPPED boolean (the
+  // listbox aria lesson — never a rozieAttr string → TS2322 on React/Solid).
   isExpanderColumn = (colId: any) => colId === this.EXPANDER_COL_ID;
 
+  // rowCanExpand gates ONLY the leading expander-column detail chevron. Group-header rows
+  // are excluded (`!getIsGrouped`): with `expandable` + grouping, getRowCanExpand returns
+  // `() => true` for EVERY flattened row, so without this a group header rendered TWO
+  // chevrons — the group-toggle in its grouped cell AND a redundant detail chevron in the
+  // leading column (both fire onToggleExpand on the shared expanded state). A group row's
+  // expand affordance is the group-toggle; the leading-column chevron is detail-only.
   rowCanExpand = (row: any) => !!(this.tick() >= 0 && row && row.getCanExpand && row.getCanExpand() && !(row.getIsGrouped && row.getIsGrouped()));
 
   rowIsExpanded = (row: any) => !!(this.tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded());
 
+  // rowShowsDetail: the #detail <tr> renders ONLY in #detail mode (no getSubRows) when the
+  // row is expanded AND is NOT a group-header row. With getSubRows the children arrive as
+  // ordinary depth-indented rows in $data.rows (table-core flattens) — NO additive detail
+  // row, NO nested r-for (Pitfall 1). The `!rowIsGrouped` guard is load-bearing: grouping
+  // and detail-expand share table-core's SINGLE `expanded` state, so a group-header row is
+  // `getIsExpanded()===true` the moment its group opens; without this guard that expanded
+  // group row also satisfied `getSubRows==null && rowIsExpanded`, painting a spurious
+  // #detail panel under every opened group (the group-toggle looked "linked" to detail).
   rowShowsDetail = (row: any) => this.getSubRows == null && !this.rowIsGrouped(row) && this.rowIsExpanded(row);
 
+  // Toggle a row's expanded state through table-core so onExpandedChange → writeExpanded
+  // fires exactly one expanded-change. Used by the chevron @click (native <button> handles
+  // Enter/Space → click, so NO explicit @keydown.enter/.space — that would DOUBLE-toggle on
+  // a real button; the grid @keydown is inert in 'table' mode, isGrid()-gated).
   onToggleExpand = (row: any, evt: any) => {
   if (!row || !row.toggleExpanded) return;
   // Capture the owning row element BEFORE the toggle so DOM focus can be restored after the
@@ -2521,6 +3081,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // bodyCellStyle: the non-virtual <td> inline style — pinStyle PLUS a depth-proportional
+  // left pad on the EXPANDER cell so nested getSubRows children visibly indent (row.depth).
+  // Only the expander column indents (the tree affordance lives in its dedicated column);
+  // data columns stay grid-aligned. depth 0 → unchanged (byte-identical-off).
   bodyCellStyle = (row: any, colId: any) => {
   const base = this.pinStyle(colId);
   if (this.isExpanderColumn(colId) && row && row.depth) {
@@ -2531,20 +3095,51 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return base;
 };
 
+  // ── Grouping template helpers (phase 50 reqs 4-7, D-04/D-05) ───────────────────────────
+  // Group-header rows ARE expandable rows: table-core's getGroupedRowModel FLATTENS them into
+  // $data.rows carrying getIsGrouped()/subRows, so they ride the SAME D-04 <template r-for> seam
+  // (no parallel render path, no nested r-for). These predicates read through the reactive tick
+  // (rowModelVer) so the group chrome + collapse state re-derive on a re-pull on the fine-grained
+  // targets (Solid/Lit) — same discipline as rowIsExpanded/visibleCellsFor. `!!`-coerced (the
+  // listbox aria lesson — a bound boolean must be UNWRAPPED, never a rozieAttr string → TS2322).
+  // rowIsGrouped: this flattened row is a group-header row.
   rowIsGrouped = (row: any) => !!(this.tick() >= 0 && row && row.getIsGrouped && row.getIsGrouped());
 
+  // groupingActive: grouping is currently engaged (a non-empty ordered key list). Drives the
+  // data-group-leaf marker so it is ABSENT when ungrouped (byte-identical-off, req-10).
   groupingActive = () => this.tick() >= 0 && (this.currentState().grouping || []).length > 0;
 
+  // cellIsGrouped / cellIsAggregated: per-CELL roles on a group-header row. The grouped cell shows
+  // the group key + toggle + count; an aggregated cell shows the rolled-up value through the
+  // EXISTING #cell slot (cell.getValue()) — NO new aggregatedCell template (RESEARCH State of the
+  // Art). A placeholder cell (neither) falls through to the #cell r-else and renders its empty value.
   cellIsGrouped = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped());
 
   cellIsAggregated = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated());
 
+  // cellIsPlaceholder: a PLACEHOLDER cell on a group-header row — a non-grouped, non-aggregated
+  // cell that table-core fills with the FIRST leaf row's value (cell.getValue() leaks e.g.
+  // "Services"/"Edsger Dijkstra" onto the group line). Renders BLANK via a dedicated empty
+  // template branch so the leaked leaf value never paints. Tick-gated exactly like cellIsGrouped
+  // so the group chrome re-derives on a re-pull on the fine-grained targets (Solid/Lit).
   cellIsPlaceholder = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder());
 
+  // groupSubRowCount: the number of underlying LEAF RECORDS under a group-header row (the count
+  // shown in the header, e.g. "North (40)"). row.subRows is the IMMEDIATE members — for MULTI-LEVEL
+  // grouping those are sub-GROUPS, not records, so "North" with 2 categories / 40 records would show
+  // "North (2)". getLeafRows() returns all leaf descendants (the actual record count); keep the
+  // subRows fallback for safety. Single-level grouping is unchanged (getLeafRows == subRows when the
+  // children are already leaves).
   groupSubRowCount = (row: any) => row && row.getLeafRows ? row.getLeafRows().length : row && row.subRows ? row.subRows.length : 0;
 
+  // groupingKeys: the live ordered grouping array — slot prop for the headless #groupBar + the
+  // default styled-token reflection. Reads currentState() ($props.grouping ?? $data.groupingDefault),
+  // both reactive sources, so the bar re-renders on a grouping change across all six targets.
   groupingKeys = () => this.currentState().grouping || [];
 
+  // groupableColumns: the data columns OFFERED to the headless #groupBar (those whose Column/config
+  // `groupable` is not false) — `[{ id, label }]`. Excludes the chrome columns (select/expander are
+  // not in columnDefs()). The consumer builds any bar/drag UI from this; the component ships none.
   groupableColumns = () => {
   const out = [];
   const defs = this.columnDefs();
@@ -2558,10 +3153,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return out;
 };
 
+  // Plain stop-propagation handler (used in place of the `@click.stop` bare modifier —
+  // a bare `.stop` with no handler hoists to `_guardedUndefined` → `this.undefined($event)`
+  // on Angular inside an `@for`, F5). Calling an explicit handler is uniform on all six.
   stopEvent = (evt: any) => {
   if (evt && evt.stopPropagation) evt.stopPropagation();
 };
 
+  // select-all header state (D-06: scopes to all filtered rows = TanStack default).
+  // `!!`-coerced booleans (the listbox aria lesson — never a bound rozieAttr string).
   isAllRowsSelected = () => !!(this.tick() >= 0 && this.table && this.table.getIsAllRowsSelected());
 
   isSomeRowsSelected = () => !!(this.tick() >= 0 && this.table && this.table.getIsSomeRowsSelected());
@@ -2571,6 +3171,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.table.toggleAllRowsSelected(!!(evt && evt.target && evt.target.checked));
 };
 
+  // per-row checkbox state + toggle (checkbox-only, D-05 — row body does NOT select).
+  // Read selection from the LIVE controlled state (currentState().rowSelection keyed by
+  // row.id) — NOT row.getIsSelected(). The latter reads table-core's row model, which
+  // only reflects a selection AFTER the re-feed watch pushes the new `state` + re-pulls
+  // (two reactive cycles on React). The controlled-state read updates in the SAME cycle
+  // as the write funnel, so the controlled <input :checked> reflects the toggle without
+  // the row-model-re-pull latency — the React controlled-checkbox revert that left
+  // `.check()` seeing no state change (F6). row.getIsSelected() is the fallback.
   rowIsSelected = (row: any) => {
   if (!row) return false;
   const id = row.id;
@@ -2584,6 +3192,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   row.toggleSelected(!!(evt && evt.target && evt.target.checked));
 };
 
+  // ── Header ⋯ menu chrome (phase 72, D-06) ──────────────────────────────────────────
+  // onHideColumn: the ⋯ menu's "Hide column" item. Reuses the SAME columnVisibility write
+  // funnel as the existing colvis toggle (onToggleVisibility in columnChrome.rzts) — just
+  // forced to `false` rather than toggled, since hide is a one-directional action from the
+  // menu (the colvis panel is the re-show path). Event stopped HERE (not a `.stop`
+  // modifier) — same Angular @for-hoist hazard as onPinColumn/onResizeStart (F5).
   onHideColumn = (colId: any, evt: any) => {
   if (evt && evt.stopPropagation) evt.stopPropagation();
   if (!this.table) return;
@@ -2591,6 +3205,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (col && col.toggleVisibility) col.toggleVisibility(false);
 };
 
+  // hasAnyFilterableColumn: gates the dedicated filter row (72-05) — true when at least one
+  // leaf column (excluding the select/expander chrome columns, already excluded by
+  // allLeafColumns) is filterable. Reactive via allLeafColumns()'s own tick() gate.
   hasAnyFilterableColumn = () => {
   const cols = this.allLeafColumns();
   for (const c of cols as any) {
@@ -2599,6 +3216,18 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return false;
 };
 
+  // `indeterminate` is a DOM PROPERTY, not an HTML attribute — a `:indeterminate="…"`
+  // binding only takes effect on Vue (which binds known DOM props); on
+  // React/Solid/Angular/Lit/Svelte it lands as an inert attribute and `el.indeterminate`
+  // stays false. So set it IMPERATIVELY: query the select-all checkbox off the component
+  // root ($el — post-mount safe) and assign the property. Called from refreshRowModel
+  // (every selection change re-pulls the row model) so it stays in lockstep with the
+  // table-core selection state. The select-all box is NOT re-created by a selection
+  // change (only its checked attr flips), so the live element persists.
+  // `box` is aliased through a module-scope null-let (typeNeutralize → `any`) so the
+  // strict bundled-leaf tsc accepts `.indeterminate` (querySelector returns `Element`,
+  // which has no `indeterminate` — it is an HTMLInputElement DOM property). Same idiom
+  // as Column's `let reg = null; reg = $inject(...)`.
   selectAllBox: any = null;
 
   syncIndeterminate = () => {
@@ -2607,6 +3236,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (this.selectAllBox) this.selectAllBox.indeterminate = this.isSomeRowsSelected() && !this.isAllRowsSelected();
 };
 
+  // The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
+  // Imperative handle (consumer-callable). Each verb is a PRE-DECLARED top-level
+  // `const` (the canonical $expose contract — `$expose({ name })` references a
+  // binding ALREADY in scope; an INLINE-defined verb `$expose({ name: () => {} })`
+  // is dropped on ALL SIX targets, only the by-reference key survives → a
+  // runtime ReferenceError at `defineExpose`/`useImperativeHandle`). Sorting verbs +
+  // a fresh column-def readout, selection, pagination, and column-management verbs.
   sortColumn = (colId: any, desc: any) => {
   if (this.table) this.table.getColumn(colId) && this.table.getColumn(colId).toggleSorting(desc, false);
 };
@@ -2617,6 +3253,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   getColumnDefs = () => this.columnDefs();
 
+  // selection verbs (req-7) — drive table-core so the onRowSelectionChange funnel
+  // emits the fresh state + selection-change.
   toggleAllRows = (value: any) => {
   if (this.table) this.table.toggleAllRowsSelected(value);
 };
@@ -2627,6 +3265,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   getSelectedRows = () => this.table ? this.table.getSelectedRowModel().rows.map((r: any) => r.original) : [];
 
+  // pagination verbs.
   setPage = (idx: any) => {
   if (this.table) this.table.setPageIndex(idx);
 };
@@ -2635,6 +3274,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (this.table) this.table.setPageSize(size);
 };
 
+  // column-management verbs (req-8/9/10/11) — drive table-core so the funnels fire.
   toggleColumnVisibility = (colId: any) => {
   if (this.table) {
     const c = this.table.getColumn(colId);
@@ -2642,6 +3282,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // NOT `setColumnOrder`: a verb named `set<ModelProp>` collides with React's
+  // auto-generated `setColumnOrder` useState setter for the `columnOrder` model
+  // prop, and an $expose verb is PUBLIC-CONTRACT-PROTECTED from the React
+  // deconfliction rename (ROZ524 — the rename target is the verb, which is
+  // off-limits). So the public verb is `applyColumnOrder` (semantically: apply a
+  // new column order). The other set* verbs (setPage/setRowsPerPage) do NOT match
+  // any model prop's setter, so they are collision-free.
   applyColumnOrder = (order: any) => {
   if (this.table) this.table.setColumnOrder(order);
 };
@@ -2650,6 +3297,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (this.table) this.table.resetColumnSizing(true);
 };
 
+  // pinColumn: the verb that drives column.pin; distinct from the template handler
+  // onPinColumn (no shadow — the deferred-items finding #4 collision check).
   pinColumn = (colId: any, side: any) => {
   if (this.table) {
     const c = this.table.getColumn(colId);
@@ -2657,39 +3306,101 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // getRowIndexRelativeToPage(absRow?) — C1 (phase 63 wave-6) converter: an ABSOLUTE display-order
+  // index (the focusCell/getActiveCell/activecell-change space) → the PAGE-RELATIVE index. Mirrors
+  // MUI getRowIndexRelativeToVisibleRows. With NO argument it converts the CURRENT active cell
+  // (toAbsRow($data.activeRow) - pageRowOffset() collapses to $data.activeRow). In virtual mode
+  // there is no page (windowing replaces pagination) → the windowed model IS the full model, so it
+  // returns the absolute index unchanged. Collision-safe: no *-change event, prop, React auto-setter,
+  // or inherited Lit DOM method named getRowIndexRelativeToPage (ROZ121/124/137 clear).
   getRowIndexRelativeToPage = (absRow: any) => {
   const abs = absRow == null ? this.toAbsRow(this._activeRow.value) : Math.trunc(Number(absRow)) || 0;
   if (this.virtual) return abs;
   return abs - this.pageRowOffset();
 };
 
+  // C3 (phase 63 wave-9) — the PUBLIC Cut verb: copy the current cell range to the clipboard then
+  // clear the source cells through the write-funnel (one writeData), delegating to cutRange (the
+  // clipboardFill funnel that also backs the Ctrl+X shortcut). Reads the persisted $data range /
+  // active cell, so it cuts the current selection even when the call arrives off a control that
+  // moved DOM focus off the grid. Collision-safe: no `cut` event / model prop / React auto-setter /
+  // inherited Lit DOM method named `cut` (ROZ121/124/137 clear) — `cut` is not on HTMLElement.
   cut = () => this.cutRange();
 
+  // 260709-8ct (grid-wide undo/redo): NO pass-through wrapper lands here for
+  // undo/redo/canUndo/canRedo/clearHistory. Unlike `cut` above (which delegates to a
+  // differently-named clipboardFill export, `cutRange`), the undoHistory.rzts exports already
+  // use the exact public verb names and are already component-scope (imported directly into
+  // DataTable.rozie) — so DataTable.rozie's $expose references them BY NAME with zero
+  // indirection. This file stays the seam for verbs that need a rename/adapter, not a mandatory
+  // stop for every $expose entry.
+  // ══ Grid interaction mode (phase 49) — STATE + STRUCTURE only ═══════════════════════════
+  // This plan (02) establishes the gated ARIA roles, the roving single-tab-stop tabindex,
+  // the active-cell index-pair state, the data-* cell markers, and the SINGLE
+  // focusActiveCell() seam. Plan 03 adds the keydown navigation math, the $expose verbs
+  // (focusCell/getActiveCell/clearActiveCell), and the activecell-change event ON TOP.
+  // interactionMode gate. 'grid' lights up roving nav; 'table' (default) is byte-behaviorally
+  // identical to phase 48 (roles fall back to the literals, tabindex drops).
   isGrid = () => this.interactionMode === 'grid';
 
+  // Role computeds (RESEARCH Pattern 4). The 'table' branch returns the EXACT phase-48
+  // literal so 'table'-mode DOM is unchanged. Header cells keep 'columnheader' and rows keep
+  // 'row'/'rowgroup' in BOTH modes (APG grid) — those stay static literals in the template.
   tableRole = () => this.isGrid() ? 'grid' : 'table';
 
   cellRole = () => this.isGrid() ? 'gridcell' : 'cell';
 
+  // ── Cell addressing helpers (plain fns — no $computed alias trap; safe in template) ────
+  // rowIndexOf: a body row's index over the visible model ($data.rows). tick() puts the read
+  // in the fine-grained reactive scope (Solid/Lit) so the data-row marker re-derives on a
+  // re-pull (reorder/filter) — matching visibleCellsFor's discipline.
   rowIndexOf = (row: any) => this.tick() >= 0 ? (this._rows.value || []).indexOf(row) : -1;
 
+  // colIndexOf: a body cell's position in its row's visible cell list.
   colIndexOf = (row: any, cellCtx: any) => this.tick() >= 0 ? this.visibleCellsFor(row).indexOf(cellCtx) : -1;
 
+  // headerColIndexOf: a header cell's position in its header group's leaf headers.
   headerColIndexOf = (hg: any, header: any) => (hg && hg.headers ? hg.headers : []).indexOf(header);
 
+  // ── C1 (phase 63 wave-6) absolute-index bridge ─────────────────────────────────────────
+  // The PUBLIC active-cell rowIndex (focusCell/getActiveCell/activecell-change) is the ABSOLUTE
+  // display-order position in getPrePaginationRowModel().rows (filter+sort+expand applied, BEFORE
+  // pagination/windowing), in BOTH paginated and virtual modes — reversing the old page-relative
+  // paginated meaning. INTERNALLY $data.activeRow stays PAGE-RELATIVE in the non-virtual paginated
+  // body (the data-row markers + the nav math index the page slice) and FULL-MODEL in virtual mode
+  // (the wr.vi.index space). pageRowOffset() bridges the two so the API speaks one absolute language.
+  //   - virtual mode: activeRow is already the full pre-pagination index → offset 0.
+  //   - non-virtual:  activeRow is page-relative → offset = pageIndex * pageSize.
+  // isGrid()-gated (the active-cell API is grid-only); pageIndex()/pageSize() read live table-core
+  // state through the reactive tick (filterPaginationRowChrome), so this re-derives on a page change.
   pageRowOffset = () => {
   if (!this.isGrid() || this.virtual) return 0;
   return this.pageIndex() * this.pageSize();
 };
 
+  // page-relative active row → absolute (display-order) index.
   toAbsRow = (localRow: any) => localRow + this.pageRowOffset();
 
+  // A body row's ABSOLUTE display-order index = its page-relative index + the page offset. Drives
+  // aria-rowindex on the non-virtual paginated body (B27); the virtual path uses wr.vi.index
+  // directly (already absolute). Reactive via rowIndexOf's tick().
+  // Total filtered+sorted PRE-pagination row count — the clamp bound for an absolute focusCell.
+  // In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
+  // non-virtual paginated body $data.rows is only the page slice, so read the live model.
   prePaginationRowCount = () => {
   if (!this.table || this.virtual) return this.bodyRowCount();
   const pm = this.table.getPrePaginationRowModel();
   return pm && pm.rows ? pm.rows.length : this.bodyRowCount();
 };
 
+  // Roving tabindex (RESEARCH Code Examples). Reads ONLY reactive $data (ROZ123-safe,
+  // fine-grained-reactive). Returns null in 'table' mode → the bound numeric attribute
+  // DROPS entirely (IN-01: on React via the `cellTabindex(...) ?? undefined` numeric-attr
+  // emitter path landed in 4bec3b8e — NOT rozieAttr, which would string-widen tabIndex and
+  // TS2322; the other five targets drop it via their own nullish-attr handling), keeping
+  // 'table'-mode DOM clean. rowKey is the literal
+  // '__header' for header cells or the String(bodyRowIndex) for body cells, so the active
+  // header state (activeIsHeader) is addressable through the same computed.
   cellTabindex = (rowKey: any, colIndex: any, level = null) => {
   if (!this.isGrid()) return null;
   // B6: an empty / all-filtered grid (no body rows) must STILL be keyboard-reachable. Fall
@@ -2710,6 +3421,17 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return isActive ? 0 : -1;
 };
 
+  // ── Active-cell ring predicate (grid pointer §1, 260708-ni6) ───────────────────────────
+  // isActiveCell mirrors cellTabindex's ACTIVE branch (the same (rowKey, colIndex, level)
+  // address tuples the roving tabindex uses) but returns a BOOLEAN for the `.rdt-cell-active`
+  // :class binding, and is STATE-DRIVEN — so the ring shows identically on click AND keyboard
+  // (independent of :focus-visible, which browsers gate off for a mouse-focused non-text <td>).
+  // It DELIBERATELY omits cellTabindex's B6 empty-grid / header-fallback branch: the ring must
+  // NOT light on an empty grid's synthetic tab-stop (there is no real active cell there). Reads
+  // ONLY reactive $data (ROZ123-safe, fine-grained). Returns false in 'table' mode so table-mode
+  // markup is byte-behaviorally unchanged. Header cells are active only while activeIsHeader is
+  // true (addressed by BOTH colIndex and level — a grouped multi-level header carries exactly one
+  // ring); body cells only while activeIsHeader is false.
   isActiveCell = (rowKey: any, colIndex: any, level = null) => {
   if (!this.isGrid()) return false;
   if (this._activeIsHeader.value) {
@@ -2720,6 +3442,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return rowKey === String(this._activeRow.value) && colIndex === this._activeColIndex.value;
 };
 
+  // ── The focus SEAM (RESEARCH Pattern 1 + 3, req-6) ─────────────────────────────────────
+  // resolveCellEl: index pair → DOM element, via a data-* attribute query off the stable
+  // post-mount root. Uniform on all six, shadow-safe (the query runs from inside the
+  // component's own scope). rowKey is the literal '__header' or a String(integer index) and
+  // colIndex is an integer — NO consumer string is interpolated into the selector (T-49-01).
   resolveCellEl = (rowKey: any, colIndex: any, level = null) => {
   if (!this.gridRoot) return null;
   // B12: a grouped multi-level header has MULTIPLE cells sharing data-row="__header" at the
@@ -2733,6 +3460,19 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return this.gridRoot.querySelector(sel);
 };
 
+  // focusActiveCell: THE single DOM-focus-resolution path (req-6). Every focus change —
+  // the D-04 entry cell here, and (plan 03) arrow nav / focusCell() / the data-change clamp —
+  // routes through this one function, so a verifier can point to it and phase 53 windowing
+  // hooks it without a rewrite. Accepts OPTIONAL explicit (nextRow,nextCol) so callers can
+  // pass FRESH post-write locals (React ROZ138 / Angular signal async — pinned by plan 01);
+  // falls back to $data when none passed. NEVER stores a DOM node (index-only state).
+  // 260618-ao9 — params carry explicit `= null` defaults so the cross-target
+  // emitters type them OPTIONAL (untyped params lower to REQUIRED `any`, making the
+  // 2-arg `focusActiveCell(r, c)` call sites a TS2554 on React/Solid/Lit — a
+  // pre-existing regression from the d7166c5e header-crossing `nextIsHeader` add).
+  // The `= null` default reproduces the documented "falls back to $data when
+  // omitted" contract: an omitted arg arrives as `null`, and the body's `== null`
+  // checks already route those to the live `$data` value — behavior-identical.
   focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, nextLevel = null) => {
   if (!this.isGrid() || !this.gridRoot) return;
   // #9 focus-intent epoch: focusActiveCell is THE single seam every keyboard nav re-asserts
@@ -2798,20 +3538,59 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (el) el.focus();
 };
 
+  // ══ Grid keyboard navigation (phase 49 plan 03 — RESEARCH Pattern 5 + the delegated handler) ═══
+  // The nav model is plain ARRAY-INDEX MATH over the VISIBLE model. table-core has already
+  // done the hard part: $data.rows (body) and $data.headerGroups (header) hold the visible,
+  // reordered, pinned cell set (row.getVisibleCells() / getHeaderGroups()) — hidden columns
+  // are ALREADY ABSENT, reorder/pinning is ALREADY REFLECTED (REQ-7). There is NO separate
+  // "compute visible order" step. Every index is clamped to [0,max] so an out-of-range key
+  // never throws or builds an injection-shaped selector (Security V5 / T-49-03).
+  // IN-01: aria-rowcount for the NON-VIRTUAL table. The virtual table binds $data.rows.length
+  // (the full pre-pagination model). For the non-virtual path $data.rows is the PAGINATED slice,
+  // so report the FILTERED (pre-pagination) total instead — the count AT users need to know "row N
+  // of TOTAL". Falls back to $data.rows.length pre-mount (table is null until $onMount).
+  // NB the helper is named `totalRowCount`, NOT `ariaRowCount`: `ariaRowCount` is an inherited
+  // HTMLElement ARIA-reflected property (`Element.ariaRowCount: string`), so a same-named method
+  // becomes a class field that shadows it on Lit → TS2416 cascades to EVERY @property decorator
+  // (the `valueOf`/`nodeType` inherited-DOM-member collision class, authoring playbook §6).
   totalRowCount = () => {
   if (!this.table) return (this._rows.value || []).length;
   const fm = this.table.getFilteredRowModel();
   return fm && fm.rows ? fm.rows.length : (this._rows.value || []).length;
 };
 
+  // ── A11y row bookkeeping (#13): consistent aria-rowindex / aria-rowcount ──────────────
+  // WAI-ARIA: when aria-rowcount is set on the grid/table, EVERY row (header rows + body rows)
+  // must carry an aria-rowindex, and aria-rowcount must equal the total number of rows INCLUDING
+  // the header rows. Before this fix aria-rowcount was set unconditionally to totalRowCount() but
+  // aria-rowindex was grid-only — so a paginated 'table'-mode grid advertised e.g. rowcount=100
+  // while its 10 visible rows carried NO index (SR announced "row 1..10 of 100" on the LAST page).
+  //   headerRowCount = the columnheader rows ($data.headerGroups — a grouped/multi-level header is
+  //     >1; the role="presentation" filter row is NOT a row and is excluded).
+  //   gridAriaRowCount = header rows + the FILTERED pre-pagination data total → equals the largest
+  //     aria-rowindex any body row carries, so count and indices are always mutually consistent.
+  // NB the helpers are gridAriaRowCount / bodyAriaRowIndex, NOT ariaRowCount / ariaRowIndex: the
+  // latter collide with the inherited HTMLElement.ariaRowCount / .ariaRowIndex reflected properties
+  // on Lit (TS2416 — the same inherited-DOM-member collision class as totalRowCount's rename note).
   headerRowCount = () => (this._headerGroups.value || []).length;
 
   gridAriaRowCount = () => this.headerRowCount() + this.totalRowCount();
 
+  // Page offset that is MODE-INDEPENDENT (works in BOTH 'table' and 'grid' mode), unlike
+  // pageRowOffset() which is isGrid()-gated for the active-cell API. In the non-virtual body
+  // $data.rows is only the page slice, so a data row's ABSOLUTE index = its page-relative
+  // rowIndexOf + this offset. Virtual mode never reaches here (that body uses wr.vi.index).
   ariaPageOffset = () => this.table ? this.pageIndex() * this.pageSize() : 0;
 
+  // A non-virtual body row's 1-based aria-rowindex: the header rows come first (headerRowCount),
+  // then the absolute (page-aware) 0-based data index, +1 to 1-base it. Present in BOTH modes so
+  // it is always consistent with gridAriaRowCount. The virtual body binds
+  // `headerRowCount() + wr.vi.index + 1` inline (wr.vi.index is already the absolute full-model index).
   bodyAriaRowIndex = (row: any) => this.headerRowCount() + this.rowIndexOf(row) + this.ariaPageOffset() + 1;
 
+  // Column count = the visible cell list length (uniform header+body in a flat grid). Reads
+  // $data.rows (reactive) so it is fine-grained-correct on Solid/Lit; falls back to the
+  // header leaf count when there are no body rows.
   visibleColCount = () => {
   // NB: local is `rowList` (NOT `rows`) — the React emitter lowers `$data.rows` to the bare
   // state binding `rows`, so a `const rows = $data.rows` self-shadows it (TS2448 TDZ). Same
@@ -2826,11 +3605,24 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   clamp = (v: any, lo: any, hi: any) => v < lo ? lo : v > hi ? hi : v;
 
+  // ── Multi-level (grouped) header addressing (B12) ──────────────────────────────────────
+  // $data.headerGroups is ordered top→bottom; the LEAF header row (the one adjacent to the
+  // body) is the LAST group. The roving active-header state carries activeHeaderLevel (the
+  // group index) alongside activeColIndex (the index within THAT level's headers) so the
+  // single-tab-stop invariant + ArrowUp parent-resolution span every header level — a flat
+  // grid has one level (leafLevel 0), so the table-mode/flat path is unchanged.
   headerLeafLevel = () => {
   const hg = this._headerGroups.value || [];
   return hg.length ? hg.length - 1 : 0;
 };
 
+  // #10: the number of header cells AT a given level. A grouped PARENT level may have FEWER
+  // headers than there are leaf columns (one parent spans several leaves), so horizontal nav on a
+  // non-leaf header must clamp against THIS count — not visibleColCount() (the leaf-column count),
+  // which would let ArrowRight/End overrun into a phantom (null) cell → focus dropped to <body>.
+  // Degenerate cases (no headerGroups, level out of range) fall back to visibleColCount() so the
+  // clamp is never negative or NaN. The LEAF level's count equals visibleColCount() (one header per
+  // visible leaf column), so leaf-header + body horizontal nav is byte-behaviorally unchanged.
   headerCountAtLevel = (level: any) => {
   const hg = this._headerGroups.value || [];
   if (!hg.length) return this.visibleColCount();
@@ -2846,6 +3638,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return grp.headers[colIndex] || null;
 };
 
+  // ArrowUp from a (level, colIndex) leaf/child header → the index of its PARENT header in the
+  // level above (the parent column that spans it, via table-core header.column.parent). -1 when
+  // there is no real parent (already at the top, or a placeholder with no group) → the caller
+  // keeps the active header where it is.
   parentHeaderColIndex = (level: any, colIndex: any) => {
   if (level <= 0) return -1;
   const h = this.headerAt(level, colIndex);
@@ -2861,6 +3657,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return -1;
 };
 
+  // ArrowDown from a (level, colIndex) GROUP header → the index of its FIRST child header in the
+  // level below (via table-core column.columns). -1 when the header has no child columns (a leaf)
+  // → the caller drops into the body instead.
   firstChildHeaderColIndex = (level: any, colIndex: any) => {
   const h = this.headerAt(level, colIndex);
   if (!h || !h.column) return -1;
@@ -2877,6 +3676,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return -1;
 };
 
+  // ── Nav helpers: compute the NEXT indices into LOCAL consts, write $data from them, and
+  // RETURN the fresh locals so the caller threads the SAME values into BOTH focusActiveCell
+  // AND the activecell-change emit. NEVER re-read $data.activeRow/activeColIndex after the
+  // write (React setState is async — ROZ138 — the re-read binds the PRE-write value; Angular
+  // signal writes are async too — both proven live by plan 01's probe). ──────────────────────
+  // ArrowRight/Left — clamp colIndex over [0, visibleColCount()-1] (no wrap; hidden cols
+  // already excluded from the visible list per REQ-7).
   moveCol = (delta: any) => {
   // #10: when a grouped PARENT header is active, clamp against the header count AT THE ACTIVE
   // LEVEL (which may be fewer than the leaf-column count) so ArrowRight never overruns onto a
@@ -2888,6 +3694,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return nextCol;
 };
 
+  // ArrowUp/Down + PageUp/Down — cross the header boundary and clamp at body edges (no
+  // page-cross per D-06/REQ-7). Returns { row, isHeader } fresh locals.
+  //  - From the header, ArrowDown (delta>0) drops into body row 0 (activeIsHeader=false).
+  //  - From body row 0, ArrowUp (delta<0) crosses into the header (activeIsHeader=true).
+  //  - PageUp/Down jump by ±GRID_PAGE_STEP, clamped to the current page bounds (no cross).
   moveRow = (delta: any) => {
   const lastRow = this.bodyRowCount() - 1;
   const maxRow = lastRow < 0 ? 0 : lastRow;
@@ -2979,6 +3790,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   };
 };
 
+  // Home/End within the current row → col 0 / max. Returns the fresh colIndex.
   gotoColEdge = (toEnd: any) => {
   // #10: End on a grouped PARENT header lands on that level's LAST header (headerCountAtLevel-1),
   // not the leaf-column max — otherwise the ring strands on a phantom cell past the level's
@@ -2990,6 +3802,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return nextCol;
 };
 
+  // gotoRowEdge(toEnd): the §8 (260709-3qt) Ctrl+ArrowUp/Down vertical region-edge jump — move the
+  // active cell to the data-region row edge (row 0 / last body row) in the CURRENT column, mirroring
+  // gotoColEdge's horizontal edge jump. Body cells only (the caller gates on !activeIsHeader); always
+  // lands in the body (activeIsHeader=false). Returns the fresh row index for the shared focus seam.
   gotoRowEdge = (toEnd: any) => {
   const lastRow = this.bodyRowCount() - 1;
   const nextRow = toEnd ? lastRow < 0 ? 0 : lastRow : 0;
@@ -2998,6 +3814,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return nextRow;
 };
 
+  // Ctrl+Home → first body cell (0,0); Ctrl+End → last body cell (lastRow,max). Returns the
+  // fresh { row, col } locals. Both land in the body (activeIsHeader=false).
   gotoStart = () => {
   this._activeIsHeader.value = false;
   this._activeRow.value = 0;
@@ -3022,17 +3840,23 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   };
 };
 
+  // Resolve the active cell element (for the in-cell trap) — uses the same data-* query as
+  // the focus seam. rowKey is the literal '__header' or String(integer) — no consumer string.
   currentCellEl = () => {
   const rowKey = this._activeIsHeader.value ? '__header' : String(this._activeRow.value);
   return this.resolveCellEl(rowKey, this._activeColIndex.value, this._activeIsHeader.value ? this._activeHeaderLevel.value : null);
 };
 
+  // The focusable descendants of a cell (non-disabled), in DOM order. Pure DOM — uniform ×6.
   focusables = (cellEl: any) => {
   if (!cellEl || !cellEl.querySelectorAll) return [];
   const list = Array.prototype.slice.call(cellEl.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'));
   return list.filter((n: any) => !n.disabled);
 };
 
+  // Enter/F2 → enter interaction mode: focus the active cell's FIRST interactive control
+  // (D-07 — uniform for header sort buttons and body controls; Enter does NOT sort directly).
+  // No-op (stay in navigation mode) if the cell has no focusable control.
   enterControl = () => {
   const cellEl = this.currentCellEl();
   const list = this.focusables(cellEl);
@@ -3041,6 +3865,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   list[0].focus();
 };
 
+  // Cycle focus among the controls WITHIN the active cell (D-08 focus containment) — Tab
+  // forward / Shift+Tab backward, wrapping at the ends. Uses the plan-01-PROVEN per-target
+  // activeElement read: gridRoot.getRootNode().activeElement is the UNIFORM correct read on
+  // ALL SIX (document in light DOM; the shadow root on Lit). Reuse verbatim — do NOT re-derive.
   cycleWithinCell = (cellEl: any, forward: any) => {
   const list = this.focusables(cellEl);
   if (!list.length) return;
@@ -3052,6 +3880,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   list[i].focus();
 };
 
+  // THE single delegated keydown handler (RESEARCH "Single delegated keydown handler"). Wired
+  // as ONE keydown listener on the <table> root — NOT per-cell, NOT with .stop/.prevent modifiers (the
+  // Angular .stop-in-@for hoist bug, F5/ROZ723). e.preventDefault() is called IMPERATIVELY for
+  // handled keys. Each nav helper writes $data and RETURNS the fresh post-write locals; those
+  // SAME locals feed BOTH focusActiveCell AND the activecell-change emit (no $data re-read).
   onGridKeyDown = (e: any) => {
   if (!this.isGrid() || !e) return;
   const key = e.key;
@@ -3389,6 +4222,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // WR-03: integrate mouse-click + programmatic focus with the roving model. A click on a
+  // tabindex="-1" cell (or focus arriving any way other than the keyboard nav path) moves
+  // DOM focus there but does NOT run onGridKeyDown — so activeRow/activeColIndex would stay
+  // on the OLD cell and the NEXT arrow key would jump from the stale active cell. Wired as
+  // ONE @focusin on the <table> root (focusin bubbles): resolve the focused element's owning
+  // [data-grid-cell], parse its data-row/data-col-index, and write them into the active-cell
+  // state (mirroring the keyboard path). Clears activeInControl ONLY when the cell ITSELF
+  // (not an inner control) received focus — focusing a control via Enter keeps the in-control
+  // flag. NEVER emits activecell-change (a focus sync is not a keyboard navigation event).
   syncActiveFromEvent = (e: any) => {
   if (!this.isGrid() || !e) return;
   const tgt = e.target;
@@ -3452,6 +4294,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (tgt === cellEl) this._activeInControl.value = false;
 };
 
+  // onGridMouseDown: the pointer range seam (phase 51 req-7 / D-07 Shift+Click; §6 260709-3qt
+  // plain drag-to-select). A focusin event carries no reliable `shiftKey`, so the modifier MUST
+  // be read off the pointer event — @mousedown fires BEFORE the cell's focusin and DOES carry
+  // shiftKey. A shift-held mousedown on a BODY cell sets the range's moving corner to that cell
+  // (keeping the anchor), then flags rangeClickPending so the follow-up focusin does not collapse
+  // the range. A PLAIN (non-shift) mousedown BEGINS a drag-select anchored at that cell (§6): the
+  // document pointermove/up listeners paint the range as the pointer moves. The fill handle owns
+  // its own @pointerdown drag (it stops propagation), so a plain mousedown originating inside it is
+  // skipped. Do NOT preventDefault — native focus must still land (focusin sync + roving tabindex).
   onGridMouseDown = (e: any) => {
   if (!this.isGrid() || !e) return;
   const tgt = e.target;
@@ -3484,6 +4335,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.beginRangeDrag(row, col);
 };
 
+  // onGridDblClick: the double-click-into-edit seam (grid pointer §3+§5, 260708-ni6). Wired as
+  // ONE @dblclick on the <table> root (mirroring the already-delegated @mousedown/@focusin). A
+  // double-click on a BODY cell either toggles a group (group-header cell) or opens the editor
+  // (editable cell); a non-editable body cell is a no-op (the cell stays active — its focusin
+  // already set the active state + the §1 ring). Header cells return early so they keep their
+  // native sort/menu/resize semantics. Reuses the SAME closest/parse/finite guards as
+  // syncActiveFromEvent and the SAME beginEdit / onToggleExpand funnels the keyboard path uses —
+  // no new edit or expand machinery. isGrid()-gated so 'table' mode never runs it.
   onGridDblClick = (e: any) => {
   if (!this.isGrid() || !e) return;
   const tgt = e.target;
@@ -3522,6 +4381,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // onGridClick: the opt-in single-click-to-edit seam (grid pointer §4, 260708-ni6). Only active
+  // when the `singleClickEdit` prop is true (default false, negative-opt-out). Wired as ONE @click
+  // on the <table> root — @click fires on a genuine mouseup-no-drag click (NOT @mousedown), which
+  // honors the deferred §6 drag guard (a mousedown that begins a drag-select must not open an
+  // editor). A plain click on an EDITABLE body cell opens its editor via the SAME beginEdit funnel;
+  // shift+click (range extend) and non-editable cells are unaffected. Same closest/parse/header-skip
+  // /finite guards as onGridDblClick. isGrid()-gated so 'table' mode never runs it.
   onGridClick = (e: any) => {
   if (!this.isGrid() || !e) return;
   if (!this.singleClickEdit) return;
@@ -3549,6 +4415,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (colId != null && this.columnEditable(colId)) this.beginEdit(row, col, null);
 };
 
+  // WR-02: reset the interaction-mode flag when focus leaves the active cell's subtree.
+  // Without this, activeInControl could stick `true` — a mouse click OUTSIDE the cell, or
+  // the focused inner control being removed from the DOM — leaving onGridKeyDown wedged in
+  // the in-cell-trap branch so arrow nav is dead until Escape. Wired as ONE @focusout on
+  // the <table> root (focusout bubbles, unlike blur). relatedTarget is the element RECEIVING
+  // focus (null when focus leaves the document / is retargeted across a shadow boundary). If
+  // focus is NOT moving to a descendant of the active cell, drop the flag. A Tab-cycle WITHIN
+  // the cell (interaction mode) keeps relatedTarget inside cellEl → no reset.
   onGridFocusOut = (e: any) => {
   if (!this.isGrid() || !this._activeInControl.value) return;
   const next = e ? e.relatedTarget : null;
@@ -3556,6 +4430,20 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (!cellEl || !next || !cellEl.contains(next)) this._activeInControl.value = false;
 };
 
+  // B25: re-focus a resolved valid cell AFTER a programmatic shrink re-renders. The clamp
+  // runs synchronously BEFORE the framework commits the new tbody, so a deferred rAF-poll
+  // resolves the [data-row][data-col-index] cell off gridRoot once it has rendered (the fast
+  // targets land on attempt 1; React/Solid retry across the async commit). Mirrors
+  // focusCellWhenReady (B23) — DOM-only (reads gridRoot), so it is React-stale-safe.
+  // guardMoved (default false): when true, the poll does NOT stomp focus that a later nav has
+  // already moved to a DIFFERENT, STILL-VALID row — used only by the group-collapse re-seat (the
+  // target group-header row is unchanged, so a stale late rAF must not steal focus back after the
+  // user ArrowDown'd away → the non-deterministic treegrid collapsed-nav focus-theft). It is left
+  // OFF for the B25 shrink-recovery site, whose target is a CLAMPED index of a now-REMOVED cell:
+  // there focus legitimately sits on the doomed old cell (a different row) mid-async-render on
+  // React and MUST be recovered onto the clamped survivor, not preserved. Compare data-row (NOT
+  // node identity) so a stale SAME-row cell on Solid's node-replacing re-render still resolves as
+  // the target — a genuinely dropped focus is always recovered on both sites.
   recoverGridFocus = (rowKey: any, col: any, level: any, guardMoved = false) => {
   if (!this.gridRoot) return;
   let attempts = 0;
@@ -3580,6 +4468,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
 };
 
+  // D-05: clamp the active cell to bounds on every underlying-data change (re-sort, filter,
+  // pagination, page-size). KEEP the same indices; clamp ONLY when the grid shrank — NO
+  // row-id following, NO bounce-to-top on a filter keystroke. Gated by isGrid() so 'table'
+  // mode is entirely untouched. Invoked at the rowModelVer bump path (refreshRowModel).
   clampActiveCell = (rowCount: any, colCount: any) => {
   if (!this.isGrid()) return;
   // B8/B23 React-stale guard: the bounds come from the FRESH model the caller (refreshRowModel)
@@ -3675,12 +4567,50 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // B6 (phase 63 wave-11) — "the active cell is parked on the empty-grid header fallback" control
+  // flag, written + read ONLY inside clampActiveCell (never bound in the template). It MUST be a
+  // plain component-scope `let` (React hoists to useRef), NOT a $data reactive field: clampActiveCell
+  // is reached through the mount-time refreshRowModel closure, so a `$data.gridEmptyFallback` READ
+  // there binds the async-stale mount-time value on React (setState is async — the rangeActive /
+  // pendingEditFollow / B23-nextRows stale-read class). With the body re-populated after a filter
+  // CLEAR, that stale read skipped the recovery branch on React → the roving tab-stop stayed on the
+  // header fallback (columnheader) instead of re-seating a body cell (the B6 recovery gap). A
+  // synchronously-written plain `let` is read fresh on all six → the empty→non-empty recovery
+  // re-seats activeRow 0 on React too. The other 5 targets are byte-behaviorally identical (they
+  // already read reactive $data synchronously). A top-level reassigned `let` referenced from the
+  // refreshRowModel/clampActiveCell chain → React hoists to useRef → persists per-instance.
   gridEmptyFallback = false;
 
+  // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
+  // A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
+  // (rangeAnchor/rangeFocus = { rowIndex, colIndex }) — NEVER a stored DOM node, so the
+  // highlight reattaches to the correct cells across virtualization recycling (the
+  // activeRow/activeColIndex invariant). ONE-WAY (D-07): exposed via getSelectedRange +
+  // range-change, NOT a model:true slice. Coexists with — and is visually distinct from —
+  // the row-selection slice (the two never touch each other's state).
+  // inRange(rIdx, cIdx): is the cell at the visible-model index pair inside the current
+  // rectangle? Pure index math (the min/max box of anchor+focus). False when no range —
+  // the byte-identical-off guard for the range markup (no anchor/focus → no :data-in-range).
+  // rangeTransition: set true while extendRange/setRangeFocus moves DOM focus to the new
+  // range-focus corner. That focus move fires @focusin → syncActiveFromEvent with NO shiftKey
+  // (a programmatic focus carries no modifier), which would otherwise clearRange() and wipe the
+  // range we just set. The flag suppresses that collapse for the in-flight focus settle (the
+  // editTransition blur-guard precedent). A top-level let → React hoists to useRef.
   rangeTransition = false;
 
+  // rangeClickPending: set by onGridMouseDown on a Shift+Click (the range is set off the
+  // pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
+  // to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
   rangeClickPending = false;
 
+  // B19: a SYNCHRONOUS mirror of "a range currently exists" — extendRange/setRangeFocus set it
+  // true, clearRange/clampRange-to-empty set it false. clearRange is invoked TWICE in one plain-
+  // arrow keydown (the explicit collapse + the focusin that follows the programmatic focus move);
+  // on React `$data.rangeAnchor = null` is an async setState, so the SECOND clearRange's
+  // `$data.rangeAnchor == null` guard reads the STALE (pre-write) range and fires a duplicate
+  // range-change. This module-let is written synchronously (no setState async), so the second
+  // clearRange sees `rangeActive === false` and returns → exactly ONE range-change per real drop
+  // across all six targets. A top-level let → React hoists to useRef.
   rangeActive = false;
 
   inRange = (rIdx: any, cIdx: any) => {
@@ -3694,6 +4624,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return rIdx >= r0 && rIdx <= r1 && cIdx >= c0 && cIdx <= c1;
 };
 
+  // getSelectedRange(): the current range as plain integers — { anchor, focus } each a
+  // { rowIndex, colIndex } pair (or null when no range). T-49-02: positions only, no row
+  // data, no DOM node. Used by the getSelectedRange $expose verb AND every range-change emit
+  // (the single payload source) AND copyRange/fillRange (the rectangle they operate over).
   getSelectedRange = () => {
   // B8: clamp the corners to the CURRENT bounds ON READ so the verb (and the range-change emit
   // payload) never reports a corner past a shrunken model — React-stale-safe (the eager
@@ -3720,6 +4654,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   };
 };
 
+  // isFillHandleCell(rIdx, cIdx): is this cell the BOTTOM-RIGHT corner of the current range?
+  // That corner hosts the fill-handle affordance (req-8 / D-04). False without a range — the
+  // byte-identical-off guard for the handle markup (no range → no handle).
   isFillHandleCell = (rIdx: any, cIdx: any) => {
   const a = this._rangeAnchor.value;
   const f = this._rangeFocus.value;
@@ -3729,6 +4666,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return rIdx === r1 && cIdx === c1;
 };
 
+  // emitRangeChange(anchor, focus): fire range-change with the FRESH range corners passed by
+  // the caller — NOT a re-read of $data.rangeAnchor/rangeFocus. The range corners are <data>
+  // (useState on React), so re-reading right after the same-tick setState returns the STALE
+  // pre-write value (ROZ138). extendRange/setRangeFocus thread the just-computed locals through
+  // here so the emitted payload matches the write. The single call site keeps the count
+  // predictable (React multi-emit dedup, D-07). One-way notification.
   emitRangeChange = (anchor: any, focus: any) => {
   this.dispatchEvent(new CustomEvent("range-change", {
     detail: {
@@ -3740,6 +4683,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }));
 };
 
+  // extendRange(dRow, dCol): move rangeFocus by the (row,col) delta, clamped to the grid
+  // bounds, seeding rangeAnchor from the active cell when no range exists yet (Shift+Arrow
+  // from a bare active cell starts a 1×N / N×1 rectangle anchored at that cell). Body cells
+  // only (header rows are not range-selectable). Emits range-change from this single site.
   extendRange = (dRow: any, dCol: any) => {
   if (this._activeIsHeader.value) return;
   const maxRow = this.bodyRowCount() - 1;
@@ -3785,6 +4732,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // setRangeFocus(rIdx, cIdx): set the moving corner to an explicit cell (Shift+Click),
+  // seeding the anchor from the active cell when no range exists yet. Clamped to bounds.
+  // Emits range-change from this single site.
   setRangeFocus = (rIdx: any, cIdx: any) => {
   const maxRow = this.bodyRowCount() - 1;
   const maxCol = this.visibleColCount() - 1;
@@ -3806,6 +4756,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.emitRangeChange(anchor, nextFocus);
 };
 
+  // selectAllBody(): the §8 (260709-3qt) Ctrl+A whole-body select — set the range to span EVERY
+  // body cell (anchor at the first body cell (0,0), moving corner at the last (maxRow, maxCol)),
+  // driving the SAME range corners shift+arrow / setRangeFocus use. Emits range-change from a single
+  // site (the emitRangeChange contract — pass the FRESH corners, never a $data re-read). No-op on an
+  // empty grid. Body cells only — a header-active Ctrl+A is gated OUT by the caller (never builds a
+  // range from a header). rangeActive is set synchronously so a follow-up clearRange collapses it.
   selectAllBody = () => {
   const maxRow = this.bodyRowCount() - 1;
   const maxCol = this.visibleColCount() - 1;
@@ -3824,6 +4780,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.emitRangeChange(anchor, focus);
 };
 
+  // clearRange(): drop the rectangle (a non-shift navigation / edit-entry collapses any
+  // range back to a single active cell). Cheap no-op when no range is set (the guard keeps a
+  // plain navigation with no active range from emitting). B19: when a range DID exist, emit
+  // range-change with null corners so a consumer mirroring the selection through the event sees
+  // the drop — without this they hold a STALE rectangle after every non-shift navigation /
+  // edit-entry collapse (getSelectedRange already reports null, but the event never fired).
   clearRange = () => {
   // B19: gate on the SYNCHRONOUS rangeActive mirror, NOT a $data re-read. clearRange runs twice
   // in one plain-arrow keydown (explicit collapse + the focusin after the programmatic focus
@@ -3837,6 +4799,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.emitRangeChange(null, null);
 };
 
+  // B8: clamp the range corners to the current grid bounds after an underlying-data change
+  // (sort/filter/paginate/page-size all re-derive the row model). A range whose rows now exceed
+  // the shrunken model would otherwise leave STALE/phantom corners → a copy serializes empty
+  // rows past the model's end (and getSelectedRange reports out-of-bounds corners). We CLAMP each
+  // corner into [0,maxRow]×[0,maxCol] (preserving a valid rectangle — a corner that clamps onto
+  // another keeps the range non-empty); when no selectable body cell remains the rectangle is
+  // dropped. Does NOT emit range-change here — the clamp is a reconcile, not a user selection
+  // move (the emit-on-change work, B18/B19, lands in plan 63-05). Called from clampActiveCell.
   clampRange = (maxRowArg: any, maxColArg: any) => {
   const a = this._rangeAnchor.value;
   const f = this._rangeFocus.value;
@@ -3869,17 +4839,42 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // ══ Clipboard (TSV copy/paste) + drag-fill (phase 51 plan 04 / req-8 / D-03 / D-04) ══════
+  // The async Clipboard API (grantPermissions confirmed in 51-01). Copy = range→TSV; paste =
+  // TSV→cells under the D-03 skip rule (editable AND validator-passing cells only) with an
+  // N-of-M aria-live announce + one cell-edit-commit per committed cell; drag-fill = value-copy
+  // ONLY (D-04, NO series detection). T-51-01 (BLOCKING-high): pasted TSV is UNTRUSTED — every
+  // cell is written as plain string DATA through the per-column validator and rendered via the
+  // SAME {{ }}/rozieDisplay text path as #cell (never innerHTML / a template / a selector); the
+  // cell-resolution query interpolates integer indices only (resolveCellEl, T-49-01).
+  // announce(msg): write the polite aria-live PASTE-announce region (D-03 — "N of M cells
+  // pasted"). SEPARATE from the validation invalidMsg region (different semantics). '' clears it.
   announce = (msg: any) => {
   this._pasteAnnounce.value = msg != null ? msg : '';
 };
 
+  // B11: copy / paste (and the Cut verb plan 63-09 adds) are NO-OPS while a HEADER cell is
+  // active. A header has no body value to copy, and a paste anchored at a header would silently
+  // write body row 0 at the header's column (a silent body mutation, borderline P0). This is the
+  // SINGLE reusable guard every clipboard entry path checks — copyRange/pasteRange self-guard
+  // with it AND the onGridKeyDown Ctrl+C/Ctrl+V branches gate on it (so the native shortcut is
+  // left untouched on a header). Plan 63-09's Cut reuses this exact predicate.
   clipboardActiveAllowed = () => !this._activeIsHeader.value;
 
+  // fieldOfColId: the row-object key (accessorKey) to write for a column id — the same
+  // accessorKey-or-id rule the edit funnels use. Used by paste/fill to apply values by field.
   fieldOfColId = (colId: any) => {
   const d = this.defFor(colId);
   return d ? d.accessorKey != null ? d.accessorKey : colId : colId;
 };
 
+  // normalizedRange(): the current rectangle as { r0, r1, c0, c1 } (min/max of anchor+focus),
+  // or null when no range. The shared rectangle source for copy/paste/fill. B8: the corners are
+  // CLAMPED to the CURRENT grid bounds ON READ (read at call time → React-stale-safe), so a copy
+  // after a filter-to-fewer can never serialize phantom rows past the shrunken model even when
+  // the stored corners were not eagerly re-clamped (refreshRowModel's clamp is async-defeated on
+  // React; this read-time clamp is the cross-target guarantee). Returns null when no body cell
+  // remains.
   normalizedRange = () => {
   const a = this._rangeAnchor.value;
   const f = this._rangeFocus.value;
@@ -3899,6 +4894,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   };
 };
 
+  // B10: escape a TSV field per the spreadsheet convention — a field containing a tab, a CR/LF,
+  // or a double-quote is wrapped in double-quotes with internal quotes DOUBLED; an ordinary
+  // field is emitted verbatim. parseTsv() unescapes symmetrically, so a cell carrying a tab /
+  // newline / quote round-trips without smearing into adjacent cells (T-63-03-02).
   escapeTsvField = (s: any) => {
   if (s.indexOf('\t') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0 || s.indexOf('"') >= 0) {
     return '"' + s.replace(/"/g, '""') + '"';
@@ -3906,6 +4905,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return s;
 };
 
+  // rangeToTsv(): serialize the current range to TSV — rows joined by '\n', cells by '\t',
+  // reading each cell's value off the visible model by index (cellValueAt). A single active
+  // cell (no range) serializes that one cell. Each field is B10-escaped. Pure read — never writes.
   rangeToTsv = () => {
   const box = this.normalizedRange();
   const r0 = box ? box.r0 : this._activeRow.value;
@@ -3924,6 +4926,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return lines.join('\n');
 };
 
+  // parseTsv(text): a TSV string → string[][] (rows of cells). Tolerates \r\n; a trailing
+  // newline does not add a phantom empty row. Pure — produces plain string DATA only (T-51-01:
+  // the cells are NEVER eval'd / interpolated into a selector / rendered as markup).
   parseTsv = (text: any) => {
   const str = text != null ? String(text) : '';
   // CR-03: length guard BEFORE the parse — an empty string is a no-op, and a pathologically
@@ -3999,6 +5004,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return rows;
 };
 
+  // copyRange(): write the current range as TSV to the clipboard (async). No-op when the
+  // async Clipboard API is unavailable (older/insecure contexts) — a copy is best-effort.
   copyRange = () => {
   // B11: never copy from a header-active state (the reusable clipboard guard).
   if (!this.clipboardActiveAllowed()) return;
@@ -4009,6 +5016,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   } catch (err: any) {/* best-effort copy */}
 };
 
+  // applyGridToRange(grid, originRow, originCol): the SHARED write path for paste + fill. Walks
+  // the grid (string[][]) anchored at (originRow, originCol), CLAMPED to the grid bounds (no
+  // unbounded loop — T-51-02). For each target cell: count it (total); SKIP if the column is
+  // non-editable (D-03) or the per-column validator rejects the value (D-03, T-51-01 — the
+  // value passes runValidator as plain string DATA before any write); else stage it into ONE
+  // running fresh array (replaceRowValue) and record the committed cell. After the walk: ONE
+  // writeData (the single r-model:data write), ONE cell-edit-commit per COMMITTED cell, and the
+  // N-of-M aria-live announce. Returns { wrote, total }.
   applyGridToRange = (grid: any, originRow: any, originCol: any) => {
   const maxRow = this.bodyRowCount() - 1;
   const maxCol = this.visibleColCount() - 1;
@@ -4073,6 +5088,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   };
 };
 
+  // rowOriginalAt / rowIdAt: the underlying row object / id at a visible-model body index.
   rowOriginalAt = (rowIndex: any) => {
   const rowList = this._rows.value || [];
   const row = rowList[rowIndex];
@@ -4085,6 +5101,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return row ? row.id : null;
 };
 
+  // C3: tile a parsed clipboard `grid` (string[][]) to fill a destination `box` — the spreadsheet
+  // paste-into-range semantics. The target rectangle is the MAX of the box dims and the source
+  // dims per axis, so a SMALLER clipboard TILES across a LARGER selection (a single 1×1 cell fills
+  // the whole range; a 2×2 block repeats — tiled[dr][dc] = src[dr % srcRows][dc % srcCols]), while a
+  // clipboard LARGER than the selection pastes its full block from the top-left (preserving the
+  // no-range "clipboard-sized block at the active cell" behavior — a 1×1 destBox + a 1×N clipboard
+  // yields the full 1×N block, byte-for-byte the prior path). Pure — returns a fresh grid; applies
+  // nothing. A ragged/short source row defaults the missing cell to '' (coerced per column on write).
   tileGridToBox = (grid: any, box: any) => {
   const srcRows = grid.length;
   // srcCols is the MAX row width across ALL rows (not grid[0].length): a RAGGED clipboard
@@ -4114,6 +5138,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return out;
 };
 
+  // pasteRange(): read TSV from the clipboard (async), parse it, TILE it over the destination
+  // (C3), and apply it anchored at the destination top-left under the D-03 skip rule. The grid is
+  // clamped to the grid bounds (T-51-02). A failed/empty read is a silent no-op.
   pasteRange = () => {
   // B11: never paste into a header-active state (the reusable clipboard guard) — a header
   // anchor would silently write body row 0 at the header's column.
@@ -4151,6 +5178,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }).catch(() => {});
 };
 
+  // cutRange(): C3 Cut — copy the current range to the clipboard (rangeToTsv — the SAME escaped
+  // serialization copyRange uses) THEN CLEAR the source cells through the SAME write-funnel as
+  // paste/fill: applyGridToRange of an empty-string grid sized to the range → coerceCellValue('')
+  // per column (null on a numeric column, '' on text) + the D-03 editable/validator skip rule +
+  // ONE writeData + one cell-edit-commit per cleared cell + the N-of-M announce. A read-only /
+  // required cell is left intact (the funnel skips it). B11: a no-op while a header cell is active
+  // (reuses clipboardActiveAllowed — Cut can never silently clear a body cell from a header anchor).
+  // The clear is SYNCHRONOUS and runs AFTER rangeToTsv has already serialized, so the copy reads the
+  // pre-clear values; the clipboard write is best-effort/async and never blocks the clear.
   cutRange = () => {
   if (!this.clipboardActiveAllowed()) return;
   // Snapshot the source rectangle synchronously (same ROZ138 concern as pasteRange).
@@ -4176,6 +5212,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.applyGridToRange(grid, r0, c0);
 };
 
+  // clearActiveRange(): the §7 (260709-3qt) Delete/Backspace clear — cutRange() MINUS the clipboard
+  // copy. Clears the active cell / selected range through the SAME write-funnel as Cut/paste/fill:
+  // applyGridToRange of an empty-string grid sized to the range → coerceCellValue('') per column
+  // (null on a numeric column, '' on text) + the D-03 editable/validator/read-only skip rule + ONE
+  // writeData + one cell-edit-commit per cleared cell + the N-of-M announce. B11: a no-op while a
+  // header cell is active (reuses clipboardActiveAllowed — Delete can never silently clear a body
+  // cell from a header anchor). NO undo — the grid is controlled (writeData → $model.data; every
+  // clear fires cell-edit-commit), so undo is the consumer's responsibility, the SAME contract
+  // Cut/Paste/Fill already carry (design §7, approved 2026-07-09).
   clearActiveRange = () => {
   if (!this.clipboardActiveAllowed()) return;
   // Snapshot the source rectangle synchronously (the ROZ138 concern cutRange/pasteRange share).
@@ -4193,6 +5238,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.applyGridToRange(grid, r0, c0);
 };
 
+  // tileIndex(i, lo, hi): map an index into the inclusive [lo,hi] source span by TILING (repeat
+  // the source block), handling indices below lo (negative offset) correctly. A 1-wide source
+  // (lo===hi) always returns lo. Used by fillRange to resolve, per target cell, WHICH source
+  // cell it copies — so each column copies its OWN source value down its OWN column.
   tileIndex = (i: any, lo: any, hi: any) => {
   const span = hi - lo + 1;
   if (span <= 1) return lo;
@@ -4201,6 +5250,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return lo + k;
 };
 
+  // fillRange(sourceBox): drag-fill (D-04 — VALUE-COPY ONLY, no series detection). B7: the fill
+  // SOURCE is the PRE-DRAG rectangle (`sourceBox`, captured at pointerdown before the drag grew
+  // the range); each target cell copies the source cell in its OWN column (and row, when the
+  // source spans rows), TILED across the source dimensions. This fixes two data-loss bugs: (1) a
+  // single-scalar broadcast clobbered the other columns' data, and (2) reading box.r0/box.c0
+  // flipped to the WRONG corner on an up/left drag (the box top-left is a TARGET cell there, not
+  // the source). `sourceBox` falls back to the box's top-left 1×1 for a no-source fill. Honors the
+  // SAME editable + validation + type-coercion skip rule as paste (via applyGridToRange): one
+  // writeData + one cell-edit-commit per committed cell + the N-of-M announce. No-op without a range.
   fillRange = (sourceBox: any, endCell: any) => {
   // B7 (React-stale-safe): compute the EXTENDED rectangle from the gesture's FRESH endpoints —
   // the pre-drag sourceBox (∪) the drag's final end cell — NOT a $data.rangeFocus re-read. On
@@ -4247,8 +5305,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.applyGridToRange(grid, box.r0, box.c0);
 };
 
+  // onFillHandlePointerDown: begin a fill-handle drag (req-8 / D-04). The handle sits on the
+  // range's bottom-right cell; a pointer drag extends the range (reusing setRangeFocus off the
+  // cell under the pointer) and, on release, value-fills the dragged rectangle. Kept minimal:
+  // pointermove extends the range to the cell under the pointer; pointerup commits the fill.
   fillDragging = false;
 
+  // CR-04: track the live fill-drag document listeners in module-lets so $onUnmount can remove
+  // them if the component unmounts MID-DRAG (the `up` handler clears them on a normal release,
+  // but a mid-drag unmount would otherwise leak a pointermove/pointerup listener on document).
   fillDragMove: any = null;
 
   fillDragUp: any = null;
@@ -4346,6 +5411,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // §6 (260709-3qt) drag-to-select — mirror the fill-drag listener discipline. rangeDragging gates
+  // the live gesture; rangeDragMove/rangeDragUp track the document pointermove/pointerup handlers so
+  // a mid-drag unmount ($onUnmount → teardownRangeDrag) can remove them (CR-04). rangeDragMoved flips
+  // true once the drag enters a DIFFERENT cell than its mousedown anchor; onGridClick reads it to
+  // suppress a singleClickEdit editor-open after a drag (reset per-gesture in beginRangeDrag). Each
+  // top-level let → React hoists to useRef.
   rangeDragging = false;
 
   rangeDragMove: any = null;
@@ -4354,6 +5425,17 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   rangeDragMoved = false;
 
+  // ══ Mouse drag-to-select (grid cell-interaction §6, 260709-3qt) ═════════════════════════
+  // A plain (non-shift) mousedown on a body cell begins a document-level drag: the FIRST
+  // pointermove that reaches a DIFFERENT body cell paints the range moving corner via the
+  // SHARED-scope setRangeFocus (the SAME range model shift+click / shift+arrow drive), pointerup
+  // ends it. Mirrors fillDrag.rzts's listener discipline VERBATIM (document pointermove/pointerup
+  // tracked in module-lets so a mid-drag unmount can remove them — CR-04), and REUSES fillDrag's
+  // shadow-piercing cellIndexFromPoint (shared scope) so the Lit shadow target is covered uniformly.
+  // teardownRangeDrag(): remove the live drag listeners, null them, clear the dragging flag. The
+  // `up` handler calls it on a normal release; $onUnmount calls it if we unmount MID-DRAG (mirrors
+  // teardownFillDrag). rangeDragMoved is NOT reset here — it is read by onGridClick AFTER pointerup
+  // (to suppress a singleClickEdit editor-open) and reset per-gesture in beginRangeDrag.
   teardownRangeDrag = () => {
   if (typeof document !== 'undefined') {
     if (this.rangeDragMove) document.removeEventListener('pointermove', this.rangeDragMove);
@@ -4364,6 +5446,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.rangeDragging = false;
 };
 
+  // beginRangeDrag(anchorR, anchorC): start a drag-select anchored at the mousedown cell. The
+  // mousedown's native focus/focusin already committed the ACTIVE cell to (anchorR, anchorC), so
+  // setRangeFocus (which seeds the anchor from the ACTIVE cell) spans mousedown-cell→pointer-cell —
+  // we NEVER write $data.rangeAnchor directly (it is React-stale, ROZ138). rangeDragMoved starts
+  // false and flips true only once the pointer reaches a DIFFERENT cell, so a mousedown-with-no-move
+  // leaves a single active cell + no range (a normal click). lastCell dedups the many pointermove
+  // events per cell (setRangeFocus emits range-change — only extend on a NEW cell, mirroring fillDrag's
+  // B20 dedup). Captured per-gesture in the closure (no module-let needed for lastCell).
   beginRangeDrag = (anchorR: any, anchorC: any) => {
   // #leak: tear down any orphaned PRIOR range gesture BEFORE reassigning the module-let handlers.
   // A missed pointerup (off-window release, context menu, alt-tab) leaves the prior drag's document
@@ -4400,6 +5490,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // ══ Editable-cell lifecycle (phase 51 plan 02 — RESEARCH Pattern 1/3/4/5) ════════════════
+  // Single-cell, non-virtual. Index-based state (editingRow/editingCol over the visible model),
+  // the display↔editor branch in the keyed <td>, F2/Enter/printable entry off the reserved
+  // onGridKeyDown seam, commit on Enter/Tab/blur, cancel+revert on Escape, sync validation with
+  // D-01 keep-open. All gated by columnEditable() / the editing index pair so a table with no
+  // editable columns lowers byte-identical (the editor branch r-if is always false).
+  // The column id at the active cell (the active row's visible cell list @ activeColIndex).
+  // Null when out of range (no body rows, or active cell is a header / select column).
   activeCellColumnId = () => {
   if (this._activeIsHeader.value) return null;
   const rowList = this._rows.value || [];
@@ -4410,11 +5508,25 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return cell && cell.column ? cell.column.id : null;
 };
 
+  // isActiveCellEditable: the active cell sits in an editable column AND is a body cell
+  // (req-1). Gates the F2/Enter/printable edit-entry branches in onGridKeyDown; a
+  // non-editable active cell falls through to the reserved enterControl path.
   isActiveCellEditable = () => {
   const colId = this.activeCellColumnId();
   return colId != null && this.columnEditable(colId);
 };
 
+  // isEditing: is the cell at (rowIndex, colIndex) over the visible model in edit? ONE
+  // predicate covers BOTH modes (RESEARCH Pattern 6):
+  //  - row mode (req-6): editingRowIndex === rowIndex AND the column at colIndex is editable —
+  //    so EVERY editable cell in the row enters edit simultaneously (the editor template branch
+  //    re-uses this gate verbatim, no template fork);
+  //  - single-cell mode (req-1/3): the editingRow/editingCol pair matches exactly.
+  // Pure index compare (editingRowIndex null + editingRow -1 = none) → the byte-identical-off
+  // guard for the editor template branch. $data.editVer is read first so the per-cell branch
+  // re-derives on Svelte/Solid when editing state mutates from a foreign slot-callback scope.
+  // Called per-cell in both <td> bodies with the body-specific row index (rowIndexOf(row)
+  // non-virtual, wr.vi.index virtual).
   isEditing = (rowIndex: any, colIndex: any) => {
   if (this._editVer.value < 0) return false;
   if (this._editingRowIndex.value != null && this._editingRowIndex.value === rowIndex) {
@@ -4424,8 +5536,17 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return this._editingRow.value === rowIndex && this._editingCol.value === colIndex;
 };
 
+  // cellAriaInvalid (req-5/D-01): the STRING 'true' ONLY for the editing cell while it holds
+  // an invalid value — drives :aria-invalid on the <td>. Returns null otherwise so the bound
+  // attribute DROPS (the rozieAttr nullish-attr path), keeping non-editing cells byte-clean.
+  // Returns the literal 'true' (NOT boolean true) so rozieAttr's string-literal-union preserve
+  // keeps React's aria-invalid (Booleanish incl. 'true') happy instead of widening to string.
   cellAriaInvalid = (rowIndex: any, colIndex: any): 'true' | null => this.isEditing(rowIndex, colIndex) && !!this._invalidMsg.value ? 'true' : null;
 
+  // runValidator: the sync per-column validator (req-5). Reads col.meta.validate; not a
+  // function → valid (true). Calls it (defensively wrapped — a thrown/non-true/non-string
+  // return coerces to a generic message so a misbehaving validator can never wedge the
+  // keymap, Security V5 DoS). A string return is the error message (commit rejected, D-01).
   runValidator = (colId: any, value: any, row: any) => {
   const m = this.editMetaOf(colId);
   const v = m ? m.validate : null;
@@ -4441,10 +5562,17 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return 'Invalid value';
 };
 
+  // setInvalid: record the current validation error (drives the aria-live region +
+  // :aria-invalid wired in Task 3). Empty string clears it.
   setInvalid = (msg: any) => {
   this._invalidMsg.value = msg != null ? msg : '';
 };
 
+  // replaceRowValue: build a FRESH array with ONE row object replaced (the column's field
+  // set to the new value); the rest share by reference (the family immutable whole-array
+  // replace — in-place mutation is silently dropped on React/Solid/Angular/Lit). rowIndex
+  // is over currentData() (== the visible model order for the non-virtual, unsorted/
+  // unfiltered single-cell case; the row id is carried for the commit payload).
   replaceRowValue = (rows: any, rowIndex: any, field: any, value: any) => {
   const src = rows || [];
   const out = [];
@@ -4463,6 +5591,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return out;
 };
 
+  // Map a visible-model body-row index ($data.rows index) to its underlying currentData()
+  // index via the row's original object identity (sorting/filtering/pagination may reorder
+  // the visible model away from the source array order). Falls back to the same index.
   sourceIndexOfRow = (visibleRowIndex: any) => {
   const rowList = this._rows.value || [];
   const row = rowList[visibleRowIndex];
@@ -4473,6 +5604,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return idx >= 0 ? idx : visibleRowIndex;
 };
 
+  // The column id / field (accessorKey) / current value / row object / row id for the cell
+  // in EDIT — keyed off the authoritative editing pair ($data.editingRow/editingCol), NOT
+  // the active-cell indices (which can drift from the editing cell on a Tab-advance, and are
+  // async-stale right after a setState on React — ROZ138). Called only from commitEdit.
   editingColumnId = () => {
   const rowList = this._rows.value || [];
   const row = rowList[this._editingRow.value];
@@ -4510,6 +5645,24 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return row ? row.id : null;
 };
 
+  // Focus the freshly-mounted editor (Pitfall 1, ROZ123): after beginEdit flips the editing
+  // state, the editor <input> does not exist until the framework commits the r-if branch
+  // (React setState async; Solid/Lit/Svelte next reactive tick). Poll for the
+  // [data-editing-cell] element off gridRoot for ~30 frames — the five fast targets resolve
+  // on attempt 1, React retries across its async commit. NEVER read $refs eagerly.
+  // B2: selectAll gates the post-focus el.select(). Select-all is right when entering
+  // edit IN PLACE (F2/Enter/click/row-edit/validation-reject — no seeded char, the user
+  // retypes), but WRONG on a type-to-edit entry where a printable key already seeded the
+  // draft (selecting the seeded char makes the next keystroke replace it: Zeta → eta).
+  // beginEdit threads `seed == null` so a seeded entry skips the select and the caret sits
+  // AFTER the seeded char; every other caller keeps the default select-all.
+  // Editor-owns-focus contract (quick 260711-i5m): REVERTS the g52 shadow-piercing helper
+  // (commit 5fa30045) that recursed into descendant shadow roots. Built-in editors are
+  // host-DOM — the plain direct query resolves them on all 6 targets (no shadow to cross). A
+  // #editor DROP-IN now owns its OWN focus via the reactive `autofocus` prop (EditorText's
+  // $onMount + lazy $watch), so the host never needs to reach across a Lit drop-in's nested
+  // shadow root at all — see the !hasEditorSlot gate below, which skips the host focus call
+  // entirely for a drop-in target.
   focusEditorWhenReady = (selectAll = true) => {
   if (!this.gridRoot) return;
   // Editor-owns-focus contract: when the CURRENT focus target is a #editor drop-in, the host
@@ -4549,6 +5702,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
 };
 
+  // Column id + current value at an EXPLICIT (rowIndex, colIndex) over the visible model —
+  // used by beginEdit so it never re-reads $data.activeRow/activeColIndex (which are async-
+  // stale right after a Tab-advance sets them on React — ROZ138).
   columnIdAt = (rowIndex: any, colIndex: any) => {
   const rowList = this._rows.value || [];
   const row = rowList[rowIndex];
@@ -4567,6 +5723,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return cell ? cell.getValue() : null;
 };
 
+  // beginEdit: open the editor on the (rowIndex, colIndex) cell (req-1/3, D-05). seed===null
+  // → seed the EXISTING value (F2/Enter in-place edit); a printable char → REPLACE (the
+  // editor opens holding just that char). Resolves the column from the PASSED indices (not
+  // $data) so a Tab-advance that just setState'd activeRow/Col works on React. Clears any
+  // prior invalid state. Focus moves into the editor.
   beginEdit = (rowIndex: any, colIndex: any, seed: any) => {
   const colId = this.columnIdAt(rowIndex, colIndex);
   if (colId == null || !this.columnEditable(colId)) return;
@@ -4592,6 +5753,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.focusEditorWhenReady(seed == null);
 };
 
+  // Return focus to a body cell AFTER the editor unmounts (commit/cancel). The display↔
+  // editor re-render must commit before the <td> is focusable with its roving tabindex —
+  // on React/Solid/Lit that commit is async, so a synchronous focusActiveCell can run while
+  // the cell is still the editor (or mid-swap) and focus is lost. Bounded rAF-poll resolves
+  // the [data-row][data-col-index] cell off gridRoot for ~30 frames (the fast targets land
+  // on attempt 1; React/Solid retry across the async commit). Mirrors focusEditorWhenReady.
   focusCellWhenReady = (row: any, col: any) => {
   if (!this.gridRoot) return;
   let attempts = 0;
@@ -4608,6 +5775,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
 };
 
+  // B23: the index of a committed row WITHIN a given (fresh) visible-model array, resolved by
+  // row IDENTITY. table-core's default getRowId is source-index-based, so a row's id is stable
+  // across a re-sort (only its VISIBLE position moves); a committed edit replaces the row object
+  // via a fresh spread (the `original` reference changes), so match by `id` FIRST, `original`
+  // only as a fallback. Returns -1 when the row filtered out of the view. PURE (the caller passes
+  // the FRESH row list — refreshRowModel's just-pulled `nextRows`, never the React-stale state).
   indexOfRowIn = (rows: any, rowOriginal: any, rowId: any) => {
   const list = rows || [];
   for (let i = 0; i < list.length; i++) {
@@ -4619,6 +5792,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return -1;
 };
 
+  // endEdit: tear down the editor (shared by commit/cancel). Clears the editing pair +
+  // draft + invalid state and returns to navigation mode. Does NOT move focus (callers
+  // decide where focus lands — commit/cancel return it to the owning cell).
   endEdit = () => {
   this._editingRow.value = -1;
   this._editingCol.value = -1;
@@ -4629,6 +5805,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._editFocusColId.value = null;
 };
 
+  // endRowEdit: tear down full-row edit (shared by commitRow/cancelRow). Clears the row
+  // index + the per-cell drafts + invalid state and returns to navigation mode. Does NOT
+  // move focus (callers return it to the active cell). Mirrors endEdit for the row mode.
   endRowEdit = () => {
   this._editingRowIndex.value = null;
   this._rowDraft.value = {};
@@ -4638,6 +5817,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._editFocusColId.value = null;
 };
 
+  // editorAutofocusFor (quick 260711-i5m, editor-owns-focus contract): the reactive `autofocus`
+  // #editor scope prop for a given (colId, rowIndex) — true for EXACTLY the current focus-
+  // target cell, re-deriving on every editVer bump (mirrors isEditing's reactive gate so
+  // Svelte/Solid re-run this per-cell on a foreign-slot-callback state mutation). Works for
+  // BOTH single-cell ($data.editingRow) and row mode ($data.editingRowIndex) since
+  // $data.editFocusColId is set by both beginEdit and beginRowEdit/commitRow/rowEditTab.
   editorAutofocusFor = (colId: any, rowIndex: any) => {
   if (this._editVer.value < 0) return false;
   if (this._editingRowIndex.value != null) {
@@ -4648,6 +5833,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return this._editFocusColId.value != null && this._editFocusColId.value === colId;
 };
 
+  // B3: coerce the committed value by the column's built-in editor type at the single
+  // commit funnel. A 'number' editor commits a real Number; an empty/whitespace/non-numeric
+  // draft commits null (never '' / never NaN — Number('') === 0 is a silent footgun). Every
+  // other editor type commits the value verbatim. Idempotent for the #editor drop-in path
+  // (an already-numeric override passes through; an explicit null stays null).
   coerceCellValue = (colId: any, raw: any) => {
   if (this.editorTypeOf(colId) !== 'number') return raw;
   if (raw == null) return null;
@@ -4658,6 +5848,16 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return Number.isNaN(n) ? null : n;
 };
 
+  // commitEdit: validate the draft (req-5); on success replace one row in a fresh array,
+  // funnel it through writeData (the controlled r-model:data write, req-4), emit EXACTLY
+  // ONE cell-edit-commit from THIS single call site (React multi-emit dedup, D-07), then
+  // return focus to the cell. On a validation FAILURE keep the editor OPEN (D-01) — set
+  // invalid, re-trap focus, never write the model. Captures the optional override value
+  // (the #editor slot's commit(v) call) else the live draft.
+  // Returns true when the commit succeeded (model written, editor closed); false when a
+  // validation failure kept the editor OPEN (D-01). Callers MUST use this return value, not
+  // a synchronous re-read of $data.editingRow — React's endEdit setState is async, so an
+  // immediate re-read of editingRow still shows the OLD value (the ROZ138 stale-read class).
   commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
   if (this._editingRow.value < 0) return false;
   // Sync idempotency latch (drop-in double cell-edit-commit fix): a second commitEdit call
@@ -4748,6 +5948,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return true;
 };
 
+  // toggleActiveBooleanCell (design doc 2026-07-05, Change 1): the spreadsheet-standard
+  // single-keystroke boolean toggle. Flips the ACTIVE cell's value and commits it through the
+  // EXACT SAME write funnel commitEdit uses (replaceRowValue → writeData → single $emit) but
+  // WITHOUT opening an editor — there is no editingRow/editingCol involvement at all, so this
+  // operates entirely off $data.activeRow/activeColIndex. Gated in onGridKeyDown to
+  // editor:'checkbox' columns only (Space/Enter/F2), full-row edit mode is unaffected (the
+  // editingRowIndex early return in onGridKeyDown already excludes it).
   toggleActiveBooleanCell = () => {
   const colId = this.columnIdAt(this._activeRow.value, this._activeColIndex.value);
   if (colId == null || !this.columnEditable(colId)) return;
@@ -4795,6 +6002,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   };
 };
 
+  // cancelEdit: discard the draft (D-05 — revert to the pre-edit value, no model write) and
+  // return focus to the owning cell.
   cancelEdit = () => {
   if (this._editingRow.value < 0) return;
   // CR-01: capture from the EDITING pair (authoritative), NOT the active-cell indices — a
@@ -4809,6 +6018,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.focusCellWhenReady(focusRow, focusCol);
 };
 
+  // ══ Full-row edit lifecycle (phase 51 plan 03 / req-6 / D-06, RESEARCH Pattern 6) ════════
+  // Shift+F2 (and the editRow $expose verb) put EVERY editable cell in the active row into
+  // edit at once; one save commits the whole row in ONE writeData (a single fresh-array row
+  // replace) + ONE row-edit-commit event; Escape reverts the whole row as a unit. Per-column
+  // validation still runs on each edited cell at commit (D-01 keep-open if ANY fails). The
+  // editor template branch (isEditing's row arm) is re-used verbatim — no per-mode fork.
+  // The editable [columnId, field] pairs for a body row at the given visible-model index,
+  // in visible-cell order. field is the column's accessorKey (the row-object key to write).
   editableColumnsForRow = (rowIndex: any) => {
   const rowList = this._rows.value || [];
   const row = rowList[rowIndex];
@@ -4833,6 +6050,16 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return out;
 };
 
+  // B21/B22: focus the row-mode editor at a given VISIBLE col index. In full-row edit every
+  // editable cell is already mounted as an editor, so this resolves the cell off gridRoot and
+  // focuses its [data-editing-cell] control. Bounded rAF-poll (mirrors focusEditorWhenReady)
+  // so a React re-render that recreates the input across the focus call still lands it. select-
+  // all on text/number editors (a no-op try/catch on select/checkbox).
+  // Editor-owns-focus contract (quick 260711-i5m): when the TARGET column is a #editor
+  // drop-in, the host does NOT reach into its DOM (early return, before starting the rAF poll
+  // at all) — the drop-in self-focuses via its own reactive `autofocus` prop, which the caller
+  // (commitRow's B22 reject path / rowEditTab) already flips via $data.editFocusColId. Built-in
+  // columns are unaffected (hasEditorSlot is false for them) — unchanged host direct-focus.
   focusRowEditorAt = (rowIndex: any, colIndex: any) => {
   if (!this.gridRoot) return;
   const colId = this.columnIdAt(rowIndex, colIndex);
@@ -4857,6 +6084,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
 };
 
+  // beginRowEdit(row): enter full-row edit on a body row (req-6). Seeds rowDraft from each
+  // editable column's CURRENT value (so an immediate save is a no-op), clears any single-cell
+  // edit (mutual exclusivity), and focuses the first editable cell's editor (the bounded
+  // rAF-poll resolves the first [data-editing-cell] off gridRoot — same mechanism as
+  // focusEditorWhenReady). Accepts the row OBJECT (the template/Shift+F2 path) — index-resolved
+  // internally via rowIndexOf so it stays in the editingRow/activeRow index space.
   beginRowEdit = (row: any) => {
   const rowIndex = this.rowIndexOf(row);
   if (rowIndex < 0) return;
@@ -4890,6 +6123,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.focusEditorWhenReady();
 };
 
+  // commitRow(): validate EVERY edited column (D-01 — keep the row open if ANY fails: set
+  // invalid + announce, NEVER write the model); on all-valid build ONE fresh array replacing
+  // the single row object with all rowDraft values applied at once, call writeData ONCE, then
+  // emit ONE row-edit-commit from THIS single call site, clear the row state, return focus.
+  // Returns true on a written commit, false when a validation failure kept the row open.
   commitRow = () => {
   if (this._editingRowIndex.value == null) return false;
   const rowIndex = this._editingRowIndex.value;
@@ -5000,6 +6238,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return true;
 };
 
+  // cancelRow(): revert the whole row as a unit (D-06 — drop every draft, NO model write) and
+  // return focus to the active cell.
   cancelRow = () => {
   if (this._editingRowIndex.value == null) return;
   const focusRow = this._activeRow.value;
@@ -5010,6 +6250,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.focusCellWhenReady(focusRow, focusCol);
 };
 
+  // replaceRowValues: like replaceRowValue but applies a MAP of field→value to ONE row object
+  // in a single fresh-array replace (req-6 — the whole-row commit is ONE write, not per cell).
   replaceRowValues = (rows: any, rowIndex: any, fieldValues: any) => {
   const src = rows || [];
   const fv = fieldValues || {};
@@ -5029,6 +6271,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return out;
 };
 
+  // Compute the next editable cell for Tab-advance (req-3, RESEARCH Open-Q3 deterministic
+  // rule): skip non-editable columns within the row; wrap to the NEXT row's first editable
+  // cell at the row's end; stop (return null) at grid end. Pure index math over the visible
+  // model. Returns { row, col } or null.
   nextEditableCell = (fromRow: any, fromCol: any) => {
   const rowList = this._rows.value || [];
   const rowCount = rowList.length;
@@ -5053,6 +6299,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return null;
 };
 
+  // B4: the mirror of nextEditableCell — the PREVIOUS editable cell for a Shift+Tab
+  // backward move. Skips non-editable columns leftward within the row; wraps to the END
+  // of the prior row; stops (returns null) at grid start. Pure index math over the visible
+  // model. Returns { row, col } or null.
   prevEditableCell = (fromRow: any, fromCol: any) => {
   const rowList = this._rows.value || [];
   const rowCount = rowList.length;
@@ -5081,18 +6331,50 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return null;
 };
 
+  // Transient guard: true while an editor commit/cancel/Tab-advance is tearing the current
+  // editor down. The unmounting editor fires a `blur` as it leaves the DOM — without this
+  // guard onEditorBlur would re-enter commitEdit on the (already-resolved or newly-opened)
+  // cell, double-counting cell-edit-commit. A top-level `let` (React hoists to useRef).
   editTransition = false;
 
+  // B23: a pending "follow the committed row's focus" request, set by commitEdit (a single-cell
+  // commit that may relocate the row under an active sort/filter) and consumed ONCE by the next
+  // refreshRowModel pass — which runs with the FRESH re-derived row model, so it can resolve the
+  // committed row's NEW display index (React-stale-safe) and re-seat focus there. Shape:
+  // { rowOriginal, rowId, col } or null. A top-level `let` (React hoists to useRef → persists).
   pendingEditFollow: any = null;
 
+  // Sync idempotency latch for a cell commit (drop-in double cell-edit-commit fix, 260705):
+  // commitEdit's `$data.editingRow < 0` re-entry guard is ASYNC-STALE on React — a deferred
+  // drop-in editor's unmount-blur (onBlur → $props.commit → commitEdit) fires AFTER commitEdit
+  // has already returned (editTransition is a SYNC latch, cleared before the async blur), while
+  // `$data.editingRow` in that stale closure still reads the OLD (pre-endEdit) value, so the
+  // second commit slips through and re-emits `cell-edit-commit`. A top-level `let` is written/read
+  // synchronously by plain assignment (unaffected by React's setState batching — that's the point)
+  // so it stays correct across the async window editTransition/editingRow cannot cover. Set true on
+  // a SUCCESSFUL commitEdit/toggleActiveBooleanCell; reset to false wherever a NEW edit session
+  // begins (beginEdit/beginRowEdit/editCell) so the next legitimate commit fires exactly once.
+  // A top-level `let` (React hoists to useRef → persists).
   committedThisSession = false;
 
+  // ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
+  // In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
+  // (editingRowIndex != null) each editable cell owns its OWN draft keyed by columnId in
+  // rowDraft — so the four editors open simultaneously never clobber one shared value. These
+  // helpers let the ONE editor template branch serve BOTH modes (no per-mode template fork):
+  // the template binds editorValueFor(colId)/editorCheckedFor(colId) and writes via
+  // onCellEditorInput(colId, evt)/onCellEditorCheckbox(colId, evt).
   inRowEdit = () => this._editingRowIndex.value != null;
 
   editorValueFor = (colId: any) => this.inRowEdit() ? this._rowDraft.value ? this._rowDraft.value[colId] : null : this._draftValue.value;
 
   editorCheckedFor = (colId: any) => !!(this.inRowEdit() ? this._rowDraft.value ? this._rowDraft.value[colId] : null : this._draftValue.value);
 
+  // #editor custom-slot callbacks (req-2/6): the consumer's slot calls commit(value)/cancel().
+  // In SINGLE-CELL mode commit(v) commits that cell (commitEdit override); in ROW mode commit(v)
+  // only WRITES this column's draft (the row commits as a unit later — never per cell). cancel()
+  // reverts the cell (single) or the whole row (row mode). Factory-bound per columnId so the
+  // row-mode commit targets the right draft key.
   editorCommitFor = (colId: any) => (value: any) => {
   if (this.inRowEdit()) {
     this.setRowDraft(colId, value);
@@ -5109,6 +6391,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.cancelEdit();
 };
 
+  // Editor input handlers (the global-filter `evt.target.value` idiom — an untyped param
+  // neutralizes to `any`, so reading .value/.checked typechecks ×6; an inline
+  // `$data.x = $event.target.value` binding does NOT neutralize and breaks Lit/React JSX).
+  // Column-aware: in row mode they write rowDraft[colId] (a FRESH object so Solid/Svelte/React
+  // re-derive); single-cell they write the shared draftValue.
   onCellEditorInput = (colId: any, evt: any) => {
   const v = evt && evt.target ? evt.target.value : '';
   if (this.inRowEdit()) {
@@ -5127,6 +6414,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._draftValue.value = v;
 };
 
+  // setRowDraft: write ONE key into a FRESH rowDraft object (whole-object replace — an
+  // in-place mutation is silently dropped on React/Solid; the family immutable rule).
   setRowDraft = (colId: any, value: any) => {
   const src = this._rowDraft.value || {};
   const next = {};
@@ -5135,6 +6424,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._rowDraft.value = next;
 };
 
+  // B21: contain a Tab WITHIN the editing row (editMode='row'). Resolve the editable cells'
+  // visible col indices for the editing row, find the current editor's col (off the blurring
+  // editor's owning [data-grid-cell]), then move to the next/prev editable col WITH WRAP so
+  // focus never leaves the row. A no-op when no row is editing / the row has no editable cells.
   rowEditTab = (target: any, backward: any) => {
   const rowIndex = this._editingRowIndex.value;
   if (rowIndex == null) return;
@@ -5156,6 +6449,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.focusRowEditorAt(rowIndex, cols[nextPos]);
 };
 
+  // onEditorKeyDown: the editor-LOCAL keymap (req-3). Enter → commit + stay (focus returns
+  // to the cell); Tab → commit + advance to the next editable cell; Escape → cancel +
+  // revert. preventDefault on handled keys so the grid keymap / native Tab don't double-act.
   onEditorKeyDown = (e: any) => {
   if (!e) return;
   const key = e.key;
@@ -5214,6 +6510,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // onEditorBlur: commit on a genuine click/focus-away (D-01 — an invalid value keeps the
+  // editor open via commitEdit's reject path). SKIP when:
+  //  - editTransition is set (a synchronous commit/cancel teardown is unmounting the editor), or
+  //  - the blur is part of a controlled keyboard transition: focus is moving to a grid cell
+  //    or another editor inside our gridRoot (Tab-advance, Enter/Escape focus-return). On the
+  //    async-render targets the unmount-blur can fire AFTER the synchronous flag cleared, so
+  //    the relatedTarget/containment check is the load-bearing guard, not the flag alone.
   onEditorBlur = (e: any) => {
   // Full-row mode (req-6): a blur that stays WITHIN the row editor — Tab/click between the
   // row's OWN fields — is a normal focus move and must NOT commit (a per-cell blur-commit
@@ -5292,6 +6595,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(reseatDestFocus);else setTimeout(reseatDestFocus, 0);
 };
 
+  // editCell(rowIndex, colIndex) — programmatic edit-entry ($expose, req-3). Coerces +
+  // clamps indices, moves the active cell, and opens the editor (no-op on a non-editable
+  // cell). Collision-clean (RESEARCH name-check): not a verb/event/prop/ROZ137 member.
   editCell = (rowIndex: any, colIndex: any) => {
   const lastRow = this.bodyRowCount() - 1;
   const maxRow = lastRow < 0 ? 0 : lastRow;
@@ -5306,6 +6612,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.beginEdit(r, c, null);
 };
 
+  // commitEditing() — programmatic commit of the open editor ($expose, req-3). No-op when
+  // nothing is editing. Collision-clean (not `commit`). Handles BOTH edit modes: a full-row
+  // edit (editRow()/Shift+F2) drives editingRowIndex and leaves editingRow at -1, so the
+  // single-cell commitEdit guard (editingRow >= 0) is false during a row edit — route to
+  // commitRow() first so a programmatic commit of a row editor is not a silent no-op.
   commitEditing = () => {
   if (this.inRowEdit()) {
     this.commitRow();
@@ -5314,6 +6625,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (this._editingRow.value >= 0) this.commitEdit(undefined);
 };
 
+  // editRow(rowIndex) — programmatically enter full-row edit on a body row ($expose, req-6 /
+  // D-06), the API twin of the Shift+F2 shortcut. Addressed BY INDEX over the visible model
+  // (coerced + clamped); no-op on a row with no editable columns. Collision-clean (RESEARCH
+  // name-check): `editRow` is not in the 15 existing verbs, not a prop, not a *-change/commit
+  // event, not a Lit ROZ137-reserved host member. Moves the active cell to the row first so the
+  // commit/cancel focus-return lands in the right row.
   editRow = (rowIndex: any) => {
   const lastRow = this.bodyRowCount() - 1;
   const maxRow = lastRow < 0 ? 0 : lastRow;
@@ -5326,6 +6643,23 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.beginRowEdit(row);
 };
 
+  // ── Grid active-cell $expose verbs (phase 49 plan 03, D-01) — exactly THREE, joining the
+  // existing 12 (→ 15). Collision-safe names (Pitfall 1): focusCell NOT `focus` (would shadow
+  // HTMLElement.focus on Lit — ROZ137); clearActiveCell NOT `clear` (listbox already exposes
+  // `clear`); getActiveCell is a read-style getter. None collide with the 9 *-change events,
+  // any prop, or a React auto-setter (ROZ121/137/524 clear). ──────────────────────────────────
+  // focusAbsCellWhenReady — paginated page-switch focus poll (C1). After a programmatic page
+  // switch the in-page (localRow, col) cell is ambiguous: EVERY page renders a row at the same
+  // page-relative index, so a plain resolveCellEl(localRow, col) poll would grab the OLD page's
+  // cell on frame 1 (before the switch commits) and focus it — only for the page switch to then
+  // REMOVE it, dropping focus to <body>. Disambiguate by the ABSOLUTE aria-rowindex: poll until
+  // the cell at (localRow, col) carries the TARGET page's body aria-rowindex (i.e. the TARGET
+  // page has actually rendered), THEN focus. DOM-only (reads gridRoot), so React-stale-safe; works
+  // for both controlled (round-trips through page-change) and uncontrolled pagination. ~60 frames
+  // (~1s) to cover the controlled-state parent round-trip on React/Solid/Lit.
+  //   #13: the body aria-rowindex is now header-offset (bodyAriaRowIndex = headerRowCount + absRow
+  //   + 1) so header rows + body rows form one consistent aria-rowindex/aria-rowcount space — so
+  //   the poll target must add headerRowCount() too, else it never matches and focus drops.
   focusAbsCellWhenReady = (absRow: any, localRow: any, col: any) => {
   if (!this.gridRoot) return;
   let attempts = 0;
@@ -5353,6 +6687,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
 };
 
+  // focusCell(rowIndex, colIndex) — move + focus the active cell. C1 (phase 63 wave-6): rowIndex
+  // is the ABSOLUTE display-order position in getPrePaginationRowModel().rows (filter+sort+expand
+  // applied, BEFORE pagination/windowing), in BOTH paginated and virtual modes — REVERSING the old
+  // page-relative-when-paginated meaning. Args are COERCED to integers and CLAMPED before the
+  // data-* selector is built (T-49-01/T-63-06-01: never interpolate a raw consumer string; clamp
+  // the abs index into getPrePaginationRowModel bounds). The activecell-change payload + getActiveCell
+  // speak the SAME absolute language (toAbsRow).
   focusCell = (rowIndex: any, colIndex: any) => {
   // B16: isGrid()-gate the verb. In 'table' mode there is no roving active cell, so focusCell
   // is a NO-OP (never an activecell-change emit) — the keyboard path (onGridKeyDown) is already
@@ -5420,6 +6761,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // getActiveCell() — return the current active-cell position. Integers only — no row data,
+  // no DOM node (T-49-02 Information-Disclosure: return the screen position, nothing else).
+  // B15: reflect the HEADER-active state. When a header cell is active the roving position is
+  // NOT a body row — return the header sentinel (rowIndex null + isHeader true, colIndex the
+  // header column) so a consumer never mistakes a header focus for body 'row 0'. A body cell
+  // returns the integer rowIndex + isHeader false (back-compatible: the rowIndex/colIndex pair
+  // is unchanged for the body case).
+  // C1: a body cell returns the ABSOLUTE display-order rowIndex (toAbsRow) — matching focusCell's
+  // addressing + the activecell-change payload — in BOTH paginated and virtual modes.
   getActiveCell = () => this._activeIsHeader.value ? {
   rowIndex: null,
   colIndex: this._activeColIndex.value,
@@ -5430,6 +6780,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   isHeader: false
 };
 
+  // clearActiveCell() — reset the roving position to the D-04 entry cell (row 0, col 0) and
+  // exit interaction mode; the next Tab-in re-enters at the entry cell (D-01). Does NOT emit
+  // (no move to a new addressable cell — a reset, not a navigation). B16: isGrid()-gated — a
+  // table-mode instance has no roving active cell, so the verb is a no-op there.
   clearActiveCell = () => {
   if (!this.isGrid()) return;
   this._activeIsHeader.value = false;
@@ -5438,6 +6792,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._activeColIndex.value = 0;
 };
 
+  // ── Expand $expose verbs (phase 50 req-3, D-06) — joining the existing 19 (→ 23).
+  // Collision-safe names (ROZ121/137/524): toggleRowExpanded / expandAll / collapseAll are
+  // not inherited HTMLElement members, Lit lifecycle names, React auto-setters, prop names,
+  // or *-change events; getExpandedRows is a read-style getter (twin of getSelectedRows).
+  // Each drives @tanstack/table-core so the onExpandedChange → writeExpanded funnel fires
+  // one expanded-change. ──────────────────────────────────────────────────────────────────
+  // toggleRowExpanded(rowId) — toggle ONE row's expanded state, addressed by the consumer's
+  // row id (the data `id` field) OR the table-core row id. Scans the core flat-row set (all
+  // rows regardless of current expansion) so a collapsed parent is still resolvable.
   toggleRowExpanded = (rowId: any) => {
   if (!this.table) return;
   const target = String(rowId);
@@ -5450,16 +6813,23 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
+  // expandAll() — open every expandable row (table-core sets ExpandedState to the `true`
+  // literal under the hood → Pitfall 2: writeExpanded passes it through verbatim).
   expandAll = () => {
   if (!this.table) return;
   this.table.toggleAllRowsExpanded(true);
 };
 
+  // collapseAll() — reset to a blank expanded state ({}). resetExpanded(true) forces the
+  // blank reset (NOT the initialState) and fires onExpandedChange → one expanded-change.
   collapseAll = () => {
   if (!this.table) return;
   this.table.resetExpanded(true);
 };
 
+  // getExpandedRows() — return the original row data for every currently-expanded row
+  // (read-verb twin of expanded-change). Integers/data only — scans the core flat rows and
+  // filters by getIsExpanded(). Empty when nothing is expanded.
   getExpandedRows = () => {
   if (!this.table) return [];
   const out = [];
@@ -5468,6 +6838,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return out;
 };
 
+  // ── Grouping $expose verbs (phase 50 reqs 4-7, D-06 name-check) ────────────────────────────
+  // applyGrouping (RENAMED from setGrouping — ROZ524: a bare `set<ModelProp>` verb shadows
+  // React's auto-generated `setGrouping` useState setter for the `grouping` model slice, and an
+  // $expose verb is PUBLIC-CONTRACT-PROTECTED from the deconfliction rename; same precedent as
+  // setColumnOrder→applyColumnOrder) + clearGrouping. Both drive @tanstack/table-core's
+  // table.setGrouping so the onGroupingChange → writeGrouping funnel fires one group-change with
+  // the fresh ordered key list. Also handed to the headless #groupBar slot as apply/clear helpers.
   applyGrouping = (cols: any) => {
   if (this.table) this.table.setGrouping(cols);
 };
@@ -5476,6 +6853,20 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (this.table) this.table.setGrouping([]);
 };
 
+  // ── Faceted filtering read helpers (phase 50 reqs 8-9, D-03) ────────────────────────────────
+  // Shared by BOTH the getFaceted* $expose verbs AND the #filter slot props. They resolve a
+  // column via table.getColumn(colId) (a table-core lookup — NEVER a string-built querySelector,
+  // T-50-06 / the T-49-01 index-only discipline) and read table-core's CROSS-FILTERED faceted
+  // values (default impl — reflects rows passing all OTHER active column filters, D-03). They
+  // touch the reactive tick (`tick() < 0` guard) so the #filter slot props re-derive when an
+  // upstream filter changes on the fine-grained targets (Solid/Lit) — the visibleCellsFor idiom.
+  //
+  // getFacetedUniqueValues: the column's distinct values, KEYS ONLY — occurrence counts are
+  // deliberately NOT exposed (D-03; the column's getFacetedUniqueValues() returns Map<any,number>,
+  // we return Array.from(map.keys()) — no .entries()/count surface). Empty array on missing
+  // column/table. NAMED to match the $expose verb exactly (the ExposedMethod.name shorthand
+  // contract: an exposed verb lowers to `{ getFacetedUniqueValues }`, which must resolve to THIS
+  // helper — the table-core factory was aliased to makeFacetedUniqueValues to free this name).
   getFacetedUniqueValues = (colId: any) => {
   if (this.tick() < 0 || !this.table) return [];
   const col = this.table.getColumn(colId);
@@ -5484,6 +6875,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return map ? Array.from(map.keys()) : []; // KEYS only — counts deferred (D-03)
 };
 
+  // getFacetedMinMaxValues: the column's [min, max] numeric range, or null when unavailable.
+  // Named to match the $expose verb (same shorthand contract as getFacetedUniqueValues above).
   getFacetedMinMaxValues = (colId: any) => {
   if (this.tick() < 0 || !this.table) return null;
   const col = this.table.getColumn(colId);

@@ -153,6 +153,8 @@ private __rozieWatchInitial_0 = true;
 `;
   }
 
+  // ---- native reconcile ---------------------------------------------------
+  // Lock/unlock <html> scroll (no-op when disabled or pre-DOM).
   applyScrollLock = (lock: any) => {
   if (this.disableScrollLock) return;
   if (typeof document === 'undefined') return;
@@ -160,6 +162,16 @@ private __rozieWatchInitial_0 = true;
   if (root) root.style.overflow = lock ? 'hidden' : '';
 };
 
+  // Reconcile the native <dialog> to the desired open state. Guarded on the
+  // native `el.open` flag (showModal throws if already open; close is a no-op when
+  // closed). Reads $refs in a post-mount callback (ROZ123-safe).
+  //
+  // The ref lives on the inner panel <div> (which the emitter types as
+  // HTMLDivElement), and we reach the <dialog> via `panel.parentElement` cast to
+  // HTMLDialogElement. This sidesteps an emitter gap: the per-target ref-type map
+  // has no `dialog` case, so a ref placed directly on <dialog> would be typed the
+  // generic HTMLElement (no `.open`/`.showModal()`/`.close()`), failing strict
+  // leaf typecheck. Fixing it here keeps the change source-only (no emitter edit).
   sync = (isOpen: any) => {
   const panel = this._refPanelEl;
   const el = (panel && panel.parentElement) as HTMLDialogElement | null;
@@ -173,6 +185,7 @@ private __rozieWatchInitial_0 = true;
   }
 };
 
+  // ---- close funnel (single $emit site) ----------------------------------
   closeWith = (reason: any) => {
   this._openControllable.write(false);
   this.dispatchEvent(new CustomEvent("close", {
@@ -184,12 +197,19 @@ private __rozieWatchInitial_0 = true;
   }));
 };
 
+  // ---- handlers ----------------------------------------------------------
+  // Native Esc fires `cancel` on the <dialog>. preventDefault so WE drive the
+  // close through the model (keeping `open` in sync); honor the opt-out.
   onCancel = (e: any) => {
   if (e) e.preventDefault();
   if (this.disableEscapeClose) return;
   this.closeWith('escape');
 };
 
+  // A click whose target IS the <dialog> element (not its panel/children) is a
+  // backdrop click — the ::backdrop is part of the dialog box. We compare the
+  // real `e.target` (reliable even under Solid's event delegation) to the dialog
+  // element resolved via the panel ref's parent.
   onClick = (e: any) => {
   if (this.disableBackdropClose) return;
   const panel = this._refPanelEl;
@@ -197,6 +217,9 @@ private __rozieWatchInitial_0 = true;
   if (e && el && e.target === el) this.closeWith('backdrop');
 };
 
+  // ---- lifecycle ---------------------------------------------------------
+  // ---- imperative handle -------------------------------------------------
+  // show()/hide() — named to avoid the `open` model + `@close` event collisions.
   show = () => {
   this._openControllable.write(true);
 };

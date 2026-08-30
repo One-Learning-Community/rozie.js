@@ -93,6 +93,19 @@ export default class RecaptchaV3 extends SignalWatcher(LitElement) {
 
   disposed = false;
 
+  // Run a v3 challenge and return a fresh token. The optional `action` arg
+  // overrides the prop default for this one call. On success writes the two-way
+  // token + emits @verify; on failure emits @error. NB: the resolved param must
+  // NOT be named `token` — on Vue, $model.token lowers to a `defineModel('token')`
+  // ref named `token`, and a same-named param shadows it (`token.value = token`
+  // would write the param). Use `tok` (mirrors Captcha.rozie's `response`).
+  //
+  // A bare `action` (no author default) is fine — the emitter now lowers a
+  // TRAILING `$expose` verb param optional (`action?: any`) whenever it sees a
+  // fewer-arg internal call to the SAME verb, which the no-arg
+  // executeOnMount path (`execute()`) below is (emitter-hardening backlog
+  // item #5). The `action = null` author-side default this comment used to
+  // require is gone — the compiler owns the arity now, not this source.
   execute(action?: any) {
     const a = action != null ? action : this.action;
     return loadRecaptchaV3(this.sitekey).then(() => v3Execute(this.sitekey, {

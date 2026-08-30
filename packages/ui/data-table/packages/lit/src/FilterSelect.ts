@@ -55,8 +55,14 @@ export default class FilterSelect extends SignalWatcher(LitElement) {
 `;
   }
 
+  // The <select> value binding coerced to a string. $props.value is typed `unknown`
+  // (opaque slot-scope), which the strict bundled-leaf tsc rejects against the native
+  // select `value` type on React/Solid — the fix is a plain function returning a
+  // string (uniform ×6, NOT a $computed; the EditorSelect/listbox value lesson).
   selectValue = () => this.value != null ? String(this.value) : '';
 
+  // Immediate-apply-on-change: read the selected value the global-filter way. An
+  // empty value (the leading "All" option) clears the column filter.
   onChange = (e: any) => {
   const v = e && e.target ? e.target.value : '';
   if (v === '') {

@@ -44,8 +44,12 @@ export default class ModelParamShadow extends SignalWatcher(LitElement) {
 `;
   }
 
+  // label: a $computed whose name a closure param (logLabel) shadows — exercises
+  // the additive `bare-read` deconflict trigger (computeds read as bare idents).
   get label() { return rozieMemo(this, 'label', [this._status.value], () => (this._status.value + '!')); }
 
+  // solve(token): param == the model prop name. `$model.token = token` lowers on
+  // Vue to `token.value = token` (param shadows the defineModel ref) pre-fix.
   solve = (token: any) => {
   this._tokenControllable.write(token);
   this.dispatchEvent(new CustomEvent("verify", {
@@ -57,10 +61,14 @@ export default class ModelParamShadow extends SignalWatcher(LitElement) {
   }));
 };
 
+  // setStatus(status): param == the $data key. `$data.status = status` lowers on
+  // Vue to `status.value = status` (param shadows the state ref) pre-fix.
   setStatus = (status: any) => {
   this._status.value = status;
 };
 
+  // logLabel(label): param == the $computed name. The bare `label` read lowers on
+  // Vue to `label.value` (reads the computed ref, not the param) pre-fix.
   logLabel = (label: any) => {
   this.dispatchEvent(new CustomEvent("verify", {
     detail: {

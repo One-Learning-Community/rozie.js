@@ -39,6 +39,13 @@ export default class Counter extends SignalWatcher(LitElement) {
 `;
   }
 
+  // 07-01 carry-forward (rozie-counter tag collision): pins the deterministic
+  // Angular selector / Lit @customElement tag a component named `Counter` emits
+  // — `rozie-counter`. The collision surfaced in 07-01's counter.spec.ts was a
+  // demo-fixture namespace clash (the Lit interop fixture reused this tag), NOT
+  // an emitter bug; the fix namespaced the Lit interop fixture to
+  // `rozie-lit-counter`. This fixture guards that the emitter's selector
+  // derivation stays stable.
   bump = () => {
   this._valueControllable.write(prev => prev + 1);
 };

@@ -46,6 +46,7 @@ export default class InlineEquivHostJ extends SignalWatcher(LitElement) {
   return next;
 };
 
+  // Re-read the row model + header groups into $data
   refreshRowModelJ = 0;
 
   /**

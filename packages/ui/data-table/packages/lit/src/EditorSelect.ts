@@ -49,8 +49,6 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
     // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
     // to '' so the <select> binds to a string.
     this._draft.value = this.value != null ? String(this.value) : '';
-
-    // Picking/arrow-cycling an option updates the draft only — no commit.
   }
 
   disconnectedCallback(): void {
@@ -71,10 +69,12 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
 `;
   }
 
+  // Picking/arrow-cycling an option updates the draft only — no commit.
   onChange = (e: any) => {
   this._draft.value = e && e.target ? e.target.value : '';
 };
 
+  // commit/cancel are Function props (default null) — guard before calling.
   doCommit = () => {
   this.commit && this.commit(this._draft.value);
 };

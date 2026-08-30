@@ -38,6 +38,25 @@ function compileInline(src: string): string {
   return compileToLit(src, 'Inline.rozie');
 }
 
+/**
+ * Strip `//` line comments so a "this member name must NOT be emitted" regex
+ * can only ever match real CODE.
+ *
+ * Quick task 260830-j53 — the Lit emitter now carries the author's comments
+ * through the class-body lift, and these fixtures DOCUMENT the very shadowing
+ * they guard ("a `$computed` named `id` lowers to a PUBLIC `get id()` getter").
+ * A bare `not.toMatch(/\bget id\(\)/)` over the whole emitted string then
+ * matched the fixture's own prose and failed even though the emitted member is
+ * correctly `get id$local()`. Scoping the assertion to code keeps it strict —
+ * it still fails if the real getter is ever emitted unrenamed.
+ */
+function codeOnly(source: string): string {
+  return source
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('//'))
+    .join('\n');
+}
+
 describe('Lit reserved-member deconfliction — $computed + $inject local (SC-2)', () => {
   it('$computed named a reserved member (`id`) renames to `id$local` getter', () => {
     const source = readFileSync(FIXTURE, 'utf8');
@@ -45,7 +64,7 @@ describe('Lit reserved-member deconfliction — $computed + $inject local (SC-2)
     // Post-fix: the getter is renamed, and the bare `get id()` is gone (no more
     // HTMLElement.id shadow). The template interpolation references the rename.
     expect(code).toContain('get id$local()');
-    expect(code).not.toMatch(/\bget id\(\)/);
+    expect(codeOnly(code)).not.toMatch(/\bget id\(\)/);
     // The template interpolation `{{ id }}` references the renamed getter.
     expect(code).toContain('this.id$local');
   });
@@ -81,7 +100,7 @@ const title = $inject('headingCtx');
     // The ContextConsumer read accessor is renamed; the colliding bare
     // `get title()` (HTMLElement.title shadow) is gone.
     expect(code).toContain('get title$local()');
-    expect(code).not.toMatch(/\bget title\(\)/);
+    expect(codeOnly(code)).not.toMatch(/\bget title\(\)/);
     expect(code).toContain('this.title$local');
   });
 

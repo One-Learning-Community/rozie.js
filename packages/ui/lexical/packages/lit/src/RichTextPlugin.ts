@@ -34,10 +34,6 @@ private get editorCtx() { return this.__rozieCtxConsumer_rozie_lexical_editor.va
   firstUpdated(): void {
     this.ctx = this.editorCtx;
 
-    // The register* cleanup, captured once we actually register. null = not yet / torn
-    // down. `disposed` guards the deferred activation against an unmount that races ahead
-    // of the microtask below.
-
     this._disconnectCleanups.push((() => {
       this.disposed = true;
       if (this.teardown) {
@@ -70,10 +66,14 @@ private get editorCtx() { return this.__rozieCtxConsumer_rozie_lexical_editor.va
 
   ctx: any = null;
 
+  // The register* cleanup, captured once we actually register. null = not yet / torn
+  // down. `disposed` guards the deferred activation against an unmount that races ahead
+  // of the microtask below.
   teardown: any = null;
 
   disposed = false;
 
+  // Register the rich-text baseline against the shared editor, idempotently.
   activate = () => {
   if (this.teardown || this.disposed) return;
   const editor = this.ctx && this.ctx.instance;

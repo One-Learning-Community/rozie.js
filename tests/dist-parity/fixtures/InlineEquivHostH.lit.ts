@@ -42,6 +42,7 @@ export default class InlineEquivHostH extends SignalWatcher(LitElement) {
 
   editTransitionH = 1;
 
+  // leading: stays with the extracted decl, must NOT float to the hoisted import
   editorBindingsH = (k: number): number => clampH(k * 2);
 
   /**

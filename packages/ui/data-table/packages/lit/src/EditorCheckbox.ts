@@ -54,6 +54,8 @@ export default class EditorCheckbox extends SignalWatcher(LitElement) {
 `;
   }
 
+  // Immediate-commit-on-change: read .checked the global-filter way, coerce to a
+  // real boolean, and commit it directly.
   onChange = (e: any) => {
   this.commit && this.commit(!!(e && e.target ? e.target.checked : false));
 };

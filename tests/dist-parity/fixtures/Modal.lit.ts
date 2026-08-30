@@ -171,6 +171,8 @@ ${this.open ? html`<div class="modal-backdrop" @click=${($event: MouseEvent & { 
   }));
 };
 
+  // Body-scroll-lock state lives outside reactive data because it tracks DOM
+  // rather than UI; managed entirely via lifecycle and listeners.
   savedBodyOverflow = '';
 
   lockScroll = () => {

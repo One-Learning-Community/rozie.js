@@ -64,6 +64,9 @@ export default class EditorNumber extends SignalWatcher(LitElement) {
   this._draft.value = e && e.target ? e.target.value : '';
 };
 
+  // Coerce to a Number at commit time. Defensive guard: an empty/whitespace draft
+  // commits null rather than NaN (Number('') === 0 is a silent footgun); a
+  // non-numeric draft also commits null. Otherwise commit the coerced number.
   doCommit = () => {
   if (!this.commit) return;
   const raw = this._draft.value;

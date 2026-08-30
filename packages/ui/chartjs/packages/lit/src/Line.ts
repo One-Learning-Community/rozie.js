@@ -156,21 +156,7 @@ private portals = {
 
     this._armListeners();
 
-    // Line registers only its own Chart.js controller/element/scale set
-    // (tree-shakable — importing this component does not pull every controller).
     ChartJS.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Legend, Tooltip, Colors);
-
-    // Chart.js v3+ ships with no controllers/elements/scales pre-registered. The
-    // generic Chart does NOT auto-register — the consumer registers only what they
-    // use (the tree-shakable Chart.js v3+ idiom every framework wrapper follows), so
-    // an app that only renders line charts doesn't ship every controller. Two paths:
-    //   - selective: `import { Chart, LineController, ... } from 'chart.js';
-    //     Chart.register(LineController, ...)` once at app startup; OR
-    //   - kitchen sink: import this package's `/auto` entry
-    //     (`@rozie-ui/chartjs-<fw>/auto`), or `import 'chart.js/auto'`, which
-    //     registers everything.
-    // The per-type components (Line/Bar/…) register their own controller set, so
-    // importing one is tree-shakable by construction.
 
     this._disconnectCleanups.push((() => {
       this.tooltipDispose?.();
@@ -280,10 +266,27 @@ private portals = {
 `;
   }
 
+  // Chart.js v3+ ships with no controllers/elements/scales pre-registered. The
+  // generic Chart does NOT auto-register — the consumer registers only what they
+  // use (the tree-shakable Chart.js v3+ idiom every framework wrapper follows), so
+  // an app that only renders line charts doesn't ship every controller. Two paths:
+  //   - selective: `import { Chart, LineController, ... } from 'chart.js';
+  //     Chart.register(LineController, ...)` once at app startup; OR
+  //   - kitchen sink: import this package's `/auto` entry
+  //     (`@rozie-ui/chartjs-<fw>/auto`), or `import 'chart.js/auto'`, which
+  //     registers everything.
+  // The per-type components (Line/Bar/…) register their own controller set, so
+  // importing one is tree-shakable by construction.
   instance: any = null;
 
+  // $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
+  // captured node so no $refs read ever executes outside the mount hook.
   canvasEl: any = null;
 
+  // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
+  // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
+  // any consumer-supplied handler first (read off $props.options), then emit a
+  // structured payload resolving the hit element(s) via getElementsAtEventForMode.
   composedOnClick = (e: any, activeEls: any, chart: any) => {
   const userOnClick = this.options?.onClick;
   if (typeof userOnClick === 'function') userOnClick(e, activeEls, chart);
@@ -330,6 +333,24 @@ private portals = {
   }));
 };
 
+  // ─── external-HTML tooltip portal slot ─────────────────────────────────────
+  // Only active when the consumer fills <slot name="tooltip">. The external
+  // handler positions a container over the canvas and mounts the consumer's
+  // framework-native fragment through $portals.tooltip(dom, scope). The scope
+  // carries the live tooltip model (title/body/dataPoints/position). Chart.js
+  // throttles external calls to active-element changes, so the dispose+remount
+  // on body-change is cheap. enabled:false suppresses the built-in canvas
+  // tooltip when we take over.
+  //
+  // MODULE-scope `let`s (not $onMount-locals) — this reverses the earlier
+  // deliberate mount-local narrowing (emitter-hardening backlog item #2,
+  // project_emitter_hardening_backlog): tooltipExternal is moving out of
+  // $onMount to top level (quick 260829-gbs), so its state can no longer live
+  // as a closure-captured mount-local. Required, not just convenient — and
+  // harmless: a module-scope `let` in `.rozie` lowers to per-instance
+  // component state on all six targets (a React/Angular/Lit class field or
+  // component-scope ref, not a shared global). The $onMount teardown below
+  // still reads tooltipDispose/tooltipEl directly, unchanged.
   tooltipEl: any = null;
 
   tooltipDispose: any = null;
@@ -380,6 +401,18 @@ private portals = {
   this.tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`;
 };
 
+  // ─── config builder ────────────────────────────────────────────────────────
+  // buildConfig is a top-level factory now that quick 260829-cd4 hoists the
+  // portals closure to component scope on all six targets; $portals.tooltip
+  // (referenced inside tooltipExternal below) resolves directly with no
+  // mount-scope bridge — the earlier rationale here ("buildConfig is DEFINED
+  // inside $onMount because it reads $portals.tooltip") no longer applies.
+  // $emit and $slots never needed this bridge either — both lower to
+  // component-scope constructs on all six targets (the earlier
+  // "$emit/$portals/$slots" phrasing here was over-broad and had been
+  // copy-propagated into all 8 generated variants).
+  // $snapshot strips Svelte 5's $state proxy first; Chart.js redefines property
+  // descriptors on whatever object it is handed.
   buildConfig = () => {
   const userOpts = this.options || {};
   const tooltipOpt = this.tooltip !== undefined ? {
@@ -409,12 +442,40 @@ private portals = {
   };
 };
 
+  // Re-create the live instance. Chart.js exposes no stable runtime type-swap or
+  // plugin-swap, so `type`/`plugins`/`redraw`-driven changes re-create. Uses the
+  // captured canvasEl (never re-reads $refs outside $onMount).
   recreate = () => {
   if (!this.canvasEl) return;
   this.instance?.destroy();
   this.instance = new ChartJS(this.canvasEl, this.buildConfig());
 };
 
+  // Reconcile prop changes. Mutating chart.data in place and calling update() is
+  // the Chart.js-supported runtime path — re-creating on every data tick would
+  // flicker and leak. (When `redraw` is set, re-create wholesale instead.)
+  // Imperative handle (Phase 21 $expose). The lifecycle/redraw verbs are SUFFIXED
+  // with `Chart` because bare `update`/`render` collide with LitElement's
+  // reactive-lifecycle methods (`update(changedProperties)` / `render()`) and
+  // would shadow them on the Lit leaf; `resize`/`reset`/`stop`/`clear` are
+  // suffixed too for a consistent, unambiguous handle. `getChart` returns the live
+  // instance for direct API access; `toBase64Image` is the marquee PNG-export.
+  //
+  // The visibility + active-element family (added later) is the #1 reason a
+  // consumer reaches for a chart handle — custom legends, externally-driven
+  // tooltips/highlights, overlay positioning — none reachable via prop/event:
+  //   - setDatasetVisibility / isDatasetVisible: drive a custom legend's series
+  //     show/hide (INSTANT toggle).
+  //   - hideDataset / showDataset: the ANIMATED hide/show (Chart.js hide()/show()).
+  //     SUFFIXED with `Dataset` both to dodge inherited HTMLElement-ish ambiguity
+  //     and to disambiguate the dataset-vs-element overload.
+  //   - setActiveElements / getActiveElements: programmatically open/read the
+  //     hovered/active points (sync hover from a table row, a map pin, a sibling
+  //     chart) — events only REPORT hover, they cannot SET it.
+  //   - getDatasetMeta: read computed geometry (pixel coords, controller) to
+  //     position custom overlays/annotations over the canvas.
+  // Collision-clear: none of the 15 names collide with the 11 props or the 3
+  // emits (click/datasetClick/hover).
   getChart() {
     return this.instance;
   }

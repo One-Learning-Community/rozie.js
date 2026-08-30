@@ -271,18 +271,66 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 `;
   }
 
+  // Mutable cross-render scratch (NOT reactive): per-id timer bookkeeping. A
+  // top-level `let` → React useRef (it escapes into $onUnmount's effect, so the
+  // emitter hoists it). The id counter lives in $data.seq instead (see <data>).
+  //
+  // Shape: { [id]: { handle, startedAt, remaining } }. `pauseTimers` clears the
+  // live setTimeout handle but KEEPS the entry with a decremented `remaining` —
+  // the remainder IS the state (this is what makes the hover pause PRECISE
+  // instead of a full restart). `resumeTimers` re-arms with exactly that
+  // remainder. `clearTimer`/the full-teardown helper below are the only ways an
+  // entry is actually removed from the map.
   timers = {};
 
+  // Per-id handles for the ~350ms exit-removal failsafe (the fallback that
+  // removes a toast if its @animationend never fires). Tracked in a module map
+  // — NOT an anonymous window.setTimeout — so teardownTimers ($onUnmount /
+  // clear()) can cancel a pending failsafe (else it fires post-unmount and
+  // writes $data on a torn-down instance) and removeToast can cancel it
+  // first-wins when @animationend beats it. Escapes into $onUnmount's effect →
+  // React hoists it to useRef alongside `timers`.
   exitFailsafes = {};
 
+  // Set true in $onUnmount; read by promise()'s settle guard (never-resurrect
+  // a toast after the host itself is gone). A top-level `let` → React useRef
+  // (it escapes into $onUnmount's effect).
   unmounted = false;
 
+  // Same-tick id-uniqueness guard for React. The id counter lives in reactive
+  // $data.seq (persists across renders), but React batches setState so within a
+  // SINGLE synchronous tick two show() calls read the SAME stale $data.seq →
+  // duplicate ids. `seqLocal` is a plain counter incremented SYNCHRONOUSLY in
+  // show(); it survives the same tick (and, because show() is an $expose verb,
+  // the emitter hoists it to a persistent useRef on React too — but the design
+  // does NOT depend on that: `Math.max($data.seq, seqLocal)` is correct whether
+  // seqLocal persists OR resets per render, since the monotonic $data.seq
+  // carries the high-water mark across any reset). On the other five targets
+  // $data.seq is synchronous, so the two simply stay in lockstep. Result:
+  // strictly-increasing, collision-free ids on all six with NO randomness.
   seqLocal = 0;
 
+  // Hover-pause flag: true while the pointer is over the stack (set by
+  // pauseTimers, cleared by resumeTimers). Read by patch() so a duration change
+  // arriving mid-hover stores the new remainder WITHOUT arming a live timer
+  // (which would dismiss the toast while it is still hovered) — resume arms it
+  // on leave. A top-level `let` reachable from the $expose verbs (patch/show →
+  // startTimer) and the @mouseenter/@mouseleave handlers, so React hoists it to
+  // useRef (persistent) like `timers`.
   paused = false;
 
+  // The ACTIVE pointer-drag gesture's non-visual bookkeeping: { id, axis, sign,
+  // size, startX, startY, startTime } | null (set on @pointerdown, read on
+  // @pointermove/@pointerup, cleared on @pointerup/@pointercancel). Referenced
+  // ONLY from the four onToastPointer* handlers below, which are bound ONLY via
+  // template `@pointerdown`/`@pointermove`/`@pointerup`/`@pointercancel` — the
+  // template-@event-handler reachability root (Quick 260717-8zb Task 3 Item 6,
+  // hoistModuleLet.ts) hoists this to useRef on React so it persists across the
+  // re-renders the sibling `$data.swipe` write triggers mid-gesture. Never read
+  // directly in the template — script-only bookkeeping.
   swipeGesture: any = null;
 
+  // ---- timers ------------------------------------------------------------
   startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;
   if (typeof window === 'undefined') return;
@@ -305,6 +353,10 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   delete this.timers[id];
 };
 
+  // Pauses every live timer WITHOUT losing the remainder: clears the handle,
+  // decrements `remaining` by the elapsed time, and KEEPS the entry (does NOT
+  // delete it — the old v1 shortcut deleted entries here, which is why leave
+  // had to do a full restart).
   pauseTimers = () => {
   this.paused = true;
   if (typeof window === 'undefined') return;
@@ -328,6 +380,10 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   }
 };
 
+  // Re-arms every paused timer with EXACTLY its stored remainder (called on
+  // mouse leave). An entry with a non-positive remainder is left un-armed
+  // (it will be cleaned up by the next dismiss/clear pass) rather than firing
+  // immediately from inside this loop.
   resumeTimers = () => {
   this.paused = false;
   if (typeof window === 'undefined') return;
@@ -353,6 +409,9 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   }
 };
 
+  // FULL teardown: clears every live handle AND drops every entry (unlike
+  // pauseTimers, which deliberately keeps entries to hold their remainders).
+  // clear() and $onUnmount can no longer reuse pauseTimers for this reason.
   teardownTimers = () => {
   if (typeof window !== 'undefined') {
     for (const id in this.timers) {
@@ -369,6 +428,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   this.exitFailsafes = {};
 };
 
+  // ---- queue (imperative handle implementations) -------------------------
   show = (input: any) => {
   const t = input || {};
   let id;
@@ -406,8 +466,15 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   return id;
 };
 
+  // ---- exit lifecycle ------------------------------------------------------
+  // Deliberately exceeds the 200ms default --rozie-toast-exit-duration token
+  // comfortably; a consumer overriding the exit duration beyond ~350ms gets cut
+  // short by this failsafe (documented in docs/components/toast.md).
   EXIT_FAILSAFE_MS = 350;
 
+  // Idempotent removal: filters the entry out of $data.toasts. Safe to call
+  // twice (from the inline @animationend binding AND the failsafe) — the
+  // second call is a harmless no-op filter over an already-absent id.
   removeToast = (id: any) => {
   // Cancel any pending exit failsafe for this id (first-wins: @animationend
   // beating the ~350ms timeout, or vice-versa — either way, only one removal).
@@ -418,6 +485,13 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   this._toasts.value = this._toasts.value.filter((t: any) => t.id !== id);
 };
 
+  // The single dismissal funnel every path routes through: the `dismiss(id)`
+  // verb ('api'), the built-in close button ('close'), a timer expiry
+  // ('timeout'), and a swipe past threshold ('swipe'). Idempotent via the
+  // entry's `exiting` flag — a second call on an id already exiting (or
+  // already gone) is a no-op, so a stray timeout firing mid-exit never
+  // double-emits. `extra` (swipe only) carries `{ swipeExitSign }` so the
+  // template can apply the direction-matched swipe-exit animation.
   dismissBegin = (id: any, reason: any, extra?: {
   swipeExitSign?: number;
 }) => {
@@ -448,11 +522,19 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   this.dismissBegin(id, 'api');
 };
 
+  // clear() is bulk: immediate full teardown, NO per-toast exit animation and
+  // NO emit (documented — see docs/components/toast.md).
   clear = () => {
   this.teardownTimers();
   this._toasts.value = [];
 };
 
+  // ---- patch / promise ------------------------------------------------------
+  // Update-in-place primitive: merges ONLY the present `{message,type,duration}`
+  // keys into the matching entry via a fresh-array map (never in-place
+  // mutation). Returns whether the id existed. A `duration` key clears+restarts
+  // the timer (0 → sticky/no-arm; positive → arm); any other key leaves a
+  // running timer untouched.
   patch = (id: any, changes: any) => {
   const c = changes || {};
   let existed = false;
@@ -495,6 +577,8 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   return true;
 };
 
+  // The settle guard: a no-op if the host unmounted OR the toast was already
+  // dismissed while the promise was still pending (never-resurrect).
   settlePromise = (id: any, type: any, messageOrFn: any, value: any) => {
   if (this.unmounted) return;
   // Never-resurrect: no-op if the toast is gone OR already exiting (its
@@ -510,6 +594,11 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   });
 };
 
+  // Sugar over show()+patch(): shows a sticky loading toast synchronously
+  // (returns its id immediately — the consumer already holds `p`), then patches
+  // the SAME entry to success/error on settle (the auto-dismiss timer starts AT
+  // SETTLE, via patch's duration-key restart). Never returns/derives a new
+  // promise — `p`'s own .then/.catch still fire for the consumer untouched.
   promise = (p: any, opts: any) => {
   const o = opts || {};
   const id = this.show({
@@ -523,6 +612,9 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   return id;
 };
 
+  // ---- swipe-to-dismiss ------------------------------------------------------
+  // Axis + dismiss-direction sign, purely derived from the corner (no per-
+  // gesture state needed for these two — they only depend on $props.position).
   swipeAxisFor = (position: any) => position === 'top-center' || position === 'bottom-center' ? 'y' : 'x';
 
   swipeSignFor = (position: any) => {
@@ -605,8 +697,28 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   if (this._swipe.value && this._swipe.value.id === t.id) this._swipe.value = null;
 };
 
+  // ---- stacked mode ----------------------------------------------------------
+  // Depth from newest: the newest toast (last in the array — show() appends)
+  // is depth 0; each older toast is one deeper. Corner-independent — the
+  // collapsed grid overlay ignores flex-direction/column-reverse entirely, so
+  // this needs no position-aware math.
+  //
+  // quick 260716-npt Finding 3 (perf): depth USED to be a per-toast
+  // `$data.toasts.findIndex(...)` scan invoked from toastStyle() for every row
+  // — O(n) work × n toasts rendered = O(n^2) per render. The template's r-for
+  // already computes each row's array index for free (the r-for bare-comma
+  // index form, `t, ti in ...` — see TreeNode.rozie/Table.rozie precedent), so
+  // depth(ti) is now O(1) arithmetic off that index — no scan, and `t`'s id
+  // can never be "not found" via this call path (ti IS t's own index), so the
+  // old idx===-1→0 fallback collapses to unreachable-by-construction (same
+  // observable semantics: newest=depth 0, older=length-1-idx).
   depth = (ti: any) => this._toasts.value.length - 1 - ti;
 
+  // String-form `:style` for the toast row. ALWAYS carries `--rozie-toast-depth`
+  // (a no-op unless `stacked` is on — CSS reads it only inside
+  // `.rozie-toaster--stacked`), plus EITHER the active drag transform (while
+  // $data.swipe tracks this id) OR the swipe-exit sign custom property (once
+  // `dismissBegin('swipe')` flipped `t.swipeExitSign`). Drag/exit never overlap.
   toastStyle = (t: any, ti: any) => {
   const depthDecl = '--rozie-toast-depth: ' + this.depth(ti) + ';';
   if (t.exiting) {
@@ -622,6 +734,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   return depthDecl + ' transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
 };
 
+  // ---- hover pause -------------------------------------------------------
   onMouseEnter = () => {
   if (this.disablePauseOnHover) return;
   this.pauseTimers();
@@ -632,8 +745,11 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   this.resumeTimers();
 };
 
+  // ---- helpers -----------------------------------------------------------
   regionLabel = () => this.ariaLabel != null ? this.ariaLabel : 'Notifications';
 
+  // Type union: 'info' | 'success' | 'error' | 'warning' | 'loading'. Only
+  // error/warning interrupt (assertive); loading (like info/success) is polite.
   liveFor = (type: any) => type === 'error' || type === 'warning' ? 'assertive' : 'polite';
 
   /**

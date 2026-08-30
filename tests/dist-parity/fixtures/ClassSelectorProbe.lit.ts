@@ -48,6 +48,9 @@ export default class ClassSelectorProbe extends SignalWatcher(LitElement) {
 `;
   }
 
+  // script-position class-selector helper call — exercises the rewriteScript.ts
+  // hook. Lowers per-target: ".grip" literal (Vue/Svelte/Solid/Angular/Lit) or
+  // "." + styles.grip (React).
   gripSelector = ".grip";
 
   /**

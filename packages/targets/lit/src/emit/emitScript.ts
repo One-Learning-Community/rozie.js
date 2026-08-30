@@ -1043,12 +1043,102 @@ function classBodyFromStatements(
   computedNames: Set<string>,
   ir: IRComponent,
   runtime: RuntimeLitImportCollector,
+  /**
+   * Comments already printed by an EARLIER scope in this emit (the module-level
+   * import block). The ledger has to span both scopes: a comment authored
+   * between the last import and the first promoted declaration is attached by
+   * @babel/parser to the import's `trailingComments` AND the declaration's
+   * `leadingComments`, and the import block prints its side from a different
+   * `generate()` call this loop cannot see. Without seeding, that comment prints
+   * TWICE (measured: 132 duplicates across the Lit corpus).
+   */
+  printedComments: WeakSet<t.Comment>,
 ): { methods: string; freeStatements: string } {
   const computedDepsByName = new Map(ir.computed.map((c) => [c.name, c.deps] as const));
   const methodChunks: string[] = [];
   const freeChunks: string[] = [];
 
+  // Quick task 260830-j53 — block-wide printed-comment ledger for the class-body
+  // lift. Every branch below emits its member as a hand-built STRING
+  // (`generate(decl)` / `renderExpression` / a freshly built `t.classMethod`),
+  // none of which carries the STATEMENT's own comments, so an author's
+  // documentation on a promoted top-level declaration was dropped outright
+  // (1370 comments across the shipped Lit corpus).
+  //
+  // A ledger rather than a per-branch rule because @babel/parser attaches a
+  // comment sitting BETWEEN two statements to BOTH neighbours — as the earlier
+  // one's `trailingComments` and the later one's `leadingComments`. Walking
+  // statements in source order and claiming each comment OBJECT exactly once
+  // (identity, never offsets — a `.rzts` partial is parsed as its own file, so
+  // offsets collide across sources) makes it print once regardless of which
+  // side claims it. Same mechanism React uses in its component-scope loop.
+  const takeUnprinted = (comments: readonly t.Comment[] | null | undefined): t.Comment[] => {
+    if (!comments || comments.length === 0) return [];
+    const fresh: t.Comment[] = [];
+    for (const c of comments) {
+      if (printedComments.has(c)) continue;
+      printedComments.add(c);
+      fresh.push(c);
+    }
+    return fresh;
+  };
+  const renderComments = (comments: readonly t.Comment[]): string | null =>
+    comments.length === 0
+      ? null
+      : comments.map((c) => (c.type === 'CommentLine' ? `//${c.value}` : `/*${c.value}*/`)).join('\n');
+
+  // The branches below `continue` from many points, so the claimed comments are
+  // attached to whichever chunk the statement produced on the NEXT pass (and
+  // once more after the loop). Only ever PREPENDS/APPENDS to an existing chunk
+  // string, so recorded indices stay valid.
+  //
+  // LEADING comments only. Babel gives the same comment object to statement N as
+  // `trailingComments` and to N+1 as `leadingComments`; claiming both in source
+  // order would let N claim it first and print it AFTER N's member, detaching a
+  // comment block from the declaration it documents. Claiming only the leading
+  // side puts it above N+1, which is where the author wrote it. Nothing else in
+  // this loop prints statement comments (every branch hand-builds its string, and
+  // the free-statement branch is stripped below), so there is no second printer
+  // that could double it. The one shape this gives up is a trailing comment on
+  // the FINAL statement with no successor to lead — dropped, exactly as before.
+  let pending: { lead: string | null; m: number; f: number } | null = null;
+  const flushPending = (): void => {
+    if (pending === null) return;
+    const { lead, m, f } = pending;
+    pending = null;
+    if (lead === null) return;
+    const target = methodChunks.length > m ? { arr: methodChunks, i: m } : freeChunks.length > f ? { arr: freeChunks, i: f } : null;
+    // Statement produced no chunk (fully consumed by another pass) — its
+    // comments have nowhere to live in this block.
+    if (target === null) return;
+    const indentTo = target.arr === methodChunks ? '  ' : '';
+    target.arr[target.i] = `${indent(lead, indentTo.length)}\n${target.arr[target.i]}`;
+  };
+
+  let prevStmt: t.Statement | null = null;
   for (const stmt of stmts) {
+    flushPending();
+    // Claim the PREVIOUS statement's still-unclaimed trailing comments first,
+    // then this statement's own leading comments, and render both ABOVE this
+    // member.
+    //
+    // Looking back is what makes inline and `.rzts`-partial hosts agree. Inline,
+    // one parse gives the same comment object to prev-as-trailing and
+    // this-as-leading, so step 1 claims it and step 2 is empty — printed once,
+    // above this member. Across a splice boundary the successor comes from a
+    // DIFFERENT parse with no comments attached at all, so the comment exists
+    // ONLY on the previous statement's trailing side; step 1 is the only thing
+    // that can find it. Claiming just the leading side printed it inline and
+    // dropped it in the partial, breaking the byte-identity guard exactly the
+    // way the React seam did (260830-fwb).
+    const carried = prevStmt === null ? [] : takeUnprinted(prevStmt.trailingComments);
+    const own = takeUnprinted(stmt.leadingComments);
+    prevStmt = stmt;
+    pending = {
+      lead: renderComments([...carried, ...own]),
+      m: methodChunks.length,
+      f: freeChunks.length,
+    };
     if (t.isVariableDeclaration(stmt)) {
       for (const decl of stmt.declarations) {
         if (!t.isIdentifier(decl.id) || !decl.init) continue;
@@ -1186,8 +1276,16 @@ function classBodyFromStatements(
     }
 
     // Free expression statement (e.g. console.log) — move into firstUpdated.
-    freeChunks.push(generate(stmt, GEN_OPTS).code);
+    // Comments stripped: the ledger above already claimed them and `flushPending`
+    // renders them around this chunk. Passing the node through verbatim would
+    // print them a SECOND time (@babel/generator has its own dedup set, which
+    // cannot see the ledger) — the exact double-print this mechanism exists to
+    // prevent.
+    freeChunks.push(
+      generate({ ...stmt, leadingComments: [], trailingComments: [] }, GEN_OPTS).code,
+    );
   }
+  flushPending();
 
   return {
     methods: methodChunks.join('\n\n'),
@@ -1393,11 +1491,39 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
   const partition = partitionScript(rewritten.file);
 
   const computedNames = new Set(ir.computed.map((c) => c.name));
+
+  // Quick task 260830-j53 — seed the class-body comment ledger with every
+  // comment the module-level import/type block above has ALREADY printed.
+  // `generate()` there and the hand-built class-member strings below are
+  // separate printers with separate dedup sets, so a comment shared across that
+  // boundary (last import's trailing == first promoted declaration's leading)
+  // would otherwise be emitted by both. Keyed on comment OBJECT identity, never
+  // on offsets — a `.rzts` partial is parsed as its own file and its offsets
+  // collide with unrelated host comments.
+  //
+  // Seeded from what the module-scope block ACTUALLY EMITTED, not from every
+  // comment merely attached to an import node. Marking all of them was too broad
+  // and DROPPED 16 comments corpus-wide: a comment can hang off an import node
+  // that the block never prints (a re-synthesized runtime import, a hoisted type
+  // that is not emitted), and pre-claiming it means no one prints it. Testing the
+  // rendered text against the emitted string answers the only question that
+  // matters — "did the earlier scope already print this?" — and cannot
+  // over-claim.
+  const printedComments = new WeakSet<t.Comment>();
+  const renderOne = (c: t.Comment): string =>
+    c.type === 'CommentLine' ? `//${c.value}` : `/*${c.value}*/`;
+  for (const node of [...userImportNodes, ...hoistedTypeNodes]) {
+    for (const c of [...(node.leadingComments ?? []), ...(node.trailingComments ?? [])]) {
+      if (userImports.includes(renderOne(c))) printedComments.add(c);
+    }
+  }
+
   const { methods: classMethodsFromScript, freeStatements } = classBodyFromStatements(
     partition.classLevelStmts,
     computedNames,
     ir,
     opts.runtime,
+    printedComments,
   );
 
   // 4. Model-prop getter/setter pair → methods.

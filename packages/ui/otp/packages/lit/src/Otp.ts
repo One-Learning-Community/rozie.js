@@ -121,6 +121,8 @@ export default class Otp extends SignalWatcher(LitElement) {
 
   code = () => typeof this.value === 'string' ? this.value : '';
 
+  // The cells to render: one { i, ch } per position, ch derived from `value`.
+  // A plain function (called in the r-for and from handlers) — never $computed.
   cells = () => {
   const v = this.code();
   const out = [];
@@ -131,10 +133,17 @@ export default class Otp extends SignalWatcher(LitElement) {
   return out;
 };
 
+  // Allowed-character test for the configured `type`. Thin wrapper over the
+  // pure write model in ./internal/otpWrite (vendored into every leaf).
   allowChar = (ch: any) => isAllowedChar(this.type, ch);
 
+  // The cell that should receive focus for new input: the first empty position
+  // (clamped to the last cell when full).
   firstEmptyIndex = () => firstEmpty(this.code(), this.length);
 
+  // ---- focus choreography (container ref, post-mount only) ----------------
+  // Read $refs.root only here / in $onMount / in $expose verbs (all post-mount →
+  // ROZ123-safe). querySelectorAll reaches the cells inside Lit's shadow root too.
   focusIndex = (idx: any) => {
   let i = idx;
   if (i < 0) i = 0;
@@ -149,6 +158,15 @@ export default class Otp extends SignalWatcher(LitElement) {
   }
 };
 
+  // ---- write funnel (single $emit site) ----------------------------------
+  // Capture `prev` BEFORE the model write (code() reads $props.value, which has
+  // not yet round-tripped) — this is what makes the transition detection
+  // stateless and keeps the documented "CONTROLLED, NO LOCAL STATE" invariant
+  // (do NOT add a `wasFull` flag to <data>). The model write stays
+  // unconditional (idempotent, keeps the controlled contract); only the emits
+  // are gated: `change` on an actual value transition, `complete` only on the
+  // not-full -> full transition (never on an in-place edit of an already-full
+  // code, never at length: 0 — see ./internal/otpWrite.planEmits).
   commitValue = (raw: any) => {
   const prev = this.code();
   const next = String(raw).slice(0, this.length);
@@ -170,6 +188,13 @@ export default class Otp extends SignalWatcher(LitElement) {
   }));
 };
 
+  // ---- input handler -----------------------------------------------------
+  // One path for every input shape (single char, autofill, swipe, IME commit —
+  // see ./internal/otpWrite.planWrite): sanitize + distribute from the write
+  // position, clamped to the current fill point so a click past the fill point
+  // never leaves a hole. An invalid / empty-after-sanitize write is rejected by
+  // restoring the cell's DOM value directly (a no-op model write may not
+  // re-render on React, so reset the element instead).
   onInput = (i: any, e: any) => {
   const raw = e && e.target ? e.target.value : '';
   if (raw === '') {
@@ -193,6 +218,9 @@ export default class Otp extends SignalWatcher(LitElement) {
   this.focusIndex(plan.focus);
 };
 
+  // ---- keyboard ----------------------------------------------------------
+  // Backspace deletes the current char (or the previous one when the cell is
+  // already empty) and moves focus accordingly; arrows / Home / End navigate.
   onKeydown = (i: any, e: any) => {
   const key = e ? e.key : '';
   const cur = this.code();
@@ -219,6 +247,7 @@ export default class Otp extends SignalWatcher(LitElement) {
   }
 };
 
+  // ---- paste (collapses onto the same distribution routine as onInput) ---
   onPaste = (i: any, e: any) => {
   if (e) e.preventDefault();
   const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
@@ -228,22 +257,37 @@ export default class Otp extends SignalWatcher(LitElement) {
   this.focusIndex(plan.focus);
 };
 
+  // Select the cell's content on focus so a keystroke overwrites it. Correct
+  // for Tab and programmatic focus.
   onFocus = (e: any) => {
   if (e && e.target && e.target.select) e.target.select();
 };
 
+  // A mouse/touch focus places the caret on mouseup, collapsing onFocus's
+  // select(); with maxlength="1" a filled cell then REJECTS the next keystroke.
+  // Re-select on pointerup (after caret placement) so click-then-type overwrites,
+  // matching the Tab-focus behavior.
   onPointerUp = (e: any) => {
   if (e && e.target && e.target.select) e.target.select();
 };
 
+  // ---- per-cell attribute helpers ----------------------------------------
   cellType = () => this.mask ? 'password' : 'text';
 
+  // NOTE: named `cellInputMode`, NOT `inputMode` — a bare `inputMode` member
+  // collides with the inherited `HTMLElement.inputMode: string` on the Lit custom
+  // element (a hard TS2416/TS1238, unlike the warn-only `focus` override). The
+  // `cell`-prefix keeps it collision-safe across all six strict-typecheck leaves.
   cellInputMode = () => this.type === 'numeric' ? 'numeric' : 'text';
 
   cellAriaLabel = (i: any) => 'Digit ' + (i + 1) + ' of ' + this.length;
 
   cellAutocomplete = (i: any) => i === 0 ? 'one-time-code' : 'off';
 
+  // ---- lifecycle + imperative handle -------------------------------------
+  // focus() — focus the first empty cell. DELIBERATELY overrides HTMLElement.focus
+  // on Lit (ROZ137 warn, accepted). clear() — reset the code and focus the first
+  // cell. Both read $refs in a post-mount handle call (ROZ123-safe).
   focus = () => this.focusIndex(this.firstEmptyIndex());
 
   clear = () => {

@@ -271,6 +271,16 @@ private __rozieFirstUpdateDone = false;
 
   lastFocusedEl: any = null;
 
+  // `document.activeElement` stops at the OUTERMOST shadow-DOM host when focus
+  // lives inside a NESTED shadow tree — e.g. a Lit consumer that composes
+  // `<rozie-popover>` inside its own shadow root (data-table's vendored copy):
+  // clicking the trigger focuses a real element several shadow boundaries deep,
+  // but `document.activeElement` only resolves as far as the outermost custom
+  // element (`<rozie-data-table>`), not the actual focused node. Walking
+  // `.shadowRoot.activeElement` recursively drills to the true focused element.
+  // On the other 5 targets (no shadow DOM) `el.shadowRoot` is always
+  // null/undefined, so the loop is a no-op and this degrades to a plain
+  // `document.activeElement` read — one implementation, safe on every target.
   deepActiveElement = () => {
   let el = document.activeElement;
   while (el && el.shadowRoot && el.shadowRoot.activeElement) {
@@ -279,6 +289,17 @@ private __rozieFirstUpdateDone = false;
   return el;
 };
 
+  // Drive the two-way model + emit in one place. Named `requestOpen` (NOT `setOpen`)
+  // to dodge the React generated `setOpen` setter for the `open` model (ROZ524).
+  //
+  // Focus-return (phase 72-06b, D-08 a11y finding): scoped to `trigger === 'click'`
+  // only — click-triggered popovers are genuinely interactive (a real dialog the
+  // user tabs/clicks into), so restoring focus to the trigger on dismissal matches
+  // standard disclosure-widget a11y practice. Deliberately NOT applied to
+  // `hover`/`focus` triggers (tooltip-flavored, see `isTooltip()`): those close on
+  // pointerleave/blur constantly during normal mouse/keyboard traversal, and
+  // forcing a focus() call on every such close would fight the user's own focus
+  // movement rather than restore anything lost.
   requestOpen = (next: any) => {
   if (this.open === next) return;
   if (next && this.trigger === 'click') {
@@ -298,6 +319,7 @@ private __rozieFirstUpdateDone = false;
   }
 };
 
+  // Apply the resolved x/y (and arrow offset, when present) onto the floating element.
   applyPosition = (x: any, y: any, middlewareData: any) => {
   if (!this.floatingNode) return;
   this.floatingNode.style.left = x + 'px';
@@ -310,6 +332,11 @@ private __rozieFirstUpdateDone = false;
   }
 };
 
+  // Recompute the position once. Pure engine call; safe to invoke whenever both
+  // elements exist and the content is open. `opts` is a null-let (→ `any`) so the
+  // loosely-typed `<props>` placement (string) + the `unknown[]` middleware array don't
+  // fail the strict leaf tsc against Floating UI's `Placement` / `Middleware[]` types
+  // (the cropper `let cfg = null` constructor-args idiom).
   position = () => {
   if (!this.anchorNode || !this.floatingNode) return;
   const middleware = buildMiddleware({
@@ -350,6 +377,9 @@ private __rozieFirstUpdateDone = false;
   });
 };
 
+  // Start autoUpdate (idempotent — stop any prior subscription first) and do an
+  // initial position. Floating UI's autoUpdate keeps the position fresh on scroll/
+  // resize/ancestor-layout changes and returns its own teardown.
   startTracking = () => {
   if (!this.anchorNode || !this.floatingNode) return;
   if (this.stopAutoUpdate) {
@@ -366,6 +396,7 @@ private __rozieFirstUpdateDone = false;
   }
 };
 
+  // ─── trigger gesture handlers (wired conditionally on the anchor by `trigger`) ──
   onAnchorClick = () => {
   if (this.disabled) return;
   this.requestOpen(!this.open);
@@ -391,14 +422,33 @@ private __rozieFirstUpdateDone = false;
   this.requestOpen(false);
 };
 
+  // Dismissal handler — method reference for the <listeners> block (an inline
+  // handler referencing $event leaks into React's useEffect deps → TS2552; every
+  // corpus <listener> uses a method-ref + modifiers).
   dismiss = () => {
   this.requestOpen(false);
 };
 
+  // ─── role helpers (plain functions; tooltip vs popover-dialog by trigger) ───────
+  // hover/focus triggers are tooltip-flavored; click is an interactive popover.
   isTooltip = () => this.trigger === 'hover' || this.trigger === 'focus';
 
+  // Role: hover/focus → 'tooltip'; a click popover is 'dialog' ONLY when the consumer
+  // opts into `modal` (which is what also emits aria-modal). A default (non-modal)
+  // click popover returns `undefined` — a role-NEUTRAL positioned container, so the slot
+  // content owns its own semantics (e.g. the data-table ⋯ menu declares role="menu").
+  // Emitting role="dialog" + aria-modal="true" on a click-outside-dismissable panel
+  // with no focus trap wrongly tells assistive tech that sibling content is inert (IN-03).
+  // `undefined` (not `null`) for the neutral case: the Vue `:role` binding target is
+  // `string | undefined`, and under strict vue-tsc `null` is not assignable to it —
+  // `undefined` drops the attribute identically (Vue/Solid nullish-attr drop treats both
+  // alike) while keeping the emitted leaf's inferred type a clean `'tooltip' | 'dialog' | undefined`.
   floatingRole = () => this.isTooltip() ? 'tooltip' : this.modal ? 'dialog' : undefined;
 
+  // ─── imperative handle ($expose) ────────────────────────────────────────────────
+  // Verbs: show/hide/toggle/reposition. NOT `update` (reserved Lit lifecycle) → the
+  // reposition verb is `reposition`. None collide with the `change` emit, the `open`
+  // model, or its React `setOpen` setter, nor with inherited HTMLElement members.
   show() {
     if (!this.disabled) this.requestOpen(true);
   }

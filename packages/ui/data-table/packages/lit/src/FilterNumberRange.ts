@@ -41,8 +41,6 @@ export default class FilterNumberRange extends SignalWatcher(LitElement) {
     // Seed both drafts once at setup from the incoming [min,max] tuple (setup-once).
     this._minDraft.value = Array.isArray(this.value) && this.value[0] != null ? String(this.value[0]) : '';
     this._maxDraft.value = Array.isArray(this.value) && this.value[1] != null ? String(this.value[1]) : '';
-
-    // Untyped handler params neutralize to `any` (the global-filter idiom).
   }
 
   disconnectedCallback(): void {
@@ -65,6 +63,7 @@ export default class FilterNumberRange extends SignalWatcher(LitElement) {
 `;
   }
 
+  // Untyped handler params neutralize to `any` (the global-filter idiom).
   onMinInput = (e: any) => {
   this._minDraft.value = e && e.target ? e.target.value : '';
 };
@@ -73,10 +72,14 @@ export default class FilterNumberRange extends SignalWatcher(LitElement) {
   this._maxDraft.value = e && e.target ? e.target.value : '';
 };
 
+  // Plain string-coercion functions for the placeholders (NOT $computed — the
+  // EditorSelect/listbox lesson; opaque slot-scope props rejected by strict leaf tsc).
   minPlaceholder = () => Array.isArray(this.minMax) && this.minMax[0] != null ? String(this.minMax[0]) : '';
 
   maxPlaceholder = () => Array.isArray(this.minMax) && this.minMax[1] != null ? String(this.minMax[1]) : '';
 
+  // Convert a draft to a Number or undefined (empty string → undefined so a
+  // one-sided range works). Both undefined → clear the filter.
   applyRange = () => {
   const minNum = this._minDraft.value === '' ? undefined : Number(this._minDraft.value);
   const maxNum = this._maxDraft.value === '' ? undefined : Number(this._maxDraft.value);

@@ -355,6 +355,31 @@ private __rozieFirstUpdateDone = false;
 
   instance: any = null;
 
+  // Imperative handle (Phase 21 $expose). The flatpickr instance methods a
+  // consumer can't drive through props alone — exposed uniformly to all 6 targets
+  // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
+  // Angular+Lit public method / Solid callback ref). Each guards on `instance`
+  // (null before $onMount and after destroy). selectDate forwards flatpickr's own
+  // triggerChange arg; leaving it undefined keeps flatpickr's default (no
+  // onChange refire), so a programmatic selectDate does not bounce through the
+  // round-trip-guarded $watch above.
+  //
+  // Two method names are deliberately NOT flatpickr's own, to avoid collisions
+  // with this component's emitted surface (a real cross-target footgun — see the
+  // Step-4 gap report):
+  //   - `selectDate` (not `setDate`): the `date` prop is `model: true`, so React's
+  //     emitter auto-generates a `setDate` setter for it (useControllableState
+  //     destructure). A user `setDate` collides — ROZ524 ("already declared" +
+  //     infinite-recursion of the model-write rewrite). selectDate wraps
+  //     flatpickr's instance.setDate.
+  //   - `openPicker` / `closePicker` (not `open` / `close`): this component emits
+  //     `open` and `close` EVENTS (onOpen/onClose -> $emit). On targets that
+  //     materialize events as named members (Angular `output()`), a method named
+  //     `open`/`close` collides with the event member and the emitter silently
+  //     renames the method to `_open`/`_close` — breaking the uniform handle. No
+  //     diagnostic fires today (unlike the model-setter ROZ524); flagged for a
+  //     future ROZ "expose-name vs event-name collision" check. Prefixing the
+  //     methods sidesteps it.
   clear() {
     this.instance?.clear();
   }
@@ -375,18 +400,29 @@ private __rozieFirstUpdateDone = false;
     this.instance?.jumpToDate(date);
   }
 
+  // getSelectedDates closes a real asymmetry: the two-way `date` model is a
+  // formatted STRING, but the parsed Date[] is otherwise only delivered on the
+  // `change` event payload — a consumer needing the current Date objects on demand
+  // (range bounds, multi-select, validation) had no path. `[]` before mount.
   getSelectedDates() {
     return this.instance ? this.instance.selectedDates : [];
   }
 
+  // togglePicker = open-or-close in one call (natural for a single trigger button).
+  // `toggle` is not an emit, but suffixed `togglePicker` for symmetry with
+  // openPicker/closePicker.
   togglePicker() {
     this.instance?.toggle();
   }
 
+  // Programmatic calendar navigation for custom prev/next / "jump N months" UI.
+  // changeMonth(value, isOffset?) — isOffset defaults to true (flatpickr). NOT
+  // `monthChange`, which is the emitted event (so ROZ121-clear).
   changeMonth(value: any, isOffset: any) {
     this.instance?.changeMonth(value, isOffset);
   }
 
+  // changeYear(year) — jump to an absolute year. NOT `yearChange` (the emit).
   changeYear(year: any) {
     this.instance?.changeYear(year);
   }

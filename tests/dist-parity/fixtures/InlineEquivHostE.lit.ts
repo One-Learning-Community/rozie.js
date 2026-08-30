@@ -39,6 +39,7 @@ export default class InlineEquivHostE extends SignalWatcher(LitElement) {
 
   usedNameE = (k: number): number => k * 2;
 
+  // leading: the inline host successor trails the spliced partial decl
   hostTailE = (n: number): number => this.usedNameE(n) + this.headE(n);
 
   /**

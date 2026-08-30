@@ -448,6 +448,44 @@ private __rozieFirstUpdateDone = false;
 `;
   }
 
+  // ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
+  // Lifted verbatim from Listbox.rozie's <script> (the monolithic pure-Rozie list logic). This
+  // partial holds ONLY the PURE list spine — option resolvers, the client-side filter, enabled-index
+  // navigation, the arrow/home/end/enter/escape/space/tab keyboard reducer, type-ahead, single+multi
+  // selection, open/close state, and activeDescendant derivation. It is a compile-time `.rzts`
+  // script-partial: it dissolves into each consumer's compiled leaf via inlineScriptPartials() before
+  // IR lowering — leaving zero runtime dependency (the 64-01-proven cross-package bare-specifier path).
+  //
+  // ── PARAMETERIZATION (D-06) ──────────────────────────────────────────────────────────────────
+  // The spine is parameterized BY HOST CONVENTION (the same implicit by-convention mixin contract
+  // windowing.rzts uses) along two axes:
+  //   - focus-model: `activedescendant` | `roving`. Both list families default to `activedescendant`
+  //     (what they use today): the highlighted option is tracked virtually via `activeDescendant`
+  //     (an option id) while DOM focus stays on the control. `roving` (real per-option tabindex
+  //     focus) is SUPPORTED-BUT-UNUSED — no focus rewrite is forced here; a roving host would supply
+  //     its own focus mover. The `activeDescendant` / `optionId` derivation below IS the
+  //     activedescendant model.
+  //   - input-mode: `select-only` (Listbox — a button trigger + type-ahead) | `filter-input`
+  //     (Combobox — a text <input> that filters by the typed query). The mode is by HOST CONVENTION,
+  //     NOT a discriminant prop (P3 retired the Listbox `combobox`/`filterable` props): a select-only
+  //     host never writes `$data.query`, so `visibleOptions` is the identity path for it and the
+  //     printable-char branch of the reducer feeds type-ahead; a filter-input host writes `$data.query`
+  //     from its <input>, so `visibleOptions` substring-filters and `onInput` drives the query.
+  //
+  // ── HOST CONTRACT (symbols the consuming host MUST define before importing) ────────────────────
+  //   - the reassigned module-`let`s `typeBuffer` / `typeTimer` — type-ahead scratch state. They are
+  //     reassigned from handlers → the React emitter hoists them to `useRef` (the setup-once
+  //     guarantee), so per the A==B playbook rule they STAY IN THE HOST; this partial only closes
+  //     over them (in `onTypeahead`).
+  //   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
+  //     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
+  //     HOST functions; this partial only closes over them (it reads NO refs itself).
+  //   - the option set + form surface (`$props.options` / `$props.value` (model) / `$props.multiple` /
+  //     `$props.id` / `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
+  //     `$props.closeOnSelect` / `$props.disabled`) and the reactive state (`$data.open` /
+  //     `$data.activeIndex` / `$data.query`). Input-mode is by convention (the host's <input> writing
+  //     `$data.query`), NOT a discriminant prop.
+  // ---- option resolvers --------------------------------------------------
   labelOf = (opt: any) => {
   if (this.optionLabel !== null) return this.optionLabel(opt);
   if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label;
@@ -466,11 +504,42 @@ private __rozieFirstUpdateDone = false;
   return false;
 };
 
+  // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
+  // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
+  // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
+  // in the host (ROZ123). It is a compile-time `.rzts` script-partial: it dissolves into each consumer's
+  // compiled leaf via inlineScriptPartials() before IR lowering — leaving zero runtime dependency.
+  //
+  // HOST CONTRACT (symbols the consuming host MUST define before importing — the same implicit
+  // by-convention mixin contract the DataTable host's other partials already use for `$data.windowVer`):
+  //   - windowSource(): T[]   — the full list to window (the KEY generalization; the DataTable host
+  //                             returns its pre-pagination row model, listbox/combobox return the
+  //                             filtered options). This partial MUST NOT reach into the host data engine
+  //                             directly — rows arrive ONLY through windowSource().
+  //   - $props.estimateRowHeight — per-item size estimate (kept aliased for DataTable back-compat).
+  //   - $data.windowVer / $data.editVer — window/edit-version reactivity bumps.
+  //   - gridScrollEl              — the scroll-container element handle.
+  //   - virtualizer               — the host virtual-core instance (built in $onMount from the ref).
+  //   - observeElementRect / observeElementOffset / elementScroll / measureElement — virtual-core fns.
+  //   - scheduleRemeasure()       — the host's rAF/microtask remeasure defer.
+  //   - pinnedEditIndex() / pinnedMeasurement(pin) — the D-05 OPTIONAL pin-extension hook (host-provided,
+  //                             defaulting to no-op): the DataTable host passes its edit-pinning hooks;
+  //                             listbox passes nothing. Routing pinning through this host hook (NOT
+  //                             inlining it) keeps DataTable's B13 edit-pinning behavior byte-identical.
+  // getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
+  // React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
+  // id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).
   virtualItemKey = (i: any) => {
   const src = this.windowSource();
   return src && src[i] ? src[i].id : undefined;
 };
 
+  // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
+  // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
+  // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
+  // Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
+  // on virtual-core's generic option inference. onChange uses the `$data.x = $data.x + 1`
+  // increment the React emitter lowers to functional setState — correct even from a mount closure.
   virtualizerOptions = (): any => ({
   count: this.windowSource().length,
   getScrollElement: () => this.gridScrollEl,
@@ -498,6 +567,15 @@ private __rozieFirstUpdateDone = false;
   }
 });
 
+  // pinMeasurement(pin): the D-05 pin-hook read, RE-TYPED at the windowing layer so the
+  // shared math is strict-clean across every host. The host-provided pinnedMeasurement() has
+  // two shapes: the DataTable host returns a real virtual-core measurement; the listbox/combobox
+  // no-op host returns bare `null` (inferred `(pin) => null`). Calling it directly makes
+  // `const pm = pinnedMeasurement(pin)` flow-narrow to `null`, so the downstream `pm && pm.start`
+  // guard collapses the object branch to `never` (TS2339, Class 3). Reading the hook through this
+  // thin wrapper with an EXPLICIT return type (a return-type annotation is NOT flow-narrowed)
+  // gives the measurement a real object-or-null shape, so `pm && pm.start` keeps the object branch.
+  // Typing-only: the runtime value (a measurement or null) is unchanged.
   pinMeasurement = (pin: number): {
   start: number;
   size: number;
@@ -505,6 +583,11 @@ private __rozieFirstUpdateDone = false;
   end: number;
 } | null => this.pinnedMeasurement(pin);
 
+  // windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
+  // { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
+  // $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
+  // full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
+  // `rows` binding → TS2448 self-shadow, line ~1149 lesson).
   windowedRows = () => {
   // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
   // early return — so Solid's <For>/Svelte's {#each} accessor subscribes to it on its FIRST eval,
@@ -575,6 +658,9 @@ private __rozieFirstUpdateDone = false;
   return out;
 };
 
+  // Spacer-<tr> heights (D-03): the leading spacer occupies items[0].start; the trailing spacer
+  // the gap between the last rendered item's end and getTotalSize(). Both windowVer-gated reads
+  // (the `$data.windowVer` touch re-derives them as the window/measurements change). 0 when off.
   padTop = () => {
   // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer + editVer at the TOP so the
   // spacer-<td> :style binding subscribes on the fine-grained targets before the early return,
@@ -627,11 +713,14 @@ private __rozieFirstUpdateDone = false;
   return pad < 0 ? 0 : pad;
 };
 
+  // pmIndexInWindow: is full-model index `idx` present in the rendered virtual window?
   pmIndexInWindow = (items: any, idx: any) => {
   for (let i = 0; i < items.length; i++) if (items[i].index === idx) return true;
   return false;
 };
 
+  // rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
+  // window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
   rowIsOutsideWindow = (r: any) => {
   if (!this.virtual || !this.virtualizer) return false;
   const items = this.virtualizer.getVirtualItems();
@@ -647,10 +736,62 @@ private __rozieFirstUpdateDone = false;
 
   remeasurePending = false;
 
+  // Non-reactive per-instance flag (never rendered — combobox-keepopen phase): written by
+  // pinOpen(v), read by onBlur() to suppress the close-on-blur while a host sub-surface
+  // (e.g. command-palette's action flyout) holds real DOM focus. Mirrors the virtualizer
+  // write-in-$onMount/read-in-several-others cross-function access pattern above.
   pinned = false;
 
+  // Non-reactive per-instance flag (combobox-virtual-reactivity phase): set true once
+  // $onMount has run; read by windowedView() below so the blank-frame fallback (D-4) only
+  // fires on a genuine RUNTIME flip — a virtual:true-at-mount (never-flipped) consumer's
+  // first paint stays byte-stable (windowedRows()'s own pre-mount `[]` still applies before
+  // didMount flips true). Mirrors the same write-in-$onMount/read-elsewhere holder class.
   didMount = false;
 
+  // ---- derived view (plain functions, uniform ×6) ------------------------
+  // The filtered option list, each carrying its filtered-list index `_i`, a stable
+  // windowing key `id`, and the RAW source option (`option`) so `@change` + the
+  // `#option` slot expose the original object (CP reads `e.option.id` / `option.group`).
+  //
+  // REFERENCE-KEYED MEMO, NOT $computed — this is load-bearing for windowed perf. TanStack
+  // virtual-core calls getItemKey(i)/getMeasurements O(count) times per pass, and windowSource()
+  // (below) aliases this, so without a memo every scroll re-`.map()`s ALL options into fresh
+  // wrapper objects — O(N²). On vue each wrapper read trips a reactive Proxy trap (valueOf/labelOf/
+  // disabledOf), so a 60-ArrowDown batch over 1,000 options cost ~16s. It is deliberately NOT a
+  // $computed: a $computed would re-SUBSCRIBE to the reactive `options` Proxy and re-run on
+  // unrelated reactive churn (and on vue re-trip the Proxy traps); the whole point is to AVOID
+  // re-mapping when only activeIndex changed. The cache key is pure VALUE/REFERENCE comparison
+  // (no reactive subscription), so it adds zero reactivity churn — it collapses virtual-core's
+  // O(count) re-maps to ONE map per real (options-ref / query / disableFilter) change.
+  //
+  // Quick 260717-8zb dogfood: re-expressed on the `$memo(fn, keyFn)` primitive.
+  // `$memo` lowers (core, shared across all 6 targets) to a member-mutated
+  // fresh-object cache const + a wrapper function — EXACTLY this foCache shape,
+  // generalized. On React the emitted cache const is stabilized to
+  // `useMemo(() => ({…}), [])` by the EXISTING collectMutatedInstanceBinders/
+  // tryWrapMutatedInstanceUseMemo machinery (feedback_react_const_mutinstance_
+  // not_stabilized) — no per-target $memo code. On the 5 setup-once targets the
+  // top-level consts persist for the instance lifetime naturally.
+  //
+  // keyFn is the SUBSCRIBE-FIRST half (fine-grained Solid <For> / Svelte
+  // {#each}): it reads ALL FOUR reactive inputs UNCONDITIONALLY — $data.query
+  // even when disableFilter is true (mirrors windowing.rzts windowedRows
+  // void-touch discipline) and $props.groups even when $props.virtual (so a
+  // groups change while windowed still invalidates the cache once virtual
+  // toggles off) — evaluated BEFORE $memo's cache-hit check, so the r-for
+  // accessor subscribes to them on every eval. Deliberately NOT a $computed: a
+  // $computed would re-SUBSCRIBE to the reactive `options` Proxy and re-run on
+  // unrelated reactive churn (and on Vue re-trip the Proxy traps); the whole
+  // point is to AVOID re-mapping when only activeIndex changed. The cache key
+  // is pure VALUE/REFERENCE comparison (no reactive subscription), so it adds
+  // zero reactivity churn — it collapses virtual-core's O(count) re-maps to ONE
+  // map per real (options-ref / query / disableFilter / groups-ref) change.
+  //
+  // fn is the MISS path (unchanged from the hand-rolled foCache): run the
+  // filter, then (native option grouping, combobox-native-groups) a
+  // NON-VIRTUAL-ONLY stable re-partition into group-visual order, then map to
+  // wrapper rows.
   filteredOptionsCache = {
   keys: null as any[] | null,
   val: null as any
@@ -708,8 +849,22 @@ private __rozieFirstUpdateDone = false;
   return __rozieMemoVal;
 };
 
+  // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
+  // list (the same wrapper rows the template iterates). Kept === $data.rows so the math's
+  // rowList[vi.index] resolves to the same wrapper the count windows over.
   windowSource = () => this.filteredOptions();
 
+  // windowedView() (combobox-virtual-reactivity, VIRT-FALLBACK): the combobox-side
+  // blank-frame fallback for the mid-flip frame. While `virtual` is on but the virtualizer
+  // has not yet (re)attached (didMount-gated, so the never-flipped virtual:true-at-mount
+  // first paint is untouched — windowedRows()'s own pre-mount `[]` still governs it),
+  // render the UN-WINDOWED full windowSource() slice mapped to the `{ vi: { index }, row }`
+  // shape the windowed template consumes (`wr.vi.index` resolves to the wrapper's own `_i`,
+  // since windowSource() IS the filtered/indexed list navRows()/activeIndex already walk).
+  // Once the virtualizer is built, delegates to windowedRows() UNCHANGED — byte-identical
+  // to today's steady windowed state. Entirely combobox-side: @rozie-ui/headless-core/
+  // windowing.rzts is untouched, preserving data-table's B13 A==B byte-identity + its
+  // empty-diff regen.
   windowedView = () => {
   // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}) — touch windowVer at the
   // TOP, mirroring windowedRows()'s own subscribe-first discipline (windowing.rzts), so
@@ -727,6 +882,13 @@ private __rozieFirstUpdateDone = false;
   return this.windowedRows();
 };
 
+  // ---- native option grouping render helpers (combobox-native-groups) ---------------
+  // groupBlocks(): re-partition the ALREADY group-ordered filteredOptions() wrappers into
+  // CONTIGUOUS runs by wrapper.group (trivial + guarantees `_i` alignment, since `ordered`
+  // from groupOptions() is already group-contiguous). Attaches each run's `{ id, label }`
+  // from $props.groups (fallback label = the group id itself). Plain function — never
+  // $computed (mirrors filteredOptions()'s convention). Non-virtual only (isGrouped() below
+  // already gates the template branch that calls this).
   groupBlocks = () => {
   const wrappers = this.filteredOptions();
   const groupsProp = Array.isArray(this.groups) ? this.groups : [];
@@ -754,25 +916,48 @@ private __rozieFirstUpdateDone = false;
   return blocks;
 };
 
+  // isGrouped(): the grouped-vs-flat template branch selector. Grouping is active
+  // (non-virtual only) SOLELY when the author explicitly set a non-empty `groups` prop —
+  // deliberately NOT "OR any option carries a group" (a real collision discovered against
+  // command-palette's pre-existing CommandItem.group per-row-badge field; see the
+  // filteredOptions() comment above). Mirrors that same non-empty-`groups` gate exactly, so
+  // isGrouped() and the filteredOptions() partition never disagree about which branch is active.
   isGrouped = () => !this.virtual && Array.isArray(this.groups) && this.groups.length > 0;
 
+  // ---- per-group result cap + expand-in-place "+N more" (combobox-group-cap) --------
+  // capNum(): coerce $props.groupCap to a whole, positive cap; anything else (NaN,
+  // negative, absent) degrades to 0 (uncapped). Plain function — never $computed.
   capNum = () => {
   const n = Number(this.groupCap);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
 };
 
+  // isCapped(): the capped-render branch selector. isGrouped() already gates non-
+  // virtual + non-empty `groups`, so the cap is automatically gated OUT of the
+  // virtual and ungrouped paths.
   isCapped = () => this.isGrouped() && this.capNum() > 0;
 
+  // gkey(gid): normalize a group id (possibly null, for the leading ungrouped
+  // section) into an expandedGroups map key.
   gkey = (gid: any) => gid == null ? '__ungrouped__' : String(gid);
 
+  // isExpanded(gid): whether the group has been expanded via its "+N more" row.
   isExpanded = (gid: any) => !!(this._expandedGroups.value && this._expandedGroups.value[this.gkey(gid)]);
 
+  // expandGroup(gid): replace $data.expandedGroups IMMUTABLY (load-bearing for
+  // React re-render — feedback_react_const_mutinstance_not_stabilized / the
+  // graph-writeback immutability rule).
   expandGroup = (gid: any) => {
   this._expandedGroups.value = Object.assign({}, this._expandedGroups.value, {
     [this.gkey(gid)]: true
   });
 };
 
+  // cappedBlocks(): the visible-block model for the capped render — groupBlocks()
+  // re-sliced to `capNum()` per group (unless expanded or non-overflowing), with a
+  // trailing "+N more" row appended to any still-capped block. Re-indexes `_i` as a
+  // running counter over the WHOLE visible+more sequence so option ids/aria-
+  // activedescendant stay contiguous and never disagree with navRows() below.
   cappedBlocks = () => {
   const blocks = this.groupBlocks();
   const cap = this.capNum();
@@ -811,6 +996,10 @@ private __rozieFirstUpdateDone = false;
   return out;
 };
 
+  // navRows(): the SINGLE keyboard/aria source of truth. Returns the EXACT
+  // filteredOptions() reference when not capped (byte-identical-off — untouched
+  // virtual/ungrouped keyboard path); flattens cappedBlocks() into visible items +
+  // more-rows, in order, when capped.
   navRows = () => {
   if (!this.isCapped()) return this.filteredOptions();
   const out = [];
@@ -823,14 +1012,25 @@ private __rozieFirstUpdateDone = false;
   return out;
 };
 
+  // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
+  // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
+  // pinnedMeasurement() UNGUARDED by convention; a combobox has no edit-pinning, so these
+  // reduce the pin union (-1 → never unioned) and the spacer subtraction (null → identity)
+  // to a no-op. They MUST exist or the by-convention call ReferenceErrors at mount.
   pinnedEditIndex = () => -1;
 
   pinnedMeasurement = (pin: any) => null;
 
+  // Keep $data.rows === windowSource() so the windowing math indexes the live filtered set.
   syncRows = () => {
   this._rows.value = this.windowSource();
 };
 
+  // Defer remeasureWindow() until AFTER the framework commits the recycled window: TWO
+  // passes (microtask THEN rAF) behind one in-flight flag (the data-table
+  // virtualization.rzts pattern, copied per-consumer per D-04/D-09) — microtask catches
+  // Solid's <For> / Svelte's {#each} synchronous commit (the Phase 63 Solid
+  // under-convergence hazard — D-09 rAF-defer budget), rAF catches React's async commit.
   scheduleRemeasure = () => {
   if (this.remeasurePending) return;
   this.remeasurePending = true;
@@ -849,6 +1049,9 @@ private __rozieFirstUpdateDone = false;
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) this.remeasurePending = false;else setTimeout(rafPass, 0);
 };
 
+  // measureElement sweep: hand every rendered windowed option to the virtualizer so its
+  // true height is observed (virtual-core measures ONLY nodes passed to measureElement,
+  // keyed by the data-index attribute). Bails during a programmatic scroll.
   remeasureWindow = () => {
   if (!this.virtualizer || !this.gridScrollEl) return;
   if (this.virtualizer.scrollState) return;
@@ -856,6 +1059,12 @@ private __rozieFirstUpdateDone = false;
   for (const el of els as any) this.virtualizer.measureElement(el);
 };
 
+  // Keep the active option visible inside the popup. When windowing, route through the
+  // virtualizer (scrollToIndex) so an active option OUTSIDE the rendered window scrolls
+  // into view (the windowed-arrow-nav seam). When NOT windowing, resolve the active
+  // option element directly (a within-own-shadow query, Lit-safe) and scrollIntoView it
+  // with 'nearest' block alignment — a plain long list taller than the popup's
+  // max-height must also keep the active option visible during arrow navigation.
   scrollActiveIntoView = () => {
   if (!this.virtual && this._isOpen.value && this._activeIndex.value >= 0) {
     const list = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rozie-combobox-list') : null;
@@ -879,12 +1088,14 @@ private __rozieFirstUpdateDone = false;
 
   listId = () => this.idBase + '-list';
 
+  // The active option's id for aria-activedescendant (null when none).
   activeId = () => {
   const list = this.navRows();
   if (this._isOpen.value && this._activeIndex.value >= 0 && list[this._activeIndex.value]) return this.optId(this._activeIndex.value);
   return null;
 };
 
+  // Next selectable index in `dir` (+1/-1), skipping disabled, clamped to ends.
   nextEnabled = (list: any, from: any, dir: any) => {
   let i = from;
   for (let step = 0; step < list.length; step++) {
@@ -897,6 +1108,11 @@ private __rozieFirstUpdateDone = false;
   return from;
 };
 
+  // ---- selection (writes the model + syncs query) ------------------------
+  // `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
+  // `@change` with BOTH the committed value AND the raw source `option` (CP reads
+  // `e.option`). `closeOnSelect` (default true) gates the popup close — a caller
+  // embedding the combobox in a multi-action surface passes `:close-on-select="false"`.
   selectOption = (opt: any) => {
   if (!opt) return;
   if (opt.isMore) {
@@ -919,12 +1135,14 @@ private __rozieFirstUpdateDone = false;
   }));
 };
 
+  // Reflect the externally-selected value into the input text.
   syncQueryToValue = () => {
   const opts = Array.isArray(this.options) ? this.options : [];
   const opt = opts.find((o: any) => o.value === this.value);
   this._query.value = opt ? String(opt.label) : '';
 };
 
+  // ---- input + keyboard handlers -----------------------------------------
   onInput = (e: any) => {
   const q = e && e.target ? e.target.value : '';
   this._query.value = q;
@@ -944,6 +1162,11 @@ private __rozieFirstUpdateDone = false;
   if (e && e.target && e.target.select) e.target.select();
 };
 
+  // @blur closes the popup. Option selection uses @mousedown.prevent, which keeps
+  // focus on the input, so a click on an option does NOT blur-close before select.
+  // While `pinned` (pinOpen(true)), early-return BEFORE the isOpen write — a host
+  // sub-surface (e.g. command-palette's action flyout) is holding focus and the
+  // popup must stay open until the host calls pinOpen(false) itself.
   onBlur = () => {
   if (this.pinned) return;
   this._isOpen.value = false;
@@ -998,6 +1221,15 @@ private __rozieFirstUpdateDone = false;
   this.scrollActiveIntoView();
 };
 
+  // ---- lifecycle + imperative handle -------------------------------------
+  // kickWindow: the cross-target first-paint settle (the data-table / listbox precedent).
+  // Re-captures the LIVE scroll element, re-feeds the CURRENT option count, re-attaches the
+  // rect observer (_willUpdate), and bumps the windowVer signal so the windowed slice
+  // re-derives. Retried over a few frames because (a) virtual-core measures the scroll rect
+  // asynchronously (D-09 Solid rAF-defer — a synchronous kick sees rectH 0 → empty window),
+  // (b) Solid/Lit recreate the list node between mount and first commit (stale scrollElement),
+  // and (c) the consumer often seeds options AFTER the combobox mounts (Lit/React). Stops once
+  // the window paints — idempotent + loop-free.
   kickWindow = (attempts: any) => {
   if (!this.virtualizer) return;
   this.gridScrollEl = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rozie-combobox-list') : this.gridScrollEl;
@@ -1017,6 +1249,12 @@ private __rozieFirstUpdateDone = false;
   }
 };
 
+  // buildVirtualizer() (combobox-virtual-reactivity, VIRT-BUILD): the SINGLE virtualizer
+  // construction site — called from $onMount below (mount-time virtual:true) AND from the
+  // virtual $watch further down (a runtime false→true flip), so the mount path can never
+  // drift from the flip path. Guarded so a build queued (rAF-deferred by the $watch) that
+  // fires AFTER a flip-back is a no-op (rapid-flip idempotence), and so calling it twice
+  // never double-constructs.
   buildVirtualizer = () => {
   if (!this.virtual || this.virtualizer) return;
   // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
@@ -1032,6 +1270,12 @@ private __rozieFirstUpdateDone = false;
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.kickWindow(8));else setTimeout(() => this.kickWindow(8), 0);
 };
 
+  // teardownVirtualizer() (VIRT-TEARDOWN): runs the SAME per-instance cleanup fn
+  // $onUnmount invokes below, then nulls the instance state + bumps windowVer so the
+  // windowed template branch (still mounted while $props.virtual — CR-01) re-derives to
+  // the pre-construction fallback state instead of holding a stale virtualizer. This is
+  // the true→false ResizeObserver-leak fix: previously ONLY $onUnmount ever called
+  // virtualizerCleanup, so a runtime flip to non-virtual left the observer live.
   teardownVirtualizer = () => {
   if (this.virtualizerCleanup) this.virtualizerCleanup();
   this.virtualizer = null;
@@ -1040,6 +1284,16 @@ private __rozieFirstUpdateDone = false;
   this._windowVer.value = this._windowVer.value + 1;
 };
 
+  // focus() — focus the input (accepted ROZ137 Lit override). clear() — reset the
+  // selection + query. seedQuery(text) — imperative-only: write the input text
+  // (and therefore filteredOptions()'s filter) without touching the `value`
+  // model or selection state (a command-palette #2 levels/restore-on-pop
+  // prerequisite — repopulating the input on back-navigation is NOT a
+  // selection). pinOpen(v) — imperative-only: pin (or unpin) the popup open so
+  // onBlur() does not collapse it while a host sub-surface holds focus
+  // (command-palette-sub-actions prerequisite). pinOpen(false) ONLY unpins — it
+  // does NOT itself close the popup or move focus; that is the host's job.
+  // Render-neutral when never called. All four are post-mount → $refs safe.
   focus = () => this._refInputEl?.focus();
 
   clear = () => {

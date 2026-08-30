@@ -182,6 +182,11 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   }));
 };
 
+  // Internal method renamed from `remove` to `removeItem` to avoid colliding
+  // with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
+  // methods as class fields and the resulting `remove(id)` signature is
+  // incompatible with the inherited `remove(): void`. Public API is unchanged:
+  // the slot param is still `:remove`, the emitted event is still `'remove'`.
   removeItem = (id: any) => {
   this._itemsControllable.write(this.items.filter((i: any) => i.id !== id));
   this.dispatchEvent(new CustomEvent("remove", {

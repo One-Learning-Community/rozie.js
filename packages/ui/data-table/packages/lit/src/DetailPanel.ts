@@ -42,6 +42,9 @@ export default class DetailPanel extends SignalWatcher(LitElement) {
 `;
   }
 
+  // Plain setup-once helper (NOT $computed — a $computed can't be aliased; the
+  // EditorSelect plain-function lesson). Build `[{ key, value }]` from the row's own
+  // enumerable keys, String-coercing each value. A null row yields an empty list.
   entries = () => {
   const r = this.row;
   if (!r) return [];

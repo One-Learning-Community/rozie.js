@@ -67,10 +67,6 @@ private get editorCtx() { return this.__rozieCtxConsumer_rozie_lexical_editor.va
   firstUpdated(): void {
     this.ctx = this.editorCtx;
 
-    // The registerUpdateListener cleanup, captured once we register. null = not yet /
-    // torn down. `disposed` guards the deferred activation against an unmount that races
-    // ahead of the microtask below.
-
     this._disconnectCleanups.push((() => {
       this.disposed = true;
       if (this.teardown) {
@@ -107,10 +103,18 @@ private get editorCtx() { return this.__rozieCtxConsumer_rozie_lexical_editor.va
 
   ctx: any = null;
 
+  // The registerUpdateListener cleanup, captured once we register. null = not yet /
+  // torn down. `disposed` guards the deferred activation against an unmount that races
+  // ahead of the microtask below.
   teardown: any = null;
 
   disposed = false;
 
+  // Recompute the toolbar's active booleans from the CURRENT selection. MUST be called
+  // inside an editorState.read() (the registerUpdateListener callback / getEditorState
+  // read below) so the `$`-API resolves against the live editor state. Named
+  // `refreshActive` — NOT `setActive`, which would collide with the React/Solid
+  // generated `$data.active` setter (ROZ524, the TipTap toolbar precedent).
   refreshActive = () => {
   const sel = lexical.$getSelection();
   if (!lexical.$isRangeSelection(sel)) {
@@ -135,6 +139,8 @@ private get editorCtx() { return this.__rozieCtxConsumer_rozie_lexical_editor.va
   };
 };
 
+  // Register the selection-reading update listener against the shared editor and seed
+  // the initial active state. Deferred one microtask from $onMount (see header).
   activate = () => {
   if (this.teardown || this.disposed) return;
   const editor = this.ctx && this.ctx.instance;
@@ -156,6 +162,8 @@ private get editorCtx() { return this.__rozieCtxConsumer_rozie_lexical_editor.va
   });
 };
 
+  // WRITE side — button command dispatchers. Each reads the LIVE editor instance fresh
+  // through the getter (never a stale handle) and guards the pre-mount / torn-down null.
   formatBold = () => {
   const editor = this.ctx && this.ctx.instance;
   if (!editor) return;
@@ -174,6 +182,10 @@ private get editorCtx() { return this.__rozieCtxConsumer_rozie_lexical_editor.va
   editor.dispatchCommand(lexicalList.INSERT_UNORDERED_LIST_COMMAND, undefined);
 };
 
+  // Unopinionated toggle: if the selection is already a link, unlink (dispatch null);
+  // otherwise link it to a fixed sample href. A fixed href (over a prompt) keeps the
+  // primitive dependency-free and SSR/test-safe — consumers wire their own URL UX
+  // against the LinkPlugin's TOGGLE_LINK_COMMAND (D-12).
   toggleLink = () => {
   const editor = this.ctx && this.ctx.instance;
   if (!editor) return;

@@ -39,6 +39,10 @@ export default class ControllableModeFlip extends SignalWatcher(LitElement) {
 `;
   }
 
+  // 06.4 walkthrough bug: createLitControllableProperty treated the INITIAL
+  // attribute parse as a controlled-mode flip. A bare-mounted Lit element with a
+  // model:true prop must seed from the initial attribute as an uncontrolled
+  // default — not latch into controlled mode just because the attribute exists.
   bump = () => {
   this._valueControllable.write(prev => prev + 1);
 };

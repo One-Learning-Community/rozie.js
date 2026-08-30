@@ -66,9 +66,6 @@ private get sources() { return this.__rozieCtxConsumer_maplibre_sources.value; }
 
     this.reg = this.sources;
 
-    // idempotency flag so the $onMount register and the late-context $onUpdate path
-    // (Lit async, REQ-30) never double-register the source.
-
     this._disconnectCleanups.push((() => {
       if (this.reg) this.reg.unregister(this.id);
     }));
@@ -123,7 +120,19 @@ private get sources() { return this.__rozieCtxConsumer_maplibre_sources.value; }
 `;
   }
 
+  // $inject is typed `unknown` (Phase 36 D-4: no rich type synthesis yet), which the
+  // STRICT BUNDLED-LEAF tsc rejects on `.register(...)` (TS2339). The .rozie-native
+  // fix is the null-let → `any` typeNeutralize idiom: alias the injected API through
+  // a MODULE-SCOPE `let reg = null` (typeNeutralize types it `any`) kept fresh from
+  // the live inject every setup pass. Module-scope (not hook-local) so the alias is
+  // in scope from the Solid teardown — which the Solid emitter hoists into a sibling
+  // onCleanup() OUTSIDE the mount closure (the same reason MapLibre keeps its entry
+  // maps at component scope). On React the alias is auto-hoisted to per-instance
+  // useRef storage and re-synced every render — the stable registry-API object makes
+  // that benign. ZERO emitter change (the Phase 35 NO-emitter-touch lesson).
   reg: any = null;
 
+  // idempotency flag so the $onMount register and the late-context $onUpdate path
+  // (Lit async, REQ-30) never double-register the source.
   didRegister = false;
 }

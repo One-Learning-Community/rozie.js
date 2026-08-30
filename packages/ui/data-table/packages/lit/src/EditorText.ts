@@ -50,9 +50,6 @@ private __rozieFirstUpdateDone = false;
     // template). Normalize null/undefined to '' so the input value binds to a string.
     this._draft.value = this.value != null ? String(this.value) : '';
 
-    // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
-    // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
-
     if (this.autofocus) this._refInputEl?.focus();
   }
 
@@ -79,10 +76,13 @@ private __rozieFirstUpdateDone = false;
 `;
   }
 
+  // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
+  // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
   onInput = (e: any) => {
   this._draft.value = e && e.target ? e.target.value : '';
 };
 
+  // commit/cancel are Function props (default null) — guard before calling.
   doCommit = () => {
   this.commit && this.commit(this._draft.value);
 };

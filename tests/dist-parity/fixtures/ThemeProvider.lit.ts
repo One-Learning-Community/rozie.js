@@ -80,6 +80,7 @@ private __rozieCtxProvider_theme = new ContextProvider(this, { context: __rozieC
 `;
   }
 
+  // The cycle order. A plain module constant — never reassigned.
   NEXT = {
   red: 'green',
   green: 'blue',

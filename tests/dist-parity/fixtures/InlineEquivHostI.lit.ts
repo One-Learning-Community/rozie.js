@@ -40,6 +40,7 @@ export default class InlineEquivHostI extends SignalWatcher(LitElement) {
 
   rangeTransitionI = this.headI(1);
 
+  // after-side: comment trails the host let rangeTransitionI and leads the spliced afterDeclI below
   afterDeclI = (k: number): number => k * 2;
 
   fillDragUpI = this.afterDeclI(1);

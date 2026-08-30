@@ -39,6 +39,10 @@ export default class PolymorphicModelGuardNarrow extends SignalWatcher(LitElemen
 `;
   }
 
+  // project_solid_polymorphic_model_typeof_narrow_gap / emitter-hardening
+  // backlog item #11: capturing the guard-and-reread pattern directly (no
+  // author-side workaround) — the emitter must bind a local before the guard
+  // so the narrowing holds uniformly on all six targets.
   selected = (): string => typeof this.value === 'string' ? this.value : '';
 
   get value(): string | any { return this._valueControllable.read(); }

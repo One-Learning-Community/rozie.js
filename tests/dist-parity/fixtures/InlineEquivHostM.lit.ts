@@ -46,6 +46,10 @@ export default class InlineEquivHostM extends SignalWatcher(LitElement) {
   return active;
 };
 
+  // the row-selection slice tracks which rows are checked
+  // across header-group and body rows alike
+  // inRange(rIdx, cIdx) gates the active cell within the
+  // current 2-D selection range before a keydown commits
   refreshRowModelM = 0;
 
   /**
