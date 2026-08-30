@@ -28,24 +28,89 @@
  * EXACTLY (coherence invariant): no shape is exempted in core that any target
  * leaves non-reactive.
  *
+ * quick 260830-m30 — the DYNAMIC-KEY REGISTRY PAIR. `$data.reg[id] = spec` and
+ * `delete $data.reg[id]` — the id-keyed register/unregister idiom — now lower
+ * reactively on all four targets, and a `UnaryExpression` (`delete`) visitor was
+ * added here. Until then this validator had NO delete visitor at all, so every
+ * nested `delete` produced ZERO diagnostics while being silently non-reactive on
+ * four targets — precisely the divergence ROZ207 exists to prevent.
+ *
+ * THE INITIALIZER GATE (D2). A computed depth-2 write is ambiguous between an
+ * array index and an object dynamic key. Resolve it from the DECLARED `<data>`
+ * initializer rather than from the key's literal type:
+ *
+ *   | init kind | `$data.k[E] = rhs`                    | `delete $data.k[E]` |
+ *   |-----------|---------------------------------------|---------------------|
+ *   | object    | `{ ...prev, [E]: rhs }`               | clone-then-delete   |
+ *   | array     | `prev.map(…)`, non-string key only    | FLAGGED (hole)      |
+ *   | other     | FLAGGED                               | FLAGGED             |
+ *
+ * The gate RESOLVES the "ambiguous array vs object" objection this header used
+ * to cite as the reason dynamic keys were excluded: the ambiguity was never in
+ * the key, it was in the container, and the container's declared initializer
+ * answers it statically.
+ *
+ * CW-INDEX RETROFIT. The old CW-INDEX path exempted ANY numeric-literal index,
+ * so `$data.obj[0] = x` with `obj: {}` emitted `{}.map(...)` — a runtime
+ * TypeError, i.e. silently-wrong emitted code INSIDE the exempt subset, which is
+ * strictly worse than a loud error. It now takes the object lowering, and a
+ * numeric index on a non-literal initializer is newly FLAGGED.
+ *
  * COVERED (EXEMPT — statement-context only, `<key>` a declared `<data>` key):
- *   - CW-MEMBER `$data.<key>.<field> = <rhs>` — both non-computed identifiers,
- *     depth-2, plain `=`.
- *   - CW-INDEX  `$data.<key>[<n>] = <rhs>`   — `<n>` a NUMERIC LITERAL, depth-2,
- *     plain `=`.
- *   - CW-ARRAY  `$data.<key>.<m>(<args>)` as an ExpressionStatement — depth-1,
+ *   - CW-MEMBER   `$data.<key>.<field> = <rhs>` — both non-computed identifiers,
+ *     depth-2, plain `=`. NOT gated on the initializer kind (out of scope).
+ *   - CW-DYNKEY   `$data.<key>[<k>] = <rhs>` on an OBJECT-initialized key —
+ *     `<k>` an Identifier, StringLiteral or NumericLiteral (D1: side-effect-free,
+ *     load-bearing because the array lowering re-evaluates `<k>` per element).
+ *   - CW-INDEX    `$data.<key>[<k>] = <rhs>` on an ARRAY-initialized key —
+ *     `<k>` an Identifier or NumericLiteral (a StringLiteral is never an index).
+ *   - CW-DYNDELETE `delete $data.<key>[<k>]` on an OBJECT-initialized key —
+ *     lowers to clone-then-delete, the shape five live corpus sites already
+ *     hand-write.
+ *   - CW-ARRAY    `$data.<key>.<m>(<args>)` as an ExpressionStatement — depth-1,
  *     `<m>` ∈ push/pop/shift/unshift/splice, every arg a plain expression, and
  *     splice with ≥ 2 args (matches where the target lowering bails).
  *
  * FLAGGED (in `<script>`, matching `propWriteValidator`'s scope):
  *   - `$data.a.b.c = …`      (depth ≥ 3 — not single-key-replaceable)
- *   - `$data.reg[id] = …`    (dynamic/computed index — ambiguous array vs object)
+ *   - `$data.reg[k()] = …`   (impure key expression — D1)
+ *   - `$data.k[0] = …` where `k`'s declared initializer is neither a literal
+ *     object nor a literal array (the CW-INDEX retrofit narrowing)
+ *   - `delete $data.arr[i]`  (ARRAY-initialized: a delete leaves a HOLE, a
+ *     genuinely different semantic from an immutable replace — never lowered)
+ *   - `delete $data.obj.field` (non-computed nested delete — D6)
+ *   - `delete $data.a.b[k]`  (depth ≥ 3 delete)
  *   - `$data.obj.field += 1` (any compound / logical-assign operator)
  *   - `$data.obj.field++`    (UpdateExpression on a nested member)
  *   - `$data.arr.sort()` / `.reverse()` / `.fill()` / `.copyWithin()` (in-place)
  *   - `$data.m.set(…)` / `$data.s.add()/.delete()/.clear()` (Map/Set mutators)
- *   - a covered mutator in EXPRESSION context (`const x = $data.arr.pop()`)
+ *   - a covered mutator in EXPRESSION context (`const x = $data.arr.pop()`,
+ *     `const ok = delete $data.reg[id]` — D4 statement-context only)
  *   - a covered array mutator at depth ≥ 2 (`$data.obj.items.push(…)`)
+ *
+ * SETTLED — PERMANENTLY DIAGNOSTIC-ONLY (quick 260830-m30, in the manner ROZ145
+ * was settled). The shapes below are CLOSED to re-litigation. They are not
+ * "deferred"; the project has decided they stay loud errors, and a future audit
+ * pass should not reopen them without new evidence of a real corpus need:
+ *   - depth ≥ 3 nested writes and deletes
+ *   - Map/Set mutators (`set`/`add`/`delete`/`clear`)
+ *   - in-place `sort`/`reverse`/`fill`/`copyWithin`
+ *   - compound (`+=`, `&&=`, …) and update (`++`, `--`) operators
+ *   - ANY covered mutator used in EXPRESSION context
+ *   - covered array mutators at depth ≥ 2
+ *   - `delete` on an array-initialized key (hole semantics)
+ *
+ * ALSO SETTLED — Solid `createStore` for `$data` object state is CLOSED AS NO,
+ * not deferred. It is Solid-ONLY leverage: adopting it would convert a uniform
+ * loud error into a per-target divergence (the exact failure mode the coherence
+ * invariant exists to prevent), and it risks the reference-identity contract
+ * MapLibre's parent watcher depends on, since a store proxy does not produce the
+ * fresh top-level reference an immutable replace does.
+ *
+ * COHERENCE INVARIANT (restated): a shape is ROZ207-exempt here IF AND ONLY IF
+ * it is reactively lowered by ALL FOUR target emitters. This is machine-checked
+ * by `tests/regressions/roz207-coherence.test.ts`, which drives one shared table
+ * through both core's diagnostics and all four emitters' real output.
  *
  * NOT FLAGGED:
  *   - `$data.x = …`          (shallow reassignment — lowers to a reactive setter)
@@ -96,11 +161,32 @@ const MUTATING_METHODS = new Set([
 const COVERED_ARRAY_MUTATORS = new Set(['push', 'pop', 'shift', 'unshift', 'splice']);
 
 /**
- * quick 260718-uvq — is this AssignmentExpression a COVERED nested-`$data` write
- * (CW-MEMBER / CW-INDEX) that lowers reactively on all four targets? Mirrors the
- * per-target `detectCoveredNestedAssign` EXACTLY (coherence invariant):
- * statement-context, plain `=`, LHS `$data.<key>.<field>` (both non-computed) or
- * `$data.<key>[<n>]` (`<n>` a NumericLiteral), `<key>` a declared `<data>` key.
+ * quick 260830-m30 — the D1 pure-key guard and the D2 initializer gate. BOTH
+ * mirror the four targets' `isPureKeyExpr` / `collectDataInitKinds` EXACTLY
+ * (coherence invariant). The targets classify from `ir.state[].initializer`
+ * (StateDecl) and core from `bindings.data.get(k).initializer` (DataDeclEntry) —
+ * the SAME classification computed off two different carriers; both must agree.
+ */
+type DataInitKind = 'object' | 'array' | 'other';
+
+function isPureKeyExpr(node: t.Node): node is t.Identifier | t.StringLiteral | t.NumericLiteral {
+  return t.isIdentifier(node) || t.isStringLiteral(node) || t.isNumericLiteral(node);
+}
+
+function dataInitKind(bindings: BindingsTable, key: string): DataInitKind {
+  const init: t.Node | undefined = bindings.data.get(key)?.initializer;
+  if (t.isObjectExpression(init)) return 'object';
+  if (t.isArrayExpression(init)) return 'array';
+  return 'other';
+}
+
+/**
+ * quick 260718-uvq / 260830-m30 — is this AssignmentExpression a COVERED
+ * nested-`$data` write (CW-MEMBER / CW-INDEX / CW-DYNKEY) that lowers reactively
+ * on all four targets? Mirrors the per-target `detectCoveredNestedAssign`
+ * EXACTLY (coherence invariant): statement-context, plain `=`, LHS
+ * `$data.<key>.<field>` (both non-computed) or `$data.<key>[<k>]` with `<k>`
+ * pure and the declared initializer resolving the container kind.
  */
 function isCoveredNestedAssign(
   path: NodePath<t.AssignmentExpression>,
@@ -115,9 +201,40 @@ function isCoveredNestedAssign(
   if (!t.isMemberExpression(base) || base.computed) return false;
   if (!t.isIdentifier(base.object) || base.object.name !== '$data') return false;
   if (!t.isIdentifier(base.property)) return false;
-  if (!bindings.data.has(base.property.name)) return false;
-  if (!left.computed) return t.isIdentifier(left.property); // CW-MEMBER
-  return t.isNumericLiteral(left.property); // CW-INDEX
+  const key = base.property.name;
+  if (!bindings.data.has(key)) return false;
+  if (!left.computed) return t.isIdentifier(left.property); // CW-MEMBER (ungated)
+  // Computed depth-2 — the D2 gate.
+  if (!isPureKeyExpr(left.property)) return false;
+  const kind = dataInitKind(bindings, key);
+  if (kind === 'object') return true; // CW-DYNKEY (absorbs the numeric-literal case)
+  if (kind === 'array') return !t.isStringLiteral(left.property); // CW-INDEX
+  return false; // 'other' — no sound single-key replace exists
+}
+
+/**
+ * quick 260830-m30 — is this `delete` a COVERED dynamic-key delete
+ * (CW-DYNDELETE)? Mirrors the per-target `detectCoveredDynDelete` EXACTLY:
+ * statement-context (D4), `delete $data.<key>[<pure-key>]`, `<key>` a declared
+ * `<data>` key whose declared initializer is a literal OBJECT. An
+ * array-initialized key is NOT covered — `delete arr[i]` leaves a hole.
+ */
+function isCoveredDynDelete(
+  path: NodePath<t.UnaryExpression>,
+  bindings: BindingsTable,
+): boolean {
+  if (path.node.operator !== 'delete') return false;
+  if (!path.parentPath?.isExpressionStatement()) return false;
+  const arg = path.node.argument;
+  if (!t.isMemberExpression(arg) || !arg.computed) return false;
+  const base = arg.object;
+  if (!t.isMemberExpression(base) || base.computed) return false;
+  if (!t.isIdentifier(base.object) || base.object.name !== '$data') return false;
+  if (!t.isIdentifier(base.property)) return false;
+  const key = base.property.name;
+  if (!bindings.data.has(key)) return false;
+  if (!isPureKeyExpr(arg.property)) return false;
+  return dataInitKind(bindings, key) === 'object';
 }
 
 /**
@@ -165,13 +282,24 @@ function analyzeDataAccess(node: t.Node): { key: string | null; depth: number } 
   return null;
 }
 
-function makeRoz207(offendingNode: t.Node, member: string, detail: string): Diagnostic {
+function makeRoz207(
+  offendingNode: t.Node,
+  member: string,
+  detail: string,
+  // quick 260830-m30 — a deletion needs its own guidance: the generic
+  // whole-object-REPLACE suggestion does not express removing a key.
+  kind: 'assign' | 'delete' = 'assign',
+): Diagnostic {
+  const hint =
+    kind === 'delete'
+      ? `Clone the whole top-level value, delete the key off the clone, then reassign it, e.g. \`const next = { ...$data.${member} }; delete next[<key>]; $data.${member} = next;\` — that lowers to a reactive setter on all six targets.`
+      : `Replace the whole top-level value instead, e.g. \`$data.${member} = { ...$data.${member}, <key>: … }\` (or a new array), which lowers to a reactive setter on all six targets.`;
   return {
     code: RozieErrorCode.DATA_NESTED_MUTATION_NOT_REACTIVE,
     severity: 'error',
     message: `In-place mutation of nested '$data.${member}' (${detail}) is not reactive on React/Solid/Angular/Lit — the change persists but no re-render fires.`,
     loc: locFromBabel(offendingNode),
-    hint: `Replace the whole top-level value instead, e.g. \`$data.${member} = { ...$data.${member}, <key>: … }\` (or a new array), which lowers to a reactive setter on all six targets.`,
+    hint,
   };
 }
 
@@ -182,12 +310,17 @@ export function runDataNestedMutationValidator(
 ): void {
   if (!ast.script) return;
 
-  function checkWriteTarget(target: t.Node, offending: t.Node, detail: string): void {
+  function checkWriteTarget(
+    target: t.Node,
+    offending: t.Node,
+    detail: string,
+    kind: 'assign' | 'delete' = 'assign',
+  ): void {
     const info = analyzeDataAccess(target);
     if (!info || info.key === null) return;
     if (info.depth < 2) return; // shallow `$data.x = …` is reactive — allowed
     if (!bindings.data.has(info.key)) return; // unknown key → ROZ106, not ours
-    diagnostics.push(makeRoz207(offending, info.key, detail));
+    diagnostics.push(makeRoz207(offending, info.key, detail, kind));
   }
 
   traverse(ast.script.program, {
@@ -200,6 +333,18 @@ export function runDataNestedMutationValidator(
     UpdateExpression(path) {
       // UpdateExpression (`$data.obj.n++`) is NEVER covered — stays flagged.
       checkWriteTarget(path.node.argument, path.node, `${path.node.operator} on a nested member`);
+    },
+    /**
+     * quick 260830-m30 — THE SOUNDNESS FIX. There was no `UnaryExpression`
+     * visitor here at all, so `delete $data.reg[id]` produced ZERO diagnostics
+     * while emitting a bare, silently non-reactive `delete` on four targets.
+     * Now every nested `delete` on a declared `<data>` key is either COVERED by
+     * CW-DYNDELETE or LOUD. None is silent.
+     */
+    UnaryExpression(path) {
+      if (path.node.operator !== 'delete') return;
+      if (isCoveredDynDelete(path, bindings)) return;
+      checkWriteTarget(path.node.argument, path.node, 'delete of a nested key', 'delete');
     },
     CallExpression(path) {
       const callee = path.node.callee;

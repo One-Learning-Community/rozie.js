@@ -57,8 +57,9 @@ describe('nested-$data-mutation diagnostics (Spike-012 R8 silent reactivity brea
   const FLAGGED: Array<[string, string, string]> = [
     // depth ≥ 3 — not statically single-key-replaceable.
     ['deep member assignment (depth-3)', '{ a: { b: { c: 0 } } }', '$data.a.b.c = 1;'],
-    // dynamic / computed index (ambiguous array-index vs object-dynamic-key).
-    ['dynamic/computed index', '{ reg: {} }', 'const id = "k"; $data.reg[id] = 5;'],
+    // quick 260830-m30 — the dynamic/computed-key ROW MOVED TO `CLEAN`: the D2
+    // initializer gate resolves the array-vs-object ambiguity that used to be
+    // the stated reason for excluding it, and all four targets now lower it.
     // compound / UpdateExpression on a nested member.
     ['compound nested assignment', '{ obj: { n: 0 } }', '$data.obj.n += 1;'],
     ['UpdateExpression on a nested member', '{ obj: { n: 0 } }', '$data.obj.n++;'],
@@ -74,6 +75,19 @@ describe('nested-$data-mutation diagnostics (Spike-012 R8 silent reactivity brea
     // covered mutator used in EXPRESSION context — the return value is consumed,
     // so it is not statement-context-lowerable and stays flagged.
     ['expression-context covered mutator (pop return used)', '{ items: [1, 2] }', 'const removed = $data.items.pop(); void removed;'],
+    // quick 260830-m30 — NEW diagnostics. Every one of these compiled CLEAN at
+    // HEAD and was SILENTLY non-reactive on React/Solid/Angular/Lit, because the
+    // validator had no `UnaryExpression` visitor at all.
+    ['delete on an ARRAY-initialized key (hole semantics)', '{ arr: [] }', 'const i = 0; delete $data.arr[i];'],
+    ['delete on a NON-LITERAL-initialized key', '{ reg: null }', 'const id = "k"; delete $data.reg[id];'],
+    ['non-computed nested delete (D6)', '{ obj: { field: 1 } }', 'delete $data.obj.field;'],
+    ['depth-3 delete', '{ a: { b: {} } }', 'const k = "x"; delete $data.a.b[k];'],
+    ['expression-context delete (D4)', '{ reg: {} }', 'const id = "k"; const ok = delete $data.reg[id]; void ok;'],
+    ['impure key expression (D1)', '{ reg: {} }', 'function k(){ return "a"; } $data.reg[k()] = 5;'],
+    // The CW-INDEX RETROFIT narrowing: this row compiled CLEAN at HEAD and the
+    // emitters produced `null.map(...)` — silently-wrong code inside the exempt
+    // subset, strictly worse than a loud error.
+    ['numeric index on a NON-LITERAL-initialized key', '{ reg: null }', '$data.reg[0] = 5;'],
   ];
 
   for (const [label, data, body] of FLAGGED) {
@@ -99,6 +113,14 @@ describe('nested-$data-mutation diagnostics (Spike-012 R8 silent reactivity brea
     ['CW-ARRAY covered shift', '{ items: [1, 2] }', '$data.items.shift();'],
     ['CW-ARRAY covered unshift', '{ items: [1] }', '$data.items.unshift(2);'],
     ['CW-ARRAY covered splice', '{ items: [1, 2] }', '$data.items.splice(0, 1);'],
+    // quick 260830-m30 — the dynamic-key registry PAIR, now lowered reactively
+    // on all four targets (this is the narrowing; the first row MOVED here out
+    // of FLAGGED).
+    ['CW-DYNKEY identifier key on an object-initialized key', '{ reg: {} }', 'const id = "k"; $data.reg[id] = 5;'],
+    ['CW-DYNKEY string-literal key on an object-initialized key', '{ reg: {} }', '$data.reg["k"] = 5;'],
+    ['CW-DYNKEY identifier index on an array-initialized key', '{ arr: [1, 2] }', 'const i = 1; $data.arr[i] = 9;'],
+    ['CW-INDEX RETROFIT numeric literal on an object-initialized key', '{ obj: {} }', '$data.obj[0] = 9;'],
+    ['CW-DYNDELETE on an object-initialized key', '{ reg: {} }', 'const id = "k"; delete $data.reg[id];'],
   ];
 
   for (const [label, data, body] of CLEAN) {
@@ -109,6 +131,11 @@ describe('nested-$data-mutation diagnostics (Spike-012 R8 silent reactivity brea
 
   it('does not flag a nested write to an UNDECLARED key (deferred to ROZ106)', () => {
     const src = rozie('{ known: 0 }', '$data.unknown.field = 5;');
+    expect(roz207(compileDiagnostics(src)).length).toBe(0);
+  });
+
+  it('does not flag a nested DELETE on an UNDECLARED key (deferred to ROZ106)', () => {
+    const src = rozie('{ known: 0 }', 'const id = "k"; delete $data.unknown[id];');
     expect(roz207(compileDiagnostics(src)).length).toBe(0);
   });
 });
