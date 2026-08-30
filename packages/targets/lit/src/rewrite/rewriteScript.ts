@@ -139,6 +139,41 @@ function immutableIndexValue(
   return t.callExpression(t.memberExpression(mkPrev(), t.identifier('map')), [arrow]);
 }
 
+/**
+ * quick 260830-m30 — the INITIALIZER GATE (D2). See the React target for the
+ * full decision table and rationale.
+ */
+type DataInitKind = 'object' | 'array' | 'other';
+
+function collectDataInitKinds(ir: IRComponent): ReadonlyMap<string, DataInitKind> {
+  const kinds = new Map<string, DataInitKind>();
+  for (const decl of ir.state) {
+    const init: t.Node | undefined = decl.initializer;
+    kinds.set(
+      decl.name,
+      t.isObjectExpression(init) ? 'object' : t.isArrayExpression(init) ? 'array' : 'other',
+    );
+  }
+  return kinds;
+}
+
+/** quick 260830-m30 (D1) — side-effect-free computed keys only. See React. */
+function isPureKeyExpr(node: t.Node): node is t.Identifier | t.StringLiteral | t.NumericLiteral {
+  return t.isIdentifier(node) || t.isStringLiteral(node) || t.isNumericLiteral(node);
+}
+
+/** CW-DYNKEY object form: `{ ...this._key.value, [<key>]: rhs }` (COMPUTED). */
+function immutableDynKeyValue(
+  mkPrev: () => t.Expression,
+  keyExpr: t.Expression,
+  rhs: t.Expression,
+): t.Expression {
+  return t.objectExpression([
+    t.spreadElement(mkPrev()),
+    t.objectProperty(keyExpr, rhs, /* computed */ true),
+  ]);
+}
+
 /** null → not lowerable (leave to ROZ207). */
 function immutableArrayValue(
   mkPrev: () => t.Expression,
@@ -175,15 +210,18 @@ function immutableArrayValue(
 }
 
 /**
- * Detect a COVERED nested `$data` assignment (CW-MEMBER / CW-INDEX). See the
- * React target for the full predicate.
+ * Detect a COVERED nested `$data` assignment (CW-MEMBER / CW-INDEX / CW-DYNKEY).
+ * See the React target for the full predicate; the computed branch is resolved
+ * by the quick 260830-m30 declared-initializer gate.
  */
 function detectCoveredNestedAssign(
   path: NodePath<t.AssignmentExpression>,
   dataNames: ReadonlySet<string>,
+  initKinds: ReadonlyMap<string, DataInitKind>,
 ):
   | { kind: 'member'; key: string; field: string }
   | { kind: 'index'; key: string; index: t.Expression }
+  | { kind: 'dynkey'; key: string; keyExpr: t.Expression }
   | null {
   const node = path.node;
   if (node.operator !== '=') return null;
@@ -200,8 +238,39 @@ function detectCoveredNestedAssign(
     if (!t.isIdentifier(left.property)) return null;
     return { kind: 'member', key, field: left.property.name };
   }
-  if (!t.isNumericLiteral(left.property)) return null;
-  return { kind: 'index', key, index: left.property };
+  // quick 260830-m30 — computed depth-2 property, resolved by the D2 gate.
+  if (!isPureKeyExpr(left.property)) return null;
+  const initKind = initKinds.get(key) ?? 'other';
+  if (initKind === 'object') return { kind: 'dynkey', key, keyExpr: left.property };
+  if (initKind === 'array') {
+    if (t.isStringLiteral(left.property)) return null; // never an array index
+    return { kind: 'index', key, index: left.property };
+  }
+  return null; // 'other' — no sound single-key replace exists.
+}
+
+/**
+ * quick 260830-m30 — detect a COVERED dynamic-key DELETE (CW-DYNDELETE) on an
+ * object-initialized `<data>` key. See the React target for the full predicate.
+ */
+function detectCoveredDynDelete(
+  path: NodePath<t.UnaryExpression>,
+  dataNames: ReadonlySet<string>,
+  initKinds: ReadonlyMap<string, DataInitKind>,
+): { key: string; keyExpr: t.Expression } | null {
+  if (path.node.operator !== 'delete') return null;
+  if (!path.parentPath?.isExpressionStatement()) return null; // D4
+  const arg = path.node.argument;
+  if (!t.isMemberExpression(arg) || !arg.computed) return null;
+  const base = arg.object;
+  if (!t.isMemberExpression(base) || base.computed) return null;
+  if (!t.isIdentifier(base.object) || base.object.name !== '$data') return null;
+  if (!t.isIdentifier(base.property)) return null;
+  const key = base.property.name;
+  if (!dataNames.has(key)) return null;
+  if (!isPureKeyExpr(arg.property)) return null;
+  if ((initKinds.get(key) ?? 'other') !== 'object') return null;
+  return { key, keyExpr: arg.property };
 }
 
 /**
@@ -409,6 +478,8 @@ export function rewriteScript(
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
   const dataNames = new Set(ir.state.map((s) => s.name));
+  // quick 260830-m30 — declared-initializer classification for the D2 gate.
+  const dataInitKinds = collectDataInitKinds(ir);
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? 'default' : s.name)));
@@ -478,6 +549,52 @@ export function rewriteScript(
   );
 
   traverse(cloned, {
+    /**
+     * quick 260830-m30 — CW-DYNDELETE. `delete $data.<key>[<pure-key>]` on an
+     * object-initialized `<data>` key lowers to a reactive clone-then-delete.
+     * There was NO `UnaryExpression` visitor here before, so this shape emitted
+     * a bare `delete this._reg.value[id]` — silently non-reactive (no
+     * `requestUpdate`, because only the `.value` SETTER triggers one).
+     *
+     * Lit's write is expression-shaped, so it cannot host the clone and the
+     * delete inline; replace the PARENT ExpressionStatement with a bare
+     * BlockStatement (legal anywhere an ExpressionStatement is, and it
+     * block-scopes `__next` so two deletes cannot collide).
+     */
+    UnaryExpression(path) {
+      if (path.node.operator !== 'delete') return;
+      const dyn = detectCoveredDynDelete(path, dataNames, dataInitKinds);
+      if (dyn === null) return; // uncovered → ROZ207 owns fail-loud in core
+      const stmtPath = path.parentPath;
+      if (!stmtPath.isExpressionStatement()) return;
+      stmtPath.replaceWith(
+        t.blockStatement([
+          t.variableDeclaration('const', [
+            t.variableDeclarator(
+              t.identifier('__next'),
+              t.objectExpression([t.spreadElement(thisSignalRead(dyn.key))]),
+            ),
+          ]),
+          t.expressionStatement(
+            t.unaryExpression(
+              'delete',
+              t.memberExpression(t.identifier('__next'), dyn.keyExpr, /* computed */ true),
+            ),
+          ),
+          // The `.value` setter is what triggers requestUpdate — this write-back
+          // is what makes the delete reactive.
+          t.expressionStatement(
+            t.assignmentExpression('=', thisSignalRead(dyn.key), t.identifier('__next')),
+          ),
+        ]),
+      );
+      // D5 — no skip: `<key>` may hold `$data.Y` reads that still need lowering.
+      // The synthesized `delete __next[E]` is re-visited and rejected (`__next`
+      // is not `$data`); the synthesized write-back is rejected by the
+      // AssignmentExpression visitor's own guards (its LHS object is a
+      // MemberExpression, not a bare `$data` Identifier).
+    },
+
     AssignmentExpression(path) {
       const node = path.node;
       const left = node.left;
@@ -485,13 +602,15 @@ export function rewriteScript(
       // quick 260718-uvq — COVERED nested-$data reactive lowering (CW-MEMBER /
       // CW-INDEX). Reassign the settable `this._key.value` signal-ref with an
       // immutable replacement (the `.value` setter triggers requestUpdate).
-      const covered = detectCoveredNestedAssign(path, dataNames);
+      const covered = detectCoveredNestedAssign(path, dataNames, dataInitKinds);
       if (covered !== null) {
         const mkPrev = (): t.Expression => thisSignalRead(covered.key);
         const value =
           covered.kind === 'member'
             ? immutableMemberValue(mkPrev, covered.field, node.right)
-            : immutableIndexValue(mkPrev, covered.index, node.right);
+            : covered.kind === 'index'
+              ? immutableIndexValue(mkPrev, covered.index, node.right)
+              : immutableDynKeyValue(mkPrev, covered.keyExpr, node.right);
         path.replaceWith(t.assignmentExpression('=', thisSignalRead(covered.key), value));
         // No skip — descend so `$data.Y` reads inside the rhs still lower.
         return;
