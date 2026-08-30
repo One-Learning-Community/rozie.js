@@ -7,6 +7,18 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@rozie-ui/combobox-lit": "workspace:*",
+    "@rozie-ui/combobox-react": "workspace:*",
+    "@rozie-ui/combobox-solid": "workspace:*",
+    "@rozie-ui/data-table-lit": "workspace:*",
+    "@rozie-ui/data-table-react": "workspace:*",
+    "@rozie-ui/data-table-solid": "workspace:*",
+    "@rozie-ui/listbox-lit": "workspace:*",
+    "@rozie-ui/listbox-react": "workspace:*",
+    "@rozie-ui/listbox-solid": "workspace:*",
+    "@rozie-ui/slider-lit": "workspace:*",
+    "@rozie-ui/slider-react": "workspace:*",
+    "@rozie-ui/slider-solid": "workspace:*",
     "@rozie/core": "workspace:*",
     "@rozie/runtime-lit": "workspace:*",
     "typescript": "~5.6.0",

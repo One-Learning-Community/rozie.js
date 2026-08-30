@@ -6919,7 +6919,7 @@ importers:
     dependencies:
       '@analogjs/vite-plugin-angular':
         specifier: ~2.5.1
-        version: 2.5.1(0007586ad59c0fe1a6489c190ed6e30a)
+        version: 2.5.1(58e94ae18d8d16a136cfa08aa996904f)
       '@angular/common':
         specifier: ^19.0.0
         version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.14.10))(rxjs@7.8.2)
@@ -6959,10 +6959,10 @@ importers:
     devDependencies:
       '@angular-devkit/build-angular':
         specifier: ^19.0.0
-        version: 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(typescript@5.6.3)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
+        version: 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(typescript@5.6.3)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.2.2)(lightningcss@1.32.0)(sass@1.85.0)(terser@5.46.2))
       '@angular/build':
         specifier: ^19.0.0
-        version: 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(postcss@8.5.16)(terser@5.46.2)(typescript@5.6.3)
+        version: 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(less@4.2.2)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(postcss@8.5.12)(terser@5.46.2)(typescript@5.6.3)
       '@angular/compiler-cli':
         specifier: ^19.0.0
         version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
@@ -6980,10 +6980,10 @@ importers:
         version: 5.6.3
       vite:
         specifier: ^6.0.0
-        version: 6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2)
+        version: 6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.2.2)(lightningcss@1.32.0)(sass@1.85.0)(terser@5.46.2)
       vitest:
         specifier: ^4.1.5
-        version: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
+        version: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.2.2)(lightningcss@1.32.0)(sass@1.85.0)(terser@5.46.2))
 
   tests/angular-typecheck:
     dependencies:
@@ -7158,13 +7158,13 @@ importers:
     dependencies:
       '@analogjs/vite-plugin-angular':
         specifier: ~2.5.1
-        version: 2.5.1(58e94ae18d8d16a136cfa08aa996904f)
+        version: 2.5.1(0007586ad59c0fe1a6489c190ed6e30a)
       '@angular-devkit/build-angular':
         specifier: ^19.0.0
-        version: 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(typescript@5.6.3)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.2.2)(lightningcss@1.32.0)(sass@1.85.0)(terser@5.46.2))
+        version: 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(typescript@5.6.3)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
       '@angular/build':
         specifier: ^19.0.0
-        version: 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(less@4.2.2)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(postcss@8.5.12)(terser@5.46.2)(typescript@5.6.3)
+        version: 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(postcss@8.5.16)(terser@5.46.2)(typescript@5.6.3)
       '@angular/common':
         specifier: ^19.0.0
         version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.14.10))(rxjs@7.8.2)
@@ -7195,10 +7195,10 @@ importers:
         version: 5.6.3
       vite:
         specifier: ^6.0.0
-        version: 6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.2.2)(lightningcss@1.32.0)(sass@1.85.0)(terser@5.46.2)
+        version: 6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2)
       vitest:
         specifier: ^4.1.5
-        version: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.2.2)(lightningcss@1.32.0)(sass@1.85.0)(terser@5.46.2))
+        version: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
 
   tests/lit-lint:
     dependencies:
@@ -7481,6 +7481,42 @@ importers:
 
   tests/strict-conformance:
     devDependencies:
+      '@rozie-ui/combobox-lit':
+        specifier: workspace:*
+        version: link:../../packages/ui/combobox/packages/lit
+      '@rozie-ui/combobox-react':
+        specifier: workspace:*
+        version: link:../../packages/ui/combobox/packages/react
+      '@rozie-ui/combobox-solid':
+        specifier: workspace:*
+        version: link:../../packages/ui/combobox/packages/solid
+      '@rozie-ui/data-table-lit':
+        specifier: workspace:*
+        version: link:../../packages/ui/data-table/packages/lit
+      '@rozie-ui/data-table-react':
+        specifier: workspace:*
+        version: link:../../packages/ui/data-table/packages/react
+      '@rozie-ui/data-table-solid':
+        specifier: workspace:*
+        version: link:../../packages/ui/data-table/packages/solid
+      '@rozie-ui/listbox-lit':
+        specifier: workspace:*
+        version: link:../../packages/ui/listbox/packages/lit
+      '@rozie-ui/listbox-react':
+        specifier: workspace:*
+        version: link:../../packages/ui/listbox/packages/react
+      '@rozie-ui/listbox-solid':
+        specifier: workspace:*
+        version: link:../../packages/ui/listbox/packages/solid
+      '@rozie-ui/slider-lit':
+        specifier: workspace:*
+        version: link:../../packages/ui/slider/packages/lit
+      '@rozie-ui/slider-react':
+        specifier: workspace:*
+        version: link:../../packages/ui/slider/packages/react
+      '@rozie-ui/slider-solid':
+        specifier: workspace:*
+        version: link:../../packages/ui/slider/packages/solid
       '@rozie/core':
         specifier: workspace:*
         version: link:../../packages/core
