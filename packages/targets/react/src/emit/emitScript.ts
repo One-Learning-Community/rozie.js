@@ -1015,16 +1015,19 @@ function collectPureLiteralBinders(
 }
 
 /**
- * Quick 260828-uyn — render a statement's own attached comments (NOT any
- * neighbour's) as standalone `//`/`/* *\/` lines, verbatim. Used only by
- * `tryWrapPureLiteralUseMemo`: unlike its two siblings, this pass's
- * candidates were — until intercepted here — headed for the plain
- * `genCode(emitted)` fallthrough at the bottom of the emission loop, which
- * prints a statement's `leadingComments`/`trailingComments` as a matter of
- * course. Skipping this would silently drop real author documentation the
- * moment a commented literal starts qualifying for the memo wrap (observed
- * on `MapLibre.rozie`'s `PROGRAMMATIC` and `TipTap.rozie`'s
- * `STARTERKIT_COLLISION_MAP`, both carrying multi-line doc comments).
+ * Quick 260828-uyn — render a list of comments as standalone `//`/`/* *\/`
+ * lines, verbatim. A statement claimed by one of the emission loop's
+ * `tryWrap*` passes is emitted as a hand-built STRING rather than generated
+ * from AST, so @babel/generator never prints its comments and real author
+ * documentation would silently vanish the moment a commented declaration
+ * started qualifying for a wrap (first observed on `MapLibre.rozie`'s
+ * `PROGRAMMATIC` and `TipTap.rozie`'s `STARTERKIT_COLLISION_MAP`).
+ *
+ * Quick 260829-j18 — the CALLER decides which comments reach here. Every
+ * wrap now routes through the emission loop's `pushWrapped`, which feeds this
+ * only the comments the block ledger has not already spent
+ * (`takeUnprintedComments`); passing a raw `stmt.leadingComments` would
+ * reintroduce the double-print this function's callers used to cause.
  *
  * Deliberately hand-formats each comment on its own line rather than
  * attaching the original `t.Comment` nodes to a synthetic AST node and
