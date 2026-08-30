@@ -57,6 +57,10 @@ export default defineConfig({
       'dynamic-slot-name-rfor.test.ts',
       'example-jsdoc-authoring-notation-guard.test.ts',
       'roz138-corpus-precision.test.ts',
+      // quick 260830-m30 — the ROZ207 coherence differential. This include list
+      // is an ALLOWLIST: an unlisted `.test.ts` is silently uncollected while
+      // the suite still reports green.
+      'roz207-coherence.test.ts',
       '**/*.test.tsx',
     ],
     testTimeout: 30000,
