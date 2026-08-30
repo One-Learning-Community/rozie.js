@@ -526,13 +526,6 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     undoRedo: 'undoRedo',
     history: 'undoRedo'
   }), []);
-  // Pure helper — returns `userConfig` extended so any StarterKit-bundled
-  // node/mark the consumer replaced (a same-named entry in `exts`) is disabled
-  // UNLESS the consumer already decided that key's fate in `userConfig` (an `in`
-  // presence check, so an explicit `false` OR an explicit options object both
-  // count as "consumer decided" — D-02, consumer wins unless configured
-  // explicitly). Never invokes consumer code — only reads `.name` and does key
-  // presence checks (guards a non-object/missing `.name` entry by skipping it).
   const buildStarterKitConfig = useCallback((userConfig: any, exts: any) => {
     const effective = {
       ...userConfig

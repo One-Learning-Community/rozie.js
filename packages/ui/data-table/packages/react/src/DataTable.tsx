@@ -443,12 +443,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
   // via the same focusActiveCell() scroll-into-view seam — kept a top-level const so that
   // later change is a one-line edit.
-  const GRID_PAGE_STEP = 10;
-  // The stable table-root element, captured in $onMount (the ONLY ROZ123-safe place to read
-  // $el / query DOM across all six). focusActiveCell() resolves cells off this root; it is
-  // shadow-safe because the query runs from INSIDE the component's own scope (the listbox
-  // querySelector-off-root precedent, proven ×6 by plan 01's probe). NEVER read in a
-  // computed/template binding (ROZ123).
+  const GRID_PAGE_STEP = useMemo(() => 10, []);
   // ── Grid-wide undo/redo (260709-8ct) — history STATE lives in top-level `let` (mirroring
   // `programmatic` above), NOT $data: recording a snapshot on every keystroke must not trigger
   // a reactive re-render. React hoists each to useRef. undoStack/redoStack hold `data` array
@@ -479,7 +474,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // and the reset would stamp/read DIFFERENT symbols and the marker would never match. Non-enumerable
   // → invisible to JSON.stringify / spread / Object.keys (the consumer's data stays clean); namespaced
   // so a consumer array never collides.
-  const DATA_WRITE_TOKEN_KEY = '__rozieDataWriteToken';
+  const DATA_WRITE_TOKEN_KEY = useMemo(() => '__rozieDataWriteToken', []);
   function groupingActiveDefault() {
     return ((grouping != null ? grouping : groupingDefault) || []).length > 0;
   }
@@ -656,25 +651,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   // The constant id of the auto-injected leading checkbox column (D-04). Distinct from
   // any consumer column id (the registry/config guard never produces a leading "__").
-  const SELECT_COL_ID = '__rdt_select';
-
+  const SELECT_COL_ID = useMemo(() => '__rdt_select', []);
   // The constant id of the auto-injected leading chevron expander column (phase 50, D-04).
   // Distinct from any consumer column id (the registry/config guard never produces a leading
   // "__"). Injected AFTER the select column (so order is [select, expander, ...userCols]).
-  // The constant id of the auto-injected leading chevron expander column (phase 50, D-04).
-  // Distinct from any consumer column id (the registry/config guard never produces a leading
-  // "__"). Injected AFTER the select column (so order is [select, expander, ...userCols]).
-  const EXPANDER_COL_ID = '__rdt_expander';
-
-  // The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
-  // user columns, PLUS a LEADING checkbox column when selectionMode is 'single' OR
-  // 'multiple' (D-04). The select column carries enableSorting/enableColumnFilter:false
-  // and an isSelectColumn marker the template uses to render checkbox chrome (NOT an
-  // accessor value). 'none' injects nothing. In 'single' mode the per-row checkbox
-  // renders but the select-all HEADER checkbox is suppressed (selecting a row caps at
-  // ≤1 via enableMultiRowSelection:false) — a single-select needs a per-row control,
-  // not a select-all, so without injecting the column single mode would expose NO
-  // selection UI at all.
+  const EXPANDER_COL_ID = useMemo(() => '__rdt_expander', []);
   function selectionEnabled() {
     return props.selectionMode === 'single' || props.selectionMode === 'multiple';
   }

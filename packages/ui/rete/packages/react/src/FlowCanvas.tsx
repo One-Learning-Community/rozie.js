@@ -450,19 +450,21 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
 
   const boxEntries = useMemo(() => new WeakMap(), []);
   const pendingResizeSizes = useMemo(() => new Map(), []);
+  // MiniMap geometry (px) — MUST match the .rozie-flow-minimap CSS box below.
   const MINIMAP_W = useMemo(() => 200, []);
   const MINIMAP_H = useMemo(() => 150, []);
+  // Fallback node-rect dims when a node-view element isn't measurable yet (Lit async
+  // first paint, REQ-30) — re-measured on the next render (the render pipe re-schedules).
   const MINIMAP_DEFAULT_NODE_W = useMemo(() => 140, []);
   const MINIMAP_DEFAULT_NODE_H = useMemo(() => 52, []);
   // Phase 74-03 (D-17) — the resize floor when a resizable NodeType declares no
   // minWidth/minHeight: a small sane default so an unconstrained drag can't shrink a
   // node to 0px (belt-and-suspenders with the double-click-to-auto-size reset, D-08).
-  const RESIZE_MIN_FALLBACK = 40;
-  // WR-02: types whose maxWidth/maxHeight has already been warned-about as inverted
-  // (below the effective minWidth/minHeight) — a one-time-per-type warning, not a
-  // per-pointermove spam during a live resize drag.
+  const RESIZE_MIN_FALLBACK = useMemo(() => 40, []);
   const clampInversionWarnedTypes = useMemo(() => new Set(), []);
   const SVGNS = useMemo(() => 'http://www.w3.org/2000/svg', []);
+  // One Socket shared by every port (Rete sockets gate compatibility by identity;
+  // a single socket = "anything connects to anything", the common editor default).
   const SOCKET = useMemo(() => new ClassicPreset.Socket('flow'), []);
   const nodeInstances = useMemo(() => new Map(), []);
   const nodeMeta = useMemo(() => new Map(), []);
@@ -485,7 +487,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // place. The settle delay is 500ms rather than 0 because a late port registration
   // lands through a reactive write that arrives in a LATER macrotask (a React commit
   // / Angular CD tick), not just the microtask queue a 0ms timeout would clear.
-  const CONN_WARN_SETTLE_MS = 500;
+  const CONN_WARN_SETTLE_MS = useMemo(() => 500, []);
   function warnConn(msg: any) {
     if (typeof console !== 'undefined' && console.warn) {
       console.warn(`[@rozie-ui/rete] ${msg}`);
@@ -528,14 +530,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // Undo is ALWAYS on for v1; `:history=false` (the `history` prop) is the cheap escape
   // hatch that skips every push (the stacks stay empty → undo/redo are no-ops).
   // COMPONENT-scope so the stack survives across area events + the Solid-hoisted teardown.
-  const HISTORY_CAP = 100;
-  // Two-stack model (simpler + correct than a single cursor): `historyStack` holds
-  // PRE-gesture snapshots (the states to UNDO back to, newest last); `redoStack` holds
-  // snapshots an undo popped off (the states to REDO forward to, newest last). A new
-  // gesture (pushHistory) snapshots the PRE-gesture graph onto historyStack and CLEARS
-  // redoStack (a fresh edit discards the redo branch). undo() pops historyStack → pushes
-  // the CURRENT (pre-undo) graph onto redoStack → restores the popped snapshot. redo()
-  // pops redoStack → pushes the current graph back onto historyStack → restores it.
+  const HISTORY_CAP = useMemo(() => 100, []);
   const pendingDragPositions = useMemo(() => new Map(), []);
   const currentGraph = useCallback(() => graph || {
     nodes: [],
@@ -1215,7 +1210,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // clamping the step to [minZoom, maxZoom] so a button never exceeds the restrictor
   // bounds. Zoom/fit are view-only, so they stay enabled even when readonly (they do not
   // edit the graph). A no-op before the area mounts.
-  const ZOOM_STEP = 1.2;
+  const ZOOM_STEP = useMemo(() => 1.2, []);
   function clampZoom(k: any) {
     let lo = typeof props.minZoom === 'number' && props.minZoom > 0 ? props.minZoom : 0.01;
     let hi = typeof props.maxZoom === 'number' && props.maxZoom > 0 ? props.maxZoom : 100;

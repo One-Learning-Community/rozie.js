@@ -413,6 +413,8 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   const _watch22First = useRef(true);
   const _watch23First = useRef(true);
 
+  // MapLibre's official no-token demo tiles — the zero-config `mapStyle` fallback
+  // (the prop default is `undefined`; see the prop note).
   const DEFAULT_STYLE = useMemo(() => 'https://demotiles.maplibre.org/style.json', []);
   // The eventData merged onto programmatic camera ops so the camera-lifecycle echo
   // handlers can ignore our own moves (the documented MapLibre echo-guard — robust

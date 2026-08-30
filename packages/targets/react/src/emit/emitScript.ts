@@ -606,23 +606,37 @@ function tryWrapEscapingConstUseMemo(
   const initDeps = computeHelperBodyDeps(init, ir, allHelperNames, constName);
   const depsLiteral = renderDepArrayWithIR(initDeps, ir);
 
-  // Quick 260829-j18 — preserve the statement's own leading/trailing
-  // comments, same rationale and mechanism as `tryWrapPureLiteralUseMemo`
-  // (`renderStatementComments`). Before the transitive closure (Task 3) this
-  // pass only ever claimed a const DIRECTLY seeded from an effect/listener —
-  // a narrow class. The expansion now routes many more corpus consts through
-  // here (CodeMirror's ten heavily-documented CM6 `Compartment`s among them);
-  // without this, every one of those author/maintainer doc comments would
-  // silently vanish from the emitted output the moment the const first
-  // qualifies for this wrap — the exact "wrapped statements are emitted as
-  // strings, not AST, so Babel's comment-attachment machinery never runs on
-  // them" gap this function always had, previously masked because so few
-  // sites went through it.
+  // Quick 260829-j18 — preserve the statement's own LEADING comment, same
+  // mechanism as `tryWrapPureLiteralUseMemo` (`renderStatementComments`).
+  // Before the transitive closure (Task 3) this pass only ever claimed a
+  // const DIRECTLY seeded from an effect/listener — a narrow class. The
+  // expansion now routes many more corpus consts through here (CodeMirror's
+  // ten heavily-documented CM6 `Compartment`s among them); without this,
+  // every one of those author/maintainer doc comments would silently
+  // vanish the moment the const first qualifies for this wrap — the "wrapped
+  // statements are emitted as strings, not AST, so Babel's comment-
+  // attachment machinery never runs on them" gap this function always had,
+  // previously masked because so few sites went through it.
+  //
+  // DELIBERATELY leadingComments ONLY, not trailingComments (unlike its
+  // sibling `tryWrapPureLiteralUseMemo`): Babel attaches a comment sitting
+  // BETWEEN two statements to BOTH neighbours — as the earlier statement's
+  // trailingComments AND the later statement's leadingComments (see
+  // `genBlockInner`'s doc comment above for the canonical statement of this).
+  // Rendering trailingComments here double-printed a comment shared with the
+  // NEXT statement whenever that statement was independently claimed by
+  // ANOTHER comment-rendering pass (`tryWrapPureLiteralUseMemo`, or a plain
+  // Babel-generated fallthrough, both of which already print it as THEIR
+  // OWN leadingComments) — found on MapLibre's DEFAULT_STYLE/PROGRAMMATIC
+  // pair during this quick's own Task 6 blast-radius census. Every real
+  // corpus site inspected has its documentation as a LEADING comment on the
+  // documented statement, never an orphaned TRAILING-only comment with
+  // nothing following it — so this narrowing costs nothing observed and
+  // removes a structural double-print hazard.
   const mainLine = `const ${constName} = useMemo(${arrowBody(init)}, ${depsLiteral});`;
   const leading = renderStatementComments(stmt.leadingComments);
-  const trailing = renderStatementComments(stmt.trailingComments);
-  if (!leading && !trailing) return mainLine;
-  return [leading, mainLine, trailing].filter((p): p is string => p !== null).join('\n');
+  if (!leading) return mainLine;
+  return [leading, mainLine].join('\n');
 }
 
 /**

@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { clsx, parseInlineStyle, rozieAttr, rozieDisplay } from '@rozie/runtime-react';
 import './Toaster.css';
@@ -194,11 +194,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   // Deliberately exceeds the 200ms default --rozie-toast-exit-duration token
   // comfortably; a consumer overriding the exit duration beyond ~350ms gets cut
   // short by this failsafe (documented in docs/components/toast.md).
-  const EXIT_FAILSAFE_MS = 350;
-
-  // Idempotent removal: filters the entry out of $data.toasts. Safe to call
-  // twice (from the inline @animationend binding AND the failsafe) — the
-  // second call is a harmless no-op filter over an already-absent id.
+  const EXIT_FAILSAFE_MS = useMemo(() => 350, []);
   const removeToast = useCallback((id: any) => {
     // Cancel any pending exit failsafe for this id (first-wins: @animationend
     // beating the ~350ms timeout, or vice-versa — either way, only one removal).

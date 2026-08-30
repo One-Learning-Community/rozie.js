@@ -267,17 +267,7 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   const panelCompartment = useMemo(() => new Compartment(), []);
   // topPanel is the top-docked sibling of `panel` — a SECOND mount-once portal
   // slot (G5 wave 1) wired through the same `showPanel` facet with `top: true`.
-  // topPanel is the top-docked sibling of `panel` — a SECOND mount-once portal
-  // slot (G5 wave 1) wired through the same `showPanel` facet with `top: true`.
   const topPanelCompartment = useMemo(() => new Compartment(), []);
-  // gutter / decoration are the REACTIVE MULTI-INSTANCE portal slots (G5 wave 2) —
-  // one portal handle per visible marker/widget (the TipTap nodeView template).
-  // Each owns a compartment so its driving prop (`gutterLines` / `decorations`)
-  // reconfigures the marked lines / decorated ranges LIVE with no remount, like
-  // every other runtime-updatable prop. The GutterMarker/WidgetType classes that
-  // capture $portals.gutter / $portals.decoration are declared inline inside the
-  // top-level makeGutterExt/makeDecorationExt factories below — no mount-scope
-  // bridge needed; these compartments are filled directly from those factories.
   // gutter / decoration are the REACTIVE MULTI-INSTANCE portal slots (G5 wave 2) —
   // one portal handle per visible marker/widget (the TipTap nodeView template).
   // Each owns a compartment so its driving prop (`gutterLines` / `decorations`)
@@ -288,18 +278,6 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   // bridge needed; these compartments are filled directly from those factories.
   const gutterCompartment = useMemo(() => new Compartment(), []);
   const decorationCompartment = useMemo(() => new Compartment(), []);
-  // tooltip is CodeMirror's FIRST REACTIVE portal slot (G5 wave 1) — a
-  // cursor-anchored tooltip via the `showTooltip` facet. Driven by a StateField
-  // (`tooltipField`, a top-level factory) so it tracks the caret; the reactive
-  // portal handle re-renders the consumer fragment IN PLACE on caret move rather
-  // than remounting it each keystroke. NO compartment — a StateField is the
-  // idiomatic showTooltip source and there is no runtime prop to reconfigure it
-  // against (slot presence is decided once at mount).
-  // language is a convenience prop mapping to the ONE bundled language
-  // (@codemirror/lang-javascript). Any other value → [] (plain text, no syntax
-  // highlighting); consumers add other languages via :extensions (D-03). This
-  // FIXES the prior declared-but-ignored bug where buildState hard-coded
-  // javascript() regardless of $props.language.
   function langExt() {
     return props.language === 'javascript' ? javascript() : [];
   }
