@@ -38,6 +38,8 @@ export default function FilterSelect(_props: FilterSelectProps): JSX.Element {
   function selectValue() {
     return props.value != null ? String(props.value) : '';
   }
+  // Immediate-apply-on-change: read the selected value the global-filter way. An
+  // empty value (the leading "All" option) clears the column filter.
   const { setFilter: _rozieProp_setFilter } = props;
     const onChange = useCallback((e: any) => {
     const v = e && e.target ? e.target.value : '';

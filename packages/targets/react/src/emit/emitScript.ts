@@ -606,37 +606,19 @@ function tryWrapEscapingConstUseMemo(
   const initDeps = computeHelperBodyDeps(init, ir, allHelperNames, constName);
   const depsLiteral = renderDepArrayWithIR(initDeps, ir);
 
-  // Quick 260829-j18 — preserve the statement's own LEADING comment, same
-  // mechanism as `tryWrapPureLiteralUseMemo` (`renderStatementComments`).
-  // Before the transitive closure (Task 3) this pass only ever claimed a
-  // const DIRECTLY seeded from an effect/listener — a narrow class. The
-  // expansion now routes many more corpus consts through here (CodeMirror's
-  // ten heavily-documented CM6 `Compartment`s among them); without this,
-  // every one of those author/maintainer doc comments would silently
-  // vanish the moment the const first qualifies for this wrap — the "wrapped
-  // statements are emitted as strings, not AST, so Babel's comment-
-  // attachment machinery never runs on them" gap this function always had,
-  // previously masked because so few sites went through it.
-  //
-  // DELIBERATELY leadingComments ONLY, not trailingComments (unlike its
-  // sibling `tryWrapPureLiteralUseMemo`): Babel attaches a comment sitting
-  // BETWEEN two statements to BOTH neighbours — as the earlier statement's
-  // trailingComments AND the later statement's leadingComments (see
-  // `genBlockInner`'s doc comment above for the canonical statement of this).
-  // Rendering trailingComments here double-printed a comment shared with the
-  // NEXT statement whenever that statement was independently claimed by
-  // ANOTHER comment-rendering pass (`tryWrapPureLiteralUseMemo`, or a plain
-  // Babel-generated fallthrough, both of which already print it as THEIR
-  // OWN leadingComments) — found on MapLibre's DEFAULT_STYLE/PROGRAMMATIC
-  // pair during this quick's own Task 6 blast-radius census. Every real
-  // corpus site inspected has its documentation as a LEADING comment on the
-  // documented statement, never an orphaned TRAILING-only comment with
-  // nothing following it — so this narrowing costs nothing observed and
-  // removes a structural double-print hazard.
-  const mainLine = `const ${constName} = useMemo(${arrowBody(init)}, ${depsLiteral});`;
-  const leading = renderStatementComments(stmt.leadingComments);
-  if (!leading) return mainLine;
-  return [leading, mainLine].join('\n');
+  // Comments are NOT rendered here. This pass emits a hand-built STRING, so
+  // Babel's comment-attachment machinery never runs on it — but so do its
+  // three sibling wraps, and a comment BETWEEN two statements belongs to both
+  // neighbours at once. Deciding locally, per-wrap, whether to print leading
+  // and/or trailing is unwinnable: the same choice that saves a comment whose
+  // other neighbour is silent (TipTap's `buildStarterKitConfig`) double-prints
+  // one whose other neighbour speaks (MapLibre's DEFAULT_STYLE/PROGRAMMATIC).
+  // Both failures were live in the shipped corpus simultaneously. The decision
+  // therefore belongs to the ONE pass that can see both neighbours — the
+  // block-wide ledger in the component-scope emission loop
+  // (`takeUnprintedComments`), which prints every comment exactly once in
+  // source order regardless of which wrap claims either side.
+  return `const ${constName} = useMemo(${arrowBody(init)}, ${depsLiteral});`;
 }
 
 /**
@@ -1060,6 +1042,64 @@ function renderStatementComments(comments: readonly t.Comment[] | null | undefin
 }
 
 /**
+ * Quick 260829-j18 — take the comments in `comments` that this block has not
+ * printed yet, recording them as printed.
+ *
+ * This is the whole mechanism behind the component-scope loop's
+ * exactly-once guarantee. The loop walks statements in SOURCE ORDER and asks
+ * for each statement's leading comments, then its trailing comments; a
+ * comment shared between statement N (as trailing) and statement N+1 (as
+ * leading) is therefore claimed by whichever position comes first in that
+ * walk — N's trailing — and skipped at N+1. No pass has to know or care what
+ * claimed its neighbour.
+ *
+ * Mirrors the single-dedup-set precedent `genBlockInner` and
+ * `genImportsBlock` already set for their own scopes; the loop cannot reuse
+ * their trick (one `generate()` call for the whole block) because most of its
+ * statements are emitted as hand-built strings, not generated from AST.
+ *
+ * The ledger keys on OBJECT IDENTITY (a `WeakSet`), not on a derived
+ * `start`/`end` key. Babel attaches the very same `t.Comment` object to both
+ * neighbours of the gap it sits in, so identity is exact. Source offsets are
+ * NOT: a `<script src>` partial (`.rzts`/`.rzjs`) is parsed as its own file
+ * and its comment offsets are relative to THAT file, so a partial comment and
+ * an unrelated host comment can share a byte range and an offset-keyed ledger
+ * silently swallows the second one. `dist-parity`'s partial-vs-inline
+ * byte-identity cells (Phase 56-R8 / R11) catch exactly that, and did.
+ */
+function takeUnprintedComments(
+  comments: readonly t.Comment[] | null | undefined,
+  printed: WeakSet<t.Comment>,
+): t.Comment[] {
+  if (!comments || comments.length === 0) return [];
+  const fresh: t.Comment[] = [];
+  for (const c of comments) {
+    if (printed.has(c)) continue;
+    printed.add(c);
+    fresh.push(c);
+  }
+  return fresh;
+}
+
+/**
+ * Quick 260829-j18 — the ledger's counterpart for the loop's `genCode`
+ * fallthrough, where @babel/generator (not `renderStatementComments`) does
+ * the printing.
+ *
+ * Returns a SHALLOW COPY of `stmt` with any already-printed comment removed
+ * from its `leadingComments`/`trailingComments`, and records whatever remains
+ * as printed. A copy rather than a mutation because `stmt` is the real IR
+ * node: the loop also pushes it onto `mappableStmts` for source-map
+ * generation, and other passes read it afterwards. Only the two comment
+ * arrays differ, which is all @babel/generator consults for comment output.
+ */
+function withCommentLedger<T extends t.Statement>(stmt: T, printed: WeakSet<t.Comment>): T {
+  const leadingComments = takeUnprintedComments(stmt.leadingComments, printed);
+  const trailingComments = takeUnprintedComments(stmt.trailingComments, printed);
+  return { ...stmt, leadingComments, trailingComments };
+}
+
+/**
  * Quick 260828-uyn — wrap a top-level pure object/array literal `const X =
  * init` in `useMemo(() => init, [])` so it is constructed ONCE per component
  * instance (setup-once parity with the other five targets). Candidate
@@ -1090,11 +1130,10 @@ function tryWrapPureLiteralUseMemo(
   // Preserve an author declarator annotation, same rationale as the sibling
   // mutated-instance wrap.
   const declTypeSuffix = renderDeclaratorTypeSuffix(decl.id);
-  const mainLine = `const ${decl.id.name}${declTypeSuffix} = useMemo(${arrowBody(init)}, []);`;
-  const leading = renderStatementComments(stmt.leadingComments);
-  const trailing = renderStatementComments(stmt.trailingComments);
-  if (!leading && !trailing) return mainLine;
-  return [leading, mainLine, trailing].filter((p): p is string => p !== null).join('\n');
+  // Comment rendering is the emission loop's job, not this pass's — see the
+  // note in `tryWrapEscapingConstUseMemo` for why a per-wrap decision cannot
+  // be right for both neighbours of a shared comment.
+  return `const ${decl.id.name}${declTypeSuffix} = useMemo(${arrowBody(init)}, []);`;
 }
 
 /**
@@ -4562,6 +4601,35 @@ export function emitScript(
   // excluded from the map (acceptable partial fix per brief).
   const mappableStmts: t.Statement[] = [];
 
+  // Quick 260829-j18 — the block-wide printed-comment ledger. See
+  // `takeUnprintedComments`: this loop mixes hand-built STRING output (four
+  // `tryWrap*` passes) with per-statement `genCode` fallthroughs, each of the
+  // latter carrying its OWN @babel/generator dedup set. Nothing but a ledger
+  // spanning the whole loop can make a comment shared between two neighbours
+  // print exactly once, whichever pass claims either side.
+  const printedComments = new WeakSet<t.Comment>();
+
+  /**
+   * Emit one wrapped (string-rendered) statement, framed by whichever of its
+   * own comments the ledger has not already spent. Every `tryWrap*` pass
+   * routes through here, so none of them renders comments itself.
+   */
+  const pushWrapped = (main: string, stmt: t.Statement): void => {
+    const leading = renderStatementComments(
+      takeUnprintedComments(stmt.leadingComments, printedComments),
+    );
+    const trailing = renderStatementComments(
+      takeUnprintedComments(stmt.trailingComments, printedComments),
+    );
+    if (leading === null && trailing === null) {
+      userArrowsLines.push(main);
+      return;
+    }
+    userArrowsLines.push(
+      [leading, main, trailing].filter((part): part is string => part !== null).join('\n'),
+    );
+  };
+
   for (let i = 0; i < cloned.program.body.length; i++) {
     if (lifecyclePairing.consumedIndices.has(i)) continue;
     // Quick plan 260515-u2b — $watch lines were emitted as useEffects.
@@ -4652,7 +4720,7 @@ export function emitScript(
     // rather than the reactive-deps `[...]` from tryWrapEscapingConstUseMemo.
     const mutMemoWrapped = tryWrapMutatedInstanceUseMemo(stmt, mutatedInstanceNames, collectors);
     if (mutMemoWrapped) {
-      userArrowsLines.push(mutMemoWrapped);
+      pushWrapped(mutMemoWrapped, stmt);
       // String output (like the other wraps) — excluded from mappableStmts.
       continue;
     }
@@ -4668,7 +4736,7 @@ export function emitScript(
       hoistedPropNames,
     );
     if (wrapped) {
-      userArrowsLines.push(wrapped);
+      pushWrapped(wrapped, stmt);
       // Wrapped statements are emitted as strings via genCode on the callback
       // body; their source locations are unreliable post-transformation.
       // Exclude from mappableStmts.
@@ -4688,7 +4756,7 @@ export function emitScript(
       collectors,
     );
     if (memoWrapped) {
-      userArrowsLines.push(memoWrapped);
+      pushWrapped(memoWrapped, stmt);
       // Same source-map exclusion rationale as the useCallback wrap above.
       continue;
     }
@@ -4701,7 +4769,7 @@ export function emitScript(
     // apply). See `tryWrapPureLiteralUseMemo` / `collectPureLiteralBinders`.
     const pureLiteralWrapped = tryWrapPureLiteralUseMemo(stmt, pureLiteralNames, collectors);
     if (pureLiteralWrapped) {
-      userArrowsLines.push(pureLiteralWrapped);
+      pushWrapped(pureLiteralWrapped, stmt);
       // Same source-map exclusion rationale as the useCallback wrap above.
       continue;
     }
@@ -4714,7 +4782,11 @@ export function emitScript(
     // deferred limitation #1; see RESEARCH Pitfall 3/8.)
     const hoisted = tryHoistArrowToFunction(stmt);
     const emitted = hoisted ?? stmt;
-    userArrowsLines.push(genCode(emitted));
+    // Quick 260829-j18 — @babel/generator prints this statement's leading AND
+    // trailing comments, and every `genCode` call carries its own dedup set,
+    // so a comment already spent by the PREVIOUS statement (as its trailing)
+    // would print a second time here. Run it through the block ledger first.
+    userArrowsLines.push(genCode(withCommentLedger(emitted, printedComments)));
     // Only collect the ORIGINAL stmt for source-map purposes — hoisted nodes are
     // synthetic (no .loc) and would produce empty mappings. The original stmt
     // retains the .rozie source location from @babel/parser.

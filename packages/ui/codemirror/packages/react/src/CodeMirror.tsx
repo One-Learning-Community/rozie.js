@@ -254,6 +254,10 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   const _watch7First = useRef(true);
   const _watch8First = useRef(true);
 
+  // CodeMirror's updateListener fires on EVERY transaction, including our own
+  // $watch-driven dispatch when the consumer changes `value`. Without a guard
+  // the wrapper would emit its own dispatch back through the model path on
+  // the next tick — a slow ping-pong loop that doesn't crash but eats RAFs.
   // Compartments let us swap individual extensions at runtime via
   // `view.dispatch({ effects: compartment.reconfigure(newExt) })` without
   // rebuilding the entire EditorState. Each runtime-updatable prop gets one so
@@ -278,6 +282,18 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   // bridge needed; these compartments are filled directly from those factories.
   const gutterCompartment = useMemo(() => new Compartment(), []);
   const decorationCompartment = useMemo(() => new Compartment(), []);
+  // tooltip is CodeMirror's FIRST REACTIVE portal slot (G5 wave 1) — a
+  // cursor-anchored tooltip via the `showTooltip` facet. Driven by a StateField
+  // (`tooltipField`, a top-level factory) so it tracks the caret; the reactive
+  // portal handle re-renders the consumer fragment IN PLACE on caret move rather
+  // than remounting it each keystroke. NO compartment — a StateField is the
+  // idiomatic showTooltip source and there is no runtime prop to reconfigure it
+  // against (slot presence is decided once at mount).
+  // language is a convenience prop mapping to the ONE bundled language
+  // (@codemirror/lang-javascript). Any other value → [] (plain text, no syntax
+  // highlighting); consumers add other languages via :extensions (D-03). This
+  // FIXES the prior declared-but-ignored bug where buildState hard-coded
+  // javascript() regardless of $props.language.
   function langExt() {
     return props.language === 'javascript' ? javascript() : [];
   }
@@ -608,12 +624,6 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   // collides on the React target (ROZ524: "already declared" + recursive rewrite).
   // Renamed to preserve the value-setter semantics collision-free across all 6
   // targets. (Deviation from the locked D-06 name `setValue`.)
-  // replaceValue routes through the SAME suppress-echo guard as $watch(value).
-  // NOTE: named `replaceValue` (not `setValue`) — a `value` model prop makes
-  // React auto-generate a `setValue` state setter, so a `setValue` $expose verb
-  // collides on the React target (ROZ524: "already declared" + recursive rewrite).
-  // Renamed to preserve the value-setter semantics collision-free across all 6
-  // targets. (Deviation from the locked D-06 name `setValue`.)
   function replaceValue(v: any) {
     writeDoc(v);
   }
@@ -654,9 +664,6 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   function selectAll() {
     if (view.current) cmCommands.selectAll(view.current);
   }
-  // Reveal a document position (jump-to-line, scroll-to-match/error). setSelection
-  // moves the caret but does not guarantee scroll; this dispatches the scroll
-  // effect. opts default centers the position vertically.
   // Reveal a document position (jump-to-line, scroll-to-match/error). setSelection
   // moves the caret but does not guarantee scroll; this dispatches the scroll
   // effect. opts default centers the position vertically.

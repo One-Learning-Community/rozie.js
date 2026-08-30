@@ -22,6 +22,7 @@ export default function PartialInlineHostJ(_props: PartialInlineHostJProps): JSX
     const next = colId + value;
     return next;
   }, []);
+  // Re-read the row model + header groups into $data
 
   useEffect(() => {
     refreshRowModelJ.current = setColumnFilterJ(1, headJ(2));

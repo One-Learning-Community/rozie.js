@@ -194,6 +194,16 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     if (slide !== null && typeof slide === 'object') return slide.id ?? slide.key ?? i;
     return slide ?? i;
   }
+  // Map the curated props → an EmblaOptionsType. `draggable` → `watchDrag`. The
+  // `...$props.options` escape hatch spreads last so a consumer can override anything.
+  //
+  // NOTE the null-let return discipline: Embla's EmblaOptionsType narrows the string
+  // options to literal unions (align→'start'|'center'|'end', axis→'x'|'y', …). The
+  // untyped `String` props are `string`, which does NOT structurally narrow to those
+  // unions under strict tsc on the emitted leaves. Building the object into a
+  // pre-nulled `let` (auto type-neutralized to `any`) launders the literal so the
+  // engine accepts it — the .rozie-native fix (no codegen type-aid, no lang="ts"),
+  // the same laundering discipline MapLibre uses for its untyped option object.
   const initialOptions = useCallback(() => {
     let opts: any = null;
     opts = {
@@ -240,18 +250,31 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     };
     return opts;
   }, [props.align, props.axis, props.containScroll, props.direction, props.dragFree, props.draggable, props.duration, props.loop, props.options, props.skipSnaps, props.slidesToScroll, props.startIndex]);
+  // startIndex is INIT-ONLY. Embla's reActivate preserves the live position by
+  // merging mergeOptions({ startIndex: selectedScrollSnap() }, withOptions) — and
+  // withOptions WINS (embla-carousel@8 esm :1450, :1558). So any startIndex left
+  // in a reInit payload teleports the carousel back to the prop's value on every
+  // option flip, slide add/remove, and no-arg reInitCarousel(). Delete it AFTER
+  // the ...$props.options spread so the raw escape hatch cannot reintroduce it
+  // either. To move programmatically, use the scrollToIndex() handle verb.
   const reinitOptions = useCallback(() => {
     let opts: any = null;
     opts = initialOptions();
     delete opts.startIndex;
     return opts;
   }, [initialOptions]);
+  // Build the plugin array: gate Autoplay behind the `autoplay` prop, then append
+  // any consumer-supplied plugins verbatim.
   const emblaPluginsFromProps = useCallback(() => {
     const builtins = props.autoplay ? [Autoplay({
       delay: props.autoplayDelay
     })] : [];
     return [...builtins, ...props.plugins];
   }, [props.autoplay, props.autoplayDelay, props.plugins]);
+  // Thumbnail-strip Embla options (the canonical Embla "thumbs" config): keep every
+  // snap reachable + free dragging so the strip scrolls independently of the main
+  // carousel, sharing the main axis. Built into a pre-nulled let for the same
+  // literal-union laundering reason as initialOptions (axis is a `string`).
   const thumbsOptionsFromProps = useCallback(() => {
     let opts: any = null;
     opts = {
@@ -261,6 +284,10 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     };
     return opts;
   }, [props.axis]);
+  // Mirror the engine's live nav state into reactive $data so the built-in dots /
+  // arrows re-render on every snap change. `snaps` is an INDEX array (one entry per
+  // scroll snap → one dot), so the dot r-for needs no unused loop value. Also keeps
+  // the thumbnail strip's scroll position in sync with the main selection.
   const syncNav = useCallback(() => {
     if (!embla.current) return;
     const i = embla.current.selectedScrollSnap();
@@ -270,6 +297,19 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     setCanNext(embla.current.canScrollNext());
     if (emblaThumbs.current) emblaThumbs.current.scrollTo(i);
   }, []);
+  // Thumb click → scroll the MAIN carousel. Calls the $expose'd scrollToIndex verb
+  // directly (below) — arg-light internal calls to an exposed verb now typecheck
+  // cleanly on all six targets: the emitter lowers a TRAILING $expose verb param
+  // optional (`jump?: any` / `index`+`jump?`) whenever it sees a fewer-arg internal
+  // call site (emitter-hardening backlog item #5). The prior raw-engine
+  // navPrev/navNext/navTo bypass existed ONLY to dodge the pre-fix required-arg
+  // TS2554 and is gone now that the compiler owns the arity.
+  //
+  // NB: no `clickAllowed()` drag-vs-click guard. Embla 8 dropped `clickAllowed`
+  // from the public API entirely (it isn't a method on EmblaCarouselType), so the
+  // old guard threw `TypeError: emblaThumbs.clickAllowed is not a function` on
+  // every thumb tap. The modern Embla thumbs idiom calls `scrollTo` directly; a
+  // drag that ends on a thumb simply scrolls, which is acceptable for a nav strip.
   const selectThumb = useCallback((i: any) => {
     scrollToIndex(i);
   }, [scrollToIndex]);

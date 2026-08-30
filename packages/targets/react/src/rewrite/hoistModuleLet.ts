@@ -502,6 +502,52 @@ export function getHoistableModuleLetNames(program: File, ir: IRComponent): Set<
 }
 
 /**
+ * Quick 260829-j18 — move the leading comments of statements about to be
+ * removed onto a neighbour that survives, so hoisting a `let` out of the
+ * component body does not silently take the author's documentation with it.
+ *
+ * Mutates the comment arrays of the surviving neighbours in place. Comment
+ * objects are compared by IDENTITY, matching the emitter's own printed-comment
+ * ledger (`takeUnprintedComments` in `emitScript.ts`): Babel attaches one
+ * `t.Comment` object to both neighbours of the gap it sits in, so an
+ * already-present comment is skipped rather than duplicated into the array.
+ */
+function rehomeRemovedComments(body: t.Statement[], removed: ReadonlySet<number>): void {
+  for (const index of [...removed].sort((a, b) => a - b)) {
+    const stmt = body[index];
+    const orphaned = stmt?.leadingComments;
+    if (!orphaned || orphaned.length === 0) continue;
+
+    let host: t.Statement | undefined;
+    let side: 'trailingComments' | 'leadingComments' = 'trailingComments';
+    for (let i = index - 1; i >= 0; i--) {
+      if (!removed.has(i)) {
+        host = body[i];
+        break;
+      }
+    }
+    if (!host) {
+      side = 'leadingComments';
+      for (let i = index + 1; i < body.length; i++) {
+        if (!removed.has(i)) {
+          host = body[i];
+          break;
+        }
+      }
+    }
+    // Every statement in the body is being removed — nothing survives to
+    // carry the comments, and there is no output for them to appear in.
+    if (!host) continue;
+
+    const existing = host[side] ?? [];
+    const additions = orphaned.filter((c) => !existing.includes(c));
+    if (additions.length === 0) continue;
+    host[side] =
+      side === 'trailingComments' ? [...existing, ...additions] : [...additions, ...existing];
+  }
+}
+
+/**
  * Auto-hoist module-scoped `let` declarations referenced from lifecycle setup
  * bodies. Mutates `program` in place.
  */
@@ -545,6 +591,28 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
 
   // Remove single-declarator let statements by index (descending for safety).
   if (indicesToRemove.size > 0) {
+    // Quick 260829-j18 — re-home the removed statement's LEADING comments
+    // before dropping it, or the author's documentation for the hoisted `let`
+    // disappears from the emitted component with the declaration.
+    //
+    // Only the leading ones: a removed statement's `trailingComments` are the
+    // SAME `t.Comment` objects Babel attached as the NEXT statement's
+    // `leadingComments`, so that side already has a surviving owner.
+    //
+    // They move onto the nearest preceding SURVIVOR as trailing comments,
+    // which is where they sat in source — after that statement, above the
+    // declaration being removed. Falling back to the nearest following
+    // survivor's leading position only when the removal is the first
+    // statement in the body and there is no predecessor to hold them.
+    //
+    // Without this, a comment survived only when the emitter happened to
+    // reach it from the other side. `dist-parity`'s Phase 56-R8 / R11
+    // byte-identity cells pin the asymmetry it caused: an inline host keeps
+    // such a comment (its neighbour is one parse away and carries it as
+    // trailing) while the `<script src>` partial-inlined host — whose spliced
+    // node comes from a DIFFERENT parse and has no comments attached at all —
+    // loses it, and the two emitted components stop being byte-identical.
+    rehomeRemovedComments(program.program.body, indicesToRemove);
     program.program.body = program.program.body.filter((_, i) => !indicesToRemove.has(i));
   }
 

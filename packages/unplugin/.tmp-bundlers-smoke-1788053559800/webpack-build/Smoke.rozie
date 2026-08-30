@@ -1,0 +1,8 @@
+<rozie name="Smoke">
+<props>
+{ label: { type: String, default: 'hello' } }
+</props>
+<template>
+<button>{{ $props.label }}</button>
+</template>
+</rozie>

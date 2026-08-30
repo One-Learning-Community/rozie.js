@@ -60,6 +60,9 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(_pr
       left: `${rect.left}px`
     });
   }, []);
+  // Re-fire reposition() whenever the open transition flips on. The panel
+  // element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch
+  // is the primitive that re-runs the effect after panel mount.
 
   useEffect(() => {
     // Initial reposition only if the panel is open at mount time.

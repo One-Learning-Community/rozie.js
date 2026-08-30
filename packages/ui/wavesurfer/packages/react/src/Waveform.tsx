@@ -345,6 +345,9 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
     }
     return regionsPlugin.current;
   }
+  // Build the engine. The whole config object is untyped (ws is `any`) so the
+  // constructor's options + event-callback params are unchecked against wavesurfer's
+  // strict types (the Cropper buildCropper idiom).
   const { onError: _rozieProp_onError, onFinished: _rozieProp_onFinished, onInteraction: _rozieProp_onInteraction, onLoading: _rozieProp_onLoading, onPaused: _rozieProp_onPaused, onPlaying: _rozieProp_onPlaying, onReady: _rozieProp_onReady, onSeeking: _rozieProp_onSeeking, onTimeupdate: _rozieProp_onTimeupdate } = props;
     const buildWaveSurfer = useCallback(() => {
     let plugins = [];
@@ -480,10 +483,6 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
   function getWaveSurfer() {
     return ws.current;
   }
-  // Regions imperative surface (active only when the `regions` array registered the
-  // plugin). `addRegion` returns the created engine Region; NO `setRegions` verb
-  // (the React `regions`-model auto-setter, ROZ524 — drive the list via the two-way
-  // binding instead).
   // Regions imperative surface (active only when the `regions` array registered the
   // plugin). `addRegion` returns the created engine Region; NO `setRegions` verb
   // (the React `regions`-model auto-setter, ROZ524 — drive the list via the two-way

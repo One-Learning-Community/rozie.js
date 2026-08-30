@@ -22,6 +22,10 @@ export default function InlineEquivHostM(_props: InlineEquivHostMProps): JSX.Ele
     const active = rIdx + cIdx;
     return active;
   }, []);
+  // the row-selection slice tracks which rows are checked
+  // across header-group and body rows alike
+  // inRange(rIdx, cIdx) gates the active cell within the
+  // current 2-D selection range before a keydown commits
 
   useEffect(() => {
     refreshRowModelM.current = gridKeydownHandlersM(1, headM(2));

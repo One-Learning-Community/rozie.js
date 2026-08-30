@@ -153,11 +153,32 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     if (props.selectionMode === 'range') return readRange().start;
     return '';
   }
+  // `viewIsoOverride` (77-08): callers that just wrote $data.viewIso in the
+  // SAME synchronous call (goToMonth/goToToday/selectMonth) can pass the
+  // FRESH value directly instead of relying on this function's own
+  // $data.viewIso read. This matters because a callback that reads $data.viewIso
+  // is a JS CLOSURE captured at a point in time — on React specifically, no
+  // amount of setTimeout/rAF deferral makes an ALREADY-CAPTURED closure
+  // observe a state write made by the SAME synchronous call that created it
+  // (React's setState is async; the closure was bound before that write even
+  // scheduled a new render). Passing the value the caller already computed
+  // sidesteps the staleness entirely (mirrors 77-07's onMonthCommit/
+  // onYearCommit `i`-parameter fix for the identical class of bug). Omitted
+  // (undefined) falls back to the live $data.viewIso read — correct for every
+  // call site with no fresher value in hand ($onMount, the focus() expose
+  // handle, template reads).
   const viewMonthGrid = useCallback((viewIsoOverride?: string) => resolveViewIso({
     viewIso: viewIsoOverride !== undefined ? viewIsoOverride : viewIso,
     value: viewAnchor(),
     today: todayIso()
   }), [todayIso, viewAnchor, viewIso]);
+  // The whole render model in a single call: { year, month, weeks }. A PLAIN
+  // function (not $computed) so it reads uniformly on all six targets and can be
+  // aliased in handlers without the Solid accessor divergence. Returns a FRESH
+  // object each call — never feed it to a reference-equality $watch getter. In
+  // range mode it additionally passes `selection` (the ordered range) + the live
+  // `previewEnd` (the hovered day); in single mode those are omitted (undefined →
+  // all range flags false → byte-stable single path).
   function grid() {
     return buildMonthGrid({
       viewIso: viewMonthGrid(),
@@ -250,6 +271,9 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       setActiveDay(next);
     });
   }, [allDayCells, currentActiveDay, rovingDayInput]);
+  // The localized month-year heading. NAMED `monthHeading`, NOT `label` — a bare
+  // `label` helper becomes a class field on the Lit custom element and a `title`
+  // would collide with the inherited HTMLElement.title; `monthHeading` is clear.
   function monthHeading() {
     return monthLabel(viewMonthGrid(), props.locale);
   }
@@ -334,6 +358,14 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       });
     }
   }
+  // Hover preview: only meaningful in range mode while a range is in progress
+  // (anchor set, end empty). Records the hovered ISO so the grid lights the
+  // direction-agnostic preview band. Otherwise a no-op — the early return below
+  // is byte-preserved from the pre-260807-6p8 behavior. [D-02] Inside the
+  // previewing state, when the hovered day is itself disabled OR the anchor→
+  // hovered span crosses a disabled day (rangeSpanBlocked), the band is
+  // SUPPRESSED entirely by clearing $data.hoverIso (not merely returning) —
+  // clamping would put the visible band somewhere the cursor is not.
   const onDayHover = useCallback((iso: any) => {
     if (props.selectionMode !== 'range') return;
     const r = readRange();
@@ -344,6 +376,8 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     }
     setHoverIso(iso);
   }, [dayEnabled, props.selectionMode, rangeSpanBlocked, readRange]);
+  // Day-select dispatch: route a click / Enter / Space through the mode-appropriate
+  // funnel (range → commitRange, single → commitValue).
   function onDaySelect(iso: any) {
     if (props.selectionMode === 'range') commitRange(iso);else commitValue(iso);
   }
@@ -361,6 +395,11 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   }
   const goPrevMonth = useCallback(() => goToMonth(-1), [goToMonth]);
   const goNextMonth = useCallback(() => goToMonth(1), [goToMonth]);
+  // ---- view-mode drill state machine (mutates $data.viewMode/$data.viewIso
+  // ONLY — never $model.value; drilling is a pure VIEW concern) -------------
+  // Named boolean guards (never a bare `.length` / bare string compare in an
+  // r-if — route through a `(): boolean` so the JSX targets emit a true boolean
+  // and no falsy value leaks a text node).
   function showsDaysView(): boolean {
     return viewMode === 'days';
   }
@@ -370,16 +409,28 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   function showsYearsView(): boolean {
     return viewMode === 'years';
   }
+  // Drill DOWN into the month picker (from the days heading). Seeds
+  // $data.activeMonth via resolveRovingDrillIndex (the SAME selection chain
+  // resolveRovingDrillIso proves), so the r-keynav grid primitive lands DOM
+  // focus on the resolved cell in the same tick the panel first renders — the
+  // focus-after-render seam (SPEC §10). No scheduleFocus call: that's now the
+  // primitive's job.
   const enterMonthsView = useCallback(() => {
     if (props.disabled) return;
     setActiveMonth(resolveRovingDrillIndex(monthList().months));
     setViewMode('months');
   }, [monthList, props.disabled]);
+  // Drill DOWN into the year picker (from the months-panel year label). Mirrors
+  // enterMonthsView.
   const enterYearsView = useCallback(() => {
     if (props.disabled) return;
     setActiveYear(resolveRovingDrillIndex(yearGrid().years));
     setViewMode('years');
   }, [props.disabled, yearGrid]);
+  // Pick a month → move the view anchor to it, drill back UP toward days, and
+  // seed $data.activeDay onto the resolved day tab stop — the r-keynav grid
+  // controller lands DOM focus itself once the value changes (77-08; no
+  // scheduler needed any more).
   const selectMonth = useCallback((iso: any) => {
     if (props.disabled) return;
     if (!isIsoDate(iso)) return;
@@ -391,6 +442,9 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     // comment).
     seedActiveDay(iso, true);
   }, [monthEnabled, props.disabled, seedActiveDay]);
+  // Pick a year → move the view anchor's year, drill back UP toward months, and
+  // re-seed $data.activeMonth (mirrors enterMonthsView — the primitive lands
+  // focus, no scheduleFocus needed).
   const selectYear = useCallback((iso: any) => {
     if (props.disabled) return;
     if (!isIsoDate(iso)) return;
@@ -399,6 +453,14 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     setViewMode('months');
     setActiveMonth(resolveRovingDrillIndex(monthList().months));
   }, [monthList, props.disabled, yearEnabled]);
+  // Shared Escape-to-days exit for both drill keydown handlers: returns to the
+  // days view AND seeds $data.activeDay, so Escape returns focus into the grid
+  // (the r-keynav controller lands it) instead of dropping it to <body>. [D-03]
+  // Now also reachable via the additive `header` slot `:closeDrill` param —
+  // unlike its two existing callers (which already guard on $props.disabled
+  // before calling), a consumer-invoked slot callback has no such guard, so a
+  // whole-control disabled check is added here (a no-op for both existing call
+  // sites, which never call this while disabled).
   function exitToDaysView() {
     if (props.disabled) return;
     setViewMode('days');
@@ -407,10 +469,87 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     // (staleness fix, see seedActiveDay's own doc comment).
     seedActiveDay(undefined, true);
   }
+  // ---- day grid r-keynav wiring (77-08 retrofit) --------------------------
+  // @keynav-commit fires with the day grid's own active index already resolved
+  // by the primitive — read via the handler's OWN `i` parameter (mirrors
+  // onMonthCommit/onYearCommit, 77-07 Task 3's real-DOM finding: re-reading
+  // $data.activeDay here would see a stale pre-click value on React's async
+  // setState). commitValue/commitRange already gate on dayEnabled(iso), so
+  // committing a disabled cell stays a safe no-op even though the primitive
+  // itself never commits one to begin with (grid mode's inert-by-default
+  // contract, SPEC §5).
   const onDayCommit = useCallback((i: any) => {
     const cell = allDayCells()[i];
     if (cell) onDaySelect(cell.iso);
   }, [allDayCells, onDaySelect]);
+  // @keynav-page — the retrofit's behavioural heart (SPEC §4.1, §10). The
+  // primitive NEVER moves $data.activeDay itself on a page/boundary event; it
+  // only reports the attempted move so the author (who owns which month is
+  // rendered) can advance the dataset and set the landing index, both in the
+  // SAME tick — the focus-after-render seam plan 77-06 proved on all six
+  // targets before this retrofit depended on it.
+  //
+  // 'boundary' (an arrow ran off either end of the WHOLE flat day source, in
+  // EITHER axis — a row-end AND a column-end boundary land identically, SPEC
+  // §4): swing the view by exactly one month in the event's direction and land
+  // at the OPPOSITE edge of the freshly rendered set — forward lands at the
+  // first cell (index 0), backward at the last.
+  //
+  // 'pageup'/'pagedown': swing the view by one month and land on the SAME FLAT
+  // INDEX (SPEC §4.1's sameWeekdayIndex illustration, mirroring KeynavGridDemo's
+  // own onPage) — every panel is unconditionally 42 cells (6 rows x 7 columns)
+  // and numberOfMonths never changes mid-page, so preserving the flat index
+  // preserves BOTH the row and the weekday column. [77-09 fix, bug report
+  // 2026-08-05] The prior implementation only preserved the COLUMN
+  // (`activeDay % 7`), which silently discarded the row and always re-landed
+  // on row 0 — visibly "jumping to the top row" on every PageUp/PageDown press
+  // whenever the active cell wasn't already there.
+  //
+  // Reuses addMonths — the family's existing month arithmetic (T-77-08-03: one
+  // month per event, no unbounded loop) — no new date math.
+  //
+  // `allDayCells()` is called AFTER the $data.viewIso write, but ONLY its
+  // `.length` is read below — SAFE despite React's async setState (unlike
+  // onMonthCommit/onYearCommit's `i`-parameter fix, 77-07 Task 3): every panel
+  // is unconditionally 42 cells, so the flat array's length is `numberOfMonths
+  // * 42` regardless of WHICH month $data.viewIso currently names — nothing
+  // here depends on the just-written value actually having landed yet.
+  //
+  // [77-09 fix] EVERY write below settles through the ROVING_DAY_NONE sentinel
+  // first, then the real landing index one animation frame later — the SAME
+  // safety net seedActiveDay uses (see its own doc comment) and for the SAME
+  // reason: a page/boundary event always tears down and recreates the day-cell
+  // DOM nodes (fresh content-based :key per week/panel for the new month) even
+  // when the computed landing INDEX happens to repeat the value activeDay
+  // already held (which the fixed 'pageup'/'pagedown' math above now does by
+  // design whenever the grid shape is unchanged). When that happens, the
+  // per-target controller's own "only re-apply focus on a genuine active-value
+  // change" guard sees no change at all and never re-queries the (brand new)
+  // DOM for the landing cell — silently dropping focus. This was the exact
+  // mechanism behind the reported "second PageUp press loses focus entirely"
+  // symptom: the first press (previously) computed a DIFFERENT column-only
+  // value than the starting index, so it visibly (if wrongly) refocused; the
+  // second press then computed the SAME value as the first, hit the
+  // no-genuine-change guard, and focus vanished. Settling through the sentinel
+  // forces a genuine reactive change on every press, regardless of whether the
+  // computed index happens to repeat.
+  //
+  // [77-09 fix, real-DOM regression] The landing-index math below reads
+  // `currentActiveDay()` (the sentinel-safe resolver), NOT `$data.activeDay`
+  // directly. `activeDay` transiently sits at ROVING_DAY_NONE between the
+  // synchronous settle-write below and the rAF-deferred real-value write one
+  // frame later — a real hazard under RAPID REPEATED presses (PageDown held
+  // down; OS key-repeat comfortably outpaces a single animation frame): a
+  // second onDayPage call landing inside that transient window would read the
+  // SENTINEL as "the current position," permanently corrupting every
+  // subsequent landing index to -1 and dropping focus forever (confirmed via
+  // real-DOM testing — a fast repeated-PageDown sequence never recovered
+  // within a 10s poll). `currentActiveDay()` falls back to `activeDayReal`
+  // (kept synchronously current below) ONLY during that window, and is
+  // `$data.activeDay` itself the rest of the time — which is what keeps an
+  // ORDINARY move (Control+Home, arrows, Home/End — none of which ever write
+  // the sentinel) correctly visible here too, rather than a stale shadow from
+  // whenever the day grid was last paged.
   const onDayPage = useCallback((detail: any) => {
     setViewIso(addMonths(viewMonthGrid(), detail.direction));
     const nextCells = allDayCells();
@@ -424,6 +563,10 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       setActiveDay(next);
     });
   }, [allDayCells, currentActiveDay, viewMonthGrid]);
+  // The native `disabled` attribute is gone from the month/year drill buttons
+  // (D-3 — focusable-but-inert, matching the day cells), so selectMonth/
+  // selectYear must gate on the cell's own `disabled` flag themselves — today the
+  // native attribute was the only guard.
   function monthEnabled(iso: any) {
     const cell = monthList().months.find((m: any) => m.iso === iso);
     return !cell || !cell.disabled;
@@ -432,6 +575,11 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     const cell = yearGrid().years.find((y: any) => y.iso === iso);
     return !cell || !cell.disabled;
   }
+  // ---- keyboard (77-08: author-owned Space/Escape only, F5) --------------
+  // Every other key (arrows, Home/End, PageUp/PageDown, Ctrl+Home/End, Enter)
+  // falls through untouched to the primitive's own root-level grid delegation
+  // (the day grid's r-keynav wrapper, template below) — the hand-rolled day
+  // keydown switch and its moveFocus helper are DELETED (77-08's whole point).
   const onDayCellKeydown = useCallback((iso: any, e: any) => {
     if (props.disabled) return;
     const key = e ? e.key : '';
@@ -459,6 +607,27 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       }
     }
   }, [_rozieProp_onChange, onDaySelect, props.disabled, props.selectionMode, readRange, setValue]);
+  // ---- drill grid (months / years 12-cell r-keynav roots, 77-07) ---------
+  // Both drills are 3-column grids — the VERIFIED shared column count (a hand-
+  // rolled constant AND the CSS custom property default were both already 3;
+  // see the drill-grid CSS comment below for the CSS-custom-property caveat).
+  // The primitive's key map (arrows, Home/End, Ctrl+Home/End, Enter) replaces
+  // the two deleted hand-rolled per-cell keydown switches entirely; only Space
+  // and Escape stay author-owned (P71 §4 boundary — the primitive
+  // does not cover either).
+  // @keynav-commit fires with the panel's own active index already resolved by
+  // the primitive — read via the handler's OWN `i` parameter (the SAME index
+  // the primitive just wrote through `r-keynav:tabindex`'s setter), NOT via
+  // $data.activeMonth/$data.activeYear: on a POINTER commit (click on a
+  // non-active cell) the primitive calls setActive(i) THEN commit(i) in the
+  // same synchronous pass, and on React specifically `setState` is
+  // async — a handler that re-reads $data.activeMonth here would see the
+  // PRE-click value, committing the WRONG cell (found via 77-07 Task 3's
+  // real-DOM run). `i` is always correct regardless of target/timing.
+  // selectMonth/selectYear already gate on the cell's own `disabled` flag (the
+  // pointer-path guard), so committing a disabled cell is a safe no-op even
+  // though the primitive itself never commits one to begin with (grid mode's
+  // inert-by-default contract, SPEC §5).
   const onMonthCommit = useCallback((i: any) => {
     const cell = monthList().months[i];
     if (cell) selectMonth(cell.iso);
@@ -467,7 +636,13 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     const cell = yearGrid().years[i];
     if (cell) selectYear(cell.iso);
   }, [selectYear, yearGrid]);
+  // The drills have no pageable dataset (12 fixed cells, never paged) — SPEC
+  // §4.1's "if the author ignores the event, boundary/page keys are safe
+  // no-ops" clamp-equivalent default. Written explicitly (not omitted) so a
+  // reader sees this is deliberate, not a missing handler.
   const onDrillPage = useCallback(() => {}, []);
+  // Author-owned Space/Escape only — every other key falls through untouched
+  // to the primitive's own root-level grid delegation (the markup below).
   const onMonthCellKeydown = useCallback((iso: any, e: any) => {
     if (props.disabled) return;
     const key = e ? e.key : '';
@@ -490,6 +665,10 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       exitToDaysView();
     }
   }, [exitToDaysView, props.disabled, selectYear]);
+  // ---- presets (range mode) ----------------------------------------------
+  // Resolve every consumer preset's `range` (literal or () => RangeValue thunk)
+  // into an ordered { label, range } for the rail + the #presets slot. A PLAIN
+  // function (uniform x6), called fresh each render.
   function resolvedPresets() {
     return props.presetRanges.map((p: any) => ({
       label: p.label,
@@ -499,6 +678,14 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   function hasPresets(): boolean {
     return resolvedPresets().length > 0;
   }
+  // Apply a preset = a complete range: write the (ordered) value + clear any
+  // in-progress preview + emit change AND rangeComplete. [D-02 discretion,
+  // DELIBERATELY NOT range-span-validated] Unlike commitRange, this does NOT
+  // consult rangeSpanBlocked: a preset's `range` is a consumer-supplied
+  // literal/thunk whose date math the consumer already owns (see the
+  // `presetRanges` prop docs), and silently refusing to honor a preset the
+  // consumer explicitly configured would be worse than applying it as
+  // supplied. Filed as a new explicit re-defer (quick task 260807-6p8 SUMMARY).
   const { onRangeComplete: _rozieProp_onRangeComplete } = props;
     const applyPreset = useCallback((range: any) => {
     if (props.disabled) return;
@@ -512,6 +699,8 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       value: next
     });
   }, [_rozieProp_onChange, _rozieProp_onRangeComplete, props.disabled, setValue]);
+  // Whether a preset matches the current value (ordered endpoint equality), used
+  // for aria-pressed / is-active. An empty range never reads active.
   function isPresetActive(range: any) {
     const p = normalizeRange(range);
     if (p.start === '') return false;
@@ -529,6 +718,11 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     // doc comment); $data.viewMode is unchanged here.
     seedActiveDay(nextViewIso);
   }
+  // ---- footer moves (Today / Clear row) ----------------------------------
+  // selectToday() — the footer "Today" action. In single mode commit today
+  // through the value funnel (write + emit change, gated exactly like a day
+  // click); in range mode just swing the view to the current month (goToToday),
+  // never mutating the value. Clear reuses the existing clear() funnel unchanged.
   const selectToday = useCallback(() => {
     if (props.disabled) return;
     if (props.selectionMode === 'range') {
@@ -537,9 +731,13 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       commitValue(todayIso());
     }
   }, [commitValue, goToToday, props.disabled, props.selectionMode, todayIso]);
+  // Named boolean guard for the footer r-if (never a bare truthiness in the r-if
+  // so the JSX targets emit a real boolean and leak no falsy value).
   function showsFooter(): boolean {
     return !!props.showFooter;
   }
+  // clear() — deselect, writing the mode-appropriate empty ('' single /
+  // { start:'', end:'' } range) + emit change.
   const clear = useCallback(() => {
     if (props.disabled) return;
     if (props.selectionMode === 'range') {

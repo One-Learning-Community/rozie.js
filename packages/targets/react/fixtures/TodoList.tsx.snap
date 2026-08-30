@@ -59,6 +59,11 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     } : i));
     _rozieProp_onToggle && _rozieProp_onToggle(id);
   }, [_rozieProp_onToggle, setItems]);
+  // Internal method renamed from `remove` to `removeItem` to avoid colliding
+  // with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
+  // methods as class fields and the resulting `remove(id)` signature is
+  // incompatible with the inherited `remove(): void`. Public API is unchanged:
+  // the slot param is still `:remove`, the emitted event is still `'remove'`.
   const { onRemove: _rozieProp_onRemove } = props;
     const removeItem = useCallback((id: any) => {
     setItems(prev => prev.filter((i: any) => i.id !== id));

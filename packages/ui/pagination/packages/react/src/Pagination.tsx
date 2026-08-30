@@ -121,6 +121,10 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
   function tabIndexFor(active: any): number | undefined {
     return active ? 0 : -1;
   }
+  // ---- write funnel (single $emit site) ----------------------------------
+  // Clamp to [1, totalPages], write the model, and emit `change` with the new
+  // page. NOT named `setModelValue` (that collides with React's generated model
+  // setter → ROZ524) — `goToPage` is collision-safe across all six leaves.
   const { onChange: _rozieProp_onChange } = props;
     const goToPage = useCallback((page: any) => {
     if (props.disabled) return;
@@ -166,6 +170,9 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
     const active = nav$local ? nav$local.ownerDocument.activeElement : null;
     return els.indexOf(active as HTMLElement);
   }
+  // Roving keyboard navigation: arrows move focus between controls, Home/End jump
+  // to the ends. Each control keeps tabindex via the template (the active page is
+  // 0, the rest -1) so the group is a single tab stop.
   const onControlKeydown = useCallback(($event: any) => {
     if (props.disabled) return;
     const key = $event.key;
@@ -184,6 +191,10 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
       focusControlAt(controls().length - 1);
     }
   }, [controls, focusControlAt, focusedIndex, props.disabled]);
+  // ---- imperative handle -------------------------------------------------
+  // Consumer-callable verbs. `goto` clamps; `next`/`prev`/`first`/`last` are the
+  // bounds-aware steppers. None collide with an emit name (`change`) or the React
+  // model setter (`setModelValue`).
   function goto(page: any) {
     return goToPage(page);
   }

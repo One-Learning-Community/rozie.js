@@ -90,6 +90,9 @@ export default function Column(_props: ColumnProps): JSX.Element {
 
   // idempotency flag so a reactive late-context registration (Lit async first paint,
   // REQ-30) and the $onMount registration never double-register the column.
+  // the column SPEC builder — shared by the $onMount register and the late-context
+  // $onUpdate below. Carries METADATA ONLY (no cell/header render callbacks — D-A moved
+  // per-cell rendering to the parent's #cell/#header scoped slot, dispatched by columnId).
   const colId = useCallback(() => props.id !== '' ? props.id : props.field, [props.field, props.id]);
   const buildSpec = useCallback(() => ({
     id: colId(),

@@ -29,9 +29,12 @@ export default function FilterText(_props: FilterTextProps): JSX.Element {
   };
   const [draft, setDraft] = useState(() => props.value != null ? String(props.value) : '');
 
+  // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
+  // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
   const onInput = useCallback((e: any) => {
     setDraft(e && e.target ? e.target.value : '');
   }, []);
+  // setFilter is a Function prop (default null) — guard before calling.
   function applyFilter() {
     props.setFilter && props.setFilter(props.columnId, draft);
   }

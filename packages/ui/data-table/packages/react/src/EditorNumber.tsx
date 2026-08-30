@@ -42,6 +42,9 @@ export default function EditorNumber(_props: EditorNumberProps): JSX.Element {
   const onInput = useCallback((e: any) => {
     setDraft(e && e.target ? e.target.value : '');
   }, []);
+  // Coerce to a Number at commit time. Defensive guard: an empty/whitespace draft
+  // commits null rather than NaN (Number('') === 0 is a silent footgun); a
+  // non-numeric draft also commits null. Otherwise commit the coerced number.
   function doCommit() {
     if (!props.commit) return;
     const raw = draft;

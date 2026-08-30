@@ -194,6 +194,17 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   const _watch8First = useRef(true);
   const _watch9First = useRef(true);
 
+  // Instance-scoped synthetic-id store for id-less object items. Keyed by object
+  // IDENTITY, so the same object keeps its synthetic id across a reorder (the
+  // framework reconciler then rebinds the row component instance to its ORIGINAL
+  // item, not its slot position — the data-corruption fix).
+  //
+  // Phase 73 item #11-b removed the former "fold the WeakMap + counter into ONE
+  // member-mutated object const" workaround: `hoistModuleLet`'s reachability
+  // walk now also roots at helpers called ONLY from a template expression
+  // (`keyFor` is called from `:key`/`:data-id`, never from a hook), so the bare
+  // `let __rowKeySeq = 0` below hoists to a `useRef` on React exactly like the
+  // hook-reached case — no more per-render reset. Verified in codegen.
   const __rowKeyMap = useMemo(() => new WeakMap(), []);
   function keyFor(item: any, index: any) {
     // (a) function itemKey: consumer-supplied (item, index) => key.
@@ -216,11 +227,22 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     //     unsafe to reorder this way — pass a function itemKey for those.
     return index;
   }
+  // Resolve the SortableJS `group` option: `cloneable` is a high-level Rozie
+  // prop that REPLACES a string `group` with SortableJS's
+  // `{ name, pull: 'clone', put: true }` clone-mode object form. When
+  // `cloneable:false`, pass `$props.group` through verbatim. When
+  // `cloneable:true` AND `$props.group` is null, leave it null — a clone-mode
+  // list without a group name is not meaningful (no peer list can join the
+  // cross-list flow). Shared by $onMount construction AND the group/cloneable
+  // $watch reconcile below — single source of truth, no duplicated ternary.
   const resolveGroup = useCallback(() => props.cloneable && typeof props.group === 'string' ? {
     name: props.group,
     pull: 'clone' as const,
     put: true as const
   } : props.group ?? undefined, [props.cloneable, props.group]);
+  // Resolve itemClass for a row: a static value (string | array | object) OR a
+  // per-row (item, index) => class function. The result is fed into the :class
+  // array and normalized by each target's class path (rozieClass / clsx / native).
   function itemClassFor(item: any, index: any) {
     const v = props.itemClass;
     return typeof v === 'function' ? v(item, index) : v;
@@ -300,6 +322,15 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       });
     }
   }, [_rozieProp_onChange, getLabel, items, keyboardEnabled, liftedIndex, setItems]);
+  // SortableJS wiring lives in `useSortableJS()` (./internal/useSortableJS).
+  // The helper owns the SortableJS-vs-reconciler dance — DOM-restore hardening
+  // against fragile-event paths, identity-based item lookup over fragile
+  // `e.oldIndex`, and the single-onEnd disambiguation that collapses
+  // onUpdate / onAdd / onRemove into one handler.
+  //
+  // What stays here is purely declarative: which array to read, what to write
+  // back, what to emit, and how to bridge `afterCommit` to the Lit-only
+  // `$reconcileAfterDomMutation()` sigil.
   // Imperative handle (Phase 21 $expose). The SortableJS imperative surface a
   // consumer can't drive through props alone — exposed uniformly to all 6 targets.
   // Each guards the pre-mount/destroyed `instance = null`. Collision-clear: none of
@@ -311,17 +342,12 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   // toArray()/sort() operate on SortableJS's data-id ordering — every row carries
   // :data-id="keyFor(item, index)", so toArray() returns the current key order and
   // sort(order) reorders by those keys (set itemKey for stable object-list keys).
-  // toArray()/sort() operate on SortableJS's data-id ordering — every row carries
-  // :data-id="keyFor(item, index)", so toArray() returns the current key order and
-  // sort(order) reorders by those keys (set itemKey for stable object-list keys).
   function toArray() {
     return instance.current ? instance.current.toArray() : [];
   }
   function sort(order: any, useAnimation = true) {
     instance.current?.sort(order, useAnimation);
   }
-  // option(name) reads a live SortableJS option; option(name, value) sets one — the
-  // runtime escape hatch for any SortableJS option beyond the curated props.
   // option(name) reads a live SortableJS option; option(name, value) sets one — the
   // runtime escape hatch for any SortableJS option beyond the curated props.
   function option(name: any, value: any) {

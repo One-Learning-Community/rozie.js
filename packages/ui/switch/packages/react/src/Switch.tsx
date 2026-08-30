@@ -69,9 +69,12 @@ const Switch = forwardRef<SwitchHandle, SwitchProps>(function Switch(_props: Swi
     if (props.disabled || props.readonly) return;
     commitValue(!isChecked());
   }
+  // ---- pointer + keyboard handlers -------------------------------------------
   const onClick = useCallback(() => {
     toggle();
   }, [toggle]);
+  // Space and Enter toggle the switch (the WAI-ARIA switch keyboard pattern).
+  // preventDefault on Space so the page does not scroll.
   const onKeydown = useCallback((e: any) => {
     if (props.disabled || props.readonly) return;
     const key = e ? e.key : '';
@@ -80,6 +83,9 @@ const Switch = forwardRef<SwitchHandle, SwitchProps>(function Switch(_props: Swi
       toggle();
     }
   }, [props.disabled, props.readonly, toggle]);
+  // ---- focusability helper (plain function, uniform ×6) ----------------------
+  // tabindex is 0 when interactive, dropped (null → attribute omitted) when
+  // disabled. Returns number | null; rozieAttr drops the attr on null.
   function controlTabindex() {
     return props.disabled ? null : 0;
   }

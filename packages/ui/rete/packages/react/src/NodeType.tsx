@@ -157,6 +157,14 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
       }
     };
   }
+  // the canvas TYPE spec builder — shared by the $onMount register and the late-context
+  // $onUpdate below. The bodyRenderer render-callback is invoked by the canvas's
+  // renderNode (per graph node of this type) from the canvas's own render scope with
+  // the engine `body` host div + the { node, selected, emit } scope; the NodeType then
+  // mounts its OWN `body` portal slot INTO that host via $portals.body — reusing the
+  // shipped reactive-portal machinery (6/6 green on the config-array `node` path). NO
+  // framework DOM is relocated. Returns { dispose } so the canvas can tear the body
+  // projection down on node unmount / port-resync.
   const buildSpec = useCallback(() => ({
     type: props.type,
     // RENDER-BY-TYPE callback: the canvas hands the engine body host + scope; delegate

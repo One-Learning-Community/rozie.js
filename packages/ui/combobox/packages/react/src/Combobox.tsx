@@ -528,9 +528,15 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   function pinnedMeasurement(pin: any) {
     return null;
   }
+  // Keep $data.rows === windowSource() so the windowing math indexes the live filtered set.
   const syncRows = useCallback(() => {
     setRows(windowSource());
   }, [windowSource]);
+  // Defer remeasureWindow() until AFTER the framework commits the recycled window: TWO
+  // passes (microtask THEN rAF) behind one in-flight flag (the data-table
+  // virtualization.rzts pattern, copied per-consumer per D-04/D-09) — microtask catches
+  // Solid's <For> / Svelte's {#each} synchronous commit (the Phase 63 Solid
+  // under-convergence hazard — D-09 rAF-defer budget), rAF catches React's async commit.
   function scheduleRemeasure() {
     if (remeasurePending.current) return;
     remeasurePending.current = true;
@@ -594,6 +600,11 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     }
     return from;
   }
+  // ---- selection (writes the model + syncs query) ------------------------
+  // `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
+  // `@change` with BOTH the committed value AND the raw source `option` (CP reads
+  // `e.option`). `closeOnSelect` (default true) gates the popup close — a caller
+  // embedding the combobox in a multi-action surface passes `:close-on-select="false"`.
   const { onChange: _rozieProp_onChange } = props;
     const selectOption = useCallback((opt: any) => {
     if (!opt) return;
@@ -612,11 +623,13 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       option: opt.option
     });
   }, [_rozieProp_onChange, expandGroup, props.closeOnSelect, setValue]);
+  // Reflect the externally-selected value into the input text.
   const syncQueryToValue = useCallback(() => {
     const opts = Array.isArray(props.options) ? props.options : [];
     const opt = opts.find((o: any) => o.value === value);
     setQuery(opt ? String(opt.label) : '');
   }, [props.options, value]);
+  // ---- input + keyboard handlers -----------------------------------------
   const { onSearch: _rozieProp_onSearch } = props;
     const onInput = useCallback((e: any) => {
     const q = e && e.target ? e.target.value : '';
@@ -631,6 +644,11 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     setIsOpen(true);
     if (e && e.target && e.target.select) e.target.select();
   }, []);
+  // @blur closes the popup. Option selection uses @mousedown.prevent, which keeps
+  // focus on the input, so a click on an option does NOT blur-close before select.
+  // While `pinned` (pinOpen(true)), early-return BEFORE the isOpen write — a host
+  // sub-surface (e.g. command-palette's action flyout) is holding focus and the
+  // popup must stay open until the host calls pinOpen(false) itself.
   const onBlur = useCallback(() => {
     if (pinned.current) return;
     setIsOpen(false);
@@ -683,6 +701,15 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     // windowing, direct scrollIntoView otherwise.
     scrollActiveIntoView();
   }, [activeIndex, isOpen, navRows, nextEnabled, scrollActiveIntoView, selectOption]);
+  // ---- lifecycle + imperative handle -------------------------------------
+  // kickWindow: the cross-target first-paint settle (the data-table / listbox precedent).
+  // Re-captures the LIVE scroll element, re-feeds the CURRENT option count, re-attaches the
+  // rect observer (_willUpdate), and bumps the windowVer signal so the windowed slice
+  // re-derives. Retried over a few frames because (a) virtual-core measures the scroll rect
+  // asynchronously (D-09 Solid rAF-defer — a synchronous kick sees rectH 0 → empty window),
+  // (b) Solid/Lit recreate the list node between mount and first commit (stale scrollElement),
+  // and (c) the consumer often seeds options AFTER the combobox mounts (Lit/React). Stops once
+  // the window paints — idempotent + loop-free.
   function kickWindow(attempts: any) {
     if (!virtualizer.current) return;
     gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-combobox-list') : gridScrollEl.current;
@@ -701,6 +728,12 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(attempts - 1));else setTimeout(() => kickWindow(attempts - 1), 16);
     }
   }
+  // buildVirtualizer() (combobox-virtual-reactivity, VIRT-BUILD): the SINGLE virtualizer
+  // construction site — called from $onMount below (mount-time virtual:true) AND from the
+  // virtual $watch further down (a runtime false→true flip), so the mount path can never
+  // drift from the flip path. Guarded so a build queued (rAF-deferred by the $watch) that
+  // fires AFTER a flip-back is a no-op (rapid-flip idempotence), and so calling it twice
+  // never double-constructs.
   const buildVirtualizer = useCallback(() => {
     if (!props.virtual || virtualizer.current) return;
     // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
@@ -715,6 +748,12 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     setWindowVer(prev => prev + 1);
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
   }, [kickWindow, props.virtual, virtualizerOptions]);
+  // teardownVirtualizer() (VIRT-TEARDOWN): runs the SAME per-instance cleanup fn
+  // $onUnmount invokes below, then nulls the instance state + bumps windowVer so the
+  // windowed template branch (still mounted while $props.virtual — CR-01) re-derives to
+  // the pre-construction fallback state instead of holding a stale virtualizer. This is
+  // the true→false ResizeObserver-leak fix: previously ONLY $onUnmount ever called
+  // virtualizerCleanup, so a runtime flip to non-virtual left the observer live.
   function teardownVirtualizer() {
     if (virtualizerCleanup.current) virtualizerCleanup.current();
     virtualizer.current = null;

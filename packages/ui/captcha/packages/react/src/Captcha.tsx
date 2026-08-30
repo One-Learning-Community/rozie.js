@@ -82,6 +82,13 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(function Captcha(_props:
   _providerRef.current = props.provider;
   const widgetEl = useRef<HTMLDivElement | null>(null);
 
+  // Live widget handle. Top-level lets → React hoists to useRef (setup-once).
+  // `api`/`widgetId` MUST be top-level — reset()/execute()/getResponse() (the
+  // $expose'd imperative handle, callable any time) read them outside $onMount.
+  // The render config shared across all three providers. The hyphenated
+  // `expired-callback` / `error-callback` keys are the common option names each
+  // provider's render() accepts. `tabindex` is omitted unless set; `options`
+  // (the escape hatch) is merged last so a consumer can override any key.
   const { onError: _rozieProp_onError, onExpire: _rozieProp_onExpire, onVerify: _rozieProp_onVerify } = props;
     const buildConfig = useCallback(() => ({
     sitekey: props.sitekey,
@@ -122,11 +129,9 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(function Captcha(_props:
     setToken('');
   }
   // Invisible / programmatic challenge (size="invisible"). No-op until rendered.
-  // Invisible / programmatic challenge (size="invisible"). No-op until rendered.
   function execute() {
     if (widgetId.current != null && api.current && typeof api.current.execute === 'function') api.current.execute(widgetId.current);
   }
-  // Read the current response token on demand (e.g. just before form submit).
   // Read the current response token on demand (e.g. just before form submit).
   function getResponse() {
     return widgetId.current != null && api.current && typeof api.current.getResponse === 'function' ? api.current.getResponse(widgetId.current) : '';

@@ -6,10 +6,24 @@
 "@rozie-ui/codemirror-angular": patch
 "@rozie-ui/codemirror-solid": patch
 "@rozie-ui/codemirror-lit": patch
+"@rozie-ui/captcha-react": patch
+"@rozie-ui/chartjs-react": patch
+"@rozie-ui/combobox-react": patch
+"@rozie-ui/command-palette-react": patch
+"@rozie-ui/cropper-react": patch
 "@rozie-ui/data-table-react": patch
+"@rozie-ui/date-picker-react": patch
+"@rozie-ui/embla-react": patch
+"@rozie-ui/flatpickr-react": patch
+"@rozie-ui/otp-react": patch
+"@rozie-ui/pdf-react": patch
+"@rozie-ui/popover-react": patch
 "@rozie-ui/rete-react": patch
+"@rozie-ui/sortable-list-react": patch
+"@rozie-ui/tags-react": patch
 "@rozie-ui/tiptap-react": patch
 "@rozie-ui/toast-react": patch
+"@rozie-ui/wavesurfer-react": patch
 ---
 
 React's `useMemo` stabilization of an escaping top-level `const` was discovered by a
@@ -40,35 +54,50 @@ The CodeMirror unwind quick 260829-gbs had to revert (`5d48f9156`, because the t
 `code-mirror [react]` VR cells failed all retries under the pre-fix emitter) is re-landed:
 all six leaves regenerated from the fixed emitter, all ten CM6 `Compartment` instances now
 emit as `useMemo(() => new Compartment(), [])` on React, and the five non-React leaves are
-byte-identical to the original unwind (`61bf99340`) — this fix is React-only.
+byte-identical to the original unwind (`61bf99340`) — the emitter fix itself is React-only.
 
-Four other shipped React leaves also had a const of this exact shape and drifted as an
-expected consequence of the emitter fix — each one individually inspected (correct empty
-dep array on a non-reactive initializer, no reactive-read case regressed to `[]`, no
-`.current`-read freeze hazard, and zero helper `function`-declaration flipped form anywhere
-in the corpus): `@rozie-ui/data-table-react` (`GRID_PAGE_STEP`, `DATA_WRITE_TOKEN_KEY`,
-`SELECT_COL_ID`, `EXPANDER_COL_ID`), `@rozie-ui/rete-react`
-(`MINIMAP_W`/`MINIMAP_H`/`MINIMAP_DEFAULT_NODE_W`/`MINIMAP_DEFAULT_NODE_H`/
-`RESIZE_MIN_FALLBACK`/`SVGNS`/`SOCKET`/`CONN_WARN_SETTLE_MS`/`HISTORY_CAP`/`ZOOM_STEP`),
-`@rozie-ui/tiptap-react` (`buildStarterKitConfig`'s `STARTERKIT_COLLISION_MAP` dependency —
-no wrap-form change, comment-fidelity only), and `@rozie-ui/toast-react`
-(`EXIT_FAILSAFE_MS`).
+Four other shipped React leaves carried a const of this exact shape and changed wrap form as
+an expected consequence, each individually inspected (correct empty dep array on a
+non-reactive initializer, no reactive-read case regressed to `[]`, no `.current`-read freeze
+hazard, and zero helper `function` declarations flipped form anywhere in the corpus):
+`@rozie-ui/data-table-react` (`GRID_PAGE_STEP`, `DATA_WRITE_TOKEN_KEY`, `SELECT_COL_ID`,
+`EXPANDER_COL_ID`), `@rozie-ui/rete-react` (`RESIZE_MIN_FALLBACK`, `CONN_WARN_SETTLE_MS`,
+`HISTORY_CAP`, `ZOOM_STEP`), and `@rozie-ui/toast-react` (`EXIT_FAILSAFE_MS`). Every one is a
+bare literal initializer reading nothing, so `[]` is the correct and complete dep array.
 
-`@rozie-ui/maplibre-*` ALSO drifted (`DEFAULT_STYLE` gained its correct `useMemo` leading
-comment on React) but is deliberately OMITTED from this changeset's front-matter: that
-family is in `.changeset/config.json`'s `ignore` list, and listing an ignored package
-alongside a non-ignored one makes `changeset status` fail outright (the exact breakage
-`8865e96df` repaired — not reintroduced here).
+**Emitted-comment fidelity — two structural fixes.** The component-scope emission loop mixes
+statements emitted as hand-built STRINGS (four `tryWrap*` passes) with statements emitted
+through a per-statement `@babel/generator` call, each of the latter carrying its own
+printed-comment dedup set. Because Babel attaches a comment sitting BETWEEN two statements to
+BOTH neighbours at once, a shared comment printed TWICE (both neighbours rendered it) or ZERO
+times (neither did), depending purely on which pass claimed each side — and both failures
+were live in the shipped corpus simultaneously. No per-wrap rule can be right for both sides,
+so the decision moved to a block-wide printed-comment ledger keyed on comment object
+identity, which prints every comment exactly once in source order regardless of which pass
+claims either neighbour. This mirrors the single-dedup-set precedent `genBlockInner` and
+`genImportsBlock` already set for their own scopes.
 
-**Comment-fidelity note.** `tryWrapEscapingConstUseMemo` now preserves a wrapped const's own
-LEADING comment (previously it silently dropped every comment on any const it wrapped — a
-narrow pre-existing gap, newly visible now that the transitive expansion routes many more
-corpus consts through it). Deliberately LEADING-only, not trailing: Babel attaches a comment
-sitting between two statements to BOTH neighbours, and rendering trailing comments here
-double-printed a comment already rendered as the NEXT statement's leading (found on
-`@rozie-ui/maplibre-react`'s `DEFAULT_STYLE`/`PROGRAMMATIC` pair during this change's own
-census; reverted to leading-only after confirming it fixed the duplicate). A comment that was
-previously visible ONLY as a wrapped const's trailing (and is not independently re-rendered
-by whatever statement follows) is a known, accepted residual gap — same pre-existing class as
-`tryHoistArrowToFunction`'s un-copied comments on a hoisted helper, out of scope for this fix,
-logged to `deferred-items.md`.
+Separately, `hoistModuleLet` removed a hoisted `let`'s declaration from the component body
+and took the author's comment on that declaration with it. Those leading comments are now
+re-homed onto the nearest surviving neighbour before removal. This one was invisible from
+inside a single component: an inline host kept such a comment (its neighbour is one parse
+away and carries it as `trailingComments`) while the byte-identical `<script src>`
+partial-inlined host — whose spliced node comes from a DIFFERENT parse with no comments
+attached — lost it. `dist-parity`'s Phase 56-R8 / R11 partial-vs-inline byte-identity cells
+are what caught it.
+
+Net effect across the shipped React corpus: 2110 comment lines restored, 187 duplicate
+prints removed, and **zero** comments dropped and **zero** non-comment bytes changed —
+verified line-by-line against the pre-change corpus. Fifteen further React leaves are bumped
+here for that comment-fidelity restoration alone, with no code change:
+`@rozie-ui/captcha-react`, `chartjs-react`, `combobox-react`, `command-palette-react`,
+`cropper-react`, `date-picker-react`, `embla-react`, `flatpickr-react`, `otp-react`,
+`pdf-react`, `popover-react`, `sortable-list-react`, `tags-react`, `tiptap-react`, and
+`wavesurfer-react`.
+
+Nine more React leaves drifted the same comment-only way but are deliberately OMITTED from
+the front matter: `@rozie-ui/dialog-react`, `lexical-react`, `listbox-react`,
+`maplibre-react`, `number-field-react`, `pagination-react`, `resizable-react`,
+`slider-react` and `switch-react` are all in `.changeset/config.json`'s `ignore` list, and
+listing an ignored package alongside a non-ignored one makes `changeset status` fail
+outright — the exact breakage `8865e96df` repaired, not reintroduced here.

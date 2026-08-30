@@ -22,6 +22,7 @@ export default function InlineEquivHostJ(_props: InlineEquivHostJProps): JSX.Ele
     const next = colId + value;
     return next;
   }, []);
+  // Re-read the row model + header groups into $data
 
   useEffect(() => {
     refreshRowModelJ.current = setColumnFilterJ(1, headJ(2));

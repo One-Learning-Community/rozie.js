@@ -139,6 +139,9 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       };
     }
   }
+  // FULL teardown: clears every live handle AND drops every entry (unlike
+  // pauseTimers, which deliberately keeps entries to hold their remainders).
+  // clear() and $onUnmount can no longer reuse pauseTimers for this reason.
   const teardownTimers = useCallback(() => {
     if (typeof window !== 'undefined') {
       for (const id in timers.current) {
@@ -154,6 +157,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     timers.current = {};
     exitFailsafes.current = {};
   }, []);
+  // ---- queue (imperative handle implementations) -------------------------
   function show(input: any) {
     const t = input || {};
     let id;
@@ -195,6 +199,9 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   // comfortably; a consumer overriding the exit duration beyond ~350ms gets cut
   // short by this failsafe (documented in docs/components/toast.md).
   const EXIT_FAILSAFE_MS = useMemo(() => 350, []);
+  // Idempotent removal: filters the entry out of $data.toasts. Safe to call
+  // twice (from the inline @animationend binding AND the failsafe) — the
+  // second call is a harmless no-op filter over an already-absent id.
   const removeToast = useCallback((id: any) => {
     // Cancel any pending exit failsafe for this id (first-wins: @animationend
     // beating the ~350ms timeout, or vice-versa — either way, only one removal).
@@ -204,6 +211,13 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     delete exitFailsafes.current[id];
     setToasts(prev => prev.filter((t: any) => t.id !== id));
   }, []);
+  // The single dismissal funnel every path routes through: the `dismiss(id)`
+  // verb ('api'), the built-in close button ('close'), a timer expiry
+  // ('timeout'), and a swipe past threshold ('swipe'). Idempotent via the
+  // entry's `exiting` flag — a second call on an id already exiting (or
+  // already gone) is a no-op, so a stray timeout firing mid-exit never
+  // double-emits. `extra` (swipe only) carries `{ swipeExitSign }` so the
+  // template can apply the direction-matched swipe-exit animation.
   const { onDismissed: _rozieProp_onDismissed } = props;
     const dismissBegin = useCallback((id: any, reason: any, extra?: {
     swipeExitSign?: number;
@@ -378,6 +392,21 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     if (swipeGesture.current && swipeGesture.current.id === t.id) swipeGesture.current = null;
     if (swipe && swipe.id === t.id) setSwipe(null);
   }, [props.disableSwipe, swipe]);
+  // ---- stacked mode ----------------------------------------------------------
+  // Depth from newest: the newest toast (last in the array — show() appends)
+  // is depth 0; each older toast is one deeper. Corner-independent — the
+  // collapsed grid overlay ignores flex-direction/column-reverse entirely, so
+  // this needs no position-aware math.
+  //
+  // quick 260716-npt Finding 3 (perf): depth USED to be a per-toast
+  // `$data.toasts.findIndex(...)` scan invoked from toastStyle() for every row
+  // — O(n) work × n toasts rendered = O(n^2) per render. The template's r-for
+  // already computes each row's array index for free (the r-for bare-comma
+  // index form, `t, ti in ...` — see TreeNode.rozie/Table.rozie precedent), so
+  // depth(ti) is now O(1) arithmetic off that index — no scan, and `t`'s id
+  // can never be "not found" via this call path (ti IS t's own index), so the
+  // old idx===-1→0 fallback collapses to unreachable-by-construction (same
+  // observable semantics: newest=depth 0, older=length-1-idx).
   function depth(ti: any) {
     return toasts.length - 1 - ti;
   }
@@ -395,6 +424,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     const opacity = magnitude > 0 && dragState.size > 0 ? Math.max(0.3, 1 - magnitude / dragState.size) : 1;
     return depthDecl + ' transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
   }
+  // ---- hover pause -------------------------------------------------------
   const onMouseEnter = useCallback(() => {
     if (props.disablePauseOnHover) return;
     pauseTimers();
@@ -403,6 +433,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     if (props.disablePauseOnHover) return;
     resumeTimers();
   }, [props.disablePauseOnHover, resumeTimers]);
+  // ---- helpers -----------------------------------------------------------
   function regionLabel() {
     return props.ariaLabel != null ? props.ariaLabel : 'Notifications';
   }

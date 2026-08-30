@@ -66,6 +66,12 @@ export default function Layer(_props: LayerProps): JSX.Element {
   // on React/Vue/Svelte/Angular; async on Lit) is picked up on re-register. `ctx` is
   // the `any` alias so the `.id` read type-checks on the strict bundled leaves.
   const resolveSource = useCallback(() => props.source ?? (ctx.current && ctx.current.id), [props.source]);
+  // The last source id we registered with. A nested <Layer> may register on mount
+  // (React/Vue/Svelte/Angular) BEFORE its <Source> parent has mounted, so its
+  // injected source ctx is null and resolveSource() yields undefined — registering a
+  // non-background layer with no source, which applyLayers can't add. When the source
+  // ctx resolves we re-register with the now-correct source id (idempotent upsert in
+  // the parent registry). null = not yet registered.
   const buildSpec = useCallback(() => ({
     id: props.id,
     type: props.type,

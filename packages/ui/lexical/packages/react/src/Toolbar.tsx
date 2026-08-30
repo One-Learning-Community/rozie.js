@@ -58,6 +58,8 @@ export default function Toolbar(props: ToolbarProps): JSX.Element {
       list: listNode !== null
     });
   }
+  // Register the selection-reading update listener against the shared editor and seed
+  // the initial active state. Deferred one microtask from $onMount (see header).
   const activate = useCallback(() => {
     if (teardown.current || disposed.current) return;
     const editor = ctx.current && ctx.current.instance;
@@ -78,6 +80,8 @@ export default function Toolbar(props: ToolbarProps): JSX.Element {
       refreshActive();
     });
   }, [refreshActive]);
+  // WRITE side — button command dispatchers. Each reads the LIVE editor instance fresh
+  // through the getter (never a stale handle) and guards the pre-mount / torn-down null.
   const formatBold = useCallback(() => {
     const editor = ctx.current && ctx.current.instance;
     if (!editor) return;
@@ -93,6 +97,10 @@ export default function Toolbar(props: ToolbarProps): JSX.Element {
     if (!editor) return;
     editor.dispatchCommand(lexicalList.INSERT_UNORDERED_LIST_COMMAND, undefined);
   }, []);
+  // Unopinionated toggle: if the selection is already a link, unlink (dispatch null);
+  // otherwise link it to a fixed sample href. A fixed href (over a prompt) keeps the
+  // primitive dependency-free and SSR/test-safe — consumers wire their own URL UX
+  // against the LinkPlugin's TOGGLE_LINK_COMMAND (D-12).
   const toggleLink = useCallback(() => {
     const editor = ctx.current && ctx.current.instance;
     if (!editor) return;

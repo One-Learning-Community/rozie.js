@@ -92,6 +92,15 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
   const [focused, setFocused] = useState(false);
   const input = useRef<HTMLInputElement | null>(null);
 
+  // Scrub-on-drag state (also top-level so teardown sees it).
+  // ---- top-level mutable handles (hook-referenced → React useRef hoist) -------
+  // The press-hold repeat timer + its current interval (the ramp). Declared at the
+  // top level so React hoists them to useRef and the Solid onMount/onCleanup split
+  // sees them in teardown. `null`/0 when no repeat is running.
+  // ---- numeric helpers (plain functions, uniform ×6) -------------------------
+  // The current value as a real number, or null when empty. Named readValue, NOT
+  // valueOf — a `valueOf` binding cascades TS1240/1271 across the Lit class via
+  // Object.prototype.
   const readValue = useCallback(() => {
     const v = modelValue;
     return typeof v === 'number' && !Number.isNaN(v) ? v : null;
@@ -162,6 +171,8 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
     const base = cur === null ? hasMin() ? props.min : 0 : cur;
     commitValue(base + dir * stepSize);
   }
+  // ---- press-hold acceleration ----------------------------------------------
+  // Stop any running repeat (pointerup / pointerleave / unmount).
   const stopHold = useCallback(() => {
     if (holdTimer.current !== null) {
       clearTimeout(holdTimer.current);
@@ -169,6 +180,7 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
     }
     holdInterval.current = 0;
   }, []);
+  // Start a repeating step that ramps from slow to fast while the button is held.
   const startHold = useCallback((dir: any) => {
     if (props.disabled || props.readonly) return;
     stopHold();
@@ -182,11 +194,13 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
     };
     holdTimer.current = setTimeout(tick, holdInterval.current);
   }, [props.disabled, props.readonly, props.step, stepBy, stopHold]);
+  // ---- input + keyboard handlers ---------------------------------------------
   const onInput = useCallback((e: any) => {
     if (props.readonly) return;
     const raw = e && e.target ? e.target.value : '';
     setText(raw);
   }, [props.readonly]);
+  // Commit the edit buffer on blur: parse → commit (or clear to null when empty).
   const onBlur = useCallback(() => {
     setFocused(false);
     const parsed = parseText(text);
@@ -230,6 +244,13 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
       commitValue(parsed);
     }
   }, [commitValue, hasMax, hasMin, parseText, props.disabled, props.largeStep, props.max, props.min, props.readonly, props.step, stepBy, text]);
+  // ---- scrub-on-drag (opt-in) ------------------------------------------------
+  // Uses POINTER CAPTURE on the input element itself (set on pointerdown) so the
+  // pointermove/pointerup keep firing on the same element through the whole drag,
+  // even when the pointer leaves the element — no document-level <listeners> (which
+  // would also avoid the React-effect `$event`-in-deps emitter edge). The handlers
+  // are bound directly on the <input> in the template, where `@event` passes a
+  // properly-typed `$event`.
   const onScrubDown = useCallback((e: any) => {
     if (!props.allowScrub || props.disabled || props.readonly) return;
     scrubbing.current = true;
@@ -255,6 +276,7 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
   const onScrubUp = useCallback(() => {
     scrubbing.current = false;
   }, []);
+  // ---- lifecycle + imperative handle -----------------------------------------
   function focus() {
     const el = input.current;
     // NOTE: $refs.input types to the generic HTMLElement on the tsdown/vue leaves

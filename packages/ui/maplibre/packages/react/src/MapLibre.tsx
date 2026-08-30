@@ -428,8 +428,27 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   // hoists into a sibling onCleanup() OUTSIDE the mount IIFE — keeps them in scope.
   const markerEntries = useMemo(() => new Map(), []);
   const popupEntries = useMemo(() => new Map(), []);
+  // ─── declarative-children registry (Phase 37 $provide/$inject dogfood) ───────
+  // Publish the source/layer register-API the <Source>/<Layer> children $inject and
+  // self-register into. EVERY method uses WHOLE-OBJECT REPLACEMENT (spread / clone-
+  // and-delete) so the watched $data.sourceReg/$data.layerReg reference changes once
+  // per mutation and the parent $watch fires on all 6 targets (D-3 / Pitfall 1 — an
+  // in-place `$data.sourceReg[id] = spec` is silent on React/Solid/Angular/Lit). The
+  // register surface mirrors the SHIPPED Tabs.rozie $provide('tabs', { … }) shape;
+  // register/update share a body (both upsert by id). The values feed the SAME
+  // applyLayers() reconcile + appliedSourceIds/appliedLayerIds provenance as the
+  // config-array props, so registry-managed sources/layers are reaped on unregister
+  // exactly like prop-managed ones (D37-08).
+  // layer-scoped feature listeners, registered per interactiveLayerId so they can
+  // be unregistered on change. id → { enter, leave }.
   const featureListeners = useMemo(() => new Map(), []);
+  // previously-applied source/layer ids (null-lets → `any`, [] in $onMount; same
+  // never[] reason as controlInstances) so a sources/layers prop change can remove
+  // the dropped ones.
+  // ─── pure helpers (no sigils → safe at top level) ───────────────────────────
   const sameCenter = useCallback((a: any, b: any) => Array.isArray(a) && Array.isArray(b) && a[0] === b[0] && a[1] === b[1], []);
+  // structured pointer-event payload — stable across targets, avoids handing the
+  // raw engine event (with its circular `target: Map`) to consumers.
   const payload = useCallback((e: any) => ({
     lngLat: e.lngLat ? {
       lng: e.lngLat.lng,
@@ -452,6 +471,10 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     if (type === 'attribution') return new maplibregl.AttributionControl(opts);
     return null;
   }
+  // Standard controls reconcile — no reactive-portal handle to manage here, so
+  // nothing ever needed mount scope (this was never a $portals/$emit constraint —
+  // $emit never forces mount scope on any target). Remove-all + re-add from the
+  // config (controls rarely change; cheap and order-correct).
   const applyControls = useCallback(() => {
     if (!instance.current) return;
     for (const c of controlInstances.current as any) instance.current.removeControl(c);
@@ -465,6 +488,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
       controlInstances.current.push(ctrl);
     }
   }, [buildControl, props.controls]);
+  // Interaction-toggle reconcile — each toggle maps to a runtime handler object.
   const applyInteractionToggles = useCallback(() => {
     if (!instance.current) return;
     const set = (name: any, on: any) => {
@@ -480,6 +504,9 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     set('touchZoomRotate', props.touchZoomRotate);
     set('touchPitch', props.touchPitch);
   }, [props.boxZoom, props.doubleClickZoom, props.dragPan, props.dragRotate, props.keyboard, props.scrollZoom, props.touchPitch, props.touchZoomRotate]);
+  // Style-load-gated source/layer reconcile. Order matters: drop removed layers
+  // FIRST, then add/update sources, then add/update layers, then drop removed
+  // sources (after their layers are gone).
   const applyLayers = useCallback(() => {
     if (!instance.current || !instance.current.isStyleLoaded()) return;
 
@@ -590,6 +617,12 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     appliedLayerIds.current = wantLayerIds;
     appliedSourceIds.current = wantSourceIds;
   }, [layerReg, props.layers, props.sources, sourceReg]);
+  // ─── REACTIVE MULTI-INSTANCE marker portal slot ───────────────────────────
+  // One reactive portal handle per markers[] entry, reconciled keep/update/dispose
+  // on prop change. The `!instance` guard is the pre-mount fence — these three
+  // reconcilers are called from top-level $watches with no other downstream guard
+  // and their bodies touch `instance` unconditionally (`.addTo(instance)`,
+  // `instance.off(...)`, `instance.on(...)`).
   const reconcileMarkers = useCallback((list: any) => {
     if (!instance.current) return;
     if (!(props.renderMarker ?? props.slots?.["marker"])) return;
@@ -632,6 +665,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
       }
     }
   }, [props.renderMarker]);
+  // ─── REACTIVE MULTI-INSTANCE popup portal slot ────────────────────────────
   const reconcilePopups = useCallback((list: any) => {
     if (!instance.current) return;
     if (!(props.renderPopup ?? props.slots?.["popup"])) return;
@@ -674,6 +708,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
       }
     }
   }, [props.renderPopup]);
+  // ─── layer-scoped feature mouseenter/mouseleave (needs a layer id) ────────
   const { onMouseenter: _rozieProp_onMouseenter, onMouseleave: _rozieProp_onMouseleave } = props;
     const reconcileInteractive = useCallback((ids: any) => {
     if (!instance.current) return;

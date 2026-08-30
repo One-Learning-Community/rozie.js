@@ -223,6 +223,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   const toggle = useCallback(() => {
     if (open$local) close();else open();
   }, [close, open, open$local]);
+  // ---- selection ---------------------------------------------------------
   const { onChange: _rozieProp_onChange } = props;
     const select = useCallback((opt: any) => {
     if (disabledOf(opt)) return;
@@ -302,6 +303,9 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       scrollActiveIntoView();
     }
   }
+  // Key handler shared by the trigger and the combobox input. The printable-
+  // character branch is reached only in select-only mode (the combobox input
+  // types through @input).
   const onControlKeyDown = useCallback(($event: any) => {
     const key = $event.key;
     if (key === 'ArrowDown') {
@@ -339,6 +343,9 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       onTypeahead(key);
     }
   }, [close, commitActive, focusControl, move, moveEdge, onTypeahead, open, open$local]);
+  // Combobox input handler: keep the popup open while typing, reset the active
+  // highlight to the first match, and surface the query for remote filtering.
+  // Pointer hover sets the virtual highlight (matches native <select> feel).
   const onOptionPointerMove = useCallback((index: any) => {
     if (activeIndex !== index) setActiveIndex(index);
   }, [activeIndex]);
@@ -346,6 +353,12 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     const src = windowSource();
     return src && src[i] ? src[i].id : undefined;
   }
+  // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
+  // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
+  // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
+  // Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
+  // on virtual-core's generic option inference. onChange uses the `$data.x = $data.x + 1`
+  // increment the React emitter lowers to functional setState — correct even from a mount closure.
   const virtualizerOptions = useCallback((): any => ({
     count: windowSource().length,
     getScrollElement: () => gridScrollEl.current,
@@ -372,6 +385,15 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       scheduleRemeasure();
     }
   }), [props.estimateRowHeight, scheduleRemeasure, virtualItemKey, windowSource]);
+  // pinMeasurement(pin): the D-05 pin-hook read, RE-TYPED at the windowing layer so the
+  // shared math is strict-clean across every host. The host-provided pinnedMeasurement() has
+  // two shapes: the DataTable host returns a real virtual-core measurement; the listbox/combobox
+  // no-op host returns bare `null` (inferred `(pin) => null`). Calling it directly makes
+  // `const pm = pinnedMeasurement(pin)` flow-narrow to `null`, so the downstream `pm && pm.start`
+  // guard collapses the object branch to `never` (TS2339, Class 3). Reading the hook through this
+  // thin wrapper with an EXPLICIT return type (a return-type annotation is NOT flow-narrowed)
+  // gives the measurement a real object-or-null shape, so `pm && pm.start` keeps the object branch.
+  // Typing-only: the runtime value (a measurement or null) is unchanged.
   function pinMeasurement(pin: number): {
     start: number;
     size: number;
@@ -534,9 +556,17 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   function pinnedMeasurement(pin: any) {
     return null;
   }
+  // Keep $data.rows === windowSource() so the windowing math indexes the live option set.
   const syncRows = useCallback(() => {
     setRows(windowSource());
   }, [windowSource]);
+  // Defer remeasureWindow() until AFTER the framework commits the recycled window
+  // (onChange fires BEFORE React/Solid commit). TWO deferred passes (microtask THEN rAF)
+  // behind one in-flight flag (the data-table virtualization.rzts:46-56 pattern, copied
+  // per-consumer per D-04/D-09): the microtask catches Solid's <For> / Svelte's {#each}
+  // SYNCHRONOUS commit (the Phase 63 Solid under-convergence hazard — D-09 rAF-defer
+  // budget), the rAF catches React's async commit. measureElement is idempotent on an
+  // already-observed node, so running both is cheap and loop-free.
   function scheduleRemeasure() {
     if (remeasurePending.current) return;
     remeasurePending.current = true;
@@ -581,6 +611,16 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       block: 'nearest'
     });
   }
+  // ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
+  // kickWindow: the cross-target first-paint settle. Re-captures the LIVE scroll element,
+  // re-feeds the CURRENT option count into the virtualizer, re-attaches its rect observer
+  // (_willUpdate), and bumps the windowVer signal so the windowed <For>/{#each}/repeat
+  // re-derives. Retried over a few frames because (a) virtual-core measures the scroll rect
+  // asynchronously (D-09 Solid rAF-defer — a synchronous kick sees rectH 0 → empty window),
+  // (b) Solid/Lit recreate the list node between mount and first commit (leaving virtual-core's
+  // scrollElement stale), and (c) the consumer often seeds options AFTER the listbox mounts
+  // (Lit/React), so the count must be re-read once the prop propagates. Stops once the window
+  // paints (or attempts run out) — idempotent + loop-free.
   const kickWindow = useCallback((attempts: any) => {
     if (!virtualizer.current) return;
     gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-listbox-list') : gridScrollEl.current;

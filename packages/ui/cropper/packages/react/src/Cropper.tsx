@@ -191,6 +191,11 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
     if (!a || !b) return false;
     return Math.round(a.x) === Math.round(b.x) && Math.round(a.y) === Math.round(b.y) && Math.round(a.width) === Math.round(b.width) && Math.round(a.height) === Math.round(b.height) && a.rotate === b.rotate && a.scaleX === b.scaleX && a.scaleY === b.scaleY;
   }
+  // Construct (or, on a future option change, re-construct) the engine. The whole
+  // options object is a null-let `any` so the constructor's 2nd arg is unchecked —
+  // the event-callback `e` params (CustomEvent) would otherwise fail the strict
+  // react/solid/lit tsc against Cropper's Options callback types (the MapLibre
+  // mapOptions idiom). restoreData re-applies the crop box if we ever rebuild.
   const { onCrop: _rozieProp_onCrop, onCropend: _rozieProp_onCropend, onCropmove: _rozieProp_onCropmove, onCropstart: _rozieProp_onCropstart, onReady: _rozieProp_onReady, onZoom: _rozieProp_onZoom } = props;
     const buildCropper = useCallback((restoreData: any) => {
     let cfg: any = null;

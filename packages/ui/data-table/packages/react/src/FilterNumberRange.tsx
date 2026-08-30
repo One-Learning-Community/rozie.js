@@ -36,18 +36,23 @@ export default function FilterNumberRange(_props: FilterNumberRangeProps): JSX.E
   const [minDraft, setMinDraft] = useState(() => Array.isArray(props.value) && props.value[0] != null ? String(props.value[0]) : '');
   const [maxDraft, setMaxDraft] = useState(() => Array.isArray(props.value) && props.value[1] != null ? String(props.value[1]) : '');
 
+  // Untyped handler params neutralize to `any` (the global-filter idiom).
   const onMinInput = useCallback((e: any) => {
     setMinDraft(e && e.target ? e.target.value : '');
   }, []);
   const onMaxInput = useCallback((e: any) => {
     setMaxDraft(e && e.target ? e.target.value : '');
   }, []);
+  // Plain string-coercion functions for the placeholders (NOT $computed — the
+  // EditorSelect/listbox lesson; opaque slot-scope props rejected by strict leaf tsc).
   function minPlaceholder() {
     return Array.isArray(props.minMax) && props.minMax[0] != null ? String(props.minMax[0]) : '';
   }
   function maxPlaceholder() {
     return Array.isArray(props.minMax) && props.minMax[1] != null ? String(props.minMax[1]) : '';
   }
+  // Convert a draft to a Number or undefined (empty string → undefined so a
+  // one-sided range works). Both undefined → clear the filter.
   const { setFilter: _rozieProp_setFilter } = props;
     const applyRange = useCallback(() => {
     const minNum = minDraft === '' ? undefined : Number(minDraft);

@@ -86,7 +86,10 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
   const [draft, setDraft] = useState('');
   const root = useRef<HTMLDivElement | null>(null);
 
+  // ---- derived view (plain functions, uniform ×6) ------------------------
+  // The committed tokens, normalized to a string[].
   const tokens = useCallback(() => Array.isArray(modelValue) ? modelValue : [], [modelValue]);
+  // The configured commit keys, normalized to a string[].
   function commitKeys() {
     return Array.isArray(props.delimiters) ? props.delimiters : [',', 'Enter'];
   }
@@ -126,6 +129,7 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
     });
     return true;
   }
+  // Remove the token at `idx`, commit, and emit remove.
   const { onRemove: _rozieProp_onRemove } = props;
     const removeAt = useCallback((idx: any) => {
     if (!canEdit()) return;
@@ -140,15 +144,24 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
       tokens: next
     });
   }, [_rozieProp_onRemove, canEdit, commitTokens, tokens]);
+  // ---- focus (container ref, post-mount only) ----------------------------
+  // Read $refs.root only here / in $onMount / in $expose verbs (post-mount →
+  // ROZ123-safe). querySelector reaches the input inside Lit's shadow root too.
   function focusTheInput() {
     const root$local = root.current;
     if (!root$local) return;
     const el = root$local.querySelector('input');
     if (el) el.focus();
   }
+  // ---- input handlers ----------------------------------------------------
+  // Mirror the typed text into the draft buffer. Capture the fresh local value
+  // (do NOT re-read $data.draft in the same handler — React setState is async and
+  // would read the pre-write value).
   const onInput = useCallback((e: any) => {
     setDraft(e && e.target ? e.target.value : '');
   }, []);
+  // A delimiter key commits the current draft; Backspace in an empty input
+  // deletes the previous token.
   const onKeydown = useCallback((e: any) => {
     if (!canEdit()) return;
     const key = e ? e.key : '';
@@ -166,11 +179,13 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
       }
     }
   }, [addToken, canEdit, commitKeys, removeAt, tokens]);
+  // Commit any leftover draft when the input loses focus (a common chips UX).
   const onBlur = useCallback((e: any) => {
     if (!canEdit()) return;
     const value = e && e.target ? e.target.value : '';
     if (value && addToken(value)) setDraft('');
   }, [addToken, canEdit]);
+  // Paste: split on the configured delimiter characters and bulk-add.
   const onPaste = useCallback((e: any) => {
     if (!canEdit()) return;
     const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
@@ -197,6 +212,7 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
     }
     if (addedAny) setDraft('');
   }, [addToken, canEdit, splitChars]);
+  // ---- per-element attribute helpers -------------------------------------
   function removeLabel(t: any) {
     return 'Remove ' + String(t);
   }

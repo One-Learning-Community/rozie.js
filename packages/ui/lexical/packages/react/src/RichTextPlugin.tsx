@@ -27,6 +27,7 @@ export default function RichTextPlugin(props: RichTextPluginProps): JSX.Element 
   // The register* cleanup, captured once we actually register. null = not yet / torn
   // down. `disposed` guards the deferred activation against an unmount that races ahead
   // of the microtask below.
+  // Register the rich-text baseline against the shared editor, idempotently.
   const activate = useCallback(() => {
     if (teardown.current || disposed.current) return;
     const editor = ctx.current && ctx.current.instance;

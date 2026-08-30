@@ -23,15 +23,21 @@ export default function ModelParamShadow(props: ModelParamShadowProps): JSX.Elem
   const label = useMemo(() => status + '!', [status]);
 
   const { onVerify: _rozieProp_onVerify } = props;
+  // solve(token): param == the model prop name. `$model.token = token` lowers on
+  // Vue to `token.value = token` (param shadows the defineModel ref) pre-fix.
   const solve = useCallback((token$local: any) => {
     setToken(token$local);
     _rozieProp_onVerify && _rozieProp_onVerify({
       token: token$local
     });
   }, [_rozieProp_onVerify, setToken]);
+  // setStatus(status): param == the $data key. `$data.status = status` lowers on
+  // Vue to `status.value = status` (param shadows the state ref) pre-fix.
   function setStatus$local(status: any) {
     setStatus(status);
   }
+  // logLabel(label): param == the $computed name. The bare `label` read lowers on
+  // Vue to `label.value` (reads the computed ref, not the param) pre-fix.
   const logLabel = useCallback((label: any) => {
     _rozieProp_onVerify && _rozieProp_onVerify({
       token: label

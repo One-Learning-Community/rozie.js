@@ -48,9 +48,12 @@ export default function EditorText(_props: EditorTextProps): JSX.Element {
   const inputEl = useRef<HTMLInputElement | null>(null);
   const _watch0First = useRef(true);
 
+  // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
+  // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
   const onInput = useCallback((e: any) => {
     setDraft(e && e.target ? e.target.value : '');
   }, []);
+  // commit/cancel are Function props (default null) — guard before calling.
   function doCommit() {
     props.commit && props.commit(draft);
   }
@@ -69,6 +72,11 @@ export default function EditorText(_props: EditorTextProps): JSX.Element {
   const onBlur = useCallback(() => {
     doCommit();
   }, [doCommit]);
+  // Editor-owns-focus contract: focus OUR OWN input when the host says we should hold focus.
+  // $onMount covers the initial open (autofocus already true on first render); the LAZY $watch
+  // (NOT { immediate: true } — an immediate watch fires PRE-mount, null ref on Lit/Solid) covers
+  // a REACTIVE refocus while already mounted (e.g. a row-mode validation failure that flips
+  // autofocus back onto this already-open drop-in).
 
   useEffect(() => {
     if (_autofocusRef.current) inputEl.current?.focus();

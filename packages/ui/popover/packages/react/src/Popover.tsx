@@ -202,6 +202,9 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       applyPosition(result.x, result.y, result.middlewareData);
     });
   }
+  // Start autoUpdate (idempotent — stop any prior subscription first) and do an
+  // initial position. Floating UI's autoUpdate keeps the position fresh on scroll/
+  // resize/ancestor-layout changes and returns its own teardown.
   const startTracking = useCallback(() => {
     if (!anchorNode.current || !floatingNode.current) return;
     if (stopAutoUpdate.current) {
@@ -216,6 +219,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       stopAutoUpdate.current = null;
     }
   }, []);
+  // ─── trigger gesture handlers (wired conditionally on the anchor by `trigger`) ──
   const onAnchorClick = useCallback(() => {
     if (props.disabled) return;
     requestOpen(!open);
@@ -236,9 +240,14 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     if (props.disabled) return;
     requestOpen(false);
   }, [props.disabled, requestOpen]);
+  // Dismissal handler — method reference for the <listeners> block (an inline
+  // handler referencing $event leaks into React's useEffect deps → TS2552; every
+  // corpus <listener> uses a method-ref + modifiers).
   const dismiss = useCallback(() => {
     requestOpen(false);
   }, [requestOpen]);
+  // ─── role helpers (plain functions; tooltip vs popover-dialog by trigger) ───────
+  // hover/focus triggers are tooltip-flavored; click is an interactive popover.
   function isTooltip() {
     return props.trigger === 'hover' || props.trigger === 'focus';
   }

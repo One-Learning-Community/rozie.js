@@ -53,6 +53,8 @@ export default function Modal(_props: ModalProps): JSX.Element {
     setOpen(false);
     _rozieProp_onClose && _rozieProp_onClose();
   }, [_rozieProp_onClose, setOpen]);
+  // Body-scroll-lock state lives outside reactive data because it tracks DOM
+  // rather than UI; managed entirely via lifecycle and listeners.
   const lockScroll = useCallback(() => {
     if (!props.lockBodyScroll || !open) return;
     savedBodyOverflow.current = document.body.style.overflow;
@@ -62,6 +64,10 @@ export default function Modal(_props: ModalProps): JSX.Element {
     if (!props.lockBodyScroll) return;
     document.body.style.overflow = savedBodyOverflow.current;
   }, [props.lockBodyScroll]);
+  // $watch re-fires on every `open` toggle — the cross-target primitive for
+  // reacting to a prop change. The $onMount/$onUnmount pair anchors the
+  // unmount-time restore; $onMount runs exactly once on every target (a
+  // guarded no-op here) and must not be relied on to re-fire.
 
   const _unlockScrollRef = useRef(unlockScroll);
   _unlockScrollRef.current = unlockScroll;

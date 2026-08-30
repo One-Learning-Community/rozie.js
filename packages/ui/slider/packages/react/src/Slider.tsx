@@ -185,9 +185,16 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
     setValue(next);
     fireChange(next);
   }
+  // ---- native input handlers ---------------------------------------------
+  // Single input. `valueAsNumber` is a number (never the string `.value`).
   const onInputSingle = useCallback(($event: any) => commitSingle($event.target.valueAsNumber), [commitSingle]);
+  // Range inputs (lo / hi).
   const onInputLo = useCallback(($event: any) => commitRange('lo', $event.target.valueAsNumber), [commitRange]);
   const onInputHi = useCallback(($event: any) => commitRange('hi', $event.target.valueAsNumber), [commitRange]);
+  // ---- PageUp / PageDown augment (Open Q1 / RESEARCH A3) ------------------
+  // Native PageUp/PageDown uses the browser's default large step, which may not
+  // equal `pageStep`. Augment ONLY those two keys: apply ±pageStep (null → step×10),
+  // quantize + clamp via clampStep, write back. Arrows / Home / End stay native.
   function effectivePageStep() {
     const ps = props.pageStep;
     if (Number.isFinite(ps) && ps > 0) return ps;
@@ -210,6 +217,10 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
     const base = which === 'lo' ? pair[0] : pair[1];
     commitRange(which, base + delta);
   }, [commitRange, effectivePageStep, rangePair]);
+  // ---- imperative handle (D-05) ------------------------------------------
+  // `focus` reads $refs in a post-mount callback (called via the handle) — safe,
+  // never eager (ROZ123). It DELIBERATELY overrides HTMLElement.focus on Lit
+  // (ROZ137 warns; accepted — see header).
   function focus() {
     return inputEl.current?.focus();
   }

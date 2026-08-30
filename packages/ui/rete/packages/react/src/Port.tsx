@@ -60,6 +60,9 @@ export default function Port(_props: PortProps): JSX.Element {
   // addPort no-ops on the canvas side (key == null guard).
   const portSide = useCallback(() => props.output != null ? 'output' : 'input', [props.output]);
   const portKey = useCallback(() => props.output != null ? props.output : props.input, [props.input, props.output]);
+  // idempotency flag so the $onMount addPort and the late-context $onUpdate path
+  // (Lit async, REQ-30) never double-add the port. (addTypePort is also idempotent —
+  // same `type::side::key` key, same value — so this is belt-and-suspenders.)
 
   const _portKeyRef = useRef(portKey);
   _portKeyRef.current = portKey;

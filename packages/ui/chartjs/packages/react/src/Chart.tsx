@@ -221,6 +221,18 @@ const Chart = forwardRef<ChartHandle, ChartProps>(function Chart(_props: ChartPr
     tooltipEl.current.style.left = `${offsetLeft + tooltip.caretX}px`;
     tooltipEl.current.style.top = `${offsetTop + tooltip.caretY}px`;
   }
+  // ─── config builder ────────────────────────────────────────────────────────
+  // buildConfig is a top-level factory now that quick 260829-cd4 hoists the
+  // portals closure to component scope on all six targets; $portals.tooltip
+  // (referenced inside tooltipExternal below) resolves directly with no
+  // mount-scope bridge — the earlier rationale here ("buildConfig is DEFINED
+  // inside $onMount because it reads $portals.tooltip") no longer applies.
+  // $emit and $slots never needed this bridge either — both lower to
+  // component-scope constructs on all six targets (the earlier
+  // "$emit/$portals/$slots" phrasing here was over-broad and had been
+  // copy-propagated into all 8 generated variants).
+  // $snapshot strips Svelte 5's $state proxy first; Chart.js redefines property
+  // descriptors on whatever object it is handed.
   const buildConfig = useCallback((): any => {
     const userOpts = props.options || {};
     const tooltipOpt = (props.renderTooltip ?? props.slots?.["tooltip"]) ? {

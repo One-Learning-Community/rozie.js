@@ -154,6 +154,13 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   const _watch11First = useRef(true);
   const _watch12First = useRef(true);
 
+  // pdfjs is DYNAMICALLY imported in $onMount, NOT a top-level import: pdfjs's main
+  // build evaluates browser globals (DOMMatrix, …) at module-load time, which
+  // crashes SSR (Next / Nuxt / SvelteKit / Analog / VitePress). Lazy-importing it on
+  // mount makes the component SSR-safe for ALL consumers AND code-splits the ~1MB
+  // engine out of the initial bundle. `pdfjsLib` is a null-let → typeNeutralize
+  // `any` (so pdfjsLib.getDocument / .TextLayer / .GlobalWorkerOptions are unchecked).
+
   // version-locked jsDelivr CDN base for the workerSrc/standardFontDataUrl
   // defaults — built from pdfjsLib.version (read at runtime off the dynamically
   // imported engine, once resolved) rather than a hand-typed version string, so
@@ -171,6 +178,19 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   // containerEl is the scroll host, observer is the continuous-mode scroll spy,
   // resizeObserver is the autoFit resize sensor (separate from `observer` — that
   // one is IntersectionObserver-typed, this one ResizeObserver-typed).
+
+  // the PDFDocumentLoadingTask — it (NOT the PDFDocumentProxy, which has no
+  // destroy() in pdfjs v6) owns teardown of the worker + document. Held so a
+  // src/password change or unmount can tear the previous load down.
+
+  // monotonic token cancels stale async loads/renders (src can change mid-render,
+  // pages render async — the SortableList rebuild-cancel discipline).
+
+  // find/search state. findQuery is the active lowercased query (''=inactive);
+  // findMatches is a flat per-OCCURRENCE list [{ page }] (drives the count + the
+  // next/prev cycle); findIndex is the current match (-1=none). TOP-LEVEL lets (not
+  // $onMount-local) so renderPage's coarse highlight pass + the find verbs can read
+  // them across renders.
   function buildSource() {
     let cfg: any = null;
     cfg = {
@@ -447,8 +467,6 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   }
   // Save the original PDF bytes. getData() resolves the raw Uint8Array; wrap in a
   // Blob and trigger a download via a transient anchor. Resolves false before mount.
-  // Save the original PDF bytes. getData() resolves the raw Uint8Array; wrap in a
-  // Blob and trigger a download via a transient anchor. Resolves false before mount.
   async function download(filename: any) {
     if (!instance.current) return false;
     const bytes = await instance.current.getData();
@@ -465,11 +483,9 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     return true;
   }
   // Document info (title/author/page labels) — resolves null before mount.
-  // Document info (title/author/page labels) — resolves null before mount.
   function getMetadata() {
     return instance.current ? instance.current.getMetadata() : null;
   }
-  // Bookmark / table-of-contents tree — resolves null when absent or before mount.
   // Bookmark / table-of-contents tree — resolves null when absent or before mount.
   function getOutline() {
     return instance.current ? instance.current.getOutline() : null;
@@ -477,21 +493,10 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   // The rendered page's DOM node (see the DOM contract docs), or null if page n
   // isn't currently rendered (single-page mode viewing a different page, or
   // before any render). Mirrors scrollToPage's own lookup.
-  // The rendered page's DOM node (see the DOM contract docs), or null if page n
-  // isn't currently rendered (single-page mode viewing a different page, or
-  // before any render). Mirrors scrollToPage's own lookup.
   function getPageElement(n: any) {
     return containerEl.current ? containerEl.current.querySelector('[data-page="' + n + '"]') : null;
   }
 
-  // ─── text find/search (coarse span-level highlight) ──────────────────────────
-  // find(query) scans EVERY page's extracted text for occurrences, navigates to +
-  // highlights the first match, returns the match count, and emits `findresult`. The
-  // highlight is COARSE / span-level: renderPage adds .rozie-pdf-find to whole
-  // text-layer spans that CONTAIN the query (a query straddling two spans won't
-  // highlight). findNext/findPrev cycle (wrap) through the per-occurrence match list;
-  // clearFind resets the query + highlights. All async-safe over the `any`
-  // PDFDocumentProxy (`instance`); no-op / return 0 before the document loads.
   // ─── text find/search (coarse span-level highlight) ──────────────────────────
   // find(query) scans EVERY page's extracted text for occurrences, navigates to +
   // highlights the first match, returns the match count, and emits `findresult`. The

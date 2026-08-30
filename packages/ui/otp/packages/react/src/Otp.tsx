@@ -92,7 +92,12 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
   function allowChar(ch: any) {
     return isAllowedChar(props.type, ch);
   }
+  // The cell that should receive focus for new input: the first empty position
+  // (clamped to the last cell when full).
   const firstEmptyIndex = useCallback(() => firstEmpty(code(), props.length), [code, props.length]);
+  // ---- focus choreography (container ref, post-mount only) ----------------
+  // Read $refs.root only here / in $onMount / in $expose verbs (all post-mount →
+  // ROZ123-safe). querySelectorAll reaches the cells inside Lit's shadow root too.
   const focusIndex = useCallback((idx: any) => {
     let i = idx;
     if (i < 0) i = 0;
@@ -106,6 +111,15 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
       if (el.select) el.select();
     }
   }, [props.length]);
+  // ---- write funnel (single $emit site) ----------------------------------
+  // Capture `prev` BEFORE the model write (code() reads $props.value, which has
+  // not yet round-tripped) — this is what makes the transition detection
+  // stateless and keeps the documented "CONTROLLED, NO LOCAL STATE" invariant
+  // (do NOT add a `wasFull` flag to <data>). The model write stays
+  // unconditional (idempotent, keeps the controlled contract); only the emits
+  // are gated: `change` on an actual value transition, `complete` only on the
+  // not-full -> full transition (never on an in-place edit of an already-full
+  // code, never at length: 0 — see ./internal/otpWrite.planEmits).
   function commitValue(raw: any) {
     const prev = code();
     const next = String(raw).slice(0, props.length);
@@ -118,6 +132,13 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
       value: next
     });
   }
+  // ---- input handler -----------------------------------------------------
+  // One path for every input shape (single char, autofill, swipe, IME commit —
+  // see ./internal/otpWrite.planWrite): sanitize + distribute from the write
+  // position, clamped to the current fill point so a click past the fill point
+  // never leaves a hole. An invalid / empty-after-sanitize write is rejected by
+  // restoring the cell's DOM value directly (a no-op model write may not
+  // re-render on React, so reset the element instead).
   const onInput = useCallback((i: any, e: any) => {
     const raw = e && e.target ? e.target.value : '';
     if (raw === '') {
@@ -140,6 +161,9 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
     if (e && e.target) e.target.value = plan.next[i] || '';
     focusIndex(plan.focus);
   }, [code, commitValue, focusIndex, props.length, props.type]);
+  // ---- keyboard ----------------------------------------------------------
+  // Backspace deletes the current char (or the previous one when the cell is
+  // already empty) and moves focus accordingly; arrows / Home / End navigate.
   const onKeydown = useCallback((i: any, e: any) => {
     const key = e ? e.key : '';
     const cur = code();
@@ -165,6 +189,7 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
       focusIndex(props.length - 1);
     }
   }, [code, commitValue, focusIndex, props.length]);
+  // ---- paste (collapses onto the same distribution routine as onInput) ---
   const onPaste = useCallback((i: any, e: any) => {
     if (e) e.preventDefault();
     const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
@@ -173,12 +198,19 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
     commitValue(plan.next);
     focusIndex(plan.focus);
   }, [code, commitValue, focusIndex, props.length, props.type]);
+  // Select the cell's content on focus so a keystroke overwrites it. Correct
+  // for Tab and programmatic focus.
   const onFocus = useCallback((e: any) => {
     if (e && e.target && e.target.select) e.target.select();
   }, []);
+  // A mouse/touch focus places the caret on mouseup, collapsing onFocus's
+  // select(); with maxlength="1" a filled cell then REJECTS the next keystroke.
+  // Re-select on pointerup (after caret placement) so click-then-type overwrites,
+  // matching the Tab-focus behavior.
   const onPointerUp = useCallback((e: any) => {
     if (e && e.target && e.target.select) e.target.select();
   }, []);
+  // ---- per-cell attribute helpers ----------------------------------------
   function cellType() {
     return props.mask ? 'password' : 'text';
   }

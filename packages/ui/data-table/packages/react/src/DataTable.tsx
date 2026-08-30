@@ -439,11 +439,46 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
 
+  // CR-01 remeasure scheduling state. remeasurePending dedupes the deferred sweep — at most ONE
+  // rAF is in flight, so a burst of onChange ticks (a fast scroll) collapses to a single measure
+  // pass per frame instead of piling up rAF callbacks that fire mid-gesture. The piled-up
+  // callbacks were what broke the Solid scroll-then-focus seam (D-12 focusActiveCell →
+  // scrollToIndex → double-rAF focus): a stray remeasure firing inside that focus deferral
+  // disrupted the focus landing. The sweep ALSO bails while virtual-core is mid-scroll
+  // (virtualizer.isScrolling), so a measure can't run during scrollToIndex; the next settled
+  // onChange re-measures the now-stable window. Scroll-driven recycling (the CR-01 case, measured
+  // once motion settles between scroll steps) is unaffected.
+  // ── Vertical row windowing instance state (phase 53) ──────────────────────────────────
+  // Mutable top-level instances (the `let table` precedent — React hoists to useRef; do NOT
+  // const). NULL until $onMount, and ONLY constructed when $props.virtual. virtualizerCleanup
+  // holds the _didMount() teardown for $onUnmount; gridScrollEl is the captured .rdt-scroll div
+  // the virtualizer observes.
+  // table-core instance — top-level `let` referenced from hooks → React hoists to
+  // useRef (hoistModuleLet). NULL until $onMount: createTable lives in $onMount so its
+  // getRowModel-reading closures capture the LIVE instance, NOT an empty initial
+  // snapshot (the rete stale-closure anti-pattern — a top-level $computed/useCallback
+  // freezes the table at the empty-initial state on React).
   // ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
   // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
   // via the same focusActiveCell() scroll-into-view seam — kept a top-level const so that
   // later change is a one-line edit.
   const GRID_PAGE_STEP = useMemo(() => 10, []);
+  // The stable table-root element, captured in $onMount (the ONLY ROZ123-safe place to read
+  // $el / query DOM across all six). focusActiveCell() resolves cells off this root; it is
+  // shadow-safe because the query runs from INSIDE the component's own scope (the listbox
+  // querySelector-off-root precedent, proven ×6 by plan 01's probe). NEVER read in a
+  // computed/template binding (ROZ123).
+  // Echo-guard: while WE are writing a slice back, the re-feed watcher must not re-enter
+  // the funnel. A counter (not a boolean) so nested writes are safe.
+  // Focus-intent epoch (#9) — a monotonic counter bumped at every focus-INTENT entry point
+  // (focusActiveCell / focusCell+focusAbsCellWhenReady arm / a genuine active-cell-moving
+  // focusin in syncActiveFromEvent). The two async focus-recovery polls (focusWhenReady for the
+  // virtual off-window scroll, focusAbsCellWhenReady for the paginated page-switch) CAPTURE this
+  // value at arm time (AFTER their own bump) and abort at the top of each iteration if it has since
+  // changed — so a LATER user nav (ArrowKey / click) supersedes a stale poll instead of the poll
+  // yanking focus back frames later. A naive guardMoved "abort if focus moved" check is WRONG here:
+  // both polls arm while focus still sits on the OLD/being-left cell BY DESIGN (scroll-to /
+  // page-switch), so an epoch — bumped only by a NEWER intent — is the correct abort signal.
   // ── Grid-wide undo/redo (260709-8ct) — history STATE lives in top-level `let` (mirroring
   // `programmatic` above), NOT $data: recording a snapshot on every keystroke must not trigger
   // a reactive re-render. React hoists each to useRef. undoStack/redoStack hold `data` array
@@ -475,6 +510,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // → invisible to JSON.stringify / spread / Object.keys (the consumer's data stays clean); namespaced
   // so a consumer array never collides.
   const DATA_WRITE_TOKEN_KEY = useMemo(() => '__rozieDataWriteToken', []);
+  // Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
+  // has not bound `expanded` and has not yet toggled any group, group-header rows default to
+  // EXPANDED (so the grouped subtree is visible — the standard grouped-grid affordance + the
+  // roundout-VR leaf-visible baseline). The FIRST group/row toggle sets this true (in
+  // writeExpanded), after which the user's expanded state wins. Stays false (untouched) on the
+  // non-grouping path → byte-identical-off (the `expanded` slice resolves to $data.expandedDefault
+  // exactly as before, both for the plain table AND the expandable-rows feature).
   function groupingActiveDefault() {
     return ((grouping != null ? grouping : groupingDefault) || []).length > 0;
   }
@@ -491,6 +533,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       left: rail.concat(deduped)
     };
   }
+  // Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
+  // All NINE slices are wired (each ?? its own $data.<slice>Default). table-core reads
+  // this whole object as `state`. Return type annotated `any`: the inferred object-literal
+  // type does not structurally match table-core's `Partial<TableState>` under the strict
+  // bundled-leaf tsc (the columnSizingInfo/pagination shapes widen to Record) — the
+  // runtime shape is correct; `any` sidesteps the over-strict structural check (the
+  // deferred-items strict-tsc #2 / leaf-output-strict-typecheck close).
   const currentState = useCallback((): any => ({
     sorting: sorting != null ? sorting : sortingDefault,
     globalFilter: globalFilter != null ? globalFilter : globalFilterDefault,
@@ -525,6 +574,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // state) — held in $data.columnSizingInfo and reset by table-core mid-drag.
     columnSizingInfo: columnSizingInfo
   }), [columnFilters, columnFiltersDefault, columnOrder, columnOrderDefault, columnSizing, columnSizingDefault, columnSizingInfo, columnVisibility, columnVisibilityDefault, effectiveColumnPinning, expanded, expandedDefault, globalFilter, globalFilterDefault, grouping, groupingActiveDefault, groupingDefault, pagination, paginationDefault, rowSelection, rowSelectionDefault, sorting, sortingDefault]);
+  // The live row data (Phase 51 req-4): the bound `data` prop when controlled, else the
+  // uncontrolled $data.dataDefault fallback (mirrors currentState's per-slice ?? pattern).
+  // A committed edit funnels a FRESH array through writeData, which writes BOTH sinks; the
+  // re-feed sources here so editing works whether or not the consumer binds r-model:data.
   const currentData = useCallback((): any => data != null ? data : dataDefault, [data, dataDefault]);
   function isSafeKey(k: any) {
     return k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
@@ -656,6 +709,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // Distinct from any consumer column id (the registry/config guard never produces a leading
   // "__"). Injected AFTER the select column (so order is [select, expander, ...userCols]).
   const EXPANDER_COL_ID = useMemo(() => '__rdt_expander', []);
+  // The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
+  // user columns, PLUS a LEADING checkbox column when selectionMode is 'single' OR
+  // 'multiple' (D-04). The select column carries enableSorting/enableColumnFilter:false
+  // and an isSelectColumn marker the template uses to render checkbox chrome (NOT an
+  // accessor value). 'none' injects nothing. In 'single' mode the per-row checkbox
+  // renders but the select-all HEADER checkbox is suppressed (selecting a row caps at
+  // ≤1 via enableMultiRowSelection:false) — a single-select needs a per-row control,
+  // not a select-all, so without injecting the column single mode would expose NO
+  // selection UI at all.
   function selectionEnabled() {
     return props.selectionMode === 'single' || props.selectionMode === 'multiple';
   }
@@ -760,6 +822,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     });
     programmatic.current--;
   }
+  // ── pagination slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ───────
+  // table-core hands { pageIndex, pageSize }; write a FRESH object + fire `page-change`.
   const { onPageChange: _rozieProp_onPageChange } = props;
     const writePagination = useCallback((next: any) => {
     if (programmatic.current) return;
@@ -769,6 +833,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     _rozieProp_onPageChange && _rozieProp_onPageChange(next);
     programmatic.current--;
   }, [_rozieProp_onPageChange, setPagination]);
+  // ── rowSelection slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ─────
+  // table-core hands RowSelectionState = { [rowId]: true }; write a FRESH object (never
+  // in-place key-set) + fire `selection-change` REGARDLESS of binding.
   function writeRowSelection(next: any) {
     if (programmatic.current) return;
     programmatic.current++;
@@ -901,6 +968,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     restoringHistory.current = false;
     emitHistoryChange();
   }
+  // PER-SLICE callbacks hoisted to top-level consts (NOT inlined in createTable) so the
+  // re-feed $watch can re-pass them on every setOptions. On React the createTable
+  // callbacks would otherwise capture the MOUNT-render's currentState() closure (table
+  // instance is built once in $onMount); table-core's setOptions keeps the prior
+  // callbacks unless new ones are supplied, so a stale callback applied each updater
+  // against the mount-time empty slice → the sort cycle never advances + multi-row
+  // selection collapses to the last row (React stale-closure, F6). Re-passing these
+  // fresh (recreated each render on React, reading fresh currentState) in the re-feed
+  // keeps the Updater base value current. No-op cost on the other five.
   const onSortingChangeCb = useCallback((updater: any) => {
     writeSorting(applyUpdater(updater, currentState().sorting));
   }, [applyUpdater, currentState, writeSorting]);
@@ -938,11 +1014,49 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const next = applyUpdater(updater, columnSizingInfo);
     setColumnSizingInfo(prev => next != null ? next : prev);
   }, [applyUpdater, columnSizingInfo]);
+  // ══ Vertical row windowing (phase 53, req-1/2/3/6/9/10) — the virtual-core bridge ════════
+  // virtual-core is a pure state machine EXACTLY like table-core: constructed once in $onMount
+  // (ONLY when $props.virtual), its imperative onChange push converted to per-target reactivity
+  // via the SEPARATE $data.windowVer tick, re-fed via setOptions()+_willUpdate() in the
+  // refreshRowModel path (NEVER a render helper — Pitfall 1). Every runtime reference is guarded
+  // so the virtual=false emitted path is dead (req-1).
+  //
+  // Phase 64 (D-04): the PURE windowing math (windowedRows / padTop / padBottom / pmIndexInWindow /
+  // rowIsOutsideWindow / virtualizerOptions / virtualItemKey) now lives in the shared, target-agnostic
+  // `@rozie-ui/headless-core/windowing.rzts` partial and is re-exported below — this file is now the
+  // thin DATA-TABLE HOST SHELL holding only the impure, per-consumer pieces (the table-bound row
+  // source + the DOM/refs/virtualizer-instance machinery + the D-05 edit-pinning hook). The math
+  // dissolves in via inlineScriptPartials() byte-identically; behavior is unchanged (the B13 specs +
+  // dist-parity are the net). The host satisfies the windowing.rzts contract by convention:
+  // windowSource() (the row source), pinnedEditIndex()/pinnedMeasurement() (the D-05 pin hook),
+  // scheduleRemeasure(), and the gridScrollEl/virtualizer/virtual-core-fn references.
+  // windowSource(): the rows fed to the virtualizer AND held in $data.rows — the windowing.rzts
+  // host-contract source. When virtual, the FULL filtered+sorted PRE-PAGINATION model
+  // (A2-verified table.getPrePaginationRowModel()) so windowing REPLACES client pagination (req-9);
+  // else the normal (paginated) row model — the non-virtual path is byte-unchanged.
   const windowSource = useCallback(() => {
     if (!table.current) return [];
     if (props.virtual) return table.current.getPrePaginationRowModel().rows;
     return table.current.getRowModel().rows;
   }, [props.virtual]);
+  // Defer remeasureWindow() until AFTER the framework commits the recycled window (onChange fires
+  // BEFORE React/Solid commit), falling back to a microtask/timeout where rAF is unavailable (SSR /
+  // test envs). DEDUPED via remeasurePending so a scroll burst queues at most one in-flight sweep
+  // (piled-up rAF sweeps broke the Solid scroll-then-focus seam — and the focus seam itself now
+  // polls for its target cell, so it no longer depends on remeasure timing).
+  //
+  // TWO deferred passes (microtask THEN rAF), both behind the single in-flight flag:
+  //   - Solid's <For> / Svelte's {#each} commit the recycled <tr> set SYNCHRONOUSLY in the reactive
+  //     tick that the windowVer bump triggers, so the recycled nodes already exist by the next
+  //     microtask — measuring there observes them while they are still connected, BEFORE the next
+  //     fast-scroll step recycles them away. A single rAF (a full frame later) was too late on the
+  //     fine-grained targets under a 40ms-per-step scroll: many rows mounted-and-recycled within one
+  //     frame, so the once-per-frame rAF sweep observed only a fraction of them and the measured
+  //     total under-converged (the Solid ~23.5k-vs-≥24k residual). The microtask catches them.
+  //   - React's setState→reconcile→commit is async (a microtask is too early — the new window is not
+  //     committed yet), so the rAF pass is what observes React's recycled rows.
+  // Each pass only OBSERVES + measures the live window; measureElement is idempotent on an
+  // already-observed node, so running both is cheap and loop-free.
   function scheduleRemeasure() {
     if (remeasurePending.current) return;
     remeasurePending.current = true;
@@ -970,6 +1084,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const ms = virtualizer.current.getMeasurements();
     return ms && ms[pin] ? ms[pin] : null;
   }
+  // measureElement sweep (D-10 / CR-01): refine estimated heights to MEASURED ones. The off-root
+  // querySelector idiom (chartjs/cropper/embla precedent — no per-row callback ref). Each rendered
+  // <tr> MUST be handed to virtualizer.measureElement on every window commit for it to be observed:
+  // virtual-core does NOT auto-register rendered rows — measureElement is the SOLE caller of its
+  // internal ResizeObserver's observe() (virtual-core@3.17.1 dist/esm/index.js:794-817), keyed by
+  // getItemKey. So this sweep must run not just once at mount but on every onChange tick (via
+  // scheduleRemeasure), or recycled rows keep the estimateRowHeight seed forever. measureElement is
+  // idempotent on an already-observed node (the `prevNode !== node` guard), so re-sweeping the
+  // visible window each commit is cheap and loop-free.
   const remeasureWindow = useCallback(() => {
     if (!virtualizer.current || !gridRoot.current) return;
     // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
@@ -983,10 +1106,22 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const trs = gridRoot.current.querySelectorAll('tbody.rdt-tbody > tr[data-index]');
     for (const tr of trs as any) virtualizer.current.measureElement(tr);
   }, []);
+  // D-04: this shell exports ONLY the impure, data-table-specific host pieces. The pure windowing
+  // math (windowedRows / padTop / padBottom / pmIndexInWindow / rowIsOutsideWindow / virtualizerOptions
+  // / virtualItemKey) is imported DIRECTLY by the host (DataTable.rozie) from
+  // `@rozie-ui/headless-core/windowing.rzts` via bare specifier — the P0-proven cross-package inline
+  // path that DISSOLVES the partial into the leaf (a re-export-from THROUGH this shell would survive as
+  // a runtime import, not inline — verified). The math closes over these host symbols by convention.
   function virtualItemKey(i: any) {
     const src = windowSource();
     return src && src[i] ? src[i].id : undefined;
   }
+  // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
+  // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
+  // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
+  // Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
+  // on virtual-core's generic option inference. onChange uses the `$data.x = $data.x + 1`
+  // increment the React emitter lowers to functional setState — correct even from a mount closure.
   const virtualizerOptions = useCallback((): any => ({
     count: windowSource().length,
     getScrollElement: () => gridScrollEl.current,
@@ -1013,6 +1148,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       scheduleRemeasure();
     }
   }), [props.estimateRowHeight, scheduleRemeasure, virtualItemKey, windowSource]);
+  // pinMeasurement(pin): the D-05 pin-hook read, RE-TYPED at the windowing layer so the
+  // shared math is strict-clean across every host. The host-provided pinnedMeasurement() has
+  // two shapes: the DataTable host returns a real virtual-core measurement; the listbox/combobox
+  // no-op host returns bare `null` (inferred `(pin) => null`). Calling it directly makes
+  // `const pm = pinnedMeasurement(pin)` flow-narrow to `null`, so the downstream `pm && pm.start`
+  // guard collapses the object branch to `never` (TS2339, Class 3). Reading the hook through this
+  // thin wrapper with an EXPLICIT return type (a return-type annotation is NOT flow-narrowed)
+  // gives the measurement a real object-or-null shape, so `pm && pm.start` keeps the object branch.
+  // Typing-only: the runtime value (a measurement or null) is unchanged.
   function pinMeasurement(pin: number): {
     start: number;
     size: number;
@@ -1150,6 +1294,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     for (const it of items as any) if (it.index === r) return false;
     return true;
   }
+  // ── Sort/filter live-announcement (#14) ─────────────────────────────────────────────
+  // A polite aria-live announcement whenever the consumer changes sorting or filtering, so a
+  // screen-reader user hears that the rows were reordered / narrowed (which is otherwise silent).
+  // announceState holds the last-seen references so the lazy watch below can tell WHICH slice
+  // changed (sort vs filter) and pick the message. It is a top-level mutable const → stabilized
+  // once per instance on all six targets (React useMemo-wraps a mutable instance; the others run
+  // setup once), so it PERSISTS across renders — unlike a top-level `let`, which React resets per
+  // render. Seeded from the initial state in $onMount so the first (post-mount) change compares
+  // against the true starting values, not a null sentinel.
+  // Typed as `unknown` members: these hold opaque last-seen references compared only by
+  // identity (!==) below, never read in a typed context — the annotation keeps the null seed
+  // from narrowing the members to `null` (which would reject the real reassignments under
+  // strictNullChecks in the emitted leaves).
   const announceState: {
     sorting: unknown;
     columnFilters: unknown;
@@ -1159,9 +1316,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     columnFilters: null,
     globalFilter: null
   }), []);
+  // Effective (controlled-or-uncontrolled) reads of the sort/filter slices: the bound prop when
+  // the consumer bound the matching r-model, else the uncontrolled $data default (mirrors currentState()).
   const effectiveSorting = useCallback(() => sorting != null ? sorting : sortingDefault, [sorting, sortingDefault]);
   const effectiveColumnFilters = useCallback(() => columnFilters != null ? columnFilters : columnFiltersDefault, [columnFilters, columnFiltersDefault]);
   const effectiveGlobalFilter = useCallback(() => globalFilter != null ? globalFilter : globalFilterDefault, [globalFilter, globalFilterDefault]);
+  // Build the polite message for a sort/filter change and advance announceState. Sort takes
+  // precedence when the sorting reference changed; otherwise a filter changed → the post-filter
+  // result count (the FILTERED total via totalRowCount(), NOT the page slice). Returns '' when
+  // neither actually changed (a no-op watch tick — do not re-announce).
   function buildSortFilterAnnounce() {
     const nextSorting = effectiveSorting();
     const nextColumnFilters = effectiveColumnFilters();
@@ -1183,6 +1346,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     return '';
   }
+  // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
+  // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
   const reFeed = useCallback(() => {
     if (!table.current) return;
     // NOTE: the external-swap history reset does NOT live here. reFeed() fires on EVERY watched
@@ -1247,6 +1412,28 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }));
     if (refreshRowModel.current) refreshRowModel.current();
   }, [currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.pageCount, props.rowCount, props.selectionMode, tableColumns]);
+  // LIT (+ any fine-grained target whose effect-tracked watch does NOT observe the plain
+  // `data` PROPERTY): the re-feed $watch reads `(this.data||[]).length` inside a
+  // preact-signals effect, but `data` is a Lit @property (not a signal) so the effect
+  // never re-runs when the consumer pushes new rows post-mount (the sticky demo seeds 20
+  // rows in its own $onMount AFTER the child mounted empty → the body stayed at 0). The
+  // slice models DO re-pull (their $data.<slice>Default signals are effect-tracked), so
+  // only a raw `data` reference/length change slips through. $onUpdate (Lit updated())
+  // fires on ANY property change incl `data`; guard with a stored last-seen data ref +
+  // length so it re-feeds ONLY on a real data change (no churn). On the coarse-render
+  // targets the watch already covers it; this is a cheap idempotent backstop.
+  // External-swap history reset (grid-wide undo/redo, 260709-8ct; #8 fix). Keyed on the CONTROLLED
+  // `$props.data` REFERENCE changing — deliberately NOT on `currentData()` inside reFeed. An internal
+  // writeback changes `$data.dataDefault` SYNCHRONOUSLY and only LATER round-trips into `$props.data`;
+  // keying on `$props.data`'s OWN change means we never observe the transient window where a fine-
+  // grained target's reFeed reads a stale, unstamped `$props.data` mid-write and wrongly wipes a
+  // just-recorded edit's history (the stale-read false-clear — the SAME failure that broke the
+  // content-signature variant — that regressed Solid/Lit when this clear lived in reFeed). When
+  // `$props.data` genuinely changes: a new array carrying DATA_WRITE_TOKEN round-tripped from one of
+  // OUR writes → keep; one without it is a dataset the consumer handed us → external swap → clear. A
+  // non-data tick (sort/filter/pagination) never touches `$props.data` → never clears. Called from
+  // BOTH the coarse re-feed watch AND the $onUpdate backstop (Lit's @property `data` the effect-
+  // tracked watch can't observe); both are ref-gated so the redundant call is an idempotent no-op.
   const maybeClearHistoryOnExternalSwap = useCallback(() => {
     const pd = data;
     if (pd === lastPropsData.current) return; // $props.data did not change → not an external swap
@@ -1255,6 +1442,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (pd != null && (pd as any)[DATA_WRITE_TOKEN_KEY] != null) return; // descends from our write → keep
     clearHistory();
   }, [clearHistory, data, props.undoable]);
+  // Header click → toggle sort. Shift-click → ADD a secondary sort (multi-sort). Driven
+  // through table-core's column API so the onSortingChange funnel emits the fresh state.
   const onHeaderSort = useCallback((colId: any, evt: any) => {
     if (!table.current) return;
     const col = table.current.getColumn(colId);
@@ -1263,6 +1452,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // toggleSorting(desc?, isMulti?) cycles asc → desc → none; multi accumulates.
     col.toggleSorting(undefined, multi);
   }, []);
+  // aria-sort string for a column header: 'ascending' | 'descending' | 'none'. Reads
+  // Reactive tick: read $data.rowModelVer (bumped by every refreshRowModel) so a
+  // template binding that calls a table-READING chrome helper (pagination/sort/pin/
+  // visibility predicates below) re-evaluates when the row model changes. On the
+  // coarse-render targets (Vue/React/Angular) the whole template re-runs anyway so this
+  // is a no-op; on the FINE-GRAINED targets (Solid/Lit) a helper that only reads the
+  // non-reactive `table` let would be computed ONCE (when table is still null → the
+  // default branch) and never update — pagination would read "Page 1 of 1" forever,
+  // aria-sort never flips, the pin position never sticks. Touching rowModelVer puts each
+  // helper in the reactive scope. The chrome helpers prefix `tick()` in their guard.
   function tick() {
     return rowModelVer;
   }
@@ -1329,6 +1528,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const w = col.getSize();
     return w != null && w > 0 ? w + 'px' : null;
   }
+  // Pointer-drag resize handler for a resizable header — table-core's getResizeHandler()
+  // returns a function bound to a pointerdown/touchstart event that drives the column
+  // size through onColumnSizingChange (our writeColumnSizing funnel) under
+  // columnResizeMode:'onChange'. Pure delegation; no scratch gesture state held in a
+  // top-level const (the React fragile-binding rule — table-core owns the gesture state).
   const onResizeStart = useCallback((colId: any, evt: any) => {
     // stop here (NOT a `.stop` modifier) — the Angular `.stop`-in-@for hoist is broken (F5).
     if (evt && evt.stopPropagation) evt.stopPropagation();
@@ -1338,6 +1542,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const handler = header.getResizeHandler();
     if (handler) handler(evt);
   }, [findHeader]);
+  // Find the live header object for a column id across the rendered header groups.
   function findHeader(colId: any) {
     const groups = headerGroups || [];
     for (const hg of groups as any) {
@@ -1361,6 +1566,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const col = table.current.getColumn(colId);
     if (col && col.toggleVisibility) col.toggleVisibility();
   }, []);
+  // The full set of leaf columns (for the visibility-toggle menu) — id + header label +
+  // current visibility. Excludes the auto-injected CHROME columns (select + expander) —
+  // neither is a data column: they carry no header label (so they'd surface their raw
+  // internal id, e.g. '__rdt_expander') and their presence is governed by the
+  // selectionMode/expandable props, not user-toggleable visibility.
   function allLeafColumns() {
     if (tick() < 0 || !table.current) return [];
     const cols = table.current.getAllLeafColumns ? table.current.getAllLeafColumns() : [];
@@ -1381,12 +1591,34 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (!col || !col.getIsPinned) return false;
     return col.getIsPinned();
   }
+  // NOTE: the event is stopped HERE (evt.stopPropagation()) rather than via a `.stop`
+  // template modifier. The Angular emitter, hoisting a `.stop`-modified handler that
+  // lives INSIDE an `@for` loop into a class-field wrapper, drops the component `this.`
+  // qualifier (→ `onPinColumn(...)` bare ReferenceError) and fails to capture the loop
+  // var — so a `@click.stop="onPinColumn(...)"` inside the header `@for` breaks on
+  // Angular (F5). Stopping inside the handler sidesteps the broken hoist on all six.
   const onPinColumn = useCallback((colId: any, side: any, evt: any) => {
     if (evt && evt.stopPropagation) evt.stopPropagation();
     if (!table.current) return;
     const col = table.current.getColumn(colId);
     if (col && col.pin) col.pin(side);
   }, []);
+  // Sticky inline style for a pinned header/cell — position:sticky + the computed left or
+  // right offset. Returns '' (no sticky) for unpinned columns. Returned as a STRING (the
+  // :style binding is value-driven — never an eval'd attr).
+  //
+  // `zIndex` (phase 72 fix, default 1 — body <td> / filter-row <th> layer): an INLINE style
+  // ALWAYS wins over the stylesheet's `.rozie-data-table.rdt-sticky .rdt-thead .rdt-th
+  // { z-index: var(--rdt-sticky-z, 2) }` rule, so a pinned header cell that unconditionally
+  // got `z-index:1` here (same as the pinned body/filter-row cells) silently DOWNGRADED the
+  // intended sticky-header stacking level from 2 to 1 — tying it with the dedicated filter
+  // row's own pinned <th> (72-05), which sits LATER in DOM order (a sibling <tr> beneath the
+  // header row) and therefore visually/interactively covers the header's ⋯ menu (phase 72,
+  // z-index:1000 relative to Popover's OWN local stacking context — capped by the pinned
+  // header <th>'s z-index, since a `position:fixed` descendant does not escape an ancestor's
+  // stacking context, only its layout containing block) whenever that SAME column is both
+  // pinned and filterable. thStyle() (the header caller) passes zIndex=2 so the header layer
+  // always wins ties against the filter-row/body layers, which keep the default of 1.
   function pinStyle(colId: any, zIndex = 1) {
     if (tick() < 0 || !table.current) return '';
     const col = table.current.getColumn(colId);
@@ -1409,6 +1641,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     s += pinStyle(colId, 2);
     return s;
   }
+  // ── Filter chrome handlers ─────────────────────────────────────────────────────────
+  // Global search input → funnel through table-core's setGlobalFilter so the
+  // onGlobalFilterChange callback fires the echo-guarded writer. Capture the fresh local
+  // value (never re-read a just-written $data key — React stale-read).
   const onGlobalFilterInput = useCallback((evt: any) => {
     const value = evt && evt.target ? evt.target.value : '';
     if (table.current) {
@@ -1417,10 +1653,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     writeGlobalFilter(value);
   }, [writeGlobalFilter]);
+  // Per-column filter input → setColumnFilter (fresh-array funnel).
   const onColumnFilterInput = useCallback((colId: any, evt: any) => {
     const value = evt && evt.target ? evt.target.value : '';
     setColumnFilter(colId, value);
   }, [setColumnFilter]);
+  // The live global filter value (bound to the search <input>, value-driven NOT eval'd).
   function globalFilterValue() {
     const v = currentState().globalFilter;
     return v != null ? v : '';
@@ -1458,6 +1696,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const n = parseInt(v, 10);
     table.current.setPageSize(Number.isFinite(n) && n > 0 ? n : 10);
   }, []);
+  // ── Row-selection chrome (req-7) ───────────────────────────────────────────────────
+  // Detect the auto-injected leading checkbox column by its constant id (template uses
+  // this to render checkbox chrome instead of an accessor value).
   function isSelectColumn(colId: any) {
     return colId === SELECT_COL_ID;
   }
@@ -1473,6 +1714,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function rowShowsDetail(row: any) {
     return props.getSubRows == null && !rowIsGrouped(row) && rowIsExpanded(row);
   }
+  // Toggle a row's expanded state through table-core so onExpandedChange → writeExpanded
+  // fires exactly one expanded-change. Used by the chevron @click (native <button> handles
+  // Enter/Space → click, so NO explicit @keydown.enter/.space — that would DOUBLE-toggle on
+  // a real button; the grid @keydown is inert in 'table' mode, isGrid()-gated).
   const onToggleExpand = useCallback((row: any, evt: any) => {
     if (!row || !row.toggleExpanded) return;
     // Capture the owning row element BEFORE the toggle so DOM focus can be restored after the
@@ -1495,6 +1740,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       });
     }
   }, []);
+  // bodyCellStyle: the non-virtual <td> inline style — pinStyle PLUS a depth-proportional
+  // left pad on the EXPANDER cell so nested getSubRows children visibly indent (row.depth).
+  // Only the expander column indents (the tree affordance lives in its dedicated column);
+  // data columns stay grid-aligned. depth 0 → unchanged (byte-identical-off).
   function bodyCellStyle(row: any, colId: any) {
     const base = pinStyle(colId);
     if (isExpanderColumn(colId) && row && row.depth) {
@@ -1537,9 +1786,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     return out;
   }
+  // Plain stop-propagation handler (used in place of the `@click.stop` bare modifier —
+  // a bare `.stop` with no handler hoists to `_guardedUndefined` → `this.undefined($event)`
+  // on Angular inside an `@for`, F5). Calling an explicit handler is uniform on all six.
   const stopEvent = useCallback((evt: any) => {
     if (evt && evt.stopPropagation) evt.stopPropagation();
   }, []);
+  // select-all header state (D-06: scopes to all filtered rows = TanStack default).
+  // `!!`-coerced booleans (the listbox aria lesson — never a bound rozieAttr string).
   function isAllRowsSelected() {
     return !!(tick() >= 0 && table.current && table.current.getIsAllRowsSelected());
   }
@@ -1550,6 +1804,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (!table.current) return;
     table.current.toggleAllRowsSelected(!!(evt && evt.target && evt.target.checked));
   }, []);
+  // per-row checkbox state + toggle (checkbox-only, D-05 — row body does NOT select).
+  // Read selection from the LIVE controlled state (currentState().rowSelection keyed by
+  // row.id) — NOT row.getIsSelected(). The latter reads table-core's row model, which
+  // only reflects a selection AFTER the re-feed watch pushes the new `state` + re-pulls
+  // (two reactive cycles on React). The controlled-state read updates in the SAME cycle
+  // as the write funnel, so the controlled <input :checked> reflects the toggle without
+  // the row-model-re-pull latency — the React controlled-checkbox revert that left
+  // `.check()` seeing no state change (F6). row.getIsSelected() is the fallback.
   function rowIsSelected(row: any) {
     if (!row) return false;
     const id = row.id;
@@ -1561,12 +1823,21 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (!row || !row.toggleSelected) return;
     row.toggleSelected(!!(evt && evt.target && evt.target.checked));
   }, []);
+  // ── Header ⋯ menu chrome (phase 72, D-06) ──────────────────────────────────────────
+  // onHideColumn: the ⋯ menu's "Hide column" item. Reuses the SAME columnVisibility write
+  // funnel as the existing colvis toggle (onToggleVisibility in columnChrome.rzts) — just
+  // forced to `false` rather than toggled, since hide is a one-directional action from the
+  // menu (the colvis panel is the re-show path). Event stopped HERE (not a `.stop`
+  // modifier) — same Angular @for-hoist hazard as onPinColumn/onResizeStart (F5).
   const onHideColumn = useCallback((colId: any, evt: any) => {
     if (evt && evt.stopPropagation) evt.stopPropagation();
     if (!table.current) return;
     const col = table.current.getColumn(colId);
     if (col && col.toggleVisibility) col.toggleVisibility(false);
   }, []);
+  // hasAnyFilterableColumn: gates the dedicated filter row (72-05) — true when at least one
+  // leaf column (excluding the select/expander chrome columns, already excluded by
+  // allLeafColumns) is filterable. Reactive via allLeafColumns()'s own tick() gate.
   function hasAnyFilterableColumn() {
     const cols = allLeafColumns();
     for (const c of cols as any) {
@@ -1579,6 +1850,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     selectAllBox.current = __rozieRoot.current!.querySelector('.rdt-select-all');
     if (selectAllBox.current) selectAllBox.current.indeterminate = isSomeRowsSelected() && !isAllRowsSelected();
   }, [isAllRowsSelected, isSomeRowsSelected]);
+  // The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
   function sortColumn(colId: any, desc: any) {
     if (table.current) table.current.getColumn(colId) && table.current.getColumn(colId).toggleSorting(desc, false);
   }
@@ -1629,7 +1901,17 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function cut() {
     return cutRange();
   }
+  // ══ Grid interaction mode (phase 49) — STATE + STRUCTURE only ═══════════════════════════
+  // This plan (02) establishes the gated ARIA roles, the roving single-tab-stop tabindex,
+  // the active-cell index-pair state, the data-* cell markers, and the SINGLE
+  // focusActiveCell() seam. Plan 03 adds the keydown navigation math, the $expose verbs
+  // (focusCell/getActiveCell/clearActiveCell), and the activecell-change event ON TOP.
+  // interactionMode gate. 'grid' lights up roving nav; 'table' (default) is byte-behaviorally
+  // identical to phase 48 (roles fall back to the literals, tabindex drops).
   const isGrid = useCallback(() => props.interactionMode === 'grid', [props.interactionMode]);
+  // Role computeds (RESEARCH Pattern 4). The 'table' branch returns the EXACT phase-48
+  // literal so 'table'-mode DOM is unchanged. Header cells keep 'columnheader' and rows keep
+  // 'row'/'rowgroup' in BOTH modes (APG grid) — those stay static literals in the template.
   function tableRole() {
     return isGrid() ? 'grid' : 'table';
   }
@@ -2004,6 +2286,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (i < 0) i = list.length - 1;
     list[i].focus();
   }
+  // THE single delegated keydown handler (RESEARCH "Single delegated keydown handler"). Wired
+  // as ONE keydown listener on the <table> root — NOT per-cell, NOT with .stop/.prevent modifiers (the
+  // Angular .stop-in-@for hoist bug, F5/ROZ723). e.preventDefault() is called IMPERATIVELY for
+  // handled keys. Each nav helper writes $data and RETURNS the fresh post-write locals; those
+  // SAME locals feed BOTH focusActiveCell AND the activecell-change emit (no $data re-read).
   const { onActivecellChange: _rozieProp_onActivecellChange } = props;
     const onGridKeyDown = useCallback((e: any) => {
     if (!isGrid() || !e) return;
@@ -2337,6 +2624,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       });
     }
   }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, bodyRowCount, clearActiveRange, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cutRange, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoRowEdge, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, onToggleExpand, pasteRange, props.undoable, recoverGridFocus, redo, rowIsGrouped, rows, selectAllBody, toAbsRow, toggleActiveBooleanCell, undo, visibleColCount]);
+  // WR-03: integrate mouse-click + programmatic focus with the roving model. A click on a
+  // tabindex="-1" cell (or focus arriving any way other than the keyboard nav path) moves
+  // DOM focus there but does NOT run onGridKeyDown — so activeRow/activeColIndex would stay
+  // on the OLD cell and the NEXT arrow key would jump from the stale active cell. Wired as
+  // ONE @focusin on the <table> root (focusin bubbles): resolve the focused element's owning
+  // [data-grid-cell], parse its data-row/data-col-index, and write them into the active-cell
+  // state (mirroring the keyboard path). Clears activeInControl ONLY when the cell ITSELF
+  // (not an inner control) received focus — focusing a control via Enter keeps the in-control
+  // flag. NEVER emits activecell-change (a focus sync is not a keyboard navigation event).
   const syncActiveFromEvent = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -2399,6 +2695,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // The cell box (not an inner control) receiving focus = navigation mode.
     if (tgt === cellEl) setActiveInControl(false);
   }, [activeColIndex, activeHeaderLevel, activeIsHeader, activeRow, clearRange, headerLeafLevel, isGrid]);
+  // onGridMouseDown: the pointer range seam (phase 51 req-7 / D-07 Shift+Click; §6 260709-3qt
+  // plain drag-to-select). A focusin event carries no reliable `shiftKey`, so the modifier MUST
+  // be read off the pointer event — @mousedown fires BEFORE the cell's focusin and DOES carry
+  // shiftKey. A shift-held mousedown on a BODY cell sets the range's moving corner to that cell
+  // (keeping the anchor), then flags rangeClickPending so the follow-up focusin does not collapse
+  // the range. A PLAIN (non-shift) mousedown BEGINS a drag-select anchored at that cell (§6): the
+  // document pointermove/up listeners paint the range as the pointer moves. The fill handle owns
+  // its own @pointerdown drag (it stops propagation), so a plain mousedown originating inside it is
+  // skipped. Do NOT preventDefault — native focus must still land (focusin sync + roving tabindex).
   const onGridMouseDown = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -2430,6 +2735,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // no move collapses to a single active cell (no range).
     beginRangeDrag(row, col);
   }, [beginRangeDrag, isGrid, setRangeFocus$local]);
+  // onGridDblClick: the double-click-into-edit seam (grid pointer §3+§5, 260708-ni6). Wired as
+  // ONE @dblclick on the <table> root (mirroring the already-delegated @mousedown/@focusin). A
+  // double-click on a BODY cell either toggles a group (group-header cell) or opens the editor
+  // (editable cell); a non-editable body cell is a no-op (the cell stays active — its focusin
+  // already set the active state + the §1 ring). Header cells return early so they keep their
+  // native sort/menu/resize semantics. Reuses the SAME closest/parse/finite guards as
+  // syncActiveFromEvent and the SAME beginEdit / onToggleExpand funnels the keyboard path uses —
+  // no new edit or expand machinery. isGrid()-gated so 'table' mode never runs it.
   const onGridDblClick = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -2467,6 +2780,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       beginEdit(row, col, null);
     }
   }, [beginEdit, columnEditable, columnIdAt, isGrid, onToggleExpand, recoverGridFocus, rowIsGrouped, rows]);
+  // onGridClick: the opt-in single-click-to-edit seam (grid pointer §4, 260708-ni6). Only active
+  // when the `singleClickEdit` prop is true (default false, negative-opt-out). Wired as ONE @click
+  // on the <table> root — @click fires on a genuine mouseup-no-drag click (NOT @mousedown), which
+  // honors the deferred §6 drag guard (a mousedown that begins a drag-select must not open an
+  // editor). A plain click on an EDITABLE body cell opens its editor via the SAME beginEdit funnel;
+  // shift+click (range extend) and non-editable cells are unaffected. Same closest/parse/header-skip
+  // /finite guards as onGridDblClick. isGrid()-gated so 'table' mode never runs it.
   const onGridClick = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     if (!props.singleClickEdit) return;
@@ -2493,12 +2813,34 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const colId = columnIdAt(row, col);
     if (colId != null && columnEditable(colId)) beginEdit(row, col, null);
   }, [beginEdit, columnEditable, columnIdAt, editingCol, editingRow, isGrid, props.singleClickEdit]);
+  // WR-02: reset the interaction-mode flag when focus leaves the active cell's subtree.
+  // Without this, activeInControl could stick `true` — a mouse click OUTSIDE the cell, or
+  // the focused inner control being removed from the DOM — leaving onGridKeyDown wedged in
+  // the in-cell-trap branch so arrow nav is dead until Escape. Wired as ONE @focusout on
+  // the <table> root (focusout bubbles, unlike blur). relatedTarget is the element RECEIVING
+  // focus (null when focus leaves the document / is retargeted across a shadow boundary). If
+  // focus is NOT moving to a descendant of the active cell, drop the flag. A Tab-cycle WITHIN
+  // the cell (interaction mode) keeps relatedTarget inside cellEl → no reset.
   const onGridFocusOut = useCallback((e: any) => {
     if (!isGrid() || !activeInControl) return;
     const next = e ? e.relatedTarget : null;
     const cellEl = currentCellEl();
     if (!cellEl || !next || !cellEl.contains(next)) setActiveInControl(false);
   }, [activeInControl, currentCellEl, isGrid]);
+  // B25: re-focus a resolved valid cell AFTER a programmatic shrink re-renders. The clamp
+  // runs synchronously BEFORE the framework commits the new tbody, so a deferred rAF-poll
+  // resolves the [data-row][data-col-index] cell off gridRoot once it has rendered (the fast
+  // targets land on attempt 1; React/Solid retry across the async commit). Mirrors
+  // focusCellWhenReady (B23) — DOM-only (reads gridRoot), so it is React-stale-safe.
+  // guardMoved (default false): when true, the poll does NOT stomp focus that a later nav has
+  // already moved to a DIFFERENT, STILL-VALID row — used only by the group-collapse re-seat (the
+  // target group-header row is unchanged, so a stale late rAF must not steal focus back after the
+  // user ArrowDown'd away → the non-deterministic treegrid collapsed-nav focus-theft). It is left
+  // OFF for the B25 shrink-recovery site, whose target is a CLAMPED index of a now-REMOVED cell:
+  // there focus legitimately sits on the doomed old cell (a different row) mid-async-render on
+  // React and MUST be recovered onto the clamped survivor, not preserved. Compare data-row (NOT
+  // node identity) so a stale SAME-row cell on Solid's node-replacing re-render still resolves as
+  // the target — a genuinely dropped focus is always recovered on both sites.
   function recoverGridFocus(rowKey: any, col: any, level: any, guardMoved = false) {
     if (!gridRoot.current) return;
     let attempts = 0;
@@ -2522,6 +2864,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
   }
+  // D-05: clamp the active cell to bounds on every underlying-data change (re-sort, filter,
+  // pagination, page-size). KEEP the same indices; clamp ONLY when the grid shrank — NO
+  // row-id following, NO bounce-to-top on a filter keystroke. Gated by isGrid() so 'table'
+  // mode is entirely untouched. Invoked at the rowModelVer bump path (refreshRowModel).
   const clampActiveCell = useCallback((rowCount: any, colCount: any) => {
     if (!isGrid()) return;
     // B8/B23 React-stale guard: the bounds come from the FRESH model the caller (refreshRowModel)
@@ -2616,6 +2962,44 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       recoverGridFocus(String(recRow), recCol, null);
     }
   }, [activeColIndex, activeIsHeader, activeRow, bodyRowCount, clamp, clampRange, headerLeafLevel, isGrid, recoverGridFocus, visibleColCount]);
+  // B6 (phase 63 wave-11) — "the active cell is parked on the empty-grid header fallback" control
+  // flag, written + read ONLY inside clampActiveCell (never bound in the template). It MUST be a
+  // plain component-scope `let` (React hoists to useRef), NOT a $data reactive field: clampActiveCell
+  // is reached through the mount-time refreshRowModel closure, so a `$data.gridEmptyFallback` READ
+  // there binds the async-stale mount-time value on React (setState is async — the rangeActive /
+  // pendingEditFollow / B23-nextRows stale-read class). With the body re-populated after a filter
+  // CLEAR, that stale read skipped the recovery branch on React → the roving tab-stop stayed on the
+  // header fallback (columnheader) instead of re-seating a body cell (the B6 recovery gap). A
+  // synchronously-written plain `let` is read fresh on all six → the empty→non-empty recovery
+  // re-seats activeRow 0 on React too. The other 5 targets are byte-behaviorally identical (they
+  // already read reactive $data synchronously). A top-level reassigned `let` referenced from the
+  // refreshRowModel/clampActiveCell chain → React hoists to useRef → persists per-instance.
+  // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
+  // A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
+  // (rangeAnchor/rangeFocus = { rowIndex, colIndex }) — NEVER a stored DOM node, so the
+  // highlight reattaches to the correct cells across virtualization recycling (the
+  // activeRow/activeColIndex invariant). ONE-WAY (D-07): exposed via getSelectedRange +
+  // range-change, NOT a model:true slice. Coexists with — and is visually distinct from —
+  // the row-selection slice (the two never touch each other's state).
+  // inRange(rIdx, cIdx): is the cell at the visible-model index pair inside the current
+  // rectangle? Pure index math (the min/max box of anchor+focus). False when no range —
+  // the byte-identical-off guard for the range markup (no anchor/focus → no :data-in-range).
+  // rangeTransition: set true while extendRange/setRangeFocus moves DOM focus to the new
+  // range-focus corner. That focus move fires @focusin → syncActiveFromEvent with NO shiftKey
+  // (a programmatic focus carries no modifier), which would otherwise clearRange() and wipe the
+  // range we just set. The flag suppresses that collapse for the in-flight focus settle (the
+  // editTransition blur-guard precedent). A top-level let → React hoists to useRef.
+  // rangeClickPending: set by onGridMouseDown on a Shift+Click (the range is set off the
+  // pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
+  // to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
+  // B19: a SYNCHRONOUS mirror of "a range currently exists" — extendRange/setRangeFocus set it
+  // true, clearRange/clampRange-to-empty set it false. clearRange is invoked TWICE in one plain-
+  // arrow keydown (the explicit collapse + the focusin that follows the programmatic focus move);
+  // on React `$data.rangeAnchor = null` is an async setState, so the SECOND clearRange's
+  // `$data.rangeAnchor == null` guard reads the STALE (pre-write) range and fires a duplicate
+  // range-change. This module-let is written synchronously (no setState async), so the second
+  // clearRange sees `rangeActive === false` and returns → exactly ONE range-change per real drop
+  // across all six targets. A top-level let → React hoists to useRef.
   function inRange(rIdx: any, cIdx: any) {
     const a = rangeAnchor;
     const f = rangeFocus;
@@ -3238,6 +3622,23 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       document.addEventListener('pointerup', up);
     }
   }, [cellIndexFromPoint, fillRange, normalizedRange, setRangeFocus$local, teardownFillDrag]);
+  // §6 (260709-3qt) drag-to-select — mirror the fill-drag listener discipline. rangeDragging gates
+  // the live gesture; rangeDragMove/rangeDragUp track the document pointermove/pointerup handlers so
+  // a mid-drag unmount ($onUnmount → teardownRangeDrag) can remove them (CR-04). rangeDragMoved flips
+  // true once the drag enters a DIFFERENT cell than its mousedown anchor; onGridClick reads it to
+  // suppress a singleClickEdit editor-open after a drag (reset per-gesture in beginRangeDrag). Each
+  // top-level let → React hoists to useRef.
+  // ══ Mouse drag-to-select (grid cell-interaction §6, 260709-3qt) ═════════════════════════
+  // A plain (non-shift) mousedown on a body cell begins a document-level drag: the FIRST
+  // pointermove that reaches a DIFFERENT body cell paints the range moving corner via the
+  // SHARED-scope setRangeFocus (the SAME range model shift+click / shift+arrow drive), pointerup
+  // ends it. Mirrors fillDrag.rzts's listener discipline VERBATIM (document pointermove/pointerup
+  // tracked in module-lets so a mid-drag unmount can remove them — CR-04), and REUSES fillDrag's
+  // shadow-piercing cellIndexFromPoint (shared scope) so the Lit shadow target is covered uniformly.
+  // teardownRangeDrag(): remove the live drag listeners, null them, clear the dragging flag. The
+  // `up` handler calls it on a normal release; $onUnmount calls it if we unmount MID-DRAG (mirrors
+  // teardownFillDrag). rangeDragMoved is NOT reset here — it is read by onGridClick AFTER pointerup
+  // (to suppress a singleClickEdit editor-open) and reset per-gesture in beginRangeDrag.
   const teardownRangeDrag = useCallback(() => {
     if (typeof document !== 'undefined') {
       if (rangeDragMove.current) document.removeEventListener('pointermove', rangeDragMove.current);
@@ -3247,6 +3648,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     rangeDragUp.current = null;
     rangeDragging.current = false;
   }, []);
+  // beginRangeDrag(anchorR, anchorC): start a drag-select anchored at the mousedown cell. The
+  // mousedown's native focus/focusin already committed the ACTIVE cell to (anchorR, anchorC), so
+  // setRangeFocus (which seeds the anchor from the ACTIVE cell) spans mousedown-cell→pointer-cell —
+  // we NEVER write $data.rangeAnchor directly (it is React-stale, ROZ138). rangeDragMoved starts
+  // false and flips true only once the pointer reaches a DIFFERENT cell, so a mousedown-with-no-move
+  // leaves a single active cell + no range (a normal click). lastCell dedups the many pointermove
+  // events per cell (setRangeFocus emits range-change — only extend on a NEW cell, mirroring fillDrag's
+  // B20 dedup). Captured per-gesture in the closure (no module-let needed for lastCell).
   function beginRangeDrag(anchorR: any, anchorC: any) {
     // #leak: tear down any orphaned PRIOR range gesture BEFORE reassigning the module-let handlers.
     // A missed pointerup (off-window release, context menu, alt-tab) leaves the prior drag's document
@@ -3459,6 +3868,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // seeded char so subsequent typing appends instead of replacing it.
     focusEditorWhenReady(seed == null);
   }
+  // Return focus to a body cell AFTER the editor unmounts (commit/cancel). The display↔
+  // editor re-render must commit before the <td> is focusable with its roving tabindex —
+  // on React/Solid/Lit that commit is async, so a synchronous focusActiveCell can run while
+  // the cell is still the editor (or mid-swap) and focus is lost. Bounded rAF-poll resolves
+  // the [data-row][data-col-index] cell off gridRoot for ~30 frames (the fast targets land
+  // on attempt 1; React/Solid retry across the async commit). Mirrors focusEditorWhenReady.
   const focusCellWhenReady = useCallback((row: any, col: any) => {
     if (!gridRoot.current) return;
     let attempts = 0;
@@ -3474,6 +3889,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
   }, [resolveCellEl]);
+  // B23: the index of a committed row WITHIN a given (fresh) visible-model array, resolved by
+  // row IDENTITY. table-core's default getRowId is source-index-based, so a row's id is stable
+  // across a re-sort (only its VISIBLE position moves); a committed edit replaces the row object
+  // via a fresh spread (the `original` reference changes), so match by `id` FIRST, `original`
+  // only as a fallback. Returns -1 when the row filtered out of the view. PURE (the caller passes
+  // the FRESH row list — refreshRowModel's just-pulled `nextRows`, never the React-stale state).
   const indexOfRowIn = useCallback((rows: any, rowOriginal: any, rowId: any) => {
     const list = rows || [];
     for (let i = 0; i < list.length; i++) {
@@ -3484,6 +3905,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     return -1;
   }, [rows]);
+  // endEdit: tear down the editor (shared by commit/cancel). Clears the editing pair +
+  // draft + invalid state and returns to navigation mode. Does NOT move focus (callers
+  // decide where focus lands — commit/cancel return it to the owning cell).
   function endEdit() {
     setEditingRow(-1);
     setEditingCol(-1);
@@ -3946,6 +4370,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       cancelEdit();
     };
   }
+  // Editor input handlers (the global-filter `evt.target.value` idiom — an untyped param
+  // neutralizes to `any`, so reading .value/.checked typechecks ×6; an inline
+  // `$data.x = $event.target.value` binding does NOT neutralize and breaks Lit/React JSX).
+  // Column-aware: in row mode they write rowDraft[colId] (a FRESH object so Solid/Svelte/React
+  // re-derive); single-cell they write the shared draftValue.
   const onCellEditorInput = useCallback((colId: any, evt: any) => {
     const v = evt && evt.target ? evt.target.value : '';
     if (inRowEdit()) {
@@ -3962,6 +4391,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     setDraftValue(v);
   }, [inRowEdit, setRowDraft$local]);
+  // setRowDraft: write ONE key into a FRESH rowDraft object (whole-object replace — an
+  // in-place mutation is silently dropped on React/Solid; the family immutable rule).
   function setRowDraft$local(colId: any, value: any) {
     const src = rowDraft || {};
     const next = {};
@@ -3989,6 +4420,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setEditVer(prev => prev + 1);
     focusRowEditorAt(rowIndex, cols[nextPos]);
   }
+  // onEditorKeyDown: the editor-LOCAL keymap (req-3). Enter → commit + stay (focus returns
+  // to the cell); Tab → commit + advance to the next editable cell; Escape → cancel +
+  // revert. preventDefault on handled keys so the grid keymap / native Tab don't double-act.
   const onEditorKeyDown = useCallback((e: any) => {
     if (!e) return;
     const key = e.key;
@@ -4046,6 +4480,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       cancelEdit();
     }
   }, [beginEdit, cancelEdit, cancelRow, commitEdit, commitRow, editingCol, editingRow, focusCellWhenReady, inRowEdit, nextEditableCell, prevEditableCell, rowEditTab]);
+  // onEditorBlur: commit on a genuine click/focus-away (D-01 — an invalid value keeps the
+  // editor open via commitEdit's reject path). SKIP when:
+  //  - editTransition is set (a synchronous commit/cancel teardown is unmounting the editor), or
+  //  - the blur is part of a controlled keyboard transition: focus is moving to a grid cell
+  //    or another editor inside our gridRoot (Tab-advance, Enter/Escape focus-return). On the
+  //    async-render targets the unmount-blur can fire AFTER the synchronous flag cleared, so
+  //    the relatedTarget/containment check is the load-bearing guard, not the flag alone.
   const onEditorBlur = useCallback((e: any) => {
     // Full-row mode (req-6): a blur that stays WITHIN the row editor — Tab/click between the
     // row's OWN fields — is a normal focus move and must NOT commit (a per-cell blur-commit
@@ -4123,6 +4564,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(reseatDestFocus);else setTimeout(reseatDestFocus, 0);
   }, [commitEdit, commitRow, editingCol, editingRow, editingRowIndex, inRowEdit, resolveCellEl]);
+  // editCell(rowIndex, colIndex) — programmatic edit-entry ($expose, req-3). Coerces +
+  // clamps indices, moves the active cell, and opens the editor (no-op on a non-editable
+  // cell). Collision-clean (RESEARCH name-check): not a verb/event/prop/ROZ137 member.
   function editCell(rowIndex: any, colIndex: any) {
     const lastRow = bodyRowCount() - 1;
     const maxRow = lastRow < 0 ? 0 : lastRow;

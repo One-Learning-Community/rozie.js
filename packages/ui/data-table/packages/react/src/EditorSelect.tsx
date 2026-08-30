@@ -46,9 +46,11 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
   };
   const [draft, setDraft] = useState(() => props.value != null ? String(props.value) : '');
 
+  // Picking/arrow-cycling an option updates the draft only — no commit.
   const onChange = useCallback((e: any) => {
     setDraft(e && e.target ? e.target.value : '');
   }, []);
+  // commit/cancel are Function props (default null) — guard before calling.
   function doCommit() {
     props.commit && props.commit(draft);
   }

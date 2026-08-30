@@ -38,6 +38,8 @@ export default function EditorCheckbox(_props: EditorCheckboxProps): JSX.Element
     cancel: _props.cancel ?? null,
   };
 
+  // Immediate-commit-on-change: read .checked the global-filter way, coerce to a
+  // real boolean, and commit it directly.
   const { commit: _rozieProp_commit } = props;
     const onChange = useCallback((e: any) => {
     _rozieProp_commit && _rozieProp_commit(!!(e && e.target ? e.target.checked : false));

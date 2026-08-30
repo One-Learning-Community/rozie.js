@@ -360,6 +360,15 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   function actionIcon(a: any) {
     return a && a.icon !== undefined ? a.icon : undefined;
   }
+  // Platform sniff for the DISPLAY of the `$mod` token only — matching is
+  // platform-agnostic (`metaKey || ctrlKey`, see matchesActionKey). SSR-guarded
+  // like every other browser-global read; defaults to the non-Apple form.
+  //
+  // Quick 260716-npt Finding 4 (efficiency): this used to be called directly
+  // from the template ONCE PER ROW (via actionKeyHint()/hotKey badge below),
+  // re-sniffing navigator on every render for every option. `navigator` never
+  // changes mid-session, so sniff it ONCE in $onMount into $data.platformIsApple
+  // and read that everywhere instead — see the two call sites below.
   const sniffApplePlatform = useCallback(() => {
     if (typeof navigator === 'undefined') return false;
     const p = (navigator.platform || '') + ' ' + (navigator.userAgent || '');
@@ -452,6 +461,14 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     // ever invoking source.
     if (isAsyncLevel(item) && levelDefaultItems(item).length === 0) beginLevelLoad(item, '');
   }
+  // Pop one level: popFrame() → restore the query MODEL AND the vendored
+  // <Combobox>'s VISIBLE input text via seedQuery(restoreQuery) (Option B — the
+  // combobox seedQuery prerequisite) — full query undo, not just the
+  // model/list. Bumps the request token so any in-flight source resolution for
+  // the popped level is dropped. reopenComboboxPopup() re-opens the combobox
+  // popup (Escape closed it on the shared bubble through the combobox — see
+  // onPanelKeydown) so the restored parent level's list is visible. No-op at
+  // root (an empty levelStack — mirrors the spec's "back() — no-op at root").
   const goBack = useCallback(() => {
     if (levelStack.length === 0) return;
     // Level nav always resets to the list surface (spec §Composition) — pop
@@ -470,6 +487,27 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     reopenComboboxPopup();
     _rozieProp_onBack && _rozieProp_onBack();
   }, [_rozieProp_onBack, closeAnySurface, levelStack, reopenComboboxPopup, setQuery]);
+  // jumpToLevel(targetDepth): the breadcrumb ANCESTOR click-to-jump affordance
+  // (260715-uz1). A breadcrumb index `ei` maps directly onto a target stack
+  // depth (breadcrumbStack() index 0 = root/depth 0, index k = the k-th pushed
+  // frame/depth k) — see breadcrumb()/depth() in internal/levelStack.ts. Pops
+  // the stack from its CURRENT length down to `targetDepth`, emitting ONE
+  // `@back` per popped level — the LOCKED event-sequence decision: N-T `@back`
+  // emits for a depth-N→depth-T jump, byte-identical to pressing Backspace
+  // (N-T) times (see the levels design spec + the VR `readout-back-count`,
+  // which counts one increment per level — a single "pop-to-depth" emit would
+  // under-report to consumers/counters).
+  //
+  // Script-internal ONLY — deliberately NOT added to $expose (keeps the
+  // surface gate, surface.test.ts, byte-unchanged; see the plan's must_haves).
+  //
+  // The pops are threaded through a LOCAL `stack` (mirrors openTo/pushLevel)
+  // rather than re-reading $data.levelStack inside the loop — the documented
+  // React/Solid/Lit setState-is-async stale-read (openTo's comment above).
+  // $data.levelStack is written once at the end for render reactivity; the
+  // query-restore / seedQuery / reopen happen ONCE with the final restored
+  // query — the final visible state is identical to N sequential goBack()
+  // calls, only the intermediate restores (invisible either way) are skipped.
   const jumpToLevel = useCallback((targetDepth: any) => {
     let stack = levelStack;
     if (targetDepth < 0 || targetDepth >= stack.length) return;
@@ -491,6 +529,16 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     setActiveValue(null);
     reopenComboboxPopup();
   }, [_rozieProp_onBack, closeAnySurface, levelStack, reopenComboboxPopup, setQuery]);
+  // openTo(path): the ⌘P deep-link (LVL-RENDER, LVL-STACK) — opens the palette,
+  // resets to root, then drills through `path` (an array of item ids) one hop
+  // at a time: resolve the CURRENT level's items, find the item whose `id`
+  // matches the next path segment, push it, and — async-aware — AWAIT its
+  // source settling before resolving the NEXT hop (a child level's items must
+  // be settled before an id can be looked up in it). Threads the stack as a
+  // LOCAL (`stack`) rather than re-reading $data.levelStack between hops (the
+  // React setState-is-async stale-read); the $data.levelStack writes are for
+  // render reactivity. Stops silently (safe no-op on the unresolved remainder)
+  // at the first id that doesn't match anything in the current level.
   async function openTo(path: any) {
     setOpen(true);
     let stack = [];
@@ -540,6 +588,17 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
       focusInput();
     }
   }
+  // ---- selection ---------------------------------------------------------
+  // Combobox's `@change` fires `{ value, option }` on each commit. A NAVIGATING
+  // item (isNavigating — children/source) is intercepted here and PUSHES a
+  // child level instead of emitting `select` (presence of children/source is
+  // the navigation signal, no separate flag). Otherwise re-emit the PUBLIC
+  // `select` event as `{ item, path }` — `item` is the FULL original command
+  // object (the `option` IS the original command item, since we feed items
+  // straight through as combobox options — no id/label/group projection) and
+  // `path` is the id breadcrumb of levels navigated through to reach it
+  // (levelStack item ids, root excluded — root carries no item). This mirrors
+  // `navigate`'s `{ item, depth }` shape.
   const { onSelect: _rozieProp_onSelect } = props;
     const onComboboxChange = useCallback((e: any) => {
     // Inert guard (ARGS-SURFACE): the result list stays visibly open (dimmed +
@@ -571,6 +630,17 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     setActiveValue(null);
     if (props.closeOnSelect) closePalette();
   }, [_rozieProp_onSelect, activeSurface, closePalette, levelStack, openArgsSurface, props.closeOnSelect, pushLevel]);
+  // Combobox's `@search` fires `{ query }` as the user types in its combobox input.
+  // Pipe it into command-palette's own two-way `query` model — `filteredItems()`
+  // then re-ranks via scoreCommands (keyword-aware, fuzzy). Capture the fresh value
+  // (never re-read a just-written $data/$model key on React — it is stale).
+  //
+  // At an ASYNC level (LVL-ASYNC), ALSO bump + capture a fresh request token
+  // immediately (dropping any earlier in-flight resolution, T-cpl-01) and
+  // schedule a DEBOUNCED (searchDebounce, T-cpl-02) source(query) refetch — the
+  // consumer source() function itself is only invoked once the debounce timer
+  // fires, never eagerly. A sync (root/children) level needs no refetch —
+  // filteredItems() already re-ranks currentItems() locally on every keystroke.
   const onComboboxSearch = useCallback((e: any) => {
     const q = e && e.query !== undefined ? e.query : '';
     setQuery(q);
@@ -603,9 +673,21 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
       if (resolved.kind === 'async') applyAsyncResult(token, resolved.promise);
     }, props.searchDebounce);
   }, [applyAsyncResult, levelStack, props.searchDebounce, setQuery]);
+  // Backdrop click: a click whose target IS the backdrop (not the panel/children).
   const onBackdropClick = useCallback((e: any) => {
     if (e && e.target === e.currentTarget) closePalette();
   }, [closePalette]);
+  // ---- open/close reconcile ----------------------------------------------
+  // Focus the vendored <Combobox>'s search <input> via its exposed `focus` handle
+  // verb (Combobox.rozie:578 `$expose({ focus, clear })`). Focusing it fires the
+  // combobox's `@focus="open"` → the popup opens (the screenshot demo seeds the
+  // palette open, so this runs on mount). `$refs.combobox` is the composed child's
+  // TYPED handle across all 6 targets (Phase 66 composed-component-ref → handle
+  // typing), so `focus()` typechecks and resolves to the child's exposed verb —
+  // including on Lit, where this RETIRES the former `<rozie-combobox>` open-shadow-
+  // root DOM pierce that only existed because the composed ref used to type as a
+  // bare HTMLElement.
+  // $refs read in a post-mount callback only (ROZ123-safe).
   function focusInput() {
     combobox.current?.focus();
   }
@@ -692,6 +774,12 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     const el: any = frame$local.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])');
     if (el && typeof el.focus === 'function') el.focus();
   }
+  // openActionMenu(item): guarded no-op unless canOpenActions(item). Anchors
+  // the item + its resolved actions, lands actionIndex on the first ENABLED
+  // action, reads the flyout's vertical offset off the highlighted row's
+  // offsetTop, tells the vendored combobox to keepOpen (ACT-KEEPOPEN —
+  // pinOpen(true), so blurring the input into the flyout does not collapse the
+  // list), then moves real focus into the first enabled menuitem next frame.
   const openActionMenu = useCallback((item: any) => {
     if (!canOpenActions(item)) return;
     const actions = actionsOf(item);
@@ -744,6 +832,10 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
       focusFirstMenuItem();
     }
   }, [actionMenuTop, deepQuerySelector, focusFirstMenuItem]);
+  // closeActionMenu(): the focus-restore invariant — ALWAYS returns to the
+  // list surface, releases keepOpen (pinOpen(false)), and reopens the combobox
+  // popup with focus back on the search input (reopenComboboxPopup — the
+  // existing level-pop blur/refocus primitive, reused verbatim here).
   function closeActionMenu() {
     setActiveSurface('list');
     setActionIndex(-1);
@@ -810,9 +902,20 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   function setArgValueFor(id: any) {
     return (v: any) => setArgValue(id, v);
   }
+  // onArgFieldInput(id, e): the default (unfilled #argsField) field's own
+  // @input handler — untyped `e` neutralizes to `any` so reading
+  // e.target.value typechecks ×6 (the global-filter idiom; never inline
+  // `$data.x = $event.target.value` directly in the template).
   const onArgFieldInput = useCallback((id: any, e: any) => {
     setArgValue(id, e && e.target ? e.target.value : '');
   }, [setArgValue]);
+  // submitArgs(): captures a FRESH local of argList/values BEFORE any $data
+  // write (the React stale-read guard — mirrors pushLevel/selectAction).
+  // !canSubmitArgs -> focus the first unfilled required field and return (no
+  // emit, no close — the "missing required" no-op). Otherwise fires the
+  // EXISTING @select with the additive, trimmed `args` payload key, then
+  // closes the args surface and — mirroring onComboboxChange's own leaf-select
+  // path — closes the palette too iff closeOnSelect.
   function submitArgs() {
     const state = argsState;
     if (!state) return;
@@ -856,6 +959,10 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     const el: any = items[idx];
     if (el && typeof el.focus === 'function') el.focus();
   }
+  // selectAction(action): a disabled action is a no-op. Captures the anchored
+  // item into a LOCAL first (React stale-read guard — closeActionMenu clears
+  // $data.actionAnchor right after), fires the public `action-select` event,
+  // ALWAYS closes the menu, then closes the palette too IFF closeOnAction.
   const { onActionSelect: _rozieProp_onActionSelect } = props;
     const selectAction = useCallback((action: any) => {
     if (!action || action.disabled) return;
@@ -868,6 +975,13 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     closeActionMenu();
     if (props.closeOnAction) closePalette();
   }, [_rozieProp_onActionSelect, actionAnchor, closeActionMenu, closePalette, props.closeOnAction]);
+  // onActionMenuKeydown(e): the flyout's OWN keydown — focus is inside the
+  // menu while this fires, so the vendored combobox never sees these keys.
+  // Escape is DELIBERATELY not handled here — it bubbles up to onPanelKeydown's
+  // single Escape funnel below. Every other handled key stops propagation so a
+  // stale-but-now-'list'-surface bubble (e.g. the actionKey toggle-close,
+  // which flips activeSurface to 'list' BEFORE the event finishes bubbling)
+  // can't be re-interpreted as a fresh open-menu trigger by onPanelKeydown.
   const onActionMenuKeydown = useCallback((e: any) => {
     if (!e) return;
     if (e.key === 'ArrowDown') {
@@ -902,6 +1016,12 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
       closeActionMenu();
     }
   }, [actionAnchor, actionIndex, closeActionMenu, props.actionKey, roveAction, selectAction]);
+  // On open: clear the internal selection, then focus the search input. The query
+  // is NOT reset here — that would clobber a pre-seeded / `r-model`-bound query.
+  // The reset happens on the close transition (the $watch else-branch below), so a
+  // value set alongside `open` is honored and each plain open still starts fresh
+  // (the query was cleared at the prior close).
+  // Runs from $onMount and the lazy open $watch callback, both post-mount.
   const onOpen = useCallback(() => {
     setActiveValue(null);
     // Defer a tick so the overlay + <Combobox> are mounted before focusing.
@@ -913,6 +1033,37 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
       focusInput();
     }
   }, [focusInput]);
+  // ---- lifecycle ---------------------------------------------------------
+  // Bubble-phase panel keydown (LVL-NAV, ACT-ARBITRATION, ACT-TRIGGER, ARGS-
+  // SURFACE/ARGS-SUBMIT/ARGS-ESCAPE):
+  //   - Escape: routed through resolveEscape(activeSurface, currentDepth()) —
+  //     the SINGLE precedence oracle (menu-close/args-close > level-pop >
+  //     palette-close-at-root). A sub-surface open (activeSurface!=='list')
+  //     ALWAYS wins — closeArgsSurface()/closeActionMenu() (whichever surface
+  //     is open) and STOP; only once the sub-surface is closed does Escape
+  //     fall through to level-pop or root-close on a LATER keypress. The
+  //     vendored <Combobox> (a child) sees the Escape FIRST on the bubble path
+  //     and closes its OWN popup (Combobox.rozie onKeydown → isOpen=false);
+  //     goBack()'s reopenComboboxPopup() re-opens it afterward so the restored
+  //     parent level's list is visible.
+  //   - Args surface (activeSurface==='args', #12): Enter submits (via
+  //     submitArgs — regardless of which field has focus, per spec "Enter
+  //     submits when valid"); Backspace on an empty FIRST field pops back to
+  //     the list (isFirstFieldEmpty, gated on e.target === the first field so
+  //     backspacing in a LATER empty field just edits text normally). Neither
+  //     falls through to the level-nav Backspace-pop below — args entry/exit
+  //     never emits @navigate/@back (spec §Composition).
+  //   - actionKey (⌘K) / caret-at-end Right-arrow (ACT-TRIGGER): open the
+  //     action menu for the highlighted row, but ONLY while activeSurface is
+  //     'list' (the menu owns these keys itself once open, via
+  //     onActionMenuKeydown) and the row canOpenActions — a no-op otherwise
+  //     (an action-less row, or no highlighted row).
+  //   - Backspace on an empty query at depth>0 → pop one level, but ONLY while
+  //     activeSurface==='list' (Backspace must never pop a level while a
+  //     sub-surface owns focus). Backspace does NOT close the combobox popup —
+  //     its onKeydown ignores it — so the reopen is a harmless no-op cycle
+  //     there. Otherwise Backspace edits the query text normally (never
+  //     intercepted at the root or with text in the box).
   const onPanelKeydown = useCallback((e: any) => {
     if (!e) return;
     if (e.key === 'Escape') {
@@ -971,6 +1122,14 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
       goBack();
     }
   }, [activeSurface, argsState, closeActionMenu, closeArgsSurface, closePalette, currentDepth, goBack, highlightedItem, openActionMenu, props.actionKey, query, searchInputEl, submitArgs]);
+  // ---- imperative handle -------------------------------------------------
+  // show()/close()/toggle() drive the `open` model. The OPEN verb is `show` (NOT
+  // `open`) — an `open` verb collides with the `open` model on React (both collapse
+  // onto the generated open/setOpen state). focus() focuses the vendored combobox's
+  // control via its exposed handle (accepted ROZ137 Lit override). All post-mount →
+  // $refs safe. The POP verb is `goBack` — NOT `back` (a `back()` expose verb would
+  // collide with the `@back` EMIT, ROZ121: expose∩emits must be empty). `openTo` is
+  // the ⌘P deep-link (stubbed above; Task 6 fills the drill-through).
   function show() {
     setOpen(true);
   }
