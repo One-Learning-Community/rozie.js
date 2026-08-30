@@ -78,9 +78,70 @@ describe('Angular nested-$data reactive lowering (covered subset)', () => {
     expect(code).not.toMatch(/this\.items\(\)\.splice\(/);
   });
 
-  // NEGATIVE — stay non-reactive (ROZ207 fail-loud owns them).
-  it('NEGATIVE dynamic index `$data.reg[id] = 5` is NOT lowered', () => {
+  // quick 260830-m30 — CW-DYNKEY / CW-DYNDELETE + the D2 initializer gate.
+  // Angular keeps `this.<key>.update(<param> => …)`; the delete's arrow takes a
+  // BLOCK body. Angular AOT's no-arrow constraint applies to TEMPLATE
+  // expressions, not to `<script>`-derived class-method bodies, so a
+  // block-bodied arrow inside a method is fine.
+  it('CW-DYNKEY object: `$data.reg[id] = 5` -> `this.reg.update(o => ({ ...o, [id]: 5 }))`', () => {
     const code = emit('{ reg: {} }', 'const id = "k"; $data.reg[id] = 5;');
+    expect(code).toMatch(/this\.reg\.update\(o =>/);
+    expect(code).toContain('...o');
+    expect(code).toMatch(/\[id\]: 5/);
+    expect(code).not.toMatch(/this\.reg\(\)\[id\]\s*=\s*5/);
+  });
+
+  it('CW-DYNKEY string key: `$data.reg["k"] = 5` -> computed-key spread', () => {
+    const code = emit('{ reg: {} }', '$data.reg["k"] = 5;');
+    expect(code).toMatch(/this\.reg\.update\(o =>/);
+    expect(code).toContain('...o');
+    expect(code).toMatch(/\["k"\]: 5/);
+  });
+
+  it('CW-DYNKEY array: `$data.arr[i] = 9` -> `this.arr.update(a => a.map(`', () => {
+    const code = emit('{ arr: [1, 2] }', 'const i = 1; $data.arr[i] = 9;');
+    expect(code).toMatch(/this\.arr\.update\(a =>/);
+    expect(code).toContain('.map(');
+    expect(code).toMatch(/=== i \?/);
+    expect(code).not.toMatch(/this\.arr\(\)\[i\]\s*=\s*9/);
+  });
+
+  it('CW-INDEX RETROFIT: `$data.obj[0] = 9` with `obj: {}` takes the OBJECT lowering', () => {
+    const code = emit('{ obj: {} }', '$data.obj[0] = 9;');
+    expect(code).toMatch(/this\.obj\.update\(o =>/);
+    expect(code).toContain('...o');
+    expect(code).toMatch(/\[0\]: 9/);
+    expect(code).not.toContain('.map(');
+  });
+
+  it('CW-DYNDELETE: `delete $data.reg[id]` -> `this.reg.update(o => { … })`', () => {
+    const code = emit('{ reg: {} }', 'const id = "k"; delete $data.reg[id];');
+    expect(code).toMatch(/this\.reg\.update\(o =>/);
+    expect(code).toContain('const __next = {');
+    expect(code).toContain('...o');
+    expect(code).toContain('delete __next[id]');
+    expect(code).toContain('return __next');
+    expect(code).not.toMatch(/delete this\.reg\(\)\[id\]/);
+  });
+
+  // NEGATIVE — stay non-reactive (ROZ207 fail-loud owns them).
+  it('NEGATIVE array delete `delete $data.arr[i]` is NOT lowered (hole semantics)', () => {
+    const code = emit('{ arr: [] }', 'const i = 0; delete $data.arr[i];');
+    expect(code).not.toMatch(/this\.arr\.update\(/);
+  });
+
+  it('NEGATIVE impure key `$data.reg[k()] = 5` is NOT lowered', () => {
+    const code = emit('{ reg: {} }', 'function k(){ return "a"; } $data.reg[k()] = 5;');
+    expect(code).not.toMatch(/this\.reg\.update\(/);
+  });
+
+  it('NEGATIVE non-literal initializer `{ reg: null }` + `$data.reg[0] = 5` is NOT lowered', () => {
+    const code = emit('{ reg: null }', '$data.reg[0] = 5;');
+    expect(code).not.toMatch(/this\.reg\.update\(/);
+  });
+
+  it('NEGATIVE expression-context delete is NOT lowered (D4 statement-context only)', () => {
+    const code = emit('{ reg: {} }', 'const id = "k"; const ok = delete $data.reg[id]; void ok;');
     expect(code).not.toMatch(/this\.reg\.update\(/);
   });
 
