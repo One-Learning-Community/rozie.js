@@ -76,8 +76,7 @@ jobs:
 
       # Seed from the most recent prior build so unchanged packages hit turbo's
       # content-addressed cache. A `packages/core` change still invalidates the
-      # whole downstream graph and rebuilds it — that is intended, and nothing
-      # here introduces a `--filter` assumption about target independence.
+      # whole downstream graph and rebuilds it — that is intended.
       - name: Restore turbo cache
         uses: actions/cache/restore@v6
         with:
@@ -87,8 +86,58 @@ jobs:
             ${{ runner.os }}-turbo-vue-
             ${{ runner.os }}-turbo-
 
+      # Quick 260829-t8t: narrowed from a bare `pnpm turbo run build` (520
+      # tasks) to the consumer-demo closure plus this workflow's cross-target
+      # gates (107 tasks, -79%). `{./examples/consumers/*}...` is a glob over
+      # every consumer demo plus its dependency closure, so a new demo is
+      # picked up automatically rather than rotting out of a hardcoded list.
+      # This still pulls in all six `@rozie/target-*` packages (via
+      # `@rozie/unplugin`'s devDeps), which the swipe canary's emit tests and
+      # the dts-identity test need to see every target's `dist/`.
+      #
+      # `vue-gates` runs three gate suites the demo closure alone does not
+      # reach: `@rozie/strict-conformance`, `@rozie/event-contract-conformance`
+      # and the Vue-leaf gate. The load-bearing one is `@rozie/vue-typecheck`,
+      # which depends on `@rozie-ui/data-table-vue`, `@rozie-ui/listbox-vue`
+      # and `@rozie-ui/sortable-list-vue` — three `@rozie-ui` leaves that are
+      # NOT in the consumer-demo closure. `@rozie/runtime-lit`
+      # (`strict-conformance`'s dep) is likewise pulled in via its own filter
+      # term. Dropping the `@rozie-ui` leaves wholesale is correct in the
+      # other five matrix workflows and WRONG here.
+      #
+      # `@rozie/strict-conformance` alone reaches a further 12 `@rozie-ui`
+      # family leaves (`@rozie-ui/{combobox,slider,listbox,data-table}-
+      # {react,solid,lit}`) — not through the workflow's `--filter`, but
+      # because quick 260829-t8t (validation phase) declared them as
+      # `workspace:*` devDependencies of `tests/strict-conformance` after this
+      # filter's first `act` run went RED: the leaf-body typecheck suite reads
+      # those 12 packages' src/ off disk with no package-dependency edge, so
+      # turbo's graph could not see them, they went unbuilt under the
+      # narrowed filter, and TS2307 pushed the recorded strict-tsc baseline
+      # into REGRESSION. The dependency was always real — the suite always
+      # needed those 12 leaves built — it was simply undeclared, which is
+      # exactly why no graph-derived filter could have seen it. 75 -> 107
+      # tasks reflects `@rozie/strict-conformance...` now correctly
+      # traversing that edge; the filter LINE itself needed no change.
+      #
+      # The demo set is NOT trimmable to `vue-vite-demo` alone: the
+      # `vue-gates` job's WR-03 step (`check-sidecar-staleness.mjs
+      # --require-complete`) walks ALL of `examples/consumers/`, not just the
+      # Vue demo, and hard-fails on any `.rozie` with no sidecar next to it.
+      # `angular-analogjs-demo` is the one exclusion, mirroring that gate's own
+      # `skipDirs: ['angular-analogjs']` — its sidecars are never required, and
+      # it is the single expensive (ngtsc AOT) build in the set.
+      #
+      # All three `turbo run build` invocations in this file (here, in
+      # `vue-gates` below, and in `vue-matrix`) MUST carry the identical
+      # filter: this job is the turbo-cache producer both cells restore from
+      # (quick 260825-hp3), so a narrower producer set would force them to
+      # rebuild the difference and break the producer/consumer contract.
+      # `vue-matrix`'s own cell does not run the sidecar gate or the three
+      # gate suites (those live in `vue-gates`) but still carries the
+      # identical filter for that cache-contract reason.
       - name: Build all packages
-        run: pnpm turbo run build
+        run: pnpm turbo run build --filter='{./examples/consumers/*}...' --filter='!angular-analogjs-demo' --filter='@rozie/vue-typecheck...' --filter='@rozie/strict-conformance...' --filter='@rozie/event-contract-conformance...'
 
       # Hoisted out of the matrix cells (quick 260825-n4y). These two suites are
       # framework-agnostic — nothing in either varies with this workflow's matrix
@@ -160,10 +209,12 @@ jobs:
             ${{ runner.os }}-turbo-vue-
             ${{ runner.os }}-turbo-
 
-      # Build the whole workspace via turbo. The swipe canary's emit tests
+      # Build the workspace via turbo. The swipe canary's emit tests
       # (Plan 07.1-03) import every target's dist/, and the dts-identity test
       # reads every target's dist/index.d.mts — so all 6 targets must be built
-      # even on Vue-only CI runs.
+      # even on Vue-only CI runs. That still holds under the narrowed filter
+      # below, because `@rozie/unplugin` devDepends on all six
+      # `@rozie/target-*` packages.
       #
       # Phase 22 / REQ-6: `turbo run build` includes `vue-vite-demo#build`
       # (`vite build`), whose @rozie/unplugin `buildStart` hook emits the
@@ -171,8 +222,24 @@ jobs:
       # absent on a fresh checkout — so this step must precede the WR-03 check
       # below (and the per-version typecheck in the vue-matrix job, which does
       # its own build for the same reason).
+      #
+      # Quick 260829-t8t: filtered identically to the `build` job's producer
+      # step above (520 -> 107 tasks, -79%). The three gate-package filter
+      # terms are required here because the gate steps below run all three
+      # directly; the Vue-leaf gate's package is the one that pulls in
+      # `@rozie-ui/data-table-vue`, `@rozie-ui/listbox-vue` and
+      # `@rozie-ui/sortable-list-vue` — dropping the
+      # `@rozie-ui` leaves wholesale (correct in every other matrix workflow)
+      # would be WRONG in this one. The demo filter must cover every consumer
+      # demo, not just `vue-vite-demo`: the WR-03 step further down
+      # (`check-sidecar-staleness.mjs --require-complete`) walks ALL of
+      # `examples/consumers/` and hard-fails on any `.rozie` with no sidecar
+      # beside it. `angular-analogjs-demo` is excluded because that gate's own
+      # walk already skips `angular-analogjs`. This invocation must stay
+      # identical to the `build` job's, which is the turbo-cache producer this
+      # one restores from.
       - name: Build all packages (generates .d.rozie.ts sidecars — REQ-6)
-        run: pnpm turbo run build
+        run: pnpm turbo run build --filter='{./examples/consumers/*}...' --filter='!angular-analogjs-demo' --filter='@rozie/vue-typecheck...' --filter='@rozie/strict-conformance...' --filter='@rozie/event-contract-conformance...'
 
       # Quick task 260711-v2l: cross-target strict-tsc leaf baseline. Placed
       # AFTER the build above (every leaf's dist + node_modules must exist — the
@@ -277,8 +344,17 @@ jobs:
       # not share a filesystem — so each leg builds for itself. The turbo cache
       # above is what keeps that from being a full rebuild every time. Same
       # shape as the angular-matrix legs.
+      #
+      # Quick 260829-t8t: carries the SAME filter as the `build` job's producer
+      # step and `vue-gates` above (520 -> 107 tasks) — including the three gate
+      # closures, even though this cell does not itself run the sidecar gate or
+      # `@rozie/vue-typecheck`/`strict-conformance`/`event-contract-conformance`
+      # (those live in `vue-gates`). This job is a cache CONSUMER of the
+      # `build` job (quick 260825-hp3); if its own filter's task set were a
+      # strict subset, this step would rebuild the difference instead of
+      # replaying from cache.
       - name: Build all packages (generates .d.rozie.ts sidecars before typecheck — REQ-6)
-        run: pnpm turbo run build
+        run: pnpm turbo run build --filter='{./examples/consumers/*}...' --filter='!angular-analogjs-demo' --filter='@rozie/vue-typecheck...' --filter='@rozie/strict-conformance...' --filter='@rozie/event-contract-conformance...'
 
       - name: Install Playwright Chromium
         run: pnpm --filter vue-vite-demo exec playwright install --with-deps chromium
