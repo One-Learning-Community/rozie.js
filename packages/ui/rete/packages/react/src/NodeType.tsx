@@ -157,6 +157,9 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
       }
     };
   }
+
+  // idempotency flag so a reactive late-context registration (Lit async first
+  // paint, REQ-30) and the $onMount registration never double-register the type.
   // the canvas TYPE spec builder — shared by the $onMount register and the late-context
   // $onUpdate below. The bodyRenderer render-callback is invoked by the canvas's
   // renderNode (per graph node of this type) from the canvas's own render scope with

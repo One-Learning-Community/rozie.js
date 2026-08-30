@@ -137,16 +137,38 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   const root = useRef<HTMLDivElement | null>(null);
 
   const { onChange: _rozieProp_onChange } = props;
+  // ---- today (deterministic per-render read) -----------------------------
+  // Today's ISO, computed from the local clock. A plain function so each call is
+  // fresh (a date picker open across midnight should follow the wall clock).
   function todayIso() {
     const d = new Date();
     return toIso(d.getFullYear(), d.getMonth(), d.getDate());
   }
+
+  // ---- derived view (ONE plain function, uniform x6) ---------------------
+  // The current selected ISO, normalized to a string. In range mode the value is
+  // an object → this returns '' (so the SINGLE-mode grid highlight no-ops there).
+  // `$props.value` lowers to an accessor CALL on both Solid (`value()`) and
+  // Angular (`this.value()`); both emitters now hoist a local before the
+  // `typeof` guard (hoistPolymorphicModelGuards, Solid emitter-hardening backlog
+  // item #11 / Angular quick task 260711-v2l), so this inline guard narrows
+  // cleanly on all six targets.
   function selected(): string {
     return typeof value === 'string' ? value : '';
   }
+
+  // The RANGE normalization funnel (mirrors selected()): coerce the polymorphic
+  // `value` into a canonical ordered { start, end }. ALL range logic reads through
+  // this — never $props.value directly — so the polymorph is funneled in one place.
   function readRange() {
     return normalizeRange(value);
   }
+
+  // The resolved month anchor: the local view state, falling back to the selected
+  // value, then today. In range mode `selected()` is '' (the value is an object),
+  // so fall back to the range's `start` endpoint — a DatePicker opened with a
+  // pre-selected range must show that range's month, mirroring how single mode
+  // pins the view to its selected ISO (else range mode always opens on today).
   function viewAnchor(): string {
     const s = selected();
     if (s !== '') return s;
@@ -195,6 +217,13 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       previewEnd: props.selectionMode === 'range' ? hoverIso : undefined
     });
   }
+
+  // The multi-month render model: N grids stepping forward from the view month,
+  // so `numberOfMonths` renders side by side. A PLAIN function (uniform x6),
+  // mirroring grid() exactly but with the view anchor advanced by `i` months.
+  // numberOfMonths === 1 yields a one-element array whose single grid === grid().
+  // `viewIsoOverride` threads through to viewMonthGrid() — see its own doc
+  // comment (77-08 staleness fix).
   function grids(viewIsoOverride?: string) {
     return Array.from({
       length: props.numberOfMonths
@@ -213,6 +242,13 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       previewEnd: props.selectionMode === 'range' ? hoverIso : undefined
     }));
   }
+
+  // ---- drill models (months / years panels) ------------------------------
+  // The 12-cell month picker for the 'months' drill view + the 12-cell year
+  // picker (decade-aligned) for the 'years' view. PLAIN functions (uniform x6),
+  // each a fresh object per call. The gates that matter to a whole month/year span
+  // are min/max (buildMonthList/buildYearGrid own the entire-span test); the
+  // per-day weekday/predicate gates apply only in the days grid.
   function monthList() {
     return buildMonthList(viewMonthGrid(), {
       min: props.min,
@@ -230,15 +266,50 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       today: todayIso()
     });
   }
+  // The decade window label (e.g. "2020–2031") shown in the years-panel header.
   function yearRangeLabel() {
     return yearGrid().rangeLabel;
   }
+
+  // The day-grid iterable for the template: the N month grids in the 'days' view,
+  // or an empty array in the months/years drill views. Gating the r-for through an
+  // EMPTY array (rather than an r-if on the same element) keeps the day-grid
+  // element free of an r-if+r-for combo. The panels render inside the ONE
+  // layout-neutral `.rozie-datepicker-grids` wrapper (77-08 — the r-keynav day
+  // grid's root; `display: contents` in the style block below keeps it out of
+  // the render tree, so this stays present regardless of numberOfMonths without
+  // perturbing the single-month layout).
+  //
+  // `viewIsoOverride` threads to viewMonthGrid() (77-08 staleness fix, see its
+  // doc comment). `assumeDaysView`, when true, bypasses the showsDaysView()
+  // gate — for a caller (selectMonth/exitToDaysView) that just wrote
+  // $data.viewMode = 'days' in the SAME synchronous call: reading
+  // $data.viewMode back here would observe the PRE-write value for the exact
+  // same closure-staleness reason, so the caller that KNOWS it is
+  // transitioning into the days view says so explicitly instead.
   function daysGrids(viewIsoOverride?: string, assumeDaysView?: boolean) {
     return assumeDaysView || showsDaysView() ? grids(viewIsoOverride) : [];
   }
+
+  // The flat, render-order concatenation of every rendered panel's day cells
+  // (panels in order, weeks in order, days in order) — the r-keynav day grid's
+  // `:source` (77-08). Every panel is always exactly 42 cells (6 weeks x 7
+  // days), so a cell's flat index is `panelIndex * 42 + weekIndex * 7 +
+  // columnIndex` — the day button's own explicit r-keynav-item index expression
+  // computes this exactly. Empty while a drill panel is showing, mirroring
+  // daysGrids()'s own gate. Both params thread straight through to daysGrids().
   function allDayCells(viewIsoOverride?: string, assumeDaysView?: boolean) {
     return daysGrids(viewIsoOverride, assumeDaysView).flatMap((g: any) => g.weeks.flatMap((row: any) => row));
   }
+
+  // The day grid's roving/active-index resolution input — the SAME shape the
+  // pre-retrofit rovingDayIso() built, now feeding resolveRovingDayIndex
+  // (buildMonthGrid.ts) instead of resolveRovingIso directly, so the tab stop,
+  // entry focus and the focus() expose handle can never disagree (the
+  // 260802-hla invariant). `anchor` mirrors the existing viewAnchor() funnel —
+  // the selected value in single mode, else the in-progress range anchor — so
+  // a range picker gets a tab stop too. `viewIsoOverride` threads to
+  // viewMonthGrid() (77-08 staleness fix).
   function rovingDayInput(viewIsoOverride?: string) {
     return {
       viewIso: viewMonthGrid(viewIsoOverride),
@@ -255,6 +326,73 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       anchor: selected() !== '' ? selected() : props.selectionMode === 'range' ? readRange().start : ''
     };
   }
+
+  // Seed $data.activeDay from the SAME anchor-in-view → today-in-view →
+  // first-enabled-in-month-day fallback the pre-retrofit tab stop used
+  // (resolveRovingDayIndex, buildMonthGrid.ts) — called on mount, after a
+  // direct month/today nav, and whenever a drill panel returns to the days
+  // view (selectMonth/exitToDaysView). The r-keynav grid controller lands DOM
+  // focus itself whenever this value CHANGES — see the day grid's template
+  // root. NOT called from onDayPage below, which computes its own precise
+  // landing index per SPEC §4.1 instead of this fallback chain.
+  //
+  // `viewIsoOverride`/`assumeDaysView` thread straight through to
+  // allDayCells()/rovingDayInput() — every caller that just wrote
+  // $data.viewIso and/or $data.viewMode passes the fresh value(s) it already
+  // computed instead of letting this function re-derive them from $data. This
+  // is NOT a timing/ordering issue — no amount of setTimeout/rAF deferral
+  // fixes it: on React, reading a state variable inside a callback observes
+  // whatever that CLOSURE captured at creation time, and a synchronous
+  // $data.X = newValue write inside the SAME calling function does not
+  // retroactively update a closure that already exists (React's setState is
+  // async — the closure calling this was bound BEFORE that write even
+  // scheduled a new render). Passing the value the caller already has
+  // sidesteps the staleness entirely (mirrors 77-07's onMonthCommit/
+  // onYearCommit `i`-parameter fix for the identical class of bug; found via
+  // 77-08's real-DOM Docker VR run — "step forward a month" resolved the
+  // fallback against the OLD month, and a drill exit resolved against an
+  // empty day source because $data.viewMode hadn't "visibly" flipped back to
+  // 'days' from this function's point of view). Omitted at a call site with
+  // no fresher value in hand (focus() expose handle) falls back to the live
+  // $data reads, correctly.
+  //
+  // The day grid's own root never remounts (unlike the drills' r-if roots,
+  // 77-07) — it's the SAME wrapper the whole time, so the controller's own
+  // {root,active} diff (its "only re-apply on a genuine change" guard) sees
+  // NO change at all when the freshly-resolved index happens to repeat the
+  // value $data.activeDay already held, and silently skips re-applying DOM
+  // focus. That drops focus continuity on exactly the 260802-hla regression
+  // case this retrofit must keep green: drilling into months/years and back
+  // out WITHOUT the selection changing (so the day tab stop resolves to the
+  // SAME index both times) — meanwhile the day buttons themselves were
+  // removed and recreated while the drill panel was showing, so REAL DOM
+  // focus has already been lost by the time this runs. Force a genuine
+  // change the reactive system actually observes: settle through the
+  // ROVING_DAY_NONE sentinel first, then the real value one animation frame
+  // later.
+  //
+  // EVERY write to $data.activeDay below is deferred one animation frame,
+  // even in the plain (not-same-value) case — found empirically via 77-08's
+  // real-DOM Docker VR run: a synchronous write from a real click handler
+  // (not a mount effect, and with a CORRECTLY fresh-computed `next` value —
+  // this is NOT the closure-staleness class of bug the viewIsoOverride
+  // parameters above fix) still silently failed to reach the template on one
+  // target. A single rAF deferral committed correctly every time on every
+  // target, with no observable flicker (never a retry loop, and still never
+  // queries the DOM or calls .focus() itself — the primitive's own effect
+  // keeps owning that once it sees activeDay actually move).
+  // [77-09 fix] Resolves the CURRENT day-grid position, safe to call even
+  // while a settle is mid-flight (`$data.activeDay === ROVING_DAY_NONE`).
+  // `$data.activeDay` is authoritative WHENEVER it holds a real value — this
+  // covers every ordinary primitive-driven move (arrows, Home/End, Ctrl+Home/
+  // End, pointer clicks, the focusin sync) transparently, since none of those
+  // ever write the sentinel; they write straight through the
+  // `r-keynav:tabindex.grid(7)="$data.activeDay"` two-way binding. Only when
+  // `activeDay` is CURRENTLY the sentinel (a settle this same module started
+  // is still in flight) does this fall back to `activeDayReal`, the shadow
+  // both seedActiveDay and onDayPage keep pointed at their own last-computed
+  // target — see `activeDayReal`'s own <data> doc comment for why a plain
+  // `$data.activeDay` read is unsafe in that window.
   function currentActiveDay() {
     return activeDay === ROVING_DAY_NONE ? activeDayReal : activeDay;
   }
@@ -277,21 +415,39 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   function monthHeading() {
     return monthLabel(viewMonthGrid(), props.locale);
   }
+  // The seven weekday header labels, rotated by weekStartsOn. Visible text —
+  // stays the SHORT Intl label (weekdaysLong() below feeds aria-label only).
   function weekdays() {
     return weekdayLabels(props.weekStartsOn, props.locale);
   }
+
+  // ---- labels / a11y (quick task 260807-6p8, D-01, D-05) -----------------
+  // labelFor(key) is the ONE resolution site for every chrome aria/visible
+  // string — no default is ever duplicated at a call site (resolveLabel funnels
+  // $props.labels through the shared LABEL_DEFAULTS table).
   function labelFor(key: any) {
     return resolveLabel(props.labels, key);
   }
+  // The day cell's full, localized, human-readable aria-label (e.g. "Sunday,
+  // June 15, 2025") — Intl-derived from $props.locale, NOT a `labels` key.
   function dayAria(iso: any) {
     return dayLabel(iso, props.locale);
   }
+  // The seven FULL weekday names (Intl 'long'), used only for the column-header
+  // aria-label — the visible text stays weekdays()'s short form.
   function weekdaysLong() {
     return weekdayLabels(props.weekStartsOn, props.locale, 'long');
   }
+  // Each rendered month panel's OWN localized "Month YYYY" caption (per-panel
+  // aria-label on its role="grid") — panel `i` is the view month advanced `i`
+  // months, matching how grids() builds the panels.
   function panelHeading(i: any) {
     return monthLabel(addMonths(viewMonthGrid(), i), props.locale);
   }
+
+  // The ten-field gating input shared by isDayDisabled AND rangeSpansDisabled,
+  // so day-cell enablement and range-span validation can never disagree about
+  // the same gates. ONE definition (was inlined per-call before this task).
   function gateInput() {
     return {
       viewIso: viewMonthGrid(),
@@ -306,12 +462,23 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       disabled: props.disabled
     };
   }
+
+  // Whether a given ISO can be selected (the template gates clicks on it too).
   function dayEnabled(iso: any) {
     return !isDayDisabled(iso, gateInput());
   }
+
+  // Whether the (order-tolerant) span between two ISOs crosses a disabled day
+  // in its interior (D-02) — consumed by BOTH onDayHover (preview suppression)
+  // and commitRange (re-anchor instead of complete) below, one predicate.
   function rangeSpanBlocked(a: any, b: any) {
     return rangeSpansDisabled(a, b, gateInput());
   }
+
+  // ---- write funnel (single $emit site) ----------------------------------
+  // Select an ISO date: write the model + emit change. NOT named `setValue`
+  // (collides with React's generated `value` model setter → ROZ524). A no-op
+  // (re-selecting the same date) still re-emits intentionally? No — guard it.
   function commitValue(iso: any) {
     if (props.disabled) return;
     if (!isIsoDate(iso)) return;
@@ -323,6 +490,20 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       value: iso
     });
   }
+
+  // ---- range write funnel (direction-agnostic two-click state machine) ----
+  // The anchor IS the partial model's `start` (end ''); there is no separate
+  // anchor field. First click (no in-progress range, OR a completed one →
+  // restart): write { start: iso, end: '' } + emit change. Second click
+  // (anchor set, end empty → completing): write the ORDERED { start, end } +
+  // clear the preview + emit change AND rangeComplete. Endpoints are compared by
+  // VALUE (never object ===, Pitfall-4).
+  // [D-02] The restart branch now ALSO fires when the in-progress span crosses
+  // a disabled day (rangeSpanBlocked(r.start, iso)) — a blocked second click
+  // RE-ANCHORS at the clicked day instead of completing, reusing this SAME
+  // restart branch verbatim (one write path; no second $model.value write site
+  // is introduced). Deliberately does NOT clear $data.hoverIso here — the
+  // frozen VR phases depend on the restart branch's existing behavior.
   function commitRange(iso: any) {
     if (props.disabled) return;
     if (!isIsoDate(iso)) return;
@@ -358,6 +539,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       });
     }
   }
+
   // Hover preview: only meaningful in range mode while a range is in progress
   // (anchor set, end empty). Records the hovered ISO so the grid lights the
   // direction-agnostic preview band. Otherwise a no-op — the early return below
@@ -381,6 +563,13 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   function onDaySelect(iso: any) {
     if (props.selectionMode === 'range') commitRange(iso);else commitValue(iso);
   }
+
+  // ---- month navigation (view-mode-aware ‹ › step) -----------------------
+  // The prev/next step advances the view anchor by ONE UNIT of the current drill
+  // view: a month in 'days', a year (12 months) in 'months', 12 years (144
+  // months) in 'years'. In the default 'days' view the delta is `delta` months —
+  // byte-identical to the pre-navigation behavior, so `:month-year-nav="false"`
+  // (which can never leave 'days') is unchanged.
   function goToMonth(delta: any) {
     if (props.disabled) return;
     const unit = viewMode === 'years' ? 144 : viewMode === 'months' ? 12 : 1;
@@ -409,6 +598,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   function showsYearsView(): boolean {
     return viewMode === 'years';
   }
+
   // Drill DOWN into the month picker (from the days heading). Seeds
   // $data.activeMonth via resolveRovingDrillIndex (the SAME selection chain
   // resolveRovingDrillIso proves), so the r-keynav grid primitive lands DOM
@@ -469,6 +659,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     // (staleness fix, see seedActiveDay's own doc comment).
     seedActiveDay(undefined, true);
   }
+
   // ---- day grid r-keynav wiring (77-08 retrofit) --------------------------
   // @keynav-commit fires with the day grid's own active index already resolved
   // by the primitive — read via the handler's OWN `i` parameter (mirrors
@@ -575,6 +766,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     const cell = yearGrid().years.find((y: any) => y.iso === iso);
     return !cell || !cell.disabled;
   }
+
   // ---- keyboard (77-08: author-owned Space/Escape only, F5) --------------
   // Every other key (arrows, Home/End, PageUp/PageDown, Ctrl+Home/End, Enter)
   // falls through untouched to the primitive's own root-level grid delegation
@@ -675,9 +867,18 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       range: rangeFromPreset(p)
     }));
   }
+
+  // Whether a preset rail should render. A BOOLEAN-returning helper, NOT a bare
+  // `resolvedPresets().length` r-if: on the JSX targets `r-if` lowers to
+  // `cond && <div>`, and a numeric `0` length leaks a literal "0" text node into
+  // the DOM (React/Solid render falsy numbers). Even `length > 0` inline is
+  // stripped back to `length` by the production minifier in the boolean-`&&`
+  // context — routing through a named boolean helper keeps the guard a true
+  // boolean through minification (the React falsy-number-in-r-if discipline).
   function hasPresets(): boolean {
     return resolvedPresets().length > 0;
   }
+
   // Apply a preset = a complete range: write the (ordered) value + clear any
   // in-progress preview + emit change AND rangeComplete. [D-02 discretion,
   // DELIBERATELY NOT range-span-validated] Unlike commitRange, this does NOT
@@ -707,9 +908,26 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     const r = readRange();
     return r.start === p.start && r.end === p.end;
   }
+
+  // ---- lifecycle + imperative handle -------------------------------------
+  // Seed the view month from value / today on mount, then seed the day grid's
+  // active-index model (77-08) — the SAME resolveRovingDayIndex chain the tab
+  // stop uses, so mount, keyboard Tab and this handle can never disagree. The
+  // fresh viewIso is passed directly (staleness fix, see seedActiveDay's own
+  // doc comment); seedActiveDay() defers its own write internally, so this
+  // call is a plain, synchronous fire-and-forget like every other
+  // seedActiveDay() call site.
+  // focus() — resolve + set $data.activeDay through the SAME roving-tabindex
+  // chain the tab stop uses (seedActiveDay/resolveRovingDayIndex), so this
+  // handle can never disagree with keyboard Tab — multi-month aware. It does
+  // NOT query the DOM itself; the r-keynav grid controller lands DOM focus once
+  // the value changes (77-08). DELIBERATELY overrides HTMLElement.focus on Lit
+  // (ROZ137 warn, accepted).
   function focus() {
     seedActiveDay();
   }
+
+  // goToToday() — swing the view to the current month (no selection change).
   function goToToday() {
     if (props.disabled) return;
     const nextViewIso = todayIso();
@@ -718,6 +936,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     // doc comment); $data.viewMode is unchanged here.
     seedActiveDay(nextViewIso);
   }
+
   // ---- footer moves (Today / Clear row) ----------------------------------
   // selectToday() — the footer "Today" action. In single mode commit today
   // through the value funnel (write + emit change, gated exactly like a day
@@ -736,6 +955,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   function showsFooter(): boolean {
     return !!props.showFooter;
   }
+
   // clear() — deselect, writing the mode-appropriate empty ('' single /
   // { start:'', end:'' } range) + emit change.
   const clear = useCallback(() => {

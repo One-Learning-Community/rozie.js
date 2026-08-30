@@ -23,6 +23,12 @@ export default function ThemeProvider(props: ThemeProviderProps): JSX.Element {
     setColor(prev => NEXT[prev]);
   }
 
+  // Publish the live theme. The GETTER is load-bearing (D-3 / REQ-29): reading
+  // `theme.color` at depth always reflects the current reactive `$data.color`,
+  // so clicking through `cycle()` cycles the displayed color at depth (the
+  // reactive round-trip). Snapshotting the primitive here (`{ color: $data.color }`)
+  // would freeze it at provide-time and kill the round-trip.
+
   return (
     <__ctx_theme.Provider value={{
   get color() {

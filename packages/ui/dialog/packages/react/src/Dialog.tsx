@@ -66,12 +66,15 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
   const panelEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
 
+  // ---- native reconcile ---------------------------------------------------
+  // Lock/unlock <html> scroll (no-op when disabled or pre-DOM).
   function applyScrollLock(lock: any) {
     if (props.disableScrollLock) return;
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
     if (root) root.style.overflow = lock ? 'hidden' : '';
   }
+
   // Reconcile the native <dialog> to the desired open state. Guarded on the
   // native `el.open` flag (showModal throws if already open; close is a no-op when
   // closed). Reads $refs in a post-mount callback (ROZ123-safe).
@@ -101,6 +104,7 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
       reason
     });
   }
+
   // ---- handlers ----------------------------------------------------------
   // Native Esc fires `cancel` on the <dialog>. preventDefault so WE drive the
   // close through the model (keeping `open` in sync); honor the opt-out.
@@ -120,6 +124,8 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
     if (e && el && e.target === el) closeWith('backdrop');
   }, [closeWith, props.disableBackdropClose]);
   // ---- lifecycle ---------------------------------------------------------
+  // ---- imperative handle -------------------------------------------------
+  // show()/hide() — named to avoid the `open` model + `@close` event collisions.
   function show() {
     setOpen(true);
   }

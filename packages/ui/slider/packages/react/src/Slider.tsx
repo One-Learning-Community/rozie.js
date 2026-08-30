@@ -115,6 +115,9 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
     };
   }, [Array, Number, pct, props.max, props.min, props.range, value]);
 
+  // ---- numeric helpers ---------------------------------------------------
+  // A plain function (not `$computed`) so it reads uniformly across all six
+  // targets — it is called from both the fill $computed and the keyboard augment.
   function pct(v: any) {
     const span = props.max - props.min;
     if (span === 0) return 0;
@@ -123,6 +126,9 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
     if (p > 100) return 100;
     return p;
   }
+
+  // Clamp a raw number into [min,max] and quantize to `step` (guarding against a
+  // non-finite or zero step). Returns a finite number bounded by the scale.
   function clampStep(raw: any) {
     if (!Number.isFinite(raw)) return props.min;
     let v = raw;
@@ -137,15 +143,29 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
     }
     return v;
   }
+
+  // The current range pair, defaulting to the full span when `value` is not yet a
+  // 2-tuple. Read into a stable local before destructuring — `$props.value`
+  // lowers to a `value()` accessor on Solid, so narrowing one local is uniform.
   function rangePair() {
     const cur = value;
     if (Array.isArray(cur) && cur.length === 2) return [cur[0], cur[1]];
     return [props.min, props.max];
   }
+
+  // The single (scalar) value, defaulting to min when not yet a number.
   function singleValue() {
     const cur = value;
     return typeof cur === 'number' && Number.isFinite(cur) ? cur : props.min;
   }
+
+  // ---- derived fill (pure $computed → inline CSS vars, D-06/D-07) ---------
+  // Read BARE in the template via :style="fillStyle". Returns the fill extent as a
+  // % of the track. The rotate-90 vertical wrapper maps X→Y, so the SAME
+  // start/end vars drive the (rotated) fill — no separate vertical math.
+  // The marks list, normalised to { value, label } objects. A bare value[] entry
+  // becomes { value, label: String(value) }. A plain function (not $computed) so
+  // it reads uniformly and can be called in the r-for.
   function normalizedMarks() {
     const list = Array.isArray(props.marks) ? props.marks : [];
     return list.map((m: any) => {
@@ -161,20 +181,34 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
       };
     });
   }
+
+  // Format a value for the bubble / aria-valuetext. A plain function: `$props.x`
+  // reads uniformly inside it.
   function display(v: any) {
     if (props.formatValue !== null) return props.formatValue(v);
     return String(v);
   }
+
+  // ---- write-back (single emit funnel) -----------------------------------
+  // The SOLE `$emit('change')` site, called from every commit path so the React
+  // prop-destructure for `onChange` hoists exactly once.
   function fireChange(value: any) {
     return props.onChange && props.onChange({
       value
     });
   }
+
+  // Single-mode commit: capture the fresh number, write the scalar, emit. Never
+  // re-read $data after the write (ROZ138: React setState is async).
   function commitSingle(raw: any) {
     const v = clampStep(raw);
     setValue(v);
     fireChange(v);
   }
+
+  // Range-mode commit: keep the [lo, hi] array SORTED and clamp each thumb at its
+  // neighbour, then write a FRESH array (in-place mutation is dropped on
+  // React/Solid/Lit/Angular change detectors — listbox precedent).
   function commitRange(which: any, raw: any) {
     const pair = rangePair();
     let lo = pair[0];
@@ -185,6 +219,7 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
     setValue(next);
     fireChange(next);
   }
+
   // ---- native input handlers ---------------------------------------------
   // Single input. `valueAsNumber` is a number (never the string `.value`).
   const onInputSingle = useCallback(($event: any) => commitSingle($event.target.valueAsNumber), [commitSingle]);
@@ -224,6 +259,8 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
   function focus() {
     return inputEl.current?.focus();
   }
+
+  // Step a thumb by ±step. In range mode `thumb` selects 'lo' | 'hi' (default 'lo').
   function increment(thumb: any) {
     if (props.range) {
       const which = thumb === 'hi' ? 'hi' : 'lo';
@@ -244,6 +281,10 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
       commitSingle(singleValue() - props.step);
     }
   }
+
+  // Shorthand keys (aliased `{ focus: fn }` keys are dropped by the React emitter)
+  // — every function is named exactly as its verb. `focus` triggers the accepted
+  // ROZ137 warn.
 
   const _rozieExposeRef = useRef({ focus, increment, decrement });
   _rozieExposeRef.current = { focus, increment, decrement };

@@ -297,6 +297,11 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   function langExt() {
     return props.language === 'javascript' ? javascript() : [];
   }
+
+  // theme resolution (G3): the two built-in strings map to oneDark / [];
+  // anything else is treated as a CM Extension (or Extension[]) and passed
+  // straight through the themeCompartment. The $watch(theme) reconfigure below
+  // covers extension themes live, identical to the string forms.
   function themeExt(): any {
     const t = props.theme;
     if (t === 'dark') return oneDark;
@@ -307,12 +312,47 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
     // accept it; the type-neutral targets strip types entirely.
     return t;
   }
+
+  // placeholder ext only when a non-empty placeholder string is supplied.
   function phExt() {
     return props.placeholder ? placeholderExt(props.placeholder) : [];
   }
+
+  // baseline keymap/gutter set (G1). When `basicSetup` is on, use CM6's
+  // `basicSetup` bundle (autocomplete, search, bracket matching, code folding,
+  // lint gutter, richer keymaps — it ALREADY includes line numbers + history, so
+  // the manual trio would double those up). When off, keep the exact thin
+  // baseline the wrapper shipped before G1 (line numbers + history + default/
+  // history keymaps) → existing consumers stay byte-stable. Composed through
+  // `baselineCompartment` (see below) so the `$watch(basicSetup)` reconfigure
+  // can swap the bundle live.
   function baselineExt() {
     return props.basicSetup ? [basicSetupBundle] : [lineNumbers(), history(), keymap.of([...defaultKeymap, ...historyKeymap])];
   }
+
+  // buildState + the panel/tooltip/gutter/decoration slot wiring are top-level
+  // now that quick 260829-cd4 hoists the portals closure to component scope on
+  // all six targets; $portals.panel / $portals.topPanel / $portals.tooltip /
+  // $portals.gutter / $portals.decoration all resolve directly with no
+  // mount-scope bridge. buildState is only ever called from $onMount below, but
+  // nothing about it is mount-exclusive — it is a plain factory function.
+  // FullCalendar's opts.*Content callbacks are a DIFFERENT case: they stay in
+  // mount scope because `opts` is the engine's construction argument, not
+  // because of $portals.
+  // One `panel` portal slot — mounted through CM6's `showPanel` facet. The
+  // Panel's `dom` is the portal host node; $portals.panel(dom, scope) mounts the
+  // consumer's framework-native fragment on Panel.mount() and the returned
+  // dispose runs in Panel.destroy(). Empty extension ([]) when the consumer
+  // doesn't fill the slot.
+  // NOTE: the Panel's mount/destroy are ARROW-FUNCTION properties (not object
+  // `mount() {}` methods) and the panel host element + view are captured in
+  // plain `const`s. The object-method form gives each method its own `this`
+  // scope, and the Lit emitter's component-field rewrite walks INTO that method
+  // body and rewrites a closure-captured `view` reference to `this.view`
+  // (TS2339 "Property 'view' does not exist on type 'Panel'"). Arrow-function
+  // properties share the enclosing lexical scope, so the captured `panelView`
+  // const resolves correctly on every target. CM6 calls `panel.mount()` /
+  // `panel.destroy()` either way.
   function panelExt() {
     if (!(props.renderPanel ?? props.slots?.["panel"])) return [];
     return showPanel.of((panelView: any) => {
@@ -335,6 +375,12 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
       };
     });
   }
+
+  // topPanel — the TOP-docked mount-once sibling of `panel` (G5 wave 1). Same
+  // `showPanel` facet, same arrow-function-property mount/destroy form (NOT
+  // object-method `mount() {}` — the Lit field-rewrite caveat documented on
+  // panelExt above applies identically), differing ONLY in `top: true` and the
+  // `.rozie-cm-panel-top` host class. Empty ([]) when the slot is unfilled.
   function topPanelExt() {
     if (!(props.renderTopPanel ?? props.slots?.["topPanel"])) return [];
     return showPanel.of((panelView: any) => {
@@ -357,6 +403,24 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
       };
     });
   }
+
+  // tooltip — CodeMirror's FIRST REACTIVE portal slot (G5 wave 1). A
+  // cursor-anchored tooltip provided through the `showTooltip` facet via a
+  // StateField that yields ONE Tooltip at the main selection head whenever the
+  // `tooltip` slot is filled.
+  //
+  // UPDATE-IN-PLACE reconciliation (verified against the installed
+  // @codemirror/view@6.43 tooltip source, TooltipViewManager.update): CM reuses
+  // an existing TooltipView — calling TooltipView.update(viewUpdate) instead of
+  // destroy+create — when the new Tooltip's `create` is REFERENCE-EQUAL to the
+  // old one's (`other.create == tip.create`); and when the whole showTooltip
+  // facet INPUT is unchanged it skips matching entirely and calls update() on
+  // every live view. We satisfy BOTH by holding ONE module-stable Tooltip object
+  // (`stableTooltip`, stable `create`) and returning that SAME object from the
+  // field's `update` while the head only moved. So the consumer fragment mounts
+  // ONCE (TooltipView.mount → $portals.tooltip → reactive {update,dispose}) and
+  // every caret move flows through TooltipView.update → handle.update(scope) —
+  // re-rendering the fragment IN PLACE, never remounting it.
   function tooltipField() {
     if (!(props.renderTooltip ?? props.slots?.["tooltip"])) return [];
     // The reactive portal handle for the SINGLE live tooltip view. Hoisted to
@@ -429,6 +493,30 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
       provide: (f: any) => showTooltip.from(f)
     });
   }
+
+  // gutter — a custom-gutter REACTIVE MULTI-INSTANCE portal slot (G5 wave 2).
+  // Each line in `gutterLines` gets a `RozieGutterMarker` whose `toDOM` mounts
+  // the consumer fragment via $portals.gutter(dom, scope) — ONE live portal
+  // handle PER VISIBLE marker (CM calls toDOM when the line scrolls into view and
+  // destroy() when it scrolls out; the reactive handle disposes cleanly). This is
+  // the TipTap nodeView multi-instance template: the GutterMarker class captures
+  // $portals.gutter and is therefore defined inside this top-level factory.
+  //
+  // The GutterMarker subclass is declared inline (GutterMarker REQUIRES
+  // subclassing), but its per-marker state (`line`, the live portal handle) lives
+  // in CLOSURE — `makeGutterMarker(line)` captures them — NOT in `this` fields.
+  // This is deliberate for the strict-tsc bundled leaves (react/solid/lit): ES
+  // class fields assigned only in the constructor (`this.line = …`) without a
+  // declaration trip TS2339 under those leaves' strict tsc, and the emitter passes
+  // the class through verbatim (a class-field type aid is an emitter concern, OUT
+  // OF SCOPE). Closure capture has zero `this`-field surface, so it typechecks
+  // cleanly across all six. The overriding CM methods (toDOM/destroy) cannot carry
+  // the TS-only `override` keyword — the `<script>` is plain JS (no `lang="ts"`),
+  // so `override` is unparseable — so the three bundled leaves relax
+  // `noImplicitOverride` in their tsconfig (the Lit leaf already did; react/solid
+  // now match). The `view` param is named `mView` — the Lit field-rewrite walks
+  // into a method body and rewrites a bare `view` token (matching the top-level
+  // `let view`) to `this.view`; `mView` is collision-free. (The panelExt lesson.)
   function makeGutterExt(gv: any) {
     if (!(props.renderGutter ?? props.slots?.["gutter"])) return [];
     const makeGutterMarker = (line: any) => {
@@ -467,6 +555,15 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
       markers: (mView: any) => buildMarkers(mView)
     });
   }
+
+  // decoration — an inline-widget REACTIVE MULTI-INSTANCE portal slot (G5 wave
+  // 2). Each `{ from, to? }` in `decorations` gets a `RozieWidget` whose `toDOM`
+  // mounts the consumer fragment via $portals.decoration(dom, scope) — ONE live
+  // portal handle PER VISIBLE widget. The decoration set is provided through a
+  // compartment-wrapped facet so the `decorations` prop reconfigures it live.
+  // The WidgetType class captures $portals.decoration and is declared inline
+  // (WidgetType REQUIRES subclassing); it needs no mount-scope bridge —
+  // $portals.decoration resolves directly from this top-level factory.
   function makeDecorationExt(dv: any) {
     // Unfilled slot → EMPTY EXTENSION (`[]`), NOT `Decoration.none`. The latter
     // is a DecorationSet (a RangeSet), which is NOT a valid Extension; placing it
@@ -536,6 +633,12 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
       provide: (f: any) => EditorView.decorations.from(f)
     });
   }
+
+  // Rebuild the gutter/decoration extension from the current $portals helper —
+  // called directly by both buildState (mount) and the gutterLines/decorations
+  // $watch reconfigures (below); $portals.gutter/$portals.decoration resolve here
+  // with no bridge required now that quick 260829-cd4 hoists the portals closure
+  // to component scope on all six targets.
   function rebuildGutterExt() {
     return makeGutterExt(portals.gutter);
   }
@@ -562,6 +665,12 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
     // Consumer extensions LAST so they win CM6's last-registered-wins facets.
     extensionsCompartment.of(props.extensions)]
   }), [baselineExt, langExt, panelExt, phExt, props.extensions, props.readOnly, rebuildDecorationExt, rebuildGutterExt, setValue, themeExt, tooltipField, topPanelExt]);
+  // Shared suppress-echo write helper. Both the $watch(value) consumer-driven
+  // reflect AND the $expose setValue verb route through this so a programmatic
+  // or prop-driven set doesn't ping-pong back through the model path. When the
+  // editor itself was the source of the change, the doc already matches `v`, so
+  // dispatching another transaction would mint a duplicate undo-history entry
+  // for no UI change.
   function writeDoc(v: any) {
     if (!view.current) return;
     const current = view.current.state.doc.toString();
@@ -580,6 +689,8 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
       suppressEmit.current = false;
     }
   }
+
+  // Consumer-driven value writes: reflect into the live editor (echo-guarded).
   function scheduleReconfigure(compartment: any, buildExt: any) {
     if (!view.current) return;
     if (!pendingReconfigures.current) {

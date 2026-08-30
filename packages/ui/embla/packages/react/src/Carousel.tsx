@@ -190,10 +190,21 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
   const _watch4First = useRef(true);
   const _watch5First = useRef(true);
 
+  // D7: the two mount-time remeasure rAF handles + the macrotask handle, captured
+  // so the mount cleanup can cancel them on unmount. Null-lets (not `= 0`) so they
+  // type-neutralize to `any` — setTimeout's return type differs between the DOM
+  // and Node lib shapes across the six leaves' tsconfigs.
+  // The SECOND Embla instance powering the optional synced thumbnail strip (null
+  // when `thumbnails` is off). Top-level let for the same hoist reason as `embla`.
+  // Top-level null-let (untyped → auto type-neutralized to `any`; React hoists it to
+  // useRef cleanly). Do NOT annotate to a concrete EmblaCarouselType.
+
+  // Stable key for config-array slides — prefer an object id, fall back to value/index.
   function keyFor(slide: any, i: any) {
     if (slide !== null && typeof slide === 'object') return slide.id ?? slide.key ?? i;
     return slide ?? i;
   }
+
   // Map the curated props → an EmblaOptionsType. `draggable` → `watchDrag`. The
   // `...$props.options` escape hatch spreads last so a consumer can override anything.
   //

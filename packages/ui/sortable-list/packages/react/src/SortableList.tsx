@@ -206,6 +206,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   // `let __rowKeySeq = 0` below hoists to a `useRef` on React exactly like the
   // hook-reached case — no more per-render reset. Verified in codegen.
   const __rowKeyMap = useMemo(() => new WeakMap(), []);
+  // 4-tier per-row key precedence. Its return feeds BOTH :key and :data-id.
   function keyFor(item: any, index: any) {
     // (a) function itemKey: consumer-supplied (item, index) => key.
     if (typeof props.itemKey === 'function') {
@@ -227,6 +228,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     //     unsafe to reorder this way — pass a function itemKey for those.
     return index;
   }
+
   // Resolve the SortableJS `group` option: `cloneable` is a high-level Rozie
   // prop that REPLACES a string `group` with SortableJS's
   // `{ name, pull: 'clone', put: true }` clone-mode object form. When
@@ -247,16 +249,41 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     const v = props.itemClass;
     return typeof v === 'function' ? v(item, index) : v;
   }
+
+  // Resolve itemStyle for a row: a static value (string | object) OR a per-row
+  // (item, index) => style function. Returns string | object | null; the dynamic
+  // :style binding normalizes it per target. null / empty → attribute dropped.
   function itemStyleFor(item: any, index: any) {
     const s = typeof props.itemStyle === 'function' ? props.itemStyle(item, index) : props.itemStyle;
     return s == null || s === '' ? null : s;
   }
+
+  // Read the display label for an item — used by the aria-live announcer.
+  // Phase 16 R7 / D-08: $props.labelFor reads as `null` on all 6 targets when
+  // the consumer omits it (Plan 16-01 prop-default coercion fix); the check is
+  // a plain null compare — NO runtime callable-type coercion.
   function getLabel(idx: any) {
     const item = items[idx];
     if (props.labelFor !== null) return props.labelFor(item, idx);
     if (item !== null && typeof item === 'object' && 'label' in item) return item.label;
     return String(item);
   }
+
+  // Keyboard handler (Phase 16 R7): Space lifts/drops, ArrowDown/ArrowUp move
+  // the lifted row, Escape cancels, Enter is an alternate drop trigger. After
+  // any array-reorder write, $restoreFocus('[role="listitem"]', newIdx) keeps
+  // focus on the moved row across the React/Vue/Angular vs Svelte/Solid/Lit
+  // keyed-reconciler divide (Plan 16-03 sigil — no-op on the first three;
+  // queueMicrotask + querySelectorAll + .focus() on the latter three).
+  //
+  // Note: `index` is passed directly as a number. Plan 16-02 (Solid call-arg
+  // accessor unwrap) ensures Solid's <For> alias unwraps to `index()` at the
+  // call site — no runtime callable-type coercion needed in user source.
+  // Keyboard reordering is available only when the list is not disabled AND the
+  // `disableKeyboard` opt-out is off. Drives BOTH the row tabindex (rows are
+  // focusable only when reorderable) and the onRowKeyDown guard below. Reads
+  // straight off $props so the tabindex binding re-evaluates reactively when
+  // `disabled`/`disableKeyboard` toggle at runtime.
   function keyboardEnabled() {
     return !props.disabled && !props.disableKeyboard;
   }

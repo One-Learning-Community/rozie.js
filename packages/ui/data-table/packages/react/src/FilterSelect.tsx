@@ -35,9 +35,14 @@ export default function FilterSelect(_props: FilterSelectProps): JSX.Element {
     uniqueValues: _props.uniqueValues ?? __defaultUniqueValues,
   };
 
+  // The <select> value binding coerced to a string. $props.value is typed `unknown`
+  // (opaque slot-scope), which the strict bundled-leaf tsc rejects against the native
+  // select `value` type on React/Solid — the fix is a plain function returning a
+  // string (uniform ×6, NOT a $computed; the EditorSelect/listbox value lesson).
   function selectValue() {
     return props.value != null ? String(props.value) : '';
   }
+
   // Immediate-apply-on-change: read the selected value the global-filter way. An
   // empty value (the leading "All" option) clears the column filter.
   const { setFilter: _rozieProp_setFilter } = props;

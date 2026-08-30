@@ -471,6 +471,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     if (type === 'attribution') return new maplibregl.AttributionControl(opts);
     return null;
   }
+
   // Standard controls reconcile — no reactive-portal handle to manage here, so
   // nothing ever needed mount scope (this was never a $portals/$emit constraint —
   // $emit never forces mount scope on any target). Remove-all + re-add from the

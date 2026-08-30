@@ -51,6 +51,7 @@ export default function FilterNumberRange(_props: FilterNumberRangeProps): JSX.E
   function maxPlaceholder() {
     return Array.isArray(props.minMax) && props.minMax[1] != null ? String(props.minMax[1]) : '';
   }
+
   // Convert a draft to a Number or undefined (empty string → undefined so a
   // one-sided range works). Both undefined → clear the filter.
   const { setFilter: _rozieProp_setFilter } = props;

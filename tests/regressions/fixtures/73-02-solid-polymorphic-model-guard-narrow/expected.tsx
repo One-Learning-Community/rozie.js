@@ -19,6 +19,10 @@ export default function PolymorphicModelGuardNarrow(props: PolymorphicModelGuard
     onValueChange: props.onValueChange,
   });
 
+  // project_solid_polymorphic_model_typeof_narrow_gap / emitter-hardening
+  // backlog item #11: capturing the guard-and-reread pattern directly (no
+  // author-side workaround) — the emitter must bind a local before the guard
+  // so the narrowing holds uniformly on all six targets.
   function selected(): string {
     return typeof value === 'string' ? value : '';
   }

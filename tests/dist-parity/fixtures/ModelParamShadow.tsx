@@ -36,6 +36,7 @@ export default function ModelParamShadow(props: ModelParamShadowProps): JSX.Elem
   function setStatus$local(status: any) {
     setStatus(status);
   }
+
   // logLabel(label): param == the $computed name. The bare `label` read lowers on
   // Vue to `label.value` (reads the computed ref, not the param) pre-fix.
   const logLabel = useCallback((label: any) => {

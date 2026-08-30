@@ -35,6 +35,11 @@ export default function Toolbar(props: ToolbarProps): JSX.Element {
   // The registerUpdateListener cleanup, captured once we register. null = not yet /
   // torn down. `disposed` guards the deferred activation against an unmount that races
   // ahead of the microtask below.
+  // Recompute the toolbar's active booleans from the CURRENT selection. MUST be called
+  // inside an editorState.read() (the registerUpdateListener callback / getEditorState
+  // read below) so the `$`-API resolves against the live editor state. Named
+  // `refreshActive` — NOT `setActive`, which would collide with the React/Solid
+  // generated `$data.active` setter (ROZ524, the TipTap toolbar precedent).
   function refreshActive() {
     const sel = lexical.$getSelection();
     if (!lexical.$isRangeSelection(sel)) {
@@ -58,6 +63,7 @@ export default function Toolbar(props: ToolbarProps): JSX.Element {
       list: listNode !== null
     });
   }
+
   // Register the selection-reading update listener against the shared editor and seed
   // the initial active state. Deferred one microtask from $onMount (see header).
   const activate = useCallback(() => {

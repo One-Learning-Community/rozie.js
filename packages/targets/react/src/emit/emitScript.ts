@@ -1598,7 +1598,21 @@ function tryHoistArrowToFunction(stmt: t.Statement): t.Statement | null {
   // preserved). `init`'s OWN returnType/typeParameters are also carried so a
   // future return-type/generics surface expansion is covered.
   reprojectDeclaratorFunctionType(decl.id, init, fn);
-  return fn;
+  // Quick task 260830-fwb — inherit the original statement's `loc` and attached
+  // comments onto the synthetic FunctionDeclaration. Without this the rebuilt
+  // node has no source position, so @babel/generator drops every user `<script>`
+  // comment attached to the declaration and falls back to default blank-line
+  // spacing. Solid's identically named `tryHoistArrowToFunction` has always
+  // ended this way and loses no comments at all.
+  //
+  // This is HALF the mechanism. On its own it breaks partial-vs-inline
+  // byte-identity: an inline host keeps such a comment via the declaration's own
+  // `leadingComments`, while a `<script src>` partial-inlined host carries it
+  // ONLY as the preceding statement's `trailingComments` — and when that
+  // preceding statement is a hoisted module-`let`, it is deleted. See the
+  // trailing-comment re-home in `rewrite/hoistModuleLet.ts`, which closes that
+  // side; the two must ship together.
+  return t.inherits(fn, stmt);
 }
 
 /**

@@ -111,12 +111,16 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
   function hasMax() {
     return typeof props.max === 'number' && !Number.isNaN(props.max);
   }
+
+  // Clamp n to [min, max] (whichever bounds are set).
   function clampValue(n: any) {
     let out = n;
     if (hasMin() && out < props.min) out = props.min;
     if (hasMax() && out > props.max) out = props.max;
     return out;
   }
+
+  // Snap n to the nearest multiple of `step` measured from `min` (or 0).
   function snapValue(n: any) {
     const stepSize = typeof props.step === 'number' && props.step > 0 ? props.step : 1;
     const base = hasMin() ? props.min : 0;
@@ -125,6 +129,8 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
     const decimals = (String(stepSize).split('.')[1] || '').length;
     return decimals > 0 ? Number(snapped.toFixed(decimals)) : snapped;
   }
+
+  // ---- locale formatting (plain functions, uniform ×6) -----------------------
   function formatter() {
     try {
       return new Intl.NumberFormat(undefined, props.formatOptions || {});
@@ -132,10 +138,16 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
       return new Intl.NumberFormat();
     }
   }
+
+  // The value formatted for display (empty string when null).
   function formatted() {
     const n = readValue();
     return n === null ? '' : formatter().format(n);
   }
+
+  // Parse a user-typed string back to a number, or null when it is not a number.
+  // Strips grouping separators + any non-numeric currency/percent chrome, keeping
+  // digits, a sign, a decimal point, and an exponent.
   function parseText(raw: any) {
     if (raw == null) return null;
     const s = String(raw).trim();
@@ -144,13 +156,23 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
     const n = Number.parseFloat(cleaned);
     return Number.isNaN(n) ? null : n;
   }
+
+  // What the <input> should show: the live edit buffer while focused, otherwise
+  // the locale-formatted value. A plain function (read in the template + handlers).
   function displayText() {
     return focused ? text : formatted();
   }
+
+  // ---- aria helpers (numbers/strings bound cleanly) --------------------------
   function ariaText() {
     const n = readValue();
     return n === null ? '' : formatted();
   }
+
+  // ---- write funnel (single $emit site) --------------------------------------
+  // Clamp + snap, write the model, mirror into the edit buffer, emit change. Named
+  // commitValue (NOT writeValue) so it does not collide with the generated Angular
+  // ControlValueAccessor.writeValue (TS2300).
   function commitValue(n: any) {
     let next = n;
     if (next !== null) {
@@ -164,6 +186,9 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
       value: next
     });
   }
+
+  // Step by a signed multiple of `step` (used by buttons + arrows). A null value
+  // seeds from min (or 0) so the first step lands on a sensible number.
   function stepBy(dir: any, size: any) {
     if (props.disabled || props.readonly) return;
     const cur = readValue();
@@ -171,6 +196,7 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
     const base = cur === null ? hasMin() ? props.min : 0 : cur;
     commitValue(base + dir * stepSize);
   }
+
   // ---- press-hold acceleration ----------------------------------------------
   // Stop any running repeat (pointerup / pointerleave / unmount).
   const stopHold = useCallback(() => {
@@ -277,6 +303,9 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
     scrubbing.current = false;
   }, []);
   // ---- lifecycle + imperative handle -----------------------------------------
+  // focus() — move DOM focus to the input. DELIBERATELY overrides
+  // HTMLElement.focus on Lit (ROZ137 warn, accepted). increment()/decrement() —
+  // step once by `step`. clear() — set the value to null and clear the buffer.
   function focus() {
     const el = input.current;
     // NOTE: $refs.input types to the generic HTMLElement on the tsdown/vue leaves

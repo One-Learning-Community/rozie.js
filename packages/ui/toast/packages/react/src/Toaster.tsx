@@ -73,6 +73,55 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   const [seq, setSeq] = useState(0);
   const [swipe, setSwipe] = useState<any>(null);
 
+  // The ACTIVE pointer-drag gesture's non-visual bookkeeping: { id, axis, sign,
+  // size, startX, startY, startTime } | null (set on @pointerdown, read on
+  // @pointermove/@pointerup, cleared on @pointerup/@pointercancel). Referenced
+  // ONLY from the four onToastPointer* handlers below, which are bound ONLY via
+  // template `@pointerdown`/`@pointermove`/`@pointerup`/`@pointercancel` — the
+  // template-@event-handler reachability root (Quick 260717-8zb Task 3 Item 6,
+  // hoistModuleLet.ts) hoists this to useRef on React so it persists across the
+  // re-renders the sibling `$data.swipe` write triggers mid-gesture. Never read
+  // directly in the template — script-only bookkeeping.
+  // Hover-pause flag: true while the pointer is over the stack (set by
+  // pauseTimers, cleared by resumeTimers). Read by patch() so a duration change
+  // arriving mid-hover stores the new remainder WITHOUT arming a live timer
+  // (which would dismiss the toast while it is still hovered) — resume arms it
+  // on leave. A top-level `let` reachable from the $expose verbs (patch/show →
+  // startTimer) and the @mouseenter/@mouseleave handlers, so React hoists it to
+  // useRef (persistent) like `timers`.
+  // Same-tick id-uniqueness guard for React. The id counter lives in reactive
+  // $data.seq (persists across renders), but React batches setState so within a
+  // SINGLE synchronous tick two show() calls read the SAME stale $data.seq →
+  // duplicate ids. `seqLocal` is a plain counter incremented SYNCHRONOUSLY in
+  // show(); it survives the same tick (and, because show() is an $expose verb,
+  // the emitter hoists it to a persistent useRef on React too — but the design
+  // does NOT depend on that: `Math.max($data.seq, seqLocal)` is correct whether
+  // seqLocal persists OR resets per render, since the monotonic $data.seq
+  // carries the high-water mark across any reset). On the other five targets
+  // $data.seq is synchronous, so the two simply stay in lockstep. Result:
+  // strictly-increasing, collision-free ids on all six with NO randomness.
+  // Set true in $onUnmount; read by promise()'s settle guard (never-resurrect
+  // a toast after the host itself is gone). A top-level `let` → React useRef
+  // (it escapes into $onUnmount's effect).
+  // Per-id handles for the ~350ms exit-removal failsafe (the fallback that
+  // removes a toast if its @animationend never fires). Tracked in a module map
+  // — NOT an anonymous window.setTimeout — so teardownTimers ($onUnmount /
+  // clear()) can cancel a pending failsafe (else it fires post-unmount and
+  // writes $data on a torn-down instance) and removeToast can cancel it
+  // first-wins when @animationend beats it. Escapes into $onUnmount's effect →
+  // React hoists it to useRef alongside `timers`.
+  // Mutable cross-render scratch (NOT reactive): per-id timer bookkeeping. A
+  // top-level `let` → React useRef (it escapes into $onUnmount's effect, so the
+  // emitter hoists it). The id counter lives in $data.seq instead (see <data>).
+  //
+  // Shape: { [id]: { handle, startedAt, remaining } }. `pauseTimers` clears the
+  // live setTimeout handle but KEEPS the entry with a decremented `remaining` —
+  // the remainder IS the state (this is what makes the hover pause PRECISE
+  // instead of a full restart). `resumeTimers` re-arms with exactly that
+  // remainder. `clearTimer`/the full-teardown helper below are the only ways an
+  // entry is actually removed from the map.
+
+  // ---- timers ------------------------------------------------------------
   function startTimer(toast: any) {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
@@ -93,6 +142,11 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     if (entry && entry.handle != null && typeof window !== 'undefined') window.clearTimeout(entry.handle);
     delete timers.current[id];
   }
+
+  // Pauses every live timer WITHOUT losing the remainder: clears the handle,
+  // decrements `remaining` by the elapsed time, and KEEPS the entry (does NOT
+  // delete it — the old v1 shortcut deleted entries here, which is why leave
+  // had to do a full restart).
   function pauseTimers() {
     paused.current = true;
     if (typeof window === 'undefined') return;
@@ -115,6 +169,11 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       };
     }
   }
+
+  // Re-arms every paused timer with EXACTLY its stored remainder (called on
+  // mouse leave). An entry with a non-positive remainder is left un-armed
+  // (it will be cleaned up by the next dismiss/clear pass) rather than firing
+  // immediately from inside this loop.
   function resumeTimers() {
     paused.current = false;
     if (typeof window === 'undefined') return;
@@ -139,6 +198,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       };
     }
   }
+
   // FULL teardown: clears every live handle AND drops every entry (unlike
   // pauseTimers, which deliberately keeps entries to hold their remainders).
   // clear() and $onUnmount can no longer reuse pauseTimers for this reason.
@@ -194,6 +254,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     startTimer(toast);
     return id;
   }
+
   // ---- exit lifecycle ------------------------------------------------------
   // Deliberately exceeds the 200ms default --rozie-toast-exit-duration token
   // comfortably; a consumer overriding the exit duration beyond ~350ms gets cut
@@ -243,10 +304,20 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   function dismiss(id: any) {
     dismissBegin(id, 'api');
   }
+
+  // clear() is bulk: immediate full teardown, NO per-toast exit animation and
+  // NO emit (documented — see docs/components/toast.md).
   function clear() {
     teardownTimers();
     setToasts([]);
   }
+
+  // ---- patch / promise ------------------------------------------------------
+  // Update-in-place primitive: merges ONLY the present `{message,type,duration}`
+  // keys into the matching entry via a fresh-array map (never in-place
+  // mutation). Returns whether the id existed. A `duration` key clears+restarts
+  // the timer (0 → sticky/no-arm; positive → arm); any other key leaves a
+  // running timer untouched.
   function patch(id: any, changes: any) {
     const c = changes || {};
     let existed = false;
@@ -288,6 +359,9 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     }
     return true;
   }
+
+  // The settle guard: a no-op if the host unmounted OR the toast was already
+  // dismissed while the promise was still pending (never-resurrect).
   function settlePromise(id: any, type: any, messageOrFn: any, value: any) {
     if (unmounted.current) return;
     // Never-resurrect: no-op if the toast is gone OR already exiting (its
@@ -302,6 +376,12 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       duration: props.duration
     });
   }
+
+  // Sugar over show()+patch(): shows a sticky loading toast synchronously
+  // (returns its id immediately — the consumer already holds `p`), then patches
+  // the SAME entry to success/error on settle (the auto-dismiss timer starts AT
+  // SETTLE, via patch's duration-key restart). Never returns/derives a new
+  // promise — `p`'s own .then/.catch still fire for the consumer untouched.
   function promise(p: any, opts: any) {
     const o = opts || {};
     const id = show({
@@ -314,6 +394,10 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     }
     return id;
   }
+
+  // ---- swipe-to-dismiss ------------------------------------------------------
+  // Axis + dismiss-direction sign, purely derived from the corner (no per-
+  // gesture state needed for these two — they only depend on $props.position).
   function swipeAxisFor(position: any) {
     return position === 'top-center' || position === 'bottom-center' ? 'y' : 'x';
   }
@@ -410,6 +494,12 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   function depth(ti: any) {
     return toasts.length - 1 - ti;
   }
+
+  // String-form `:style` for the toast row. ALWAYS carries `--rozie-toast-depth`
+  // (a no-op unless `stacked` is on — CSS reads it only inside
+  // `.rozie-toaster--stacked`), plus EITHER the active drag transform (while
+  // $data.swipe tracks this id) OR the swipe-exit sign custom property (once
+  // `dismissBegin('swipe')` flipped `t.swipeExitSign`). Drag/exit never overlap.
   function toastStyle(t: any, ti: any) {
     const depthDecl = '--rozie-toast-depth: ' + depth(ti) + ';';
     if (t.exiting) {
@@ -424,6 +514,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     const opacity = magnitude > 0 && dragState.size > 0 ? Math.max(0.3, 1 - magnitude / dragState.size) : 1;
     return depthDecl + ' transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
   }
+
   // ---- hover pause -------------------------------------------------------
   const onMouseEnter = useCallback(() => {
     if (props.disablePauseOnHover) return;
@@ -437,9 +528,13 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   function regionLabel() {
     return props.ariaLabel != null ? props.ariaLabel : 'Notifications';
   }
+  // Type union: 'info' | 'success' | 'error' | 'warning' | 'loading'. Only
+  // error/warning interrupt (assertive); loading (like info/success) is polite.
   function liveFor(type: any) {
     return type === 'error' || type === 'warning' ? 'assertive' : 'polite';
   }
+
+  // ---- lifecycle + handle ------------------------------------------------
 
   useEffect(() => {
     return () => {

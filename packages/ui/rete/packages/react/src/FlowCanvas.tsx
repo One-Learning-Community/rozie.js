@@ -840,6 +840,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     selfWriteInFlight.current = true;
     setGraph(g);
   }
+
   // Capture the canvas's current graph state (its own last write, falling back to the bound
   // prop before the first write). Always a fresh deep clone.
   const snapshotCurrent = useCallback(() => {
@@ -853,6 +854,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   function baseGraph() {
     return lastWrittenGraph.current != null ? lastWrittenGraph.current : currentGraph();
   }
+
   // Commit an ALREADY-CAPTURED snapshot onto the undo stack (caps + clears redo). Gated on
   // the `history` prop. Used by both the synchronous-commit path (connect/disconnect/delete)
   // and the drag gesture (pre-move snapshot taken on pointer-down, committed on first translate).
@@ -873,6 +875,14 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     if (props.history === false) return;
     pushHistorySnapshot(snapshotCurrent());
   }
+
+  // T2.5 — close the reconnect coalesce window. Called on a DEFERRED macrotask after a
+  // connectiondrop, so the trailing connectionremoved + connectioncreated writeBacks (which
+  // the classic preset fires AFTER the drop) have all run with the window still open
+  // (suppressing their per-event pushHistory, flagging reconnectDidWriteBack). Pushes the
+  // SINGLE pre-gesture snapshot iff the gesture actually changed the graph, then resets the
+  // per-gesture state. Idempotent + gated on the one-shot scheduled flag so a re-pick can
+  // cancel a pending close.
   function closeReconnectGesture() {
     if (!reconnectCloseScheduled.current) return;
     reconnectCloseScheduled.current = false;
@@ -924,6 +934,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       programmatic.current--;
     }
   }
+
   // undo() — pop the newest PRE-gesture snapshot, push the CURRENT graph onto the redo
   // stack, and restore the snapshot. No-op when nothing to undo.
   const undo = useCallback(() => {
@@ -948,6 +959,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   function canRedo() {
     return redoStack.current.length > 0;
   }
+
+  // Flush the coalesced drag positions: one fresh graph object with every pending
+  // node's x/y applied. Echo-guarded. Clears the pending map.
   function flushDragWriteBack() {
     dragFlushRaf.current = 0;
     if (programmatic.current) {
@@ -982,6 +996,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       connections
     });
   }
+
   // Schedule a coalesced drag write-back (rAF; falls back to a microtask where rAF is
   // unavailable — e.g. a non-DOM test env).
   const scheduleDragFlush = useCallback(() => {
@@ -1226,6 +1241,18 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     }
     return candidate;
   }
+
+  // T2.8 — the PURE duplicate kernel: given a graph object `g` and a node id, return a FRESH
+  // `{ graph: { ...g, nodes:[...g.nodes, clone] }, newId }` (the controlled-graph write-back
+  // contract — never an in-place push), or null if the source isn't found. The clone carries a
+  // NEW unique id and a small offset; its `data` is deep-cloned ($clone strips any reactivity
+  // proxy) so the copy is independent of the source. Connections are NOT cloned (a duplicate is
+  // an isolated node — the React-Flow default).
+  //
+  // This helper performs NO history push and NO commit — history/commit are the CALLER's, so a
+  // single-node gesture and a batch gesture each own their own coalescing (quick-260803-qwh:
+  // origin is encoded by CALL SITE, never by a mutable "suppress history" flag — a sync-set
+  // flag read on a later frame is a known-dead pattern here).
   function duplicateInto(g: any, id: any) {
     if (g == null || id == null) return null;
     const sid = String(id);
@@ -1253,6 +1280,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       newId
     };
   }
+
   // T2.8 — DUPLICATE the given node (the public verb + the NodeToolbar's Duplicate button).
   // One history entry per duplicate gesture (pushHistory, gated on !programmatic + history).
   // Returns the new id, or null if the source isn't found. NOT echo-guarded — a duplicate
@@ -1325,6 +1353,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // the single selected+resizable node; hides on multi-select / empty / non-resizable).
     if (syncResizerSelection.current) syncResizerSelection.current();
   }
+
   // Schedule the selection recompute AFTER the engine's own async selection update has
   // settled. AreaExtensions.selectableNodes does its pick / unselectAll via AWAITED
   // area.update() calls, so a bare microtask can run before `selector.entities` reflects

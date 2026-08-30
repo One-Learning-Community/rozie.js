@@ -55,9 +55,19 @@ const Switch = forwardRef<SwitchHandle, SwitchProps>(function Switch(_props: Swi
   });
   const control = useRef<HTMLButtonElement | null>(null);
 
+  // ---- derived view (plain function, uniform ×6) -----------------------------
+  // The current on/off state as a real boolean. Named isChecked, NOT a bare
+  // `checked` (which would become a Lit class field colliding with inherited DOM)
+  // nor `valueOf` (which cascades TS1240/1271 across the Lit class). A plain
+  // function (read in the template AND inside handlers/verbs) — never $computed,
+  // whose value-vs-accessor form diverges between React and Solid.
   function isChecked() {
     return modelValue === true;
   }
+
+  // ---- write funnel (single $emit site) --------------------------------------
+  // Write the model and emit change. Named commitValue (NOT writeValue) so it does
+  // not collide with the generated Angular ControlValueAccessor.writeValue (TS2300).
   function commitValue(next: any) {
     const v = next === true;
     setModelValue(v);
@@ -65,10 +75,14 @@ const Switch = forwardRef<SwitchHandle, SwitchProps>(function Switch(_props: Swi
       checked: v
     });
   }
+
+  // Flip the state, unless disabled / readonly. The public toggle verb + the
+  // click/keyboard handlers all funnel through here.
   function toggle() {
     if (props.disabled || props.readonly) return;
     commitValue(!isChecked());
   }
+
   // ---- pointer + keyboard handlers -------------------------------------------
   const onClick = useCallback(() => {
     toggle();
@@ -89,6 +103,14 @@ const Switch = forwardRef<SwitchHandle, SwitchProps>(function Switch(_props: Swi
   function controlTabindex() {
     return props.disabled ? null : 0;
   }
+
+  // ---- imperative handle -----------------------------------------------------
+  // focus() — move DOM focus to the control. DELIBERATELY overrides
+  // HTMLElement.focus on Lit (ROZ137 warn, accepted; the public focus() handle is
+  // intended). Reads $refs in a post-mount handle call (ROZ123-safe). $refs.control
+  // types to the generic HTMLElement on the tsdown/vue leaves, so we only touch
+  // HTMLElement members here (`focus`). toggle() — flip the state (same funnel as
+  // the UI), a no-op when disabled / readonly.
   function focus() {
     const el = control.current;
     if (el && el.focus) el.focus();

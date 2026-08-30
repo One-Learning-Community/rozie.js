@@ -148,6 +148,10 @@ const Radar = forwardRef<RadarHandle, RadarProps>(function Radar(_props: RadarPr
 
   // $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
   // captured node so no $refs read ever executes outside the mount hook.
+  // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
+  // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
+  // any consumer-supplied handler first (read off $props.options), then emit a
+  // structured payload resolving the hit element(s) via getElementsAtEventForMode.
   function composedOnClick(e: any, activeEls: any, chart: any) {
     const userOnClick = props.options?.onClick;
     if (typeof userOnClick === 'function') userOnClick(e, activeEls, chart);
@@ -180,6 +184,25 @@ const Radar = forwardRef<RadarHandle, RadarProps>(function Radar(_props: RadarPr
       chart
     });
   }
+
+  // ─── external-HTML tooltip portal slot ─────────────────────────────────────
+  // Only active when the consumer fills <slot name="tooltip">. The external
+  // handler positions a container over the canvas and mounts the consumer's
+  // framework-native fragment through $portals.tooltip(dom, scope). The scope
+  // carries the live tooltip model (title/body/dataPoints/position). Chart.js
+  // throttles external calls to active-element changes, so the dispose+remount
+  // on body-change is cheap. enabled:false suppresses the built-in canvas
+  // tooltip when we take over.
+  //
+  // MODULE-scope `let`s (not $onMount-locals) — this reverses the earlier
+  // deliberate mount-local narrowing (emitter-hardening backlog item #2,
+  // project_emitter_hardening_backlog): tooltipExternal is moving out of
+  // $onMount to top level (quick 260829-gbs), so its state can no longer live
+  // as a closure-captured mount-local. Required, not just convenient — and
+  // harmless: a module-scope `let` in `.rozie` lowers to per-instance
+  // component state on all six targets (a React/Angular/Lit class field or
+  // component-scope ref, not a shared global). The $onMount teardown below
+  // still reads tooltipDispose/tooltipEl directly, unchanged.
   function tooltipExternal(context: any) {
     const {
       chart,
@@ -223,6 +246,7 @@ const Radar = forwardRef<RadarHandle, RadarProps>(function Radar(_props: RadarPr
     tooltipEl.current.style.left = `${offsetLeft + tooltip.caretX}px`;
     tooltipEl.current.style.top = `${offsetTop + tooltip.caretY}px`;
   }
+
   // ─── config builder ────────────────────────────────────────────────────────
   // buildConfig is a top-level factory now that quick 260829-cd4 hoists the
   // portals closure to component scope on all six targets; $portals.tooltip
@@ -263,11 +287,18 @@ const Radar = forwardRef<RadarHandle, RadarProps>(function Radar(_props: RadarPr
       }
     };
   }, [composedOnClick, composedOnHover, props.data, props.options, props.plugins, props.renderTooltip, tooltipExternal]);
+  // Re-create the live instance. Chart.js exposes no stable runtime type-swap or
+  // plugin-swap, so `type`/`plugins`/`redraw`-driven changes re-create. Uses the
+  // captured canvasEl (never re-reads $refs outside $onMount).
   function recreate() {
     if (!canvasEl$local.current) return;
     instance.current?.destroy();
     instance.current = new ChartJS(canvasEl$local.current, buildConfig());
   }
+
+  // Reconcile prop changes. Mutating chart.data in place and calling update() is
+  // the Chart.js-supported runtime path — re-creating on every data tick would
+  // flicker and leak. (When `redraw` is set, re-create wholesale instead.)
   // Imperative handle (Phase 21 $expose). The lifecycle/redraw verbs are SUFFIXED
   // with `Chart` because bare `update`/`render` collide with LitElement's
   // reactive-lifecycle methods (`update(changedProperties)` / `render()`) and

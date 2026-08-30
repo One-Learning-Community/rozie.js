@@ -545,6 +545,46 @@ function rehomeRemovedComments(body: t.Statement[], removed: ReadonlySet<number>
     host[side] =
       side === 'trailingComments' ? [...existing, ...additions] : [...additions, ...existing];
   }
+
+  // Quick task 260830-fwb — the TRAILING side, which 260829-j18 deliberately
+  // skipped on the reasoning that "a removed statement's `trailingComments` are
+  // the SAME `t.Comment` objects Babel attached as the NEXT statement's
+  // `leadingComments`, so that side already has a surviving owner."
+  //
+  // That holds for an inline-authored `<script>`, where one parse attaches the
+  // comment in the gap to BOTH neighbours. It does NOT hold at a `.rzts` splice
+  // boundary: the spliced successor comes from a DIFFERENT parse and has no
+  // comments attached at all, so a comment authored between a hoisted module-`let`
+  // and a spliced statement lives ONLY on the removed `let`'s trailing side — and
+  // dies with it. The inline-equivalent host keeps it, the partial host loses it,
+  // and `dist-parity`'s multi-boundary DataTable-shaped guard goes red.
+  //
+  // Identity-keyed dedup (as above, and as the emitter's own printed-comment
+  // ledger does) is what makes this safe for the inline case: there the comment
+  // object ALREADY sits on the successor's `leadingComments`, so it is skipped
+  // rather than duplicated. Only the genuinely orphaned splice-boundary comment
+  // is re-homed.
+  for (const index of [...removed].sort((a, b) => a - b)) {
+    const orphaned = body[index]?.trailingComments;
+    if (!orphaned || orphaned.length === 0) continue;
+
+    let host: t.Statement | undefined;
+    for (let i = index + 1; i < body.length; i++) {
+      if (!removed.has(i)) {
+        host = body[i];
+        break;
+      }
+    }
+    // No following survivor — the leading-comment pass above already moved this
+    // statement's own documentation onto a preceding survivor; anything trailing
+    // it has nowhere later to live.
+    if (!host) continue;
+
+    const existing = host.leadingComments ?? [];
+    const additions = orphaned.filter((c) => !existing.includes(c));
+    if (additions.length === 0) continue;
+    host.leadingComments = [...additions, ...existing];
+  }
 }
 
 /**
@@ -595,9 +635,14 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
     // before dropping it, or the author's documentation for the hoisted `let`
     // disappears from the emitted component with the declaration.
     //
-    // Only the leading ones: a removed statement's `trailingComments` are the
-    // SAME `t.Comment` objects Babel attached as the NEXT statement's
-    // `leadingComments`, so that side already has a surviving owner.
+    // The TRAILING side is handled by a second pass inside
+    // `rehomeRemovedComments` (quick 260830-fwb). It was originally skipped on
+    // the reasoning that a removed statement's `trailingComments` are the SAME
+    // `t.Comment` objects Babel attached as the NEXT statement's
+    // `leadingComments`, so that side already had a surviving owner. True for
+    // an inline-authored `<script>`; false at a `.rzts` splice boundary, where
+    // the spliced successor comes from a different parse with no comments
+    // attached, so the comment lives ONLY on the removed `let`.
     //
     // They move onto the nearest preceding SURVIVOR as trailing comments,
     // which is where they sat in source — after that statement, above the

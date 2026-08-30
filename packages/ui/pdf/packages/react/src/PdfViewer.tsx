@@ -191,6 +191,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   // next/prev cycle); findIndex is the current match (-1=none). TOP-LEVEL lets (not
   // $onMount-local) so renderPage's coarse highlight pass + the find verbs can read
   // them across renders.
+  // ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
   function buildSource() {
     let cfg: any = null;
     cfg = {
@@ -225,6 +226,8 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     cfg.standardFontDataUrl = props.standardFontDataUrl || cdnBase() + '/standard_fonts/';
     return cfg;
   }
+
+  // ─── render one page (canvas + optional text layer) into the container ───────
   async function renderPage(pdf: any, pageNum: any, container: any) {
     const page = await pdf.getPage(pageNum);
     const viewport = page.getViewport({
@@ -289,6 +292,18 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     });
     return pageDiv;
   }
+
+  // continuous-mode scroll spy — reflect the most-visible page into $data.current.
+  // It ONLY writes $data.current (which echoes to $model.page + the `pagechange`
+  // event via the $data.current $watch); it deliberately does NOT scroll. The
+  // scroll-into-view lives at the navigation origins (goToPage + the `page`-prop
+  // $watch) so an observer-driven page change never snaps the view back under the
+  // user's own scroll. This is the origin-distinguishing fix for the render-all-
+  // pages scroll fight: a suppress flag set here and read by the ASYNC $data.current
+  // effect is defeated by flush timing (the flag is already reset by the time the
+  // deferred effect runs — true on Vue's flush:'pre' and every other target's
+  // deferred-effect model), so origin is encoded by WHERE scrollToPage is called,
+  // not by a boolean held across a flush.
   function setupScrollSpy() {
     if (observer.current) {
       observer.current.disconnect();
@@ -322,6 +337,8 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
       behavior: 'auto'
     });
   }
+
+  // ─── render the current view (single page, or all pages) ─────────────────────
   async function renderView() {
     if (!instance.current || !containerEl.current) return;
     const token = ++renderToken.current;
@@ -346,6 +363,8 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     if (props.renderAllPages) setupScrollSpy();
     props.onPagesrendered && props.onPagesrendered();
   }
+
+  // ─── load the document ───────────────────────────────────────────────────────
   async function load() {
     if (!pdfjsLib.current) return;
     const token = ++renderToken.current;

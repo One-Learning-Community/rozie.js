@@ -93,6 +93,12 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
   });
   const nav = useRef<HTMLElement | null>(null);
 
+  // ---- derived view (ONE plain function, uniform x6) ---------------------
+  // The whole render model in a single call: { totalPages, page, pages,
+  // hasPrev, hasNext }. A PLAIN function (not $computed) so it reads uniformly
+  // on all six targets and can be aliased in handlers without the Solid
+  // accessor divergence. Returns a FRESH object each call — never feed it to a
+  // reference-equality $watch getter.
   function model() {
     return paginationItems({
       page: modelValue,
@@ -103,9 +109,16 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
       boundaryCount: props.boundaryCount
     });
   }
+
+  // The resolved effective total page count (read in the template + handlers).
+  // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
+  // the `totalPages` PROP, which on Lit becomes a class field of type `number`
+  // (hard TS2300/TS2717 against a `() => number` helper). The prop-name-collision
+  // sibling of the otp `inputMode` gotcha.
   function effectivePages() {
     return model().totalPages;
   }
+  // The clamped current page (the raw prop may be out of range).
   function currentPage() {
     return model().page;
   }
@@ -118,9 +131,18 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
   function isActive(page: any) {
     return page === currentPage();
   }
+
+  // Roving-tabindex value for a control: the active page is the single tab stop
+  // (0), the rest are -1. The return type is annotated `number | undefined` ON
+  // PURPOSE: the React emitter wraps every numeric `:attr` binding in
+  // `(expr) ?? undefined`, and a PROVABLY non-null value (a bare `0`/`-1` or a
+  // `0 : -1` ternary) trips TS2869 "right operand of ?? is unreachable". Routing
+  // every tabindex through this nullable-typed helper keeps the `?? undefined`
+  // reachable (the data-table cellTabindex precedent).
   function tabIndexFor(active: any): number | undefined {
     return active ? 0 : -1;
   }
+
   // ---- write funnel (single $emit site) ----------------------------------
   // Clamp to [1, totalPages], write the model, and emit `change` with the new
   // page. NOT named `setModelValue` (that collides with React's generated model
@@ -150,6 +172,11 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
   function goLast() {
     return goToPage(effectivePages());
   }
+
+  // ---- roving focus across the page controls -----------------------------
+  // Read $refs.nav only here / in handlers (post-mount → ROZ123-safe).
+  // querySelectorAll<HTMLElement> reaches the controls inside Lit's shadow root
+  // too; the generic gives `.focus()` (Element has no `.focus`, TS2339).
   function controls() {
     const nav$local = nav.current;
     if (!nav$local) return [];
@@ -170,6 +197,7 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
     const active = nav$local ? nav$local.ownerDocument.activeElement : null;
     return els.indexOf(active as HTMLElement);
   }
+
   // Roving keyboard navigation: arrows move focus between controls, Home/End jump
   // to the ends. Each control keeps tabindex via the template (the active page is
   // 0, the rest -1) so the group is a single tab stop.

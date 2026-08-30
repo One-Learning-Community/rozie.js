@@ -20,9 +20,12 @@ export default function InlineEquivHostC(_props: InlineEquivHostCProps): JSX.Ele
   })();
   const usedName = useMemo(() => clamp(double(props.base)), [clamp, double, props.base]);
 
+  /* between-statement: a transitive non-exported helper pulled in as the closure of usedName */
   function double(n: number): number {
     return n * 2;
-  }
+  } // trailing: doubles its input
+
+  // leading: the used $computed export (comment immediately above)
 
   return (
     <>

@@ -18,6 +18,7 @@ export default function InlineEquivHostH(_props: InlineEquivHostHProps): JSX.Ele
   })();
   const editTransitionH = useRef(1);
 
+  // leading: stays with the extracted decl, must NOT float to the hoisted import
   function editorBindingsH(k: number): number {
     return clampH(k * 2);
   }

@@ -167,6 +167,61 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   }, [activeIndex, open$local, optionId]);
   const _watch0First = useRef(true);
 
+  // ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
+  // The option resolvers, client filter, enabled-index navigation, the keyboard
+  // reducer, type-ahead, single+multi selection, open/close state, and
+  // activeDescendant derivation now live in the shared, focus-/input-mode
+  // parameterized list spine. It is a compile-time `.rzts` script-partial: it
+  // dissolves into this leaf via inlineScriptPartials() before IR lowering (zero
+  // runtime dep). Listbox consumes it in focus-model `activedescendant` +
+  // input-mode `select-only` + multi + type-ahead. The spine closes over this
+  // host's pieces by convention: the reassigned module-`let`s typeBuffer/typeTimer
+  // (above) and the impure ref fns focusControl/scrollActiveIntoView (below).
+  // Type-ahead buffer for the select-only listbox trigger. Module-scope
+  // `let`s reassigned from handlers → the React emitter hoists them to `useRef`
+  // so they persist across renders (the setup-once guarantee); no-op elsewhere.
+  // They STAY in this host (not the shared spine) per the A==B rule: reassigned
+  // module-`let`s + sigils live in the host; the partial only closes over them.
+
+  // ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
+  // Lifted verbatim from Listbox.rozie's <script> (the monolithic pure-Rozie list logic). This
+  // partial holds ONLY the PURE list spine — option resolvers, the client-side filter, enabled-index
+  // navigation, the arrow/home/end/enter/escape/space/tab keyboard reducer, type-ahead, single+multi
+  // selection, open/close state, and activeDescendant derivation. It is a compile-time `.rzts`
+  // script-partial: it dissolves into each consumer's compiled leaf via inlineScriptPartials() before
+  // IR lowering — leaving zero runtime dependency (the 64-01-proven cross-package bare-specifier path).
+  //
+  // ── PARAMETERIZATION (D-06) ──────────────────────────────────────────────────────────────────
+  // The spine is parameterized BY HOST CONVENTION (the same implicit by-convention mixin contract
+  // windowing.rzts uses) along two axes:
+  //   - focus-model: `activedescendant` | `roving`. Both list families default to `activedescendant`
+  //     (what they use today): the highlighted option is tracked virtually via `activeDescendant`
+  //     (an option id) while DOM focus stays on the control. `roving` (real per-option tabindex
+  //     focus) is SUPPORTED-BUT-UNUSED — no focus rewrite is forced here; a roving host would supply
+  //     its own focus mover. The `activeDescendant` / `optionId` derivation below IS the
+  //     activedescendant model.
+  //   - input-mode: `select-only` (Listbox — a button trigger + type-ahead) | `filter-input`
+  //     (Combobox — a text <input> that filters by the typed query). The mode is by HOST CONVENTION,
+  //     NOT a discriminant prop (P3 retired the Listbox `combobox`/`filterable` props): a select-only
+  //     host never writes `$data.query`, so `visibleOptions` is the identity path for it and the
+  //     printable-char branch of the reducer feeds type-ahead; a filter-input host writes `$data.query`
+  //     from its <input>, so `visibleOptions` substring-filters and `onInput` drives the query.
+  //
+  // ── HOST CONTRACT (symbols the consuming host MUST define before importing) ────────────────────
+  //   - the reassigned module-`let`s `typeBuffer` / `typeTimer` — type-ahead scratch state. They are
+  //     reassigned from handlers → the React emitter hoists them to `useRef` (the setup-once
+  //     guarantee), so per the A==B playbook rule they STAY IN THE HOST; this partial only closes
+  //     over them (in `onTypeahead`).
+  //   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
+  //     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
+  //     HOST functions; this partial only closes over them (it reads NO refs itself).
+  //   - the option set + form surface (`$props.options` / `$props.value` (model) / `$props.multiple` /
+  //     `$props.id` / `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
+  //     `$props.closeOnSelect` / `$props.disabled`) and the reactive state (`$data.open` /
+  //     `$data.activeIndex` / `$data.query`). Input-mode is by convention (the host's <input> writing
+  //     `$data.query`), NOT a discriminant prop.
+
+  // ---- option resolvers --------------------------------------------------
   function labelOf(opt: any) {
     if (props.optionLabel !== null) return props.optionLabel(opt);
     if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label;
@@ -185,23 +240,51 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   function optionId(index: any) {
     return props.id + '-opt-' + index;
   }
+
+  // ---- derived state -----------------------------------------------------
+  // The visible option list: identity in select-only / non-filtering mode,
+  // a case-insensitive substring filter when a combobox query is present.
+  // A plain function (not `$computed`) so it reads uniformly across all six
+  // targets — a `$computed` is a value on React but an accessor on Solid, so
+  // aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
+  // plain function is identical everywhere.
   function visibleOptions() {
     const q = (query || '').trim().toLowerCase();
     if (q === '') return props.options;
     return props.options.filter((opt: any) => labelOf(opt).toLowerCase().includes(q));
   }
+
+  // The label shown in the (select-only) trigger when closed. A real `$computed`
+  // — read bare in the template, never aliased in script, so the per-target
+  // accessor form stays uniform.
+  // Is a given option currently selected? Multi compares array membership.
   function isSelected(opt: any) {
     const v = valueOf(opt);
     const cur = value;
     if (props.multiple) return Array.isArray(cur) && cur.includes(v);
     return cur === v;
   }
+
+  // First enabled visible index, preferring the currently-selected option.
   function resolveInitialActive() {
     const opts = visibleOptions();
     const sel = opts.findIndex((o: any) => isSelected(o) && !disabledOf(o));
     if (sel !== -1) return sel;
     return opts.findIndex((o: any) => !disabledOf(o));
   }
+
+  // ---- open / close ------------------------------------------------------
+  // Phase 73 item #8 (emitter-hardening batch): each of `open`/`close`/`toggle`
+  // $emit's directly — no longer funneled through a single wrapper. The
+  // former "route every emit through ONE wrapper fn" workaround guarded
+  // against a React duplicate `const {onOpenChange}=props` per emit-site
+  // (TS2451); verified against the current emitter (target-react
+  // `emitScript-multiEmitDedupe.test.ts`) that the shipped ITEM-1 (Phase 46)
+  // hoist-once dedupe already collapses N ESCAPING helpers sharing an emit
+  // target into exactly one destructure, and a non-escaping function (e.g.
+  // `open`, reachable here only via `$expose`) never destructures at all — so
+  // no combination of these three functions can produce the duplicate-const
+  // shape. See project_next_port_listbox / project_emitter_hardening_backlog.
   function open() {
     if (props.disabled) return;
     if (open$local) return;
@@ -260,6 +343,8 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       option: null
     });
   }
+
+  // ---- keyboard navigation over the VISIBLE list -------------------------
   function nextEnabled(from: any, dir: any) {
     const opts = visibleOptions();
     if (opts.length === 0) return -1;
@@ -289,6 +374,9 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     const opts = visibleOptions();
     if (activeIndex >= 0 && activeIndex < opts.length) select(opts[activeIndex]);
   }
+
+  // Type-ahead for select-only listboxes: accumulate keystrokes and jump to the
+  // first option whose label starts with the buffer.
   function onTypeahead(ch: any) {
     if (typeTimer.current !== null) clearTimeout(typeTimer.current);
     typeBuffer.current += ch.toLowerCase();
@@ -303,6 +391,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       scrollActiveIntoView();
     }
   }
+
   // Key handler shared by the trigger and the combobox input. The printable-
   // character branch is reached only in select-only mode (the combobox input
   // types through @input).
@@ -349,10 +438,37 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   const onOptionPointerMove = useCallback((index: any) => {
     if (activeIndex !== index) setActiveIndex(index);
   }, [activeIndex]);
+  // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
+  // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
+  // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
+  // in the host (ROZ123). It is a compile-time `.rzts` script-partial: it dissolves into each consumer's
+  // compiled leaf via inlineScriptPartials() before IR lowering — leaving zero runtime dependency.
+  //
+  // HOST CONTRACT (symbols the consuming host MUST define before importing — the same implicit
+  // by-convention mixin contract the DataTable host's other partials already use for `$data.windowVer`):
+  //   - windowSource(): T[]   — the full list to window (the KEY generalization; the DataTable host
+  //                             returns its pre-pagination row model, listbox/combobox return the
+  //                             filtered options). This partial MUST NOT reach into the host data engine
+  //                             directly — rows arrive ONLY through windowSource().
+  //   - $props.estimateRowHeight — per-item size estimate (kept aliased for DataTable back-compat).
+  //   - $data.windowVer / $data.editVer — window/edit-version reactivity bumps.
+  //   - gridScrollEl              — the scroll-container element handle.
+  //   - virtualizer               — the host virtual-core instance (built in $onMount from the ref).
+  //   - observeElementRect / observeElementOffset / elementScroll / measureElement — virtual-core fns.
+  //   - scheduleRemeasure()       — the host's rAF/microtask remeasure defer.
+  //   - pinnedEditIndex() / pinnedMeasurement(pin) — the D-05 OPTIONAL pin-extension hook (host-provided,
+  //                             defaulting to no-op): the DataTable host passes its edit-pinning hooks;
+  //                             listbox passes nothing. Routing pinning through this host hook (NOT
+  //                             inlining it) keeps DataTable's B13 edit-pinning behavior byte-identical.
+
+  // getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
+  // React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
+  // id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).
   function virtualItemKey(i: any) {
     const src = windowSource();
     return src && src[i] ? src[i].id : undefined;
   }
+
   // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
   // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
   // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
@@ -402,6 +518,12 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   } | null {
     return pinnedMeasurement(pin);
   }
+
+  // windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
+  // { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
+  // $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
+  // full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
+  // `rows` binding → TS2448 self-shadow, line ~1149 lesson).
   function windowedRows() {
     // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
     // early return — so Solid's <For>/Svelte's {#each} accessor subscribes to it on its FIRST eval,
@@ -471,6 +593,10 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     }
     return out;
   }
+
+  // Spacer-<tr> heights (D-03): the leading spacer occupies items[0].start; the trailing spacer
+  // the gap between the last rendered item's end and getTotalSize(). Both windowVer-gated reads
+  // (the `$data.windowVer` touch re-derives them as the window/measurements change). 0 when off.
   function padTop() {
     // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer + editVer at the TOP so the
     // spacer-<td> :style binding subscribes on the fine-grained targets before the early return,
@@ -521,16 +647,44 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     }
     return pad < 0 ? 0 : pad;
   }
+  // pmIndexInWindow: is full-model index `idx` present in the rendered virtual window?
   function pmIndexInWindow(items: any, idx: any) {
     for (let i = 0; i < items.length; i++) if (items[i].index === idx) return true;
     return false;
   }
+  // rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
+  // window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
   function rowIsOutsideWindow(r: any) {
     if (!props.virtual || !virtualizer.current) return false;
     const items = virtualizer.current.getVirtualItems();
     for (const it of items as any) if (it.index === r) return false;
     return true;
   }
+
+  // Windowing instance state (the `let table` precedent — React hoists reassigned
+  // module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
+  // when $props.virtual. gridScrollEl is the captured .rozie-listbox-list scroll div the
+  // virtualizer observes; remeasurePending dedupes the deferred sweep.
+  // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
+  // set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
+  // (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
+  // wr.row.id). A raw Listbox option is a primitive or a bare { label, value, disabled }
+  // — NOT guaranteed to have `.id` — so an unwrapped raw set keyed on wr.row.id collapses
+  // every framework :key (and every virtual-core measurement key) to `undefined`, which
+  // recycles the wrong DOM node as the window scrolls. Wrap each option into an id-bearing
+  // row the way the sibling Combobox's filteredOptions() does — `id` is the resolved
+  // value, `_opt` the original option (read via wr.row._opt in the windowed template),
+  // `_i` the source index. Kept === $data.rows so the math's rowList[vi.index] resolves to
+  // the same wrapped row the count windows over.
+  //
+  // $memo, keyed on the TRUE inputs — NOT on visibleOptions() itself, which returns a
+  // FRESH filtered array whenever a query is active (a visibleOptions()-keyed cache
+  // would never hit while filtering). The key covers everything the map reads:
+  // options ref + query (visibleOptions' inputs) and the optionValue/optionLabel
+  // resolvers (valueOf in the map body; labelOf inside visibleOptions' filter path).
+  // Same reference-stability contract the sibling Combobox's filteredOptions carries —
+  // virtual-core's getItemKey/getMeasurements walk this O(count) per pass, so an
+  // unmemoized per-call re-map made every scroll tick O(N²) in wrapper allocations.
   const windowSourceCache = useMemo(() => ({
     keys: null as any[] | null,
     val: null as any
@@ -550,12 +704,18 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     windowSourceCache.val = __rozieMemoVal;
     return __rozieMemoVal;
   }
+  // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
+  // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
+  // pinnedMeasurement() UNGUARDED by convention; a listbox has no edit-pinning, so these
+  // reduce the pin union (-1 → never unioned) and the spacer subtraction (null → identity)
+  // to a no-op. They MUST exist or the by-convention call ReferenceErrors at mount.
   function pinnedEditIndex() {
     return -1;
   }
   function pinnedMeasurement(pin: any) {
     return null;
   }
+
   // Keep $data.rows === windowSource() so the windowing math indexes the live option set.
   const syncRows = useCallback(() => {
     setRows(windowSource());
@@ -584,15 +744,30 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     }
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) remeasurePending.current = false;else setTimeout(rafPass, 0);
   }
+
+  // measureElement sweep: hand every rendered windowed option to the virtualizer so its
+  // true (variable) height is observed (virtual-core measures ONLY nodes passed to
+  // measureElement, keyed by the data-index attribute). Bails during a programmatic
+  // scroll (scrollToIndex) so a measure can't starve the scroll target.
   function remeasureWindow() {
     if (!virtualizer.current || !gridScrollEl.current) return;
     if (virtualizer.current.scrollState) return;
     const els = gridScrollEl.current.querySelectorAll('.rozie-listbox-option[data-index]');
     for (const el of els as any) virtualizer.current.measureElement(el);
   }
+
+  // ---- focus / scroll helpers (post-mount $refs only) --------------------
+  // Impure ($refs) → per the ROZ123 + A==B rules they stay in the host (the spine
+  // only closes over them). Named `focusControl` (not `focus`): a `focus` $expose
+  // verb would override the inherited HTMLElement.focus method on the Lit element.
   function focusControl() {
     triggerEl.current?.focus();
   }
+
+  // Keep the active option visible inside the scrolling listbox. Reads $refs in
+  // a post-mount callback only (never eagerly — ROZ123). When windowing, route through
+  // the virtualizer (scrollToIndex) so an active option OUTSIDE the rendered window is
+  // scrolled into view (the windowed-arrow-nav seam); else the native scrollIntoView.
   function scrollActiveIntoView() {
     if (activeIndex < 0) return;
     if (props.virtual && virtualizer.current) {
@@ -611,6 +786,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       block: 'nearest'
     });
   }
+
   // ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
   // kickWindow: the cross-target first-paint settle. Re-captures the LIVE scroll element,
   // re-feeds the CURRENT option count into the virtualizer, re-attaches its rect observer

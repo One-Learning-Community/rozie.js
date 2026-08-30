@@ -67,6 +67,10 @@ const Resizable = forwardRef<ResizableHandle, ResizableProps>(function Resizable
   const [dragging, setDragging] = useState(false);
   const root = useRef<HTMLDivElement | null>(null);
 
+  // ---- derived view (plain functions, uniform ×6) ------------------------
+  // The current size, normalized + clamped. Plain function (called in template
+  // bindings AND handlers) — never $computed (a $computed is a value on React but
+  // an accessor on Solid; a plain fn reads uniformly).
   function currentSize() {
     const raw = typeof size === 'number' ? size : props.min;
     return clampPercent(raw, props.min, props.max);
@@ -74,11 +78,18 @@ const Resizable = forwardRef<ResizableHandle, ResizableProps>(function Resizable
   function isVertical() {
     return props.direction === 'vertical';
   }
+
+  // Inline CSS custom property positioning the panels. Read BARE in the template
+  // via :style — a plain object literal, recomputed each render.
   function sizeStyle() {
     return {
       '--rozie-resizable-size': currentSize() + '%'
     };
   }
+
+  // ---- write funnel (single $emit site) ----------------------------------
+  // Clamp, write the model, emit resize. The SOLE $emit('resize') site so the
+  // React prop-destructure for onResize hoists exactly once.
   function commitSize(raw: any) {
     const next = clampPercent(raw, props.min, props.max);
     setSize(next);
@@ -86,6 +97,7 @@ const Resizable = forwardRef<ResizableHandle, ResizableProps>(function Resizable
       size: next
     });
   }
+
   // ---- pointer drag (template @event + pointer capture) ------------------
   // $refs.root is post-mount-only (ROZ123-safe): read inside these handlers.
   const onPointerDown = useCallback((e: any) => {

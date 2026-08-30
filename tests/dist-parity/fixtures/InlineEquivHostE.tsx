@@ -21,6 +21,7 @@ export default function InlineEquivHostE(_props: InlineEquivHostEProps): JSX.Ele
   function usedNameE(k: number): number {
     return k * 2;
   }
+  // leading: the inline host successor trails the spliced partial decl
   function hostTailE(n: number): number {
     return usedNameE(n) + headE(n);
   }

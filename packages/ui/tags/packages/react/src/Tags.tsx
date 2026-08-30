@@ -93,21 +93,34 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
   function commitKeys() {
     return Array.isArray(props.delimiters) ? props.delimiters : [',', 'Enter'];
   }
+
+  // The non-Enter delimiters act as split characters for paste.
   function splitChars() {
     return commitKeys().filter((k: any) => k !== 'Enter');
   }
+
+  // Whether the control has reached its token cap.
   function atMax() {
     return typeof props.max === 'number' && tokens().length >= props.max;
   }
+
+  // Whether new input is accepted at all.
   function canEdit() {
     return !props.disabled && !props.readonly;
   }
+
+  // ---- write funnel (single $emit site) ----------------------------------
+  // Write the model and emit change. Every committed-list mutation funnels here.
   function commitTokens(next: any) {
     setModelValue(next);
     props.onChange && props.onChange({
       value: next
     });
   }
+
+  // ---- add / remove ------------------------------------------------------
+  // Normalize → validate → dedup → cap a candidate, then commit + emit add.
+  // Returns true if it was added (so the caller can clear the draft).
   function addToken(raw: any) {
     if (!canEdit()) return false;
     let candidate = String(raw == null ? '' : raw).trim();
@@ -129,6 +142,7 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
     });
     return true;
   }
+
   // Remove the token at `idx`, commit, and emit remove.
   const { onRemove: _rozieProp_onRemove } = props;
     const removeAt = useCallback((idx: any) => {
@@ -153,6 +167,7 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
     const el = root$local.querySelector('input');
     if (el) el.focus();
   }
+
   // ---- input handlers ----------------------------------------------------
   // Mirror the typed text into the draft buffer. Capture the fresh local value
   // (do NOT re-read $data.draft in the same handler — React setState is async and
@@ -220,11 +235,18 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
     const n = tokens().length;
     return n === 1 ? '1 tag' : n + ' tags';
   }
+
+  // ---- lifecycle + imperative handle -------------------------------------
+  // clear() — remove every token (emits change with []) and focus the input.
   function clear() {
     commitTokens([]);
     setDraft('');
     focusTheInput();
   }
+  // focus() — move DOM focus to the text input. DELIBERATELY overrides the
+  // inherited HTMLElement.focus on the Lit custom element (warn-only ROZ137,
+  // accepted — the public focus() handle is the intended semantics; otp/slider
+  // precedent, consistent with NumberField which also exposes `focus`).
   function focus() {
     return focusTheInput();
   }

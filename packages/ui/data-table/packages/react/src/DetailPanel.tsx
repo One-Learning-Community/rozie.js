@@ -13,6 +13,9 @@ export default function DetailPanel(_props: DetailPanelProps): JSX.Element {
     row: _props.row ?? null,
   };
 
+  // Plain setup-once helper (NOT $computed — a $computed can't be aliased; the
+  // EditorSelect plain-function lesson). Build `[{ key, value }]` from the row's own
+  // enumerable keys, String-coercing each value. A null row yields an empty list.
   function entries() {
     const r = props.row;
     if (!r) return [];

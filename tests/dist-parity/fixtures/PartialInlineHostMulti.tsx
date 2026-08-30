@@ -24,15 +24,18 @@ export default function PartialInlineHostMulti(_props: PartialInlineHostMultiPro
   function headM(n: number): number {
     return n + 1;
   }
+  // after-side: comment trails the host let editTransitionM and leads the spliced editorBindingsM below
   function editorBindingsM(k: number): number {
     return k * 2;
   }
+  // trailing-seam: the inline host successor trails the spliced editorBindingsM
   function hostTailM(n: number): number {
     return editorBindingsM(1) + headM(n);
   }
   function tickM(): number {
     return props.base * 2;
   }
+  // gap-0 leading: stays with the extracted columnChromeM, must NOT float to the hoisted import
   function columnChromeM(k: number): number {
     return clampB(tickM() + k);
   }

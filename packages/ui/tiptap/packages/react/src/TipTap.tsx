@@ -447,6 +447,25 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     editor.current?.chain().focus().extendMarkRange('link').unsetLink().run();
     openFlag.current = false;
   }
+  // Force the link-editor BubbleMenu to open/close right now, matching openFlag
+  // (bug fix — quick 260809-6zp). `editor?.commands.focus()` alone is NOT
+  // sufficient: TipTap's `focus` command early-returns with NO dispatch whenever
+  // `view.hasFocus() && position === null` (the whole document is already
+  // focused — the COMMON case once the create/close affordance is invoked from
+  // a `@mousedown.prevent`-guarded control, which deliberately never blurs the
+  // editor). And even a dispatched but otherwise-INERT transaction (no doc/
+  // selection change) is not enough either: @tiptap/extension-bubble-menu's own
+  // `update()` short-circuits with `isSame = !selectionChanged && !docChanged`
+  // BEFORE it ever re-runs `shouldShow` — so a no-op dispatch is silently
+  // swallowed by the extension's OWN guard, not just TipTap's `focus` command.
+  // The extension's `transactionHandler` (its own doc comment: "This allows
+  // external code to trigger ... via `editor.view.dispatch(editor.state.tr
+  // .setMeta(pluginKey, 'updatePosition'))`") is the official escape hatch: a
+  // transaction tagged with THIS surface's own `pluginKey` ('rozieLinkEditor')
+  // calls `show()`/`hide()` directly, bypassing both guards. This bit both
+  // `openLinkEditor` (create-mode toolbar button) and `closeLink` (built-in
+  // Cancel AND any consumer `close()`), on every target, whenever the editor
+  // was already focused. `editor` is the raw TipTap `Editor` instance on all 6.
   function forceMenuRecheck() {
     if (!editor.current) return;
     const visible = editor.current.isEditable && (editor.current.isActive('link') || openFlag.current);
@@ -783,6 +802,15 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       };
     };
   }
+
+  // Pure helper (ask B, D-02) — extracts { el, attr, value } from a parseHTML
+  // tag selector string, e.g. 'span[data-x]' → { el: 'span', attr: 'data-x',
+  // value: '' } or 'div[data-x=y]' → { el: 'div', attr: 'data-x', value: 'y' }.
+  // Drives renderHTML's marker attribute so the serialized element reproduces
+  // the exact shape the parseHTML rule expects. MUST NOT throw on a
+  // malformed/empty selector (T-d9e-01 — a bad selector degrades only that one
+  // node's render, never crashes the editor): falls back to el = the raw
+  // selector (or 'span' if falsy), attr = null (no marker), value = ''.
   function parseTagSelector(selector: any) {
     const raw = typeof selector === 'string' ? selector : '';
     const elMatch = raw.match(/^[a-zA-Z][a-zA-Z0-9-]*/);
@@ -801,6 +829,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       value
     };
   }
+
   // Build ONE custom Node per consumer-supplied spec, all bound to the SAME
   // reactive nodeView portal (ask B, D-02). Takes the `nodeSpecs` prop array
   // (read once at mount — setup-once, not reactive); `$portals.nodeView` is read
@@ -858,6 +887,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     }
     return undefined;
   }
+
   // uploadImage paste/drop fallbacks (ask D / D-04) — ProseMirror `editorProps`
   // handlers. TOP-LEVEL functions (siblings of `refreshActive`/the $expose
   // verbs below), NOT nested inside $onMount's ternary/object-literal — a

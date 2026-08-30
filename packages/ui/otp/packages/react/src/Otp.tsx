@@ -77,9 +77,14 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
   _autoFocusRef.current = props.autoFocus;
   const root = useRef<HTMLDivElement | null>(null);
 
+  // ---- derived view (plain functions, uniform ×6) ------------------------
+  // The current code, normalized to a string.
   function code() {
     return typeof value === 'string' ? value : '';
   }
+
+  // The cells to render: one { i, ch } per position, ch derived from `value`.
+  // A plain function (called in the r-for and from handlers) — never $computed.
   function cells() {
     const v = code();
     const out = [];
@@ -89,9 +94,13 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
     });
     return out;
   }
+
+  // Allowed-character test for the configured `type`. Thin wrapper over the
+  // pure write model in ./internal/otpWrite (vendored into every leaf).
   function allowChar(ch: any) {
     return isAllowedChar(props.type, ch);
   }
+
   // The cell that should receive focus for new input: the first empty position
   // (clamped to the last cell when full).
   const firstEmptyIndex = useCallback(() => firstEmpty(code(), props.length), [code, props.length]);
@@ -132,6 +141,7 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
       value: next
     });
   }
+
   // ---- input handler -----------------------------------------------------
   // One path for every input shape (single char, autofill, swipe, IME commit —
   // see ./internal/otpWrite.planWrite): sanitize + distribute from the write
@@ -214,6 +224,10 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
   function cellType() {
     return props.mask ? 'password' : 'text';
   }
+  // NOTE: named `cellInputMode`, NOT `inputMode` — a bare `inputMode` member
+  // collides with the inherited `HTMLElement.inputMode: string` on the Lit custom
+  // element (a hard TS2416/TS1238, unlike the warn-only `focus` override). The
+  // `cell`-prefix keeps it collision-safe across all six strict-typecheck leaves.
   function cellInputMode() {
     return props.type === 'numeric' ? 'numeric' : 'text';
   }
@@ -223,6 +237,11 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
   function cellAutocomplete(i: any) {
     return i === 0 ? 'one-time-code' : 'off';
   }
+
+  // ---- lifecycle + imperative handle -------------------------------------
+  // focus() — focus the first empty cell. DELIBERATELY overrides HTMLElement.focus
+  // on Lit (ROZ137 warn, accepted). clear() — reset the code and focus the first
+  // cell. Both read $refs in a post-mount handle call (ROZ123-safe).
   function focus() {
     return focusIndex(firstEmptyIndex());
   }
