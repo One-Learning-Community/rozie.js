@@ -1,5 +1,11 @@
 # @rozie-ui/otp-vue
 
+## 0.1.6
+
+### Patch Changes
+
+- @rozie/runtime-vue@0.7.0
+
 ## 0.1.5
 
 ### Patch Changes

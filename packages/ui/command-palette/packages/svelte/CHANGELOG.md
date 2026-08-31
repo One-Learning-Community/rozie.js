@@ -1,5 +1,11 @@
 # @rozie-ui/command-palette-svelte
 
+## 0.4.4
+
+### Patch Changes
+
+- @rozie/runtime-svelte@0.7.0
+
 ## 0.4.3
 
 ### Patch Changes

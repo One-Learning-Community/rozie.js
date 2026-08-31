@@ -1,5 +1,11 @@
 # @rozie-ui/data-table-vue
 
+## 0.2.6
+
+### Patch Changes
+
+- @rozie/runtime-vue@0.7.0
+
 ## 0.2.5
 
 ### Patch Changes

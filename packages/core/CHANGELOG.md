@@ -1,5 +1,383 @@
 # @rozie/core
 
+## 0.7.0
+
+### Patch Changes
+
+- 843ab40: On React, a top-level `.rozie` `<script>` object or array literal const that reads nothing
+  reactive (`$props`, `$data`, a computed, or a helper) is now constructed ONCE per component
+  instance, matching Vue/Svelte/Angular/Lit/Solid — instead of being rebuilt with a fresh reference
+  on every render.
+
+  Before this release, only two narrow shapes were stabilized on React: a member-mutated fresh
+  instance (`new X()` / `[...]` / `{...}` later mutated via `.push`/`.add`/etc.) and a const escaping
+  into an effect's dependency array. A plain object/array literal outside both shapes — the common
+  "engine options" / "plugin list" pattern — silently kept a fresh identity every render, so any
+  `$watch` a child component ran on that prop re-fired on every unrelated parent re-render.
+
+  `.rozie` authors do not need to change anything — this is a compiler-side fix. A literal that reads
+  anything reactive, or cites a non-stable top-level reference (a helper, a plain `let`, another
+  un-stabilized const), is left byte-identical to before: only a literal PROVABLY safe to build once
+  gets the new `useMemo(..., [])` wrap.
+
+  No other `@rozie-ui/*-react` leaf package changes: across the full shipped component surface, only
+  `@rozie-ui/maplibre-react`'s `PROGRAMMATIC` and `@rozie-ui/tiptap-react`'s
+  `STARTERKIT_COLLISION_MAP` qualify for the new stabilization.
+
+  **Changeset scope note.** `@rozie-ui/maplibre-react` was removed from this changeset: it is in the changeset config's `ignore` list, and changesets rejects a changeset that mixes ignored and non-ignored packages (`Mixed changesets that contain both ignored and not ignored packages are not allowed`), which made `changeset status` — and any release run — fail outright. The maplibre leaves are deliberately unpublished, so nothing consumer-facing is lost by the removal.
+
+- 0368a7c: On React, a `$computed` value read bare from inside a `$onMount`-registered callback now
+  observes the CURRENT value instead of the first render's frozen snapshot, matching
+  Vue/Svelte/Angular/Solid/Lit.
+
+  `$computed` lowers to `const C = useMemo(() => ..., deps)`. `$onMount` lowers to a `[]`-dep
+  `useEffect` by contract (mount-once). A long-lived callback registered inside that effect and
+  reading `C` bare previously captured the FIRST render's value forever — even though the
+  `useMemo` recomputes on every dependency change, React never re-creates a mount-once closure
+  to observe the recomputation. The read is now routed through a synced ref
+  (`_<C>Ref.current`), the same live-ref treatment already applied to reactive state and model
+  props read from a mount body.
+
+  `.rozie` authors do not need to change anything — this is a compiler-side fix. A computed read
+  from a non-mount hook (`$onUpdate`), a locally-shadowed name, or a computed read only from the
+  template is unaffected, byte-identical.
+
+  No `@rozie-ui/*-react` leaf package requires a version bump from this change: a corpus-wide
+  post-lower census (12 `.rozie` files pairing `$computed` with `$onMount`) found zero shipped
+  sites that read a computed bare from inside a mount body. The three production workarounds
+  this defect otherwise motivated (`FlowCanvas.portTypeOf`, `DataTable.table` /
+  `refreshRowModel`, `PdfViewer`'s `$watch` hand-off) all deliberately avoid `$computed` in a
+  mount-read position for independent reasons and are left unchanged.
+
+- 4b8a209: ROZ138 (React stale-read) no longer fires when the write it would pair with the read is
+  provably unreachable before that read — either because the write sits in a branch that
+  `return`s/`throw`s before control can fall through to the read, or because the write and
+  the read sit in mutually exclusive `.consequent`/`.alternate` arms of the same `if`
+  statement. The diagnostic still fires on the genuine bug shape it was built for: a write
+  inside a plain (non-returning) conditional followed by a read after the `if`, and a
+  write-then-read within the same branch.
+
+  Previously the validator's dominance test was a raw textual offset comparison with no
+  branch/loop reasoning, so a write buried in a `return`ing arm or an `else`-exclusive arm
+  still "dominated" every later read in the function body — even though that write could
+  never actually run on the same path as the read. On the shipped `packages/ui` corpus this
+  produced 24 warnings, 100% of them false positives, concentrated in the two components
+  (`SortableList`, `DataTable`) that are already the most carefully engineered against this
+  exact React footgun. Narrowing the analysis to two sound control-flow suppressions (still no
+  general CFG — no loop-iteration reasoning, no cross-function/async-window reasoning) drops
+  that count to 3, all in `DataTable`'s `clampActiveCell`, where a real (if currently harmless)
+  React-vs-others control-flow divergence exists.
+
+  `.rozie` authors do not need to change anything — this is a diagnostic-only compiler fix.
+  Emitted output is byte-identical across all six targets; no `@rozie-ui/*` leaf package
+  requires a version bump.
+
+- ba42bc2: On React, Angular, and Lit, the synthesized `$portals` closure now lives at COMPONENT scope
+  (React: the hook section; Angular/Lit: a private class field) instead of being declared
+  inside the mount-phase lifecycle hook body. Vue, Svelte, and Solid already did the right
+  thing and are unaffected in shape (Vue/Svelte additionally now declare the closure BEFORE
+  the user script, matching Solid, closing a secondary TDZ hazard for a top-level invocation).
+
+  This closes a silent parity bug: a `<script>` top-level helper reading `$portals.<name>`
+  previously compiled on three targets and failed on the other three — `TS2304 Cannot find
+name 'portals'` on the bundled-leaf strict typecheck, `ReferenceError: portals is not
+defined` at runtime, with zero diagnostics. Three failure shapes are fixed:
+  1. A top-level helper reading `$portals.<name>`, called from `$onMount`.
+  2. A top-level helper reading `$portals.<name>`, with NO `$onMount` at all — previously
+     the whole closure was emitted NOWHERE on React (it was attached unconditionally to the
+     first mount-phase hook; no hook meant it was silently dropped).
+  3. A `$portals.<name>` read from a `$watch` body — broken on all three targets, and the
+     shape driving most of the corpus workarounds this closes the door on.
+
+  React additionally synthesizes a dispose-only effect (`[]` deps) for a component that has
+  portals but no mount-phase lifecycle hook at all, so portal roots still bulk-dispose on
+  unmount in that shape. Angular and Lit now lower `$portals.<name>` to a `this.`-qualified
+  member read (the closure is a class field, not a same-method-only `const`); the
+  reactive-handle `interface ReactivePortalHandle` moved to module scope on both (a TS
+  `interface` cannot live inside a class body).
+
+  A new diagnostic, ROZ149, now flags a `$portals.<name>` reference genuinely evaluated
+  during setup/render — `<script>` Program top level, a `$computed` body, a `$watch` GETTER,
+  or a template binding/directive/`r-for`-iterable/interpolation — since the portal anchor
+  does not exist yet at those positions on any target, even after this fix. It does NOT fire
+  on an ordinary function/arrow body (the shape this fix makes correct), `$onMount` /
+  `$onUnmount` / `$onUpdate` bodies, a `$watch` CALLBACK, or event handlers.
+
+  `.rozie` authors do not need to change anything for code that already calls `$portals` from
+  inside `$onMount` — a hook-scope const / class field is visible from the method that used to
+  declare it, so nothing that compiled before stops compiling. Emitted output is NOT
+  byte-identical for any component with a portal slot — the closure text moves and, on
+  Angular/Lit, gains a `this.` qualifier — so `@rozie-ui/chartjs`, `@rozie-ui/codemirror`,
+  `@rozie-ui/fullcalendar`, `@rozie-ui/maplibre`, and `@rozie-ui/rete` (the shipped leaf
+  packages whose `.rozie` sources declare a portal slot) take a patch bump alongside
+  `@rozie/core`.
+
+  The workaround bridges those five packages carry to route `$portals` calls into mount scope
+  (null-let bridges, a "must not be called before mount" invariant, a relocated code block)
+  are now unnecessary and can be unwound at leisure as an independent, opt-in follow-up — not
+  part of this change.
+
+  **Changeset scope note.** The six `@rozie-ui/<family>` umbrella packages are `private: true` and the repo sets `privatePackages.version: false`, so listing them alone versions nothing. The published, consumer-installed artifacts are the per-framework pre-compiled leaves (`@rozie-ui/<family>-<target>`), and they carry no dependency on `@rozie/core` — a core bump does not cascade to them. Since this change rewrites their emitted source, they are bumped explicitly. `@rozie-ui/maplibre-*` is omitted deliberately: those leaves are in the changeset config's `ignore` list. `-solid` leaves are omitted because Solid already emitted the closure at component scope and its output is unchanged.
+
+  **Why no `@rozie-ui/<family>` umbrella entries.** Those six packages are `private: true`, so changesets treats them as ignored; a changeset that mixes ignored and non-ignored packages is rejected outright (`Mixed changesets that contain both ignored and not ignored packages are not allowed`), failing `changeset status` and any release run. Only the published, consumer-installed per-framework leaves are listed.
+
+- 6274a5f: React's `useMemo` stabilization of an escaping top-level `const` was discovered by a
+  ONE-LEVEL, NON-TRANSITIVE scan of `Listener.deps` / `LifecycleHook.setupDeps` — a
+  `new X()` an effect reached only THROUGH a top-level helper (`buildState() ->
+gutterCompartment.of(...)`) was invisible to that scan and never got `useMemo`, so React
+  rebuilt it fresh every render. For an identity-keyed engine object (a CodeMirror6
+  `Compartment`, a Map/WeakMap/Set used as cross-render scratch state) this silently no-ops
+  any imperative API keyed on that instance's identity — CodeMirror's
+  `scheduleReconfigure(compartment, ...)` against an `EditorState` that never saw the fresh
+  Compartment being the corpus shape that surfaced this. All four turbo gates (build, test,
+  dist-parity, typecheck) stayed green while the bug was live; only visual regression testing
+  caught it.
+
+  `computeEscapingNames` (`packages/targets/react/src/emit/computeEscapingNames.ts`) now runs
+  a worklist-to-fixpoint over top-level helper bodies: a helper name reached by an
+  effect/listener seed is walked (its body inspected for further references) but never itself
+  promoted into the escaping set — only a non-function top-level `const` binder reached at any
+  depth through that walk is added. This bound is deliberate: promoting a helper NAME into the
+  escaping set would flip a hoisted `function` declaration back into a non-hoisted
+  `useCallback` const, reopening the temporal-dead-zone class the emitter's plain-hoist branch
+  exists to close, across 860+ shipped `function` declarations corpus-wide. The duplicated seed
+  computation (previously maintained independently in two places in `emitScript.ts`) is now
+  one shared computation, so the `useMemo`/`useCallback` wrap decision and the seam-3 staleness
+  classification can never silently diverge.
+
+  The CodeMirror unwind quick 260829-gbs had to revert (`5d48f9156`, because the two
+  `code-mirror [react]` VR cells failed all retries under the pre-fix emitter) is re-landed:
+  all six leaves regenerated from the fixed emitter, all ten CM6 `Compartment` instances now
+  emit as `useMemo(() => new Compartment(), [])` on React, and the five non-React leaves are
+  byte-identical to the original unwind (`61bf99340`) — the emitter fix itself is React-only.
+
+  Four other shipped React leaves carried a const of this exact shape and changed wrap form as
+  an expected consequence, each individually inspected (correct empty dep array on a
+  non-reactive initializer, no reactive-read case regressed to `[]`, no `.current`-read freeze
+  hazard, and zero helper `function` declarations flipped form anywhere in the corpus):
+  `@rozie-ui/data-table-react` (`GRID_PAGE_STEP`, `DATA_WRITE_TOKEN_KEY`, `SELECT_COL_ID`,
+  `EXPANDER_COL_ID`), `@rozie-ui/rete-react` (`RESIZE_MIN_FALLBACK`, `CONN_WARN_SETTLE_MS`,
+  `HISTORY_CAP`, `ZOOM_STEP`), and `@rozie-ui/toast-react` (`EXIT_FAILSAFE_MS`). Every one is a
+  bare literal initializer reading nothing, so `[]` is the correct and complete dep array.
+
+  **Emitted-comment fidelity — two structural fixes.** The component-scope emission loop mixes
+  statements emitted as hand-built STRINGS (four `tryWrap*` passes) with statements emitted
+  through a per-statement `@babel/generator` call, each of the latter carrying its own
+  printed-comment dedup set. Because Babel attaches a comment sitting BETWEEN two statements to
+  BOTH neighbours at once, a shared comment printed TWICE (both neighbours rendered it) or ZERO
+  times (neither did), depending purely on which pass claimed each side — and both failures
+  were live in the shipped corpus simultaneously. No per-wrap rule can be right for both sides,
+  so the decision moved to a block-wide printed-comment ledger keyed on comment object
+  identity, which prints every comment exactly once in source order regardless of which pass
+  claims either neighbour. This mirrors the single-dedup-set precedent `genBlockInner` and
+  `genImportsBlock` already set for their own scopes.
+
+  Separately, `hoistModuleLet` removed a hoisted `let`'s declaration from the component body
+  and took the author's comment on that declaration with it. Those leading comments are now
+  re-homed onto the nearest surviving neighbour before removal. This one was invisible from
+  inside a single component: an inline host kept such a comment (its neighbour is one parse
+  away and carries it as `trailingComments`) while the byte-identical `<script src>`
+  partial-inlined host — whose spliced node comes from a DIFFERENT parse with no comments
+  attached — lost it. `dist-parity`'s Phase 56-R8 / R11 partial-vs-inline byte-identity cells
+  are what caught it.
+
+  Net effect across the shipped React corpus: 2110 comment lines restored, 187 duplicate
+  prints removed, and **zero** comments dropped and **zero** non-comment bytes changed —
+  verified line-by-line against the pre-change corpus. Fifteen further React leaves are bumped
+  here for that comment-fidelity restoration alone, with no code change:
+  `@rozie-ui/captcha-react`, `chartjs-react`, `combobox-react`, `command-palette-react`,
+  `cropper-react`, `date-picker-react`, `embla-react`, `flatpickr-react`, `otp-react`,
+  `pdf-react`, `popover-react`, `sortable-list-react`, `tags-react`, `tiptap-react`, and
+  `wavesurfer-react`.
+
+  Nine more React leaves drifted the same comment-only way but are deliberately OMITTED from
+  the front matter: `@rozie-ui/dialog-react`, `lexical-react`, `listbox-react`,
+  `maplibre-react`, `number-field-react`, `pagination-react`, `resizable-react`,
+  `slider-react` and `switch-react` are all in `.changeset/config.json`'s `ignore` list, and
+  listing an ignored package alongside a non-ignored one makes `changeset status` fail
+  outright — the exact breakage `8865e96df` repaired, not reintroduced here.
+
+- 4888105: Angular and Lit lowered a component-state write to `this.<name>` inside a non-arrow member
+  of an object literal, where `this` is the OBJECT and not the component — so the write landed
+  on the object, the component never updated, and nothing was reported. Silent, zero-diagnostic,
+  and only on the two class targets; React/Vue/Svelte/Solid close over the binding instead and
+  were always correct.
+
+  `redirectNestedThis` exists precisely to repair every emitter-injected `this` that would
+  rebind, redirecting it to a `const __rozieSelf = this;` alias. Its guard returned early for
+  any top-level non-arrow function, on the reasoning that a top-level function is a promoted
+  class method whose `this` is the component. That reasoning does not hold for an object-literal
+  member: a top-level `const api = { load() { … } }` is promoted to a class FIELD, so `api`'s
+  members have no function parent and read as top-level, yet their `this` is `api`.
+
+  The gap covers every non-arrow object member — method shorthand, getter/setter, and a
+  function-expression property — with or without a nested callback. The arrow-property form was
+  always correct, and is the reason the fix works: an arrow member of a class-field initializer
+  already resolves `this` to the instance, because a field initializer's `this` is the instance
+  and an arrow inherits it.
+
+  Two changes, applied to both byte-identical target mirrors. Detection now treats
+  object-literal membership as a non-component-`this` context. For the host, when the outermost
+  enclosing function is itself an object member there is no function to hold the alias, so the
+  field initializer is wrapped in an arrow IIFE that carries it —
+  `api = (() => { const __rozieSelf = this; return { … }; })();`. An object nested inside a
+  function keeps using the existing function host and emits no IIFE. The IIFE was chosen over
+  rewriting methods into arrow properties because it preserves the object's own method
+  semantics and is the one mechanism that also covers getters and setters, which cannot be
+  arrow-converted at all.
+
+  `$provide(...)` payloads are excluded. `emitContext.bindProvidedValue` already owns that
+  seam: it wraps the payload in a host-capturing IIFE, rewrites every `ThisExpression` to a
+  `__rozieCtxHost` parameter, and keys its reactivity bridge on finding those `ThisExpression`s.
+  Because `redirectNestedThis` runs earlier, an unguarded fix consumed that `this` first and the
+  entire reactive `effect(...)` bridge disappeared from every emitted provider — caught by
+  Lit's existing context test and now locked by a dedicated case in both targets' fixtures.
+
+  No emitted output changes. A scan of all 218 emitted Angular and Lit files in this repo found
+  3497 object literals and 60 non-arrow object member functions, none of which contained a
+  `this` — so the shape was latent and the whole-repo rebuild produced zero drift, with
+  dist-parity 1049/1049. This closes an authorable correctness hole rather than a shipped
+  defect, and no `@rozie-ui` leaf needs regenerating.
+
+- 4a2de54: React dropped the author's leading comments on any top-level `const f = () => {…}`. The
+  emitter rebuilds those as `function f() {…}` so the binding hoists (a real TDZ fix), but it
+  returned the bare synthetic node — no source position and no comments attached — so
+  `@babel/generator` printed the declaration and silently discarded everything documenting it.
+  Measured against the shipped corpus, that was 683 of React's 899 lost comments; Solid, whose
+  identically-named `tryHoistArrowToFunction` has always ended with `t.inherits(fn, stmt)`,
+  lost none. React simply never got that line.
+
+  Restoring it alone is only half the mechanism, and the half on its own is a regression. A
+  comment authored between a hoisted module-`let` and the declaration below it survives on the
+  inline path (one parse attaches the comment object to both neighbours, so the successor still
+  carries it) but not across a `<script src>` partial boundary, where the spliced successor
+  comes from a different parse with nothing attached. There the comment lives only on the
+  removed `let`'s trailing side and dies with the statement — so the inline host printed a
+  comment the partial-inlined host could not, and the two stopped being byte-identical.
+
+  Quick task 260829-j18 re-homed a removed statement's LEADING comments onto a surviving
+  neighbour but deliberately skipped the trailing side, on the reasoning that a removed
+  statement's trailing comments are the same objects Babel attached as the next statement's
+  leading comments, so that side already had an owner. That holds for an inline-authored
+  `<script>` and fails at a splice boundary. `hoistModuleLet` now re-homes the trailing side
+  too, onto the nearest following survivor, deduped by comment object IDENTITY — which is what
+  keeps the inline case from double-printing, since there the object is already present on the
+  successor.
+
+  The two changes ship together and are asserted together: `dist-parity`'s multi-boundary
+  "DataTable-shaped permanent guard" goes red with either half missing, and green with both.
+
+  Across the 38 regenerated React leaves this restores **2655 comments, with zero comments
+  dropped and zero non-comment bytes changed** — verified by parsing each file before and
+  after, comparing the parser's own comment list as a multiset, and comparing
+  `generate(ast, { comments: false })` on both sides, rather than by reading the diff. The
+  dist-parity fixture rebless was verified the same way (55 comments restored, no code delta).
+
+  One cosmetic wart, not fixed here: in `@rozie-ui/data-table-react` a single restored comment
+  prints on the same line as the preceding function's closing brace (`} // …`) instead of
+  starting its own line, because it is re-homed as the previous statement's trailing comment.
+  The block still reads immediately above the declaration it documents and the AST is
+  unaffected. Output prettiness stays a v2 concern.
+
+  Nine further React leaves drifted the same comment-only way but are deliberately absent from
+  the front matter — `@rozie-ui/dialog-react`, `lexical-react`, `listbox-react`,
+  `maplibre-react`, `number-field-react`, `pagination-react`, `resizable-react`,
+  `slider-react` and `switch-react` are all in `.changeset/config.json`'s `ignore` list, and
+  listing an ignored package beside a non-ignored one makes `changeset status` fail outright.
+
+- 6943820: Lit and Angular dropped every leading comment on a top-level declaration promoted into
+  the component class — 1370 apiece across the shipped corpus. Both emitters build each
+  class member as a hand-built string (`generate(decl)` / `renderExpression` / a rebuilt
+  arrow or `t.classMethod`), and none of those carries the STATEMENT's own comments, so an
+  author's documentation simply vanished from the emitted component.
+
+  Both now run a printed-comment ledger keyed on comment OBJECT IDENTITY. Identity rather
+  than source offsets is load-bearing: a `.rzts` script partial is parsed as its own file,
+  so its comment offsets collide with unrelated host comments. A per-branch rule cannot
+  work here at all, because @babel/parser attaches a comment sitting BETWEEN two statements
+  to BOTH neighbours at once — whichever side a local rule picks, the other side either
+  double-prints it or drops it.
+
+  Three properties this needed, each found by measuring the corpus rather than by reading
+  code:
+
+  **It looks back, not just down.** Each statement claims the PREVIOUS statement's
+  still-unclaimed trailing comments as well as its own leading ones, rendering both above
+  its member. Inline, one parse hands the same comment object to both sides, so it prints
+  once. Across a `.rzts` splice boundary the successor comes from a different parse with
+  nothing attached, and the previous statement's trailing side is the only place the
+  comment exists. Without this the inline host printed a comment the partial-inlined host
+  could not, and the partial-vs-inline byte-identity guards went red.
+
+  **The ledger spans the import block.** A comment between the last import and the first
+  promoted declaration is printed by the module-scope import generation — a separate
+  printer with its own dedup set. Unseeded, 132 comments printed twice on Lit and 155 on
+  Angular. Seeding from every comment merely ATTACHED to an import node over-corrected and
+  lost 16, since a comment can hang off a node the block never prints; the seed is taken
+  from what the block actually emitted.
+
+  **It unclaims.** A statement can be consumed by another pass — a `$computed`, a lifecycle
+  hook, a `$provide` directive — and produce no class member at all. When the flush finds
+  no target it releases the claim so whichever printer does emit that statement still
+  renders its comments. Claiming without emitting is how a ledger silently drops comments,
+  which is strictly worse than double-printing, and this is why both targets report zero
+  lost despite several statement kinds never reaching a ledger-owned array.
+
+  Net effect: 5311 comments restored across 53 Lit leaves and 5266 across the Angular
+  leaves, with ZERO comments dropped and ZERO non-comment bytes changed, plus 16
+  pre-existing double-prints fixed on each target (a comment that had been emitted both at
+  module scope and again inside the mount hook). Verified by parsing every file before and
+  after, comparing the parser's own comment list as a multiset, and comparing
+  `generate(ast, { comments: false })` on both sides — never by reading the diff.
+
+  Emitted code is unchanged in every case; this is documentation fidelity only.
+
+  Eighteen further Lit/Angular leaves drifted the same comment-only way but are
+  deliberately absent from the front matter — dialog, lexical, listbox, maplibre,
+  number-field, pagination, resizable, slider and switch (both targets) are all in
+  `.changeset/config.json`'s `ignore` list, and listing an ignored package beside a
+  non-ignored one makes `changeset status` fail outright.
+
+- eebbe66: ROZ207: the id-keyed registry pair now compiles reactively, and uncovered nested `delete` is no longer silent
+
+  **The registry pair works now.** `$data.reg[id] = spec` (register/update) and
+  `delete $data.reg[id]` (unregister) — where `<data>` declares `reg: {}` — now
+  lower to a reactive whole-key replace on React, Solid, Angular and Lit, and raise
+  no ROZ207. Vue and Svelte already worked via deep reactivity, so the idiom is now
+  correct on all six targets. This is the one real-world shape the previous covered
+  subset could not reach; you no longer need to hand-write the whole-object-replace
+  workaround for it.
+
+  A dynamic index into an array-declared key (`$data.arr[i] = v` with `arr: []`) is
+  covered too. The key expression must be a plain identifier, string literal or
+  number literal — a call or a computed chain stays flagged, because the array
+  lowering re-evaluates the key once per element.
+
+  **Behavior change you can hit (1):** a nested `delete` on a `<data>` key that is
+  NOT covered is now a compile ERROR. It previously compiled clean and was silently
+  non-reactive on React/Solid/Angular/Lit — the key was removed but no re-render
+  fired. The validator simply had no `delete` visitor. Newly flagged:
+  `delete $data.arr[i]` on an array-declared key (deleting an array element leaves a
+  hole, which is a different semantic from an immutable replace),
+  `delete $data.obj.field` (non-computed), `delete $data.a.b[k]` (depth 3), a
+  `delete` whose result is consumed as an expression, and a `delete` on a key whose
+  declared value is not a literal object. The diagnostic carries a clone-then-delete
+  hint: `const next = { ...$data.reg }; delete next[id]; $data.reg = next;`.
+
+  **Behavior change you can hit (2):** `$data.k[0] = v` where `k`'s declared value
+  is neither a literal array nor a literal object is now a compile error. It
+  previously emitted an array `.map(...)` operation unconditionally, so
+  `$data.obj[0] = v` with `obj: {}` shipped `{}.map(...)` — a runtime TypeError.
+  An object-declared key now takes the object lowering instead, and the
+  genuinely-unresolvable case fails loud rather than emitting broken code.
+
+  **Note on semantics:** a dynamic key written through the new object lowering
+  becomes an OWN property, because the compiler emits a computed property in an
+  object literal (`{ ...prev, [id]: v }`) rather than a bracket assignment. A key of
+  `"__proto__"` therefore adds an own property instead of setting the prototype.
+  This matches the whole-object-replace workaround this shape supersedes, and is
+  strictly safer than the in-place bracket write it replaces.
+
 ## 0.6.0
 
 ### Minor Changes

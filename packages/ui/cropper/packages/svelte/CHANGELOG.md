@@ -1,5 +1,11 @@
 # @rozie-ui/cropper-svelte
 
+## 0.1.4
+
+### Patch Changes
+
+- @rozie/runtime-svelte@0.7.0
+
 ## 0.1.3
 
 ### Patch Changes

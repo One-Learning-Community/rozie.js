@@ -1,5 +1,11 @@
 # @rozie-ui/date-picker-svelte
 
+## 0.1.7
+
+### Patch Changes
+
+- @rozie/runtime-svelte@0.7.0
+
 ## 0.1.6
 
 ### Patch Changes

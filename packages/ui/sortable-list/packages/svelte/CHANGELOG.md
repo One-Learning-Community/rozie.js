@@ -1,5 +1,11 @@
 # @rozie-ui/sortable-list-svelte
 
+## 0.1.9
+
+### Patch Changes
+
+- @rozie/runtime-svelte@0.7.0
+
 ## 0.1.8
 
 ### Patch Changes

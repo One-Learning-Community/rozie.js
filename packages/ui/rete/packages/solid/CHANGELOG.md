@@ -1,5 +1,79 @@
 # @rozie-ui/rete-solid
 
+## 0.3.1
+
+### Patch Changes
+
+- 5e2e697: A `graph.connections` edge that cannot be placed — an unknown node id, a port
+  key the node does not have, or one a connection rule rejects — now logs a
+  one-time developer warning naming that edge, instead of vanishing silently.
+  The warning is deferred until the graph settles, so an edge that lands on a
+  later reconcile pass (for example, one whose target node or port registers
+  just after the edge itself) stays silent.
+
+  The imperative `addConnection()` handle verb now returns `null` and logs a
+  warning when the connection is rejected by connection validation or names a
+  port key that does not exist on the endpoint node, instead of returning an
+  id for an edge the canvas never actually took — which previously left a
+  phantom entry in the canvas's internal connection map that desynchronised
+  the next graph reconcile. A bad port key no longer surfaces as a raw,
+  unhandled rete exception.
+
+  `connection-rejected` now also fires when an explicit `addConnection()` handle
+  call is rejected by a connection rule, carrying the same `reason` discriminator
+  (`'type-mismatch'` / `'can-connect'`) the drag path already carried. Previously
+  that path was suppressed by the same echo-guard that silences props-driven
+  reconcile, which conflated a deliberate consumer call with the canvas echoing
+  its own pass. Reconcile stays suppressed and is unchanged. A consumer already
+  handling `connection-rejected` may therefore see events from imperative calls
+  that were previously swallowed — the payload shape is unchanged.
+
+  The warnings themselves are a console-only diagnostic channel.
+
+- eb280c9: No API change. Internal helpers that read `$portals.<name>` now live at component scope
+  instead of inside the mount-phase lifecycle hook, now that quick 260829-cd4 hoists the
+  emitter-synthesized `$portals` closure to component scope on all six targets.
+
+  This unwinds the `$portals` mount-scope workarounds in three shipped `@rozie-ui`
+  components (of the five originally targeted — see the CodeMirror note below) carried
+  before that emitter fix landed:
+  - **`@rozie-ui/tiptap`** — `makeNodeView`/`makeNodeViewExtensions` read `$portals.nodeView`
+    directly instead of taking it as an injected parameter.
+  - **`@rozie-ui/rete`** (`NodeType`) — the `#body` portal-mount closure is a top-level
+    function instead of a null-let bridge assigned inside `$onMount`.
+  - **`@rozie-ui/chartjs`** (and its 8 per-type variants, generated from the same source) —
+    `buildConfig` and its click/hover/tooltip helpers are top-level; `$onMount` now only
+    captures the canvas ref, constructs the `Chart` instance, and tears it down.
+
+  `@rozie-ui/maplibre`'s per-framework leaves are changesets-ignored (deliberately
+  unpublished) even though the marker/popup/interactive-layer reconcile unwind landed and
+  is included in the source diff — no leaf version bump applies.
+
+  `@rozie-ui/rete`'s sibling `FlowCanvas` component was investigated and found
+  correct-by-design (its reconcilers are rooted in a `$refs` read that must stay
+  `$onMount`-scoped under ROZ123) — only its stale comment was corrected, no behavior change.
+
+  **`@rozie-ui/codemirror` REVERTED, not shipped.** The relocation was implemented, gated
+  green (build/test/typecheck), and committed, but the full Docker VR union caught a
+  React-only regression it introduced: the CM6 `Compartment` instances (`themeCompartment`
+  et al.) lost their `useMemo(() => new Compartment(), [])` wrapping and became a
+  per-render `new Compartment()` once `buildState` (which reads them) moved out of
+  `$onMount` to a top-level `useCallback` — an emitter memoization-heuristic gap, not a
+  `.rozie`-source-fixable issue (SCOPE FENCE: no emitter code changed in this quick). Two
+  React `code-mirror.spec.ts` tests failed (theme-toggle class never changing; an
+  extensions-toggle readOnly reconfigure never taking effect) while all five other targets
+  stayed green. The commit was reverted; CodeMirror.rozie and its six leaves are unchanged
+  from `main` before this quick. Recorded as a follow-up for the emitter team, not
+  worked around here.
+
+  Several stale comments across the touched files claimed `$emit` and/or `$slots` also
+  forced mount scope. Neither ever did, on any target — those comments are corrected too.
+
+  No emitter code changed in this patch. `@rozie/core` is not bumped.
+
+  **Why no `@rozie-ui/<family>` umbrella entries.** Those six packages are `private: true`, so changesets treats them as ignored; a changeset that mixes ignored and non-ignored packages is rejected outright (`Mixed changesets that contain both ignored and not ignored packages are not allowed`), failing `changeset status` and any release run. Only the published, consumer-installed per-framework leaves are listed.
+  - @rozie/runtime-solid@0.7.0
+
 ## 0.3.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/data-table-svelte
 
+## 0.2.4
+
+### Patch Changes
+
+- @rozie/runtime-svelte@0.7.0
+
 ## 0.2.3
 
 ### Patch Changes

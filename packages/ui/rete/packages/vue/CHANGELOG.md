@@ -1,5 +1,128 @@
 # @rozie-ui/rete-vue
 
+## 0.3.1
+
+### Patch Changes
+
+- 5e2e697: A `graph.connections` edge that cannot be placed — an unknown node id, a port
+  key the node does not have, or one a connection rule rejects — now logs a
+  one-time developer warning naming that edge, instead of vanishing silently.
+  The warning is deferred until the graph settles, so an edge that lands on a
+  later reconcile pass (for example, one whose target node or port registers
+  just after the edge itself) stays silent.
+
+  The imperative `addConnection()` handle verb now returns `null` and logs a
+  warning when the connection is rejected by connection validation or names a
+  port key that does not exist on the endpoint node, instead of returning an
+  id for an edge the canvas never actually took — which previously left a
+  phantom entry in the canvas's internal connection map that desynchronised
+  the next graph reconcile. A bad port key no longer surfaces as a raw,
+  unhandled rete exception.
+
+  `connection-rejected` now also fires when an explicit `addConnection()` handle
+  call is rejected by a connection rule, carrying the same `reason` discriminator
+  (`'type-mismatch'` / `'can-connect'`) the drag path already carried. Previously
+  that path was suppressed by the same echo-guard that silences props-driven
+  reconcile, which conflated a deliberate consumer call with the canvas echoing
+  its own pass. Reconcile stays suppressed and is unchanged. A consumer already
+  handling `connection-rejected` may therefore see events from imperative calls
+  that were previously swallowed — the payload shape is unchanged.
+
+  The warnings themselves are a console-only diagnostic channel.
+
+- ba42bc2: On React, Angular, and Lit, the synthesized `$portals` closure now lives at COMPONENT scope
+  (React: the hook section; Angular/Lit: a private class field) instead of being declared
+  inside the mount-phase lifecycle hook body. Vue, Svelte, and Solid already did the right
+  thing and are unaffected in shape (Vue/Svelte additionally now declare the closure BEFORE
+  the user script, matching Solid, closing a secondary TDZ hazard for a top-level invocation).
+
+  This closes a silent parity bug: a `<script>` top-level helper reading `$portals.<name>`
+  previously compiled on three targets and failed on the other three — `TS2304 Cannot find
+name 'portals'` on the bundled-leaf strict typecheck, `ReferenceError: portals is not
+defined` at runtime, with zero diagnostics. Three failure shapes are fixed:
+  1. A top-level helper reading `$portals.<name>`, called from `$onMount`.
+  2. A top-level helper reading `$portals.<name>`, with NO `$onMount` at all — previously
+     the whole closure was emitted NOWHERE on React (it was attached unconditionally to the
+     first mount-phase hook; no hook meant it was silently dropped).
+  3. A `$portals.<name>` read from a `$watch` body — broken on all three targets, and the
+     shape driving most of the corpus workarounds this closes the door on.
+
+  React additionally synthesizes a dispose-only effect (`[]` deps) for a component that has
+  portals but no mount-phase lifecycle hook at all, so portal roots still bulk-dispose on
+  unmount in that shape. Angular and Lit now lower `$portals.<name>` to a `this.`-qualified
+  member read (the closure is a class field, not a same-method-only `const`); the
+  reactive-handle `interface ReactivePortalHandle` moved to module scope on both (a TS
+  `interface` cannot live inside a class body).
+
+  A new diagnostic, ROZ149, now flags a `$portals.<name>` reference genuinely evaluated
+  during setup/render — `<script>` Program top level, a `$computed` body, a `$watch` GETTER,
+  or a template binding/directive/`r-for`-iterable/interpolation — since the portal anchor
+  does not exist yet at those positions on any target, even after this fix. It does NOT fire
+  on an ordinary function/arrow body (the shape this fix makes correct), `$onMount` /
+  `$onUnmount` / `$onUpdate` bodies, a `$watch` CALLBACK, or event handlers.
+
+  `.rozie` authors do not need to change anything for code that already calls `$portals` from
+  inside `$onMount` — a hook-scope const / class field is visible from the method that used to
+  declare it, so nothing that compiled before stops compiling. Emitted output is NOT
+  byte-identical for any component with a portal slot — the closure text moves and, on
+  Angular/Lit, gains a `this.` qualifier — so `@rozie-ui/chartjs`, `@rozie-ui/codemirror`,
+  `@rozie-ui/fullcalendar`, `@rozie-ui/maplibre`, and `@rozie-ui/rete` (the shipped leaf
+  packages whose `.rozie` sources declare a portal slot) take a patch bump alongside
+  `@rozie/core`.
+
+  The workaround bridges those five packages carry to route `$portals` calls into mount scope
+  (null-let bridges, a "must not be called before mount" invariant, a relocated code block)
+  are now unnecessary and can be unwound at leisure as an independent, opt-in follow-up — not
+  part of this change.
+
+  **Changeset scope note.** The six `@rozie-ui/<family>` umbrella packages are `private: true` and the repo sets `privatePackages.version: false`, so listing them alone versions nothing. The published, consumer-installed artifacts are the per-framework pre-compiled leaves (`@rozie-ui/<family>-<target>`), and they carry no dependency on `@rozie/core` — a core bump does not cascade to them. Since this change rewrites their emitted source, they are bumped explicitly. `@rozie-ui/maplibre-*` is omitted deliberately: those leaves are in the changeset config's `ignore` list. `-solid` leaves are omitted because Solid already emitted the closure at component scope and its output is unchanged.
+
+  **Why no `@rozie-ui/<family>` umbrella entries.** Those six packages are `private: true`, so changesets treats them as ignored; a changeset that mixes ignored and non-ignored packages is rejected outright (`Mixed changesets that contain both ignored and not ignored packages are not allowed`), failing `changeset status` and any release run. Only the published, consumer-installed per-framework leaves are listed.
+
+- eb280c9: No API change. Internal helpers that read `$portals.<name>` now live at component scope
+  instead of inside the mount-phase lifecycle hook, now that quick 260829-cd4 hoists the
+  emitter-synthesized `$portals` closure to component scope on all six targets.
+
+  This unwinds the `$portals` mount-scope workarounds in three shipped `@rozie-ui`
+  components (of the five originally targeted — see the CodeMirror note below) carried
+  before that emitter fix landed:
+  - **`@rozie-ui/tiptap`** — `makeNodeView`/`makeNodeViewExtensions` read `$portals.nodeView`
+    directly instead of taking it as an injected parameter.
+  - **`@rozie-ui/rete`** (`NodeType`) — the `#body` portal-mount closure is a top-level
+    function instead of a null-let bridge assigned inside `$onMount`.
+  - **`@rozie-ui/chartjs`** (and its 8 per-type variants, generated from the same source) —
+    `buildConfig` and its click/hover/tooltip helpers are top-level; `$onMount` now only
+    captures the canvas ref, constructs the `Chart` instance, and tears it down.
+
+  `@rozie-ui/maplibre`'s per-framework leaves are changesets-ignored (deliberately
+  unpublished) even though the marker/popup/interactive-layer reconcile unwind landed and
+  is included in the source diff — no leaf version bump applies.
+
+  `@rozie-ui/rete`'s sibling `FlowCanvas` component was investigated and found
+  correct-by-design (its reconcilers are rooted in a `$refs` read that must stay
+  `$onMount`-scoped under ROZ123) — only its stale comment was corrected, no behavior change.
+
+  **`@rozie-ui/codemirror` REVERTED, not shipped.** The relocation was implemented, gated
+  green (build/test/typecheck), and committed, but the full Docker VR union caught a
+  React-only regression it introduced: the CM6 `Compartment` instances (`themeCompartment`
+  et al.) lost their `useMemo(() => new Compartment(), [])` wrapping and became a
+  per-render `new Compartment()` once `buildState` (which reads them) moved out of
+  `$onMount` to a top-level `useCallback` — an emitter memoization-heuristic gap, not a
+  `.rozie`-source-fixable issue (SCOPE FENCE: no emitter code changed in this quick). Two
+  React `code-mirror.spec.ts` tests failed (theme-toggle class never changing; an
+  extensions-toggle readOnly reconfigure never taking effect) while all five other targets
+  stayed green. The commit was reverted; CodeMirror.rozie and its six leaves are unchanged
+  from `main` before this quick. Recorded as a follow-up for the emitter team, not
+  worked around here.
+
+  Several stale comments across the touched files claimed `$emit` and/or `$slots` also
+  forced mount scope. Neither ever did, on any target — those comments are corrected too.
+
+  No emitter code changed in this patch. `@rozie/core` is not bumped.
+
+  **Why no `@rozie-ui/<family>` umbrella entries.** Those six packages are `private: true`, so changesets treats them as ignored; a changeset that mixes ignored and non-ignored packages is rejected outright (`Mixed changesets that contain both ignored and not ignored packages are not allowed`), failing `changeset status` and any release run. Only the published, consumer-installed per-framework leaves are listed.
+  - @rozie/runtime-vue@0.7.0
+
 ## 0.3.0
 
 ### Minor Changes
