@@ -1,9 +1,5 @@
 ---
-'@rozie/core': patch
-'@rozie/target-react': patch
-'@rozie/target-solid': patch
-'@rozie/target-angular': patch
-'@rozie/target-lit': patch
+"@rozie/core": patch
 ---
 
 ROZ207: the id-keyed registry pair now compiles reactively, and uncovered nested `delete` is no longer silent
