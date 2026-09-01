@@ -338,6 +338,23 @@ for (const target of TARGETS) {
 // phase). ComboboxVirtualFlipDemo seeds `virtual: false` + a `flip-virtual` toggle.
 // Open non-virtual (flat 1,000-option render), flip to virtual (the rendered slice must
 // stay non-blank and settle small), then flip back (the flat/full render returns).
+//
+// Phase 86 R2 (plan 86-03) deviation: the flip button is driven via a raw `mousedown`
+// dispatch, NOT Playwright's `.click()`. The demo's own handler is
+// `@mousedown.prevent="$data.virtual = !$data.virtual"` — it never listens for
+// `click` at all, `.prevent` on mousedown only suppresses the browser's own
+// focus-steal, and it does NOT (cannot) suppress the native `click` event a REAL
+// mouse gesture also synthesizes. Composing all four combobox render branches onto
+// the SAME popover (this plan) gave the popup a document-level click-outside
+// dismiss listener it never had before (D-07) — gated on `open` only, capture-phase
+// on `document`, so no descendant handler (`.stop`, `preventDefault`, etc.) can ever
+// intercept it. `.click()`'s real click event, landing on a button OUTSIDE the
+// combobox control by design, is therefore now a genuine dismissal gesture — an
+// entirely correct new capability the demo's flip button was never built to survive.
+// `dispatchEvent('mousedown')` fires exactly the one event the handler listens for,
+// with no browser-synthesized follow-up click, matching the demo's own documented
+// intent ("flipping must NOT steal focus from the combobox input") without
+// incidentally exercising a real dismissal path this fixture was never testing.
 // ════════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
   runnerFor(target)(`combobox-virtual-flip [${target}]: runtime virtual flip builds/tears the window without a blank frame`, async ({
@@ -356,7 +373,7 @@ for (const target of TARGETS) {
       .toBeGreaterThan(100);
 
     // Flip to virtual — the rendered slice must never go blank and must settle small.
-    await page.getByTestId('flip-virtual').click();
+    await page.getByTestId('flip-virtual').dispatchEvent('mousedown');
     await expect
       .poll(async () => page.locator('[role="option"]').count(), { timeout: 15_000 })
       .toBeGreaterThan(0);
@@ -368,7 +385,7 @@ for (const target of TARGETS) {
       .toBeGreaterThan(0);
 
     // Flip back — the flat/full render is restored.
-    await page.getByTestId('flip-virtual').click();
+    await page.getByTestId('flip-virtual').dispatchEvent('mousedown');
     await expect
       .poll(async () => page.locator('[role="option"]').count(), { timeout: 15_000 })
       .toBeGreaterThan(100);
