@@ -1,0 +1,97 @@
+name: Changeset Guard
+
+# WHY THIS EXISTS. The 0.7.0 wave (2026-08-31) was assembled with a changeset
+# that named the PRIVATE family roots @rozie/target-{react,solid,angular,lit}
+# alongside the public @rozie/core. Two things were wrong with it, and both are
+# invisible until you actually try to cut a release:
+#
+#   1. Naming a private root versions NOTHING — .changeset/config.json sets
+#      privatePackages.version:false, so those four entries were inert.
+#   2. Worse, config.json also `ignore`s 54 held-back leaves, which made the
+#      entry a MIXED changeset (ignored + non-ignored packages). That is a HARD
+#      ERROR in @changesets/assemble-release-plan: `changeset status` AND
+#      `changeset version` both abort outright. The whole pending wave was
+#      unreleasable — 13 changesets, 131 packages — not just the bad entry.
+#
+# The defect sat on main through a full green CI sweep: all ten workflows
+# (six framework matrices, repo-wide typecheck, visual regression, adoption
+# smokes, docs) passed while the release pipeline was broken, because nothing
+# in CI has ever exercised the release plan. It surfaced only when a human went
+# to publish. `pnpm changeset:check` catches case (1) in about a second and
+# `changeset status` catches case (2); neither was wired up.
+#
+# TWO CHECKS, NOT ONE — they cover different classes and neither subsumes the
+# other:
+#   - check-changeset-private-packages.mjs catches a PRIVATE root by name. It
+#     does not know about the `ignore` list.
+#   - `changeset status` computes the actual release plan, which is the only
+#     thing that catches a mixed changeset. Note this fires even when every
+#     named package is public: naming one of the 54 ignored-but-public
+#     held-back leaves next to a non-ignored one is the same hard error.
+#
+# PATH FILTER RATIONALE. Unlike typecheck.yml (deliberately unfiltered, since a
+# type regression can come from anywhere), this defect class has a bounded set
+# of inputs: the changeset files themselves, the config that decides what is
+# ignored, the guard script, and — following dep-drift.yml's WR-02 reasoning —
+# any package.json, because a package flipping to `private: true` retroactively
+# turns an existing, previously-valid changeset into a private-root entry.
+#
+# Cost: an install plus two node invocations. Seconds.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.changeset/**'
+      - 'scripts/check-changeset-private-packages.mjs'
+      - '.github/workflows/changeset-guard.yml'
+      - '**/package.json'
+  pull_request:
+    paths:
+      - '.changeset/**'
+      - 'scripts/check-changeset-private-packages.mjs'
+      - '.github/workflows/changeset-guard.yml'
+      - '**/package.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  changeset-guard:
+    name: changeset release-plan integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # fetch-depth: 0 is insurance, not decoration. `changeset status` without
+      # --since reads .changeset/*.md and needs no history, but the CLI also
+      # resolves the current branch, and a shallow detached-HEAD checkout is a
+      # known source of CI-only changesets failures. The clone is cheap here
+      # because this job installs nothing else.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Class 1: a changeset naming a private family root. Versions nothing,
+      # and combined with the ignore list produces the mixed-changeset abort.
+      - name: Private-root guard
+        run: node scripts/check-changeset-private-packages.mjs
+
+      # Class 2: the release plan must actually assemble. This is the check
+      # that would have caught the 0.7.0 breakage. An empty .changeset/ exits 0,
+      # so this is a no-op between waves rather than a nuisance failure.
+      - name: Release plan assembles (mixed-changeset guard)
+        run: pnpm exec changeset status
