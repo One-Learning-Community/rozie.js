@@ -42,12 +42,14 @@ const EXPECT = {
   // the composed @rozie-ui/popover leaf wrapping the plain popup branch.
   // Phase 86 (R1, plan 86-04): + `multiple` — widens the sole `value` model to
   // an array; `value` is STILL the only model:true prop (no ROZ125).
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift'],
-  models: ['value'],
-  emits: ['change', 'search'],
   // Phase 86 (R1, plan 86-05): + `chip` — the chip-rail scoped slot `{ option,
   // remove, index }`, rendered inside the control before the input under `multiple`.
-  slots: ['option', 'empty', 'groupHeading', 'groupMore', 'chip'] as string[],
+  // Phase 86 (R3, plan 86-06): + `creatable` prop, `create` emit, `create`
+  // scoped slot `{ query }`.
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'creatable', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift'],
+  models: ['value'],
+  emits: ['change', 'search', 'create'],
+  slots: ['option', 'empty', 'groupHeading', 'groupMore', 'chip', 'create'] as string[],
   // seedQuery (command-palette #2 levels/restore-on-pop prerequisite): an
   // imperative-only handle verb that seeds $data.query — NOT a second model
   // (ROZ125 — combobox's sole model:true prop stays `value`).
@@ -78,7 +80,7 @@ describe('Combobox.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (22 props)', () => {
+  it('props surface matches (23 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

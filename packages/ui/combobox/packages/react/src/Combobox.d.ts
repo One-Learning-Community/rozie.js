@@ -48,6 +48,10 @@ export interface ComboboxProps {
    */
   multiple?: boolean;
   /**
+   * When the user commits text matching no option (case-insensitive, trimmed, exact label equality — no Unicode normalization applied), combobox emits `create` with the query and writes NOTHING to `value` — the consumer adds the option to `options` and updates the model itself. Composes with `multiple`. Turning this on replaces the `#empty` fill with the `#create` row whenever the query is creatable (non-empty, no exact match); `#empty` still renders for an empty or whitespace-only query. Default `false` is byte-identical to today.
+   */
+  creatable?: boolean;
+  /**
    * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
    */
   optionLabel?: ((...args: any[]) => any) | null;
@@ -95,20 +99,25 @@ export interface ComboboxProps {
    * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
    */
   disableShift?: boolean;
+  onCreate?: (...args: unknown[]) => void;
   onChange?: (...args: unknown[]) => void;
   onSearch?: (...args: unknown[]) => void;
   renderChip?: (params: { option: unknown; remove: unknown; index: unknown }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;
+  renderCreate?: (params: { query: unknown }) => ReactNode;
   renderGroupHeading?: (params: { group: unknown }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;
+  renderCreate?: (params: { query: unknown }) => ReactNode;
   renderGroupHeading?: (params: { group: unknown }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderGroupMore?: (params: { group: unknown; hidden: unknown; expand: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;
+  renderCreate?: (params: { query: unknown }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;
+  renderCreate?: (params: { query: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

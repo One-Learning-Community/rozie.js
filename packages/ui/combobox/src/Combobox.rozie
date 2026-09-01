@@ -199,6 +199,26 @@
     },
   },
 
+  // ── Creatable mode: consumer-owned `create` event (Phase 86 R3) ──────────
+  // When the user commits text matching no option (case-insensitive,
+  // trimmed, EXACT label equality — no Unicode normalization applied),
+  // combobox emits `create` with the query and writes NOTHING to `value` —
+  // the consumer adds the option to `options` and updates the model itself;
+  // combobox never guesses the consumer's option shape. Composes with
+  // `multiple`. Turning this on replaces the `#empty` fill with the
+  // `#create` row whenever the query is creatable (non-empty, no exact
+  // match) — `#empty` still renders for an empty or whitespace-only query.
+  // Default `false` is byte-identical to today: no create row ever renders,
+  // `create` never fires.
+  creatable: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'When the user commits text matching no option (case-insensitive, trimmed, exact label equality — no Unicode normalization applied), combobox emits `create` with the query and writes NOTHING to `value` — the consumer adds the option to `options` and updates the model itself. Composes with `multiple`. Turning this on replaces the `#empty` fill with the `#create` row whenever the query is creatable (non-empty, no exact match); `#empty` still renders for an empty or whitespace-only query. Default `false` is byte-identical to today.',
+    },
+  },
+
   // Resolver overrides for object options. Fall back to `.label` / `.value` /
   // `.disabled`. (Grown in P3 + lifted to the shared listCore spine so callers
   // can drive non-`{label,value}`-shaped option objects, e.g. command items.)
@@ -355,6 +375,13 @@
   // group-cap). A map of gkey(gid) -> true for groups the user has expanded.
   // Replaced immutably so React re-renders; reset by the options/query $watch.
   expandedGroups: {},
+  // Double-commit latch for creatable mode (Phase 86 R3, D-17/D-20): the
+  // normalized (trimmed + lower-cased) query most recently committed via a
+  // `create` emit, or `null`. A second commit of the SAME normalized query
+  // (e.g. two rapid Enter presses, or the async round-trip window before the
+  // consumer's `options` update lands) is a no-op — `create` fires exactly
+  // once per distinct query. Cleared on every input change (onInput below).
+  createdQuery: null,
 }
 </data>
 
@@ -622,12 +649,68 @@ const cappedBlocks = () => {
   return out
 }
 
+// ---- creatable mode (Phase 86 R3, D-17..D-20) ---------------------------
+// normalizedQuery(): trimmed + lower-cased query — reuses the SAME case-fold
+// filteredOptions() already applies above, but for an EXACT-EQUALITY
+// comparison, never a substring search, and with NO Unicode normalization
+// (R3 locked: a composition-form difference must NOT be treated as a match).
+const normalizedQuery = () => String($data.query == null ? '' : $data.query).trim().toLowerCase()
+
+// queryMatchesOption(nq): whether the (already-normalized) query is an exact,
+// case-insensitive, trimmed match of some option's label.
+const queryMatchesOption = (nq) => {
+  const opts = Array.isArray($props.options) ? $props.options : []
+  return opts.some((o) => String(labelOf(o)).trim().toLowerCase() === nq)
+}
+
+// isCreatableQuery(): the create-row visibility gate (also gates the `#empty`
+// -> `#create` swap, D-19). `creatable` must be set, the normalized query
+// must be non-empty (an empty/whitespace-only query never offers create —
+// `#empty` keeps its job there), and no option's normalized label may equal
+// it exactly.
+const isCreatableQuery = () => {
+  if (!$props.creatable) return false
+  const nq = normalizedQuery()
+  if (!nq) return false
+  return !queryMatchesOption(nq)
+}
+
+// createRowAt(baseCount): the synthetic, non-option `role="option"` create
+// row (D-17) — mirrors the `groupMore` "+N more" row shape exactly (a real
+// id, arrow-reachable, commits through the SAME selectOption() dispatch
+// without writing the model). Each render branch passes ITS OWN flattened
+// pre-create-row row count (`baseCount`) as the running index, exactly as
+// `cappedBlocks()` already re-indexes `_i` across options + the more row —
+// so ids / aria-activedescendant / navRows() can never disagree.
+const createRowAt = (baseCount) => ({ isCreate: true, _i: baseCount, disabled: false })
+
+// cappedRowCount(): the total navigable row count cappedBlocks() flattens to
+// (visible items + more-rows, across every block) — the running index the
+// capped branch's own create row (below) must continue from. Mirrors
+// cappedBlocks()'s own `running` counter without re-deriving `_i` per item.
+const cappedRowCount = () => {
+  const blocks = cappedBlocks()
+  let n = 0
+  for (let bi = 0; bi < blocks.length; bi++) {
+    n += blocks[bi].items.length
+    if (blocks[bi].more) n++
+  }
+  return n
+}
+
 // navRows(): the SINGLE keyboard/aria source of truth. Returns the EXACT
-// filteredOptions() reference when not capped (byte-identical-off — untouched
-// virtual/ungrouped keyboard path); flattens cappedBlocks() into visible items +
-// more-rows, in order, when capped.
+// filteredOptions() reference when not capped and not creatable (byte-
+// identical-off — untouched virtual/ungrouped keyboard path); flattens
+// cappedBlocks() into visible items + more-rows, in order, when capped.
+// Appends the create row, AFTER the full flattened visible(+more) sequence,
+// whenever isCreatableQuery() — R3's locked "renders last, after all options
+// and group sections" is a positional fact here, not a per-branch special case.
 const navRows = () => {
-  if (!isCapped()) return filteredOptions()
+  if (!isCapped()) {
+    const base = filteredOptions()
+    if (!isCreatableQuery()) return base
+    return base.concat([createRowAt(base.length)])
+  }
   const out = []
   const blocks = cappedBlocks()
   for (let bi = 0; bi < blocks.length; bi++) {
@@ -635,6 +718,7 @@ const navRows = () => {
     for (let ii = 0; ii < blk.items.length; ii++) out.push(blk.items[ii])
     if (blk.more) out.push(blk.more)
   }
+  if (isCreatableQuery()) out.push(createRowAt(out.length))
   return out
 }
 
@@ -801,6 +885,29 @@ const selectOption = (opt) => {
     $data.activeIndex = opt._i
     return
   }
+  if (opt.isCreate) {
+    // Read locals before any write (ROZ138 idiom).
+    const q = $data.query
+    const nq = normalizedQuery()
+    // The double-commit latch (D-17/D-20): a second commit of the SAME
+    // normalized query — whether a rapid double gesture, or the async
+    // round-trip window before the consumer's `options` update lands — is a
+    // no-op. An empty/whitespace normalized query never emits either (the
+    // row should not even be reachable then, since isCreatableQuery() gates
+    // it, but this guard is cheap insurance against a stale reference).
+    if (!nq || nq === $data.createdQuery) return
+    $data.createdQuery = nq
+    $emit('create', { query: q })
+    // D-20: after `create` fires, local UI state behaves like a pick — the
+    // effective close-on-select applies, and the query clears in `multiple`
+    // mode (ready for the next entry) and is left alone in single mode (the
+    // consumer's async add flows back through the ordinary `value` watch).
+    // `value` itself is untouched — R3 locked.
+    if (effectiveCloseOnSelect()) $data.isOpen = false
+    if ($props.multiple) $data.query = ''
+    $data.activeIndex = -1
+    return
+  }
   if (opt.disabled) return
   if ($props.multiple) {
     // Capture whether the value was already present BEFORE the toggle — this
@@ -853,6 +960,10 @@ const syncQueryToValue = () => {
 const onInput = (e) => {
   const q = e && e.target ? e.target.value : ''
   $data.query = q
+  // Any input change re-arms the double-commit latch (D-17/D-20) — a
+  // freshly-typed query is a new gesture, never a repeat of whatever was
+  // last created.
+  $data.createdQuery = null
   $data.isOpen = true
   $data.activeIndex = 0
   $emit('search', { query: q })
@@ -1281,8 +1392,29 @@ $expose({ focus, clear, seedQuery, pinOpen })
         <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === $data.activeIndex" :selected="isRowSelected(opt)" :disabled="opt.disabled">{{ opt.label }}</slot>
       </li>
 
-      <li r-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
+      <li r-if="filteredOptions().length === 0 && !isCreatableQuery()" class="rozie-combobox-empty" role="presentation">
         <slot name="empty" :query="$data.query">No results</slot>
+      </li>
+
+      <!-- Creatable mode (Phase 86 R3, D-17/D-18/D-19): mirrors the +N more
+           row's shape exactly — a real option id, arrow-reachable, commits
+           through the SAME selectOption() dispatch (its isCreate branch
+           writes nothing to the model). Renders LAST, after every option —
+           R3's locked "renders after all options and group sections" is a
+           positional fact (it is the final sibling here), not a special
+           case. REPLACES the empty-state row above when the query is
+           creatable (D-19); coexists with real options whenever the query
+           substring-matches something but exact-matches nothing. -->
+      <li
+        r-if="isCreatableQuery()"
+        class="rozie-combobox-option rozie-combobox-create"
+        :id="optId(filteredOptions().length)"
+        role="option"
+        :class="{ 'rozie-combobox-option--active': filteredOptions().length === $data.activeIndex }"
+        @mousedown.prevent="selectOption(createRowAt(filteredOptions().length))"
+        @mouseenter="$data.activeIndex = filteredOptions().length"
+      >
+        <slot name="create" :query="$data.query">Create "{{ $data.query }}"</slot>
       </li>
     </ul>
 
@@ -1329,8 +1461,24 @@ $expose({ focus, clear, seedQuery, pinOpen })
         </div>
       </li>
 
-      <li r-if="groupBlocks().length === 0" class="rozie-combobox-empty" role="presentation">
+      <li r-if="groupBlocks().length === 0 && !isCreatableQuery()" class="rozie-combobox-empty" role="presentation">
         <slot name="empty" :query="$data.query">No results</slot>
+      </li>
+
+      <!-- Creatable mode (Phase 86 R3): renders LAST, after every group
+           section — mirrors the plain branch's create row above verbatim,
+           `_i` continues from filteredOptions().length (the same flattened
+           count groupBlocks() re-partitions without changing). -->
+      <li
+        r-if="isCreatableQuery()"
+        class="rozie-combobox-option rozie-combobox-create"
+        :id="optId(filteredOptions().length)"
+        role="option"
+        :class="{ 'rozie-combobox-option--active': filteredOptions().length === $data.activeIndex }"
+        @mousedown.prevent="selectOption(createRowAt(filteredOptions().length))"
+        @mouseenter="$data.activeIndex = filteredOptions().length"
+      >
+        <slot name="create" :query="$data.query">Create "{{ $data.query }}"</slot>
       </li>
     </ul>
 
@@ -1389,8 +1537,25 @@ $expose({ focus, clear, seedQuery, pinOpen })
         </div>
       </li>
 
-      <li r-if="cappedBlocks().length === 0" class="rozie-combobox-empty" role="presentation">
+      <li r-if="cappedBlocks().length === 0 && !isCreatableQuery()" class="rozie-combobox-empty" role="presentation">
         <slot name="empty" :query="$data.query">No results</slot>
+      </li>
+
+      <!-- Creatable mode (Phase 86 R3): renders LAST, after every group
+           section AND every "+N more" row — `_i` continues from
+           cappedRowCount() (the SAME running total cappedBlocks() itself
+           re-indexes across visible items + more-rows), so ids never
+           disagree with navRows(). -->
+      <li
+        r-if="isCreatableQuery()"
+        class="rozie-combobox-option rozie-combobox-create"
+        :id="optId(cappedRowCount())"
+        role="option"
+        :class="{ 'rozie-combobox-option--active': cappedRowCount() === $data.activeIndex }"
+        @mousedown.prevent="selectOption(createRowAt(cappedRowCount()))"
+        @mouseenter="$data.activeIndex = cappedRowCount()"
+      >
+        <slot name="create" :query="$data.query">Create "{{ $data.query }}"</slot>
       </li>
     </ul>
 
@@ -1439,8 +1604,26 @@ $expose({ focus, clear, seedQuery, pinOpen })
 
       <li class="rozie-combobox-spacer" aria-hidden="true" :style="'height:' + padBottom() + 'px'"></li>
 
-      <li r-if="windowSource().length === 0" class="rozie-combobox-empty" role="presentation">
+      <li r-if="windowSource().length === 0 && !isCreatableQuery()" class="rozie-combobox-empty" role="presentation">
         <slot name="empty" :query="$data.query">No results</slot>
+      </li>
+
+      <!-- Creatable mode (Phase 86 R3, D-17/A3): a SYNTHETIC non-option row
+           has no natural place inside virtual-core's measured window slice,
+           so it renders as a trailing sibling OUTSIDE the r-for loop —
+           mirroring how the empty-state row directly above already sits
+           outside it. windowSource() === filteredOptions() (same reference),
+           so `_i` continues from the same count the other three branches use. -->
+      <li
+        r-if="isCreatableQuery()"
+        class="rozie-combobox-option rozie-combobox-create"
+        :id="optId(windowSource().length)"
+        role="option"
+        :class="{ 'rozie-combobox-option--active': windowSource().length === $data.activeIndex }"
+        @mousedown.prevent="selectOption(createRowAt(windowSource().length))"
+        @mouseenter="$data.activeIndex = windowSource().length"
+      >
+        <slot name="create" :query="$data.query">Create "{{ $data.query }}"</slot>
       </li>
     </ul>
     </template>
@@ -1583,6 +1766,16 @@ $expose({ focus, clear, seedQuery, pinOpen })
   cursor: pointer;
   color: var(--rozie-combobox-more-color, rgba(0, 0, 0, 0.55));
   font-size: var(--rozie-combobox-more-size, 0.875rem);
+}
+/* Creatable mode (Phase 86 R3): the trailing "Create …" row — reads as
+   interactive but keeps the shared .rozie-combobox-option sizing/active-state
+   styling of a regular option (the .rozie-combobox-option--active rule still
+   applies). Fully token-driven; the two --rozie-combobox-create* tokens are
+   declared with their documentation prose in themes/base.css (plan 86-06 task 3). */
+.rozie-combobox-create {
+  cursor: pointer;
+  color: var(--rozie-combobox-create-color, var(--rozie-combobox-accent, #0066cc));
+  background: var(--rozie-combobox-create-bg, transparent);
 }
 /* Windowing spacer rows (Phase 64 P4): zero-chrome <li> whose inline height keeps the
    total scroll height === virtual-core getTotalSize() (the windowed slice sits between). */

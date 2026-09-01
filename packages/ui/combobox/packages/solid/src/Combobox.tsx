@@ -134,6 +134,11 @@ __rozieInjectStyle('Combobox-9546115a', `.rozie-combobox[data-rozie-s-9546115a] 
   color: var(--rozie-combobox-more-color, rgba(0, 0, 0, 0.55));
   font-size: var(--rozie-combobox-more-size, 0.875rem);
 }
+.rozie-combobox-create[data-rozie-s-9546115a] {
+  cursor: pointer;
+  color: var(--rozie-combobox-create-color, var(--rozie-combobox-accent, #0066cc));
+  background: var(--rozie-combobox-create-bg, transparent);
+}
 .rozie-combobox-spacer[data-rozie-s-9546115a] { margin: 0; padding: 0; border: 0; list-style: none; }
 .rozie-combobox-chips[data-rozie-s-9546115a] {
   display: flex;
@@ -203,6 +208,8 @@ interface OptionSlotCtx { option: any; index: any; active: any; selected: any; d
 
 interface EmptySlotCtx { query: any; }
 
+interface CreateSlotCtx { query: any; }
+
 interface GroupHeadingSlotCtx { group: any; }
 
 interface GroupMoreSlotCtx { group: any; hidden: any; expand: any; }
@@ -253,6 +260,10 @@ interface ComboboxProps {
    */
   multiple?: boolean;
   /**
+   * When the user commits text matching no option (case-insensitive, trimmed, exact label equality — no Unicode normalization applied), combobox emits `create` with the query and writes NOTHING to `value` — the consumer adds the option to `options` and updates the model itself. Composes with `multiple`. Turning this on replaces the `#empty` fill with the `#create` row whenever the query is creatable (non-empty, no exact match); `#empty` still renders for an empty or whitespace-only query. Default `false` is byte-identical to today.
+   */
+  creatable?: boolean;
+  /**
    * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
    */
   optionLabel?: ((...args: any[]) => any) | null;
@@ -300,11 +311,13 @@ interface ComboboxProps {
    * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
    */
   disableShift?: boolean;
+  onCreate?: (...args: unknown[]) => void;
   onChange?: (...args: unknown[]) => void;
   onSearch?: (...args: unknown[]) => void;
   chipSlot?: (ctx: ChipSlotCtx) => JSX.Element;
   optionSlot?: (ctx: OptionSlotCtx) => JSX.Element;
   emptySlot?: (ctx: EmptySlotCtx) => JSX.Element;
+  createSlot?: (ctx: CreateSlotCtx) => JSX.Element;
   groupHeadingSlot?: (ctx: GroupHeadingSlotCtx) => JSX.Element;
   groupMoreSlot?: (ctx: GroupMoreSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
@@ -319,8 +332,8 @@ export interface ComboboxHandle {
 }
 
 export default function Combobox(_props: ComboboxProps): JSX.Element {
-  const _merged = mergeProps({ options: (() => [])() as any[], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: null, multiple: false, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: (() => [])() as any[], groupCap: 0, placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift', 'ref', 'onChange', 'onSearch']);
+  const _merged = mergeProps({ options: (() => [])() as any[], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: null, multiple: false, creatable: false, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: (() => [])() as any[], groupCap: 0, placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false }, _props);
+  const [local, attrs] = splitProps(_merged, ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'creatable', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift', 'ref', 'onCreate', 'onChange', 'onSearch']);
   onMount(() => { local.ref?.({ focus, clear, seedQuery, pinOpen }); });
 
   const [value, setValue] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'value', null);
@@ -331,6 +344,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   const [windowVer, setWindowVer] = createSignal(0);
   const [editVer, setEditVer] = createSignal(0);
   const [expandedGroups, setExpandedGroups] = createSignal<Record<string, any>>({});
+  const [createdQuery, setCreatedQuery] = createSignal<any>(null);
   onMount(() => {
     syncQueryToValue();
     syncRows();
@@ -927,12 +941,76 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     return out;
   }
 
+  // ---- creatable mode (Phase 86 R3, D-17..D-20) ---------------------------
+  // normalizedQuery(): trimmed + lower-cased query — reuses the SAME case-fold
+  // filteredOptions() already applies above, but for an EXACT-EQUALITY
+  // comparison, never a substring search, and with NO Unicode normalization
+  // (R3 locked: a composition-form difference must NOT be treated as a match).
+  function normalizedQuery() {
+    return String(query() == null ? '' : query()).trim().toLowerCase();
+  }
+
+  // queryMatchesOption(nq): whether the (already-normalized) query is an exact,
+  // case-insensitive, trimmed match of some option's label.
+  function queryMatchesOption(nq: any) {
+    const opts = Array.isArray(local.options) ? local.options : [];
+    return opts.some((o: any) => String(labelOf(o)).trim().toLowerCase() === nq);
+  }
+
+  // isCreatableQuery(): the create-row visibility gate (also gates the `#empty`
+  // -> `#create` swap, D-19). `creatable` must be set, the normalized query
+  // must be non-empty (an empty/whitespace-only query never offers create —
+  // `#empty` keeps its job there), and no option's normalized label may equal
+  // it exactly.
+  function isCreatableQuery() {
+    if (!local.creatable) return false;
+    const nq = normalizedQuery();
+    if (!nq) return false;
+    return !queryMatchesOption(nq);
+  }
+
+  // createRowAt(baseCount): the synthetic, non-option `role="option"` create
+  // row (D-17) — mirrors the `groupMore` "+N more" row shape exactly (a real
+  // id, arrow-reachable, commits through the SAME selectOption() dispatch
+  // without writing the model). Each render branch passes ITS OWN flattened
+  // pre-create-row row count (`baseCount`) as the running index, exactly as
+  // `cappedBlocks()` already re-indexes `_i` across options + the more row —
+  // so ids / aria-activedescendant / navRows() can never disagree.
+  function createRowAt(baseCount: any) {
+    return {
+      isCreate: true,
+      _i: baseCount,
+      disabled: false
+    };
+  }
+
+  // cappedRowCount(): the total navigable row count cappedBlocks() flattens to
+  // (visible items + more-rows, across every block) — the running index the
+  // capped branch's own create row (below) must continue from. Mirrors
+  // cappedBlocks()'s own `running` counter without re-deriving `_i` per item.
+  function cappedRowCount() {
+    const blocks = cappedBlocks();
+    let n = 0;
+    for (let bi = 0; bi < blocks.length; bi++) {
+      n += blocks[bi].items.length;
+      if (blocks[bi].more) n++;
+    }
+    return n;
+  }
+
   // navRows(): the SINGLE keyboard/aria source of truth. Returns the EXACT
-  // filteredOptions() reference when not capped (byte-identical-off — untouched
-  // virtual/ungrouped keyboard path); flattens cappedBlocks() into visible items +
-  // more-rows, in order, when capped.
+  // filteredOptions() reference when not capped and not creatable (byte-
+  // identical-off — untouched virtual/ungrouped keyboard path); flattens
+  // cappedBlocks() into visible items + more-rows, in order, when capped.
+  // Appends the create row, AFTER the full flattened visible(+more) sequence,
+  // whenever isCreatableQuery() — R3's locked "renders last, after all options
+  // and group sections" is a positional fact here, not a per-branch special case.
   function navRows() {
-    if (!isCapped()) return filteredOptions();
+    if (!isCapped()) {
+      const base = filteredOptions();
+      if (!isCreatableQuery()) return base;
+      return base.concat([createRowAt(base.length)]);
+    }
     const out = [];
     const blocks = cappedBlocks();
     for (let bi = 0; bi < blocks.length; bi++) {
@@ -940,6 +1018,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
       for (let ii = 0; ii < blk.items.length; ii++) out.push(blk.items[ii]);
       if (blk.more) out.push(blk.more);
     }
+    if (isCreatableQuery()) out.push(createRowAt(out.length));
     return out;
   }
 
@@ -1135,6 +1214,31 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
       setActiveIndex(opt._i);
       return;
     }
+    if (opt.isCreate) {
+      // Read locals before any write (ROZ138 idiom).
+      const q = query();
+      const nq = normalizedQuery();
+      // The double-commit latch (D-17/D-20): a second commit of the SAME
+      // normalized query — whether a rapid double gesture, or the async
+      // round-trip window before the consumer's `options` update lands — is a
+      // no-op. An empty/whitespace normalized query never emits either (the
+      // row should not even be reachable then, since isCreatableQuery() gates
+      // it, but this guard is cheap insurance against a stale reference).
+      if (!nq || nq === createdQuery()) return;
+      setCreatedQuery(nq);
+      _props.onCreate?.({
+        query: q
+      });
+      // D-20: after `create` fires, local UI state behaves like a pick — the
+      // effective close-on-select applies, and the query clears in `multiple`
+      // mode (ready for the next entry) and is left alone in single mode (the
+      // consumer's async add flows back through the ordinary `value` watch).
+      // `value` itself is untouched — R3 locked.
+      if (effectiveCloseOnSelect()) setIsOpen(false);
+      if (local.multiple) setQuery('');
+      setActiveIndex(-1);
+      return;
+    }
     if (opt.disabled) return;
     if (local.multiple) {
       // Capture whether the value was already present BEFORE the toggle — this
@@ -1198,6 +1302,10 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   function onInput(e: any) {
     const q = e && e.target ? e.target.value : '';
     setQuery(q);
+    // Any input change re-arms the double-commit latch (D-17/D-20) — a
+    // freshly-typed query is a new gesture, never a repeat of whatever was
+    // last created.
+    setCreatedQuery(null);
     setIsOpen(true);
     setActiveIndex(0);
     _props.onSearch?.({
@@ -1436,8 +1544,10 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
             {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt().option, index: opt()._i, active: opt()._i === activeIndex(), selected: isRowSelected(opt()), disabled: opt().disabled }) ?? rozieDisplay(opt().label)}
           </li>}</Key>
 
-          {<Show when={filteredOptions().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+          {<Show when={filteredOptions().length === 0 && !isCreatableQuery()}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
             {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
+          </li></Show>}{<Show when={isCreatableQuery()}><li role="option" class={"rozie-combobox-option rozie-combobox-create" + " " + rozieClass({ 'rozie-combobox-option--active': filteredOptions().length === activeIndex() })} id={rozieAttr(optId(filteredOptions().length))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(createRowAt(filteredOptions().length)); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(filteredOptions().length); }} data-rozie-s-9546115a="">
+            {(_props.createSlot ?? _props.slots?.['create'])?.({ query: query() }) ?? <>Create "{query()}"</>}
           </li></Show>}</ul></Show>}{<Show when={isOpen() && !local.virtual && isGrouped() && !isCapped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" aria-multiselectable={(local.multiple ? 'true' : null) ?? undefined} data-rozie-s-9546115a="">
           <Key each={groupBlocks() as readonly any[]} by={(blk) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped')}>{(blk) => <li class={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-9546115a="">
             {<Show when={blk().group}><div class={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
@@ -1447,8 +1557,10 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
             </div>}</Key>
           </li>}</Key>
 
-          {<Show when={groupBlocks().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+          {<Show when={groupBlocks().length === 0 && !isCreatableQuery()}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
             {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
+          </li></Show>}{<Show when={isCreatableQuery()}><li role="option" class={"rozie-combobox-option rozie-combobox-create" + " " + rozieClass({ 'rozie-combobox-option--active': filteredOptions().length === activeIndex() })} id={rozieAttr(optId(filteredOptions().length))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(createRowAt(filteredOptions().length)); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(filteredOptions().length); }} data-rozie-s-9546115a="">
+            {(_props.createSlot ?? _props.slots?.['create'])?.({ query: query() }) ?? <>Create "{query()}"</>}
           </li></Show>}</ul></Show>}{<Show when={isOpen() && !local.virtual && isCapped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" aria-multiselectable={(local.multiple ? 'true' : null) ?? undefined} data-rozie-s-9546115a="">
           <Key each={cappedBlocks() as readonly any[]} by={(blk) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped')}>{(blk) => <li class={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-9546115a="">
             {<Show when={blk().group}><div class={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
@@ -1461,8 +1573,10 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
               {(_props.groupMoreSlot ?? _props.slots?.['groupMore'])?.({ group: blk().group, hidden: blk().more.hidden, expand: blk().more.expand }) ?? <>+{rozieDisplay(blk().more.hidden)} more</>}
             </div></Show>}</li>}</Key>
 
-          {<Show when={cappedBlocks().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+          {<Show when={cappedBlocks().length === 0 && !isCreatableQuery()}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
             {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
+          </li></Show>}{<Show when={isCreatableQuery()}><li role="option" class={"rozie-combobox-option rozie-combobox-create" + " " + rozieClass({ 'rozie-combobox-option--active': cappedRowCount() === activeIndex() })} id={rozieAttr(optId(cappedRowCount()))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(createRowAt(cappedRowCount())); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(cappedRowCount()); }} data-rozie-s-9546115a="">
+            {(_props.createSlot ?? _props.slots?.['create'])?.({ query: query() }) ?? <>Create "{query()}"</>}
           </li></Show>}</ul></Show>}{<Show when={local.virtual}><ul class={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" aria-multiselectable={(local.multiple ? 'true' : null) ?? undefined} style={parseInlineStyle((isOpen() ? '' : 'display:none;') + (local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + local.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a="">
           <li class={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a="" />
 
@@ -1472,8 +1586,10 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
 
           <li class={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padBottom() + 'px')} data-rozie-s-9546115a="" />
 
-          {<Show when={windowSource().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+          {<Show when={windowSource().length === 0 && !isCreatableQuery()}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
             {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
+          </li></Show>}{<Show when={isCreatableQuery()}><li role="option" class={"rozie-combobox-option rozie-combobox-create" + " " + rozieClass({ 'rozie-combobox-option--active': windowSource().length === activeIndex() })} id={rozieAttr(optId(windowSource().length))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(createRowAt(windowSource().length)); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(windowSource().length); }} data-rozie-s-9546115a="">
+            {(_props.createSlot ?? _props.slots?.['create'])?.({ query: query() }) ?? <>Create "{query()}"</>}
           </li></Show>}</ul></Show>}</Popover>
     </div>
     </>

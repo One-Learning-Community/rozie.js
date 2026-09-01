@@ -39,6 +39,10 @@ interface RozieEmptySlotCtx {
   query: any;
 }
 
+interface RozieCreateSlotCtx {
+  query: any;
+}
+
 interface RozieGroupHeadingSlotCtx {
   group: any;
 }
@@ -169,6 +173,11 @@ export default class Combobox extends SignalWatcher(LitElement) {
   color: var(--rozie-combobox-more-color, rgba(0, 0, 0, 0.55));
   font-size: var(--rozie-combobox-more-size, 0.875rem);
 }
+.rozie-combobox-create[data-rozie-s-9546115a] {
+  cursor: pointer;
+  color: var(--rozie-combobox-create-color, var(--rozie-combobox-accent, #0066cc));
+  background: var(--rozie-combobox-create-bg, transparent);
+}
 .rozie-combobox-spacer[data-rozie-s-9546115a] { margin: 0; padding: 0; border: 0; list-style: none; }
 .rozie-combobox-chips[data-rozie-s-9546115a] {
   display: flex;
@@ -277,6 +286,10 @@ export default class Combobox extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true }) multiple: boolean = false;
   /**
+   * When the user commits text matching no option (case-insensitive, trimmed, exact label equality — no Unicode normalization applied), combobox emits `create` with the query and writes NOTHING to `value` — the consumer adds the option to `options` and updates the model itself. Composes with `multiple`. Turning this on replaces the `#empty` fill with the `#create` row whenever the query is creatable (non-empty, no exact match); `#empty` still renders for an empty or whitespace-only query. Default `false` is byte-identical to today.
+   */
+  @property({ type: Boolean, reflect: true }) creatable: boolean = false;
+  /**
    * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
    */
   @property({ type: Function }) optionLabel: ((...args: any[]) => any) | null = null;
@@ -331,6 +344,7 @@ export default class Combobox extends SignalWatcher(LitElement) {
   private _windowVer = signal(0);
   private _editVer = signal(0);
   private _expandedGroups = signal<any>({});
+  private _createdQuery = signal<any>(null);
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
@@ -348,6 +362,9 @@ private __rozieFirstUpdateDone = false;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
   @property({ attribute: false }) empty?: (scope: { query: any }) => unknown;
+  @state() private _hasSlotCreate = false;
+  @queryAssignedElements({ slot: 'create', flatten: true }) private _slotCreateElements!: Element[];
+  @property({ attribute: false }) create?: (scope: { query: any }) => unknown;
   @state() private _hasSlotGroupHeading = false;
   @queryAssignedElements({ slot: 'groupHeading', flatten: true }) private _slotGroupHeadingElements!: Element[];
   @property({ attribute: false }) groupHeading?: (scope: { group: any }) => unknown;
@@ -405,6 +422,17 @@ private __rozieFirstUpdateDone = false;
     }
 
     {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="create"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotCreate = this._slotCreateElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
       const slotEl = this.shadowRoot?.querySelector('slot[name="groupHeading"]');
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotGroupHeading = this._slotGroupHeadingElements.length > 0; };
@@ -432,6 +460,7 @@ private __rozieFirstUpdateDone = false;
     this._hasSlotChip = Array.from(this.children).some((el) => el.getAttribute('slot') === 'chip');
     this._hasSlotOption = Array.from(this.children).some((el) => el.getAttribute('slot') === 'option');
     this._hasSlotEmpty = Array.from(this.children).some((el) => el.getAttribute('slot') === 'empty');
+    this._hasSlotCreate = Array.from(this.children).some((el) => el.getAttribute('slot') === 'create');
     this._hasSlotGroupHeading = Array.from(this.children).some((el) => el.getAttribute('slot') === 'groupHeading');
     this._hasSlotGroupMore = Array.from(this.children).some((el) => el.getAttribute('slot') === 'groupMore');
     super.connectedCallback();
@@ -518,8 +547,10 @@ private __rozieFirstUpdateDone = false;
         ${this.option !== undefined ? this.option({option: opt.option, index: opt._i, active: opt._i === this._activeIndex.value, selected: this.isRowSelected(opt), disabled: opt.disabled}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: opt.option, index: opt._i, active: opt._i === this._activeIndex.value, selected: this.isRowSelected(opt), disabled: opt.disabled}); } catch { return '{}'; } })()}>${rozieDisplay(opt.label)}</slot>`}
       </li>`)}
 
-      ${this.filteredOptions().length === 0 ? html`<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>
+      ${this.filteredOptions().length === 0 && !this.isCreatableQuery() ? html`<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>
         ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No results</slot>`}
+      </li>` : nothing}${this.isCreatableQuery() ? html`<li class="${Object.entries({ "rozie-combobox-create": true, "rozie-combobox-option": true, 'rozie-combobox-option--active': this.filteredOptions().length === this._activeIndex.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optId(this.filteredOptions().length))} role="option" @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(this.createRowAt(this.filteredOptions().length)); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = this.filteredOptions().length; }} data-rozie-s-9546115a>
+        ${this.create !== undefined ? this.create({query: this._query.value}) : html`<slot name="create" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>Create "${this._query.value}"</slot>`}
       </li>` : nothing}</ul>` : nothing}${this._isOpen.value && !this.virtual && this.isGrouped() && !this.isCapped() ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" aria-multiselectable=${rozieAttr(this.multiple ? 'true' : null)} data-rozie-s-9546115a>
       ${repeat<any>(this.groupBlocks(), (blk, _idx) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped'), (blk, _idx) => html`<li class="rozie-combobox-group" role="group" aria-label=${rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-9546115a>
         ${blk.group ? html`<div class="rozie-combobox-group-heading" role="presentation" data-rozie-s-9546115a>
@@ -529,8 +560,10 @@ private __rozieFirstUpdateDone = false;
         </div>`)}
       </li>`)}
 
-      ${this.groupBlocks().length === 0 ? html`<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>
+      ${this.groupBlocks().length === 0 && !this.isCreatableQuery() ? html`<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>
         ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No results</slot>`}
+      </li>` : nothing}${this.isCreatableQuery() ? html`<li class="${Object.entries({ "rozie-combobox-create": true, "rozie-combobox-option": true, 'rozie-combobox-option--active': this.filteredOptions().length === this._activeIndex.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optId(this.filteredOptions().length))} role="option" @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(this.createRowAt(this.filteredOptions().length)); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = this.filteredOptions().length; }} data-rozie-s-9546115a>
+        ${this.create !== undefined ? this.create({query: this._query.value}) : html`<slot name="create" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>Create "${this._query.value}"</slot>`}
       </li>` : nothing}</ul>` : nothing}${this._isOpen.value && !this.virtual && this.isCapped() ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" aria-multiselectable=${rozieAttr(this.multiple ? 'true' : null)} data-rozie-s-9546115a>
       ${repeat<any>(this.cappedBlocks(), (blk, _idx) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped'), (blk, _idx) => html`<li class="rozie-combobox-group" role="group" aria-label=${rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-9546115a>
         ${blk.group ? html`<div class="rozie-combobox-group-heading" role="presentation" data-rozie-s-9546115a>
@@ -543,8 +576,10 @@ private __rozieFirstUpdateDone = false;
           ${this.groupMore !== undefined ? this.groupMore({group: blk.group, hidden: blk.more.hidden, expand: blk.more.expand}) : html`<slot name="groupMore" data-rozie-params=${(() => { try { return JSON.stringify({group: blk.group, hidden: blk.more.hidden, expand: blk.more.expand}); } catch { return '{}'; } })()}>+${rozieDisplay(blk.more.hidden)} more</slot>`}
         </div>` : nothing}</li>`)}
 
-      ${this.cappedBlocks().length === 0 ? html`<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>
+      ${this.cappedBlocks().length === 0 && !this.isCreatableQuery() ? html`<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>
         ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No results</slot>`}
+      </li>` : nothing}${this.isCreatableQuery() ? html`<li class="${Object.entries({ "rozie-combobox-create": true, "rozie-combobox-option": true, 'rozie-combobox-option--active': this.cappedRowCount() === this._activeIndex.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optId(this.cappedRowCount()))} role="option" @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(this.createRowAt(this.cappedRowCount())); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = this.cappedRowCount(); }} data-rozie-s-9546115a>
+        ${this.create !== undefined ? this.create({query: this._query.value}) : html`<slot name="create" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>Create "${this._query.value}"</slot>`}
       </li>` : nothing}</ul>` : nothing}${this.virtual ? html`<ul class="rozie-combobox-list rozie-combobox-list--virtual" id=${rozieAttr(this.listId())} role="listbox" aria-multiselectable=${rozieAttr(this.multiple ? 'true' : null)} style=${rozieStyle((this._isOpen.value ? '' : 'display:none;') + (this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + this.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a>
       <li class="rozie-combobox-spacer" aria-hidden="true" style=${rozieStyle('height:' + this.padTop() + 'px')} data-rozie-s-9546115a></li>
 
@@ -554,8 +589,10 @@ private __rozieFirstUpdateDone = false;
 
       <li class="rozie-combobox-spacer" aria-hidden="true" style=${rozieStyle('height:' + this.padBottom() + 'px')} data-rozie-s-9546115a></li>
 
-      ${this.windowSource().length === 0 ? html`<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>
+      ${this.windowSource().length === 0 && !this.isCreatableQuery() ? html`<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>
         ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No results</slot>`}
+      </li>` : nothing}${this.isCreatableQuery() ? html`<li class="${Object.entries({ "rozie-combobox-create": true, "rozie-combobox-option": true, 'rozie-combobox-option--active': this.windowSource().length === this._activeIndex.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optId(this.windowSource().length))} role="option" @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(this.createRowAt(this.windowSource().length)); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = this.windowSource().length; }} data-rozie-s-9546115a>
+        ${this.create !== undefined ? this.create({query: this._query.value}) : html`<slot name="create" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>Create "${this._query.value}"</slot>`}
       </li>` : nothing}</ul>` : nothing}</rozie-popover>
 </div>
 `;
@@ -1116,12 +1153,72 @@ private __rozieFirstUpdateDone = false;
   return out;
 };
 
+  // ---- creatable mode (Phase 86 R3, D-17..D-20) ---------------------------
+  // normalizedQuery(): trimmed + lower-cased query — reuses the SAME case-fold
+  // filteredOptions() already applies above, but for an EXACT-EQUALITY
+  // comparison, never a substring search, and with NO Unicode normalization
+  // (R3 locked: a composition-form difference must NOT be treated as a match).
+  normalizedQuery = () => String(this._query.value == null ? '' : this._query.value).trim().toLowerCase();
+
+  // queryMatchesOption(nq): whether the (already-normalized) query is an exact,
+  // case-insensitive, trimmed match of some option's label.
+  queryMatchesOption = (nq: any) => {
+  const opts = Array.isArray(this.options) ? this.options : [];
+  return opts.some((o: any) => String(this.labelOf(o)).trim().toLowerCase() === nq);
+};
+
+  // isCreatableQuery(): the create-row visibility gate (also gates the `#empty`
+  // -> `#create` swap, D-19). `creatable` must be set, the normalized query
+  // must be non-empty (an empty/whitespace-only query never offers create —
+  // `#empty` keeps its job there), and no option's normalized label may equal
+  // it exactly.
+  isCreatableQuery = () => {
+  if (!this.creatable) return false;
+  const nq = this.normalizedQuery();
+  if (!nq) return false;
+  return !this.queryMatchesOption(nq);
+};
+
+  // createRowAt(baseCount): the synthetic, non-option `role="option"` create
+  // row (D-17) — mirrors the `groupMore` "+N more" row shape exactly (a real
+  // id, arrow-reachable, commits through the SAME selectOption() dispatch
+  // without writing the model). Each render branch passes ITS OWN flattened
+  // pre-create-row row count (`baseCount`) as the running index, exactly as
+  // `cappedBlocks()` already re-indexes `_i` across options + the more row —
+  // so ids / aria-activedescendant / navRows() can never disagree.
+  createRowAt = (baseCount: any) => ({
+  isCreate: true,
+  _i: baseCount,
+  disabled: false
+});
+
+  // cappedRowCount(): the total navigable row count cappedBlocks() flattens to
+  // (visible items + more-rows, across every block) — the running index the
+  // capped branch's own create row (below) must continue from. Mirrors
+  // cappedBlocks()'s own `running` counter without re-deriving `_i` per item.
+  cappedRowCount = () => {
+  const blocks = this.cappedBlocks();
+  let n = 0;
+  for (let bi = 0; bi < blocks.length; bi++) {
+    n += blocks[bi].items.length;
+    if (blocks[bi].more) n++;
+  }
+  return n;
+};
+
   // navRows(): the SINGLE keyboard/aria source of truth. Returns the EXACT
-  // filteredOptions() reference when not capped (byte-identical-off — untouched
-  // virtual/ungrouped keyboard path); flattens cappedBlocks() into visible items +
-  // more-rows, in order, when capped.
+  // filteredOptions() reference when not capped and not creatable (byte-
+  // identical-off — untouched virtual/ungrouped keyboard path); flattens
+  // cappedBlocks() into visible items + more-rows, in order, when capped.
+  // Appends the create row, AFTER the full flattened visible(+more) sequence,
+  // whenever isCreatableQuery() — R3's locked "renders last, after all options
+  // and group sections" is a positional fact here, not a per-branch special case.
   navRows = () => {
-  if (!this.isCapped()) return this.filteredOptions();
+  if (!this.isCapped()) {
+    const base = this.filteredOptions();
+    if (!this.isCreatableQuery()) return base;
+    return base.concat([this.createRowAt(base.length)]);
+  }
   const out = [];
   const blocks = this.cappedBlocks();
   for (let bi = 0; bi < blocks.length; bi++) {
@@ -1129,6 +1226,7 @@ private __rozieFirstUpdateDone = false;
     for (let ii = 0; ii < blk.items.length; ii++) out.push(blk.items[ii]);
     if (blk.more) out.push(blk.more);
   }
+  if (this.isCreatableQuery()) out.push(this.createRowAt(out.length));
   return out;
 };
 
@@ -1316,6 +1414,35 @@ private __rozieFirstUpdateDone = false;
     this._activeIndex.value = opt._i;
     return;
   }
+  if (opt.isCreate) {
+    // Read locals before any write (ROZ138 idiom).
+    const q = this._query.value;
+    const nq = this.normalizedQuery();
+    // The double-commit latch (D-17/D-20): a second commit of the SAME
+    // normalized query — whether a rapid double gesture, or the async
+    // round-trip window before the consumer's `options` update lands — is a
+    // no-op. An empty/whitespace normalized query never emits either (the
+    // row should not even be reachable then, since isCreatableQuery() gates
+    // it, but this guard is cheap insurance against a stale reference).
+    if (!nq || nq === this._createdQuery.value) return;
+    this._createdQuery.value = nq;
+    this.dispatchEvent(new CustomEvent("create", {
+      detail: {
+        query: q
+      },
+      bubbles: true,
+      composed: true
+    }));
+    // D-20: after `create` fires, local UI state behaves like a pick — the
+    // effective close-on-select applies, and the query clears in `multiple`
+    // mode (ready for the next entry) and is left alone in single mode (the
+    // consumer's async add flows back through the ordinary `value` watch).
+    // `value` itself is untouched — R3 locked.
+    if (this.effectiveCloseOnSelect()) this._isOpen.value = false;
+    if (this.multiple) this._query.value = '';
+    this._activeIndex.value = -1;
+    return;
+  }
   if (opt.disabled) return;
   if (this.multiple) {
     // Capture whether the value was already present BEFORE the toggle — this
@@ -1387,6 +1514,10 @@ private __rozieFirstUpdateDone = false;
   onInput = (e: any) => {
   const q = e && e.target ? e.target.value : '';
   this._query.value = q;
+  // Any input change re-arms the double-commit latch (D-17/D-20) — a
+  // freshly-typed query is a new gesture, never a repeat of whatever was
+  // last created.
+  this._createdQuery.value = null;
   this._isOpen.value = true;
   this._activeIndex.value = 0;
   this.dispatchEvent(new CustomEvent("search", {
@@ -1641,7 +1772,7 @@ private __rozieFirstUpdateDone = false;
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'value', 'options', 'placeholder', 'disabled', 'disable-filter', 'disablefilter', 'aria-label', 'arialabel', 'id-base', 'idbase', 'inline', 'close-on-select', 'closeonselect', 'multiple', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'virtual', 'estimate-row-height', 'estimaterowheight', 'max-height', 'maxheight', 'groups', 'group-cap', 'groupcap', 'placement', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift']);
+    const __skip = new Set<string>(['data-rozie-ref', 'value', 'options', 'placeholder', 'disabled', 'disable-filter', 'disablefilter', 'aria-label', 'arialabel', 'id-base', 'idbase', 'inline', 'close-on-select', 'closeonselect', 'multiple', 'creatable', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'virtual', 'estimate-row-height', 'estimaterowheight', 'max-height', 'maxheight', 'groups', 'group-cap', 'groupcap', 'placement', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

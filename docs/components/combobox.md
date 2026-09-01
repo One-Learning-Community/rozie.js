@@ -76,6 +76,7 @@ const frameworks = [
 | `inline` | `Boolean` | `false` | yes | Render the results list in normal flow (static) rather than as an absolutely-positioned popup — use when embedding the combobox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. |
 | `closeOnSelect` | `Boolean` | `null` | yes | Close the popup after a selection commits. Unset (`null`, the default) resolves to `true` in single-select (today's behavior) and `false` in `multiple` mode, where closing after every chip pick would make multi-select unusable; pass an explicit `true`/`false` to override in either mode. |
 | `multiple` | `Boolean` | `false` | yes | `value` widens to hold an **array** of selected values and remains the sole `model: true` prop, so the Angular `ControlValueAccessor` is preserved (a second model would forfeit it). Re-selecting an already-selected option toggles it off. Default `false` is byte-identical to single-select. |
+| `creatable` | `Boolean` | `false` | yes | When the user commits text matching no option (case-insensitive, trimmed, exact label equality — no Unicode normalization applied), combobox emits `create` with the query and writes NOTHING to `value` — the consumer adds the option to `options` and updates the model itself. Composes with `multiple`. Turning this on replaces the `#empty` fill with the `#create` row whenever the query is creatable (non-empty, no exact match); `#empty` still renders for an empty or whitespace-only query. Default `false` is byte-identical to today. |
 | `optionLabel` | `Function` | `null` | yes | Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property. |
 | `optionValue` | `Function` | `null` | yes | Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property. |
 | `optionDisabled` | `Function` | `null` | yes | Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property. |
@@ -95,6 +96,7 @@ const frameworks = [
 | --- | --- |
 | `change` | Fired when the selected value changes — a user picks an option (toggling membership in `multiple` mode), or `clear()` resets it. Payload `{ value, option, selected }`: `value` is always the model's NEW value (the whole array in `multiple` mode, the scalar or `null` in single mode); `option` is the raw source option that was toggled (`null` after `clear()`); `selected` is the direction of the toggle — `true` when added / always `true` in single-select, `false` when removed or after `clear()`. |
 | `search` | Fired on every keystroke in the input. Payload `{ query }` — the current text. Pair it with `disableFilter` to drive async / server-side filtering. |
+| `create` | Fired when `creatable` is set and the user commits text matching no option (case-insensitive, trimmed, exact label equality — no Unicode normalization). Payload `{ query }` — the committed text. Combobox writes NOTHING to `value` when this fires — the consumer adds the option to `options` and updates the model itself. Fires at most once per distinct query (a double-commit is a no-op); composes with `multiple` (`value` stays untouched there too). |
 
 ### Imperative handle
 
@@ -116,6 +118,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `groupHeading` | `group` | Custom rendering for a group's heading (only when grouping is active — see [Grouping options](#grouping-options)). `group` is `{ id, label }`. Omit it to render the plain `group.label`. |
 | `groupMore` | `group, hidden, expand` | Custom rendering for a capped group's "+N more" row (only when `groupCap` is set — see [Capping groups](#capping-groups)). `group` is `{ id, label }` (or `null` for the leading ungrouped section), `hidden` is the count of not-yet-shown options, `expand` is a zero-arg closure that expands the group in place. Omit it to render the default `+{hidden} more` text. |
 | `chip` | `option, remove, index` | Custom rendering for one selected-value chip in the chip rail (only when `multiple` is set — see [Multi-select](#multi-select)). `option` is the raw source option object, or `null` when it has disappeared from `options` (the chip still renders, labelled by its raw value). `remove` is a zero-arg closure that removes that value from the selection via the same toggle path a re-select uses. `index` is the chip's position in the (de-duplicated, selection-ordered) chip list. Omit it to render the default label + focusable aria-labelled remove button. |
+| `create` | `query` | Custom rendering for the trailing create row (only when `creatable` is set and the query is creatable — see [Creatable](#creatable)). `query` is the current input text. Omit it to render the default `Create "{query}"`. |
 
 ## Grouping options
 
@@ -172,6 +175,32 @@ Set `multiple` to select many options. `value` widens to an **array** while stay
 ```
 
 Selected values render as chips **inside the control, before the input** — the whole control box becomes the popover anchor, so the width-matched popup spans the chips plus the input, not the input alone. Re-selecting an already-selected option toggles it off; chips render in selection order (the `value` array order IS the display order); duplicate values dedupe to one chip; a chip whose option has disappeared from `options` (an async `options` swap) persists, labelled with its raw value. Every chip carries a focusable, aria-labelled remove button (customize via the `chip` slot above), and Backspace on an empty input removes the last chip — Backspace with any text in the input edits the text instead. The effective `closeOnSelect` default flips to `false` under `multiple` (closing after every pick would make multi-select unusable); pass an explicit `:close-on-select="true"` to override. `aria-multiselectable="true"` and per-option `aria-selected` mark the listbox and options.
+
+## Creatable
+
+Set `creatable` to let arbitrary typed text become a selection, without `Combobox` ever guessing the consumer's option shape:
+
+```rozie
+<template>
+  <Combobox
+    r-model:value="$data.userId"
+    :options="OPTIONS"
+    creatable
+    @create="onCreate"
+  />
+</template>
+```
+
+```js
+// The consumer owns adding the option — combobox writes NOTHING to `value`.
+const onCreate = (e) => {
+  const newOption = { value: e.query, label: e.query }
+  $data.options = [...$data.options, newOption]
+  $data.userId = newOption.value
+}
+```
+
+When the user commits text (`Enter`, or a click/tap on the row) that matches no option, `Combobox` emits `create` with `{ query }` and leaves `value` untouched — the `create` handler is responsible for adding the option and updating the model itself. "Matches no option" is decided by **case-insensitive, trimmed, exact label equality** — never a substring, and never with any Unicode normalization, so a query differing from an option's label only by composition form is treated as a genuine miss. A query equal to an existing option's label — in any case, with any surrounding whitespace — offers no create row at all; an empty or whitespace-only query never does either. The create row is the LAST navigable row, after every option and every group section, arrow-reachable and carrying a real option id, and it REPLACES the `#empty` row whenever the query is creatable (`#empty` still renders for an empty/whitespace-only query — see the `create` slot above to customize its default `Create "{query}"` wording). A double-commit of the same text fires `create` exactly once; typing anything new re-arms it, covering the round-trip window before an async `options` update lands. Composes with `multiple`: `create` fires and `value` stays untouched there too, and after it fires local UI state behaves like a pick (the effective `closeOnSelect` applies, and the query clears in `multiple` mode / is left alone in single mode). Works in all four render branches (plain, `groups`, `groups` + `groupCap`, and `virtual`).
 
 ## Filtering: client vs. async
 

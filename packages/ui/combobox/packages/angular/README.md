@@ -100,6 +100,7 @@ export class ComboboxFormComponent {
 | `inline` | `Boolean` | `false` |  |  |
 | `closeOnSelect` | `Boolean` | `null` |  |  |
 | `multiple` | `Boolean` | `false` |  |  |
+| `creatable` | `Boolean` | `false` |  |  |
 | `optionLabel` | `Function` | `null` |  |  |
 | `optionValue` | `Function` | `null` |  |  |
 | `optionDisabled` | `Function` | `null` |  |  |
@@ -117,6 +118,7 @@ export class ComboboxFormComponent {
 
 | Event | Description |
 | --- | --- |
+| `create` | Fired when `creatable` is set and the user commits text matching no option (case-insensitive, trimmed, exact label equality — no Unicode normalization). Payload `{ query }` — the committed text. Combobox writes NOTHING to `value` when this fires — the consumer is responsible for adding the option to `options` and updating the model itself. Fires at most once per distinct query (a double-commit of the same text is a no-op); composes with `multiple` (`value` stays untouched there too). |
 | `change` | Fired when the selected value changes — a user picks an option (toggling membership in `multiple` mode), or `clear()` resets it. Payload `{ value, option, selected }`. `value` is always the model's NEW value — the whole array in `multiple` mode, the scalar (or `null`) in single mode. `option` is the raw source option that was just toggled (`null` after a `clear()`). `selected` names the direction of the toggle: `true` when the option was just added (and always `true` in single-select), `false` when it was just removed or after `clear()`. |
 | `search` | Fired on every keystroke in the input. Payload `{ query }` — the current text. Pair it with `disableFilter` to drive async / server-side filtering: refetch `options` from the query and the popup re-renders the supplied list verbatim. |
 
@@ -147,12 +149,16 @@ export class DemoComponent {
 | chip | option, remove, index |
 | option | option, index, active, selected, disabled |
 | empty | query |
+| create | query |
 | groupHeading | group |
 | option | option, index, active, selected, disabled |
 | empty | query |
+| create | query |
 | groupHeading | group |
 | option | option, index, active, selected, disabled |
 | groupMore | group, hidden, expand |
 | empty | query |
+| create | query |
 | option | option, index, active, selected, disabled |
 | empty | query |
+| create | query |

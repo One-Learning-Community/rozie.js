@@ -33,9 +33,6 @@ const EXPECT = {
   // (virtual/estimateRowHeight/maxHeight) consuming @rozie-ui/headless-core/windowing.rzts.
   // Phase 86 (R1, plan 86-04): + `multiple` — widens the sole `value` model to
   // an array; `value` is STILL the only model:true prop (no ROZ125).
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift'],
-  models: ['value'],
-  emits: ['change', 'search'],
   // patch-adjacent (this .mjs isn't wired into CI — see the header note — so it
   // had drifted stale: missing `groups`/`groupHeading` from combobox-native-groups
   // and `seedQuery`/`pinOpen` from later phases; synced to the IR here alongside
@@ -43,7 +40,12 @@ const EXPECT = {
   // Phase 86 (R1, plan 86-05): + `chip` — the chip-rail scoped slot `{ option,
   // remove, index }`, rendered inside the control before the input under
   // `multiple`.
-  slots: ['option', 'empty', 'groupHeading', 'groupMore', 'chip'],
+  // Phase 86 (R3, plan 86-06): + `creatable` prop, `create` emit, `create`
+  // scoped slot `{ query }`.
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'creatable', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift'],
+  models: ['value'],
+  emits: ['change', 'search', 'create'],
+  slots: ['option', 'empty', 'groupHeading', 'groupMore', 'chip', 'create'],
   expose: ['focus', 'clear', 'seedQuery', 'pinOpen'],
 };
 

@@ -43,6 +43,11 @@ interface EmptyCtx {
   query: any;
 }
 
+interface CreateCtx {
+  $implicit: { query: any };
+  query: any;
+}
+
 interface GroupHeadingCtx {
   $implicit: { group: any };
   group: any;
@@ -95,12 +100,20 @@ interface GroupMoreCtx {
           </li>
     }
 
-          @if (filteredOptions().length === 0) {
+          @if (filteredOptions().length === 0 && !isCreatableQuery()) {
     <li class="rozie-combobox-empty" role="presentation">
             @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     No results
+    }
+          </li>
+    }@if (isCreatableQuery()) {
+    <li class="rozie-combobox-option rozie-combobox-create" [ngClass]="{ 'rozie-combobox-option--active': filteredOptions().length === activeIndex() }" [attr.id]="rozieAttr(optId(filteredOptions().length))" role="option" (mousedown)="$event.preventDefault(); selectOption(createRowAt(filteredOptions().length))" (mouseenter)="activeIndex.set(filteredOptions().length)">
+            @if ((createTpl ?? __rozieFillMap()['create'] ?? templates()?.['create'])) {
+    <ng-container *ngTemplateOutlet="(createTpl ?? __rozieFillMap()['create'] ?? templates()?.['create']); context: { $implicit: { query: query() }, query: query() }" />
+    } @else {
+    Create "{{ query() }}"
     }
           </li>
     }</ul>
@@ -128,12 +141,20 @@ interface GroupMoreCtx {
           </li>
     }
 
-          @if (groupBlocks().length === 0) {
+          @if (groupBlocks().length === 0 && !isCreatableQuery()) {
     <li class="rozie-combobox-empty" role="presentation">
             @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     No results
+    }
+          </li>
+    }@if (isCreatableQuery()) {
+    <li class="rozie-combobox-option rozie-combobox-create" [ngClass]="{ 'rozie-combobox-option--active': filteredOptions().length === activeIndex() }" [attr.id]="rozieAttr(optId(filteredOptions().length))" role="option" (mousedown)="$event.preventDefault(); selectOption(createRowAt(filteredOptions().length))" (mouseenter)="activeIndex.set(filteredOptions().length)">
+            @if ((createTpl ?? __rozieFillMap()['create'] ?? templates()?.['create'])) {
+    <ng-container *ngTemplateOutlet="(createTpl ?? __rozieFillMap()['create'] ?? templates()?.['create']); context: { $implicit: { query: query() }, query: query() }" />
+    } @else {
+    Create "{{ query() }}"
     }
           </li>
     }</ul>
@@ -170,12 +191,20 @@ interface GroupMoreCtx {
     }</li>
     }
 
-          @if (cappedBlocks().length === 0) {
+          @if (cappedBlocks().length === 0 && !isCreatableQuery()) {
     <li class="rozie-combobox-empty" role="presentation">
             @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     No results
+    }
+          </li>
+    }@if (isCreatableQuery()) {
+    <li class="rozie-combobox-option rozie-combobox-create" [ngClass]="{ 'rozie-combobox-option--active': cappedRowCount() === activeIndex() }" [attr.id]="rozieAttr(optId(cappedRowCount()))" role="option" (mousedown)="$event.preventDefault(); selectOption(createRowAt(cappedRowCount()))" (mouseenter)="activeIndex.set(cappedRowCount())">
+            @if ((createTpl ?? __rozieFillMap()['create'] ?? templates()?.['create'])) {
+    <ng-container *ngTemplateOutlet="(createTpl ?? __rozieFillMap()['create'] ?? templates()?.['create']); context: { $implicit: { query: query() }, query: query() }" />
+    } @else {
+    Create "{{ query() }}"
     }
           </li>
     }</ul>
@@ -195,12 +224,20 @@ interface GroupMoreCtx {
 
           <li class="rozie-combobox-spacer" aria-hidden="true" [attr.style]="'height:' + padBottom() + 'px'"></li>
 
-          @if (windowSource().length === 0) {
+          @if (windowSource().length === 0 && !isCreatableQuery()) {
     <li class="rozie-combobox-empty" role="presentation">
             @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     No results
+    }
+          </li>
+    }@if (isCreatableQuery()) {
+    <li class="rozie-combobox-option rozie-combobox-create" [ngClass]="{ 'rozie-combobox-option--active': windowSource().length === activeIndex() }" [attr.id]="rozieAttr(optId(windowSource().length))" role="option" (mousedown)="$event.preventDefault(); selectOption(createRowAt(windowSource().length))" (mouseenter)="activeIndex.set(windowSource().length)">
+            @if ((createTpl ?? __rozieFillMap()['create'] ?? templates()?.['create'])) {
+    <ng-container *ngTemplateOutlet="(createTpl ?? __rozieFillMap()['create'] ?? templates()?.['create']); context: { $implicit: { query: query() }, query: query() }" />
+    } @else {
+    Create "{{ query() }}"
     }
           </li>
     }</ul>
@@ -324,6 +361,11 @@ interface GroupMoreCtx {
       color: var(--rozie-combobox-more-color, rgba(0, 0, 0, 0.55));
       font-size: var(--rozie-combobox-more-size, 0.875rem);
     }
+    .rozie-combobox-create {
+      cursor: pointer;
+      color: var(--rozie-combobox-create-color, var(--rozie-combobox-accent, #0066cc));
+      background: var(--rozie-combobox-create-bg, transparent);
+    }
     .rozie-combobox-spacer { margin: 0; padding: 0; border: 0; list-style: none; }
     .rozie-combobox-chips {
       display: flex;
@@ -440,6 +482,10 @@ export class Combobox {
    */
   multiple = input<boolean>(false);
   /**
+   * When the user commits text matching no option (case-insensitive, trimmed, exact label equality — no Unicode normalization applied), combobox emits `create` with the query and writes NOTHING to `value` — the consumer adds the option to `options` and updates the model itself. Composes with `multiple`. Turning this on replaces the `#empty` fill with the `#create` row whenever the query is creatable (non-empty, no exact match); `#empty` still renders for an empty or whitespace-only query. Default `false` is byte-identical to today.
+   */
+  creatable = input<boolean>(false);
+  /**
    * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
    */
   optionLabel = input<((...args: any[]) => any) | null>(null);
@@ -494,13 +540,16 @@ export class Combobox {
   windowVer = signal(0);
   editVer = signal(0);
   expandedGroups = signal({});
+  createdQuery = signal<any>(null);
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
+  create = output<unknown>();
   change = output<unknown>();
   search = output<unknown>();
   @ContentChild('chip', { read: TemplateRef }) chipTpl?: TemplateRef<ChipCtx>;
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
+  @ContentChild('create', { read: TemplateRef }) createTpl?: TemplateRef<CreateCtx>;
   @ContentChild('groupHeading', { read: TemplateRef }) groupHeadingTpl?: TemplateRef<GroupHeadingCtx>;
   @ContentChild('groupMore', { read: TemplateRef }) groupMoreTpl?: TemplateRef<GroupMoreCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
@@ -1093,12 +1142,68 @@ export class Combobox {
     }
     return out;
   };
+  // ---- creatable mode (Phase 86 R3, D-17..D-20) ---------------------------
+  // normalizedQuery(): trimmed + lower-cased query — reuses the SAME case-fold
+  // filteredOptions() already applies above, but for an EXACT-EQUALITY
+  // comparison, never a substring search, and with NO Unicode normalization
+  // (R3 locked: a composition-form difference must NOT be treated as a match).
+  normalizedQuery = () => String(this.query() == null ? '' : this.query()).trim().toLowerCase();
+  // queryMatchesOption(nq): whether the (already-normalized) query is an exact,
+  // case-insensitive, trimmed match of some option's label.
+  queryMatchesOption = (nq: any) => {
+    const __options = this.options();
+    const opts = Array.isArray(__options) ? __options : [];
+    return opts.some((o: any) => String(this.labelOf(o)).trim().toLowerCase() === nq);
+  };
+  // isCreatableQuery(): the create-row visibility gate (also gates the `#empty`
+  // -> `#create` swap, D-19). `creatable` must be set, the normalized query
+  // must be non-empty (an empty/whitespace-only query never offers create —
+  // `#empty` keeps its job there), and no option's normalized label may equal
+  // it exactly.
+  isCreatableQuery = () => {
+    if (!this.creatable()) return false;
+    const nq = this.normalizedQuery();
+    if (!nq) return false;
+    return !this.queryMatchesOption(nq);
+  };
+  // createRowAt(baseCount): the synthetic, non-option `role="option"` create
+  // row (D-17) — mirrors the `groupMore` "+N more" row shape exactly (a real
+  // id, arrow-reachable, commits through the SAME selectOption() dispatch
+  // without writing the model). Each render branch passes ITS OWN flattened
+  // pre-create-row row count (`baseCount`) as the running index, exactly as
+  // `cappedBlocks()` already re-indexes `_i` across options + the more row —
+  // so ids / aria-activedescendant / navRows() can never disagree.
+  createRowAt = (baseCount: any) => ({
+    isCreate: true,
+    _i: baseCount,
+    disabled: false
+  });
+  // cappedRowCount(): the total navigable row count cappedBlocks() flattens to
+  // (visible items + more-rows, across every block) — the running index the
+  // capped branch's own create row (below) must continue from. Mirrors
+  // cappedBlocks()'s own `running` counter without re-deriving `_i` per item.
+  cappedRowCount = () => {
+    const blocks = this.cappedBlocks();
+    let n = 0;
+    for (let bi = 0; bi < blocks.length; bi++) {
+      n += blocks[bi].items.length;
+      if (blocks[bi].more) n++;
+    }
+    return n;
+  };
   // navRows(): the SINGLE keyboard/aria source of truth. Returns the EXACT
-  // filteredOptions() reference when not capped (byte-identical-off — untouched
-  // virtual/ungrouped keyboard path); flattens cappedBlocks() into visible items +
-  // more-rows, in order, when capped.
+  // filteredOptions() reference when not capped and not creatable (byte-
+  // identical-off — untouched virtual/ungrouped keyboard path); flattens
+  // cappedBlocks() into visible items + more-rows, in order, when capped.
+  // Appends the create row, AFTER the full flattened visible(+more) sequence,
+  // whenever isCreatableQuery() — R3's locked "renders last, after all options
+  // and group sections" is a positional fact here, not a per-branch special case.
   navRows = () => {
-    if (!this.isCapped()) return this.filteredOptions();
+    if (!this.isCapped()) {
+      const base = this.filteredOptions();
+      if (!this.isCreatableQuery()) return base;
+      return base.concat([this.createRowAt(base.length)]);
+    }
     const out = [];
     const blocks = this.cappedBlocks();
     for (let bi = 0; bi < blocks.length; bi++) {
@@ -1106,6 +1211,7 @@ export class Combobox {
       for (let ii = 0; ii < blk.items.length; ii++) out.push(blk.items[ii]);
       if (blk.more) out.push(blk.more);
     }
+    if (this.isCreatableQuery()) out.push(this.createRowAt(out.length));
     return out;
   };
   // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
@@ -1275,14 +1381,40 @@ export class Combobox {
   // `@change` with BOTH the committed value AND the raw source `option` (CP reads
   // `e.option`). `effectiveCloseOnSelect()` gates the popup close.
   selectOption = (opt: any) => {
+    const __multiple = this.multiple();
     if (!opt) return;
     if (opt.isMore) {
       this.expandGroup(opt.group);
       this.activeIndex.set(opt._i);
       return;
     }
+    if (opt.isCreate) {
+      // Read locals before any write (ROZ138 idiom).
+      const q = this.query();
+      const nq = this.normalizedQuery();
+      // The double-commit latch (D-17/D-20): a second commit of the SAME
+      // normalized query — whether a rapid double gesture, or the async
+      // round-trip window before the consumer's `options` update lands — is a
+      // no-op. An empty/whitespace normalized query never emits either (the
+      // row should not even be reachable then, since isCreatableQuery() gates
+      // it, but this guard is cheap insurance against a stale reference).
+      if (!nq || nq === this.createdQuery()) return;
+      this.createdQuery.set(nq);
+      this.create.emit({
+        query: q
+      });
+      // D-20: after `create` fires, local UI state behaves like a pick — the
+      // effective close-on-select applies, and the query clears in `multiple`
+      // mode (ready for the next entry) and is left alone in single mode (the
+      // consumer's async add flows back through the ordinary `value` watch).
+      // `value` itself is untouched — R3 locked.
+      if (this.effectiveCloseOnSelect()) this.isOpen.set(false);
+      if (__multiple) this.query.set('');
+      this.activeIndex.set(-1);
+      return;
+    }
     if (opt.disabled) return;
-    if (this.multiple()) {
+    if (__multiple) {
       // Capture whether the value was already present BEFORE the toggle — this
       // local is what feeds the `selected` field on the `change` payload (D-15).
       const cur = this.selectedValues();
@@ -1343,6 +1475,10 @@ export class Combobox {
   onInput = (e: any) => {
     const q = e && e.target ? e.target.value : '';
     this.query.set(q);
+    // Any input change re-arms the double-commit latch (D-17/D-20) — a
+    // freshly-typed query is a new gesture, never a repeat of whatever was
+    // last created.
+    this.createdQuery.set(null);
     this.isOpen.set(true);
     this.activeIndex.set(0);
     this.search.emit({
@@ -1580,7 +1716,7 @@ export class Combobox {
   static ngTemplateContextGuard(
     _dir: Combobox,
     _ctx: unknown,
-  ): _ctx is ChipCtx | OptionCtx | EmptyCtx | GroupHeadingCtx | GroupMoreCtx {
+  ): _ctx is ChipCtx | OptionCtx | EmptyCtx | CreateCtx | GroupHeadingCtx | GroupMoreCtx {
     return true;
   }
 

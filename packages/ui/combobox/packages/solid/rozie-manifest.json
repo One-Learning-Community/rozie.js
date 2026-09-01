@@ -63,6 +63,12 @@
       "type": "Boolean"
     },
     {
+      "name": "creatable",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
       "name": "optionLabel",
       "isModel": false,
       "required": false,
@@ -188,6 +194,17 @@
       "isReactive": false
     },
     {
+      "name": "create",
+      "params": [
+        {
+          "name": "query"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
       "name": "groupHeading",
       "params": [
         {
@@ -223,6 +240,17 @@
     },
     {
       "name": "empty",
+      "params": [
+        {
+          "name": "query"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
+      "name": "create",
       "params": [
         {
           "name": "query"
@@ -295,6 +323,17 @@
       "isReactive": false
     },
     {
+      "name": "create",
+      "params": [
+        {
+          "name": "query"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
       "name": "option",
       "params": [
         {
@@ -327,9 +366,21 @@
       "paramTypes": null,
       "isPortal": false,
       "isReactive": false
+    },
+    {
+      "name": "create",
+      "params": [
+        {
+          "name": "query"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
     }
   ],
   "emits": [
+    "create",
     "change",
     "search"
   ],
