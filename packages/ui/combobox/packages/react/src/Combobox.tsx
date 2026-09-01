@@ -186,7 +186,6 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   const gridScrollEl = useRef<any>(null);
   const virtualizerCleanup = useRef<any>(null);
   const remeasurePending = useRef(false);
-  const pinned = useRef(false);
   const openingInProgress = useRef(false);
   const [value, setValue] = useControllableState({
     value: props.value,
@@ -203,6 +202,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   const [editVer, setEditVer] = useState(0);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, any>>({});
   const [createdQuery, setCreatedQuery] = useState<any>(null);
+  const [pinned, setPinned] = useState(false);
   const inputEl = useRef<HTMLInputElement | null>(null);
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
@@ -492,11 +492,6 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   // Windowing instance state (reassigned module-`let`s → React hoists to useRef; do NOT
   // const). NULL until $onMount, ONLY constructed when $props.virtual. gridScrollEl is the
   // captured .rozie-combobox-list scroll div; remeasurePending dedupes the deferred sweep.
-
-  // Non-reactive per-instance flag (never rendered — combobox-keepopen phase): written by
-  // pinOpen(v), read by onBlur() to suppress the close-on-blur while a host sub-surface
-  // (e.g. command-palette's action flyout) holds real DOM focus. Mirrors the virtualizer
-  // write-in-$onMount/read-in-several-others cross-function access pattern above.
 
   // Non-reactive per-instance flag (Phase 86 R2, plan 86-03, Solid-only): true for
   // the duration of an onFocus-triggered open transition (set before the isOpen
@@ -1174,10 +1169,10 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   // blur is a side effect of our OWN open-transition recreating the anchor's DOM,
   // not the user moving focus elsewhere.
   const onBlur = useCallback(() => {
-    if (pinned.current) return;
+    if (pinned) return;
     if (openingInProgress.current) return;
     setIsOpen(false);
-  }, []);
+  }, [pinned]);
   const onKeydown = useCallback((e: any) => {
     const key = e ? e.key : '';
     const list = navRows();
@@ -1309,7 +1304,9 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   // model or selection state (a command-palette #2 levels/restore-on-pop
   // prerequisite — repopulating the input on back-navigation is NOT a
   // selection). pinOpen(v) — imperative-only: pin (or unpin) the popup open so
-  // onBlur() does not collapse it while a host sub-surface holds focus
+  // onBlur() does not collapse it while a host sub-surface holds focus, AND
+  // (Phase 86-07 regression fix) so the composed Popover's OWN independent
+  // Escape/click-outside dismissal is vetoed too via `:disable-dismiss`
   // (command-palette-sub-actions prerequisite). pinOpen(false) ONLY unpins — it
   // does NOT itself close the popup or move focus; that is the host's job.
   // Render-neutral when never called. All four are post-mount → $refs safe.
@@ -1334,7 +1331,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     setQuery(String(text == null ? '' : text));
   }
   function pinOpen(v: any) {
-    pinned.current = !!v;
+    setPinned(!!v);
   }
 
   const _buildVirtualizerRef = useRef(buildVirtualizer);
@@ -1390,7 +1387,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     <>
     <div ref={__rozieRoot} {...attrs} className={clsx(clsx("rozie-combobox", { "rozie-combobox--open": isOpen, "rozie-combobox--disabled": props.disabled, "rozie-combobox--inline": props.inline, "rozie-combobox--multiple": props.multiple }), (attrs.className as string | undefined))} data-rozie-s-9546115a="">
       
-      <Popover trigger="manual" open={isOpen} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={props.virtual} disablePositioning={props.inline} placement={props.placement} offset={props.offset} disableFlip={props.disableFlip} disableShift={props.disableShift} data-rozie-s-9546115a="" renderAnchor={() => (<>
+      <Popover trigger="manual" open={isOpen} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={props.virtual} disablePositioning={props.inline} disableDismiss={pinned} placement={props.placement} offset={props.offset} disableFlip={props.disableFlip} disableShift={props.disableShift} data-rozie-s-9546115a="" renderAnchor={() => (<>
           
           {!!(props.multiple) && <ul className={"rozie-combobox-chips"} data-rozie-s-9546115a="">
             {chipRows().map((row, idx) => <li key={'chip-' + row.value} className={"rozie-combobox-chip"} data-rozie-s-9546115a="">

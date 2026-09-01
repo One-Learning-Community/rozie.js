@@ -85,6 +85,12 @@
       "isModel": false,
       "required": false,
       "type": "Boolean"
+    },
+    {
+      "name": "disableDismiss",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
     }
   ],
   "slots": [

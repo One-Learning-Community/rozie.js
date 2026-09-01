@@ -137,6 +137,10 @@ interface PopoverProps {
    * Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height.
    */
   matchWidth?: boolean;
+  /**
+   * Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Off by default; existing `trigger="manual"` consumers relying on real click-outside dismissal are unaffected unless they opt in.
+   */
+  disableDismiss?: boolean;
   onChange?: (...args: unknown[]) => void;
   anchorSlot?: (ctx: AnchorSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
@@ -153,8 +157,8 @@ export interface PopoverHandle {
 }
 
 export default function Popover(_props: PopoverProps): JSX.Element {
-  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false, matchWidth: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'children', 'ref', 'onChange']);
+  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false, matchWidth: false, disableDismiss: false }, _props);
+  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss', 'children', 'ref', 'onChange']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ show, hide, toggle, reposition }); });
 
@@ -438,7 +442,7 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   }
 
   createEffect(() => {
-    if (!(open())) return;
+    if (!(open() && !local.disableDismiss)) return;
     const _rozieHandler = ($event: KeyboardEvent) => {
       if ($event.key !== 'Escape') return;
       dismiss();
@@ -450,7 +454,7 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   createOutsideClick(
     [() => anchorElRef, () => floatingElRef],
     dismiss,
-    () => open(),
+    () => open() && !local.disableDismiss,
   );
 
   return (

@@ -146,6 +146,10 @@ export default class Popover extends SignalWatcher(LitElement) {
    * Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height.
    */
   @property({ type: Boolean, reflect: true }) matchWidth: boolean = false;
+  /**
+   * Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Off by default; existing `trigger="manual"` consumers relying on real click-outside dismissal are unaffected unless they opt in.
+   */
+  @property({ type: Boolean, reflect: true }) disableDismiss: boolean = false;
   @query('[data-rozie-ref="anchorEl"]') private _refAnchorEl!: HTMLElement;
   @query('[data-rozie-ref="floatingEl"]') private _refFloatingEl!: HTMLElement;
   @query('[data-rozie-ref="arrowEl"]') private _refArrowEl!: HTMLElement;
@@ -174,11 +178,11 @@ private __rozieFirstUpdateDone = false;
   private _rozieTornDown = false;
 
   private _armListeners(): void {
-    const _lh0 = ($event: KeyboardEvent) => { if (!(this.open)) return; if ($event.key !== 'Escape') return; ((this.dismiss) as (...args: any[]) => any)($event); };
+    const _lh0 = ($event: KeyboardEvent) => { if (!(this.open && !this.disableDismiss)) return; if ($event.key !== 'Escape') return; ((this.dismiss) as (...args: any[]) => any)($event); };
     document.addEventListener('keydown', _lh0, undefined);
     this._disconnectCleanups.push(() => document.removeEventListener('keydown', _lh0, undefined));
 
-    const _u1 = attachOutsideClickListener([() => this._refAnchorEl, () => this._refFloatingEl], ($event) => {  ((this.dismiss) as (...args: any[]) => any)($event); }, () => (this.open));
+    const _u1 = attachOutsideClickListener([() => this._refAnchorEl, () => this._refFloatingEl], ($event) => {  ((this.dismiss) as (...args: any[]) => any)($event); }, () => (this.open && !this.disableDismiss));
     this._disconnectCleanups.push(_u1);
 
     {
@@ -541,7 +545,7 @@ private __rozieFirstUpdateDone = false;
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disable-positioning', 'disablepositioning', 'keep-mounted', 'keepmounted', 'match-width', 'matchwidth']);
+    const __skip = new Set<string>(['data-rozie-ref', 'open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disable-positioning', 'disablepositioning', 'keep-mounted', 'keepmounted', 'match-width', 'matchwidth', 'disable-dismiss', 'disabledismiss']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

@@ -158,6 +158,23 @@
     default: false,
     docs: { description: "Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height." },
   },
+  // opt-in dismissal suppression (phase 86-07 regression fix): a composing
+  // component that drives `open` itself (typically alongside `trigger="manual"`)
+  // needs a way to temporarily veto Popover's OWN independent Escape/click-outside
+  // dismissal — e.g. while a host sub-surface OUTSIDE anchorEl/floatingEl (a
+  // flyout menu anchored to the composed control, not nested inside Popover's own
+  // DOM) legitimately holds focus. Without this, Popover's document-level dismiss
+  // listeners close the panel out from under the composing component even while
+  // that component's OWN "stay open" contract (e.g. combobox's `pinOpen(true)`)
+  // is active, because those listeners are wired directly to `requestOpen(false)`
+  // and never consult the composing component's state. OFF by default — every
+  // existing `trigger="manual"` consumer (real click-outside dismissal is D-07's
+  // whole point) is unaffected unless it explicitly opts in.
+  disableDismiss: {
+    type: Boolean,
+    default: false,
+    docs: { description: "Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Off by default; existing `trigger=\"manual\"` consumers relying on real click-outside dismissal are unaffected unless they opt in." },
+  },
 }
 </props>
 
@@ -448,8 +465,8 @@ $expose({ show, hide, toggle, reposition })
 </script>
 
 <listeners>
-  <listener :target="document" @keydown.escape="dismiss" r-if="$props.open" />
-  <listener :target="document" @click.outside($refs.anchorEl,$refs.floatingEl)="dismiss" r-if="$props.open" />
+  <listener :target="document" @keydown.escape="dismiss" r-if="$props.open && !$props.disableDismiss" />
+  <listener :target="document" @click.outside($refs.anchorEl,$refs.floatingEl)="dismiss" r-if="$props.open && !$props.disableDismiss" />
 </listeners>
 
 <template>

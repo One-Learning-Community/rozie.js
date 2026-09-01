@@ -70,6 +70,7 @@ Two-way bind `open`, project a trigger into the `anchor` slot and the content in
 | `disablePositioning` | `Boolean` | `false` | yes | Render the floating panel in normal document flow instead of computing a floating position — no `computePosition` call and no `autoUpdate` tracking is ever started. For a composing component that already controls the panel's layout. |
 | `keepMounted` | `Boolean` | `false` | yes | Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open. |
 | `matchWidth` | `Boolean` | `false` | yes | Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height. |
+| `disableDismiss` | `Boolean` | `false` | yes | Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Existing `trigger="manual"` consumers relying on real click-outside dismissal are unaffected unless they opt in. |
 
 ### Events
 

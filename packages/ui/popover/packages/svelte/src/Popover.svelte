@@ -61,6 +61,10 @@ interface Props {
    * Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height.
    */
   matchWidth?: boolean;
+  /**
+   * Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Off by default; existing `trigger="manual"` consumers relying on real click-outside dismissal are unaffected unless they opt in.
+   */
+  disableDismiss?: boolean;
   anchor?: Snippet<[{ open: any; toggle: any; show: any; hide: any }]>;
   children?: Snippet;
   snippets?: Record<string, any>;
@@ -83,6 +87,7 @@ let {
   disablePositioning = false,
   keepMounted = false,
   matchWidth = false,
+  disableDismiss = false,
   anchor: __anchorProp,
   children: __childrenProp,
   snippets,
@@ -373,7 +378,7 @@ $effect(() => { (() => strategy)(); untrack(() => { if (__rozieWatchInitial_5) {
 })(); }); });
 
 $effect(() => {
-  if (!(open)) return;
+  if (!(open && !disableDismiss)) return;
   const handler = ($event: KeyboardEvent) => {
     if ($event.key !== 'Escape') return;
     dismiss();
@@ -383,7 +388,7 @@ $effect(() => {
 });
 
 $effect(() => {
-  if (!(open)) return;
+  if (!(open && !disableDismiss)) return;
   const handler = ($event: MouseEvent) => {
     const target = $event.target as Node;
     if (anchorEl?.contains(target) || floatingEl?.contains(target)) return;

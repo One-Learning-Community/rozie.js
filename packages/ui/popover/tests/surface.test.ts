@@ -29,8 +29,10 @@ const EXPECT = {
   // disablePositioning (static pass-through, never computePosition/autoUpdate).
   // Phase 86-02 (D-03): + keepMounted (hide-not-unmount while closed, one-shot
   // mount position). Phase 86-02 (D-04): + matchWidth (anchor-width matching
-  // via the `size` middleware).
-  props: ['open', 'placement', 'strategy', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth'],
+  // via the `size` middleware). Phase 86-07 (D-24, regression fix): +
+  // disableDismiss (veto Popover's own Escape/click-outside dismissal for a
+  // composing component that drives `open` itself).
+  props: ['open', 'placement', 'strategy', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss'],
   models: ['open'],
   emits: ['change'],
   slots: ['', 'anchor'] as string[],

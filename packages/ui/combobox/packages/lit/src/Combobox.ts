@@ -345,6 +345,7 @@ export default class Combobox extends SignalWatcher(LitElement) {
   private _editVer = signal(0);
   private _expandedGroups = signal<any>({});
   private _createdQuery = signal<any>(null);
+  private _pinned = signal(false);
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
@@ -530,7 +531,7 @@ private __rozieFirstUpdateDone = false;
     return html`
 <div class="${Object.entries({ "rozie-combobox": true, 'rozie-combobox--open': this._isOpen.value, 'rozie-combobox--disabled': this.disabled, 'rozie-combobox--inline': this.inline, 'rozie-combobox--multiple': this.multiple }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-9546115a>
   
-  <rozie-popover trigger="manual" .open=${this._isOpen.value} @open-change=${($event: CustomEvent) => { this._isOpen.value = $event.detail; }} .bare=${true} .matchWidth=${true} .keepMounted=${this.virtual} .disablePositioning=${this.inline} .placement=${this.placement} .offset=${this.offset} .disableFlip=${this.disableFlip} .disableShift=${this.disableShift} data-rozie-s-9546115a><div slot="anchor">
+  <rozie-popover trigger="manual" .open=${this._isOpen.value} @open-change=${($event: CustomEvent) => { this._isOpen.value = $event.detail; }} .bare=${true} .matchWidth=${true} .keepMounted=${this.virtual} .disablePositioning=${this.inline} .disableDismiss=${this._pinned.value} .placement=${this.placement} .offset=${this.offset} .disableFlip=${this.disableFlip} .disableShift=${this.disableShift} data-rozie-s-9546115a><div slot="anchor">
       
       ${this.multiple ? html`<ul class="rozie-combobox-chips" data-rozie-s-9546115a>
         ${repeat<any>(this.chipRows(), (row, idx) => 'chip-' + row.value, (row, idx) => html`<li class="rozie-combobox-chip" data-rozie-s-9546115a>
@@ -885,12 +886,6 @@ private __rozieFirstUpdateDone = false;
   gridScrollEl: any = null;
 
   remeasurePending = false;
-
-  // Non-reactive per-instance flag (never rendered — combobox-keepopen phase): written by
-  // pinOpen(v), read by onBlur() to suppress the close-on-blur while a host sub-surface
-  // (e.g. command-palette's action flyout) holds real DOM focus. Mirrors the virtualizer
-  // write-in-$onMount/read-in-several-others cross-function access pattern above.
-  pinned = false;
 
   // Non-reactive per-instance flag (Phase 86 R2, plan 86-03, Solid-only): true for
   // the duration of an onFocus-triggered open transition (set before the isOpen
@@ -1578,7 +1573,7 @@ private __rozieFirstUpdateDone = false;
   // blur is a side effect of our OWN open-transition recreating the anchor's DOM,
   // not the user moving focus elsewhere.
   onBlur = () => {
-  if (this.pinned) return;
+  if (this._pinned.value) return;
   if (this.openingInProgress) return;
   this._isOpen.value = false;
 };
@@ -1717,7 +1712,9 @@ private __rozieFirstUpdateDone = false;
   // model or selection state (a command-palette #2 levels/restore-on-pop
   // prerequisite — repopulating the input on back-navigation is NOT a
   // selection). pinOpen(v) — imperative-only: pin (or unpin) the popup open so
-  // onBlur() does not collapse it while a host sub-surface holds focus
+  // onBlur() does not collapse it while a host sub-surface holds focus, AND
+  // (Phase 86-07 regression fix) so the composed Popover's OWN independent
+  // Escape/click-outside dismissal is vetoed too via `:disable-dismiss`
   // (command-palette-sub-actions prerequisite). pinOpen(false) ONLY unpins — it
   // does NOT itself close the popup or move focus; that is the host's job.
   // Render-neutral when never called. All four are post-mount → $refs safe.
@@ -1747,7 +1744,7 @@ private __rozieFirstUpdateDone = false;
 };
 
   pinOpen = (v: any) => {
-  this.pinned = !!v;
+  this._pinned.value = !!v;
 };
 
   get value(): unknown { return this._valueControllable.read(); }

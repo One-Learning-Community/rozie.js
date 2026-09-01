@@ -382,6 +382,17 @@
   // consumer's `options` update lands) is a no-op — `create` fires exactly
   // once per distinct query. Cleared on every input change (onInput below).
   createdQuery: null,
+  // Whether the popup is pinned open by a host sub-surface (Phase 86-07
+  // regression fix, D-24): pinOpen(v) writes here. Promoted from a plain
+  // (non-reactive) `let` to `<data>` because it is now ALSO forwarded to the
+  // composed Popover's `:disable-dismiss` prop below — Popover's OWN
+  // document-level Escape/click-outside dismissal (D-07) writes `isOpen`
+  // directly and never consulted the old onBlur-only guard, so a host
+  // sub-surface's own click (e.g. command-palette's action-menu flyout, which
+  // lives outside Popover's anchorEl/floatingEl) was judged "outside" and
+  // silently closed the list out from under the pin. onBlur() below still
+  // reads it too, for the ordinary blur-into-flyout path.
+  pinned: false,
 }
 </data>
 
@@ -430,11 +441,6 @@ let virtualizer = null
 let virtualizerCleanup = null
 let gridScrollEl = null
 let remeasurePending = false
-// Non-reactive per-instance flag (never rendered — combobox-keepopen phase): written by
-// pinOpen(v), read by onBlur() to suppress the close-on-blur while a host sub-surface
-// (e.g. command-palette's action flyout) holds real DOM focus. Mirrors the virtualizer
-// write-in-$onMount/read-in-several-others cross-function access pattern above.
-let pinned = false
 // Non-reactive per-instance flag (Phase 86 R2, plan 86-03, Solid-only): true for
 // the duration of an onFocus-triggered open transition (set before the isOpen
 // write, cleared in the deferred microtask after). Lets onBlur distinguish a
@@ -1018,7 +1024,7 @@ const onFocus = (e) => {
 // blur is a side effect of our OWN open-transition recreating the anchor's DOM,
 // not the user moving focus elsewhere.
 const onBlur = () => {
-  if (pinned) return
+  if ($data.pinned) return
   if (openingInProgress) return
   $data.isOpen = false
 }
@@ -1215,7 +1221,9 @@ $onUnmount(() => {
 // model or selection state (a command-palette #2 levels/restore-on-pop
 // prerequisite — repopulating the input on back-navigation is NOT a
 // selection). pinOpen(v) — imperative-only: pin (or unpin) the popup open so
-// onBlur() does not collapse it while a host sub-surface holds focus
+// onBlur() does not collapse it while a host sub-surface holds focus, AND
+// (Phase 86-07 regression fix) so the composed Popover's OWN independent
+// Escape/click-outside dismissal is vetoed too via `:disable-dismiss`
 // (command-palette-sub-actions prerequisite). pinOpen(false) ONLY unpins — it
 // does NOT itself close the popup or move focus; that is the host's job.
 // Render-neutral when never called. All four are post-mount → $refs safe.
@@ -1234,7 +1242,7 @@ const seedQuery = (text) => {
   $data.query = String(text == null ? '' : text)
 }
 const pinOpen = (v) => {
-  pinned = !!v
+  $data.pinned = !!v
 }
 
 $expose({ focus, clear, seedQuery, pinOpen })
@@ -1280,7 +1288,15 @@ $expose({ focus, clear, seedQuery, pinOpen })
        measurements survive a close). `trigger="manual"` + `r-model:open` mean
        popover's Escape/click-outside dismissal writes the SAME `$data.isOpen`
        combobox would have written itself (D-07) — real click-outside dismissal,
-       which combobox did not have before (it only closed on blur). `bare`
+       which combobox did not have before (it only closed on blur).
+       `:disable-dismiss="$data.pinned"` (Phase 86-07 regression fix, D-24) vetoes
+       THAT SAME independent dismissal while a host sub-surface pins the popup
+       open via `pinOpen(true)` — Popover's document-level Escape/click-outside
+       listeners bypass `onBlur()` entirely (they write `isOpen` straight from a
+       `document`-level listener), so a click landing on a host-owned flyout
+       anchored to but not nested inside Popover's own anchorEl/floatingEl (e.g.
+       command-palette's action menu) was judged "outside" and silently closed
+       the list even while pinned. `bare`
        suppresses popover's own chrome so `.rozie-combobox-list`'s own
        background/border/radius/shadow keep supplying it (see the style block
        below). `:match-width="true"` (D-04/D-12, always on) makes the popup span
@@ -1299,6 +1315,7 @@ $expose({ focus, clear, seedQuery, pinOpen })
     :match-width="true"
     :keep-mounted="$props.virtual"
     :disable-positioning="$props.inline"
+    :disable-dismiss="$data.pinned"
     :placement="$props.placement"
     :offset="$props.offset"
     :disable-flip="$props.disableFlip"

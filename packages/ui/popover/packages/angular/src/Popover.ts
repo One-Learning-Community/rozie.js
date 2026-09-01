@@ -179,6 +179,10 @@ export class Popover {
    * Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height.
    */
   matchWidth = input<boolean>(false);
+  /**
+   * Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Off by default; existing `trigger="manual"` consumers relying on real click-outside dismissal are unaffected unless they opt in.
+   */
+  disableDismiss = input<boolean>(false);
   anchorEl = viewChild<ElementRef<HTMLDivElement>>('anchorEl');
   floatingEl = viewChild<ElementRef<HTMLDivElement>>('floatingEl');
   arrowEl = viewChild<ElementRef<HTMLDivElement>>('arrowEl');
@@ -209,7 +213,7 @@ export class Popover {
       const renderer = inject(Renderer2);
 
       effect((onCleanup) => {
-        if (!(this.open())) return;
+        if (!(this.open() && !this.disableDismiss())) return;
         const handler = ($event: KeyboardEvent) => {
           if ($event.key !== 'Escape') return;
           this.dismiss();
@@ -219,7 +223,7 @@ export class Popover {
       });
 
       effect((onCleanup) => {
-        if (!(this.open())) return;
+        if (!(this.open() && !this.disableDismiss())) return;
         const handler = ($event: MouseEvent) => {
           const target = $event.target as Node;
           if (this.anchorEl()?.nativeElement?.contains(target) || this.floatingEl()?.nativeElement?.contains(target)) return;

@@ -68,7 +68,7 @@ interface GroupMoreCtx {
 
     <div class="rozie-combobox" [ngClass]="{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-combobox--inline': inline(), 'rozie-combobox--multiple': multiple() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
       
-      <rozie-popover trigger="manual" [open]="isOpen()" (openChange)="isOpen.set($event)" [bare]="true" [matchWidth]="true" [keepMounted]="virtual()" [disablePositioning]="inline()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()"><ng-template #anchor>
+      <rozie-popover trigger="manual" [open]="isOpen()" (openChange)="isOpen.set($event)" [bare]="true" [matchWidth]="true" [keepMounted]="virtual()" [disablePositioning]="inline()" [disableDismiss]="pinned()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()"><ng-template #anchor>
           
           @if (multiple()) {
     <ul class="rozie-combobox-chips">
@@ -541,6 +541,7 @@ export class Combobox {
   editVer = signal(0);
   expandedGroups = signal({});
   createdQuery = signal<any>(null);
+  pinned = signal(false);
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   create = output<unknown>();
@@ -885,11 +886,6 @@ export class Combobox {
   virtualizerCleanup: any = null;
   gridScrollEl: any = null;
   remeasurePending = false;
-  // Non-reactive per-instance flag (never rendered — combobox-keepopen phase): written by
-  // pinOpen(v), read by onBlur() to suppress the close-on-blur while a host sub-surface
-  // (e.g. command-palette's action flyout) holds real DOM focus. Mirrors the virtualizer
-  // write-in-$onMount/read-in-several-others cross-function access pattern above.
-  pinned = false;
   // Non-reactive per-instance flag (Phase 86 R2, plan 86-03, Solid-only): true for
   // the duration of an onFocus-triggered open transition (set before the isOpen
   // write, cleared in the deferred microtask after). Lets onBlur distinguish a
@@ -1533,7 +1529,7 @@ export class Combobox {
   // blur is a side effect of our OWN open-transition recreating the anchor's DOM,
   // not the user moving focus elsewhere.
   onBlur = () => {
-    if (this.pinned) return;
+    if (this.pinned()) return;
     if (this.openingInProgress) return;
     this.isOpen.set(false);
   };
@@ -1667,7 +1663,9 @@ export class Combobox {
   // model or selection state (a command-palette #2 levels/restore-on-pop
   // prerequisite — repopulating the input on back-navigation is NOT a
   // selection). pinOpen(v) — imperative-only: pin (or unpin) the popup open so
-  // onBlur() does not collapse it while a host sub-surface holds focus
+  // onBlur() does not collapse it while a host sub-surface holds focus, AND
+  // (Phase 86-07 regression fix) so the composed Popover's OWN independent
+  // Escape/click-outside dismissal is vetoed too via `:disable-dismiss`
   // (command-palette-sub-actions prerequisite). pinOpen(false) ONLY unpins — it
   // does NOT itself close the popup or move focus; that is the host's job.
   // Render-neutral when never called. All four are post-mount → $refs safe.
@@ -1690,7 +1688,7 @@ export class Combobox {
     this.query.set(String(text == null ? '' : text));
   };
   pinOpen = (v: any) => {
-    this.pinned = !!v;
+    this.pinned.set(!!v);
   };
 
   private __rozieCvaOnChange: (v: unknown) => void = () => {};

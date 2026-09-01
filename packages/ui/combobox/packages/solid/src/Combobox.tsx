@@ -345,6 +345,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   const [editVer, setEditVer] = createSignal(0);
   const [expandedGroups, setExpandedGroups] = createSignal<Record<string, any>>({});
   const [createdQuery, setCreatedQuery] = createSignal<any>(null);
+  const [pinned, setPinned] = createSignal(false);
   onMount(() => {
     syncQueryToValue();
     syncRows();
@@ -668,11 +669,6 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   let virtualizerCleanup: any = null;
   let gridScrollEl: any = null;
   let remeasurePending = false;
-  // Non-reactive per-instance flag (never rendered — combobox-keepopen phase): written by
-  // pinOpen(v), read by onBlur() to suppress the close-on-blur while a host sub-surface
-  // (e.g. command-palette's action flyout) holds real DOM focus. Mirrors the virtualizer
-  // write-in-$onMount/read-in-several-others cross-function access pattern above.
-  let pinned = false;
   // Non-reactive per-instance flag (Phase 86 R2, plan 86-03, Solid-only): true for
   // the duration of an onFocus-triggered open transition (set before the isOpen
   // write, cleared in the deferred microtask after). Lets onBlur distinguish a
@@ -1361,7 +1357,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   // blur is a side effect of our OWN open-transition recreating the anchor's DOM,
   // not the user moving focus elsewhere.
   function onBlur() {
-    if (pinned) return;
+    if (pinned()) return;
     if (openingInProgress) return;
     setIsOpen(false);
   }
@@ -1498,7 +1494,9 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   // model or selection state (a command-palette #2 levels/restore-on-pop
   // prerequisite — repopulating the input on back-navigation is NOT a
   // selection). pinOpen(v) — imperative-only: pin (or unpin) the popup open so
-  // onBlur() does not collapse it while a host sub-surface holds focus
+  // onBlur() does not collapse it while a host sub-surface holds focus, AND
+  // (Phase 86-07 regression fix) so the composed Popover's OWN independent
+  // Escape/click-outside dismissal is vetoed too via `:disable-dismiss`
   // (command-palette-sub-actions prerequisite). pinOpen(false) ONLY unpins — it
   // does NOT itself close the popup or move focus; that is the host's job.
   // Render-neutral when never called. All four are post-mount → $refs safe.
@@ -1523,14 +1521,14 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     setQuery(String(text == null ? '' : text));
   }
   function pinOpen(v: any) {
-    pinned = !!v;
+    setPinned(!!v);
   }
 
   return (
     <>
     <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-combobox" + " " + rozieClass({ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': local.disabled, 'rozie-combobox--inline': local.inline, 'rozie-combobox--multiple': local.multiple }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-9546115a="">
       
-      <Popover trigger="manual" open={isOpen()} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={local.virtual} disablePositioning={local.inline} placement={local.placement} offset={local.offset} disableFlip={local.disableFlip} disableShift={local.disableShift} data-rozie-s-9546115a="" anchorSlot={() => (<>
+      <Popover trigger="manual" open={isOpen()} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={local.virtual} disablePositioning={local.inline} disableDismiss={pinned()} placement={local.placement} offset={local.offset} disableFlip={local.disableFlip} disableShift={local.disableShift} data-rozie-s-9546115a="" anchorSlot={() => (<>
           
           {<Show when={local.multiple}><ul class={"rozie-combobox-chips"} data-rozie-s-9546115a="">
             <Key each={chipRows() as readonly any[]} by={(row) => 'chip-' + row.value}>{(row, idx) => <li class={"rozie-combobox-chip"} data-rozie-s-9546115a="">

@@ -92,6 +92,10 @@ interface PopoverProps {
    * Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height.
    */
   matchWidth?: boolean;
+  /**
+   * Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Off by default; existing `trigger="manual"` consumers relying on real click-outside dismissal are unaffected unless they opt in.
+   */
+  disableDismiss?: boolean;
   onChange?: (...args: any[]) => void;
   renderAnchor?: (ctx: AnchorCtx) => ReactNode;
   children?: ReactNode;
@@ -106,7 +110,7 @@ export interface PopoverHandle {
 }
 
 const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props: PopoverProps, ref): JSX.Element {
-  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean; keepMounted: boolean; matchWidth: boolean } = {
+  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean; keepMounted: boolean; matchWidth: boolean; disableDismiss: boolean } = {
     ..._props,
     placement: _props.placement ?? 'bottom',
     trigger: _props.trigger ?? 'click',
@@ -121,10 +125,11 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     disablePositioning: _props.disablePositioning ?? false,
     keepMounted: _props.keepMounted ?? false,
     matchWidth: _props.matchWidth ?? false,
+    disableDismiss: _props.disableDismiss ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, matchWidth, defaultValue, onOpenChange, defaultOpen, onChange, ...rest } = _props as PopoverProps & Record<string, unknown>;
-    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void matchWidth; void defaultValue; void onOpenChange; void defaultOpen; void onChange;
+    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, matchWidth, disableDismiss, defaultValue, onOpenChange, defaultOpen, onChange, ...rest } = _props as PopoverProps & Record<string, unknown>;
+    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void matchWidth; void disableDismiss; void defaultValue; void onOpenChange; void defaultOpen; void onChange;
     return rest;
   })();
   const anchorNode = useRef<any>(null);
@@ -429,19 +434,19 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   }, [props.strategy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!(open)) return;
+    if (!(open && !props.disableDismiss)) return;
     const _rozieHandler = ($event: KeyboardEvent) => {
       if ($event.key !== 'Escape') return;
       ((dismiss) as ((...args: any[]) => any))($event);
     };
     document.addEventListener('keydown', _rozieHandler);
     return () => document.removeEventListener('keydown', _rozieHandler);
-  }, [dismiss, open]);
+  }, [dismiss, open, props.disableDismiss]);
 
   useOutsideClick(
     [anchorEl, floatingEl],
     dismiss,
-    () => !!(open),
+    () => !!(open && !props.disableDismiss),
   );
 
   const _rozieExposeRef = useRef({ show, hide, toggle, reposition });
