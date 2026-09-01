@@ -1,10 +1,10 @@
 <template>
 
 <div :class="['rozie-combobox', { 'rozie-combobox--open': isOpen, 'rozie-combobox--disabled': props.disabled, 'rozie-combobox--inline': props.inline }]" ref="__rozieRootRef" v-bind="$attrs">
-  <input ref="inputElRef" class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" :aria-expanded="!!isOpen" :aria-controls="listId()" :aria-activedescendant="(activeId()) ?? undefined" :aria-label="props.ariaLabel" :value="query" :placeholder="props.placeholder" :disabled="!!props.disabled" autocomplete="off" @input="onInput($event)" @focus="onFocus($event)" @blur="onBlur()" @keydown="onKeydown($event)" />
-
   
-  <Popover v-if="isOpen || props.virtual" trigger="manual" v-model:open="isOpen" :bare="true" :match-width="true" :keep-mounted="props.virtual" :disable-positioning="props.inline" :placement="props.placement" :offset="props.offset" :disable-flip="props.disableFlip" :disable-shift="props.disableShift">
+  <Popover trigger="manual" v-model:open="isOpen" :bare="true" :match-width="true" :keep-mounted="props.virtual" :disable-positioning="props.inline" :placement="props.placement" :offset="props.offset" :disable-flip="props.disableFlip" :disable-shift="props.disableShift"><template #anchor>
+      <input ref="inputElRef" class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" :aria-expanded="!!isOpen" :aria-controls="listId()" :aria-activedescendant="(activeId()) ?? undefined" :aria-label="props.ariaLabel" :value="query" :placeholder="props.placeholder" :disabled="!!props.disabled" autocomplete="off" @input="onInput($event)" @focus="onFocus($event)" @blur="onBlur()" @keydown="onKeydown($event)" />
+    </template>
     
     <ul v-if="isOpen && !props.virtual && !isGrouped()" class="rozie-combobox-list" :id="listId()" role="listbox">
       <li v-for="opt in filteredOptions()" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="opt.value === value" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
@@ -49,7 +49,8 @@
 
       <li v-if="windowSource().length === 0" class="rozie-combobox-empty" role="presentation">
         <slot name="empty" :query="query">No results</slot>
-      </li></ul></Popover></div>
+      </li></ul></Popover>
+</div>
 
 </template>
 
@@ -475,6 +476,12 @@ let remeasurePending = false;
 // (e.g. command-palette's action flyout) holds real DOM focus. Mirrors the virtualizer
 // write-in-$onMount/read-in-several-others cross-function access pattern above.
 let pinned = false;
+// Non-reactive per-instance flag (Phase 86 R2, plan 86-03, Solid-only): true for
+// the duration of an onFocus-triggered open transition (set before the isOpen
+// write, cleared in the deferred microtask after). Lets onBlur distinguish a
+// blur caused by Solid recreating the anchor's DOM mid-open (skip closing) from
+// a genuine user-initiated blur (close normally). See onFocus/onBlur below.
+let openingInProgress = false;
 // Non-reactive per-instance flag (combobox-virtual-reactivity phase): set true once
 // $onMount has run; read by windowedView() below so the blank-frame fallback (D-4) only
 // fires on a genuine RUNTIME flip — a virtual:true-at-mount (never-flipped) consumer's
@@ -857,16 +864,55 @@ const onInput = (e: any) => {
   });
 };
 const onFocus = (e: any) => {
+  // Phase 86 R2 (plan 86-03), Solid-only reentrancy guard: the input now
+  // renders inside the composed popover's SCOPED `#anchor` slot
+  // (`:open="$props.open"` among its params — see the <Popover> template
+  // comment for why the input moved there). On Solid, a named slot invocation
+  // with reactive scope params is a plain closure CALL re-run whenever any
+  // param changes (@rozie/core's documented, intentional Solid
+  // slot-reactivity design — not a bug to route around at the emitter level):
+  // the `isOpen` write below changes the `open` param this exact handler is
+  // responding to, which on Solid SYNCHRONOUSLY recreates the anchor's DOM
+  // subtree (Solid's JSX has no virtual-DOM diffing to preserve node identity
+  // across a closure re-invocation) — removing the just-focused `<input>`
+  // fires a NATIVE blur on it, mid-call-stack, before this function even
+  // returns. Without the guard below, that blur's own onBlur() would
+  // immediately set isOpen back to false, and the deferred re-focus further
+  // down would restart the SAME cycle on the fresh node — an infinite
+  // recreate/blur/close/refocus loop. `openingInProgress` (below) tells
+  // onBlur "this blur is a side effect of OUR OWN isOpen write, not the user
+  // moving focus away" so it can skip closing. The other 5 targets diff their
+  // scoped-slot re-render and keep the existing, already-focused node — no
+  // blur ever fires there, so the guard is a no-op for them.
+  openingInProgress = true;
   isOpen.value = true;
+  // Cleared SYNCHRONOUSLY, immediately after the write — Solid's reactive
+  // cascade (if any) runs SYNCHRONOUSLY as part of that write, before this
+  // line executes, so the guard window covers exactly the recreate/blur
+  // cascade and nothing past it. A deferred (microtask) clear would leave a
+  // stale `true` window spanning an `await` boundary whenever the re-focus
+  // below re-enters onFocus, incorrectly suppressing a LATER, genuine blur.
+  openingInProgress = false;
   if (e && e.target && e.target.select) e.target.select();
+  queueMicrotask(() => {
+    // Re-assert focus onto whatever node is CURRENT — after Solid's
+    // synchronous signal-write reactivity (if any) has already run and
+    // `$refs.inputEl` reflects the latest node — recovering focus if it was
+    // stranded on a since-removed one.
+    if (inputElRef.value && document.activeElement !== inputElRef.value) inputElRef.value!.focus();
+  });
 };
 // @blur closes the popup. Option selection uses @mousedown.prevent, which keeps
 // focus on the input, so a click on an option does NOT blur-close before select.
 // While `pinned` (pinOpen(true)), early-return BEFORE the isOpen write — a host
 // sub-surface (e.g. command-palette's action flyout) is holding focus and the
-// popup must stay open until the host calls pinOpen(false) itself.
+// popup must stay open until the host calls pinOpen(false) itself. While
+// `openingInProgress` (Solid-only, see onFocus above), early-return too — this
+// blur is a side effect of our OWN open-transition recreating the anchor's DOM,
+// not the user moving focus elsewhere.
 const onBlur = () => {
   if (pinned) return;
+  if (openingInProgress) return;
   isOpen.value = false;
 };
 const onKeydown = (e: any) => {
@@ -1050,7 +1096,22 @@ defineExpose({ focus, clear, seedQuery, pinOpen });
 }
 .rozie-combobox-input {
   box-sizing: border-box;
-  width: 100%;
+  /* Phase 86 R2 (plan 86-03): EXPLICIT width, not `100%`. The input now renders
+     inside popover's `.rozie-popover-anchor` (`display: inline-block`,
+     shrink-to-fit) rather than as a direct 100%-width child of `.rozie-combobox`
+     (`width: var(--rozie-combobox-width, 16rem)`) — a percentage width here would
+     be circular against that shrink-to-fit ancestor (CSS 2.1 §10.3.3: an
+     unresolvable percentage against an auto-width parent degrades to the
+     intrinsic/auto size, NOT the control's real width), which is exactly the
+     bug this fixes: `anchorEl`'s measured rect must equal the input's real box
+     for Floating UI's positioning AND `matchWidth`'s reference width to be
+     correct. Reads the SAME `--rozie-combobox-width` token `.rozie-combobox`
+     itself uses, so the rendered pixel width is IDENTICAL to before this change
+     in the default (non-inline) case. `.rozie-combobox--inline
+     .rozie-combobox-input` below restores `100%` for the inline pass-through
+     path, where `.rozie-combobox` itself stretches to its container (unaffected
+     by this fix — `disablePositioning` skips anchor measurement entirely there). */
+  width: var(--rozie-combobox-width, 16rem);
   padding: var(--rozie-combobox-input-padding, 0.5rem 0.75rem);
   font: inherit;
   color: var(--rozie-combobox-color, inherit);
@@ -1156,5 +1217,8 @@ defineExpose({ focus, clear, seedQuery, pinOpen });
   border: none;
   border-radius: 0;
   box-shadow: none;
+}
+.rozie-combobox--inline .rozie-combobox-input {
+  width: 100%;
 }
 </style>

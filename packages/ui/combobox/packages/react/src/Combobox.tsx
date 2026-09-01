@@ -170,6 +170,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   const virtualizerCleanup = useRef<any>(null);
   const remeasurePending = useRef(false);
   const pinned = useRef(false);
+  const openingInProgress = useRef(false);
   const [value, setValue] = useControllableState({
     value: props.value,
     defaultValue: props.defaultValue ?? null,
@@ -478,6 +479,12 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   // pinOpen(v), read by onBlur() to suppress the close-on-blur while a host sub-surface
   // (e.g. command-palette's action flyout) holds real DOM focus. Mirrors the virtualizer
   // write-in-$onMount/read-in-several-others cross-function access pattern above.
+
+  // Non-reactive per-instance flag (Phase 86 R2, plan 86-03, Solid-only): true for
+  // the duration of an onFocus-triggered open transition (set before the isOpen
+  // write, cleared in the deferred microtask after). Lets onBlur distinguish a
+  // blur caused by Solid recreating the anchor's DOM mid-open (skip closing) from
+  // a genuine user-initiated blur (close normally). See onFocus/onBlur below.
 
   // Non-reactive per-instance flag (combobox-virtual-reactivity phase): set true once
   // $onMount has run; read by windowedView() below so the blank-frame fallback (D-4) only
@@ -896,16 +903,55 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     });
   }, [_rozieProp_onSearch]);
   const onFocus = useCallback((e: any) => {
+    // Phase 86 R2 (plan 86-03), Solid-only reentrancy guard: the input now
+    // renders inside the composed popover's SCOPED `#anchor` slot
+    // (`:open="$props.open"` among its params — see the <Popover> template
+    // comment for why the input moved there). On Solid, a named slot invocation
+    // with reactive scope params is a plain closure CALL re-run whenever any
+    // param changes (@rozie/core's documented, intentional Solid
+    // slot-reactivity design — not a bug to route around at the emitter level):
+    // the `isOpen` write below changes the `open` param this exact handler is
+    // responding to, which on Solid SYNCHRONOUSLY recreates the anchor's DOM
+    // subtree (Solid's JSX has no virtual-DOM diffing to preserve node identity
+    // across a closure re-invocation) — removing the just-focused `<input>`
+    // fires a NATIVE blur on it, mid-call-stack, before this function even
+    // returns. Without the guard below, that blur's own onBlur() would
+    // immediately set isOpen back to false, and the deferred re-focus further
+    // down would restart the SAME cycle on the fresh node — an infinite
+    // recreate/blur/close/refocus loop. `openingInProgress` (below) tells
+    // onBlur "this blur is a side effect of OUR OWN isOpen write, not the user
+    // moving focus away" so it can skip closing. The other 5 targets diff their
+    // scoped-slot re-render and keep the existing, already-focused node — no
+    // blur ever fires there, so the guard is a no-op for them.
+    openingInProgress.current = true;
     setIsOpen(true);
+    // Cleared SYNCHRONOUSLY, immediately after the write — Solid's reactive
+    // cascade (if any) runs SYNCHRONOUSLY as part of that write, before this
+    // line executes, so the guard window covers exactly the recreate/blur
+    // cascade and nothing past it. A deferred (microtask) clear would leave a
+    // stale `true` window spanning an `await` boundary whenever the re-focus
+    // below re-enters onFocus, incorrectly suppressing a LATER, genuine blur.
+    openingInProgress.current = false;
     if (e && e.target && e.target.select) e.target.select();
+    queueMicrotask(() => {
+      // Re-assert focus onto whatever node is CURRENT — after Solid's
+      // synchronous signal-write reactivity (if any) has already run and
+      // `$refs.inputEl` reflects the latest node — recovering focus if it was
+      // stranded on a since-removed one.
+      if (inputEl.current && document.activeElement !== inputEl.current) inputEl.current!.focus();
+    });
   }, []);
   // @blur closes the popup. Option selection uses @mousedown.prevent, which keeps
   // focus on the input, so a click on an option does NOT blur-close before select.
   // While `pinned` (pinOpen(true)), early-return BEFORE the isOpen write — a host
   // sub-surface (e.g. command-palette's action flyout) is holding focus and the
-  // popup must stay open until the host calls pinOpen(false) itself.
+  // popup must stay open until the host calls pinOpen(false) itself. While
+  // `openingInProgress` (Solid-only, see onFocus above), early-return too — this
+  // blur is a side effect of our OWN open-transition recreating the anchor's DOM,
+  // not the user moving focus elsewhere.
   const onBlur = useCallback(() => {
     if (pinned.current) return;
+    if (openingInProgress.current) return;
     setIsOpen(false);
   }, []);
   const onKeydown = useCallback((e: any) => {
@@ -1097,10 +1143,10 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   return (
     <>
     <div ref={__rozieRoot} {...attrs} className={clsx(clsx("rozie-combobox", { "rozie-combobox--open": isOpen, "rozie-combobox--disabled": props.disabled, "rozie-combobox--inline": props.inline }), (attrs.className as string | undefined))} data-rozie-s-9546115a="">
-      <input ref={inputEl} className={"rozie-combobox-input"} type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(props.ariaLabel)} value={query} placeholder={props.placeholder} disabled={!!props.disabled} autoComplete="off" onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur(); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-9546115a="" />
-
       
-      {!!(isOpen || props.virtual) && <Popover trigger="manual" open={isOpen} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={props.virtual} disablePositioning={props.inline} placement={props.placement} offset={props.offset} disableFlip={props.disableFlip} disableShift={props.disableShift} data-rozie-s-9546115a="" children={<>
+      <Popover trigger="manual" open={isOpen} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={props.virtual} disablePositioning={props.inline} placement={props.placement} offset={props.offset} disableFlip={props.disableFlip} disableShift={props.disableShift} data-rozie-s-9546115a="" renderAnchor={() => (<>
+          <input ref={inputEl} className={"rozie-combobox-input"} type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(props.ariaLabel)} value={query} placeholder={props.placeholder} disabled={!!props.disabled} autoComplete="off" onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur(); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-9546115a="" />
+        </>)} children={<>
         
         {!!(isOpen && !props.virtual && !isGrouped()) && <ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
           {filteredOptions().map((opt) => <li key={opt.value} className={clsx("rozie-combobox-option", { "rozie-combobox-option--active": opt._i === activeIndex, "rozie-combobox-option--selected": opt.value === value, "rozie-combobox-option--disabled": opt.disabled })} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onMouseDown={($event) => { $event.preventDefault(); selectOption(opt); }} onMouseEnter={($event) => { setActiveIndex(opt._i); }} data-rozie-s-9546115a="">
@@ -1145,7 +1191,8 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
 
           {!!(windowSource().length === 0) && <li className={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
             {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No results"}
-          </li>}</ul>}</>} />}</div>
+          </li>}</ul>}</>} />
+    </div>
     </>
   );
 });

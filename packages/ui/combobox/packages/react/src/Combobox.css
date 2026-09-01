@@ -6,7 +6,22 @@
 }
 .rozie-combobox-input[data-rozie-s-9546115a] {
   box-sizing: border-box;
-  width: 100%;
+  /* Phase 86 R2 (plan 86-03): EXPLICIT width, not `100%`. The input now renders
+     inside popover's `.rozie-popover-anchor` (`display: inline-block`,
+     shrink-to-fit) rather than as a direct 100%-width child of `.rozie-combobox`
+     (`width: var(--rozie-combobox-width, 16rem)`) — a percentage width here would
+     be circular against that shrink-to-fit ancestor (CSS 2.1 §10.3.3: an
+     unresolvable percentage against an auto-width parent degrades to the
+     intrinsic/auto size, NOT the control's real width), which is exactly the
+     bug this fixes: `anchorEl`'s measured rect must equal the input's real box
+     for Floating UI's positioning AND `matchWidth`'s reference width to be
+     correct. Reads the SAME `--rozie-combobox-width` token `.rozie-combobox`
+     itself uses, so the rendered pixel width is IDENTICAL to before this change
+     in the default (non-inline) case. `.rozie-combobox--inline
+     .rozie-combobox-input` below restores `100%` for the inline pass-through
+     path, where `.rozie-combobox` itself stretches to its container (unaffected
+     by this fix — `disablePositioning` skips anchor measurement entirely there). */
+  width: var(--rozie-combobox-width, 16rem);
   padding: var(--rozie-combobox-input-padding, 0.5rem 0.75rem);
   font: inherit;
   color: var(--rozie-combobox-color, inherit);
@@ -112,4 +127,7 @@
   border: none;
   border-radius: 0;
   box-shadow: none;
+}
+.rozie-combobox--inline[data-rozie-s-9546115a] .rozie-combobox-input[data-rozie-s-9546115a] {
+  width: 100%;
 }
