@@ -28,8 +28,9 @@ const EXPECT = {
   // Phase 86 (D-02/D-05/D-06): + bare (suppress panel chrome) and
   // disablePositioning (static pass-through, never computePosition/autoUpdate).
   // Phase 86-02 (D-03): + keepMounted (hide-not-unmount while closed, one-shot
-  // mount position).
-  props: ['open', 'placement', 'strategy', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'bare', 'disablePositioning', 'keepMounted'],
+  // mount position). Phase 86-02 (D-04): + matchWidth (anchor-width matching
+  // via the `size` middleware).
+  props: ['open', 'placement', 'strategy', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth'],
   models: ['open'],
   emits: ['change'],
   slots: ['', 'anchor'] as string[],
@@ -53,7 +54,7 @@ describe('Popover.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (13 props)', () => {
+  it('props surface matches (14 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

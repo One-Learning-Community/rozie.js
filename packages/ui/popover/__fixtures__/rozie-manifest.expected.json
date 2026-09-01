@@ -79,6 +79,12 @@
       "isModel": false,
       "required": false,
       "type": "Boolean"
+    },
+    {
+      "name": "matchWidth",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
     }
   ],
   "slots": [

@@ -68,8 +68,12 @@ const props = withDefaults(
      * Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open.
      */
     keepMounted?: boolean;
+    /**
+     * Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height.
+     */
+    matchWidth?: boolean;
   }>(),
-  { placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false }
+  { placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false, matchWidth: false }
 );
 
 /**
@@ -98,7 +102,7 @@ const arrowElRef = ref<HTMLElement>();
 // of the middleware function (TS2322). Aliasing both severs the import↔prop clash.
 // (The Cropper import-name==component-name class, applied to imports vs PROP names —
 // two collisions, not one.) computePosition/autoUpdate/flip/shift carry no clash.
-import { computePosition, autoUpdate, offset as offsetMiddleware, flip, shift, arrow as arrowMiddleware } from '@floating-ui/dom';
+import { computePosition, autoUpdate, offset as offsetMiddleware, flip, shift, arrow as arrowMiddleware, size } from '@floating-ui/dom';
 import { buildMiddleware } from './internal/middleware';
 // null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
 //   anchorNode/floatingNode/arrowNode hold the resolved ref ELEMENTS (read ONLY in
@@ -188,13 +192,15 @@ const position = () => {
     offset: offsetMiddleware,
     flip,
     shift,
-    arrow: arrowMiddleware
+    arrow: arrowMiddleware,
+    size
   }, {
     offset: props.offset,
     disableFlip: props.disableFlip,
     disableShift: props.disableShift,
     arrow: props.arrow,
-    arrowEl: arrowNode
+    arrowEl: arrowNode,
+    matchWidth: !!props.matchWidth
   });
   // 'fixed' inline position MUST be written before computePosition measures the
   // floating element's offset parent (fixed vs absolute changes the containing

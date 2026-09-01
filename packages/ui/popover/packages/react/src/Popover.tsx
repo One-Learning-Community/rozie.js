@@ -10,7 +10,7 @@ import './Popover.css';
 // of the middleware function (TS2322). Aliasing both severs the import↔prop clash.
 // (The Cropper import-name==component-name class, applied to imports vs PROP names —
 // two collisions, not one.) computePosition/autoUpdate/flip/shift carry no clash.
-import { computePosition, autoUpdate, offset as offsetMiddleware, flip, shift, arrow as arrowMiddleware } from '@floating-ui/dom';
+import { computePosition, autoUpdate, offset as offsetMiddleware, flip, shift, arrow as arrowMiddleware, size } from '@floating-ui/dom';
 import { buildMiddleware } from './internal/middleware';
 
 // null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
@@ -88,6 +88,10 @@ interface PopoverProps {
    * Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open.
    */
   keepMounted?: boolean;
+  /**
+   * Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height.
+   */
+  matchWidth?: boolean;
   onChange?: (...args: any[]) => void;
   renderAnchor?: (ctx: AnchorCtx) => ReactNode;
   children?: ReactNode;
@@ -102,7 +106,7 @@ export interface PopoverHandle {
 }
 
 const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props: PopoverProps, ref): JSX.Element {
-  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean; keepMounted: boolean } = {
+  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean; keepMounted: boolean; matchWidth: boolean } = {
     ..._props,
     placement: _props.placement ?? 'bottom',
     trigger: _props.trigger ?? 'click',
@@ -116,10 +120,11 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     bare: _props.bare ?? false,
     disablePositioning: _props.disablePositioning ?? false,
     keepMounted: _props.keepMounted ?? false,
+    matchWidth: _props.matchWidth ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, defaultValue, onOpenChange, defaultOpen, onChange, ...rest } = _props as PopoverProps & Record<string, unknown>;
-    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void defaultValue; void onOpenChange; void defaultOpen; void onChange;
+    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, matchWidth, defaultValue, onOpenChange, defaultOpen, onChange, ...rest } = _props as PopoverProps & Record<string, unknown>;
+    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void matchWidth; void defaultValue; void onOpenChange; void defaultOpen; void onChange;
     return rest;
   })();
   const anchorNode = useRef<any>(null);
@@ -235,13 +240,15 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       offset: offsetMiddleware,
       flip,
       shift,
-      arrow: arrowMiddleware
+      arrow: arrowMiddleware,
+      size
     }, {
       offset: props.offset,
       disableFlip: props.disableFlip,
       disableShift: props.disableShift,
       arrow: props.arrow,
-      arrowEl: arrowNode.current
+      arrowEl: arrowNode.current,
+      matchWidth: !!props.matchWidth
     });
     // 'fixed' inline position MUST be written before computePosition measures the
     // floating element's offset parent (fixed vs absolute changes the containing
@@ -267,7 +274,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     computePosition(anchorNode.current, floatingNode.current, opts).then((result: any) => {
       applyPosition(result.x, result.y, result.middlewareData);
     });
-  }, [applyPosition, props.arrow, props.disableFlip, props.disablePositioning, props.disableShift, props.offset, props.placement, props.strategy]);
+  }, [applyPosition, props.arrow, props.disableFlip, props.disablePositioning, props.disableShift, props.matchWidth, props.offset, props.placement, props.strategy]);
   // Start autoUpdate (idempotent — stop any prior subscription first) and do an
   // initial position. Floating UI's autoUpdate keeps the position fresh on scroll/
   // resize/ancestor-layout changes and returns its own teardown.

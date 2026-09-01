@@ -13,6 +13,7 @@ const factories: MiddlewareFactories = {
   flip: () => ({ name: 'flip' }),
   shift: () => ({ name: 'shift' }),
   arrow: (opts) => ({ name: 'arrow', element: opts.element }),
+  size: (opts) => ({ name: 'size', ...opts }),
 };
 
 const names = (mw: unknown[]) => mw.map((m) => (m as { name: string }).name);
@@ -23,6 +24,7 @@ const base: MiddlewareConfig = {
   disableShift: false,
   arrow: false,
   arrowEl: null,
+  matchWidth: false,
 };
 
 const fakeEl = {} as Element;
@@ -67,5 +69,20 @@ describe('buildMiddleware', () => {
   it('omits arrow when an element exists but arrow is off', () => {
     const mw = buildMiddleware(factories, { ...base, arrow: false, arrowEl: fakeEl });
     expect(names(mw)).toEqual(['offset', 'flip', 'shift']);
+  });
+
+  it('drops size when matchWidth is false', () => {
+    const mw = buildMiddleware(factories, { ...base, matchWidth: false });
+    expect(names(mw)).toEqual(['offset', 'flip', 'shift']);
+  });
+
+  it('inserts size after offset, before flip/shift when matchWidth is true', () => {
+    const mw = buildMiddleware(factories, { ...base, matchWidth: true });
+    expect(names(mw)).toEqual(['offset', 'size', 'flip', 'shift']);
+  });
+
+  it('keeps size at index 1 even with disableFlip and disableShift both set', () => {
+    const mw = buildMiddleware(factories, { ...base, matchWidth: true, disableFlip: true, disableShift: true });
+    expect(names(mw)).toEqual(['offset', 'size']);
   });
 });

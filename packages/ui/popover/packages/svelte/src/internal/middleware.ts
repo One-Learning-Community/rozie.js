@@ -14,9 +14,11 @@
  * copy in each leaf has zero engine import of its own (the leaf's Popover.* owns
  * the single engine import).
  *
- * Floating UI ordering contract: offset → flip → shift → arrow. `offset` first so
- * the gap is measured before collision detection; `arrow` last so it reads the
- * final resolved placement.
+ * Floating UI ordering contract: offset → size → flip → shift → arrow. `offset`
+ * first so the gap is measured before collision detection; `size` next (pure
+ * width-matching, placement-independent, so its slot is readability-driven, not
+ * functional — gap math, then sizing, then collision-avoidance, then decoration);
+ * `arrow` last so it reads the final resolved placement.
  */
 
 export interface MiddlewareFactories {
@@ -24,6 +26,7 @@ export interface MiddlewareFactories {
   flip: () => unknown;
   shift: () => unknown;
   arrow: (opts: { element: Element }) => unknown;
+  size: (opts: { apply: (args: unknown) => void }) => unknown;
 }
 
 export interface MiddlewareConfig {
@@ -32,6 +35,7 @@ export interface MiddlewareConfig {
   disableShift: boolean;
   arrow: boolean;
   arrowEl: Element | null;
+  matchWidth: boolean;
 }
 
 /**
@@ -43,6 +47,23 @@ export function buildMiddleware(
   config: MiddlewareConfig,
 ): unknown[] {
   const mw: unknown[] = [factories.offset(config.offset)];
+  if (config.matchWidth) {
+    mw.push(
+      factories.size({
+        apply: (args: unknown) => {
+          // D-12: WIDTH ONLY — never a height-family style property. Height
+          // stays owned by the composing component's own token; a container
+          // whose size changes on every scroll/resize is a virtualizer
+          // re-measure feedback loop this repo has already paid for.
+          const { rects, elements } = args as {
+            rects: { reference: { width: number } };
+            elements: { floating: HTMLElement };
+          };
+          elements.floating.style.width = `${rects.reference.width}px`;
+        },
+      }),
+    );
+  }
   if (!config.disableFlip) mw.push(factories.flip());
   if (!config.disableShift) mw.push(factories.shift());
   // The arrow middleware needs a real element to position; opt-in only when both

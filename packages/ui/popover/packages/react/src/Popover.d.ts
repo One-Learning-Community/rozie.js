@@ -57,6 +57,10 @@ export interface PopoverProps {
    * Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open.
    */
   keepMounted?: boolean;
+  /**
+   * Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height.
+   */
+  matchWidth?: boolean;
   onChange?: (...args: unknown[]) => void;
   renderAnchor?: (params: { open: boolean; toggle: (...args: any[]) => any; show: (...args: any[]) => any; hide: (...args: any[]) => any }) => ReactNode;
   children?: ReactNode;

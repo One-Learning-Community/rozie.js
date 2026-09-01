@@ -11,7 +11,7 @@ import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAtt
 // of the middleware function (TS2322). Aliasing both severs the import↔prop clash.
 // (The Cropper import-name==component-name class, applied to imports vs PROP names —
 // two collisions, not one.) computePosition/autoUpdate/flip/shift carry no clash.
-import { computePosition, autoUpdate, offset as offsetMiddleware, flip, shift, arrow as arrowMiddleware } from '@floating-ui/dom';
+import { computePosition, autoUpdate, offset as offsetMiddleware, flip, shift, arrow as arrowMiddleware, size } from '@floating-ui/dom';
 import { buildMiddleware } from './internal/middleware';
 
 // null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
@@ -175,6 +175,10 @@ export class Popover {
    * Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open.
    */
   keepMounted = input<boolean>(false);
+  /**
+   * Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height.
+   */
+  matchWidth = input<boolean>(false);
   anchorEl = viewChild<ElementRef<HTMLDivElement>>('anchorEl');
   floatingEl = viewChild<ElementRef<HTMLDivElement>>('floatingEl');
   arrowEl = viewChild<ElementRef<HTMLDivElement>>('arrowEl');
@@ -354,13 +358,15 @@ export class Popover {
       offset: offsetMiddleware,
       flip,
       shift,
-      arrow: arrowMiddleware
+      arrow: arrowMiddleware,
+      size
     }, {
       offset: this.offset(),
       disableFlip: this.disableFlip(),
       disableShift: this.disableShift(),
       arrow: this.arrow(),
-      arrowEl: this.arrowNode
+      arrowEl: this.arrowNode,
+      matchWidth: !!this.matchWidth()
     });
     // 'fixed' inline position MUST be written before computePosition measures the
     // floating element's offset parent (fixed vs absolute changes the containing

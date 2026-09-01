@@ -56,6 +56,7 @@ Every visual value is a `--rozie-popover-*` CSS custom property (background, bor
 | `bare` | `Boolean` | `false` |  |  | Suppress the floating panel's own chrome (background, border, border-radius, box-shadow, padding) so a composing component can supply its own instead. Off by default — the panel keeps its standard `--rozie-popover-*` chrome tokens. |
 | `disablePositioning` | `Boolean` | `false` |  |  | Render the floating panel in normal document flow instead of computing a floating position — no `computePosition` call and no `autoUpdate` tracking is ever started. For a composing component that already controls the panel's layout (e.g. an `inline` consumer) rather than a genuinely floating popover. |
 | `keepMounted` | `Boolean` | `false` |  |  | Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open. |
+| `matchWidth` | `Boolean` | `false` |  |  | Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height. |
 
 ## Events
 
