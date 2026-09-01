@@ -10,13 +10,37 @@
  * model-param-shadow.vue.test.ts precedent): mount the REAL committed
  * emitted packages/vue/src/Combobox.vue (transformed by @vitejs/plugin-vue),
  * drive it via real DOM events, and assert on the rendered DOM + the
- * collected `create` events.
+ * collected `create` events, in EACH of the four mutually-exclusive render
+ * branches (plain / grouped / grouped+capped / windowed) — SPEC forbids a
+ * "works except with windowing" caveat.
  *
- * Task 1 (this initial slice, red-first against the source BEFORE the
- * `creatable` prop/emit/row existed — see the SUMMARY for the captured
- * failing output) proves the core mechanics on the plain (ungrouped,
- * non-virtual) branch only. Task 2 expands this file into the full
- * seven-behavior-group × four-render-branch matrix R3 requires.
+ * Task 1 proved the core mechanics red-first on the plain branch alone (see
+ * the 86-06 SUMMARY for that captured failing output). This file (task 2)
+ * additionally captures RED for the double-commit and exact-match cases —
+ * see the SUMMARY.
+ *
+ * Asserts, per branch:
+ *   (1) adjacency: text exactly equal to an existing option label (lower/
+ *       upper/mixed case, and with leading+trailing whitespace) offers NO
+ *       create row; the non-whitespace case variants also select the
+ *       existing option on commit (a whitespace-padded query legitimately
+ *       filters to zero rendered options under the pre-existing, UNCHANGED
+ *       substring filter — see the SUMMARY's noted scope boundary).
+ *   (2) empty: an empty or whitespace-only query emits no create row.
+ *   (3) encoding: case/whitespace differences match; a Unicode-composition-
+ *       form difference does NOT (no normalization applied — the row still
+ *       renders, proving the miss).
+ *   (4) ordering: the create row is the LAST navigable row, positionally
+ *       after every rendered option (asserted by DOM order, not presence).
+ *   (5) idempotency: a double-commit of the same query emits `create`
+ *       exactly once (an emitted-event COUNT assertion); a fresh character
+ *       re-arms it.
+ *   (6) composition: `multiple` active — `create` fires and `value` stays
+ *       untouched; the query clears in `multiple` mode after the commit,
+ *       and is left alone in single mode.
+ *   (7) empty-state replacement: a creatable query shows the create row and
+ *       NOT the `#empty` row; a whitespace-only query shows `#empty` and NOT
+ *       the create row.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { createApp, h, ref, nextTick } from 'vue';
@@ -26,10 +50,34 @@ import { createApp, h, ref, nextTick } from 'vue';
 import Combobox from '../packages/vue/src/Combobox.vue';
 
 const OPTIONS = [
-  { value: 'apple', label: 'Apple' },
-  { value: 'banana', label: 'Banana' },
-  { value: 'cherry', label: 'Cherry' },
-  { value: 'date', label: 'Date' },
+  { value: 'apple', label: 'Apple', group: 'fruit' },
+  { value: 'banana', label: 'Banana', group: 'fruit' },
+  { value: 'cherry', label: 'Cherry', group: 'fruit' },
+  { value: 'date', label: 'Date', group: 'fruit' },
+  { value: 'carrot', label: 'Carrot', group: 'veg' },
+  { value: 'potato', label: 'Potato', group: 'veg' },
+];
+
+const GROUPS = [
+  { id: 'fruit', label: 'Fruit' },
+  { id: 'veg', label: 'Vegetable' },
+];
+
+interface BranchConfig {
+  name: string;
+  props: Record<string, unknown>;
+}
+
+// The four mutually-exclusive render branches this family ships (SPEC: "no
+// works-except-with-windowing caveat"). `virtual` itself is NOT set here —
+// see `openBranch()` below: the windowed branch starts non-virtual and flips
+// at runtime so its option rows are real DOM (TanStack's virtualizer has no
+// real layout to measure under happy-dom).
+const BRANCHES: BranchConfig[] = [
+  { name: 'plain', props: {} },
+  { name: 'grouped', props: { groups: GROUPS } },
+  { name: 'grouped+capped', props: { groups: GROUPS, groupCap: 2 } },
+  { name: 'windowed', props: { maxHeight: '200px' } },
 ];
 
 const hosts: HTMLElement[] = [];
@@ -37,8 +85,22 @@ afterEach(() => {
   for (const host of hosts.splice(0)) host.remove();
 });
 
-function mountCombobox(extraProps: Record<string, unknown> = {}) {
-  const value = ref<unknown>(null);
+/**
+ * Mount Combobox with `creatable` on by default, a reactive `value` /
+ * `virtual` pair (so windowed can flip at runtime), and `create`/`change`
+ * event logs.
+ */
+function mountCombobox(
+  branchProps: Record<string, unknown>,
+  opts: {
+    initialValue?: unknown;
+    extraProps?: Record<string, unknown>;
+    optionsList?: Array<Record<string, unknown>>;
+  } = {},
+) {
+  const { initialValue = null, extraProps = {}, optionsList = OPTIONS } = opts;
+  const value = ref<unknown>(initialValue);
+  const virtual = ref<boolean>(!!branchProps.virtual);
   const creates: Array<Record<string, unknown>> = [];
   const changes: unknown[] = [];
   const host = document.createElement('div');
@@ -53,22 +115,55 @@ function mountCombobox(extraProps: Record<string, unknown> = {}) {
         },
         onChange: (e: unknown) => changes.push(e),
         onCreate: (e: Record<string, unknown>) => creates.push(e),
-        options: OPTIONS,
+        options: optionsList,
         creatable: true,
-        placeholder: 'Search fruit…',
-        ariaLabel: 'Fruit',
+        placeholder: 'Search…',
+        ariaLabel: 'Fruit or vegetable',
         idBase: 'creatable-test',
+        ...branchProps,
+        virtual: virtual.value,
         ...extraProps,
       }),
   });
   app.mount(host);
-  return { app, host, value: () => value.value, creates, changes };
+  return {
+    app,
+    host,
+    creates,
+    changes,
+    value: () => value.value,
+    setVirtual: (v: boolean) => {
+      virtual.value = v;
+    },
+  };
+}
+
+interface Mounted {
+  host: HTMLElement;
+  setVirtual: (v: boolean) => void;
+}
+
+/**
+ * Open the popup (focus the input) with REAL rows in the DOM for every
+ * branch, including windowed — mirrors multiple.behavior.test.ts's
+ * `openBranch()` (see its doc comment for the full TanStack-under-happy-dom
+ * rationale: mount non-virtual, open, THEN flip `virtual` true and await
+ * only a `nextTick()`, landing in the un-windowed fallback frame that still
+ * exercises the real windowed markup).
+ */
+async function openBranch(branchName: string, mount: Mounted): Promise<HTMLInputElement> {
+  const input = mount.host.querySelector('input[role="combobox"]') as HTMLInputElement;
+  input.dispatchEvent(new Event('focus'));
+  await nextTick();
+  if (branchName === 'windowed') {
+    mount.setVirtual(true);
+    await nextTick();
+  }
+  return input;
 }
 
 async function typeQuery(host: HTMLElement, text: string): Promise<HTMLInputElement> {
   const input = host.querySelector('input[role="combobox"]') as HTMLInputElement;
-  input.dispatchEvent(new Event('focus'));
-  await nextTick();
   input.value = text;
   input.dispatchEvent(new Event('input'));
   await nextTick();
@@ -79,115 +174,211 @@ function createRowEl(host: HTMLElement): HTMLElement | null {
   return host.querySelector('.rozie-combobox-create');
 }
 
-describe('Combobox creatable — core mechanics (behavioral, plain branch)', () => {
-  it('committing unmatched text emits `create` with the query and writes NOTHING to value', async () => {
-    const { app, host, value, creates } = mountCombobox();
-    try {
-      const input = await typeQuery(host, 'kiwi');
-      const row = createRowEl(host);
-      expect(row).not.toBeNull();
-      expect(row!.textContent).toContain('kiwi');
+function emptyRowEl(host: HTMLElement): HTMLElement | null {
+  return host.querySelector('.rozie-combobox-empty');
+}
 
-      row!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-      await nextTick();
+function optionEls(host: HTMLElement): HTMLElement[] {
+  return Array.from(host.querySelectorAll('[role="option"]')) as HTMLElement[];
+}
 
-      expect(creates).toEqual([{ query: 'kiwi' }]);
-      expect(value()).toBe(null);
-      void input;
-    } finally {
-      app.unmount();
-    }
+function findOptionEl(host: HTMLElement, label: string): HTMLElement | undefined {
+  return optionEls(host).find(
+    (e) => !e.classList.contains('rozie-combobox-create') && !e.classList.contains('rozie-combobox-more') && e.textContent?.includes(label),
+  );
+}
+
+for (const branch of BRANCHES) {
+  describe(`Combobox creatable — ${branch.name} branch (behavioral)`, () => {
+    it('(1) adjacency: an exact-match query (any case, any whitespace) offers NO create row', async () => {
+      const mount = mountCombobox(branch.props);
+      const { app, host } = mount;
+      try {
+        await openBranch(branch.name, mount);
+        for (const q of ['apple', 'APPLE', 'ApPlE', '  Apple  ', '\tApple\n']) {
+          await typeQuery(host, q);
+          expect(createRowEl(host), `query "${q}" should offer no create row`).toBeNull();
+        }
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(1b) adjacency: a case-different exact match (no whitespace) selects the existing option on commit', async () => {
+      const mount = mountCombobox(branch.props);
+      const { app, host, value } = mount;
+      try {
+        await openBranch(branch.name, mount);
+        await typeQuery(host, 'APPLE');
+        expect(createRowEl(host)).toBeNull();
+        const el = findOptionEl(host, 'Apple');
+        expect(el, 'the exact-match option must still be rendered/selectable').not.toBeUndefined();
+        el!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        await nextTick();
+        expect(value()).toBe('apple');
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(2) empty: an empty or whitespace-only query emits no create row', async () => {
+      const mount = mountCombobox(branch.props);
+      const { app, host } = mount;
+      try {
+        await openBranch(branch.name, mount);
+        await typeQuery(host, '');
+        expect(createRowEl(host)).toBeNull();
+        await typeQuery(host, '   ');
+        expect(createRowEl(host)).toBeNull();
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(3) encoding: case/whitespace differences match; a Unicode composition-form difference does NOT', async () => {
+      // Isolated single-option fixture: label carries the precomposed 'é'
+      // (U+00E9); the query below is the SAME text with a DECOMPOSED 'é'
+      // (U+0065 U+0301 — 'e' + combining acute accent). Visually identical,
+      // never string-equal — the locked contract is NO normalization, so
+      // this must be treated as a genuine miss (creatable), not a match.
+      const CAFE_OPTIONS = [{ value: 'cafe', label: 'Café' }];
+      const mount = mountCombobox(branch.props, { optionsList: CAFE_OPTIONS });
+      const { app, host } = mount;
+      try {
+        await openBranch(branch.name, mount);
+        // Case + whitespace variant of the SAME (precomposed) string DOES match.
+        await typeQuery(host, '  CAFÉ  ');
+        expect(createRowEl(host), 'a case/whitespace-only difference must still match').toBeNull();
+
+        // Decomposed-form variant must NOT match (no create suppression).
+        await typeQuery(host, 'café');
+        expect(createRowEl(host), 'a Unicode composition-form difference must NOT match').not.toBeNull();
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(4) ordering: the create row is the LAST navigable row, after every rendered option', async () => {
+      const mount = mountCombobox(branch.props);
+      const { app, host } = mount;
+      try {
+        await openBranch(branch.name, mount);
+        // "at" substring-matches Date (fruit) AND Potato (veg) — spans both
+        // group sections in the grouped/capped branches — but exact-matches
+        // no label, so it is creatable while real options ALSO render.
+        await typeQuery(host, 'at');
+        const rows = optionEls(host);
+        expect(rows.length).toBeGreaterThan(1);
+        expect(rows[rows.length - 1]!.classList.contains('rozie-combobox-create')).toBe(true);
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(5) idempotency: a double-commit of the same query emits `create` exactly once', async () => {
+      const mount = mountCombobox(branch.props);
+      const { app, host, creates } = mount;
+      try {
+        await openBranch(branch.name, mount);
+        await typeQuery(host, 'kiwi');
+        let row = createRowEl(host);
+        row!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        await nextTick();
+        expect(creates.length).toBe(1);
+
+        // Re-open (closeOnSelect closed it; the query text is unchanged in
+        // single mode) and commit again — the SAME normalized query.
+        const input = host.querySelector('input[role="combobox"]') as HTMLInputElement;
+        input.dispatchEvent(new Event('focus'));
+        await nextTick();
+        row = createRowEl(host);
+        expect(row, 'the row must still be offered — nothing consumed it').not.toBeNull();
+        row!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        await nextTick();
+
+        expect(creates.length).toBe(1);
+        expect(creates).toEqual([{ query: 'kiwi' }]);
+
+        // A fresh character re-arms the latch.
+        await typeQuery(host, 'kiwi2');
+        row = createRowEl(host);
+        row!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        await nextTick();
+        expect(creates.length).toBe(2);
+        expect(creates[1]).toEqual({ query: 'kiwi2' });
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(6) composition: `multiple` active — create fires, value stays untouched, query clears after', async () => {
+      const mount = mountCombobox(branch.props, { extraProps: { multiple: true } });
+      const { app, host, value, creates } = mount;
+      try {
+        const input = await openBranch(branch.name, mount);
+        await typeQuery(host, 'kiwi');
+        const row = createRowEl(host);
+        row!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        await nextTick();
+
+        expect(creates).toEqual([{ query: 'kiwi' }]);
+        expect(value()).toEqual(null);
+        expect(input.value).toBe('');
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(6b) composition: single mode leaves the query alone after a create commit', async () => {
+      const mount = mountCombobox(branch.props);
+      const { app, host, creates } = mount;
+      try {
+        const input = await openBranch(branch.name, mount);
+        await typeQuery(host, 'kiwi');
+        const row = createRowEl(host);
+        row!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        await nextTick();
+
+        expect(creates).toEqual([{ query: 'kiwi' }]);
+        expect(input.value).toBe('kiwi');
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(7) empty-state replacement: creatable ⇒ create row present, #empty absent; whitespace ⇒ the reverse', async () => {
+      const mount = mountCombobox(branch.props);
+      const { app, host } = mount;
+      try {
+        await openBranch(branch.name, mount);
+
+        // "zzz" matches NO option at all (filteredOptions() empty) AND is
+        // creatable — the create row REPLACES #empty here (D-19).
+        await typeQuery(host, 'zzz');
+        expect(createRowEl(host)).not.toBeNull();
+        expect(emptyRowEl(host)).toBeNull();
+
+        // Whitespace-only ⇒ never creatable — #empty keeps its job.
+        await typeQuery(host, '   ');
+        expect(createRowEl(host)).toBeNull();
+        expect(emptyRowEl(host)).not.toBeNull();
+      } finally {
+        app.unmount();
+      }
+    });
   });
+}
 
-  it('a query exactly matching an existing option label (any case, trimmed) offers NO create row', async () => {
-    const { app, host } = mountCombobox();
+describe('Combobox creatable — with `creatable` unset (byte-identical-off)', () => {
+  it('no create row ever renders and no `create` event ever fires', async () => {
+    const mount = mountCombobox({}, { extraProps: { creatable: false } });
+    const { app, host, creates } = mount;
     try {
-      await typeQuery(host, 'APPLE');
-      expect(createRowEl(host)).toBeNull();
-
-      await typeQuery(host, '  apple  ');
-      expect(createRowEl(host)).toBeNull();
-    } finally {
-      app.unmount();
-    }
-  });
-
-  it('an empty or whitespace-only query offers NO create row', async () => {
-    const { app, host } = mountCombobox();
-    try {
-      await typeQuery(host, '');
-      expect(createRowEl(host)).toBeNull();
-
-      await typeQuery(host, '   ');
-      expect(createRowEl(host)).toBeNull();
-    } finally {
-      app.unmount();
-    }
-  });
-
-  it('a double-commit gesture on the same query emits `create` exactly once', async () => {
-    const { app, host, creates } = mountCombobox();
-    try {
-      await typeQuery(host, 'kiwi');
-      let row = createRowEl(host);
-      row!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-      await nextTick();
-      // Re-open the popup: closeOnSelect default (true, single-select) closed
-      // it, but the query text is unchanged in single mode, so the same
-      // creatable row is offered again on refocus.
-      const input = host.querySelector('input[role="combobox"]') as HTMLInputElement;
-      input.dispatchEvent(new Event('focus'));
-      await nextTick();
-      row = createRowEl(host);
-      expect(row).not.toBeNull();
-      row!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-      await nextTick();
-
-      expect(creates).toEqual([{ query: 'kiwi' }]);
-    } finally {
-      app.unmount();
-    }
-  });
-
-  it('the create row is Arrow-reachable and carries a real option id', async () => {
-    const { app, host } = mountCombobox();
-    try {
-      const input = await typeQuery(host, 'kiwi');
-      // Only the create row is navigable (no options match "kiwi").
-      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
-      await nextTick();
-      const row = createRowEl(host);
-      expect(row).not.toBeNull();
-      expect(row!.id).toBeTruthy();
-      expect(input.getAttribute('aria-activedescendant')).toBe(row!.id);
-    } finally {
-      app.unmount();
-    }
-  });
-
-  it('with `creatable` unset, nothing about the rendered output changes (byte-identical-off)', async () => {
-    const { app, host } = mountCombobox({ creatable: false });
-    try {
+      await openBranch('plain', mount);
       await typeQuery(host, 'kiwi');
       expect(createRowEl(host)).toBeNull();
       expect(host.querySelectorAll('[role="option"]').length).toBe(0);
-    } finally {
-      app.unmount();
-    }
-  });
-
-  it('with `multiple` also active, `create` fires and `value` stays untouched', async () => {
-    const { app, host, value, creates } = mountCombobox({ multiple: true });
-    try {
-      const input = await typeQuery(host, 'kiwi');
-      const row = createRowEl(host);
-      row!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-      await nextTick();
-
-      expect(creates).toEqual([{ query: 'kiwi' }]);
-      expect(value()).toEqual(null);
-      // D-20: the query clears in multiple mode after a create commit.
-      expect(input.value).toBe('');
+      expect(creates).toEqual([]);
     } finally {
       app.unmount();
     }
