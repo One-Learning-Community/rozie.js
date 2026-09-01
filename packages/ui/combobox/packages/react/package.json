@@ -52,7 +52,8 @@
   "peerDependencies": {
     "react": "^18.2 || ^19",
     "react-dom": "^18.2 || ^19",
-    "@tanstack/virtual-core": "^3"
+    "@tanstack/virtual-core": "^3",
+    "@rozie-ui/popover-react": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -63,6 +64,9 @@
     },
     "@tanstack/virtual-core": {
       "optional": true
+    },
+    "@rozie-ui/popover-react": {
+      "optional": false
     }
   },
   "devDependencies": {
