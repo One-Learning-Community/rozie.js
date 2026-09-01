@@ -137,6 +137,23 @@
   ],
   "slots": [
     {
+      "name": "chip",
+      "params": [
+        {
+          "name": "option"
+        },
+        {
+          "name": "remove"
+        },
+        {
+          "name": "index"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
       "name": "option",
       "params": [
         {

@@ -40,7 +40,10 @@ const EXPECT = {
   // had drifted stale: missing `groups`/`groupHeading` from combobox-native-groups
   // and `seedQuery`/`pinOpen` from later phases; synced to the IR here alongside
   // the new `groupCap`/`groupMore` combobox-group-cap surface).
-  slots: ['option', 'empty', 'groupHeading', 'groupMore'],
+  // Phase 86 (R1, plan 86-05): + `chip` — the chip-rail scoped slot `{ option,
+  // remove, index }`, rendered inside the control before the input under
+  // `multiple`.
+  slots: ['option', 'empty', 'groupHeading', 'groupMore', 'chip'],
   expose: ['focus', 'clear', 'seedQuery', 'pinOpen'],
 };
 

@@ -22,6 +22,13 @@ import { groupOptions } from './internal/groupOptions';
 // const). NULL until $onMount, ONLY constructed when $props.virtual. gridScrollEl is the
 // captured .rozie-combobox-list scroll div; remeasurePending dedupes the deferred sweep.
 
+interface ChipCtx {
+  $implicit: { option: any; remove: any; index: any };
+  option: any;
+  remove: any;
+  index: any;
+}
+
 interface OptionCtx {
   $implicit: { option: any; index: any; active: any; selected: any; disabled: any };
   option: any;
@@ -57,7 +64,23 @@ interface GroupMoreCtx {
     <div class="rozie-combobox" [ngClass]="{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-combobox--inline': inline(), 'rozie-combobox--multiple': multiple() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
       
       <rozie-popover trigger="manual" [open]="isOpen()" (openChange)="isOpen.set($event)" [bare]="true" [matchWidth]="true" [keepMounted]="virtual()" [disablePositioning]="inline()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()"><ng-template #anchor>
-          <input #inputEl class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" [attr.aria-expanded]="!!isOpen()" [attr.aria-controls]="rozieAttr(listId())" [attr.aria-activedescendant]="rozieAttr(activeId())" [attr.aria-label]="rozieAttr(ariaLabel())" [value]="query()" [placeholder]="placeholder()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" autocomplete="off" (input)="onInput($event)" (focus)="onFocus($event)" (blur)="onBlur()" (keydown)="onKeydown($event)" />
+          
+          @if (multiple()) {
+    <ul class="rozie-combobox-chips">
+            @for (row of chipRows(); track 'chip-' + row.value; let idx = $index) {
+    <li class="rozie-combobox-chip">
+              @if ((chipTpl ?? __rozieFillMap()['chip'] ?? templates()?.['chip'])) {
+    <ng-container *ngTemplateOutlet="(chipTpl ?? __rozieFillMap()['chip'] ?? templates()?.['chip']); context: _chip_ctx_2(row, idx)" />
+    } @else {
+
+                <span class="rozie-combobox-chip__label">{{ rozieDisplay(row.label) }}</span>
+                <button type="button" class="rozie-combobox-chip__remove" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(chipRemoveLabel(row))" (click)="removeChipValue(row.value)">×</button>
+              
+    }
+            </li>
+    }
+          </ul>
+    }<input #inputEl class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" [attr.aria-expanded]="!!isOpen()" [attr.aria-controls]="rozieAttr(listId())" [attr.aria-activedescendant]="rozieAttr(activeId())" [attr.aria-label]="rozieAttr(ariaLabel())" [value]="query()" [placeholder]="placeholder()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" autocomplete="off" (input)="onInput($event)" (focus)="onFocus($event)" (blur)="onBlur()" (keydown)="onKeydown($event)" />
         </ng-template><ng-template #defaultSlot>
         
         @if (isOpen() && !virtual() && !isGrouped()) {
@@ -302,6 +325,49 @@ interface GroupMoreCtx {
       font-size: var(--rozie-combobox-more-size, 0.875rem);
     }
     .rozie-combobox-spacer { margin: 0; padding: 0; border: 0; list-style: none; }
+    .rozie-combobox-chips {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--rozie-combobox-chip-gap, 0.4rem);
+      padding: var(--rozie-combobox-chips-padding, 0.35rem 0.45rem 0 0.45rem);
+      margin: 0;
+      list-style: none;
+    }
+    .rozie-combobox-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: var(--rozie-combobox-chip-padding, 0.15rem 0.5rem);
+      font-size: var(--rozie-combobox-chip-size, 0.85rem);
+      color: var(--rozie-combobox-chip-color, inherit);
+      background: var(--rozie-combobox-chip-bg, rgba(0, 102, 204, 0.12));
+      border-radius: var(--rozie-combobox-chip-radius, 0.375rem);
+      white-space: nowrap;
+    }
+    .rozie-combobox-chip__remove {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: var(--rozie-combobox-chip-remove-size, 1.1rem);
+      height: var(--rozie-combobox-chip-remove-size, 1.1rem);
+      padding: 0;
+      font: inherit;
+      line-height: 1;
+      color: var(--rozie-combobox-chip-remove-color, currentColor);
+      background: transparent;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .rozie-combobox-chip__remove:hover:not(:disabled) {
+      color: var(--rozie-combobox-chip-remove-hover-color, var(--rozie-combobox-accent, #0066cc));
+    }
+    .rozie-combobox-chip__remove:disabled {
+      cursor: not-allowed;
+      opacity: var(--rozie-combobox-option-disabled-opacity, 0.45);
+    }
     .rozie-combobox--inline {
       display: block;
       width: 100%;
@@ -432,6 +498,7 @@ export class Combobox {
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   change = output<unknown>();
   search = output<unknown>();
+  @ContentChild('chip', { read: TemplateRef }) chipTpl?: TemplateRef<ChipCtx>;
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
   @ContentChild('groupHeading', { read: TemplateRef }) groupHeadingTpl?: TemplateRef<GroupHeadingCtx>;
@@ -1167,6 +1234,42 @@ export class Combobox {
     if (v === true || v === false) return v;
     return !this.multiple();
   };
+  // ---- chip rail (Phase 86 R1, plan 86-05, D-13/D-16/D-18) ---------------
+  // chipRows(): selectedValues() (already de-duplicated — see above) mapped to
+  // chip-rail display rows. Each row carries the raw source `option` when it is
+  // still present in `options` (mirroring how filteredOptions() attaches the raw
+  // option to every wrapper row), or a raw-value fallback label when the option
+  // has disappeared from an asynchronously swapped `options` array — the locked
+  // R1 concurrency edge: an orphan chip persists, labelled by its raw value,
+  // rather than vanishing. `value` array order IS chip display order (R1
+  // locked); selectedValues() already preserves it.
+  chipRows = () => {
+    const __options = this.options();
+    const opts = Array.isArray(__options) ? __options : [];
+    return this.selectedValues().map((v: any) => {
+      const found = opts.find((o: any) => this.valueOf$local(o) === v);
+      return found ? {
+        value: v,
+        label: this.labelOf(found),
+        option: found
+      } : {
+        value: v,
+        label: String(v),
+        option: null
+      };
+    });
+  };
+  // chipRemoveLabel(row): the aria-label naming what a chip's remove control removes.
+  chipRemoveLabel = (row: any) => 'Remove ' + String(row.label);
+  // removeChipValue(v) is defined AFTER selectOption() below (not here) — React's
+  // emitter derives each `useCallback`'s static dependency array from the
+  // helpers its body calls, and `removeChipValue` calls `selectOption`. Declaring
+  // it before `selectOption`'s own `const` would put `selectOption` in
+  // `removeChipValue`'s deps array ahead of its OWN initializer in the SAME
+  // module scope — a real same-render TDZ (`ReferenceError` at runtime on
+  // React, TS2448 "used before its declaration" at typecheck). Source order
+  // here IS emission order for these plain top-level consts, so
+  // `removeChipValue` must textually follow `selectOption`.
   // ---- selection (writes the model + syncs query) ------------------------
   // `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
   // `@change` with BOTH the committed value AND the raw source `option` (CP reads
@@ -1209,6 +1312,21 @@ export class Combobox {
       value: opt.value,
       option: opt.option,
       selected: true
+    });
+  };
+  // removeChipValue(v): routes chip removal through the EXACT SAME toggle path
+  // selectOption() uses for a re-select — a synthetic wrapper row is enough,
+  // since the `multiple` branch above only reads `opt.value`/`opt.option`/
+  // `opt.disabled`/`opt.isMore` — so removal and toggle-off can never diverge
+  // into different payload shapes. Declared here, after selectOption(), not
+  // alongside chipRows()/chipRemoveLabel() above — see the comment there.
+  removeChipValue = (v: any) => {
+    const __options = this.options();
+    const opts = Array.isArray(__options) ? __options : [];
+    const found = opts.find((o: any) => this.valueOf$local(o) === v);
+    this.selectOption({
+      value: v,
+      option: found || null
     });
   };
   // Reflect the externally-selected value into the input text. D-14: no-ops
@@ -1325,6 +1443,22 @@ export class Combobox {
       if (wasOpen) {
         if (e) e.preventDefault();
         this.activeIndex.set(this.nextEnabled(list, list.length, -1));
+      }
+    } else if (key === 'Backspace') {
+      // Backspace-removes-last-chip (Tags.rozie precedent, Phase 86 R1 plan
+      // 86-05): guarded on `multiple` AND the LIVE input value being empty —
+      // read `e.target.value` directly (Tags' proven idiom), never the mirrored
+      // `$data.query`. A non-empty query falls through to normal text editing —
+      // nothing here removes a chip while there is text to delete.
+      if (this.multiple()) {
+        const liveValue = e && e.target ? e.target.value : '';
+        if (liveValue === '') {
+          const cur = this.selectedValues();
+          if (cur.length > 0) {
+            if (e) e.preventDefault();
+            this.removeChipValue(cur[cur.length - 1]);
+          }
+        }
       }
     }
     // Keep the (new) active option in view — routes through the virtualizer when
@@ -1446,7 +1580,7 @@ export class Combobox {
   static ngTemplateContextGuard(
     _dir: Combobox,
     _ctx: unknown,
-  ): _ctx is OptionCtx | EmptyCtx | GroupHeadingCtx | GroupMoreCtx {
+  ): _ctx is ChipCtx | OptionCtx | EmptyCtx | GroupHeadingCtx | GroupMoreCtx {
     return true;
   }
 
@@ -1493,6 +1627,8 @@ export class Combobox {
       });
     }
   });
+
+  private _chip_ctx_2 = (row: any, idx: any) => ({ $implicit: { option: row.option, remove: () => this.removeChipValue(row.value), index: idx }, option: row.option, remove: () => this.removeChipValue(row.value), index: idx });
 
   protected get __style() {
       const __maxHeight = this.maxHeight();

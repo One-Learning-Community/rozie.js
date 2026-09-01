@@ -109,6 +109,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 
 | Slot | Params |
 | --- | --- |
+| chip | option, remove, index |
 | option | option, index, active, selected, disabled |
 | empty | query |
 | groupHeading | group |

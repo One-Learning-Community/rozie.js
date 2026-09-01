@@ -100,6 +100,7 @@ el.clear();
 
 | Slot | Params |
 | --- | --- |
+| chip | option, remove, index |
 | option | option, index, active, selected, disabled |
 | empty | query |
 | groupHeading | group |

@@ -45,7 +45,9 @@ const EXPECT = {
   props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift'],
   models: ['value'],
   emits: ['change', 'search'],
-  slots: ['option', 'empty', 'groupHeading', 'groupMore'] as string[],
+  // Phase 86 (R1, plan 86-05): + `chip` — the chip-rail scoped slot `{ option,
+  // remove, index }`, rendered inside the control before the input under `multiple`.
+  slots: ['option', 'empty', 'groupHeading', 'groupMore', 'chip'] as string[],
   // seedQuery (command-palette #2 levels/restore-on-pop prerequisite): an
   // imperative-only handle verb that seeds $data.query — NOT a second model
   // (ROZ125 — combobox's sole model:true prop stays `value`).

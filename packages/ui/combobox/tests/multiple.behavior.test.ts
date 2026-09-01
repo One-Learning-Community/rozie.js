@@ -213,6 +213,17 @@ async function selectByLabel(host: HTMLElement, label: string): Promise<void> {
   await nextTick();
 }
 
+// ── chip-rail helpers (Phase 86 R1, plan 86-05) ─────────────────────────────
+function chipEls(host: HTMLElement): HTMLElement[] {
+  return Array.from(host.querySelectorAll('.rozie-combobox-chip')) as HTMLElement[];
+}
+function chipLabels(host: HTMLElement): string[] {
+  return chipEls(host).map((el) => el.querySelector('.rozie-combobox-chip__label')?.textContent?.trim() ?? '');
+}
+function chipRemoveBtn(el: HTMLElement): HTMLButtonElement {
+  return el.querySelector('.rozie-combobox-chip__remove') as HTMLButtonElement;
+}
+
 for (const branch of BRANCHES) {
   describe(`Combobox multiple — ${branch.name} branch (behavioral)`, () => {
     it('(1) toggle: picking then re-picking the same option returns value to its prior array', async () => {
@@ -391,6 +402,106 @@ for (const branch of BRANCHES) {
         expect(input.getAttribute('aria-expanded')).toBe('false');
       } finally {
         closes.app.unmount();
+      }
+    });
+
+    it('(9) chips: render inside the control before the input, in selection order, deduplicated', async () => {
+      const mount = mountCombobox(branch.props, { initialValue: ['banana', 'apple', 'banana'] });
+      const { app, host } = mount;
+      try {
+        await openBranch(branch.name, mount);
+        expect(chipLabels(host)).toEqual(['Banana', 'Apple']);
+        const chipsList = host.querySelector('.rozie-combobox-chips') as HTMLElement;
+        const input = host.querySelector('input[role="combobox"]') as HTMLElement;
+        expect(chipsList).not.toBeNull();
+        // The chips list precedes the input in document order (D-13: before
+        // the input, inside the same #anchor slot fill).
+        // eslint-disable-next-line no-bitwise
+        expect(!!(chipsList.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(10) chips: a value whose option has disappeared from options persists, labelled by its raw value', async () => {
+      const mount = mountCombobox(branch.props, { initialValue: ['apple', 'ghost-value'] });
+      const { app, host } = mount;
+      try {
+        await openBranch(branch.name, mount);
+        expect(chipLabels(host)).toEqual(['Apple', 'ghost-value']);
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(11) chips: activating a remove control removes exactly that value and emits the same payload shape a toggle-off emits', async () => {
+      const mount = mountCombobox(branch.props, { initialValue: ['apple', 'banana'] });
+      const { app, host, value, changes } = mount;
+      try {
+        await openBranch(branch.name, mount);
+        const target = chipEls(host).find((el) => el.textContent?.includes('Apple'))!;
+        chipRemoveBtn(target).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        await nextTick();
+        expect(value()).toEqual(['banana']);
+        const last = changes[changes.length - 1] as { value: unknown; option: { value: string } | null; selected: boolean };
+        expect(last.value).toEqual(['banana']);
+        expect(last.selected).toBe(false);
+        expect(last.option?.value).toBe('apple');
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(12) chips: every remove control is focusable and carries an aria-label naming what it removes', async () => {
+      const mount = mountCombobox(branch.props, { initialValue: ['apple'] });
+      const { app, host } = mount;
+      try {
+        await openBranch(branch.name, mount);
+        const btn = chipRemoveBtn(chipEls(host)[0]);
+        expect(btn.tagName).toBe('BUTTON');
+        expect(btn.getAttribute('type')).toBe('button');
+        expect(btn.hasAttribute('disabled')).toBe(false);
+        expect(btn.getAttribute('aria-label')).toMatch(/Apple/);
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(13) chips: Backspace on an empty query removes the last chip; Backspace with a non-empty query does not', async () => {
+      const mount = mountCombobox(branch.props, { initialValue: ['apple', 'banana'] });
+      const { app, host, value } = mount;
+      try {
+        const input = await openBranch(branch.name, mount);
+
+        // Non-empty query: Backspace must NOT remove a chip.
+        input.value = 'ba';
+        input.dispatchEvent(new Event('input'));
+        await nextTick();
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }));
+        await nextTick();
+        expect(value()).toEqual(['apple', 'banana']);
+
+        // Empty query: Backspace removes the LAST chip.
+        input.value = '';
+        input.dispatchEvent(new Event('input'));
+        await nextTick();
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }));
+        await nextTick();
+        expect(value()).toEqual(['apple']);
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(14) chips: no chip rail renders when multiple is unset, and the control markup is unchanged', async () => {
+      const mount = mountCombobox(branch.props, { extraProps: { multiple: false }, initialValue: null });
+      const { app, host } = mount;
+      try {
+        await openBranch(branch.name, mount);
+        expect(host.querySelector('.rozie-combobox-chips')).toBeNull();
+        expect(chipEls(host).length).toBe(0);
+      } finally {
+        app.unmount();
       }
     });
   });

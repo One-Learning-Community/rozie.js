@@ -21,6 +21,12 @@ import { groupOptions } from './internal/groupOptions';
 // const). NULL until $onMount, ONLY constructed when $props.virtual. gridScrollEl is the
 // captured .rozie-combobox-list scroll div; remeasurePending dedupes the deferred sweep.
 
+interface RozieChipSlotCtx {
+  option: any;
+  remove: any;
+  index: any;
+}
+
 interface RozieOptionSlotCtx {
   option: any;
   index: any;
@@ -164,6 +170,49 @@ export default class Combobox extends SignalWatcher(LitElement) {
   font-size: var(--rozie-combobox-more-size, 0.875rem);
 }
 .rozie-combobox-spacer[data-rozie-s-9546115a] { margin: 0; padding: 0; border: 0; list-style: none; }
+.rozie-combobox-chips[data-rozie-s-9546115a] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rozie-combobox-chip-gap, 0.4rem);
+  padding: var(--rozie-combobox-chips-padding, 0.35rem 0.45rem 0 0.45rem);
+  margin: 0;
+  list-style: none;
+}
+.rozie-combobox-chip[data-rozie-s-9546115a] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: var(--rozie-combobox-chip-padding, 0.15rem 0.5rem);
+  font-size: var(--rozie-combobox-chip-size, 0.85rem);
+  color: var(--rozie-combobox-chip-color, inherit);
+  background: var(--rozie-combobox-chip-bg, rgba(0, 102, 204, 0.12));
+  border-radius: var(--rozie-combobox-chip-radius, 0.375rem);
+  white-space: nowrap;
+}
+.rozie-combobox-chip__remove[data-rozie-s-9546115a] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--rozie-combobox-chip-remove-size, 1.1rem);
+  height: var(--rozie-combobox-chip-remove-size, 1.1rem);
+  padding: 0;
+  font: inherit;
+  line-height: 1;
+  color: var(--rozie-combobox-chip-remove-color, currentColor);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.rozie-combobox-chip__remove[data-rozie-s-9546115a]:hover:not([data-rozie-s-9546115a]:disabled) {
+  color: var(--rozie-combobox-chip-remove-hover-color, var(--rozie-combobox-accent, #0066cc));
+}
+.rozie-combobox-chip__remove[data-rozie-s-9546115a]:disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-combobox-option-disabled-opacity, 0.45);
+}
 .rozie-combobox--inline[data-rozie-s-9546115a] {
   display: block;
   width: 100%;
@@ -290,6 +339,9 @@ private __rozieFirstUpdateDone = false;
 
   private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
+  @state() private _hasSlotChip = false;
+  @queryAssignedElements({ slot: 'chip', flatten: true }) private _slotChipElements!: Element[];
+  @property({ attribute: false }) chip?: (scope: { option: any; remove: any; index: any }) => unknown;
   @state() private _hasSlotOption = false;
   @queryAssignedElements({ slot: 'option', flatten: true }) private _slotOptionElements!: Element[];
   @property({ attribute: false }) option?: (scope: { option: any; index: any; active: any; selected: any; disabled: any }) => unknown;
@@ -319,6 +371,17 @@ private __rozieFirstUpdateDone = false;
   private _rozieTornDown = false;
 
   private _armListeners(): void {
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="chip"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotChip = this._slotChipElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
     {
       const slotEl = this.shadowRoot?.querySelector('slot[name="option"]');
       if (slotEl !== null && slotEl !== undefined) {
@@ -366,6 +429,7 @@ private __rozieFirstUpdateDone = false;
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotChip = Array.from(this.children).some((el) => el.getAttribute('slot') === 'chip');
     this._hasSlotOption = Array.from(this.children).some((el) => el.getAttribute('slot') === 'option');
     this._hasSlotEmpty = Array.from(this.children).some((el) => el.getAttribute('slot') === 'empty');
     this._hasSlotGroupHeading = Array.from(this.children).some((el) => el.getAttribute('slot') === 'groupHeading');
@@ -437,7 +501,17 @@ private __rozieFirstUpdateDone = false;
     return html`
 <div class="${Object.entries({ "rozie-combobox": true, 'rozie-combobox--open': this._isOpen.value, 'rozie-combobox--disabled': this.disabled, 'rozie-combobox--inline': this.inline, 'rozie-combobox--multiple': this.multiple }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-9546115a>
   
-  <rozie-popover trigger="manual" .open=${this._isOpen.value} @open-change=${($event: CustomEvent) => { this._isOpen.value = $event.detail; }} .bare=${true} .matchWidth=${true} .keepMounted=${this.virtual} .disablePositioning=${this.inline} .placement=${this.placement} .offset=${this.offset} .disableFlip=${this.disableFlip} .disableShift=${this.disableShift} data-rozie-s-9546115a><input class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded=${!!this._isOpen.value} aria-controls=${rozieAttr(this.listId())} aria-activedescendant=${rozieAttr(this.activeId())} aria-label=${rozieAttr(this.ariaLabel)} .value=${this._query.value} placeholder=${this.placeholder} ?disabled=${!!this.disabled} autocomplete="off" @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @focus=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onFocus($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} data-rozie-ref="inputEl" data-rozie-s-9546115a  slot="anchor"/>
+  <rozie-popover trigger="manual" .open=${this._isOpen.value} @open-change=${($event: CustomEvent) => { this._isOpen.value = $event.detail; }} .bare=${true} .matchWidth=${true} .keepMounted=${this.virtual} .disablePositioning=${this.inline} .placement=${this.placement} .offset=${this.offset} .disableFlip=${this.disableFlip} .disableShift=${this.disableShift} data-rozie-s-9546115a><div slot="anchor">
+      
+      ${this.multiple ? html`<ul class="rozie-combobox-chips" data-rozie-s-9546115a>
+        ${repeat<any>(this.chipRows(), (row, idx) => 'chip-' + row.value, (row, idx) => html`<li class="rozie-combobox-chip" data-rozie-s-9546115a>
+          ${this.chip !== undefined ? this.chip({option: row.option, remove: () => this.removeChipValue(row.value), index: idx}) : html`<slot name="chip" data-rozie-params=${(() => { try { return JSON.stringify({option: row.option, index: idx}); } catch { return '{}'; } })()} @rozie-chip-remove=${($event: CustomEvent) => ((() => this.removeChipValue(row.value)) as (...args: any[]) => any)($event.detail)}>
+            <span class="rozie-combobox-chip__label" data-rozie-s-9546115a>${rozieDisplay(row.label)}</span>
+            <button class="rozie-combobox-chip__remove" type="button" ?disabled=${!!this.disabled} aria-label=${rozieAttr(this.chipRemoveLabel(row))} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.removeChipValue(row.value); }} data-rozie-s-9546115a>×</button>
+          </slot>`}
+        </li>`)}
+      </ul>` : nothing}<input class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded=${!!this._isOpen.value} aria-controls=${rozieAttr(this.listId())} aria-activedescendant=${rozieAttr(this.activeId())} aria-label=${rozieAttr(this.ariaLabel)} .value=${this._query.value} placeholder=${this.placeholder} ?disabled=${!!this.disabled} autocomplete="off" @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @focus=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onFocus($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} data-rozie-ref="inputEl" data-rozie-s-9546115a />
+    </div>
     
     ${this._isOpen.value && !this.virtual && !this.isGrouped() ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" aria-multiselectable=${rozieAttr(this.multiple ? 'true' : null)} data-rozie-s-9546115a>
       ${repeat<any>(this.filteredOptions(), (opt, _idx) => opt.value, (opt, _idx) => html`<li class="${Object.entries({ "rozie-combobox-option": true, 'rozie-combobox-option--active': opt._i === this._activeIndex.value, 'rozie-combobox-option--selected': this.isRowSelected(opt), 'rozie-combobox-option--disabled': opt.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optId(opt._i))} role="option" aria-selected=${!!this.isRowSelected(opt)} aria-disabled=${!!opt.disabled} @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(opt); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = opt._i; }} data-rozie-s-9546115a>
@@ -1194,6 +1268,43 @@ private __rozieFirstUpdateDone = false;
   return !this.multiple;
 };
 
+  // ---- chip rail (Phase 86 R1, plan 86-05, D-13/D-16/D-18) ---------------
+  // chipRows(): selectedValues() (already de-duplicated — see above) mapped to
+  // chip-rail display rows. Each row carries the raw source `option` when it is
+  // still present in `options` (mirroring how filteredOptions() attaches the raw
+  // option to every wrapper row), or a raw-value fallback label when the option
+  // has disappeared from an asynchronously swapped `options` array — the locked
+  // R1 concurrency edge: an orphan chip persists, labelled by its raw value,
+  // rather than vanishing. `value` array order IS chip display order (R1
+  // locked); selectedValues() already preserves it.
+  chipRows = () => {
+  const opts = Array.isArray(this.options) ? this.options : [];
+  return this.selectedValues().map((v: any) => {
+    const found = opts.find((o: any) => this.valueOf$local(o) === v);
+    return found ? {
+      value: v,
+      label: this.labelOf(found),
+      option: found
+    } : {
+      value: v,
+      label: String(v),
+      option: null
+    };
+  });
+};
+
+  // chipRemoveLabel(row): the aria-label naming what a chip's remove control removes.
+  chipRemoveLabel = (row: any) => 'Remove ' + String(row.label);
+
+  // removeChipValue(v) is defined AFTER selectOption() below (not here) — React's
+  // emitter derives each `useCallback`'s static dependency array from the
+  // helpers its body calls, and `removeChipValue` calls `selectOption`. Declaring
+  // it before `selectOption`'s own `const` would put `selectOption` in
+  // `removeChipValue`'s deps array ahead of its OWN initializer in the SAME
+  // module scope — a real same-render TDZ (`ReferenceError` at runtime on
+  // React, TS2448 "used before its declaration" at typecheck). Source order
+  // here IS emission order for these plain top-level consts, so
+  // `removeChipValue` must textually follow `selectOption`.
   // ---- selection (writes the model + syncs query) ------------------------
   // `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
   // `@change` with BOTH the committed value AND the raw source `option` (CP reads
@@ -1245,6 +1356,21 @@ private __rozieFirstUpdateDone = false;
     bubbles: true,
     composed: true
   }));
+};
+
+  // removeChipValue(v): routes chip removal through the EXACT SAME toggle path
+  // selectOption() uses for a re-select — a synthetic wrapper row is enough,
+  // since the `multiple` branch above only reads `opt.value`/`opt.option`/
+  // `opt.disabled`/`opt.isMore` — so removal and toggle-off can never diverge
+  // into different payload shapes. Declared here, after selectOption(), not
+  // alongside chipRows()/chipRemoveLabel() above — see the comment there.
+  removeChipValue = (v: any) => {
+  const opts = Array.isArray(this.options) ? this.options : [];
+  const found = opts.find((o: any) => this.valueOf$local(o) === v);
+  this.selectOption({
+    value: v,
+    option: found || null
+  });
 };
 
   // Reflect the externally-selected value into the input text. D-14: no-ops
@@ -1368,6 +1494,22 @@ private __rozieFirstUpdateDone = false;
     if (wasOpen) {
       if (e) e.preventDefault();
       this._activeIndex.value = this.nextEnabled(list, list.length, -1);
+    }
+  } else if (key === 'Backspace') {
+    // Backspace-removes-last-chip (Tags.rozie precedent, Phase 86 R1 plan
+    // 86-05): guarded on `multiple` AND the LIVE input value being empty —
+    // read `e.target.value` directly (Tags' proven idiom), never the mirrored
+    // `$data.query`. A non-empty query falls through to normal text editing —
+    // nothing here removes a chip while there is text to delete.
+    if (this.multiple) {
+      const liveValue = e && e.target ? e.target.value : '';
+      if (liveValue === '') {
+        const cur = this.selectedValues();
+        if (cur.length > 0) {
+          if (e) e.preventDefault();
+          this.removeChipValue(cur[cur.length - 1]);
+        }
+      }
     }
   }
   // Keep the (new) active option in view — routes through the virtualizer when

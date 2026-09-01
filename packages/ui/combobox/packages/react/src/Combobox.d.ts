@@ -97,6 +97,7 @@ export interface ComboboxProps {
   disableShift?: boolean;
   onChange?: (...args: unknown[]) => void;
   onSearch?: (...args: unknown[]) => void;
+  renderChip?: (params: { option: unknown; remove: unknown; index: unknown }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;
   renderGroupHeading?: (params: { group: unknown }) => ReactNode;

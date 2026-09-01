@@ -115,6 +115,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `empty` | `query` | Rendered inside the open popup when the filtered list is empty. `query` is the current input text. Omit it to render the default "No results". |
 | `groupHeading` | `group` | Custom rendering for a group's heading (only when grouping is active — see [Grouping options](#grouping-options)). `group` is `{ id, label }`. Omit it to render the plain `group.label`. |
 | `groupMore` | `group, hidden, expand` | Custom rendering for a capped group's "+N more" row (only when `groupCap` is set — see [Capping groups](#capping-groups)). `group` is `{ id, label }` (or `null` for the leading ungrouped section), `hidden` is the count of not-yet-shown options, `expand` is a zero-arg closure that expands the group in place. Omit it to render the default `+{hidden} more` text. |
+| `chip` | `option, remove, index` | Custom rendering for one selected-value chip in the chip rail (only when `multiple` is set — see [Multi-select](#multi-select)). `option` is the raw source option object, or `null` when it has disappeared from `options` (the chip still renders, labelled by its raw value). `remove` is a zero-arg closure that removes that value from the selection via the same toggle path a re-select uses. `index` is the chip's position in the (de-duplicated, selection-ordered) chip list. Omit it to render the default label + focusable aria-labelled remove button. |
 
 ## Grouping options
 
@@ -154,6 +155,23 @@ Pass `groupCap` alongside `groups` to cap each section to its first `groupCap` o
 ```
 
 Activating the "+N more" row — `Enter` while it is the active-descendant, or a click/tap — expands **that section only**, in place: the rest of its options render inline and the more-row disappears. Expanding never writes the `value` model or fires `change`; it is purely a reveal. `ArrowDown`/`ArrowUp` rove onto the more-row like any other option and, once expanded, continue into the newly-revealed options — `aria-activedescendant` always resolves to a rendered option or more-row id. A section with `groupCap` or fewer options renders in full with no more-row. Expansion state resets whenever the option set or the typed query changes (a new result set invalidates any prior expansion). Customize the row's markup with the `groupMore` slot; the default reads `+{hidden} more`. `0`/absent (the default) is uncapped, identical to plain grouping. `groupCap` only applies to the standard (non-`virtual`) grouped render, same as `groups` itself.
+
+## Multi-select
+
+Set `multiple` to select many options. `value` widens to an **array** while staying the sole `model: true` prop, so the Angular `ControlValueAccessor` is preserved — no second model, no `<ComboboxMulti>`:
+
+```rozie
+<template>
+  <Combobox
+    r-model:value="$data.selected"
+    :options="OPTIONS"
+    multiple
+    placeholder="Pick fruit…"
+  />
+</template>
+```
+
+Selected values render as chips **inside the control, before the input** — the whole control box becomes the popover anchor, so the width-matched popup spans the chips plus the input, not the input alone. Re-selecting an already-selected option toggles it off; chips render in selection order (the `value` array order IS the display order); duplicate values dedupe to one chip; a chip whose option has disappeared from `options` (an async `options` swap) persists, labelled with its raw value. Every chip carries a focusable, aria-labelled remove button (customize via the `chip` slot above), and Backspace on an empty input removes the last chip — Backspace with any text in the input edits the text instead. The effective `closeOnSelect` default flips to `false` under `multiple` (closing after every pick would make multi-select unusable); pass an explicit `:close-on-select="true"` to override. `aria-multiselectable="true"` and per-option `aria-selected` mark the listbox and options.
 
 ## Filtering: client vs. async
 
