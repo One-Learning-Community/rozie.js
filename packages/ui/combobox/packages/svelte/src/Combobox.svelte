@@ -41,9 +41,13 @@ interface Props {
    */
   inline?: boolean;
   /**
-   * Close the popup after a selection commits. Defaults `true` (standard autocomplete behavior); set to `false` to keep the popup open after a selection — e.g. when the combobox is embedded in a multi-action surface like a command palette.
+   * Close the popup after a selection commits. Unset (default) resolves through `effectiveCloseOnSelect()`: `true` in single-select (today's default behavior) and `false` in `multiple` mode, where closing after every chip pick would make multi-select unusable. Pass an explicit `true` or `false` to override in either mode.
    */
-  closeOnSelect?: boolean;
+  closeOnSelect?: (boolean) | null;
+  /**
+   * `value` widens to hold an **array** of selected values and remains the sole `model: true` prop, so the Angular `ControlValueAccessor` is preserved (a second model would forfeit it — `ROZ125`). Re-selecting an already-selected option toggles it off. Default `false` is byte-identical to single-select.
+   */
+  multiple?: boolean;
   /**
    * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
    */
@@ -114,7 +118,8 @@ let {
   ariaLabel = null,
   idBase = 'rozie-combobox',
   inline = false,
-  closeOnSelect = true,
+  closeOnSelect = null,
+  multiple = false,
   optionLabel = null,
   optionValue = null,
   optionDisabled = null,
@@ -796,11 +801,47 @@ const nextEnabled = (list: any, from: any, dir: any) => {
   }
   return from;
 };
+// ---- multi-select membership + effective-default helpers (Phase 86 R1) -----
+// Ported from @rozie-ui/headless-core/listCore.rzts's select()/isSelected()
+// algorithm (also shipped, verbatim, via @rozie-ui/listbox) — PORTED, not
+// imported: combobox's own open/active/query state machine is deliberately
+// host-local (see the header comment above), and listCore.rzts is also
+// consumed by the release-ignored listbox family, so pulling this into the
+// shared partial would put listbox's frozen leaves back in scope.
+//
+// selectedValues(): the current selection as a de-duplicated array, tolerant
+// of a null/undefined model. De-duplicates the MODEL array itself (not just
+// `options`) so a re-normalized selection never reports the same value twice
+// even if the model ever ends up holding a duplicate.
+const selectedValues = () => {
+  const cur = value;
+  const arr = Array.isArray(cur) ? cur : [];
+  return Array.from(new Set(arr));
+};
+// isRowSelected(row): array membership under `multiple`, strict equality
+// otherwise. Replaces every raw `opt.value === $props.value` / `wr.row.value
+// === $props.value` template comparison (task 2) so all four render branches
+// share exactly ONE membership check and can never disagree.
+const isRowSelected = (row: any) => {
+  if (!row) return false;
+  if (multiple) return selectedValues().indexOf(row.value) !== -1;
+  return row.value === value;
+};
+// effectiveCloseOnSelect(): resolves the `closeOnSelect` sentinel (see the
+// prop's own doc comment above for why the prop's default is `null`, not a
+// literal `true`). Unset ⇒ `true` in single-select (today's default,
+// unchanged), `false` under `multiple`; an explicit `true`/`false` from the
+// consumer always wins in either mode. Every existing `closeOnSelect` read
+// routes through this helper so the four render branches cannot disagree.
+const effectiveCloseOnSelect = () => {
+  const v = closeOnSelect;
+  if (v === true || v === false) return v;
+  return !multiple;
+};
 // ---- selection (writes the model + syncs query) ------------------------
 // `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
 // `@change` with BOTH the committed value AND the raw source `option` (CP reads
-// `e.option`). `closeOnSelect` (default true) gates the popup close — a caller
-// embedding the combobox in a multi-action surface passes `:close-on-select="false"`.
+// `e.option`). `effectiveCloseOnSelect()` gates the popup close.
 const selectOption = (opt: any) => {
   if (!opt) return;
   if (opt.isMore) {
@@ -809,17 +850,43 @@ const selectOption = (opt: any) => {
     return;
   }
   if (opt.disabled) return;
+  if (multiple) {
+    // Capture whether the value was already present BEFORE the toggle — this
+    // local is what feeds the `selected` field on the `change` payload (D-15).
+    const cur = selectedValues();
+    const wasSelected = cur.indexOf(opt.value) !== -1;
+    // Fresh array on every commit — in-place mutation (.push/.splice) is
+    // silently dropped by the React/Solid/Lit/Angular change detectors.
+    const next = wasSelected ? cur.filter((v: any) => v !== opt.value) : [...cur, opt.value];
+    value = next;
+    // D-14: clear the query on pick under `multiple` (not the option's label)
+    // so Backspace-removes-last stays reachable immediately after a pick.
+    query = '';
+    if (effectiveCloseOnSelect()) isOpen = false;
+    activeIndex = -1;
+    onchange?.({
+      value: next,
+      option: opt.option,
+      selected: !wasSelected
+    });
+    return;
+  }
   value = opt.value;
   query = String(opt.label);
-  if (closeOnSelect) isOpen = false;
+  if (effectiveCloseOnSelect()) isOpen = false;
   activeIndex = -1;
+  // D-15: `selected` is additive and always `true` in single-select.
   onchange?.({
     value: opt.value,
-    option: opt.option
+    option: opt.option,
+    selected: true
   });
 };
-// Reflect the externally-selected value into the input text.
+// Reflect the externally-selected value into the input text. D-14: no-ops
+// under `multiple` — there is no single label to mirror into the input once
+// `value` holds an array, and the query is owned by chip-picking instead.
 const syncQueryToValue = () => {
+  if (multiple) return;
   const opts = Array.isArray(options) ? options : [];
   const opt = opts.find((o: any) => o.value === value);
   query = opt ? String(opt.label) : '';
@@ -1006,11 +1073,17 @@ const teardownVirtualizer = () => {
 // Render-neutral when never called. All four are post-mount → $refs safe.
 export const focus = () => inputEl?.focus();
 export const clear = () => {
-  value = null;
+  // Fresh empty array under `multiple` (never in-place mutation), null in
+  // single mode — mirrors selectOption()'s `{ value, option, selected }`
+  // shape; nothing is selected after a clear, so `selected` is `false`.
+  const empty = multiple ? [] : null;
+  value = empty;
   query = '';
   activeIndex = -1;
   onchange?.({
-    value: null
+    value: empty,
+    option: null,
+    selected: false
   });
 };
 export const seedQuery = (text: any) => {
@@ -1059,7 +1132,7 @@ $effect(() => { (() => virtual)(); untrack(() => { if (__rozieWatchInitial_2) { 
 })(); }); });
 </script>
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-combobox", { 'rozie-combobox--open': isOpen, 'rozie-combobox--disabled': disabled, 'rozie-combobox--inline': inline }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-9546115a><Popover trigger="manual" bind:open={isOpen} bare={true} matchWidth={true} keepMounted={virtual} disablePositioning={inline} placement={placement} offset={offset} disableFlip={disableFlip} disableShift={disableShift} data-rozie-s-9546115a>{#snippet anchor()}<input bind:this={inputEl} class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={ariaLabel} value={query} placeholder={placeholder} disabled={!!disabled} autocomplete="off" oninput={($event) => { onInput($event); }} onfocus={($event) => { onFocus($event); }} onblur={($event) => { onBlur(); }} onkeydown={($event) => { onKeydown($event); }} data-rozie-s-9546115a />{/snippet}{#if isOpen && !virtual && !isGrouped()}<ul class="rozie-combobox-list" id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a>{#each filteredOptions() as opt (opt.value)}<li class={["rozie-combobox-option", { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onmousedown={($event) => { $event.preventDefault(); selectOption(opt); }} onmouseenter={($event) => { activeIndex = opt._i; }} data-rozie-s-9546115a>{#if option}{@render option({ option: opt.option, index: opt._i, active: opt._i === activeIndex, selected: opt.value === value, disabled: opt.disabled })}{:else}{rozieDisplay(opt.label)}{/if}</li>{/each}{#if filteredOptions().length === 0}<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>{#if empty}{@render empty({ query })}{:else}No results{/if}</li>{/if}</ul>{/if}{#if isOpen && !virtual && isGrouped() && !isCapped()}<ul class="rozie-combobox-list" id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a>{#each groupBlocks() as blk ('grp-' + (blk.group ? blk.group.id : '_ungrouped'))}<li class="rozie-combobox-group" role="group" aria-label={rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-9546115a>{#if blk.group}<div class="rozie-combobox-group-heading" role="presentation" data-rozie-s-9546115a>{#if groupHeading}{@render groupHeading({ group: blk.group })}{:else}{rozieDisplay(blk.group.label)}{/if}</div>{/if}{#each blk.items as opt (opt.value)}<div class={["rozie-combobox-option", { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onmousedown={($event) => { $event.preventDefault(); selectOption(opt); }} onmouseenter={($event) => { activeIndex = opt._i; }} data-rozie-s-9546115a>{#if option}{@render option({ option: opt.option, index: opt._i, active: opt._i === activeIndex, selected: opt.value === value, disabled: opt.disabled })}{:else}{rozieDisplay(opt.label)}{/if}</div>{/each}</li>{/each}{#if groupBlocks().length === 0}<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>{#if empty}{@render empty({ query })}{:else}No results{/if}</li>{/if}</ul>{/if}{#if isOpen && !virtual && isCapped()}<ul class="rozie-combobox-list" id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a>{#each cappedBlocks() as blk ('grp-' + (blk.group ? blk.group.id : '_ungrouped'))}<li class="rozie-combobox-group" role="group" aria-label={rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-9546115a>{#if blk.group}<div class="rozie-combobox-group-heading" role="presentation" data-rozie-s-9546115a>{#if groupHeading}{@render groupHeading({ group: blk.group })}{:else}{rozieDisplay(blk.group.label)}{/if}</div>{/if}{#each blk.items as opt (opt.value)}<div class={["rozie-combobox-option", { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onmousedown={($event) => { $event.preventDefault(); selectOption(opt); }} onmouseenter={($event) => { activeIndex = opt._i; }} data-rozie-s-9546115a>{#if option}{@render option({ option: opt.option, index: opt._i, active: opt._i === activeIndex, selected: opt.value === value, disabled: opt.disabled })}{:else}{rozieDisplay(opt.label)}{/if}</div>{/each}{#if blk.more}<div class={["rozie-combobox-option rozie-combobox-more", { 'rozie-combobox-option--active': blk.more._i === activeIndex }]} id={rozieAttr(optId(blk.more._i))} role="option" onmousedown={($event) => { $event.preventDefault(); selectOption(blk.more); }} onmouseenter={($event) => { activeIndex = blk.more._i; }} data-rozie-s-9546115a>{#if groupMore}{@render groupMore({ group: blk.group, hidden: blk.more.hidden, expand: blk.more.expand })}{:else}+{rozieDisplay(blk.more.hidden)} more{/if}</div>{/if}</li>{/each}{#if cappedBlocks().length === 0}<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>{#if empty}{@render empty({ query })}{:else}No results{/if}</li>{/if}</ul>{/if}{#if virtual}<ul class="rozie-combobox-list rozie-combobox-list--virtual" id={rozieAttr(listId())} role="listbox" style={rozieStyle((isOpen ? '' : 'display:none;') + (maxHeight ? 'height:' + maxHeight + ';max-height:' + maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a><li class="rozie-combobox-spacer" aria-hidden="true" style={rozieStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a></li>{#each windowedView() as wr (wr.row.id)}<li class={["rozie-combobox-option", { 'rozie-combobox-option--active': wr.vi.index === activeIndex, 'rozie-combobox-option--selected': wr.row.value === value, 'rozie-combobox-option--disabled': wr.row.disabled }]} id={rozieAttr(optId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} role="option" aria-selected={wr.row.value === value} aria-disabled={!!wr.row.disabled} onmousedown={($event) => { $event.preventDefault(); selectOption(wr.row); }} onmouseenter={($event) => { activeIndex = wr.vi.index; }} data-rozie-s-9546115a>{#if option}{@render option({ option: wr.row.option, index: wr.vi.index, active: wr.vi.index === activeIndex, selected: wr.row.value === value, disabled: wr.row.disabled })}{:else}{rozieDisplay(wr.row.label)}{/if}</li>{/each}<li class="rozie-combobox-spacer" aria-hidden="true" style={rozieStyle('height:' + padBottom() + 'px')} data-rozie-s-9546115a></li>{#if windowSource().length === 0}<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>{#if empty}{@render empty({ query })}{:else}No results{/if}</li>{/if}</ul>{/if}</Popover></div>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-combobox", { 'rozie-combobox--open': isOpen, 'rozie-combobox--disabled': disabled, 'rozie-combobox--inline': inline, 'rozie-combobox--multiple': multiple }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-9546115a><Popover trigger="manual" bind:open={isOpen} bare={true} matchWidth={true} keepMounted={virtual} disablePositioning={inline} placement={placement} offset={offset} disableFlip={disableFlip} disableShift={disableShift} data-rozie-s-9546115a>{#snippet anchor()}<input bind:this={inputEl} class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={ariaLabel} value={query} placeholder={placeholder} disabled={!!disabled} autocomplete="off" oninput={($event) => { onInput($event); }} onfocus={($event) => { onFocus($event); }} onblur={($event) => { onBlur(); }} onkeydown={($event) => { onKeydown($event); }} data-rozie-s-9546115a />{/snippet}{#if isOpen && !virtual && !isGrouped()}<ul class="rozie-combobox-list" id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a>{#each filteredOptions() as opt (opt.value)}<li class={["rozie-combobox-option", { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onmousedown={($event) => { $event.preventDefault(); selectOption(opt); }} onmouseenter={($event) => { activeIndex = opt._i; }} data-rozie-s-9546115a>{#if option}{@render option({ option: opt.option, index: opt._i, active: opt._i === activeIndex, selected: opt.value === value, disabled: opt.disabled })}{:else}{rozieDisplay(opt.label)}{/if}</li>{/each}{#if filteredOptions().length === 0}<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>{#if empty}{@render empty({ query })}{:else}No results{/if}</li>{/if}</ul>{/if}{#if isOpen && !virtual && isGrouped() && !isCapped()}<ul class="rozie-combobox-list" id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a>{#each groupBlocks() as blk ('grp-' + (blk.group ? blk.group.id : '_ungrouped'))}<li class="rozie-combobox-group" role="group" aria-label={rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-9546115a>{#if blk.group}<div class="rozie-combobox-group-heading" role="presentation" data-rozie-s-9546115a>{#if groupHeading}{@render groupHeading({ group: blk.group })}{:else}{rozieDisplay(blk.group.label)}{/if}</div>{/if}{#each blk.items as opt (opt.value)}<div class={["rozie-combobox-option", { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onmousedown={($event) => { $event.preventDefault(); selectOption(opt); }} onmouseenter={($event) => { activeIndex = opt._i; }} data-rozie-s-9546115a>{#if option}{@render option({ option: opt.option, index: opt._i, active: opt._i === activeIndex, selected: opt.value === value, disabled: opt.disabled })}{:else}{rozieDisplay(opt.label)}{/if}</div>{/each}</li>{/each}{#if groupBlocks().length === 0}<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>{#if empty}{@render empty({ query })}{:else}No results{/if}</li>{/if}</ul>{/if}{#if isOpen && !virtual && isCapped()}<ul class="rozie-combobox-list" id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a>{#each cappedBlocks() as blk ('grp-' + (blk.group ? blk.group.id : '_ungrouped'))}<li class="rozie-combobox-group" role="group" aria-label={rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-9546115a>{#if blk.group}<div class="rozie-combobox-group-heading" role="presentation" data-rozie-s-9546115a>{#if groupHeading}{@render groupHeading({ group: blk.group })}{:else}{rozieDisplay(blk.group.label)}{/if}</div>{/if}{#each blk.items as opt (opt.value)}<div class={["rozie-combobox-option", { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onmousedown={($event) => { $event.preventDefault(); selectOption(opt); }} onmouseenter={($event) => { activeIndex = opt._i; }} data-rozie-s-9546115a>{#if option}{@render option({ option: opt.option, index: opt._i, active: opt._i === activeIndex, selected: opt.value === value, disabled: opt.disabled })}{:else}{rozieDisplay(opt.label)}{/if}</div>{/each}{#if blk.more}<div class={["rozie-combobox-option rozie-combobox-more", { 'rozie-combobox-option--active': blk.more._i === activeIndex }]} id={rozieAttr(optId(blk.more._i))} role="option" onmousedown={($event) => { $event.preventDefault(); selectOption(blk.more); }} onmouseenter={($event) => { activeIndex = blk.more._i; }} data-rozie-s-9546115a>{#if groupMore}{@render groupMore({ group: blk.group, hidden: blk.more.hidden, expand: blk.more.expand })}{:else}+{rozieDisplay(blk.more.hidden)} more{/if}</div>{/if}</li>{/each}{#if cappedBlocks().length === 0}<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>{#if empty}{@render empty({ query })}{:else}No results{/if}</li>{/if}</ul>{/if}{#if virtual}<ul class="rozie-combobox-list rozie-combobox-list--virtual" id={rozieAttr(listId())} role="listbox" style={rozieStyle((isOpen ? '' : 'display:none;') + (maxHeight ? 'height:' + maxHeight + ';max-height:' + maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a><li class="rozie-combobox-spacer" aria-hidden="true" style={rozieStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a></li>{#each windowedView() as wr (wr.row.id)}<li class={["rozie-combobox-option", { 'rozie-combobox-option--active': wr.vi.index === activeIndex, 'rozie-combobox-option--selected': wr.row.value === value, 'rozie-combobox-option--disabled': wr.row.disabled }]} id={rozieAttr(optId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} role="option" aria-selected={wr.row.value === value} aria-disabled={!!wr.row.disabled} onmousedown={($event) => { $event.preventDefault(); selectOption(wr.row); }} onmouseenter={($event) => { activeIndex = wr.vi.index; }} data-rozie-s-9546115a>{#if option}{@render option({ option: wr.row.option, index: wr.vi.index, active: wr.vi.index === activeIndex, selected: wr.row.value === value, disabled: wr.row.disabled })}{:else}{rozieDisplay(wr.row.label)}{/if}</li>{/each}<li class="rozie-combobox-spacer" aria-hidden="true" style={rozieStyle('height:' + padBottom() + 'px')} data-rozie-s-9546115a></li>{#if windowSource().length === 0}<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>{#if empty}{@render empty({ query })}{:else}No results{/if}</li>{/if}</ul>{/if}</Popover></div>
 
 <style>
 :global {

@@ -66,9 +66,13 @@ interface ComboboxProps {
    */
   inline?: boolean;
   /**
-   * Close the popup after a selection commits. Defaults `true` (standard autocomplete behavior); set to `false` to keep the popup open after a selection — e.g. when the combobox is embedded in a multi-action surface like a command palette.
+   * Close the popup after a selection commits. Unset (default) resolves through `effectiveCloseOnSelect()`: `true` in single-select (today's default behavior) and `false` in `multiple` mode, where closing after every chip pick would make multi-select unusable. Pass an explicit `true` or `false` to override in either mode.
    */
-  closeOnSelect?: boolean;
+  closeOnSelect?: (boolean) | null;
+  /**
+   * `value` widens to hold an **array** of selected values and remains the sole `model: true` prop, so the Angular `ControlValueAccessor` is preserved (a second model would forfeit it — `ROZ125`). Re-selecting an already-selected option toggles it off. Default `false` is byte-identical to single-select.
+   */
+  multiple?: boolean;
   /**
    * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
    */
@@ -136,7 +140,7 @@ export interface ComboboxHandle {
 const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_props: ComboboxProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => [])())[0];
   const __defaultGroups = useState(() => (() => [])())[0];
-  const props: Omit<ComboboxProps, 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap' | 'placement' | 'offset' | 'disableFlip' | 'disableShift'> & { options: any[]; placeholder: string; disabled: boolean; disableFilter: boolean; ariaLabel: (string) | null; idBase: string; inline: boolean; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string; groups: any[]; groupCap: number; placement: string; offset: number; disableFlip: boolean; disableShift: boolean } = {
+  const props: Omit<ComboboxProps, 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'multiple' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap' | 'placement' | 'offset' | 'disableFlip' | 'disableShift'> & { options: any[]; placeholder: string; disabled: boolean; disableFilter: boolean; ariaLabel: (string) | null; idBase: string; inline: boolean; closeOnSelect: (boolean) | null; multiple: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string; groups: any[]; groupCap: number; placement: string; offset: number; disableFlip: boolean; disableShift: boolean } = {
     ..._props,
     options: _props.options ?? __defaultOptions,
     placeholder: _props.placeholder ?? '',
@@ -145,7 +149,8 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     ariaLabel: _props.ariaLabel ?? null,
     idBase: _props.idBase ?? 'rozie-combobox',
     inline: _props.inline ?? false,
-    closeOnSelect: _props.closeOnSelect ?? true,
+    closeOnSelect: _props.closeOnSelect ?? null,
+    multiple: _props.multiple ?? false,
     optionLabel: _props.optionLabel ?? null,
     optionValue: _props.optionValue ?? null,
     optionDisabled: _props.optionDisabled ?? null,
@@ -160,8 +165,8 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     disableShift: _props.disableShift ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { value, options, placeholder, disabled, disableFilter, ariaLabel, idBase, inline, closeOnSelect, optionLabel, optionValue, optionDisabled, virtual, estimateRowHeight, maxHeight, groups, groupCap, placement, offset, disableFlip, disableShift, defaultValue, onValueChange, onChange, onSearch, ...rest } = _props as ComboboxProps & Record<string, unknown>;
-    void value; void options; void placeholder; void disabled; void disableFilter; void ariaLabel; void idBase; void inline; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void virtual; void estimateRowHeight; void maxHeight; void groups; void groupCap; void placement; void offset; void disableFlip; void disableShift; void defaultValue; void onValueChange; void onChange; void onSearch;
+    const { value, options, placeholder, disabled, disableFilter, ariaLabel, idBase, inline, closeOnSelect, multiple, optionLabel, optionValue, optionDisabled, virtual, estimateRowHeight, maxHeight, groups, groupCap, placement, offset, disableFlip, disableShift, defaultValue, onValueChange, onChange, onSearch, ...rest } = _props as ComboboxProps & Record<string, unknown>;
+    void value; void options; void placeholder; void disabled; void disableFilter; void ariaLabel; void idBase; void inline; void closeOnSelect; void multiple; void optionLabel; void optionValue; void optionDisabled; void virtual; void estimateRowHeight; void maxHeight; void groups; void groupCap; void placement; void offset; void disableFlip; void disableShift; void defaultValue; void onValueChange; void onChange; void onSearch;
     return rest;
   })();
   const didMount = useRef(false);
@@ -862,11 +867,50 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     return from;
   }
 
+  // ---- multi-select membership + effective-default helpers (Phase 86 R1) -----
+  // Ported from @rozie-ui/headless-core/listCore.rzts's select()/isSelected()
+  // algorithm (also shipped, verbatim, via @rozie-ui/listbox) — PORTED, not
+  // imported: combobox's own open/active/query state machine is deliberately
+  // host-local (see the header comment above), and listCore.rzts is also
+  // consumed by the release-ignored listbox family, so pulling this into the
+  // shared partial would put listbox's frozen leaves back in scope.
+  //
+  // selectedValues(): the current selection as a de-duplicated array, tolerant
+  // of a null/undefined model. De-duplicates the MODEL array itself (not just
+  // `options`) so a re-normalized selection never reports the same value twice
+  // even if the model ever ends up holding a duplicate.
+  function selectedValues() {
+    const cur = value;
+    const arr = Array.isArray(cur) ? cur : [];
+    return Array.from(new Set(arr));
+  }
+
+  // isRowSelected(row): array membership under `multiple`, strict equality
+  // otherwise. Replaces every raw `opt.value === $props.value` / `wr.row.value
+  // === $props.value` template comparison (task 2) so all four render branches
+  // share exactly ONE membership check and can never disagree.
+  function isRowSelected(row: any) {
+    if (!row) return false;
+    if (props.multiple) return selectedValues().indexOf(row.value) !== -1;
+    return row.value === value;
+  }
+
+  // effectiveCloseOnSelect(): resolves the `closeOnSelect` sentinel (see the
+  // prop's own doc comment above for why the prop's default is `null`, not a
+  // literal `true`). Unset ⇒ `true` in single-select (today's default,
+  // unchanged), `false` under `multiple`; an explicit `true`/`false` from the
+  // consumer always wins in either mode. Every existing `closeOnSelect` read
+  // routes through this helper so the four render branches cannot disagree.
+  function effectiveCloseOnSelect() {
+    const v = props.closeOnSelect;
+    if (v === true || v === false) return v;
+    return !props.multiple;
+  }
+
   // ---- selection (writes the model + syncs query) ------------------------
   // `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
   // `@change` with BOTH the committed value AND the raw source `option` (CP reads
-  // `e.option`). `closeOnSelect` (default true) gates the popup close — a caller
-  // embedding the combobox in a multi-action surface passes `:close-on-select="false"`.
+  // `e.option`). `effectiveCloseOnSelect()` gates the popup close.
   const { onChange: _rozieProp_onChange } = props;
     const selectOption = useCallback((opt: any) => {
     if (!opt) return;
@@ -876,21 +920,47 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       return;
     }
     if (opt.disabled) return;
+    if (props.multiple) {
+      // Capture whether the value was already present BEFORE the toggle — this
+      // local is what feeds the `selected` field on the `change` payload (D-15).
+      const cur = selectedValues();
+      const wasSelected = cur.indexOf(opt.value) !== -1;
+      // Fresh array on every commit — in-place mutation (.push/.splice) is
+      // silently dropped by the React/Solid/Lit/Angular change detectors.
+      const next = wasSelected ? cur.filter((v: any) => v !== opt.value) : [...cur, opt.value];
+      setValue(next);
+      // D-14: clear the query on pick under `multiple` (not the option's label)
+      // so Backspace-removes-last stays reachable immediately after a pick.
+      setQuery('');
+      if (effectiveCloseOnSelect()) setIsOpen(false);
+      setActiveIndex(-1);
+      _rozieProp_onChange && _rozieProp_onChange({
+        value: next,
+        option: opt.option,
+        selected: !wasSelected
+      });
+      return;
+    }
     setValue(opt.value);
     setQuery(String(opt.label));
-    if (props.closeOnSelect) setIsOpen(false);
+    if (effectiveCloseOnSelect()) setIsOpen(false);
     setActiveIndex(-1);
+    // D-15: `selected` is additive and always `true` in single-select.
     _rozieProp_onChange && _rozieProp_onChange({
       value: opt.value,
-      option: opt.option
+      option: opt.option,
+      selected: true
     });
-  }, [_rozieProp_onChange, expandGroup, props.closeOnSelect, setValue]);
-  // Reflect the externally-selected value into the input text.
+  }, [_rozieProp_onChange, effectiveCloseOnSelect, expandGroup, props.multiple, selectedValues, setValue]);
+  // Reflect the externally-selected value into the input text. D-14: no-ops
+  // under `multiple` — there is no single label to mirror into the input once
+  // `value` holds an array, and the query is owned by chip-picking instead.
   const syncQueryToValue = useCallback(() => {
+    if (props.multiple) return;
     const opts = Array.isArray(props.options) ? props.options : [];
     const opt = opts.find((o: any) => o.value === value);
     setQuery(opt ? String(opt.label) : '');
-  }, [props.options, value]);
+  }, [props.multiple, props.options, value]);
   // ---- input + keyboard handlers -----------------------------------------
   const { onSearch: _rozieProp_onSearch } = props;
     const onInput = useCallback((e: any) => {
@@ -1077,11 +1147,17 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     return inputEl.current?.focus();
   }
   function clear() {
-    setValue(null);
+    // Fresh empty array under `multiple` (never in-place mutation), null in
+    // single mode — mirrors selectOption()'s `{ value, option, selected }`
+    // shape; nothing is selected after a clear, so `selected` is `false`.
+    const empty = props.multiple ? [] : null;
+    setValue(empty);
     setQuery('');
     setActiveIndex(-1);
     props.onChange && props.onChange({
-      value: null
+      value: empty,
+      option: null,
+      selected: false
     });
   }
   function seedQuery(text: any) {
@@ -1142,7 +1218,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
 
   return (
     <>
-    <div ref={__rozieRoot} {...attrs} className={clsx(clsx("rozie-combobox", { "rozie-combobox--open": isOpen, "rozie-combobox--disabled": props.disabled, "rozie-combobox--inline": props.inline }), (attrs.className as string | undefined))} data-rozie-s-9546115a="">
+    <div ref={__rozieRoot} {...attrs} className={clsx(clsx("rozie-combobox", { "rozie-combobox--open": isOpen, "rozie-combobox--disabled": props.disabled, "rozie-combobox--inline": props.inline, "rozie-combobox--multiple": props.multiple }), (attrs.className as string | undefined))} data-rozie-s-9546115a="">
       
       <Popover trigger="manual" open={isOpen} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={props.virtual} disablePositioning={props.inline} placement={props.placement} offset={props.offset} disableFlip={props.disableFlip} disableShift={props.disableShift} data-rozie-s-9546115a="" renderAnchor={() => (<>
           <input ref={inputEl} className={"rozie-combobox-input"} type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(props.ariaLabel)} value={query} placeholder={props.placeholder} disabled={!!props.disabled} autoComplete="off" onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur(); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-9546115a="" />

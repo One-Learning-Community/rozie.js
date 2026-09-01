@@ -75,7 +75,8 @@ import '@rozie-ui/combobox-react/themes/shadcn.css';    // or material.css, boot
 | `ariaLabel` | `String` | `null` |  |  |
 | `idBase` | `String` | `"rozie-combobox"` |  |  |
 | `inline` | `Boolean` | `false` |  |  |
-| `closeOnSelect` | `Boolean` | `true` |  |  |
+| `closeOnSelect` | `Boolean` | `null` |  |  |
+| `multiple` | `Boolean` | `false` |  |  |
 | `optionLabel` | `Function` | `null` |  |  |
 | `optionValue` | `Function` | `null` |  |  |
 | `optionDisabled` | `Function` | `null` |  |  |
@@ -93,7 +94,7 @@ import '@rozie-ui/combobox-react/themes/shadcn.css';    // or material.css, boot
 
 | Event | Description |
 | --- | --- |
-| `change` | Fired when the selected value changes — a user picks an option, or `clear()` resets it. Payload `{ value }` — the newly-selected option value (or `null` after a clear). This is the two-way `value` write-back funneled through one wrapper. |
+| `change` | Fired when the selected value changes — a user picks an option (toggling membership in `multiple` mode), or `clear()` resets it. Payload `{ value, option, selected }`. `value` is always the model's NEW value — the whole array in `multiple` mode, the scalar (or `null`) in single mode. `option` is the raw source option that was just toggled (`null` after a `clear()`). `selected` names the direction of the toggle: `true` when the option was just added (and always `true` in single-select), `false` when it was just removed or after `clear()`. |
 | `search` | Fired on every keystroke in the input. Payload `{ query }` — the current text. Pair it with `disableFilter` to drive async / server-side filtering: refetch `options` from the query and the popup re-renders the supplied list verbatim. |
 
 ## Imperative handle

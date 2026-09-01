@@ -31,7 +31,9 @@ const EXPECT = {
   // plus an `empty` slot. The option resolvers are consumed from the shared
   // @rozie-ui/headless-core/listCore.rzts spine. P4 (SC-5): + windowing props
   // (virtual/estimateRowHeight/maxHeight) consuming @rozie-ui/headless-core/windowing.rzts.
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift'],
+  // Phase 86 (R1, plan 86-04): + `multiple` — widens the sole `value` model to
+  // an array; `value` is STILL the only model:true prop (no ROZ125).
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift'],
   models: ['value'],
   emits: ['change', 'search'],
   // patch-adjacent (this .mjs isn't wired into CI — see the header note — so it

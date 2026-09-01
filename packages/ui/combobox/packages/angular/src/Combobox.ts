@@ -54,7 +54,7 @@ interface GroupMoreCtx {
   imports: [NgTemplateOutlet, NgClass, Popover],
   template: `
 
-    <div class="rozie-combobox" [ngClass]="{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-combobox--inline': inline() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="rozie-combobox" [ngClass]="{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-combobox--inline': inline(), 'rozie-combobox--multiple': multiple() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
       
       <rozie-popover trigger="manual" [open]="isOpen()" (openChange)="isOpen.set($event)" [bare]="true" [matchWidth]="true" [keepMounted]="virtual()" [disablePositioning]="inline()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()"><ng-template #anchor>
           <input #inputEl class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" [attr.aria-expanded]="!!isOpen()" [attr.aria-controls]="rozieAttr(listId())" [attr.aria-activedescendant]="rozieAttr(activeId())" [attr.aria-label]="rozieAttr(ariaLabel())" [value]="query()" [placeholder]="placeholder()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" autocomplete="off" (input)="onInput($event)" (focus)="onFocus($event)" (blur)="onBlur()" (keydown)="onKeydown($event)" />
@@ -366,9 +366,13 @@ export class Combobox {
    */
   inline = input<boolean>(false);
   /**
-   * Close the popup after a selection commits. Defaults `true` (standard autocomplete behavior); set to `false` to keep the popup open after a selection — e.g. when the combobox is embedded in a multi-action surface like a command palette.
+   * Close the popup after a selection commits. Unset (default) resolves through `effectiveCloseOnSelect()`: `true` in single-select (today's default behavior) and `false` in `multiple` mode, where closing after every chip pick would make multi-select unusable. Pass an explicit `true` or `false` to override in either mode.
    */
-  closeOnSelect = input<boolean>(true);
+  closeOnSelect = input<(boolean) | null>(null);
+  /**
+   * `value` widens to hold an **array** of selected values and remains the sole `model: true` prop, so the Angular `ControlValueAccessor` is preserved (a second model would forfeit it — `ROZ125`). Re-selecting an already-selected option toggles it off. Default `false` is byte-identical to single-select.
+   */
+  multiple = input<boolean>(false);
   /**
    * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
    */
@@ -1126,11 +1130,47 @@ export class Combobox {
     }
     return from;
   };
+  // ---- multi-select membership + effective-default helpers (Phase 86 R1) -----
+  // Ported from @rozie-ui/headless-core/listCore.rzts's select()/isSelected()
+  // algorithm (also shipped, verbatim, via @rozie-ui/listbox) — PORTED, not
+  // imported: combobox's own open/active/query state machine is deliberately
+  // host-local (see the header comment above), and listCore.rzts is also
+  // consumed by the release-ignored listbox family, so pulling this into the
+  // shared partial would put listbox's frozen leaves back in scope.
+  //
+  // selectedValues(): the current selection as a de-duplicated array, tolerant
+  // of a null/undefined model. De-duplicates the MODEL array itself (not just
+  // `options`) so a re-normalized selection never reports the same value twice
+  // even if the model ever ends up holding a duplicate.
+  selectedValues = () => {
+    const cur = this.value();
+    const arr = Array.isArray(cur) ? cur : [];
+    return Array.from(new Set(arr));
+  };
+  // isRowSelected(row): array membership under `multiple`, strict equality
+  // otherwise. Replaces every raw `opt.value === $props.value` / `wr.row.value
+  // === $props.value` template comparison (task 2) so all four render branches
+  // share exactly ONE membership check and can never disagree.
+  isRowSelected = (row: any) => {
+    if (!row) return false;
+    if (this.multiple()) return this.selectedValues().indexOf(row.value) !== -1;
+    return row.value === this.value();
+  };
+  // effectiveCloseOnSelect(): resolves the `closeOnSelect` sentinel (see the
+  // prop's own doc comment above for why the prop's default is `null`, not a
+  // literal `true`). Unset ⇒ `true` in single-select (today's default,
+  // unchanged), `false` under `multiple`; an explicit `true`/`false` from the
+  // consumer always wins in either mode. Every existing `closeOnSelect` read
+  // routes through this helper so the four render branches cannot disagree.
+  effectiveCloseOnSelect = () => {
+    const v = this.closeOnSelect();
+    if (v === true || v === false) return v;
+    return !this.multiple();
+  };
   // ---- selection (writes the model + syncs query) ------------------------
   // `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
   // `@change` with BOTH the committed value AND the raw source `option` (CP reads
-  // `e.option`). `closeOnSelect` (default true) gates the popup close — a caller
-  // embedding the combobox in a multi-action surface passes `:close-on-select="false"`.
+  // `e.option`). `effectiveCloseOnSelect()` gates the popup close.
   selectOption = (opt: any) => {
     if (!opt) return;
     if (opt.isMore) {
@@ -1139,18 +1179,44 @@ export class Combobox {
       return;
     }
     if (opt.disabled) return;
+    if (this.multiple()) {
+      // Capture whether the value was already present BEFORE the toggle — this
+      // local is what feeds the `selected` field on the `change` payload (D-15).
+      const cur = this.selectedValues();
+      const wasSelected = cur.indexOf(opt.value) !== -1;
+      // Fresh array on every commit — in-place mutation (.push/.splice) is
+      // silently dropped by the React/Solid/Lit/Angular change detectors.
+      const next = wasSelected ? cur.filter((v: any) => v !== opt.value) : [...cur, opt.value];
+      this.value.set(next), this.__rozieCvaOnChange(next);
+      // D-14: clear the query on pick under `multiple` (not the option's label)
+      // so Backspace-removes-last stays reachable immediately after a pick.
+      this.query.set('');
+      if (this.effectiveCloseOnSelect()) this.isOpen.set(false);
+      this.activeIndex.set(-1);
+      this.change.emit({
+        value: next,
+        option: opt.option,
+        selected: !wasSelected
+      });
+      return;
+    }
     this.value.set(opt.value), this.__rozieCvaOnChange(opt.value);
     this.query.set(String(opt.label));
-    if (this.closeOnSelect()) this.isOpen.set(false);
+    if (this.effectiveCloseOnSelect()) this.isOpen.set(false);
     this.activeIndex.set(-1);
+    // D-15: `selected` is additive and always `true` in single-select.
     this.change.emit({
       value: opt.value,
-      option: opt.option
+      option: opt.option,
+      selected: true
     });
   };
-  // Reflect the externally-selected value into the input text.
+  // Reflect the externally-selected value into the input text. D-14: no-ops
+  // under `multiple` — there is no single label to mirror into the input once
+  // `value` holds an array, and the query is owned by chip-picking instead.
   syncQueryToValue = () => {
     const __options = this.options();
+    if (this.multiple()) return;
     const opts = Array.isArray(__options) ? __options : [];
     const opt = opts.find((o: any) => o.value === this.value());
     this.query.set(opt ? String(opt.label) : '');
@@ -1337,11 +1403,17 @@ export class Combobox {
   // Render-neutral when never called. All four are post-mount → $refs safe.
   focus = () => this.inputEl()?.nativeElement?.focus();
   clear = () => {
-    this.value.set(null), this.__rozieCvaOnChange(null);
+    // Fresh empty array under `multiple` (never in-place mutation), null in
+    // single mode — mirrors selectOption()'s `{ value, option, selected }`
+    // shape; nothing is selected after a clear, so `selected` is `false`.
+    const empty = this.multiple() ? [] : null;
+    this.value.set(empty), this.__rozieCvaOnChange(empty);
     this.query.set('');
     this.activeIndex.set(-1);
     this.change.emit({
-      value: null
+      value: empty,
+      option: null,
+      selected: false
     });
   };
   seedQuery = (text: any) => {

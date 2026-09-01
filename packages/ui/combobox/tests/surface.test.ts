@@ -40,7 +40,9 @@ const EXPECT = {
   // hyphenated slot names (Vue's defineSlots<{…}>() can't emit an unquoted hyphenated key).
   // Phase 86 (R2/R4): + placement/offset/disableFlip/disableShift, forwarded to
   // the composed @rozie-ui/popover leaf wrapping the plain popup branch.
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift'],
+  // Phase 86 (R1, plan 86-04): + `multiple` — widens the sole `value` model to
+  // an array; `value` is STILL the only model:true prop (no ROZ125).
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift'],
   models: ['value'],
   emits: ['change', 'search'],
   slots: ['option', 'empty', 'groupHeading', 'groupMore'] as string[],
@@ -74,7 +76,7 @@ describe('Combobox.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (21 props)', () => {
+  it('props surface matches (22 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

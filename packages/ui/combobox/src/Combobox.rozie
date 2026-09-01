@@ -159,17 +159,43 @@
     },
   },
 
-  // Close the popup after a selection. DEFAULT TRUE — a justified, intentional
-  // deviation from the project rule `feedback_boolean_props_default_false`
-  // (negative opt-out / default false), taken here for cross-family API parity
-  // with the `@rozie-ui/listbox` sibling's `closeOnSelect` prop this is copied
-  // from (command-palette + existing consumers rely on the default-true close).
+  // Close the popup after a selection. Default is a SENTINEL `null` ("unset"),
+  // NOT a literal `true` — Phase 86 (D-15/R1) needs `effectiveCloseOnSelect()`
+  // (below) to distinguish "the consumer never set this" from "the consumer
+  // explicitly passed `true`", and every ×6 target merges an unset prop as
+  // `_props.closeOnSelect ?? <default>` at the emission boundary BEFORE any
+  // script code runs — a literal `true` default is therefore indistinguishable
+  // from an explicit `true` once the script sees it (confirmed against the
+  // existing `ariaLabel` prop, which already uses this identical `default:
+  // null` -> `(T) | null` sentinel shape). `effectiveCloseOnSelect()` resolves
+  // the sentinel to `true` in single-select (today's behavior, unchanged) and
+  // to `false` in `multiple` mode (D-15 — closing after every chip pick would
+  // make multi-select unusable); an explicit `true`/`false` from the consumer
+  // always wins in either mode. Route every read through that helper — never
+  // read `$props.closeOnSelect` directly.
   closeOnSelect: {
     type: Boolean,
-    default: true,
+    default: null,
     docs: {
       description:
-        'Close the popup after a selection commits. Defaults `true` (standard autocomplete behavior); set to `false` to keep the popup open after a selection — e.g. when the combobox is embedded in a multi-action surface like a command palette.',
+        'Close the popup after a selection commits. Unset (default) resolves through `effectiveCloseOnSelect()`: `true` in single-select (today\'s default behavior) and `false` in `multiple` mode, where closing after every chip pick would make multi-select unusable. Pass an explicit `true` or `false` to override in either mode.',
+    },
+  },
+
+  // ── Multi-select via the widened sole `value` model (Phase 86 R1) ────────
+  // Ported from the identical shipped shape on `@rozie-ui/listbox` (its own
+  // `multiple` prop + the shared listCore.rzts `select()`/`isSelected()`/
+  // `clear()` algorithm) rather than invented fresh. Does NOT add a second
+  // `model: true` prop — ROZ125 is hard: a second model would suppress the
+  // Angular `ControlValueAccessor`, which is exactly why `seedQuery` is an
+  // imperative handle verb today instead of a second model. Default `false`
+  // is byte-identical to today's single-select behavior.
+  multiple: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        '`value` widens to hold an **array** of selected values and remains the sole `model: true` prop, so the Angular `ControlValueAccessor` is preserved (a second model would forfeit it — `ROZ125`). Re-selecting an already-selected option toggles it off. Default `false` is byte-identical to single-select.',
     },
   },
 
@@ -694,11 +720,50 @@ const nextEnabled = (list, from, dir) => {
   return from
 }
 
+// ---- multi-select membership + effective-default helpers (Phase 86 R1) -----
+// Ported from @rozie-ui/headless-core/listCore.rzts's select()/isSelected()
+// algorithm (also shipped, verbatim, via @rozie-ui/listbox) — PORTED, not
+// imported: combobox's own open/active/query state machine is deliberately
+// host-local (see the header comment above), and listCore.rzts is also
+// consumed by the release-ignored listbox family, so pulling this into the
+// shared partial would put listbox's frozen leaves back in scope.
+//
+// selectedValues(): the current selection as a de-duplicated array, tolerant
+// of a null/undefined model. De-duplicates the MODEL array itself (not just
+// `options`) so a re-normalized selection never reports the same value twice
+// even if the model ever ends up holding a duplicate.
+const selectedValues = () => {
+  const cur = $props.value
+  const arr = Array.isArray(cur) ? cur : []
+  return Array.from(new Set(arr))
+}
+
+// isRowSelected(row): array membership under `multiple`, strict equality
+// otherwise. Replaces every raw `opt.value === $props.value` / `wr.row.value
+// === $props.value` template comparison (task 2) so all four render branches
+// share exactly ONE membership check and can never disagree.
+const isRowSelected = (row) => {
+  if (!row) return false
+  if ($props.multiple) return selectedValues().indexOf(row.value) !== -1
+  return row.value === $props.value
+}
+
+// effectiveCloseOnSelect(): resolves the `closeOnSelect` sentinel (see the
+// prop's own doc comment above for why the prop's default is `null`, not a
+// literal `true`). Unset ⇒ `true` in single-select (today's default,
+// unchanged), `false` under `multiple`; an explicit `true`/`false` from the
+// consumer always wins in either mode. Every existing `closeOnSelect` read
+// routes through this helper so the four render branches cannot disagree.
+const effectiveCloseOnSelect = () => {
+  const v = $props.closeOnSelect
+  if (v === true || v === false) return v
+  return !$props.multiple
+}
+
 // ---- selection (writes the model + syncs query) ------------------------
 // `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
 // `@change` with BOTH the committed value AND the raw source `option` (CP reads
-// `e.option`). `closeOnSelect` (default true) gates the popup close — a caller
-// embedding the combobox in a multi-action surface passes `:close-on-select="false"`.
+// `e.option`). `effectiveCloseOnSelect()` gates the popup close.
 const selectOption = (opt) => {
   if (!opt) return
   if (opt.isMore) {
@@ -707,15 +772,36 @@ const selectOption = (opt) => {
     return
   }
   if (opt.disabled) return
+  if ($props.multiple) {
+    // Capture whether the value was already present BEFORE the toggle — this
+    // local is what feeds the `selected` field on the `change` payload (D-15).
+    const cur = selectedValues()
+    const wasSelected = cur.indexOf(opt.value) !== -1
+    // Fresh array on every commit — in-place mutation (.push/.splice) is
+    // silently dropped by the React/Solid/Lit/Angular change detectors.
+    const next = wasSelected ? cur.filter((v) => v !== opt.value) : [...cur, opt.value]
+    $model.value = next
+    // D-14: clear the query on pick under `multiple` (not the option's label)
+    // so Backspace-removes-last stays reachable immediately after a pick.
+    $data.query = ''
+    if (effectiveCloseOnSelect()) $data.isOpen = false
+    $data.activeIndex = -1
+    $emit('change', { value: next, option: opt.option, selected: !wasSelected })
+    return
+  }
   $model.value = opt.value
   $data.query = String(opt.label)
-  if ($props.closeOnSelect) $data.isOpen = false
+  if (effectiveCloseOnSelect()) $data.isOpen = false
   $data.activeIndex = -1
-  $emit('change', { value: opt.value, option: opt.option })
+  // D-15: `selected` is additive and always `true` in single-select.
+  $emit('change', { value: opt.value, option: opt.option, selected: true })
 }
 
-// Reflect the externally-selected value into the input text.
+// Reflect the externally-selected value into the input text. D-14: no-ops
+// under `multiple` — there is no single label to mirror into the input once
+// `value` holds an array, and the query is owned by chip-picking instead.
 const syncQueryToValue = () => {
+  if ($props.multiple) return
   const opts = Array.isArray($props.options) ? $props.options : []
   const opt = opts.find((o) => o.value === $props.value)
   $data.query = opt ? String(opt.label) : ''
@@ -966,10 +1052,14 @@ $onUnmount(() => {
 // Render-neutral when never called. All four are post-mount → $refs safe.
 const focus = () => $refs.inputEl?.focus()
 const clear = () => {
-  $model.value = null
+  // Fresh empty array under `multiple` (never in-place mutation), null in
+  // single mode — mirrors selectOption()'s `{ value, option, selected }`
+  // shape; nothing is selected after a clear, so `selected` is `false`.
+  const empty = $props.multiple ? [] : null
+  $model.value = empty
   $data.query = ''
   $data.activeIndex = -1
-  $emit('change', { value: null })
+  $emit('change', { value: empty, option: null, selected: false })
 }
 const seedQuery = (text) => {
   $data.query = String(text == null ? '' : text)
@@ -984,7 +1074,7 @@ $expose({ focus, clear, seedQuery, pinOpen })
 <template>
 <div
   class="rozie-combobox"
-  :class="{ 'rozie-combobox--open': $data.isOpen, 'rozie-combobox--disabled': $props.disabled, 'rozie-combobox--inline': $props.inline }"
+  :class="{ 'rozie-combobox--open': $data.isOpen, 'rozie-combobox--disabled': $props.disabled, 'rozie-combobox--inline': $props.inline, 'rozie-combobox--multiple': $props.multiple }"
 >
   <!-- Composed popover positioning (Phase 86 R2/R4, plan 86-03) — ONE Popover wrapper
        element now wraps the INPUT (as its `#anchor` slot fill) AND all FOUR
