@@ -258,3 +258,68 @@ for (const target of TARGETS) {
     });
   });
 }
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// Phase 86 R3 (plan 86-06) — the create-row PIXEL cell.
+//
+// examples/demos/ComboboxCreatableDemo.rozie opens itself at mount (deferred
+// one macrotask past $onMount, mirroring ComboboxMultiDemo.rozie's identical
+// child-ref-readiness workaround) with a `creatable` combobox seeded (via
+// `seedQuery`) with a fixed query matching no option, against a four-option
+// list — so all four options AND the create row (positioned last) are both
+// visible in one deterministic frame.
+//
+// Baseline PNGs are Linux-Docker-generated (feedback_vr_linux_baselines) —
+// mirroring the combobox-multi cell above, since combobox.spec.ts has no
+// built-in per-example baseline gate of its own.
+// ════════════════════════════════════════════════════════════════════════════════════
+
+function creatableBaselineExists(name: string): boolean {
+  if (FLOATING_BOOTSTRAP_BASELINES.has(name)) return true;
+  return existsSync(resolve(__dirname, `../__screenshots__/${name}.png`));
+}
+const comboboxCreatableHasBaseline = creatableBaselineExists('ComboboxCreatable');
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner =
+    !built || !comboboxCreatableHasBaseline || KNOWN_FAILING.has(target)
+      ? test.fixme
+      : test;
+  runner(`combobox-creatable [${target}]: the create row renders last, after every real option`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ComboboxCreatable&target=${target}`);
+    const component = page.getByTestId('rozie-mount');
+    await expect(component).toBeVisible();
+
+    // The role/CSS locators pierce Lit's open shadow root.
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+
+    // The demo self-opens + self-seeds via $refs.creatableCombobox.focus() /
+    // .seedQuery('kiwi') one macrotask after its own $onMount — wait for the
+    // create row (not just any option, since "kiwi" matches nothing) before
+    // asserting or screenshotting.
+    const createRow = page.locator('.rozie-combobox-create');
+    await expect(createRow).toBeVisible({ timeout: 15_000 });
+
+    // DOM EVIDENCE (not just the screenshot — a wrong state must fail loudly,
+    // never silently rebless): the create row is the LAST option row, and no
+    // empty-state row is present in the same frame (D-19 — a creatable query
+    // with zero substring matches still shows the create row, not #empty).
+    const options = page.locator('[role="option"]');
+    await expect(options).toHaveCount(1);
+    const lastOptionClass = await options.last().getAttribute('class');
+    expect(lastOptionClass ?? '').toContain('rozie-combobox-create');
+    await expect(page.locator('.rozie-combobox-empty')).toHaveCount(0);
+
+    await expect(component).toHaveScreenshot('ComboboxCreatable.png', {
+      maxDiffPixels: 2,
+      animations: 'disabled',
+      caret: 'hide',
+    });
+  });
+}

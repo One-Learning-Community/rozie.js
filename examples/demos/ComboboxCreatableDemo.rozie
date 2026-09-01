@@ -1,0 +1,136 @@
+<!--
+  ComboboxCreatableDemo.rozie — content-STABLE create-row screenshot fixture for
+  the pure-Rozie Combobox `creatable` mode (Phase 86 R3, plan 86-06).
+
+  The one thing no happy-dom mount-and-drive behavioral test
+  (creatable.behavior.test.ts) can prove: the create row's real on-screen
+  appearance, and that it renders LAST, visibly after every real option, in
+  the same frame. This demo exists ONLY to make that a deterministic pixel
+  cell — never extend it for behavior (mirrors ComboboxMultiDemo.rozie /
+  ComboboxFloatingDemo.rozie's own "never bolt behavior onto the screenshot
+  cell" discipline).
+
+  Made deterministic by:
+    1. `creatable` set with a FIXED query ("kiwi") seeded via the composed
+       Combobox's own `seedQuery` handle — a query that matches NO option in
+       the four-item fruit list, so the create row is the sole trailing
+       affordance below all four rendered options (a deterministic frame
+       showing options + the create row together, in one screenshot).
+    2. The popup is opened DETERMINISTICALLY at mount via the composed
+       Combobox's own `focus` handle — `$refs.creatableCombobox.focus()`,
+       deferred one macrotask (setTimeout(0)) past `$onMount`, mirroring
+       ComboboxMultiDemo.rozie's identical child-ref-readiness workaround (a
+       child's $expose handle is not yet registered when a PARENT's
+       $onMount runs synchronously on Solid). `seedQuery('kiwi')` is called
+       BEFORE `focus()`, not after: Combobox's own `onFocus` handler runs
+       `e.target.select()` on every real focus event, and on Solid
+       specifically (only) the R2 `openingInProgress` reentrancy guard's
+       deferred microtask re-focus fires a SECOND native focus event once the
+       anchor's DOM is recreated (see Combobox.rozie's onFocus doc comment) —
+       re-running `select()` again. Seeding first means BOTH the first
+       (all six targets) and Solid's second `select()` call land on the
+       SAME already-seeded text, so every target's baseline shows the
+       identical browser text-selection highlight instead of Solid alone
+       diffing by a re-selected-after-the-fact highlight discovered during
+       this plan's own VR run (see the SUMMARY's Deviations).
+    3. An explicit `height` on the root box (not auto-sized from flow
+       content) — mirrors ComboboxMultiDemo.rozie's point 3: the popup's
+       `position: absolute` panel does not grow an ancestor's auto height,
+       so without an explicit height tall enough for the input + the
+       four-option + create-row open popup, the popup would render OUTSIDE
+       `[data-testid="rozie-mount"]`'s captured bounding box and never be
+       captured.
+    4. A DISTINCT idBase so the aria ids never collide with any other
+       combobox cell.
+
+  One .rozie source compiles to six per-framework screenshot consumers; the
+  Linux PNG baseline is generated separately in pinned Linux Docker (NOT here
+  — feedback_vr_linux_baselines). Until it lands the matrix cell auto-fixmes
+  on `baselineExists()`.
+-->
+
+<rozie name="ComboboxCreatableDemo">
+
+<components>
+{
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+
+<data>
+{
+  value: null,
+}
+</data>
+
+<script>
+const OPTIONS = [
+  { value: 'apple', label: 'Apple' },
+  { value: 'banana', label: 'Banana' },
+  { value: 'cherry', label: 'Cherry' },
+  { value: 'date', label: 'Date' },
+]
+
+// See the header comment (point 2) for why this is deferred one macrotask
+// past $onMount rather than called synchronously.
+$onMount(() => {
+  setTimeout(() => {
+    // Seed BEFORE focus — see the header comment (point 2) for why the order
+    // matters (a Solid-only reentrancy re-select discovered via this plan's
+    // own VR run).
+    $refs.creatableCombobox.seedQuery('kiwi')
+    $refs.creatableCombobox.focus()
+  }, 0)
+})
+</script>
+
+<template>
+<div class="combobox-creatable-demo">
+  <Combobox
+    ref="creatableCombobox"
+    r-model:value="$data.value"
+    :options="OPTIONS"
+    creatable
+    placeholder="Search fruit…"
+    ariaLabel="Fruit (creatable)"
+    idBase="creatable-combobox"
+  />
+</div>
+</template>
+
+<style>
+.combobox-creatable-demo {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  width: 360px;
+  height: 380px;
+  padding: 1rem;
+}
+/* Combobox's own onFocus() calls e.target.select() on every real focus event
+   (existing, documented select-all-on-focus UX, unrelated to this fixture).
+   On Solid ONLY, the R2 openingInProgress reentrancy guard's deferred
+   microtask re-focus (see Combobox.rozie's onFocus doc comment) may fire a
+   SECOND native focus event after this demo's own seedQuery()+focus() pair
+   settles — non-deterministically leaving the input's text selected or not
+   by the time Playwright captures the screenshot (discovered as a genuine
+   cross-run flake while proving this cell in Docker: the SAME build failed
+   0/3 then 3/3 retries on [solid] alone). Neutralizing the browser's default
+   text-selection highlight makes the selected and unselected renders
+   pixel-identical, so this SPECIFIC race can never show up as a VR diff
+   again. `.rozie-combobox-input` is rendered by the COMPOSED Combobox child,
+   not this demo's own scoped markup, so a plain scoped rule's
+   [data-rozie-s-*] attribute never matches it — the engine-DOM `:root { }`
+   escape hatch (Phase 34) is required, host-qualified by
+   `.combobox-creatable-demo` so it stays scoped to this one fixture. A
+   fixture-local fix, not a Combobox.rozie change — the select-all-on-focus
+   behavior itself is untouched and still fires. */
+:root {
+  .combobox-creatable-demo .rozie-combobox-input::selection {
+    background: transparent;
+    color: inherit;
+  }
+}
+</style>
+
+</rozie>

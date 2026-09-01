@@ -703,6 +703,16 @@ export const EXAMPLES = [
   // combobox.spec.ts's own toHaveScreenshot assertion (not matrix.spec.ts).
   // Lives under examples/demos/ (same Angular cross-tree coverage as ComboboxVirtual).
   'ComboboxMulti',
+  // Phase 86 R3 (plan 86-06) — the create-row PIXEL cell (loader →
+  // examples/demos/ComboboxCreatableDemo.rozie, importing packages/ui/combobox/src/
+  // Combobox.rozie): a `creatable` combobox seeded (via `seedQuery`) with a
+  // fixed query matching no option, self-opened at mount (via the composed
+  // Combobox's own `focus` handle), so the create row's steady-state appearance
+  // AND its position last, after every real option, are both visible in one
+  // deterministic frame. Mirrors ComboboxMulti above — this cell IS in
+  // combobox.spec.ts's own toHaveScreenshot assertion (not matrix.spec.ts).
+  // Lives under examples/demos/ (same Angular cross-tree coverage as ComboboxVirtual).
+  'ComboboxCreatable',
   // @rozie-ui/slider (pure-Rozie WAI-ARIA slider/range, NO engine — the engine IS
   // the native <input type="range">) — the four BEHAVIORAL cells (loaders →
   // examples/demos/Slider{Behavior,Range,Vertical,Marks}Demo.rozie, each importing
@@ -1535,6 +1545,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 86 R1 (plan 86-05) — '-demo' appended on Lit → tag
   // 'rozie-combobox-multi-demo' = kebab of ComboboxMultiDemo.
   ComboboxMulti: 'rozie-combobox-multi',
+  // Phase 86 R3 (plan 86-06) — '-demo' appended on Lit → tag
+  // 'rozie-combobox-creatable-demo' = kebab of ComboboxCreatableDemo.
+  ComboboxCreatable: 'rozie-combobox-creatable',
   // @rozie-ui/slider — '-demo' appended on Lit → tags 'rozie-slider-behavior-demo'
   // etc. = kebab of Slider*Demo (the wrapper component is name="Slider" →
   // 'rozie-slider'). Behavioral-only, no screenshot cell.
@@ -2041,6 +2054,12 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // $refs.multiCombobox.focus() at mount (not parent-supplied), so no
   // MODEL_PROPS entry. No parent props needed.
   ComboboxMulti: {},
+  // Phase 86 R3 (plan 86-06) — ComboboxCreatableDemo is self-contained: it
+  // seeds its own fixed 4-option list in <script> + value:null in <data>,
+  // binds r-model:value internally, and opens + seeds itself via
+  // $refs.creatableCombobox.focus()/.seedQuery('kiwi') at mount (not
+  // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
+  ComboboxCreatable: {},
   // @rozie-ui/slider — every Slider*Demo is self-contained: it seeds its own value
   // in <data> and binds r-model:value internally (not parent-supplied), so no
   // MODEL_PROPS entry. No parent props needed.

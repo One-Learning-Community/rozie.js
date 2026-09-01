@@ -109,6 +109,13 @@ overflow — the "+N more" affordance shown when the selection exceeds the visib
 | `--rozie-combobox-more-color` | `rgba(0, 0, 0, 0.55)` |
 | `--rozie-combobox-more-size` | `0.875rem` |
 
+creatable — the trailing "Create …" row shown when `creatable` is set and the typed query matches no option (see the Creatable section of the component docs). Reads as interactive; `-color` defaults through `--rozie-combobox-accent` (the same accent every selected/focused state already derives from) so it reads as an affordance, not a plain row; `-bg` is transparent by default, matching the "+N more" row's own chrome-free treatment.
+
+| Token | Default |
+| --- | --- |
+| `--rozie-combobox-create-color` | `var(--rozie-combobox-accent, #0066cc)` |
+| `--rozie-combobox-create-bg` | `transparent` |
+
 chip rail — the selected-value chips rendered inside the control, before the input, when `multiple` is set. Mirrors @rozie-ui/tags' own chip theme: `--rozie-combobox-chip-size` sets the chip's font-size (Tags' equivalent of chip-font-size), and the single `--rozie-combobox-chip-remove-size` token drives BOTH the width and the height of the round remove button, same as Tags.
 
 | Token | Default |
