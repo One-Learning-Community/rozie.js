@@ -693,6 +693,16 @@ export const EXAMPLES = [
   // assertion (not matrix.spec.ts) — see combobox.spec.ts for the per-target loop.
   // Lives under examples/demos/ (same Angular cross-tree coverage as ComboboxVirtual).
   'ComboboxFloating',
+  // Phase 86 R1 (plan 86-05) — the chip-rail PIXEL cell (loader →
+  // examples/demos/ComboboxMultiDemo.rozie, importing packages/ui/combobox/src/
+  // Combobox.rozie): a `multiple` combobox seeded with three selected chips
+  // that self-opens its popup at mount (via the composed Combobox's own
+  // `focus` handle), so the chip rail's steady-state appearance AND the
+  // popup's width-matches-the-whole-control positioning are both visible in
+  // one deterministic frame. Mirrors ComboboxFloating above — this cell IS in
+  // combobox.spec.ts's own toHaveScreenshot assertion (not matrix.spec.ts).
+  // Lives under examples/demos/ (same Angular cross-tree coverage as ComboboxVirtual).
+  'ComboboxMulti',
   // @rozie-ui/slider (pure-Rozie WAI-ARIA slider/range, NO engine — the engine IS
   // the native <input type="range">) — the four BEHAVIORAL cells (loaders →
   // examples/demos/Slider{Behavior,Range,Vertical,Marks}Demo.rozie, each importing
@@ -1522,6 +1532,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 86 R2 (plan 86-03) — '-demo' appended on Lit → tag
   // 'rozie-combobox-floating-demo' = kebab of ComboboxFloatingDemo.
   ComboboxFloating: 'rozie-combobox-floating',
+  // Phase 86 R1 (plan 86-05) — '-demo' appended on Lit → tag
+  // 'rozie-combobox-multi-demo' = kebab of ComboboxMultiDemo.
+  ComboboxMulti: 'rozie-combobox-multi',
   // @rozie-ui/slider — '-demo' appended on Lit → tags 'rozie-slider-behavior-demo'
   // etc. = kebab of Slider*Demo (the wrapper component is name="Slider" →
   // 'rozie-slider'). Behavioral-only, no screenshot cell.
@@ -2022,6 +2035,12 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // internally, and opens itself via $refs.floatingCombobox.focus() at mount (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
   ComboboxFloating: {},
+  // Phase 86 R1 (plan 86-05) — ComboboxMultiDemo is self-contained: it seeds
+  // its own fixed 5-option list in <script> + a 3-value array in <data>,
+  // binds r-model:value + `multiple` internally, and opens itself via
+  // $refs.multiCombobox.focus() at mount (not parent-supplied), so no
+  // MODEL_PROPS entry. No parent props needed.
+  ComboboxMulti: {},
   // @rozie-ui/slider — every Slider*Demo is self-contained: it seeds its own value
   // in <data> and binds r-model:value internally (not parent-supplied), so no
   // MODEL_PROPS entry. No parent props needed.

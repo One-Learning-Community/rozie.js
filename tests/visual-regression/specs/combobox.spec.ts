@@ -184,3 +184,77 @@ for (const target of TARGETS) {
     });
   });
 }
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// Phase 86 R1 (plan 86-05) — the chip-rail PIXEL cell.
+//
+// examples/demos/ComboboxMultiDemo.rozie opens itself at mount (deferred one
+// macrotask past $onMount, mirroring ComboboxFloatingDemo.rozie's identical
+// child-ref-readiness workaround) with a `multiple` combobox seeded with three
+// selected chips against a five-option list — so the chip rail's steady state
+// (chips inside the control, before the input) AND the open popup's
+// width-matches-the-whole-control positioning (D-13) are both visible in one
+// deterministic frame.
+//
+// Baseline PNGs are Linux-Docker-generated (feedback_vr_linux_baselines) —
+// mirroring the combobox-floating cell above, since combobox.spec.ts has no
+// built-in per-example baseline gate of its own.
+// ════════════════════════════════════════════════════════════════════════════════════
+
+function multiBaselineExists(name: string): boolean {
+  if (FLOATING_BOOTSTRAP_BASELINES.has(name)) return true;
+  return existsSync(resolve(__dirname, `../__screenshots__/${name}.png`));
+}
+const comboboxMultiHasBaseline = multiBaselineExists('ComboboxMulti');
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner =
+    !built || !comboboxMultiHasBaseline || KNOWN_FAILING.has(target)
+      ? test.fixme
+      : test;
+  runner(`combobox-multi [${target}]: chip rail renders inside the control, popup width matches the whole control`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ComboboxMulti&target=${target}`);
+    const component = page.getByTestId('rozie-mount');
+    await expect(component).toBeVisible();
+
+    // The role/CSS locators pierce Lit's open shadow root.
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+
+    // The demo self-opens via $refs.multiCombobox.focus() one macrotask after
+    // its own $onMount — wait for all 5 options + the floating panel rather
+    // than assuming they are already there.
+    await expect
+      .poll(async () => page.locator('[role="option"]').count(), {
+        timeout: 15_000,
+      })
+      .toBe(5);
+    const panel = page.locator('.rozie-popover-floating');
+    await expect(panel).toBeVisible({ timeout: 15_000 });
+
+    // DOM EVIDENCE (not just the screenshot — a wrong state must fail loudly,
+    // never silently rebless): exactly three chips render, and the popup's
+    // measured width equals the control's — the whole control box (chips +
+    // input) is the popover anchor, so `matchWidth` spans it, not the input
+    // alone (D-04/D-13's stated purpose).
+    const chips = page.locator('.rozie-combobox-chip');
+    await expect(chips).toHaveCount(3);
+    const control = page.locator('.rozie-combobox').first();
+    const controlBox = await control.boundingBox();
+    const panelBox = await panel.boundingBox();
+    expect(controlBox).not.toBeNull();
+    expect(panelBox).not.toBeNull();
+    expect(Math.abs(panelBox!.width - controlBox!.width)).toBeLessThanOrEqual(1);
+
+    await expect(component).toHaveScreenshot('ComboboxMulti.png', {
+      maxDiffPixels: 2,
+      animations: 'disabled',
+      caret: 'hide',
+    });
+  });
+}

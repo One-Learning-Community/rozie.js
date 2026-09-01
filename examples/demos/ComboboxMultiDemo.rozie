@@ -1,0 +1,103 @@
+<!--
+  ComboboxMultiDemo.rozie — content-STABLE chip-rail screenshot fixture for the
+  pure-Rozie Combobox `multiple` mode (Phase 86 R1, plan 86-05).
+
+  The one thing no happy-dom mount-and-drive behavioral test
+  (multiple.behavior.test.ts) can prove: the chip rail's real on-screen
+  appearance — its wrapping, its spacing inside the control, and the popup
+  width matching the WHOLE control (chips + input), not the input alone. This
+  demo exists ONLY to make that a deterministic pixel cell — never extend it
+  for behavior (mirrors ComboboxScreenshotDemo.rozie / ComboboxFloatingDemo.
+  rozie's own "never bolt behavior onto the screenshot cell" discipline).
+
+  Made deterministic by:
+    1. `multiple` set with a FIXED three-value seeded selection
+       (apple/banana/cherry) bound `r-model:value="$data.value"` against a
+       five-option list, so three chips render (at rest, chip order === the
+       seeded array order) and two options (Date, Elderberry) remain
+       unselected in the popup — giving a single frame that shows both the
+       chip rail's steady state AND the popup's selected/unselected marking
+       together.
+    2. The popup is opened DETERMINISTICALLY at mount via the composed
+       Combobox's own `focus` handle — `$refs.multiCombobox.focus()`,
+       deferred one macrotask (setTimeout(0)) past `$onMount`, mirroring
+       ComboboxFloatingDemo.rozie's identical child-ref-readiness workaround
+       (a child's $expose handle is not yet registered when a PARENT's
+       $onMount runs synchronously on Solid — a synchronous call there
+       no-ops and the popup never opens). Opening the popup in the same
+       frame is what makes the width-match-spans-chips-plus-input truth
+       (D-13) a visible, not just asserted, fact.
+    3. An explicit `height` on the root box (not auto-sized from flow
+       content) — mirrors ComboboxFloatingDemo.rozie's point 2: the popup's
+       `position: absolute` panel does not grow an ancestor's auto height,
+       so without an explicit height tall enough for chips + input + the
+       five-option open popup, the popup would render OUTSIDE
+       `[data-testid="rozie-mount"]`'s captured bounding box and never be
+       captured.
+    4. A DISTINCT idBase so the aria ids never collide with any other
+       combobox cell.
+
+  One .rozie source compiles to six per-framework screenshot consumers; the
+  Linux PNG baseline is generated separately in pinned Linux Docker (NOT here
+  — feedback_vr_linux_baselines). Until it lands the matrix cell auto-fixmes
+  on `baselineExists()`.
+-->
+
+<rozie name="ComboboxMultiDemo">
+
+<components>
+{
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+
+<data>
+{
+  value: ['apple', 'banana', 'cherry'],
+}
+</data>
+
+<script>
+const OPTIONS = [
+  { value: 'apple', label: 'Apple' },
+  { value: 'banana', label: 'Banana' },
+  { value: 'cherry', label: 'Cherry' },
+  { value: 'date', label: 'Date' },
+  { value: 'elderberry', label: 'Elderberry' },
+]
+
+// See the header comment (point 2) for why this is deferred one macrotask
+// past $onMount rather than called synchronously.
+$onMount(() => {
+  setTimeout(() => {
+    $refs.multiCombobox.focus()
+  }, 0)
+})
+</script>
+
+<template>
+<div class="combobox-multi-demo">
+  <Combobox
+    ref="multiCombobox"
+    r-model:value="$data.value"
+    :options="OPTIONS"
+    multiple
+    placeholder="Add more…"
+    ariaLabel="Fruit (multi-select)"
+    idBase="multi-combobox"
+  />
+</div>
+</template>
+
+<style>
+.combobox-multi-demo {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  width: 360px;
+  height: 380px;
+  padding: 1rem;
+}
+</style>
+
+</rozie>
