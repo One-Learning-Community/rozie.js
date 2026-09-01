@@ -103,6 +103,30 @@
       "isModel": false,
       "required": false,
       "type": "Number"
+    },
+    {
+      "name": "placement",
+      "isModel": false,
+      "required": false,
+      "type": "String"
+    },
+    {
+      "name": "offset",
+      "isModel": false,
+      "required": false,
+      "type": "Number"
+    },
+    {
+      "name": "disableFlip",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "disableShift",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
     }
   ],
   "slots": [

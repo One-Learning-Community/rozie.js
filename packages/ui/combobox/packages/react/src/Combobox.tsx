@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import type { ReactNode } from 'react';
 import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './Combobox.css';
+import Popover from '@rozie-ui/popover-react';
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally;
 // every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so
@@ -100,6 +101,22 @@ interface ComboboxProps {
    * Cap each native section group to its first `groupCap` results, adding a keyboard-reachable '+N more' row that expands that group IN PLACE when activated. `0`/absent = uncapped (default). Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on.
    */
   groupCap?: number;
+  /**
+   * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` matches the pre-Phase-86 static popup alignment (flush with the control's left edge). Ignored when `inline` is set.
+   */
+  placement?: string;
+  /**
+   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4` preserves the pre-Phase-86 resting gap (`--rozie-combobox-list-gap`). Ignored when `inline` is set.
+   */
+  offset?: number;
+  /**
+   * Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup flips above the control when it would overflow the viewport below; set this to keep it pinned to `placement` regardless. Ignored when `inline` is set.
+   */
+  disableFlip?: boolean;
+  /**
+   * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
+   */
+  disableShift?: boolean;
   onChange?: (...args: any[]) => void;
   onSearch?: (...args: any[]) => void;
   renderOption?: (ctx: OptionCtx) => ReactNode;
@@ -119,7 +136,7 @@ export interface ComboboxHandle {
 const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_props: ComboboxProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => [])())[0];
   const __defaultGroups = useState(() => (() => [])())[0];
-  const props: Omit<ComboboxProps, 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap'> & { options: any[]; placeholder: string; disabled: boolean; disableFilter: boolean; ariaLabel: (string) | null; idBase: string; inline: boolean; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string; groups: any[]; groupCap: number } = {
+  const props: Omit<ComboboxProps, 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap' | 'placement' | 'offset' | 'disableFlip' | 'disableShift'> & { options: any[]; placeholder: string; disabled: boolean; disableFilter: boolean; ariaLabel: (string) | null; idBase: string; inline: boolean; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string; groups: any[]; groupCap: number; placement: string; offset: number; disableFlip: boolean; disableShift: boolean } = {
     ..._props,
     options: _props.options ?? __defaultOptions,
     placeholder: _props.placeholder ?? '',
@@ -137,10 +154,14 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     maxHeight: _props.maxHeight ?? '',
     groups: _props.groups ?? __defaultGroups,
     groupCap: _props.groupCap ?? 0,
+    placement: _props.placement ?? 'bottom-start',
+    offset: _props.offset ?? 4,
+    disableFlip: _props.disableFlip ?? false,
+    disableShift: _props.disableShift ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { value, options, placeholder, disabled, disableFilter, ariaLabel, idBase, inline, closeOnSelect, optionLabel, optionValue, optionDisabled, virtual, estimateRowHeight, maxHeight, groups, groupCap, defaultValue, onValueChange, onChange, onSearch, ...rest } = _props as ComboboxProps & Record<string, unknown>;
-    void value; void options; void placeholder; void disabled; void disableFilter; void ariaLabel; void idBase; void inline; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void virtual; void estimateRowHeight; void maxHeight; void groups; void groupCap; void defaultValue; void onValueChange; void onChange; void onSearch;
+    const { value, options, placeholder, disabled, disableFilter, ariaLabel, idBase, inline, closeOnSelect, optionLabel, optionValue, optionDisabled, virtual, estimateRowHeight, maxHeight, groups, groupCap, placement, offset, disableFlip, disableShift, defaultValue, onValueChange, onChange, onSearch, ...rest } = _props as ComboboxProps & Record<string, unknown>;
+    void value; void options; void placeholder; void disabled; void disableFilter; void ariaLabel; void idBase; void inline; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void virtual; void estimateRowHeight; void maxHeight; void groups; void groupCap; void placement; void offset; void disableFlip; void disableShift; void defaultValue; void onValueChange; void onChange; void onSearch;
     return rest;
   })();
   const didMount = useRef(false);
@@ -1079,14 +1100,14 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       <input ref={inputEl} className={"rozie-combobox-input"} type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(props.ariaLabel)} value={query} placeholder={props.placeholder} disabled={!!props.disabled} autoComplete="off" onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur(); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-9546115a="" />
 
       
-      {!!(isOpen && !props.virtual && !isGrouped()) && <ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
-        {filteredOptions().map((opt) => <li key={opt.value} className={clsx("rozie-combobox-option", { "rozie-combobox-option--active": opt._i === activeIndex, "rozie-combobox-option--selected": opt.value === value, "rozie-combobox-option--disabled": opt.disabled })} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onMouseDown={($event) => { $event.preventDefault(); selectOption(opt); }} onMouseEnter={($event) => { setActiveIndex(opt._i); }} data-rozie-s-9546115a="">
-          {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: opt.option, index: opt._i, active: opt._i === activeIndex, selected: opt.value === value, disabled: opt.disabled }) : rozieDisplay(opt.label)}
-        </li>)}
+      {!!(isOpen && !props.virtual && !isGrouped()) && <Popover trigger="manual" open={isOpen} onOpenChange={setIsOpen} bare={true} disablePositioning={props.inline} placement={props.placement} offset={props.offset} disableFlip={props.disableFlip} disableShift={props.disableShift} data-rozie-s-9546115a="" children={<><ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+          {filteredOptions().map((opt) => <li key={opt.value} className={clsx("rozie-combobox-option", { "rozie-combobox-option--active": opt._i === activeIndex, "rozie-combobox-option--selected": opt.value === value, "rozie-combobox-option--disabled": opt.disabled })} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onMouseDown={($event) => { $event.preventDefault(); selectOption(opt); }} onMouseEnter={($event) => { setActiveIndex(opt._i); }} data-rozie-s-9546115a="">
+            {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: opt.option, index: opt._i, active: opt._i === activeIndex, selected: opt.value === value, disabled: opt.disabled }) : rozieDisplay(opt.label)}
+          </li>)}
 
-        {!!(filteredOptions().length === 0) && <li className={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
-          {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No results"}
-        </li>}</ul>}{!!(isOpen && !props.virtual && isGrouped() && !isCapped()) && <ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+          {!!(filteredOptions().length === 0) && <li className={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+            {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No results"}
+          </li>}</ul></>} />}{!!(isOpen && !props.virtual && isGrouped() && !isCapped()) && <ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
         {groupBlocks().map((blk) => <li key={'grp-' + (blk.group ? blk.group.id : '_ungrouped')} className={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk.group ? blk.group.label : undefined)} data-rozie-s-9546115a="">
           {!!(blk.group) && <div className={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
             {(props.renderGroupHeading ?? props.slots?.['groupHeading']) ? ((props.renderGroupHeading ?? props.slots?.['groupHeading']) as Function)({ group: blk.group }) : rozieDisplay(blk.group.label)}

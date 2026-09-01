@@ -83,6 +83,10 @@ const frameworks = [
 | `maxHeight` | `String` | `''` | yes | A CSS length string bounding the popup scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-combobox-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off. |
 | `groups` | `Array` | `[]` | yes | Ordered section list `[{ id, label }]` setting group order + heading text. Options are partitioned by their optional `group?` string; groups present on options but absent here fall back to first-appearance order after the listed ones. Empty/absent ⇒ flat, ungrouped rendering (default). |
 | `groupCap` | `Number` | `0` | yes | Cap each native section group to its first `groupCap` results, adding a keyboard-reachable "+N more" row that expands that group in place when activated. `0`/absent = uncapped (default), byte-identical to today. Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on. |
+| `placement` | `String` | `"bottom-start"` | yes | Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf. Default `"bottom-start"` matches the pre-Phase-86 static popup alignment. Ignored when `inline` is set. |
+| `offset` | `Number` | `4` | yes | Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4` preserves the pre-Phase-86 resting gap. Ignored when `inline` is set. |
+| `disableFlip` | `Boolean` | `false` | yes | Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). Ignored when `inline` is set. |
+| `disableShift` | `Boolean` | `false` | yes | Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). Ignored when `inline` is set. |
 
 ### Events
 
@@ -212,4 +216,4 @@ Pointer interaction mirrors the keyboard: hovering an option makes it active, an
 
 ## v1 scope
 
-The popup is positioned directly below the input (CSS `position: absolute`); there is **no floating-ui-style auto-flip/shift** to keep it on-screen near a viewport edge — a deliberate no-engine v1 limitation. See the [comparison](/components/combobox-comparison#what-rozie-defers) for the full list of deferrals.
+The plain (non-grouped, non-virtual) popup is positioned by composing the published [`@rozie-ui/popover`](/components/popover) leaf via Floating UI — `placement` / `offset` / `disableFlip` / `disableShift` are forwarded straight through, so it flips and shifts to stay on-screen near a viewport edge. The `groups`, `groups` + `groupCap`, and `:virtual` render branches are not yet composed with popover and still position with static CSS (`position: absolute`, no flip/shift) — a deliberate interim limitation, not a permanent one. See the [comparison](/components/combobox-comparison#what-rozie-defers) for the full list of deferrals.

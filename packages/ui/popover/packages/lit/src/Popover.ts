@@ -62,6 +62,20 @@ export default class Popover extends SignalWatcher(LitElement) {
   box-shadow: var(--rozie-popover-shadow, 0 8px 24px rgba(0, 0, 0, 0.12));
   padding: var(--rozie-popover-padding, 8px 12px);
 }
+.rozie-popover-floating--static[data-rozie-s-c6cf02ea] {
+  position: static;
+  left: auto;
+  top: auto;
+  width: auto;
+  z-index: auto;
+}
+.rozie-popover-floating--bare[data-rozie-s-c6cf02ea] {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
 .rozie-popover-arrow[data-rozie-s-c6cf02ea] {
   position: absolute;
   width: var(--rozie-popover-arrow-size, 8px);
@@ -82,7 +96,7 @@ export default class Popover extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) placement: string = 'bottom';
   /**
-   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur. Drives both the gesture handlers and the ARIA role (`'hover'`/`'focus'` → tooltip, `'click'` → popover dialog).
+   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur, or `'manual'` for a composing component that drives `open` itself — every built-in gesture handler no-ops and the anchor omits `aria-haspopup`/`aria-expanded` (only a real gesture trigger claims the popup). Drives both the gesture handlers and the ARIA role (`'hover'`/`'focus'` → tooltip, `'click'` → popover dialog, `'manual'` → no anchor ARIA claim).
    */
   @property({ type: String, reflect: true }) trigger: string = 'click';
   /**
@@ -113,6 +127,14 @@ export default class Popover extends SignalWatcher(LitElement) {
    * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
    */
   @property({ type: String, reflect: true }) strategy: string = 'absolute';
+  /**
+   * Suppress the floating panel's own chrome (background, border, border-radius, box-shadow, padding) so a composing component can supply its own instead. Off by default — the panel keeps its standard `--rozie-popover-*` chrome tokens.
+   */
+  @property({ type: Boolean, reflect: true }) bare: boolean = false;
+  /**
+   * Render the floating panel in normal document flow instead of computing a floating position — no `computePosition` call and no `autoUpdate` tracking is ever started. For a composing component that already controls the panel's layout (e.g. an `inline` consumer) rather than a genuinely floating popover.
+   */
+  @property({ type: Boolean, reflect: true }) disablePositioning: boolean = false;
   @query('[data-rozie-ref="anchorEl"]') private _refAnchorEl!: HTMLElement;
   @query('[data-rozie-ref="floatingEl"]') private _refFloatingEl!: HTMLElement;
   @query('[data-rozie-ref="arrowEl"]') private _refArrowEl!: HTMLElement;
@@ -250,12 +272,12 @@ private __rozieFirstUpdateDone = false;
 <div class="rozie-popover" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-c6cf02ea>
 
   
-  <div class="rozie-popover-anchor" aria-haspopup="dialog" aria-expanded=${!!this.open} aria-describedby=${rozieAttr(this.isTooltip() && this.open ? 'rozie-popover-floating' : null)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'click' && this.onAnchorClick(); }} @pointerenter=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'hover' && this.onAnchorPointerEnter(); }} @pointerleave=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'hover' && this.onAnchorPointerLeave(); }} @focusin=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'focus' && this.onAnchorFocus(); }} @focusout=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'focus' && this.onAnchorBlur(); }} data-rozie-ref="anchorEl" data-rozie-s-c6cf02ea>
+  <div class="rozie-popover-anchor" aria-haspopup=${rozieAttr(this.hasGestureTrigger() ? 'dialog' : null)} aria-expanded=${rozieAttr(this.hasGestureTrigger() ? !!this.open : null)} aria-describedby=${rozieAttr(this.isTooltip() && this.open ? 'rozie-popover-floating' : null)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'click' && this.onAnchorClick(); }} @pointerenter=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'hover' && this.onAnchorPointerEnter(); }} @pointerleave=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'hover' && this.onAnchorPointerLeave(); }} @focusin=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'focus' && this.onAnchorFocus(); }} @focusout=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'focus' && this.onAnchorBlur(); }} data-rozie-ref="anchorEl" data-rozie-s-c6cf02ea>
     ${this.anchor !== undefined ? this.anchor({open: this.open, toggle: this.toggle, show: this.show, hide: this.hide}) : html`<slot name="anchor" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open}); } catch { return '{}'; } })()} @rozie-anchor-toggle=${($event: CustomEvent) => ((this.toggle) as (...args: any[]) => any)($event.detail)} @rozie-anchor-show=${($event: CustomEvent) => ((this.show) as (...args: any[]) => any)($event.detail)} @rozie-anchor-hide=${($event: CustomEvent) => ((this.hide) as (...args: any[]) => any)($event.detail)}></slot>`}
   </div>
 
   
-  ${this.open && !this.disabled ? html`<div class="rozie-popover-floating" id="rozie-popover-floating" role=${rozieAttr(this.floatingRole())} aria-modal=${!!(this.floatingRole() === 'dialog')} data-rozie-ref="floatingEl" data-rozie-s-c6cf02ea>
+  ${this.open && !this.disabled ? html`<div class="${Object.entries({ "rozie-popover-floating": true, 'rozie-popover-floating--static': this.disablePositioning, 'rozie-popover-floating--bare': this.bare }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id="rozie-popover-floating" role=${rozieAttr(this.floatingRole())} aria-modal=${!!(this.floatingRole() === 'dialog')} data-rozie-ref="floatingEl" data-rozie-s-c6cf02ea>
     ${this.arrow ? html`<div class="rozie-popover-arrow" data-rozie-ref="arrowEl" data-rozie-s-c6cf02ea></div>` : nothing}<slot></slot>
   </div>` : nothing}</div>
 `;
@@ -338,6 +360,7 @@ private __rozieFirstUpdateDone = false;
   // fail the strict leaf tsc against Floating UI's `Placement` / `Middleware[]` types
   // (the cropper `let cfg = null` constructor-args idiom).
   position = () => {
+  if (this.disablePositioning) return;
   if (!this.anchorNode || !this.floatingNode) return;
   const middleware = buildMiddleware({
     offset: offsetMiddleware,
@@ -381,6 +404,7 @@ private __rozieFirstUpdateDone = false;
   // initial position. Floating UI's autoUpdate keeps the position fresh on scroll/
   // resize/ancestor-layout changes and returns its own teardown.
   startTracking = () => {
+  if (this.disablePositioning) return;
   if (!this.anchorNode || !this.floatingNode) return;
   if (this.stopAutoUpdate) {
     this.stopAutoUpdate();
@@ -430,6 +454,13 @@ private __rozieFirstUpdateDone = false;
 };
 
   // ─── role helpers (plain functions; tooltip vs popover-dialog by trigger) ───────
+  // hasGestureTrigger() (D-02): whether `trigger` is one of the three REAL anchor
+  // gestures. `'manual'` (and any other unrecognized value) returns false, which
+  // gates the anchor's `aria-haspopup`/`aria-expanded` off entirely — a composing
+  // component driving `open` itself must not have its wrapper claim a popup it
+  // does not own (D-01).
+  hasGestureTrigger = () => this.trigger === 'click' || this.trigger === 'hover' || this.trigger === 'focus';
+
   // hover/focus triggers are tooltip-flavored; click is an interactive popover.
   isTooltip = () => this.trigger === 'hover' || this.trigger === 'focus';
 
@@ -487,7 +518,7 @@ private __rozieFirstUpdateDone = false;
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'modal', 'strategy']);
+    const __skip = new Set<string>(['data-rozie-ref', 'open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disable-positioning', 'disablepositioning']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

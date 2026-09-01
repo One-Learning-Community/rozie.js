@@ -43,11 +43,6 @@
   background: var(--rozie-combobox-disabled-bg, rgba(0, 0, 0, 0.04));
 }
 .rozie-combobox-list[data-rozie-s-9546115a] {
-  position: absolute;
-  z-index: var(--rozie-combobox-list-z, 50);
-  top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
-  left: 0;
-  right: 0;
   margin: 0;
   padding: var(--rozie-combobox-list-padding, 0.25rem);
   list-style: none;
@@ -57,6 +52,13 @@
   border: var(--rozie-combobox-border-width, 1px) solid var(--rozie-combobox-list-border-color, rgba(0, 0, 0, 0.15));
   border-radius: var(--rozie-combobox-radius, 0.5rem);
   box-shadow: var(--rozie-combobox-list-shadow, 0 10px 24px rgba(0, 0, 0, 0.16));
+}
+.rozie-combobox[data-rozie-s-9546115a] > .rozie-combobox-list[data-rozie-s-9546115a] {
+  position: absolute;
+  z-index: var(--rozie-combobox-list-z, 50);
+  top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
+  left: 0;
+  right: 0;
 }
 .rozie-combobox-option[data-rozie-s-9546115a] {
   padding: var(--rozie-combobox-option-padding, 0.4rem 0.6rem);

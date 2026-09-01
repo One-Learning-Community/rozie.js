@@ -13,12 +13,16 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { compile, createDefaultRegistry, lowerToIR, ProducerResolver, parse } from '@rozie/core';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SRC = resolve(ROOT, 'src/Combobox.rozie');
-const FILENAME = 'Combobox.rozie';
 const source = readFileSync(SRC, 'utf8');
+// Phase 86 (D-01): `filename` MUST be the ABSOLUTE path to src/Combobox.rozie
+// (not a bare label) so resolveManifestProducer's node_modules walk for the
+// composed `@rozie-ui/popover-<target>` package starts from combobox/src, not
+// process.cwd() — mirrors codegen.mjs's resolver wiring.
+const resolver = new ProducerResolver({ root: ROOT });
 
 const EXPECT = {
   name: 'Combobox',
@@ -27,7 +31,7 @@ const EXPECT = {
   // plus an `empty` slot. The option resolvers are consumed from the shared
   // @rozie-ui/headless-core/listCore.rzts spine. P4 (SC-5): + windowing props
   // (virtual/estimateRowHeight/maxHeight) consuming @rozie-ui/headless-core/windowing.rzts.
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap'],
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift'],
   models: ['value'],
   emits: ['change', 'search'],
   // patch-adjacent (this .mjs isn't wired into CI — see the header note — so it
@@ -42,8 +46,8 @@ const fail = (msg) => { console.error(`✗ ${msg}`); process.exitCode = 1; };
 const setEq = (a, b) => a.length === b.length && [...a].sort().join(',') === [...b].sort().join(',');
 
 // ── 1. lower + surface assertions ──────────────────────────────────────────
-const { ast } = parse(source, { filename: FILENAME });
-const { ir, diagnostics: lowerDiags = [] } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
+const { ast } = parse(source, { filename: SRC });
+const { ir, diagnostics: lowerDiags = [] } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry(), filename: SRC, resolver });
 const lowerErrs = lowerDiags.filter((d) => d.severity === 'error');
 if (lowerErrs.length) fail(`lowerToIR errors:\n${lowerErrs.map((d) => `  ${d.code} ${d.message}`).join('\n')}`);
 
@@ -83,7 +87,7 @@ if (slotPropClash.length) fail(`slot == prop collision (ROZ127): [${slotPropClas
 // ── 2. compile()×6 — collision gates surface here as error diagnostics ──────
 const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'];
 for (const target of TARGETS) {
-  const r = compile(source, { target, filename: FILENAME });
+  const r = compile(source, { target, filename: SRC, resolverRoot: ROOT, resolver });
   const errs = r.diagnostics.filter((d) => d.severity === 'error');
   if (errs.length) fail(`compile(${target}) errors:\n${errs.map((d) => `  ${d.code} ${d.message}`).join('\n')}`);
   else if (!r.code || !r.code.length) fail(`compile(${target}) produced empty output with no diagnostics`);

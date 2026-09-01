@@ -50,6 +50,25 @@
 
 <rozie name="Combobox" vendorable="true">
 
+<!--
+  Phase 86 (D-01): the SECOND Option A published-leaf composition chain — the
+  first was Phase 75's data-table→popover / command-palette→combobox pair;
+  this makes command-palette → combobox → popover a proven TWO-level chain.
+  The STABLE package-style specifier ending in `.rozie` resolves, via
+  @rozie/core's resolveManifestProducer, to the PUBLISHED per-target
+  `@rozie-ui/popover-<target>` package's compiled manifest at compile time —
+  the IDENTICAL mechanism data-table uses for its own `<components>{ Popover:
+  ... }` entry. There is NO vendored sibling and NO in-memory remap. Do NOT
+  hand-write the relative `./Popover.rozie` — that would be Option B (source
+  vendoring), the stale approach CommandPalette.rozie's own header comment
+  still describes (predating Phase 75); this is Option A. Popover composes
+  into the plain (non-grouped, non-virtual) popup branch below; the composed
+  `@rozie-ui/popover-<target>` package is a runtime peerDependency of each
+  combobox leaf and is NOT publicly re-exported — consumers use
+  `@rozie-ui/popover-<target>` directly.
+-->
+<components>{ Popover: '@rozie-ui/popover/Popover.rozie' }</components>
+
 <props>
 {
   // The selected option's value (two-way). Sole model:true prop → Angular CVA.
@@ -246,6 +265,43 @@
     docs: {
       description:
         'Cap each native section group to its first `groupCap` results, adding a keyboard-reachable \'+N more\' row that expands that group IN PLACE when activated. `0`/absent = uncapped (default). Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on.',
+    },
+  },
+
+  // ── Floating positioning via the composed @rozie-ui/popover leaf (Phase 86 R2/R4) ──
+  // Forwarded straight through to the <Popover> wrapping the plain (non-grouped,
+  // non-virtual) popup branch. Ignored when `inline` is set — `inline` forwards
+  // `disablePositioning` to popover instead (D-09), so the popup never floats.
+  placement: {
+    type: String,
+    default: 'bottom-start',
+    docs: {
+      description:
+        'Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` matches the pre-Phase-86 static popup alignment (flush with the control\'s left edge). Ignored when `inline` is set.',
+    },
+  },
+  offset: {
+    type: Number,
+    default: 4,
+    docs: {
+      description:
+        'Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4` preserves the pre-Phase-86 resting gap (`--rozie-combobox-list-gap`). Ignored when `inline` is set.',
+    },
+  },
+  disableFlip: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        "Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup flips above the control when it would overflow the viewport below; set this to keep it pinned to `placement` regardless. Ignored when `inline` is set.",
+    },
+  },
+  disableShift: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        "Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.",
     },
   },
 }
@@ -903,36 +959,61 @@ $expose({ focus, clear, seedQuery, pinOpen })
     @keydown="onKeydown($event)"
   />
 
-  <!-- NON-VIRTUAL, UNGROUPED popup. Byte-identical to the pre-grouping render — the
-       `&& !isGrouped()` only routes grouped usage to the grouped popup below (isGrouped()
-       is false whenever `groups` is empty and no option carries a `group`, so this branch
-       is the untouched flat path). `&& !$props.virtual` still routes virtual usage to the
-       windowed branch further below. -->
-  <ul
+  <!-- NON-VIRTUAL, UNGROUPED popup — positioned by the composed @rozie-ui/popover leaf
+       (Phase 86 R2/R4) via Floating UI (`placement`/`offset`/`disableFlip`/`disableShift`
+       forwarded). `trigger="manual"` + `r-model:open` mean popover's Escape/click-outside
+       dismissal writes the SAME `$data.isOpen` combobox would have written itself (D-07) —
+       real click-outside dismissal, which combobox did not have before (it only closed on
+       blur). `bare` suppresses popover's own chrome so `.rozie-combobox-list`'s own
+       background/border/radius/shadow keep supplying it (see the `<style>` block). The
+       whole `.rozie-combobox` control stays the anchor visually — the input is left where
+       it is, outside `<Popover>`, so popover's own empty anchor element renders exactly
+       where the popup used to sit in flow. `:disable-positioning="$props.inline"` (D-09)
+       makes `inline` a popover static pass-through: the popup renders in normal flow and
+       popover never calls computePosition/autoUpdate, preserving the overflow-safe
+       embedded behavior with ONE copy of this branch (not a duplicated inline/floating
+       pair). The `&& !isGrouped()` only routes grouped usage to the grouped popup below
+       (isGrouped() is false whenever `groups` is empty and no option carries a `group`,
+       so this branch is the untouched flat path). `&& !$props.virtual` still routes
+       virtual usage to the windowed branch further below. The grouped, capped, and
+       virtual branches are NOT wrapped — they stay on the static CSS path until plan
+       86-03 (see the `.rozie-combobox > .rozie-combobox-list` rule in `<style>`). -->
+  <Popover
     r-if="$data.isOpen && !$props.virtual && !isGrouped()"
-    class="rozie-combobox-list"
-    :id="listId()"
-    role="listbox"
+    trigger="manual"
+    r-model:open="$data.isOpen"
+    bare
+    :disable-positioning="$props.inline"
+    :placement="$props.placement"
+    :offset="$props.offset"
+    :disable-flip="$props.disableFlip"
+    :disable-shift="$props.disableShift"
   >
-    <li
-      r-for="opt in filteredOptions()"
-      :key="opt.value"
-      class="rozie-combobox-option"
-      :class="{ 'rozie-combobox-option--active': opt._i === $data.activeIndex, 'rozie-combobox-option--selected': opt.value === $props.value, 'rozie-combobox-option--disabled': opt.disabled }"
-      :id="optId(opt._i)"
-      role="option"
-      :aria-selected="opt.value === $props.value"
-      :aria-disabled="!!opt.disabled"
-      @mousedown.prevent="selectOption(opt)"
-      @mouseenter="$data.activeIndex = opt._i"
+    <ul
+      class="rozie-combobox-list"
+      :id="listId()"
+      role="listbox"
     >
-      <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === $data.activeIndex" :selected="opt.value === $props.value" :disabled="opt.disabled">{{ opt.label }}</slot>
-    </li>
+      <li
+        r-for="opt in filteredOptions()"
+        :key="opt.value"
+        class="rozie-combobox-option"
+        :class="{ 'rozie-combobox-option--active': opt._i === $data.activeIndex, 'rozie-combobox-option--selected': opt.value === $props.value, 'rozie-combobox-option--disabled': opt.disabled }"
+        :id="optId(opt._i)"
+        role="option"
+        :aria-selected="opt.value === $props.value"
+        :aria-disabled="!!opt.disabled"
+        @mousedown.prevent="selectOption(opt)"
+        @mouseenter="$data.activeIndex = opt._i"
+      >
+        <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === $data.activeIndex" :selected="opt.value === $props.value" :disabled="opt.disabled">{{ opt.label }}</slot>
+      </li>
 
-    <li r-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
-      <slot name="empty" :query="$data.query">No results</slot>
-    </li>
-  </ul>
+      <li r-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
+        <slot name="empty" :query="$data.query">No results</slot>
+      </li>
+    </ul>
+  </Popover>
 
   <!-- ══ NON-VIRTUAL, GROUPED popup (combobox-native-groups) — active ONLY when isGrouped()
        (non-virtual + `groups` non-empty or an option carries `group`). Options render
@@ -1138,11 +1219,6 @@ $expose({ focus, clear, seedQuery, pinOpen })
   background: var(--rozie-combobox-disabled-bg, rgba(0, 0, 0, 0.04));
 }
 .rozie-combobox-list {
-  position: absolute;
-  z-index: var(--rozie-combobox-list-z, 50);
-  top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
-  left: 0;
-  right: 0;
   margin: 0;
   padding: var(--rozie-combobox-list-padding, 0.25rem);
   list-style: none;
@@ -1152,6 +1228,22 @@ $expose({ focus, clear, seedQuery, pinOpen })
   border: var(--rozie-combobox-border-width, 1px) solid var(--rozie-combobox-list-border-color, rgba(0, 0, 0, 0.15));
   border-radius: var(--rozie-combobox-radius, 0.5rem);
   box-shadow: var(--rozie-combobox-list-shadow, 0 10px 24px rgba(0, 0, 0, 0.16));
+}
+/* Phase 86 R2: the plain (non-grouped, non-virtual) popup's <ul> now renders
+   NESTED inside the composed popover's `.rozie-popover-floating` (itself
+   positioned by Floating UI), not as a direct child of `.rozie-combobox` — so
+   it no longer needs position/top/left/right/z-index. The grouped, capped,
+   and virtual branches still render their <ul> as a DIRECT child of
+   `.rozie-combobox` (untouched this phase — plan 86-03 composes them too), so
+   this direct-child selector restores the exact prior absolute-positioning
+   geometry for THEM only, leaving the composed branch's popup positioning to
+   popover exclusively. */
+.rozie-combobox > .rozie-combobox-list {
+  position: absolute;
+  z-index: var(--rozie-combobox-list-z, 50);
+  top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
+  left: 0;
+  right: 0;
 }
 .rozie-combobox-option {
   padding: var(--rozie-combobox-option-padding, 0.4rem 0.6rem);

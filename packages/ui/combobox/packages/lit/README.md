@@ -63,6 +63,10 @@ import '@rozie-ui/combobox-lit/themes/shadcn.css';    // or material.css, bootst
 | `maxHeight` | `String` | `''` |  |  |
 | `groups` | `Array` | `[]` |  |  |
 | `groupCap` | `Number` | `0` |  |  |
+| `placement` | `String` | `"bottom-start"` |  |  |
+| `offset` | `Number` | `4` |  |  |
+| `disableFlip` | `Boolean` | `false` |  |  |
+| `disableShift` | `Boolean` | `false` |  |  |
 
 ## Events
 

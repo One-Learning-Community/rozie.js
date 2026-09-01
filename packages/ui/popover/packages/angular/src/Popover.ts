@@ -1,5 +1,5 @@
 import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
 
@@ -45,19 +45,19 @@ interface DefaultCtx {}
 @Component({
   selector: 'rozie-popover',
   standalone: true,
-  imports: [NgTemplateOutlet],
+  imports: [NgTemplateOutlet, NgClass],
   template: `
 
     <div class="rozie-popover" #rozieSpread_0 #rozieListenersTarget_1>
 
       
-      <div class="rozie-popover-anchor" #anchorEl aria-haspopup="dialog" [attr.aria-expanded]="!!open()" [attr.aria-describedby]="rozieAttr(isTooltip() && open() ? 'rozie-popover-floating' : null)" (click)="trigger() === 'click' && onAnchorClick()" (pointerenter)="trigger() === 'hover' && onAnchorPointerEnter()" (pointerleave)="trigger() === 'hover' && onAnchorPointerLeave()" (focusin)="trigger() === 'focus' && onAnchorFocus()" (focusout)="trigger() === 'focus' && onAnchorBlur()">
+      <div class="rozie-popover-anchor" #anchorEl [attr.aria-haspopup]="rozieAttr(hasGestureTrigger() ? 'dialog' : null)" [attr.aria-expanded]="rozieAttr(hasGestureTrigger() ? !!open() : null)" [attr.aria-describedby]="rozieAttr(isTooltip() && open() ? 'rozie-popover-floating' : null)" (click)="trigger() === 'click' && onAnchorClick()" (pointerenter)="trigger() === 'hover' && onAnchorPointerEnter()" (pointerleave)="trigger() === 'hover' && onAnchorPointerLeave()" (focusin)="trigger() === 'focus' && onAnchorFocus()" (focusout)="trigger() === 'focus' && onAnchorBlur()">
         <ng-container *ngTemplateOutlet="(anchorTpl ?? __rozieFillMap()['anchor'] ?? templates()?.['anchor']); context: { $implicit: { open: open(), toggle: toggle, show: show, hide: hide }, open: open(), toggle: toggle, show: show, hide: hide }" />
       </div>
 
       
       @if (open() && !(disabled() || this.__rozieCvaDisabled())) {
-    <div class="rozie-popover-floating" #floatingEl id="rozie-popover-floating" [attr.role]="rozieAttr(floatingRole())" [attr.aria-modal]="!!(floatingRole() === 'dialog')">
+    <div class="rozie-popover-floating" [ngClass]="{ 'rozie-popover-floating--static': disablePositioning(), 'rozie-popover-floating--bare': bare() }" #floatingEl id="rozie-popover-floating" [attr.role]="rozieAttr(floatingRole())" [attr.aria-modal]="!!(floatingRole() === 'dialog')">
         @if (arrow()) {
     <div class="rozie-popover-arrow" #arrowEl></div>
     }<ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" />
@@ -87,6 +87,20 @@ interface DefaultCtx {}
       box-shadow: var(--rozie-popover-shadow, 0 8px 24px rgba(0, 0, 0, 0.12));
       padding: var(--rozie-popover-padding, 8px 12px);
     }
+    .rozie-popover-floating--static {
+      position: static;
+      left: auto;
+      top: auto;
+      width: auto;
+      z-index: auto;
+    }
+    .rozie-popover-floating--bare {
+      background: none;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      padding: 0;
+    }
     .rozie-popover-arrow {
       position: absolute;
       width: var(--rozie-popover-arrow-size, 8px);
@@ -115,7 +129,7 @@ export class Popover {
    */
   placement = input<string>('bottom');
   /**
-   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur. Drives both the gesture handlers and the ARIA role (`'hover'`/`'focus'` → tooltip, `'click'` → popover dialog).
+   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur, or `'manual'` for a composing component that drives `open` itself — every built-in gesture handler no-ops and the anchor omits `aria-haspopup`/`aria-expanded` (only a real gesture trigger claims the popup). Drives both the gesture handlers and the ARIA role (`'hover'`/`'focus'` → tooltip, `'click'` → popover dialog, `'manual'` → no anchor ARIA claim).
    */
   trigger = input<string>('click');
   /**
@@ -146,6 +160,14 @@ export class Popover {
    * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
    */
   strategy = input<string>('absolute');
+  /**
+   * Suppress the floating panel's own chrome (background, border, border-radius, box-shadow, padding) so a composing component can supply its own instead. Off by default — the panel keeps its standard `--rozie-popover-*` chrome tokens.
+   */
+  bare = input<boolean>(false);
+  /**
+   * Render the floating panel in normal document flow instead of computing a floating position — no `computePosition` call and no `autoUpdate` tracking is ever started. For a composing component that already controls the panel's layout (e.g. an `inline` consumer) rather than a genuinely floating popover.
+   */
+  disablePositioning = input<boolean>(false);
   anchorEl = viewChild<ElementRef<HTMLDivElement>>('anchorEl');
   floatingEl = viewChild<ElementRef<HTMLDivElement>>('floatingEl');
   arrowEl = viewChild<ElementRef<HTMLDivElement>>('arrowEl');
@@ -308,6 +330,7 @@ export class Popover {
   // (the cropper `let cfg = null` constructor-args idiom).
   position = () => {
     const __strategy = this.strategy();
+    if (this.disablePositioning()) return;
     if (!this.anchorNode || !this.floatingNode) return;
     const middleware = buildMiddleware({
       offset: offsetMiddleware,
@@ -350,6 +373,7 @@ export class Popover {
   // initial position. Floating UI's autoUpdate keeps the position fresh on scroll/
   // resize/ancestor-layout changes and returns its own teardown.
   startTracking = () => {
+    if (this.disablePositioning()) return;
     if (!this.anchorNode || !this.floatingNode) return;
     if (this.stopAutoUpdate) {
       this.stopAutoUpdate();
@@ -391,6 +415,12 @@ export class Popover {
     this.requestOpen(false);
   };
   // ─── role helpers (plain functions; tooltip vs popover-dialog by trigger) ───────
+  // hasGestureTrigger() (D-02): whether `trigger` is one of the three REAL anchor
+  // gestures. `'manual'` (and any other unrecognized value) returns false, which
+  // gates the anchor's `aria-haspopup`/`aria-expanded` off entirely — a composing
+  // component driving `open` itself must not have its wrapper claim a popup it
+  // does not own (D-01).
+  hasGestureTrigger = () => this.trigger() === 'click' || this.trigger() === 'hover' || this.trigger() === 'focus';
   // hover/focus triggers are tooltip-flavored; click is an interactive popover.
   isTooltip = () => this.trigger() === 'hover' || this.trigger() === 'focus';
   // Role: hover/focus → 'tooltip'; a click popover is 'dialog' ONLY when the consumer

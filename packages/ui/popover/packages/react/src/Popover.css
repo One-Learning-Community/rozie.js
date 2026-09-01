@@ -18,6 +18,20 @@
   box-shadow: var(--rozie-popover-shadow, 0 8px 24px rgba(0, 0, 0, 0.12));
   padding: var(--rozie-popover-padding, 8px 12px);
 }
+.rozie-popover-floating--static[data-rozie-s-c6cf02ea] {
+  position: static;
+  left: auto;
+  top: auto;
+  width: auto;
+  z-index: auto;
+}
+.rozie-popover-floating--bare[data-rozie-s-c6cf02ea] {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
 .rozie-popover-arrow[data-rozie-s-c6cf02ea] {
   position: absolute;
   width: var(--rozie-popover-arrow-size, 8px);

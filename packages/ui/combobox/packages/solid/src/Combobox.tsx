@@ -2,6 +2,7 @@ import type { JSX } from 'solid-js';
 import { Show, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
+import Popover from '@rozie-ui/popover-solid';
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally;
 // every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so
@@ -64,11 +65,6 @@ __rozieInjectStyle('Combobox-9546115a', `.rozie-combobox[data-rozie-s-9546115a] 
   background: var(--rozie-combobox-disabled-bg, rgba(0, 0, 0, 0.04));
 }
 .rozie-combobox-list[data-rozie-s-9546115a] {
-  position: absolute;
-  z-index: var(--rozie-combobox-list-z, 50);
-  top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
-  left: 0;
-  right: 0;
   margin: 0;
   padding: var(--rozie-combobox-list-padding, 0.25rem);
   list-style: none;
@@ -78,6 +74,13 @@ __rozieInjectStyle('Combobox-9546115a', `.rozie-combobox[data-rozie-s-9546115a] 
   border: var(--rozie-combobox-border-width, 1px) solid var(--rozie-combobox-list-border-color, rgba(0, 0, 0, 0.15));
   border-radius: var(--rozie-combobox-radius, 0.5rem);
   box-shadow: var(--rozie-combobox-list-shadow, 0 10px 24px rgba(0, 0, 0, 0.16));
+}
+.rozie-combobox[data-rozie-s-9546115a] > .rozie-combobox-list[data-rozie-s-9546115a] {
+  position: absolute;
+  z-index: var(--rozie-combobox-list-z, 50);
+  top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
+  left: 0;
+  right: 0;
 }
 .rozie-combobox-option[data-rozie-s-9546115a] {
   padding: var(--rozie-combobox-option-padding, 0.4rem 0.6rem);
@@ -217,6 +220,22 @@ interface ComboboxProps {
    * Cap each native section group to its first `groupCap` results, adding a keyboard-reachable '+N more' row that expands that group IN PLACE when activated. `0`/absent = uncapped (default). Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on.
    */
   groupCap?: number;
+  /**
+   * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` matches the pre-Phase-86 static popup alignment (flush with the control's left edge). Ignored when `inline` is set.
+   */
+  placement?: string;
+  /**
+   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4` preserves the pre-Phase-86 resting gap (`--rozie-combobox-list-gap`). Ignored when `inline` is set.
+   */
+  offset?: number;
+  /**
+   * Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup flips above the control when it would overflow the viewport below; set this to keep it pinned to `placement` regardless. Ignored when `inline` is set.
+   */
+  disableFlip?: boolean;
+  /**
+   * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
+   */
+  disableShift?: boolean;
   onChange?: (...args: unknown[]) => void;
   onSearch?: (...args: unknown[]) => void;
   optionSlot?: (ctx: OptionSlotCtx) => JSX.Element;
@@ -235,8 +254,8 @@ export interface ComboboxHandle {
 }
 
 export default function Combobox(_props: ComboboxProps): JSX.Element {
-  const _merged = mergeProps({ options: (() => [])() as any[], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: (() => [])() as any[], groupCap: 0 }, _props);
-  const [local, attrs] = splitProps(_merged, ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'ref', 'onChange', 'onSearch']);
+  const _merged = mergeProps({ options: (() => [])() as any[], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: (() => [])() as any[], groupCap: 0, placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false }, _props);
+  const [local, attrs] = splitProps(_merged, ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift', 'ref', 'onChange', 'onSearch']);
   onMount(() => { local.ref?.({ focus, clear, seedQuery, pinOpen }); });
 
   const [value, setValue] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'value', null);
@@ -1153,14 +1172,14 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
       <input type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen()} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(local.ariaLabel)} autocomplete="off" ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-combobox-input"} value={query()} placeholder={local.placeholder} disabled={!!local.disabled} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onFocus={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onFocus($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} data-rozie-s-9546115a="" />
 
       
-      {<Show when={isOpen() && !local.virtual && !isGrouped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
-        <Key each={filteredOptions() as readonly any[]} by={(opt) => opt.value}>{(opt) => <li role="option" aria-selected={opt().value === value()} aria-disabled={!!opt().disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': opt()._i === activeIndex(), 'rozie-combobox-option--selected': opt().value === value(), 'rozie-combobox-option--disabled': opt().disabled })} id={rozieAttr(optId(opt()._i))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(opt()); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(opt()._i); }} data-rozie-s-9546115a="">
-          {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt().option, index: opt()._i, active: opt()._i === activeIndex(), selected: opt().value === value(), disabled: opt().disabled }) ?? rozieDisplay(opt().label)}
-        </li>}</Key>
+      {<Show when={isOpen() && !local.virtual && !isGrouped()}><Popover trigger="manual" open={isOpen()} onOpenChange={setIsOpen} bare={true} disablePositioning={local.inline} placement={local.placement} offset={local.offset} disableFlip={local.disableFlip} disableShift={local.disableShift} data-rozie-s-9546115a=""><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+          <Key each={filteredOptions() as readonly any[]} by={(opt) => opt.value}>{(opt) => <li role="option" aria-selected={opt().value === value()} aria-disabled={!!opt().disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': opt()._i === activeIndex(), 'rozie-combobox-option--selected': opt().value === value(), 'rozie-combobox-option--disabled': opt().disabled })} id={rozieAttr(optId(opt()._i))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(opt()); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(opt()._i); }} data-rozie-s-9546115a="">
+            {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt().option, index: opt()._i, active: opt()._i === activeIndex(), selected: opt().value === value(), disabled: opt().disabled }) ?? rozieDisplay(opt().label)}
+          </li>}</Key>
 
-        {<Show when={filteredOptions().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
-          {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
-        </li></Show>}</ul></Show>}{<Show when={isOpen() && !local.virtual && isGrouped() && !isCapped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+          {<Show when={filteredOptions().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
+          </li></Show>}</ul></Popover></Show>}{<Show when={isOpen() && !local.virtual && isGrouped() && !isCapped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
         <Key each={groupBlocks() as readonly any[]} by={(blk) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped')}>{(blk) => <li class={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-9546115a="">
           {<Show when={blk().group}><div class={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
             {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ group: blk().group }) ?? rozieDisplay(blk().group.label)}

@@ -2454,6 +2454,27 @@ importers:
       '@rozie-ui/headless-core':
         specifier: workspace:*
         version: link:../headless-core
+      '@rozie-ui/popover':
+        specifier: workspace:*
+        version: link:../popover
+      '@rozie-ui/popover-angular':
+        specifier: workspace:*
+        version: link:../popover/packages/angular
+      '@rozie-ui/popover-lit':
+        specifier: workspace:*
+        version: link:../popover/packages/lit
+      '@rozie-ui/popover-react':
+        specifier: workspace:*
+        version: link:../popover/packages/react
+      '@rozie-ui/popover-solid':
+        specifier: workspace:*
+        version: link:../popover/packages/solid
+      '@rozie-ui/popover-svelte':
+        specifier: workspace:*
+        version: link:../popover/packages/svelte
+      '@rozie-ui/popover-vue':
+        specifier: workspace:*
+        version: link:../popover/packages/vue
       '@rozie/core':
         specifier: workspace:*
         version: link:../../core

@@ -3,6 +3,8 @@ import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
 
+import { Popover } from '@rozie-ui/popover-angular';
+
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally;
 // every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so
@@ -49,7 +51,7 @@ interface GroupMoreCtx {
 @Component({
   selector: 'rozie-combobox',
   standalone: true,
-  imports: [NgTemplateOutlet, NgClass],
+  imports: [NgTemplateOutlet, NgClass, Popover],
   template: `
 
     <div class="rozie-combobox" [ngClass]="{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-combobox--inline': inline() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
@@ -57,26 +59,26 @@ interface GroupMoreCtx {
 
       
       @if (isOpen() && !virtual() && !isGrouped()) {
-    <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
-        @for (opt of filteredOptions(); track opt.value) {
+    <rozie-popover trigger="manual" [open]="isOpen()" (openChange)="isOpen.set($event)" [bare]="true" [disablePositioning]="inline()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()"><ng-template #defaultSlot><ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
+          @for (opt of filteredOptions(); track opt.value) {
     <li class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': opt._i === activeIndex(), 'rozie-combobox-option--selected': opt.value === value(), 'rozie-combobox-option--disabled': opt.disabled }" [attr.id]="rozieAttr(optId(opt._i))" role="option" [attr.aria-selected]="opt.value === value()" [attr.aria-disabled]="!!opt.disabled" (mousedown)="$event.preventDefault(); selectOption(opt)" (mouseenter)="activeIndex.set(opt._i)">
-          @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
+            @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option']); context: { $implicit: { option: opt.option, index: opt._i, active: opt._i === activeIndex(), selected: opt.value === value(), disabled: opt.disabled }, option: opt.option, index: opt._i, active: opt._i === activeIndex(), selected: opt.value === value(), disabled: opt.disabled }" />
     } @else {
     {{ rozieDisplay(opt.label) }}
     }
-        </li>
+          </li>
     }
 
-        @if (filteredOptions().length === 0) {
+          @if (filteredOptions().length === 0) {
     <li class="rozie-combobox-empty" role="presentation">
-          @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
+            @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     No results
     }
-        </li>
-    }</ul>
+          </li>
+    }</ul></ng-template></rozie-popover>
     }@if (isOpen() && !virtual() && isGrouped() && !isCapped()) {
     <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
         @for (blk of groupBlocks(); track 'grp-' + (blk.group ? blk.group.id : '_ungrouped')) {
@@ -227,11 +229,6 @@ interface GroupMoreCtx {
       background: var(--rozie-combobox-disabled-bg, rgba(0, 0, 0, 0.04));
     }
     .rozie-combobox-list {
-      position: absolute;
-      z-index: var(--rozie-combobox-list-z, 50);
-      top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
-      left: 0;
-      right: 0;
       margin: 0;
       padding: var(--rozie-combobox-list-padding, 0.25rem);
       list-style: none;
@@ -241,6 +238,13 @@ interface GroupMoreCtx {
       border: var(--rozie-combobox-border-width, 1px) solid var(--rozie-combobox-list-border-color, rgba(0, 0, 0, 0.15));
       border-radius: var(--rozie-combobox-radius, 0.5rem);
       box-shadow: var(--rozie-combobox-list-shadow, 0 10px 24px rgba(0, 0, 0, 0.16));
+    }
+    .rozie-combobox > .rozie-combobox-list {
+      position: absolute;
+      z-index: var(--rozie-combobox-list-z, 50);
+      top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
+      left: 0;
+      right: 0;
     }
     .rozie-combobox-option {
       padding: var(--rozie-combobox-option-padding, 0.4rem 0.6rem);
@@ -379,6 +383,22 @@ export class Combobox {
    * Cap each native section group to its first `groupCap` results, adding a keyboard-reachable '+N more' row that expands that group IN PLACE when activated. `0`/absent = uncapped (default). Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on.
    */
   groupCap = input<number>(0);
+  /**
+   * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` matches the pre-Phase-86 static popup alignment (flush with the control's left edge). Ignored when `inline` is set.
+   */
+  placement = input<string>('bottom-start');
+  /**
+   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4` preserves the pre-Phase-86 resting gap (`--rozie-combobox-list-gap`). Ignored when `inline` is set.
+   */
+  offset = input<number>(4);
+  /**
+   * Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup flips above the control when it would overflow the viewport below; set this to keep it pinned to `placement` regardless. Ignored when `inline` is set.
+   */
+  disableFlip = input<boolean>(false);
+  /**
+   * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
+   */
+  disableShift = input<boolean>(false);
   query = signal('');
   isOpen = signal(false);
   activeIndex = signal(-1);

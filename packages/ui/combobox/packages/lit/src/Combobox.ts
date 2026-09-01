@@ -3,6 +3,7 @@ import { customElement, property, query, queryAssignedElements, state } from 'li
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
 import { RozieSlotDistributor, createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
+import '@rozie-ui/popover-lit';
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally;
 // every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so
@@ -93,11 +94,6 @@ export default class Combobox extends SignalWatcher(LitElement) {
   background: var(--rozie-combobox-disabled-bg, rgba(0, 0, 0, 0.04));
 }
 .rozie-combobox-list[data-rozie-s-9546115a] {
-  position: absolute;
-  z-index: var(--rozie-combobox-list-z, 50);
-  top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
-  left: 0;
-  right: 0;
   margin: 0;
   padding: var(--rozie-combobox-list-padding, 0.25rem);
   list-style: none;
@@ -107,6 +103,13 @@ export default class Combobox extends SignalWatcher(LitElement) {
   border: var(--rozie-combobox-border-width, 1px) solid var(--rozie-combobox-list-border-color, rgba(0, 0, 0, 0.15));
   border-radius: var(--rozie-combobox-radius, 0.5rem);
   box-shadow: var(--rozie-combobox-list-shadow, 0 10px 24px rgba(0, 0, 0, 0.16));
+}
+.rozie-combobox[data-rozie-s-9546115a] > .rozie-combobox-list[data-rozie-s-9546115a] {
+  position: absolute;
+  z-index: var(--rozie-combobox-list-z, 50);
+  top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
+  left: 0;
+  right: 0;
 }
 .rozie-combobox-option[data-rozie-s-9546115a] {
   padding: var(--rozie-combobox-option-padding, 0.4rem 0.6rem);
@@ -237,6 +240,22 @@ export default class Combobox extends SignalWatcher(LitElement) {
    * Cap each native section group to its first `groupCap` results, adding a keyboard-reachable '+N more' row that expands that group IN PLACE when activated. `0`/absent = uncapped (default). Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on.
    */
   @property({ type: Number, reflect: true }) groupCap: number = 0;
+  /**
+   * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` matches the pre-Phase-86 static popup alignment (flush with the control's left edge). Ignored when `inline` is set.
+   */
+  @property({ type: String, reflect: true }) placement: string = 'bottom-start';
+  /**
+   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4` preserves the pre-Phase-86 resting gap (`--rozie-combobox-list-gap`). Ignored when `inline` is set.
+   */
+  @property({ type: Number, reflect: true }) offset: number = 4;
+  /**
+   * Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup flips above the control when it would overflow the viewport below; set this to keep it pinned to `placement` regardless. Ignored when `inline` is set.
+   */
+  @property({ type: Boolean, reflect: true }) disableFlip: boolean = false;
+  /**
+   * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
+   */
+  @property({ type: Boolean, reflect: true }) disableShift: boolean = false;
   private _query = signal('');
   private _isOpen = signal(false);
   private _activeIndex = signal(-1);
@@ -401,14 +420,14 @@ private __rozieFirstUpdateDone = false;
   <input class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded=${!!this._isOpen.value} aria-controls=${rozieAttr(this.listId())} aria-activedescendant=${rozieAttr(this.activeId())} aria-label=${rozieAttr(this.ariaLabel)} .value=${this._query.value} placeholder=${this.placeholder} ?disabled=${!!this.disabled} autocomplete="off" @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @focus=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onFocus($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} data-rozie-ref="inputEl" data-rozie-s-9546115a />
 
   
-  ${this._isOpen.value && !this.virtual && !this.isGrouped() ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" data-rozie-s-9546115a>
-    ${repeat<any>(this.filteredOptions(), (opt, _idx) => opt.value, (opt, _idx) => html`<li class="${Object.entries({ "rozie-combobox-option": true, 'rozie-combobox-option--active': opt._i === this._activeIndex.value, 'rozie-combobox-option--selected': opt.value === this.value, 'rozie-combobox-option--disabled': opt.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optId(opt._i))} role="option" aria-selected=${opt.value === this.value} aria-disabled=${!!opt.disabled} @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(opt); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = opt._i; }} data-rozie-s-9546115a>
-      ${this.option !== undefined ? this.option({option: opt.option, index: opt._i, active: opt._i === this._activeIndex.value, selected: opt.value === this.value, disabled: opt.disabled}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: opt.option, index: opt._i, active: opt._i === this._activeIndex.value, selected: opt.value === this.value, disabled: opt.disabled}); } catch { return '{}'; } })()}>${rozieDisplay(opt.label)}</slot>`}
-    </li>`)}
+  ${this._isOpen.value && !this.virtual && !this.isGrouped() ? html`<rozie-popover trigger="manual" .open=${this._isOpen.value} @open-change=${($event: CustomEvent) => { this._isOpen.value = $event.detail; }} .bare=${true} .disablePositioning=${this.inline} .placement=${this.placement} .offset=${this.offset} .disableFlip=${this.disableFlip} .disableShift=${this.disableShift} data-rozie-s-9546115a><ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" data-rozie-s-9546115a>
+      ${repeat<any>(this.filteredOptions(), (opt, _idx) => opt.value, (opt, _idx) => html`<li class="${Object.entries({ "rozie-combobox-option": true, 'rozie-combobox-option--active': opt._i === this._activeIndex.value, 'rozie-combobox-option--selected': opt.value === this.value, 'rozie-combobox-option--disabled': opt.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optId(opt._i))} role="option" aria-selected=${opt.value === this.value} aria-disabled=${!!opt.disabled} @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(opt); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = opt._i; }} data-rozie-s-9546115a>
+        ${this.option !== undefined ? this.option({option: opt.option, index: opt._i, active: opt._i === this._activeIndex.value, selected: opt.value === this.value, disabled: opt.disabled}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: opt.option, index: opt._i, active: opt._i === this._activeIndex.value, selected: opt.value === this.value, disabled: opt.disabled}); } catch { return '{}'; } })()}>${rozieDisplay(opt.label)}</slot>`}
+      </li>`)}
 
-    ${this.filteredOptions().length === 0 ? html`<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>
-      ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No results</slot>`}
-    </li>` : nothing}</ul>` : nothing}${this._isOpen.value && !this.virtual && this.isGrouped() && !this.isCapped() ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" data-rozie-s-9546115a>
+      ${this.filteredOptions().length === 0 ? html`<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>
+        ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No results</slot>`}
+      </li>` : nothing}</ul></rozie-popover>` : nothing}${this._isOpen.value && !this.virtual && this.isGrouped() && !this.isCapped() ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" data-rozie-s-9546115a>
     ${repeat<any>(this.groupBlocks(), (blk, _idx) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped'), (blk, _idx) => html`<li class="rozie-combobox-group" role="group" aria-label=${rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-9546115a>
       ${blk.group ? html`<div class="rozie-combobox-group-heading" role="presentation" data-rozie-s-9546115a>
         ${this.groupHeading !== undefined ? this.groupHeading({group: blk.group}) : html`<slot name="groupHeading" data-rozie-params=${(() => { try { return JSON.stringify({group: blk.group}); } catch { return '{}'; } })()}>${rozieDisplay(blk.group.label)}</slot>`}
@@ -1339,7 +1358,7 @@ private __rozieFirstUpdateDone = false;
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'value', 'options', 'placeholder', 'disabled', 'disable-filter', 'disablefilter', 'aria-label', 'arialabel', 'id-base', 'idbase', 'inline', 'close-on-select', 'closeonselect', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'virtual', 'estimate-row-height', 'estimaterowheight', 'max-height', 'maxheight', 'groups', 'group-cap', 'groupcap']);
+    const __skip = new Set<string>(['data-rozie-ref', 'value', 'options', 'placeholder', 'disabled', 'disable-filter', 'disablefilter', 'aria-label', 'arialabel', 'id-base', 'idbase', 'inline', 'close-on-select', 'closeonselect', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'virtual', 'estimate-row-height', 'estimaterowheight', 'max-height', 'maxheight', 'groups', 'group-cap', 'groupcap', 'placement', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

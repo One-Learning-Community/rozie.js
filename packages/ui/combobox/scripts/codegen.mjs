@@ -44,7 +44,7 @@
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { buildManifest, compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { buildManifest, compile, createDefaultRegistry, lowerToIR, ProducerResolver, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
@@ -53,7 +53,6 @@ import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/combobox
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
 const SRC = resolve(ROOT, 'src/Combobox.rozie');
-const FILENAME = 'Combobox.rozie';
 
 /** Per-target leaf dir + emitted filename (build mode is informational). */
 const TARGETS = {
@@ -102,9 +101,25 @@ function copyInternal(leafSrc) {
 function main() {
   const source = readFileSync(SRC, 'utf8');
 
+  // Phase 86 (D-01): a per-compiler-instance resolver, rooted at this package
+  // (ROOT), reused across the doc-table lowerToIR() call and every per-target
+  // compile() below — the established `resolverRoot`/`resolver` option shape
+  // (packages/ui/data-table/scripts/codegen.mjs,
+  // packages/ui/command-palette/scripts/codegen.mjs). `resolverRoot`/
+  // `ResolverOptions.root` feeds ONLY the tsconfig-paths matcher — the
+  // published `@rozie-ui/popover-<target>` package itself is found by walking
+  // node_modules UPWARD from dirname(fromFile) (combobox/src), which resolves
+  // because this package declares each popover-<target> as a devDependency,
+  // so pnpm symlinks them into combobox/node_modules. `filename` MUST be the
+  // ABSOLUTE path to src/Combobox.rozie (not the bare `FILENAME` label) or
+  // `resolveProducerPath`'s node_modules walk starts from the wrong directory
+  // (process.cwd() when compile() is invoked without a resolver) and the
+  // cross-package `<components>` lookup fails with ROZ945.
+  const resolver = new ProducerResolver({ root: ROOT });
+
   // (2) parse + lower ONCE for the doc tables.
-  const { ast } = parse(source, { filename: FILENAME });
-  const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
+  const { ast } = parse(source, { filename: SRC });
+  const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry(), filename: SRC, resolver });
 
   // (2b) derive the published-primitive contract manifest (D-01/D-02/D-03) from
   // the SAME single lowered IR — the same bytes are written into all 6 leaves
@@ -130,7 +145,7 @@ function main() {
 
   // (3)(4)(5) per-target emit + vendor themes + README.
   for (const [target, cfg] of Object.entries(TARGETS)) {
-    const r = compile(source, { target, filename: FILENAME });
+    const r = compile(source, { target, filename: SRC, resolverRoot: ROOT, resolver });
     const errs = r.diagnostics.filter((d) => d.severity === 'error');
     if (errs.length) {
       throw new Error(

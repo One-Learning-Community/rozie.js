@@ -45,7 +45,7 @@ interface PopoverProps {
    */
   placement?: string;
   /**
-   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur. Drives both the gesture handlers and the ARIA role (`'hover'`/`'focus'` → tooltip, `'click'` → popover dialog).
+   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur, or `'manual'` for a composing component that drives `open` itself — every built-in gesture handler no-ops and the anchor omits `aria-haspopup`/`aria-expanded` (only a real gesture trigger claims the popup). Drives both the gesture handlers and the ARIA role (`'hover'`/`'focus'` → tooltip, `'click'` → popover dialog, `'manual'` → no anchor ARIA claim).
    */
   trigger?: string;
   /**
@@ -76,6 +76,14 @@ interface PopoverProps {
    * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
    */
   strategy?: string;
+  /**
+   * Suppress the floating panel's own chrome (background, border, border-radius, box-shadow, padding) so a composing component can supply its own instead. Off by default — the panel keeps its standard `--rozie-popover-*` chrome tokens.
+   */
+  bare?: boolean;
+  /**
+   * Render the floating panel in normal document flow instead of computing a floating position — no `computePosition` call and no `autoUpdate` tracking is ever started. For a composing component that already controls the panel's layout (e.g. an `inline` consumer) rather than a genuinely floating popover.
+   */
+  disablePositioning?: boolean;
   onChange?: (...args: any[]) => void;
   renderAnchor?: (ctx: AnchorCtx) => ReactNode;
   children?: ReactNode;
@@ -90,7 +98,7 @@ export interface PopoverHandle {
 }
 
 const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props: PopoverProps, ref): JSX.Element {
-  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string } = {
+  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean } = {
     ..._props,
     placement: _props.placement ?? 'bottom',
     trigger: _props.trigger ?? 'click',
@@ -101,10 +109,12 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     disabled: _props.disabled ?? false,
     modal: _props.modal ?? false,
     strategy: _props.strategy ?? 'absolute',
+    bare: _props.bare ?? false,
+    disablePositioning: _props.disablePositioning ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, defaultValue, onOpenChange, defaultOpen, onChange, ...rest } = _props as PopoverProps & Record<string, unknown>;
-    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void defaultValue; void onOpenChange; void defaultOpen; void onChange;
+    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, defaultValue, onOpenChange, defaultOpen, onChange, ...rest } = _props as PopoverProps & Record<string, unknown>;
+    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void defaultValue; void onOpenChange; void defaultOpen; void onChange;
     return rest;
   })();
   const anchorNode = useRef<any>(null);
@@ -212,6 +222,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   // fail the strict leaf tsc against Floating UI's `Placement` / `Middleware[]` types
   // (the cropper `let cfg = null` constructor-args idiom).
   function position() {
+    if (props.disablePositioning) return;
     if (!anchorNode.current || !floatingNode.current) return;
     const middleware = buildMiddleware({
       offset: offsetMiddleware,
@@ -255,13 +266,14 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   // initial position. Floating UI's autoUpdate keeps the position fresh on scroll/
   // resize/ancestor-layout changes and returns its own teardown.
   const startTracking = useCallback(() => {
+    if (props.disablePositioning) return;
     if (!anchorNode.current || !floatingNode.current) return;
     if (stopAutoUpdate.current) {
       stopAutoUpdate.current();
       stopAutoUpdate.current = null;
     }
     stopAutoUpdate.current = autoUpdate(anchorNode.current, floatingNode.current, position);
-  }, [position]);
+  }, [position, props.disablePositioning]);
   const stopTracking = useCallback(() => {
     if (stopAutoUpdate.current) {
       stopAutoUpdate.current();
@@ -296,6 +308,14 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     requestOpen(false);
   }, [requestOpen]);
   // ─── role helpers (plain functions; tooltip vs popover-dialog by trigger) ───────
+  // hasGestureTrigger() (D-02): whether `trigger` is one of the three REAL anchor
+  // gestures. `'manual'` (and any other unrecognized value) returns false, which
+  // gates the anchor's `aria-haspopup`/`aria-expanded` off entirely — a composing
+  // component driving `open` itself must not have its wrapper claim a popup it
+  // does not own (D-01).
+  function hasGestureTrigger() {
+    return props.trigger === 'click' || props.trigger === 'hover' || props.trigger === 'focus';
+  }
   // hover/focus triggers are tooltip-flavored; click is an interactive popover.
   function isTooltip() {
     return props.trigger === 'hover' || props.trigger === 'focus';
@@ -408,12 +428,12 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     <div {...attrs} className={clsx("rozie-popover", (attrs.className as string | undefined))} data-rozie-s-c6cf02ea="">
 
       
-      <div className={"rozie-popover-anchor"} ref={anchorEl} aria-haspopup="dialog" aria-expanded={!!open} aria-describedby={rozieAttr(isTooltip() && open ? 'rozie-popover-floating' : undefined)} onClick={($event) => { props.trigger === 'click' && onAnchorClick(); }} onPointerEnter={($event) => { props.trigger === 'hover' && onAnchorPointerEnter(); }} onPointerLeave={($event) => { props.trigger === 'hover' && onAnchorPointerLeave(); }} onFocus={($event) => { props.trigger === 'focus' && onAnchorFocus(); }} onBlur={($event) => { props.trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea="">
+      <div className={"rozie-popover-anchor"} ref={anchorEl} aria-haspopup={rozieAttr(hasGestureTrigger() ? 'dialog' : undefined)} aria-expanded={(hasGestureTrigger() ? !!open : undefined) ?? undefined} aria-describedby={rozieAttr(isTooltip() && open ? 'rozie-popover-floating' : undefined)} onClick={($event) => { props.trigger === 'click' && onAnchorClick(); }} onPointerEnter={($event) => { props.trigger === 'hover' && onAnchorPointerEnter(); }} onPointerLeave={($event) => { props.trigger === 'hover' && onAnchorPointerLeave(); }} onFocus={($event) => { props.trigger === 'focus' && onAnchorFocus(); }} onBlur={($event) => { props.trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea="">
         {(props.renderAnchor ?? props.slots?.['anchor'])?.({ open, toggle, show, hide })}
       </div>
 
       
-      {!!(open && !props.disabled) && <div className={"rozie-popover-floating"} ref={floatingEl} id="rozie-popover-floating" role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea="">
+      {!!(open && !props.disabled) && <div className={clsx("rozie-popover-floating", { "rozie-popover-floating--static": props.disablePositioning, "rozie-popover-floating--bare": props.bare })} ref={floatingEl} id="rozie-popover-floating" role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea="">
         {!!(props.arrow) && <div className={"rozie-popover-arrow"} ref={arrowEl} data-rozie-s-c6cf02ea="" />}{(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
       </div>}</div>
     </>

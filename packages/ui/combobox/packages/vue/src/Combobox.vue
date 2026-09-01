@@ -4,14 +4,14 @@
   <input ref="inputElRef" class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" :aria-expanded="!!isOpen" :aria-controls="listId()" :aria-activedescendant="(activeId()) ?? undefined" :aria-label="props.ariaLabel" :value="query" :placeholder="props.placeholder" :disabled="!!props.disabled" autocomplete="off" @input="onInput($event)" @focus="onFocus($event)" @blur="onBlur()" @keydown="onKeydown($event)" />
 
   
-  <ul v-if="isOpen && !props.virtual && !isGrouped()" class="rozie-combobox-list" :id="listId()" role="listbox">
-    <li v-for="opt in filteredOptions()" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="opt.value === value" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
-      <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === activeIndex" :selected="opt.value === value" :disabled="opt.disabled">{{ opt.label }}</slot>
-    </li>
+  <Popover v-if="isOpen && !props.virtual && !isGrouped()" trigger="manual" v-model:open="isOpen" :bare="true" :disable-positioning="props.inline" :placement="props.placement" :offset="props.offset" :disable-flip="props.disableFlip" :disable-shift="props.disableShift"><ul class="rozie-combobox-list" :id="listId()" role="listbox">
+      <li v-for="opt in filteredOptions()" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="opt.value === value" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
+        <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === activeIndex" :selected="opt.value === value" :disabled="opt.disabled">{{ opt.label }}</slot>
+      </li>
 
-    <li v-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
-      <slot name="empty" :query="query">No results</slot>
-    </li></ul><ul v-if="isOpen && !props.virtual && isGrouped() && !isCapped()" class="rozie-combobox-list" :id="listId()" role="listbox">
+      <li v-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
+        <slot name="empty" :query="query">No results</slot>
+      </li></ul></Popover><ul v-if="isOpen && !props.virtual && isGrouped() && !isCapped()" class="rozie-combobox-list" :id="listId()" role="listbox">
     <li v-for="blk in groupBlocks()" :key="'grp-' + (blk.group ? blk.group.id : '_ungrouped')" class="rozie-combobox-group" role="group" :aria-label="blk.group ? blk.group.label : undefined">
       <div v-if="blk.group" class="rozie-combobox-group-heading" role="presentation">
         <slot name="groupHeading" :group="blk.group">{{ blk.group.label }}</slot>
@@ -52,6 +52,8 @@
 </template>
 
 <script setup lang="ts">
+import Popover from '@rozie-ui/popover-vue';
+
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
@@ -120,8 +122,24 @@ const props = withDefaults(
      * Cap each native section group to its first `groupCap` results, adding a keyboard-reachable '+N more' row that expands that group IN PLACE when activated. `0`/absent = uncapped (default). Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on.
      */
     groupCap?: number;
+    /**
+     * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` matches the pre-Phase-86 static popup alignment (flush with the control's left edge). Ignored when `inline` is set.
+     */
+    placement?: string;
+    /**
+     * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4` preserves the pre-Phase-86 resting gap (`--rozie-combobox-list-gap`). Ignored when `inline` is set.
+     */
+    offset?: number;
+    /**
+     * Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup flips above the control when it would overflow the viewport below; set this to keep it pinned to `placement` regardless. Ignored when `inline` is set.
+     */
+    disableFlip?: boolean;
+    /**
+     * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
+     */
+    disableShift?: boolean;
   }>(),
-  { options: () => [], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: () => [], groupCap: 0 }
+  { options: () => [], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: () => [], groupCap: 0, placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false }
 );
 
 /**
@@ -1067,11 +1085,6 @@ defineExpose({ focus, clear, seedQuery, pinOpen });
   background: var(--rozie-combobox-disabled-bg, rgba(0, 0, 0, 0.04));
 }
 .rozie-combobox-list {
-  position: absolute;
-  z-index: var(--rozie-combobox-list-z, 50);
-  top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
-  left: 0;
-  right: 0;
   margin: 0;
   padding: var(--rozie-combobox-list-padding, 0.25rem);
   list-style: none;
@@ -1081,6 +1094,13 @@ defineExpose({ focus, clear, seedQuery, pinOpen });
   border: var(--rozie-combobox-border-width, 1px) solid var(--rozie-combobox-list-border-color, rgba(0, 0, 0, 0.15));
   border-radius: var(--rozie-combobox-radius, 0.5rem);
   box-shadow: var(--rozie-combobox-list-shadow, 0 10px 24px rgba(0, 0, 0, 0.16));
+}
+.rozie-combobox > .rozie-combobox-list {
+  position: absolute;
+  z-index: var(--rozie-combobox-list-z, 50);
+  top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
+  left: 0;
+  right: 0;
 }
 .rozie-combobox-option {
   padding: var(--rozie-combobox-option-padding, 0.4rem 0.6rem);

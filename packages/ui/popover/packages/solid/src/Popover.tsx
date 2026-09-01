@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { Show, children, createEffect, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, createOutsideClick, rozieAttr } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, createOutsideClick, rozieAttr, rozieClass } from '@rozie/runtime-solid';
 // The `offset` AND `arrow` middleware factories are ALIASED on import: both are
 // ALSO author PROP names (`offset`, `arrow`). A bare `offset`/`arrow` shorthand in
 // the buildMiddleware factories object resolves to the PROP — on Vue/Svelte the
@@ -50,6 +50,20 @@ __rozieInjectStyle('Popover-c6cf02ea', `.rozie-popover[data-rozie-s-c6cf02ea] {
   box-shadow: var(--rozie-popover-shadow, 0 8px 24px rgba(0, 0, 0, 0.12));
   padding: var(--rozie-popover-padding, 8px 12px);
 }
+.rozie-popover-floating--static[data-rozie-s-c6cf02ea] {
+  position: static;
+  left: auto;
+  top: auto;
+  width: auto;
+  z-index: auto;
+}
+.rozie-popover-floating--bare[data-rozie-s-c6cf02ea] {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
 .rozie-popover-arrow[data-rozie-s-c6cf02ea] {
   position: absolute;
   width: var(--rozie-popover-arrow-size, 8px);
@@ -73,7 +87,7 @@ interface PopoverProps {
    */
   placement?: string;
   /**
-   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur. Drives both the gesture handlers and the ARIA role (`'hover'`/`'focus'` → tooltip, `'click'` → popover dialog).
+   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur, or `'manual'` for a composing component that drives `open` itself — every built-in gesture handler no-ops and the anchor omits `aria-haspopup`/`aria-expanded` (only a real gesture trigger claims the popup). Drives both the gesture handlers and the ARIA role (`'hover'`/`'focus'` → tooltip, `'click'` → popover dialog, `'manual'` → no anchor ARIA claim).
    */
   trigger?: string;
   /**
@@ -104,6 +118,14 @@ interface PopoverProps {
    * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
    */
   strategy?: string;
+  /**
+   * Suppress the floating panel's own chrome (background, border, border-radius, box-shadow, padding) so a composing component can supply its own instead. Off by default — the panel keeps its standard `--rozie-popover-*` chrome tokens.
+   */
+  bare?: boolean;
+  /**
+   * Render the floating panel in normal document flow instead of computing a floating position — no `computePosition` call and no `autoUpdate` tracking is ever started. For a composing component that already controls the panel's layout (e.g. an `inline` consumer) rather than a genuinely floating popover.
+   */
+  disablePositioning?: boolean;
   onChange?: (...args: unknown[]) => void;
   anchorSlot?: (ctx: AnchorSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
@@ -120,8 +142,8 @@ export interface PopoverHandle {
 }
 
 export default function Popover(_props: PopoverProps): JSX.Element {
-  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute' }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'children', 'ref', 'onChange']);
+  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false }, _props);
+  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disablePositioning', 'children', 'ref', 'onChange']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ show, hide, toggle, reposition }); });
 
@@ -261,6 +283,7 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   // fail the strict leaf tsc against Floating UI's `Placement` / `Middleware[]` types
   // (the cropper `let cfg = null` constructor-args idiom).
   function position() {
+    if (local.disablePositioning) return;
     if (!anchorNode || !floatingNode) return;
     const middleware = buildMiddleware({
       offset: offsetMiddleware,
@@ -304,6 +327,7 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   // initial position. Floating UI's autoUpdate keeps the position fresh on scroll/
   // resize/ancestor-layout changes and returns its own teardown.
   function startTracking() {
+    if (local.disablePositioning) return;
     if (!anchorNode || !floatingNode) return;
     if (stopAutoUpdate) {
       stopAutoUpdate();
@@ -347,6 +371,14 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   }
 
   // ─── role helpers (plain functions; tooltip vs popover-dialog by trigger) ───────
+  // hasGestureTrigger() (D-02): whether `trigger` is one of the three REAL anchor
+  // gestures. `'manual'` (and any other unrecognized value) returns false, which
+  // gates the anchor's `aria-haspopup`/`aria-expanded` off entirely — a composing
+  // component driving `open` itself must not have its wrapper claim a popup it
+  // does not own (D-01).
+  function hasGestureTrigger() {
+    return local.trigger === 'click' || local.trigger === 'hover' || local.trigger === 'focus';
+  }
   // hover/focus triggers are tooltip-flavored; click is an interactive popover.
   function isTooltip() {
     return local.trigger === 'hover' || local.trigger === 'focus';
@@ -403,12 +435,12 @@ export default function Popover(_props: PopoverProps): JSX.Element {
     <div {...attrs} class={"rozie-popover" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-c6cf02ea="">
 
       
-      <div aria-haspopup="dialog" aria-expanded={!!open()} aria-describedby={rozieAttr(isTooltip() && open() ? 'rozie-popover-floating' : null)} class={"rozie-popover-anchor"} ref={(el) => { anchorElRef = el as HTMLElement; }} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'click' && onAnchorClick(); }} onPointerEnter={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'hover' && onAnchorPointerEnter(); }} onPointerLeave={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'hover' && onAnchorPointerLeave(); }} onFocusIn={($event: FocusEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'focus' && onAnchorFocus(); }} onFocusOut={($event: FocusEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea="">
+      <div aria-haspopup={rozieAttr(hasGestureTrigger() ? 'dialog' : null)} aria-expanded={(hasGestureTrigger() ? !!open() : null) ?? undefined} aria-describedby={rozieAttr(isTooltip() && open() ? 'rozie-popover-floating' : null)} class={"rozie-popover-anchor"} ref={(el) => { anchorElRef = el as HTMLElement; }} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'click' && onAnchorClick(); }} onPointerEnter={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'hover' && onAnchorPointerEnter(); }} onPointerLeave={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'hover' && onAnchorPointerLeave(); }} onFocusIn={($event: FocusEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'focus' && onAnchorFocus(); }} onFocusOut={($event: FocusEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea="">
         {(_props.anchorSlot ?? _props.slots?.['anchor'])?.({ open: open(), toggle, show, hide })}
       </div>
 
       
-      {<Show when={open() && !local.disabled}><div class={"rozie-popover-floating"} ref={(el) => { floatingElRef = el as HTMLElement; }} id="rozie-popover-floating" role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea="">
+      {<Show when={open() && !local.disabled}><div class={"rozie-popover-floating" + " " + rozieClass({ 'rozie-popover-floating--static': local.disablePositioning, 'rozie-popover-floating--bare': local.bare })} ref={(el) => { floatingElRef = el as HTMLElement; }} id="rozie-popover-floating" role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea="">
         {<Show when={local.arrow}><div class={"rozie-popover-arrow"} ref={(el) => { arrowElRef = el as HTMLElement; }} data-rozie-s-c6cf02ea="" /></Show>}{resolved()}
       </div></Show>}</div>
     </>

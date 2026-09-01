@@ -20,7 +20,7 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'Popover',
-  props: ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled'],
+  props: ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disablePositioning'],
   models: ['open'],
   emits: ['change'],
   slots: ['', 'anchor'],
