@@ -1,0 +1,100 @@
+<!--
+  ComboboxFloatingDemo.rozie — content-STABLE flipped-popup screenshot fixture for
+  the pure-Rozie Combobox (Phase 86 R2, plan 86-03).
+
+  The one thing a happy-dom mount-and-drive behavioral test (floating-popover.
+  behavior.test.ts) cannot prove: an actual VIEWPORT-EDGE flip, since happy-dom has
+  no layout engine. This demo exists ONLY to make that flip a deterministic pixel
+  cell — never extend it for behavior (mirrors ComboboxScreenshotDemo.rozie's own
+  "never bolt behavior onto the screenshot cell" discipline, inverted).
+
+  Made deterministic by:
+    1. A tall (680px), explicitly-sized root box with the control pushed near its
+       BOTTOM via `padding-top`. The Playwright viewport pinned for this suite is
+       1280×720 (playwright.config.ts) and `rozie-mount` starts at the very top of
+       the page (no chrome above it), so an input sitting ~600-640px down leaves
+       only ~80-120px of viewport space below it — less than the four-option
+       popup's rendered height, so Floating UI's `flip` middleware (the composed
+       @rozie-ui/popover leaf's default) relocates the popup ABOVE the input.
+    2. The root box's OWN explicit height (not auto-sized from flow content) is
+       what keeps the flipped-up popup inside `[data-testid="rozie-mount"]`'s
+       captured bounding box: `position: absolute` content does not grow an
+       ancestor's auto height, so if the root box were only as tall as the input
+       itself, the popup — rendered visually ABOVE that box's top edge — would fall
+       OUTSIDE Playwright's element-screenshot crop region and never be captured.
+    3. A FIXED four-option list (apple/banana/cherry/date — the same set
+       ComboboxScreenshotDemo.rozie uses) with NO pre-selected value, so the
+       popup's content is identical across all six targets and every re-run.
+    4. The popup is opened DETERMINISTICALLY at mount via the composed Combobox's
+       own `focus` handle — `$refs.floatingCombobox.focus()`, deferred one
+       macrotask (setTimeout(0)) past `$onMount` for the SAME reason
+       ToasterScreenshotDemo.rozie defers its `$refs.toaster.show()` call: a
+       child's $expose handle is not yet registered when a PARENT's $onMount
+       runs synchronously on Solid (children-before-parent mount + ref-readiness
+       timing) — a synchronous call there no-ops and the popup never opens. A
+       screenshot cell cannot click/focus from the spec side the way a
+       behavioral cell would, so it must self-open on mount.
+
+  One .rozie source compiles to six per-framework screenshot consumers; the Linux
+  PNG baseline is generated separately in pinned Linux Docker (NOT here —
+  feedback_vr_linux_baselines). Until it lands the matrix cell auto-fixmes on
+  `baselineExists()`.
+-->
+
+<rozie name="ComboboxFloatingDemo">
+
+<components>
+{
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+
+<data>
+{
+  value: null,
+}
+</data>
+
+<script>
+const OPTIONS = [
+  { value: 'apple', label: 'Apple' },
+  { value: 'banana', label: 'Banana' },
+  { value: 'cherry', label: 'Cherry' },
+  { value: 'date', label: 'Date' },
+]
+
+// See the header comment (point 4) for why this is deferred one macrotask past
+// $onMount rather than called synchronously.
+$onMount(() => {
+  setTimeout(() => {
+    $refs.floatingCombobox.focus()
+  }, 0)
+})
+</script>
+
+<template>
+<div class="combobox-floating-demo">
+  <Combobox
+    ref="floatingCombobox"
+    r-model:value="$data.value"
+    :options="OPTIONS"
+    placeholder="Search fruit…"
+    ariaLabel="Fruit"
+    idBase="floating-combobox"
+  />
+</div>
+</template>
+
+<style>
+.combobox-floating-demo {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  width: 360px;
+  height: 680px;
+  padding: 1rem;
+  padding-top: 600px;
+}
+</style>
+
+</rozie>

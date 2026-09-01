@@ -683,6 +683,16 @@ export const EXAMPLES = [
   // only (DOM assert, NOT in matrix.spec.ts — no pixel baseline); lives under
   // examples/demos/ (same Angular cross-tree coverage as ComboboxVirtual above).
   'ComboboxVirtualFlip',
+  // Phase 86 R2 (plan 86-03) — the flipped-popup PIXEL cell (loader →
+  // examples/demos/ComboboxFloatingDemo.rozie, importing packages/ui/combobox/src/
+  // Combobox.rozie): a tall, deterministic fixture that opens the popup at mount
+  // (via the composed Combobox's own `focus` handle) with the control pushed near
+  // the viewport's bottom edge, forcing the composed @rozie-ui/popover leaf's
+  // `flip` middleware to relocate the popup ABOVE the input. Unlike
+  // ComboboxVirtualFlip above, this cell IS in combobox.spec.ts's own toHaveScreenshot
+  // assertion (not matrix.spec.ts) — see combobox.spec.ts for the per-target loop.
+  // Lives under examples/demos/ (same Angular cross-tree coverage as ComboboxVirtual).
+  'ComboboxFloating',
   // @rozie-ui/slider (pure-Rozie WAI-ARIA slider/range, NO engine — the engine IS
   // the native <input type="range">) — the four BEHAVIORAL cells (loaders →
   // examples/demos/Slider{Behavior,Range,Vertical,Marks}Demo.rozie, each importing
@@ -1509,6 +1519,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // combobox-virtual-reactivity phase — '-demo' appended on Lit → tag
   // 'rozie-combobox-virtual-flip-demo' = kebab of ComboboxVirtualFlipDemo.
   ComboboxVirtualFlip: 'rozie-combobox-virtual-flip',
+  // Phase 86 R2 (plan 86-03) — '-demo' appended on Lit → tag
+  // 'rozie-combobox-floating-demo' = kebab of ComboboxFloatingDemo.
+  ComboboxFloating: 'rozie-combobox-floating',
   // @rozie-ui/slider — '-demo' appended on Lit → tags 'rozie-slider-behavior-demo'
   // etc. = kebab of Slider*Demo (the wrapper component is name="Slider" →
   // 'rozie-slider'). Behavioral-only, no screenshot cell.
@@ -2004,6 +2017,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // r-model:value + :virtual internally (not parent-supplied), so no MODEL_PROPS entry.
   // No parent props needed.
   ComboboxVirtualFlip: {},
+  // Phase 86 R2 (plan 86-03) — ComboboxFloatingDemo is self-contained: it seeds its
+  // own fixed 4-option list in <script> + value:null in <data>, binds r-model:value
+  // internally, and opens itself via $refs.floatingCombobox.focus() at mount (not
+  // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
+  ComboboxFloating: {},
   // @rozie-ui/slider — every Slider*Demo is self-contained: it seeds its own value
   // in <data> and binds r-model:value internally (not parent-supplied), so no
   // MODEL_PROPS entry. No parent props needed.
