@@ -75,13 +75,6 @@ __rozieInjectStyle('Combobox-9546115a', `.rozie-combobox[data-rozie-s-9546115a] 
   border-radius: var(--rozie-combobox-radius, 0.5rem);
   box-shadow: var(--rozie-combobox-list-shadow, 0 10px 24px rgba(0, 0, 0, 0.16));
 }
-.rozie-combobox[data-rozie-s-9546115a] > .rozie-combobox-list[data-rozie-s-9546115a] {
-  position: absolute;
-  z-index: var(--rozie-combobox-list-z, 50);
-  top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
-  left: 0;
-  right: 0;
-}
 .rozie-combobox-option[data-rozie-s-9546115a] {
   padding: var(--rozie-combobox-option-padding, 0.4rem 0.6rem);
   border-radius: var(--rozie-combobox-option-radius, 0.375rem);
@@ -132,7 +125,11 @@ __rozieInjectStyle('Combobox-9546115a', `.rozie-combobox[data-rozie-s-9546115a] 
   width: 100%;
 }
 .rozie-combobox--inline[data-rozie-s-9546115a] .rozie-combobox-list[data-rozie-s-9546115a] {
-  position: static;
+  /* \`position: static\` dropped (plan 86-03): \`.rozie-combobox-list\` carries no
+     absolute positioning to undo anymore — that geometry lives on popover's
+     \`.rozie-popover-floating\`, and \`:disable-positioning="$props.inline"\`
+     (D-09) already renders it as a static pass-through via popover's own
+     \`.rozie-popover-floating--static\` rule. */
   margin-top: var(--rozie-combobox-list-gap, 0.25rem);
   border: none;
   border-radius: 0;
@@ -1172,50 +1169,52 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
       <input type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen()} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(local.ariaLabel)} autocomplete="off" ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-combobox-input"} value={query()} placeholder={local.placeholder} disabled={!!local.disabled} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onFocus={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onFocus($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} data-rozie-s-9546115a="" />
 
       
-      {<Show when={isOpen() && !local.virtual && !isGrouped()}><Popover trigger="manual" open={isOpen()} onOpenChange={setIsOpen} bare={true} disablePositioning={local.inline} placement={local.placement} offset={local.offset} disableFlip={local.disableFlip} disableShift={local.disableShift} data-rozie-s-9546115a=""><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+      {<Show when={isOpen() || local.virtual}><Popover trigger="manual" open={isOpen()} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={local.virtual} disablePositioning={local.inline} placement={local.placement} offset={local.offset} disableFlip={local.disableFlip} disableShift={local.disableShift} data-rozie-s-9546115a="">
+        
+        {<Show when={isOpen() && !local.virtual && !isGrouped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
           <Key each={filteredOptions() as readonly any[]} by={(opt) => opt.value}>{(opt) => <li role="option" aria-selected={opt().value === value()} aria-disabled={!!opt().disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': opt()._i === activeIndex(), 'rozie-combobox-option--selected': opt().value === value(), 'rozie-combobox-option--disabled': opt().disabled })} id={rozieAttr(optId(opt()._i))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(opt()); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(opt()._i); }} data-rozie-s-9546115a="">
             {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt().option, index: opt()._i, active: opt()._i === activeIndex(), selected: opt().value === value(), disabled: opt().disabled }) ?? rozieDisplay(opt().label)}
           </li>}</Key>
 
           {<Show when={filteredOptions().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
             {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
-          </li></Show>}</ul></Popover></Show>}{<Show when={isOpen() && !local.virtual && isGrouped() && !isCapped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
-        <Key each={groupBlocks() as readonly any[]} by={(blk) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped')}>{(blk) => <li class={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-9546115a="">
-          {<Show when={blk().group}><div class={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
-            {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ group: blk().group }) ?? rozieDisplay(blk().group.label)}
-          </div></Show>}<Key each={blk().items as readonly any[]} by={(opt) => opt.value}>{(opt) => <div role="option" aria-selected={opt().value === value()} aria-disabled={!!opt().disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': opt()._i === activeIndex(), 'rozie-combobox-option--selected': opt().value === value(), 'rozie-combobox-option--disabled': opt().disabled })} id={rozieAttr(optId(opt()._i))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { $event.preventDefault(); selectOption(opt()); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setActiveIndex(opt()._i); }} data-rozie-s-9546115a="">
-            {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt().option, index: opt()._i, active: opt()._i === activeIndex(), selected: opt().value === value(), disabled: opt().disabled }) ?? rozieDisplay(opt().label)}
-          </div>}</Key>
-        </li>}</Key>
+          </li></Show>}</ul></Show>}{<Show when={isOpen() && !local.virtual && isGrouped() && !isCapped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+          <Key each={groupBlocks() as readonly any[]} by={(blk) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped')}>{(blk) => <li class={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-9546115a="">
+            {<Show when={blk().group}><div class={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
+              {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ group: blk().group }) ?? rozieDisplay(blk().group.label)}
+            </div></Show>}<Key each={blk().items as readonly any[]} by={(opt) => opt.value}>{(opt) => <div role="option" aria-selected={opt().value === value()} aria-disabled={!!opt().disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': opt()._i === activeIndex(), 'rozie-combobox-option--selected': opt().value === value(), 'rozie-combobox-option--disabled': opt().disabled })} id={rozieAttr(optId(opt()._i))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { $event.preventDefault(); selectOption(opt()); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setActiveIndex(opt()._i); }} data-rozie-s-9546115a="">
+              {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt().option, index: opt()._i, active: opt()._i === activeIndex(), selected: opt().value === value(), disabled: opt().disabled }) ?? rozieDisplay(opt().label)}
+            </div>}</Key>
+          </li>}</Key>
 
-        {<Show when={groupBlocks().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
-          {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
-        </li></Show>}</ul></Show>}{<Show when={isOpen() && !local.virtual && isCapped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
-        <Key each={cappedBlocks() as readonly any[]} by={(blk) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped')}>{(blk) => <li class={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-9546115a="">
-          {<Show when={blk().group}><div class={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
-            {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ group: blk().group }) ?? rozieDisplay(blk().group.label)}
-          </div></Show>}<Key each={blk().items as readonly any[]} by={(opt) => opt.value}>{(opt) => <div role="option" aria-selected={opt().value === value()} aria-disabled={!!opt().disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': opt()._i === activeIndex(), 'rozie-combobox-option--selected': opt().value === value(), 'rozie-combobox-option--disabled': opt().disabled })} id={rozieAttr(optId(opt()._i))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { $event.preventDefault(); selectOption(opt()); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setActiveIndex(opt()._i); }} data-rozie-s-9546115a="">
-            {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt().option, index: opt()._i, active: opt()._i === activeIndex(), selected: opt().value === value(), disabled: opt().disabled }) ?? rozieDisplay(opt().label)}
-          </div>}</Key>
+          {<Show when={groupBlocks().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
+          </li></Show>}</ul></Show>}{<Show when={isOpen() && !local.virtual && isCapped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+          <Key each={cappedBlocks() as readonly any[]} by={(blk) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped')}>{(blk) => <li class={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-9546115a="">
+            {<Show when={blk().group}><div class={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
+              {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ group: blk().group }) ?? rozieDisplay(blk().group.label)}
+            </div></Show>}<Key each={blk().items as readonly any[]} by={(opt) => opt.value}>{(opt) => <div role="option" aria-selected={opt().value === value()} aria-disabled={!!opt().disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': opt()._i === activeIndex(), 'rozie-combobox-option--selected': opt().value === value(), 'rozie-combobox-option--disabled': opt().disabled })} id={rozieAttr(optId(opt()._i))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { $event.preventDefault(); selectOption(opt()); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setActiveIndex(opt()._i); }} data-rozie-s-9546115a="">
+              {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt().option, index: opt()._i, active: opt()._i === activeIndex(), selected: opt().value === value(), disabled: opt().disabled }) ?? rozieDisplay(opt().label)}
+            </div>}</Key>
 
-          {<Show when={blk().more}><div role="option" class={"rozie-combobox-option rozie-combobox-more" + " " + rozieClass({ 'rozie-combobox-option--active': blk().more._i === activeIndex() })} id={rozieAttr(optId(blk().more._i))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { $event.preventDefault(); selectOption(blk().more); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setActiveIndex(blk().more._i); }} data-rozie-s-9546115a="">
-            {(_props.groupMoreSlot ?? _props.slots?.['groupMore'])?.({ group: blk().group, hidden: blk().more.hidden, expand: blk().more.expand }) ?? <>+{rozieDisplay(blk().more.hidden)} more</>}
-          </div></Show>}</li>}</Key>
+            {<Show when={blk().more}><div role="option" class={"rozie-combobox-option rozie-combobox-more" + " " + rozieClass({ 'rozie-combobox-option--active': blk().more._i === activeIndex() })} id={rozieAttr(optId(blk().more._i))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { $event.preventDefault(); selectOption(blk().more); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setActiveIndex(blk().more._i); }} data-rozie-s-9546115a="">
+              {(_props.groupMoreSlot ?? _props.slots?.['groupMore'])?.({ group: blk().group, hidden: blk().more.hidden, expand: blk().more.expand }) ?? <>+{rozieDisplay(blk().more.hidden)} more</>}
+            </div></Show>}</li>}</Key>
 
-        {<Show when={cappedBlocks().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
-          {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
-        </li></Show>}</ul></Show>}{<Show when={local.virtual}><ul class={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" style={parseInlineStyle((isOpen() ? '' : 'display:none;') + (local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + local.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a="">
-        <li class={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a="" />
+          {<Show when={cappedBlocks().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
+          </li></Show>}</ul></Show>}{<Show when={local.virtual}><ul class={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" style={parseInlineStyle((isOpen() ? '' : 'display:none;') + (local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + local.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a="">
+          <li class={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a="" />
 
-        <Key each={windowedView() as readonly any[]} by={(wr) => wr.row.id}>{(wr) => <li data-index={rozieAttr(wr().vi.index)} role="option" aria-selected={wr().row.value === value()} aria-disabled={!!wr().row.disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': wr().vi.index === activeIndex(), 'rozie-combobox-option--selected': wr().row.value === value(), 'rozie-combobox-option--disabled': wr().row.disabled })} id={rozieAttr(optId(wr().vi.index))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(wr().row); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(wr().vi.index); }} data-rozie-s-9546115a="">
-          {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: wr().row.option, index: wr().vi.index, active: wr().vi.index === activeIndex(), selected: wr().row.value === value(), disabled: wr().row.disabled }) ?? rozieDisplay(wr().row.label)}
-        </li>}</Key>
+          <Key each={windowedView() as readonly any[]} by={(wr) => wr.row.id}>{(wr) => <li data-index={rozieAttr(wr().vi.index)} role="option" aria-selected={wr().row.value === value()} aria-disabled={!!wr().row.disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': wr().vi.index === activeIndex(), 'rozie-combobox-option--selected': wr().row.value === value(), 'rozie-combobox-option--disabled': wr().row.disabled })} id={rozieAttr(optId(wr().vi.index))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(wr().row); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(wr().vi.index); }} data-rozie-s-9546115a="">
+            {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: wr().row.option, index: wr().vi.index, active: wr().vi.index === activeIndex(), selected: wr().row.value === value(), disabled: wr().row.disabled }) ?? rozieDisplay(wr().row.label)}
+          </li>}</Key>
 
-        <li class={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padBottom() + 'px')} data-rozie-s-9546115a="" />
+          <li class={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padBottom() + 'px')} data-rozie-s-9546115a="" />
 
-        {<Show when={windowSource().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
-          {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
-        </li></Show>}</ul></Show>}</div>
+          {<Show when={windowSource().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
+          </li></Show>}</ul></Show>}</Popover></Show>}</div>
     </>
   );
 }

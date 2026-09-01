@@ -58,8 +58,11 @@ interface GroupMoreCtx {
       <input #inputEl class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" [attr.aria-expanded]="!!isOpen()" [attr.aria-controls]="rozieAttr(listId())" [attr.aria-activedescendant]="rozieAttr(activeId())" [attr.aria-label]="rozieAttr(ariaLabel())" [value]="query()" [placeholder]="placeholder()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" autocomplete="off" (input)="onInput($event)" (focus)="onFocus($event)" (blur)="onBlur()" (keydown)="onKeydown($event)" />
 
       
-      @if (isOpen() && !virtual() && !isGrouped()) {
-    <rozie-popover trigger="manual" [open]="isOpen()" (openChange)="isOpen.set($event)" [bare]="true" [disablePositioning]="inline()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()"><ng-template #defaultSlot><ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
+      @if (isOpen() || virtual()) {
+    <rozie-popover trigger="manual" [open]="isOpen()" (openChange)="isOpen.set($event)" [bare]="true" [matchWidth]="true" [keepMounted]="virtual()" [disablePositioning]="inline()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()"><ng-template #defaultSlot>
+        
+        @if (isOpen() && !virtual() && !isGrouped()) {
+    <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
           @for (opt of filteredOptions(); track opt.value) {
     <li class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': opt._i === activeIndex(), 'rozie-combobox-option--selected': opt.value === value(), 'rozie-combobox-option--disabled': opt.disabled }" [attr.id]="rozieAttr(optId(opt._i))" role="option" [attr.aria-selected]="opt.value === value()" [attr.aria-disabled]="!!opt.disabled" (mousedown)="$event.preventDefault(); selectOption(opt)" (mouseenter)="activeIndex.set(opt._i)">
             @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
@@ -78,107 +81,108 @@ interface GroupMoreCtx {
     No results
     }
           </li>
-    }</ul></ng-template></rozie-popover>
+    }</ul>
     }@if (isOpen() && !virtual() && isGrouped() && !isCapped()) {
     <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
-        @for (blk of groupBlocks(); track 'grp-' + (blk.group ? blk.group.id : '_ungrouped')) {
+          @for (blk of groupBlocks(); track 'grp-' + (blk.group ? blk.group.id : '_ungrouped')) {
     <li class="rozie-combobox-group" role="group" [attr.aria-label]="rozieAttr(blk.group ? blk.group.label : null)">
-          @if (blk.group) {
+            @if (blk.group) {
     <div class="rozie-combobox-group-heading" role="presentation">
-            @if ((groupHeadingTpl ?? __rozieFillMap()['groupHeading'] ?? templates()?.['groupHeading'])) {
+              @if ((groupHeadingTpl ?? __rozieFillMap()['groupHeading'] ?? templates()?.['groupHeading'])) {
     <ng-container *ngTemplateOutlet="(groupHeadingTpl ?? __rozieFillMap()['groupHeading'] ?? templates()?.['groupHeading']); context: { $implicit: { group: blk.group }, group: blk.group }" />
     } @else {
     {{ rozieDisplay(blk.group.label) }}
     }
-          </div>
+            </div>
     }@for (opt of blk.items; track opt.value) {
     <div class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': opt._i === activeIndex(), 'rozie-combobox-option--selected': opt.value === value(), 'rozie-combobox-option--disabled': opt.disabled }" [attr.id]="rozieAttr(optId(opt._i))" role="option" [attr.aria-selected]="opt.value === value()" [attr.aria-disabled]="!!opt.disabled" (mousedown)="$event.preventDefault(); selectOption(opt)" (mouseenter)="activeIndex.set(opt._i)">
-            @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
+              @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option']); context: { $implicit: { option: opt.option, index: opt._i, active: opt._i === activeIndex(), selected: opt.value === value(), disabled: opt.disabled }, option: opt.option, index: opt._i, active: opt._i === activeIndex(), selected: opt.value === value(), disabled: opt.disabled }" />
     } @else {
     {{ rozieDisplay(opt.label) }}
     }
-          </div>
+            </div>
     }
-        </li>
+          </li>
     }
 
-        @if (groupBlocks().length === 0) {
+          @if (groupBlocks().length === 0) {
     <li class="rozie-combobox-empty" role="presentation">
-          @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
+            @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     No results
     }
-        </li>
+          </li>
     }</ul>
     }@if (isOpen() && !virtual() && isCapped()) {
     <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
-        @for (blk of cappedBlocks(); track 'grp-' + (blk.group ? blk.group.id : '_ungrouped')) {
+          @for (blk of cappedBlocks(); track 'grp-' + (blk.group ? blk.group.id : '_ungrouped')) {
     <li class="rozie-combobox-group" role="group" [attr.aria-label]="rozieAttr(blk.group ? blk.group.label : null)">
-          @if (blk.group) {
+            @if (blk.group) {
     <div class="rozie-combobox-group-heading" role="presentation">
-            @if ((groupHeadingTpl ?? __rozieFillMap()['groupHeading'] ?? templates()?.['groupHeading'])) {
+              @if ((groupHeadingTpl ?? __rozieFillMap()['groupHeading'] ?? templates()?.['groupHeading'])) {
     <ng-container *ngTemplateOutlet="(groupHeadingTpl ?? __rozieFillMap()['groupHeading'] ?? templates()?.['groupHeading']); context: { $implicit: { group: blk.group }, group: blk.group }" />
     } @else {
     {{ rozieDisplay(blk.group.label) }}
     }
-          </div>
+            </div>
     }@for (opt of blk.items; track opt.value) {
     <div class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': opt._i === activeIndex(), 'rozie-combobox-option--selected': opt.value === value(), 'rozie-combobox-option--disabled': opt.disabled }" [attr.id]="rozieAttr(optId(opt._i))" role="option" [attr.aria-selected]="opt.value === value()" [attr.aria-disabled]="!!opt.disabled" (mousedown)="$event.preventDefault(); selectOption(opt)" (mouseenter)="activeIndex.set(opt._i)">
-            @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
+              @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option']); context: { $implicit: { option: opt.option, index: opt._i, active: opt._i === activeIndex(), selected: opt.value === value(), disabled: opt.disabled }, option: opt.option, index: opt._i, active: opt._i === activeIndex(), selected: opt.value === value(), disabled: opt.disabled }" />
     } @else {
     {{ rozieDisplay(opt.label) }}
     }
-          </div>
+            </div>
     }
 
-          @if (blk.more) {
+            @if (blk.more) {
     <div class="rozie-combobox-option rozie-combobox-more" [ngClass]="{ 'rozie-combobox-option--active': blk.more._i === activeIndex() }" [attr.id]="rozieAttr(optId(blk.more._i))" role="option" (mousedown)="$event.preventDefault(); selectOption(blk.more)" (mouseenter)="activeIndex.set(blk.more._i)">
-            @if ((groupMoreTpl ?? __rozieFillMap()['groupMore'] ?? templates()?.['groupMore'])) {
+              @if ((groupMoreTpl ?? __rozieFillMap()['groupMore'] ?? templates()?.['groupMore'])) {
     <ng-container *ngTemplateOutlet="(groupMoreTpl ?? __rozieFillMap()['groupMore'] ?? templates()?.['groupMore']); context: { $implicit: { group: blk.group, hidden: blk.more.hidden, expand: blk.more.expand }, group: blk.group, hidden: blk.more.hidden, expand: blk.more.expand }" />
     } @else {
     +{{ rozieDisplay(blk.more.hidden) }} more
     }
-          </div>
+            </div>
     }</li>
     }
 
-        @if (cappedBlocks().length === 0) {
+          @if (cappedBlocks().length === 0) {
     <li class="rozie-combobox-empty" role="presentation">
-          @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
+            @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     No results
     }
-        </li>
+          </li>
     }</ul>
     }@if (virtual()) {
     <ul class="rozie-combobox-list rozie-combobox-list--virtual" [attr.id]="rozieAttr(listId())" role="listbox" [attr.style]="__style">
-        <li class="rozie-combobox-spacer" aria-hidden="true" [attr.style]="'height:' + padTop() + 'px'"></li>
+          <li class="rozie-combobox-spacer" aria-hidden="true" [attr.style]="'height:' + padTop() + 'px'"></li>
 
-        @for (wr of windowedView(); track wr.row.id) {
+          @for (wr of windowedView(); track wr.row.id) {
     <li class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': wr.vi.index === activeIndex(), 'rozie-combobox-option--selected': wr.row.value === value(), 'rozie-combobox-option--disabled': wr.row.disabled }" [attr.id]="rozieAttr(optId(wr.vi.index))" [attr.data-index]="rozieAttr(wr.vi.index)" role="option" [attr.aria-selected]="wr.row.value === value()" [attr.aria-disabled]="!!wr.row.disabled" (mousedown)="$event.preventDefault(); selectOption(wr.row)" (mouseenter)="activeIndex.set(wr.vi.index)">
-          @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
+            @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option']); context: { $implicit: { option: wr.row.option, index: wr.vi.index, active: wr.vi.index === activeIndex(), selected: wr.row.value === value(), disabled: wr.row.disabled }, option: wr.row.option, index: wr.vi.index, active: wr.vi.index === activeIndex(), selected: wr.row.value === value(), disabled: wr.row.disabled }" />
     } @else {
     {{ rozieDisplay(wr.row.label) }}
     }
-        </li>
+          </li>
     }
 
-        <li class="rozie-combobox-spacer" aria-hidden="true" [attr.style]="'height:' + padBottom() + 'px'"></li>
+          <li class="rozie-combobox-spacer" aria-hidden="true" [attr.style]="'height:' + padBottom() + 'px'"></li>
 
-        @if (windowSource().length === 0) {
+          @if (windowSource().length === 0) {
     <li class="rozie-combobox-empty" role="presentation">
-          @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
+            @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     No results
     }
-        </li>
+          </li>
     }</ul>
+    }</ng-template></rozie-popover>
     }</div>
 
   `,
@@ -239,13 +243,6 @@ interface GroupMoreCtx {
       border-radius: var(--rozie-combobox-radius, 0.5rem);
       box-shadow: var(--rozie-combobox-list-shadow, 0 10px 24px rgba(0, 0, 0, 0.16));
     }
-    .rozie-combobox > .rozie-combobox-list {
-      position: absolute;
-      z-index: var(--rozie-combobox-list-z, 50);
-      top: calc(100% + var(--rozie-combobox-list-gap, 0.25rem));
-      left: 0;
-      right: 0;
-    }
     .rozie-combobox-option {
       padding: var(--rozie-combobox-option-padding, 0.4rem 0.6rem);
       border-radius: var(--rozie-combobox-option-radius, 0.375rem);
@@ -296,7 +293,11 @@ interface GroupMoreCtx {
       width: 100%;
     }
     .rozie-combobox--inline .rozie-combobox-list {
-      position: static;
+      /* \`position: static\` dropped (plan 86-03): \`.rozie-combobox-list\` carries no
+         absolute positioning to undo anymore — that geometry lives on popover's
+         \`.rozie-popover-floating\`, and \`:disable-positioning="$props.inline"\`
+         (D-09) already renders it as a static pass-through via popover's own
+         \`.rozie-popover-floating--static\` rule. */
       margin-top: var(--rozie-combobox-list-gap, 0.25rem);
       border: none;
       border-radius: 0;
