@@ -18,12 +18,17 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { compile, createDefaultRegistry, lowerToIR, ProducerResolver, parse } from '@rozie/core';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SRC = resolve(HERE, '..', 'src', 'Combobox.rozie');
-const FILENAME = 'Combobox.rozie';
+const ROOT = resolve(HERE, '..');
+const SRC = resolve(ROOT, 'src', 'Combobox.rozie');
 const source = readFileSync(SRC, 'utf8');
+// Phase 86 (D-01): `filename` MUST be the ABSOLUTE path to src/Combobox.rozie
+// (not a bare label) so resolveManifestProducer's node_modules walk for the
+// composed `@rozie-ui/popover-<target>` package starts from combobox/src, not
+// process.cwd() — mirrors codegen.mjs's resolver wiring.
+const resolver = new ProducerResolver({ root: ROOT });
 
 const EXPECT = {
   name: 'Combobox',
@@ -33,7 +38,9 @@ const EXPECT = {
   // combobox-native-groups: + `groups` prop + `groupHeading` slot (native option grouping).
   // NOTE: the slot is named `groupHeading` (camelCase), NOT `group-heading` — ROZ127 rejects
   // hyphenated slot names (Vue's defineSlots<{…}>() can't emit an unquoted hyphenated key).
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap'],
+  // Phase 86 (R2/R4): + placement/offset/disableFlip/disableShift, forwarded to
+  // the composed @rozie-ui/popover leaf wrapping the plain popup branch.
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift'],
   models: ['value'],
   emits: ['change', 'search'],
   slots: ['option', 'empty', 'groupHeading', 'groupMore'] as string[],
@@ -51,9 +58,11 @@ const EXPECT = {
 const sorted = (a: readonly string[]) => [...a].sort();
 
 describe('Combobox.rozie surface gate', () => {
-  const { ast } = parse(source, { filename: FILENAME });
+  const { ast } = parse(source, { filename: SRC });
   const { ir, diagnostics: lowerDiags = [] } = lowerToIR(ast, {
     modifierRegistry: createDefaultRegistry(),
+    filename: SRC,
+    resolver,
   });
 
   it('lowerToIR emits zero error diagnostics', () => {
@@ -65,7 +74,7 @@ describe('Combobox.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (17 props)', () => {
+  it('props surface matches (21 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -117,7 +126,7 @@ describe('Combobox.rozie surface gate', () => {
 
   const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const;
   it.each(TARGETS)('compile(%s) emits zero error diagnostics + non-empty code', (target) => {
-    const r = compile(source, { target, filename: FILENAME });
+    const r = compile(source, { target, filename: SRC, resolverRoot: ROOT, resolver });
     const errs = r.diagnostics.filter((d) => d.severity === 'error');
     expect(errs).toEqual([]);
     expect(r.code.length).toBeGreaterThan(0);

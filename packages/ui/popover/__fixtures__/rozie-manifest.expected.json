@@ -61,6 +61,18 @@
       "isModel": false,
       "required": false,
       "type": "String"
+    },
+    {
+      "name": "bare",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "disablePositioning",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
     }
   ],
   "slots": [
