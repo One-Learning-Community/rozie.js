@@ -44,7 +44,13 @@
   "pnpm": {
     "overrides": {
       "vite@^8": "8.1.0",
-      "vite@^7": "8.1.0"
+      "vite@^7": "8.1.0",
+      "@rozie-ui/combobox-react": "workspace:*",
+      "@rozie-ui/combobox-vue": "workspace:*",
+      "@rozie-ui/combobox-svelte": "workspace:*",
+      "@rozie-ui/combobox-solid": "workspace:*",
+      "@rozie-ui/combobox-angular": "workspace:*",
+      "@rozie-ui/combobox-lit": "workspace:*"
     },
     "packageExtensions": {
       "@analogjs/vite-plugin-angular": {

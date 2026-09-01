@@ -7,6 +7,12 @@ settings:
 overrides:
   vite@^8: 8.1.0
   vite@^7: 8.1.0
+  '@rozie-ui/combobox-react': workspace:*
+  '@rozie-ui/combobox-vue': workspace:*
+  '@rozie-ui/combobox-svelte': workspace:*
+  '@rozie-ui/combobox-solid': workspace:*
+  '@rozie-ui/combobox-angular': workspace:*
+  '@rozie-ui/combobox-lit': workspace:*
 
 packageExtensionsChecksum: sha256-Rymkso6m2HwcqaVtvqdz33LfVonuOaDdV4aPZuuzU/o=
 
@@ -2725,7 +2731,7 @@ importers:
   packages/ui/command-palette/packages/angular:
     dependencies:
       '@rozie-ui/combobox-angular':
-        specifier: ^0.4.0
+        specifier: workspace:*
         version: link:../../../combobox/packages/angular
       '@rozie/runtime-angular':
         specifier: workspace:*
@@ -2768,7 +2774,7 @@ importers:
         specifier: ^1.3.0
         version: 1.14.2
       '@rozie-ui/combobox-lit':
-        specifier: ^0.4.0
+        specifier: workspace:*
         version: link:../../../combobox/packages/lit
       '@rozie/runtime-lit':
         specifier: workspace:*
@@ -2784,7 +2790,7 @@ importers:
   packages/ui/command-palette/packages/react:
     dependencies:
       '@rozie-ui/combobox-react':
-        specifier: ^0.4.0
+        specifier: workspace:*
         version: link:../../../combobox/packages/react
       '@rozie/runtime-react':
         specifier: workspace:*
@@ -2809,7 +2815,7 @@ importers:
   packages/ui/command-palette/packages/solid:
     dependencies:
       '@rozie-ui/combobox-solid':
-        specifier: ^0.4.0
+        specifier: workspace:*
         version: link:../../../combobox/packages/solid
       '@rozie/runtime-solid':
         specifier: workspace:*
@@ -2828,7 +2834,7 @@ importers:
   packages/ui/command-palette/packages/svelte:
     dependencies:
       '@rozie-ui/combobox-svelte':
-        specifier: ^0.4.0
+        specifier: workspace:*
         version: link:../../../combobox/packages/svelte
       '@rozie/runtime-svelte':
         specifier: workspace:^
@@ -2856,7 +2862,7 @@ importers:
   packages/ui/command-palette/packages/vue:
     dependencies:
       '@rozie-ui/combobox-vue':
-        specifier: ^0.4.0
+        specifier: workspace:*
         version: link:../../../combobox/packages/vue
       '@rozie/runtime-vue':
         specifier: workspace:^
@@ -23395,7 +23401,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
+      vitest: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.1.0(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
 
   '@vitest/expect@4.1.5':
     dependencies:
