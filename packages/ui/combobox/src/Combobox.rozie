@@ -1175,20 +1175,21 @@ $expose({ focus, clear, seedQuery, pinOpen })
       class="rozie-combobox-list"
       :id="listId()"
       role="listbox"
+      :aria-multiselectable="$props.multiple ? 'true' : null"
     >
       <li
         r-for="opt in filteredOptions()"
         :key="opt.value"
         class="rozie-combobox-option"
-        :class="{ 'rozie-combobox-option--active': opt._i === $data.activeIndex, 'rozie-combobox-option--selected': opt.value === $props.value, 'rozie-combobox-option--disabled': opt.disabled }"
+        :class="{ 'rozie-combobox-option--active': opt._i === $data.activeIndex, 'rozie-combobox-option--selected': isRowSelected(opt), 'rozie-combobox-option--disabled': opt.disabled }"
         :id="optId(opt._i)"
         role="option"
-        :aria-selected="opt.value === $props.value"
+        :aria-selected="!!isRowSelected(opt)"
         :aria-disabled="!!opt.disabled"
         @mousedown.prevent="selectOption(opt)"
         @mouseenter="$data.activeIndex = opt._i"
       >
-        <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === $data.activeIndex" :selected="opt.value === $props.value" :disabled="opt.disabled">{{ opt.label }}</slot>
+        <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === $data.activeIndex" :selected="isRowSelected(opt)" :disabled="opt.disabled">{{ opt.label }}</slot>
       </li>
 
       <li r-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
@@ -1210,6 +1211,7 @@ $expose({ focus, clear, seedQuery, pinOpen })
       class="rozie-combobox-list"
       :id="listId()"
       role="listbox"
+      :aria-multiselectable="$props.multiple ? 'true' : null"
     >
       <li
         r-for="blk in groupBlocks()"
@@ -1226,15 +1228,15 @@ $expose({ focus, clear, seedQuery, pinOpen })
           r-for="opt in blk.items"
           :key="opt.value"
           class="rozie-combobox-option"
-          :class="{ 'rozie-combobox-option--active': opt._i === $data.activeIndex, 'rozie-combobox-option--selected': opt.value === $props.value, 'rozie-combobox-option--disabled': opt.disabled }"
+          :class="{ 'rozie-combobox-option--active': opt._i === $data.activeIndex, 'rozie-combobox-option--selected': isRowSelected(opt), 'rozie-combobox-option--disabled': opt.disabled }"
           :id="optId(opt._i)"
           role="option"
-          :aria-selected="opt.value === $props.value"
+          :aria-selected="!!isRowSelected(opt)"
           :aria-disabled="!!opt.disabled"
           @mousedown.prevent="selectOption(opt)"
           @mouseenter="$data.activeIndex = opt._i"
         >
-          <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === $data.activeIndex" :selected="opt.value === $props.value" :disabled="opt.disabled">{{ opt.label }}</slot>
+          <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === $data.activeIndex" :selected="isRowSelected(opt)" :disabled="opt.disabled">{{ opt.label }}</slot>
         </div>
       </li>
 
@@ -1257,6 +1259,7 @@ $expose({ focus, clear, seedQuery, pinOpen })
       class="rozie-combobox-list"
       :id="listId()"
       role="listbox"
+      :aria-multiselectable="$props.multiple ? 'true' : null"
     >
       <li
         r-for="blk in cappedBlocks()"
@@ -1273,15 +1276,15 @@ $expose({ focus, clear, seedQuery, pinOpen })
           r-for="opt in blk.items"
           :key="opt.value"
           class="rozie-combobox-option"
-          :class="{ 'rozie-combobox-option--active': opt._i === $data.activeIndex, 'rozie-combobox-option--selected': opt.value === $props.value, 'rozie-combobox-option--disabled': opt.disabled }"
+          :class="{ 'rozie-combobox-option--active': opt._i === $data.activeIndex, 'rozie-combobox-option--selected': isRowSelected(opt), 'rozie-combobox-option--disabled': opt.disabled }"
           :id="optId(opt._i)"
           role="option"
-          :aria-selected="opt.value === $props.value"
+          :aria-selected="!!isRowSelected(opt)"
           :aria-disabled="!!opt.disabled"
           @mousedown.prevent="selectOption(opt)"
           @mouseenter="$data.activeIndex = opt._i"
         >
-          <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === $data.activeIndex" :selected="opt.value === $props.value" :disabled="opt.disabled">{{ opt.label }}</slot>
+          <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === $data.activeIndex" :selected="isRowSelected(opt)" :disabled="opt.disabled">{{ opt.label }}</slot>
         </div>
 
         <div
@@ -1324,6 +1327,7 @@ $expose({ focus, clear, seedQuery, pinOpen })
       class="rozie-combobox-list rozie-combobox-list--virtual"
       :id="listId()"
       role="listbox"
+      :aria-multiselectable="$props.multiple ? 'true' : null"
       :style="($data.isOpen ? '' : 'display:none;') + ($props.maxHeight ? ('height:' + $props.maxHeight + ';max-height:' + $props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + $props.maxHeight) : 'overflow-y:auto')"
     >
       <li class="rozie-combobox-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></li>
@@ -1332,16 +1336,16 @@ $expose({ focus, clear, seedQuery, pinOpen })
         r-for="wr in windowedView()"
         :key="wr.row.id"
         class="rozie-combobox-option"
-        :class="{ 'rozie-combobox-option--active': wr.vi.index === $data.activeIndex, 'rozie-combobox-option--selected': wr.row.value === $props.value, 'rozie-combobox-option--disabled': wr.row.disabled }"
+        :class="{ 'rozie-combobox-option--active': wr.vi.index === $data.activeIndex, 'rozie-combobox-option--selected': isRowSelected(wr.row), 'rozie-combobox-option--disabled': wr.row.disabled }"
         :id="optId(wr.vi.index)"
         :data-index="wr.vi.index"
         role="option"
-        :aria-selected="wr.row.value === $props.value"
+        :aria-selected="!!isRowSelected(wr.row)"
         :aria-disabled="!!wr.row.disabled"
         @mousedown.prevent="selectOption(wr.row)"
         @mouseenter="$data.activeIndex = wr.vi.index"
       >
-        <slot name="option" :option="wr.row.option" :index="wr.vi.index" :active="wr.vi.index === $data.activeIndex" :selected="wr.row.value === $props.value" :disabled="wr.row.disabled">{{ wr.row.label }}</slot>
+        <slot name="option" :option="wr.row.option" :index="wr.vi.index" :active="wr.vi.index === $data.activeIndex" :selected="isRowSelected(wr.row)" :disabled="wr.row.disabled">{{ wr.row.label }}</slot>
       </li>
 
       <li class="rozie-combobox-spacer" aria-hidden="true" :style="'height:' + padBottom() + 'px'"></li>

@@ -6,30 +6,30 @@
       <input ref="inputElRef" class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" :aria-expanded="!!isOpen" :aria-controls="listId()" :aria-activedescendant="(activeId()) ?? undefined" :aria-label="props.ariaLabel" :value="query" :placeholder="props.placeholder" :disabled="!!props.disabled" autocomplete="off" @input="onInput($event)" @focus="onFocus($event)" @blur="onBlur()" @keydown="onKeydown($event)" />
     </template>
     
-    <ul v-if="isOpen && !props.virtual && !isGrouped()" class="rozie-combobox-list" :id="listId()" role="listbox">
-      <li v-for="opt in filteredOptions()" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="opt.value === value" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
-        <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === activeIndex" :selected="opt.value === value" :disabled="opt.disabled">{{ opt.label }}</slot>
+    <ul v-if="isOpen && !props.virtual && !isGrouped()" class="rozie-combobox-list" :id="listId()" role="listbox" :aria-multiselectable="(props.multiple ? 'true' : undefined) ?? undefined">
+      <li v-for="opt in filteredOptions()" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': isRowSelected(opt), 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="!!isRowSelected(opt)" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
+        <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === activeIndex" :selected="isRowSelected(opt)" :disabled="opt.disabled">{{ opt.label }}</slot>
       </li>
 
       <li v-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
         <slot name="empty" :query="query">No results</slot>
-      </li></ul><ul v-if="isOpen && !props.virtual && isGrouped() && !isCapped()" class="rozie-combobox-list" :id="listId()" role="listbox">
+      </li></ul><ul v-if="isOpen && !props.virtual && isGrouped() && !isCapped()" class="rozie-combobox-list" :id="listId()" role="listbox" :aria-multiselectable="(props.multiple ? 'true' : undefined) ?? undefined">
       <li v-for="blk in groupBlocks()" :key="'grp-' + (blk.group ? blk.group.id : '_ungrouped')" class="rozie-combobox-group" role="group" :aria-label="blk.group ? blk.group.label : undefined">
         <div v-if="blk.group" class="rozie-combobox-group-heading" role="presentation">
           <slot name="groupHeading" :group="blk.group">{{ blk.group.label }}</slot>
-        </div><div v-for="opt in blk.items" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="opt.value === value" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
-          <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === activeIndex" :selected="opt.value === value" :disabled="opt.disabled">{{ opt.label }}</slot>
+        </div><div v-for="opt in blk.items" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': isRowSelected(opt), 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="!!isRowSelected(opt)" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
+          <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === activeIndex" :selected="isRowSelected(opt)" :disabled="opt.disabled">{{ opt.label }}</slot>
         </div>
       </li>
 
       <li v-if="groupBlocks().length === 0" class="rozie-combobox-empty" role="presentation">
         <slot name="empty" :query="query">No results</slot>
-      </li></ul><ul v-if="isOpen && !props.virtual && isCapped()" class="rozie-combobox-list" :id="listId()" role="listbox">
+      </li></ul><ul v-if="isOpen && !props.virtual && isCapped()" class="rozie-combobox-list" :id="listId()" role="listbox" :aria-multiselectable="(props.multiple ? 'true' : undefined) ?? undefined">
       <li v-for="blk in cappedBlocks()" :key="'grp-' + (blk.group ? blk.group.id : '_ungrouped')" class="rozie-combobox-group" role="group" :aria-label="blk.group ? blk.group.label : undefined">
         <div v-if="blk.group" class="rozie-combobox-group-heading" role="presentation">
           <slot name="groupHeading" :group="blk.group">{{ blk.group.label }}</slot>
-        </div><div v-for="opt in blk.items" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="opt.value === value" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
-          <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === activeIndex" :selected="opt.value === value" :disabled="opt.disabled">{{ opt.label }}</slot>
+        </div><div v-for="opt in blk.items" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': isRowSelected(opt), 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="!!isRowSelected(opt)" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
+          <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === activeIndex" :selected="isRowSelected(opt)" :disabled="opt.disabled">{{ opt.label }}</slot>
         </div>
 
         <div v-if="blk.more" :class="['rozie-combobox-option rozie-combobox-more', { 'rozie-combobox-option--active': blk.more._i === activeIndex }]" :id="optId(blk.more._i)" role="option" @mousedown.prevent="selectOption(blk.more)" @mouseenter="activeIndex = blk.more._i">
@@ -38,11 +38,11 @@
 
       <li v-if="cappedBlocks().length === 0" class="rozie-combobox-empty" role="presentation">
         <slot name="empty" :query="query">No results</slot>
-      </li></ul><ul v-if="props.virtual" class="rozie-combobox-list rozie-combobox-list--virtual" :id="listId()" role="listbox" :style="(isOpen ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto')">
+      </li></ul><ul v-if="props.virtual" class="rozie-combobox-list rozie-combobox-list--virtual" :id="listId()" role="listbox" :aria-multiselectable="(props.multiple ? 'true' : undefined) ?? undefined" :style="(isOpen ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto')">
       <li class="rozie-combobox-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></li>
 
-      <li v-for="wr in windowedView()" :key="wr.row.id" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': wr.vi.index === activeIndex, 'rozie-combobox-option--selected': wr.row.value === value, 'rozie-combobox-option--disabled': wr.row.disabled }]" :id="optId(wr.vi.index)" :data-index="wr.vi.index" role="option" :aria-selected="wr.row.value === value" :aria-disabled="!!wr.row.disabled" @mousedown.prevent="selectOption(wr.row)" @mouseenter="activeIndex = wr.vi.index">
-        <slot name="option" :option="wr.row.option" :index="wr.vi.index" :active="wr.vi.index === activeIndex" :selected="wr.row.value === value" :disabled="wr.row.disabled">{{ wr.row.label }}</slot>
+      <li v-for="wr in windowedView()" :key="wr.row.id" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': wr.vi.index === activeIndex, 'rozie-combobox-option--selected': isRowSelected(wr.row), 'rozie-combobox-option--disabled': wr.row.disabled }]" :id="optId(wr.vi.index)" :data-index="wr.vi.index" role="option" :aria-selected="!!isRowSelected(wr.row)" :aria-disabled="!!wr.row.disabled" @mousedown.prevent="selectOption(wr.row)" @mouseenter="activeIndex = wr.vi.index">
+        <slot name="option" :option="wr.row.option" :index="wr.vi.index" :active="wr.vi.index === activeIndex" :selected="isRowSelected(wr.row)" :disabled="wr.row.disabled">{{ wr.row.label }}</slot>
       </li>
 
       <li class="rozie-combobox-spacer" aria-hidden="true" :style="'height:' + padBottom() + 'px'"></li>
