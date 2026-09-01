@@ -264,6 +264,12 @@ Full commands run, in the order the plan's `<verification>` section specifies:
 - Plan 86-03 (grouped/capped/virtual branch composition) has a working direct-child CSS selector precedent to build from, and an explicit note in this SUMMARY that those three branches are still on the pre-Phase-86 static CSS path.
 - The R6 comparison-doc flip is explicitly NOT blocked by anything in this plan — both open `WINDOWS.md` entries note the current prose is still accurate and only needs a review + hash bump once the full feature set (multi-select, full floating, creatable) ships.
 
+## Self-Check: PASSED
+
+- All 12 key-files confirmed present on disk with `[ -f ]`.
+- All 4 commit hashes (`a33de1743`, `9856cc1b8`, `e07b531d0`, `5a7f42150`) confirmed in `git log --oneline --all`.
+- All acceptance criteria for tasks 1-3 re-verified with real command output (see Verification Log above).
+
 ---
 *Phase: 86-combobox-v1-gap-cluster-multi-select-floating-popup-via-popo*
 *Completed: 2026-09-01*
