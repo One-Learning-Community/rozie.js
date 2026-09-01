@@ -56,10 +56,16 @@ describe('buildManifest', () => {
     expect(manifest.schemaVersion).toBe(1);
   });
 
-  it('derives emits === [\'change\', \'search\'] from the real Combobox IR', () => {
+  it('derives emits === [\'create\', \'change\', \'search\'] from the real Combobox IR', () => {
+    // Phase 86 R3 (plan 86-06): Combobox gained a `create` emit (creatable
+    // mode). Emit order follows first-textual-occurrence in the source — the
+    // `isCreate` branch's `$emit('create', ...)` sits ahead of `change`
+    // (selectOption's single-select tail) and `search` (onInput), which is
+    // why `create` leads rather than trails. This fixture test hardcodes
+    // the live component's emit order, so it must track that surface exactly.
     const ir = loadComboboxIR();
     const manifest = buildManifest(ir);
-    expect(manifest.emits).toEqual(['change', 'search']);
+    expect(manifest.emits).toEqual(['create', 'change', 'search']);
   });
 
   it("derives expose === ['focus', 'clear', 'seedQuery', 'pinOpen'] from the real Combobox IR", () => {
