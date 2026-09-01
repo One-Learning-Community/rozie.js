@@ -53,6 +53,10 @@ interface Props {
    * Render the floating panel in normal document flow instead of computing a floating position — no `computePosition` call and no `autoUpdate` tracking is ever started. For a composing component that already controls the panel's layout (e.g. an `inline` consumer) rather than a genuinely floating popover.
    */
   disablePositioning?: boolean;
+  /**
+   * Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open.
+   */
+  keepMounted?: boolean;
   anchor?: Snippet<[{ open: any; toggle: any; show: any; hide: any }]>;
   children?: Snippet;
   snippets?: Record<string, any>;
@@ -73,6 +77,7 @@ let {
   strategy = 'absolute',
   bare = false,
   disablePositioning = false,
+  keepMounted = false,
   anchor: __anchorProp,
   children: __childrenProp,
   snippets,
@@ -302,7 +307,8 @@ export function reposition() {
 
 onMount(() => {
   // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
-  // and may be null until open; startTracking re-reads via the watch path.
+  // and may be null until open (or keepMounted); startTracking re-reads via the
+  // watch path.
   anchorNode = anchorEl;
   if (open && !disabled) {
     // floatingNode is populated by its r-if having rendered; read it lazily inside
@@ -310,6 +316,15 @@ onMount(() => {
     floatingNode = floatingEl;
     arrowNode = arrowEl;
     startTracking();
+  } else if (keepMounted && !disabled) {
+    // keepMounted (D-03): the panel is mounted-but-hidden. Read the refs and run
+    // a ONE-SHOT position() — never startTracking()/autoUpdate, which stays
+    // strictly open-gated (D-11) — so the hidden panel already carries real
+    // coordinates before the first open instead of painting at 0,0. position()
+    // itself no-ops when disablePositioning is set.
+    floatingNode = floatingEl;
+    arrowNode = arrowEl;
+    position();
   }
   return () => {
     stopTracking();
@@ -382,7 +397,7 @@ $effect(() => {
 });
 </script>
 
-<div {...__rozieAttrs} class={["rozie-popover", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-c6cf02ea><div class="rozie-popover-anchor" bind:this={anchorEl} aria-haspopup={rozieAttr(hasGestureTrigger() ? 'dialog' : null)} aria-expanded={rozieAttr(hasGestureTrigger() ? !!open : null)} aria-describedby={rozieAttr(isTooltip() && open ? 'rozie-popover-floating' : null)} onclick={($event) => { trigger === 'click' && onAnchorClick(); }} onpointerenter={($event) => { trigger === 'hover' && onAnchorPointerEnter(); }} onpointerleave={($event) => { trigger === 'hover' && onAnchorPointerLeave(); }} onfocusin={($event) => { trigger === 'focus' && onAnchorFocus(); }} onfocusout={($event) => { trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea>{@render anchor?.({ open, toggle, show, hide })}</div>{#if open && !disabled}<div class={["rozie-popover-floating", { 'rozie-popover-floating--static': disablePositioning, 'rozie-popover-floating--bare': bare }]} bind:this={floatingEl} id="rozie-popover-floating" role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea>{#if arrow}<div class="rozie-popover-arrow" bind:this={arrowEl} data-rozie-s-c6cf02ea></div>{/if}{@render children?.()}</div>{/if}</div>
+<div {...__rozieAttrs} class={["rozie-popover", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-c6cf02ea><div class="rozie-popover-anchor" bind:this={anchorEl} aria-haspopup={rozieAttr(hasGestureTrigger() ? 'dialog' : null)} aria-expanded={rozieAttr(hasGestureTrigger() ? !!open : null)} aria-describedby={rozieAttr(isTooltip() && open ? 'rozie-popover-floating' : null)} onclick={($event) => { trigger === 'click' && onAnchorClick(); }} onpointerenter={($event) => { trigger === 'hover' && onAnchorPointerEnter(); }} onpointerleave={($event) => { trigger === 'hover' && onAnchorPointerLeave(); }} onfocusin={($event) => { trigger === 'focus' && onAnchorFocus(); }} onfocusout={($event) => { trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea>{@render anchor?.({ open, toggle, show, hide })}</div>{#if (open || keepMounted) && !disabled}<div class={["rozie-popover-floating", { 'rozie-popover-floating--static': disablePositioning, 'rozie-popover-floating--bare': bare, 'rozie-popover-floating--hidden': !open }]} bind:this={floatingEl} id="rozie-popover-floating" role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea>{#if arrow}<div class="rozie-popover-arrow" bind:this={arrowEl} data-rozie-s-c6cf02ea></div>{/if}{@render children?.()}</div>{/if}</div>
 
 <style>
 :global {
@@ -419,6 +434,9 @@ $effect(() => {
     border-radius: 0;
     box-shadow: none;
     padding: 0;
+  }
+  .rozie-popover-floating--hidden[data-rozie-s-c6cf02ea] {
+    display: none;
   }
   .rozie-popover-arrow[data-rozie-s-c6cf02ea] {
     position: absolute;

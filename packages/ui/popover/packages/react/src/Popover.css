@@ -32,6 +32,9 @@
   box-shadow: none;
   padding: 0;
 }
+.rozie-popover-floating--hidden[data-rozie-s-c6cf02ea] {
+  display: none;
+}
 .rozie-popover-arrow[data-rozie-s-c6cf02ea] {
   position: absolute;
   width: var(--rozie-popover-arrow-size, 8px);

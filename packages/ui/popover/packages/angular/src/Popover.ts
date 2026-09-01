@@ -56,8 +56,8 @@ interface DefaultCtx {}
       </div>
 
       
-      @if (open() && !(disabled() || this.__rozieCvaDisabled())) {
-    <div class="rozie-popover-floating" [ngClass]="{ 'rozie-popover-floating--static': disablePositioning(), 'rozie-popover-floating--bare': bare() }" #floatingEl id="rozie-popover-floating" [attr.role]="rozieAttr(floatingRole())" [attr.aria-modal]="!!(floatingRole() === 'dialog')">
+      @if ((open() || keepMounted()) && !(disabled() || this.__rozieCvaDisabled())) {
+    <div class="rozie-popover-floating" [ngClass]="{ 'rozie-popover-floating--static': disablePositioning(), 'rozie-popover-floating--bare': bare(), 'rozie-popover-floating--hidden': !open() }" #floatingEl id="rozie-popover-floating" [attr.role]="rozieAttr(floatingRole())" [attr.aria-modal]="!!(floatingRole() === 'dialog')">
         @if (arrow()) {
     <div class="rozie-popover-arrow" #arrowEl></div>
     }<ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" />
@@ -100,6 +100,9 @@ interface DefaultCtx {}
       border-radius: 0;
       box-shadow: none;
       padding: 0;
+    }
+    .rozie-popover-floating--hidden {
+      display: none;
     }
     .rozie-popover-arrow {
       position: absolute;
@@ -168,6 +171,10 @@ export class Popover {
    * Render the floating panel in normal document flow instead of computing a floating position — no `computePosition` call and no `autoUpdate` tracking is ever started. For a composing component that already controls the panel's layout (e.g. an `inline` consumer) rather than a genuinely floating popover.
    */
   disablePositioning = input<boolean>(false);
+  /**
+   * Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open.
+   */
+  keepMounted = input<boolean>(false);
   anchorEl = viewChild<ElementRef<HTMLDivElement>>('anchorEl');
   floatingEl = viewChild<ElementRef<HTMLDivElement>>('floatingEl');
   arrowEl = viewChild<ElementRef<HTMLDivElement>>('arrowEl');
@@ -248,15 +255,26 @@ export class Popover {
   }
 
   ngAfterViewInit() {
+    const __disabled = (this.disabled() || this.__rozieCvaDisabled());
     // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
-    // and may be null until open; startTracking re-reads via the watch path.
+    // and may be null until open (or keepMounted); startTracking re-reads via the
+    // watch path.
     this.anchorNode = this.anchorEl()?.nativeElement;
-    if (this.open() && !(this.disabled() || this.__rozieCvaDisabled())) {
+    if (this.open() && !__disabled) {
       // floatingNode is populated by its r-if having rendered; read it lazily inside
       // the watch/handlers too. Position on next tick when it exists.
       this.floatingNode = this.floatingEl()?.nativeElement;
       this.arrowNode = this.arrowEl()?.nativeElement;
       this.startTracking();
+    } else if (this.keepMounted() && !__disabled) {
+      // keepMounted (D-03): the panel is mounted-but-hidden. Read the refs and run
+      // a ONE-SHOT position() — never startTracking()/autoUpdate, which stays
+      // strictly open-gated (D-11) — so the hidden panel already carries real
+      // coordinates before the first open instead of painting at 0,0. position()
+      // itself no-ops when disablePositioning is set.
+      this.floatingNode = this.floatingEl()?.nativeElement;
+      this.arrowNode = this.arrowEl()?.nativeElement;
+      this.position();
     }
     this.__rozieDestroyRef.onDestroy(() => {
       this.stopTracking();

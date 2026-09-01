@@ -76,6 +76,9 @@ export default class Popover extends SignalWatcher(LitElement) {
   box-shadow: none;
   padding: 0;
 }
+.rozie-popover-floating--hidden[data-rozie-s-c6cf02ea] {
+  display: none;
+}
 .rozie-popover-arrow[data-rozie-s-c6cf02ea] {
   position: absolute;
   width: var(--rozie-popover-arrow-size, 8px);
@@ -135,6 +138,10 @@ export default class Popover extends SignalWatcher(LitElement) {
    * Render the floating panel in normal document flow instead of computing a floating position — no `computePosition` call and no `autoUpdate` tracking is ever started. For a composing component that already controls the panel's layout (e.g. an `inline` consumer) rather than a genuinely floating popover.
    */
   @property({ type: Boolean, reflect: true }) disablePositioning: boolean = false;
+  /**
+   * Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open.
+   */
+  @property({ type: Boolean, reflect: true }) keepMounted: boolean = false;
   @query('[data-rozie-ref="anchorEl"]') private _refAnchorEl!: HTMLElement;
   @query('[data-rozie-ref="floatingEl"]') private _refFloatingEl!: HTMLElement;
   @query('[data-rozie-ref="arrowEl"]') private _refArrowEl!: HTMLElement;
@@ -222,7 +229,8 @@ private __rozieFirstUpdateDone = false;
     })(__watchVal); }); }));
 
     // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
-    // and may be null until open; startTracking re-reads via the watch path.
+    // and may be null until open (or keepMounted); startTracking re-reads via the
+    // watch path.
     this.anchorNode = this._refAnchorEl;
     if (this.open && !this.disabled) {
       // floatingNode is populated by its r-if having rendered; read it lazily inside
@@ -230,6 +238,15 @@ private __rozieFirstUpdateDone = false;
       this.floatingNode = this._refFloatingEl;
       this.arrowNode = this._refArrowEl;
       this.startTracking();
+    } else if (this.keepMounted && !this.disabled) {
+      // keepMounted (D-03): the panel is mounted-but-hidden. Read the refs and run
+      // a ONE-SHOT position() — never startTracking()/autoUpdate, which stays
+      // strictly open-gated (D-11) — so the hidden panel already carries real
+      // coordinates before the first open instead of painting at 0,0. position()
+      // itself no-ops when disablePositioning is set.
+      this.floatingNode = this._refFloatingEl;
+      this.arrowNode = this._refArrowEl;
+      this.position();
     }
   }
 
@@ -277,7 +294,7 @@ private __rozieFirstUpdateDone = false;
   </div>
 
   
-  ${this.open && !this.disabled ? html`<div class="${Object.entries({ "rozie-popover-floating": true, 'rozie-popover-floating--static': this.disablePositioning, 'rozie-popover-floating--bare': this.bare }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id="rozie-popover-floating" role=${rozieAttr(this.floatingRole())} aria-modal=${!!(this.floatingRole() === 'dialog')} data-rozie-ref="floatingEl" data-rozie-s-c6cf02ea>
+  ${(this.open || this.keepMounted) && !this.disabled ? html`<div class="${Object.entries({ "rozie-popover-floating": true, 'rozie-popover-floating--static': this.disablePositioning, 'rozie-popover-floating--bare': this.bare, 'rozie-popover-floating--hidden': !this.open }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id="rozie-popover-floating" role=${rozieAttr(this.floatingRole())} aria-modal=${!!(this.floatingRole() === 'dialog')} data-rozie-ref="floatingEl" data-rozie-s-c6cf02ea>
     ${this.arrow ? html`<div class="rozie-popover-arrow" data-rozie-ref="arrowEl" data-rozie-s-c6cf02ea></div>` : nothing}<slot></slot>
   </div>` : nothing}</div>
 `;
@@ -518,7 +535,7 @@ private __rozieFirstUpdateDone = false;
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disable-positioning', 'disablepositioning']);
+    const __skip = new Set<string>(['data-rozie-ref', 'open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disable-positioning', 'disablepositioning', 'keep-mounted', 'keepmounted']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

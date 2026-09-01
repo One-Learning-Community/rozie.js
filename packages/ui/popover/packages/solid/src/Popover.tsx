@@ -64,6 +64,9 @@ __rozieInjectStyle('Popover-c6cf02ea', `.rozie-popover[data-rozie-s-c6cf02ea] {
   box-shadow: none;
   padding: 0;
 }
+.rozie-popover-floating--hidden[data-rozie-s-c6cf02ea] {
+  display: none;
+}
 .rozie-popover-arrow[data-rozie-s-c6cf02ea] {
   position: absolute;
   width: var(--rozie-popover-arrow-size, 8px);
@@ -126,6 +129,10 @@ interface PopoverProps {
    * Render the floating panel in normal document flow instead of computing a floating position — no `computePosition` call and no `autoUpdate` tracking is ever started. For a composing component that already controls the panel's layout (e.g. an `inline` consumer) rather than a genuinely floating popover.
    */
   disablePositioning?: boolean;
+  /**
+   * Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open.
+   */
+  keepMounted?: boolean;
   onChange?: (...args: unknown[]) => void;
   anchorSlot?: (ctx: AnchorSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
@@ -142,8 +149,8 @@ export interface PopoverHandle {
 }
 
 export default function Popover(_props: PopoverProps): JSX.Element {
-  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disablePositioning', 'children', 'ref', 'onChange']);
+  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false }, _props);
+  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disablePositioning', 'keepMounted', 'children', 'ref', 'onChange']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ show, hide, toggle, reposition }); });
 
@@ -151,7 +158,8 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   onMount(() => {
     const _cleanup = (() => {
     // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
-    // and may be null until open; startTracking re-reads via the watch path.
+    // and may be null until open (or keepMounted); startTracking re-reads via the
+    // watch path.
     anchorNode = anchorElRef;
     if (open() && !local.disabled) {
       // floatingNode is populated by its r-if having rendered; read it lazily inside
@@ -159,6 +167,15 @@ export default function Popover(_props: PopoverProps): JSX.Element {
       floatingNode = floatingElRef;
       arrowNode = arrowElRef;
       startTracking();
+    } else if (local.keepMounted && !local.disabled) {
+      // keepMounted (D-03): the panel is mounted-but-hidden. Read the refs and run
+      // a ONE-SHOT position() — never startTracking()/autoUpdate, which stays
+      // strictly open-gated (D-11) — so the hidden panel already carries real
+      // coordinates before the first open instead of painting at 0,0. position()
+      // itself no-ops when disablePositioning is set.
+      floatingNode = floatingElRef;
+      arrowNode = arrowElRef;
+      position();
     }
   })() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
@@ -440,7 +457,7 @@ export default function Popover(_props: PopoverProps): JSX.Element {
       </div>
 
       
-      {<Show when={open() && !local.disabled}><div class={"rozie-popover-floating" + " " + rozieClass({ 'rozie-popover-floating--static': local.disablePositioning, 'rozie-popover-floating--bare': local.bare })} ref={(el) => { floatingElRef = el as HTMLElement; }} id="rozie-popover-floating" role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea="">
+      {<Show when={(open() || local.keepMounted) && !local.disabled}><div class={"rozie-popover-floating" + " " + rozieClass({ 'rozie-popover-floating--static': local.disablePositioning, 'rozie-popover-floating--bare': local.bare, 'rozie-popover-floating--hidden': !open() })} ref={(el) => { floatingElRef = el as HTMLElement; }} id="rozie-popover-floating" role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea="">
         {<Show when={local.arrow}><div class={"rozie-popover-arrow"} ref={(el) => { arrowElRef = el as HTMLElement; }} data-rozie-s-c6cf02ea="" /></Show>}{resolved()}
       </div></Show>}</div>
     </>

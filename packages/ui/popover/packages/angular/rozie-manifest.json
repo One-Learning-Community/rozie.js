@@ -73,6 +73,12 @@
       "isModel": false,
       "required": false,
       "type": "Boolean"
+    },
+    {
+      "name": "keepMounted",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
     }
   ],
   "slots": [

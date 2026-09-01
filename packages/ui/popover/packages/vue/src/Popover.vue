@@ -8,7 +8,7 @@
   </div>
 
   
-  <div v-if="open && !props.disabled" :class="['rozie-popover-floating', { 'rozie-popover-floating--static': props.disablePositioning, 'rozie-popover-floating--bare': props.bare }]" ref="floatingElRef" id="rozie-popover-floating" :role="floatingRole()" :aria-modal="!!(floatingRole() === 'dialog')">
+  <div v-if="(open || props.keepMounted) && !props.disabled" :class="['rozie-popover-floating', { 'rozie-popover-floating--static': props.disablePositioning, 'rozie-popover-floating--bare': props.bare, 'rozie-popover-floating--hidden': !open }]" ref="floatingElRef" id="rozie-popover-floating" :role="floatingRole()" :aria-modal="!!(floatingRole() === 'dialog')">
     <div v-if="props.arrow" class="rozie-popover-arrow" ref="arrowElRef"></div><slot></slot>
   </div></div>
 
@@ -64,8 +64,12 @@ const props = withDefaults(
      * Render the floating panel in normal document flow instead of computing a floating position — no `computePosition` call and no `autoUpdate` tracking is ever started. For a composing component that already controls the panel's layout (e.g. an `inline` consumer) rather than a genuinely floating popover.
      */
     disablePositioning?: boolean;
+    /**
+     * Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open.
+     */
+    keepMounted?: boolean;
   }>(),
-  { placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false }
+  { placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false }
 );
 
 /**
@@ -302,7 +306,8 @@ function reposition() {
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
   // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
-  // and may be null until open; startTracking re-reads via the watch path.
+  // and may be null until open (or keepMounted); startTracking re-reads via the
+  // watch path.
   anchorNode = anchorElRef.value;
   if (open.value && !props.disabled) {
     // floatingNode is populated by its r-if having rendered; read it lazily inside
@@ -310,6 +315,15 @@ onMounted(() => {
     floatingNode = floatingElRef.value;
     arrowNode = arrowElRef.value;
     startTracking();
+  } else if (props.keepMounted && !props.disabled) {
+    // keepMounted (D-03): the panel is mounted-but-hidden. Read the refs and run
+    // a ONE-SHOT position() — never startTracking()/autoUpdate, which stays
+    // strictly open-gated (D-11) — so the hidden panel already carries real
+    // coordinates before the first open instead of painting at 0,0. position()
+    // itself no-ops when disablePositioning is set.
+    floatingNode = floatingElRef.value;
+    arrowNode = arrowElRef.value;
+    position();
   }
   _cleanup_0 = () => {
     stopTracking();
@@ -398,6 +412,9 @@ useOutsideClick(
   border-radius: 0;
   box-shadow: none;
   padding: 0;
+}
+.rozie-popover-floating--hidden {
+  display: none;
 }
 .rozie-popover-arrow {
   position: absolute;

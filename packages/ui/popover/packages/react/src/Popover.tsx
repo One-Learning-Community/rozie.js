@@ -84,6 +84,10 @@ interface PopoverProps {
    * Render the floating panel in normal document flow instead of computing a floating position — no `computePosition` call and no `autoUpdate` tracking is ever started. For a composing component that already controls the panel's layout (e.g. an `inline` consumer) rather than a genuinely floating popover.
    */
   disablePositioning?: boolean;
+  /**
+   * Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open.
+   */
+  keepMounted?: boolean;
   onChange?: (...args: any[]) => void;
   renderAnchor?: (ctx: AnchorCtx) => ReactNode;
   children?: ReactNode;
@@ -98,7 +102,7 @@ export interface PopoverHandle {
 }
 
 const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props: PopoverProps, ref): JSX.Element {
-  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean } = {
+  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean; keepMounted: boolean } = {
     ..._props,
     placement: _props.placement ?? 'bottom',
     trigger: _props.trigger ?? 'click',
@@ -111,10 +115,11 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     strategy: _props.strategy ?? 'absolute',
     bare: _props.bare ?? false,
     disablePositioning: _props.disablePositioning ?? false,
+    keepMounted: _props.keepMounted ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, defaultValue, onOpenChange, defaultOpen, onChange, ...rest } = _props as PopoverProps & Record<string, unknown>;
-    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void defaultValue; void onOpenChange; void defaultOpen; void onChange;
+    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, defaultValue, onOpenChange, defaultOpen, onChange, ...rest } = _props as PopoverProps & Record<string, unknown>;
+    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void defaultValue; void onOpenChange; void defaultOpen; void onChange;
     return rest;
   })();
   const anchorNode = useRef<any>(null);
@@ -129,6 +134,8 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   });
   const _disabledRef = useRef(props.disabled);
   _disabledRef.current = props.disabled;
+  const _keepMountedRef = useRef(props.keepMounted);
+  _keepMountedRef.current = props.keepMounted;
   const _openRef = useRef(open);
   _openRef.current = open;
   const anchorEl = useRef<HTMLDivElement | null>(null);
@@ -221,7 +228,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   // loosely-typed `<props>` placement (string) + the `unknown[]` middleware array don't
   // fail the strict leaf tsc against Floating UI's `Placement` / `Middleware[]` types
   // (the cropper `let cfg = null` constructor-args idiom).
-  function position() {
+  const position = useCallback(() => {
     if (props.disablePositioning) return;
     if (!anchorNode.current || !floatingNode.current) return;
     const middleware = buildMiddleware({
@@ -260,8 +267,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     computePosition(anchorNode.current, floatingNode.current, opts).then((result: any) => {
       applyPosition(result.x, result.y, result.middlewareData);
     });
-  }
-
+  }, [applyPosition, props.arrow, props.disableFlip, props.disablePositioning, props.disableShift, props.offset, props.placement, props.strategy]);
   // Start autoUpdate (idempotent — stop any prior subscription first) and do an
   // initial position. Floating UI's autoUpdate keeps the position fresh on scroll/
   // resize/ancestor-layout changes and returns its own teardown.
@@ -351,11 +357,14 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     position();
   }
 
+  const _positionRef = useRef(position);
+  _positionRef.current = position;
   const _startTrackingRef = useRef(startTracking);
   _startTrackingRef.current = startTracking;
   useEffect(() => {
     // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
-    // and may be null until open; startTracking re-reads via the watch path.
+    // and may be null until open (or keepMounted); startTracking re-reads via the
+    // watch path.
     anchorNode.current = anchorEl.current;
     if (_openRef.current && !_disabledRef.current) {
       // floatingNode is populated by its r-if having rendered; read it lazily inside
@@ -363,6 +372,15 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       floatingNode.current = floatingEl.current;
       arrowNode.current = arrowEl.current;
       _startTrackingRef.current();
+    } else if (_keepMountedRef.current && !_disabledRef.current) {
+      // keepMounted (D-03): the panel is mounted-but-hidden. Read the refs and run
+      // a ONE-SHOT position() — never startTracking()/autoUpdate, which stays
+      // strictly open-gated (D-11) — so the hidden panel already carries real
+      // coordinates before the first open instead of painting at 0,0. position()
+      // itself no-ops when disablePositioning is set.
+      floatingNode.current = floatingEl.current;
+      arrowNode.current = arrowEl.current;
+      _positionRef.current();
     }
     return () => {
       stopTracking();
@@ -433,7 +451,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       </div>
 
       
-      {!!(open && !props.disabled) && <div className={clsx("rozie-popover-floating", { "rozie-popover-floating--static": props.disablePositioning, "rozie-popover-floating--bare": props.bare })} ref={floatingEl} id="rozie-popover-floating" role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea="">
+      {!!((open || props.keepMounted) && !props.disabled) && <div className={clsx("rozie-popover-floating", { "rozie-popover-floating--static": props.disablePositioning, "rozie-popover-floating--bare": props.bare, "rozie-popover-floating--hidden": !open })} ref={floatingEl} id="rozie-popover-floating" role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea="">
         {!!(props.arrow) && <div className={"rozie-popover-arrow"} ref={arrowEl} data-rozie-s-c6cf02ea="" />}{(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
       </div>}</div>
     </>
