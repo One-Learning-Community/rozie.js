@@ -1062,7 +1062,10 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       setValue(next);
       // D-14: clear the query on pick under `multiple` (not the option's label)
       // so Backspace-removes-last stays reachable immediately after a pick.
-      setQuery('');
+      // `opt.isRemoval` (set only by removeChipValue() below) skips this —
+      // removing a chip is not a pick, and clobbering whatever the user was
+      // mid-typing in the search box is a separate, unrelated data loss.
+      if (!opt.isRemoval) setQuery('');
       if (effectiveCloseOnSelect()) setIsOpen(false);
       setActiveIndex(-1);
       _rozieProp_onChange && _rozieProp_onChange({
@@ -1092,9 +1095,12 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   const removeChipValue = useCallback((v: any) => {
     const opts = Array.isArray(props.options) ? props.options : [];
     const found = opts.find((o: any) => valueOf(o) === v);
+    // isRemoval: true tells selectOption()'s `multiple` branch this is a
+    // removal, not a pick — see the D-14 comment there.
     selectOption({
       value: v,
-      option: found || null
+      option: found || null,
+      isRemoval: true
     });
   }, [props.options, selectOption, valueOf]);
   // Reflect the externally-selected value into the input text. D-14: no-ops
@@ -1391,7 +1397,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
           
           {!!(props.multiple) && <ul className={"rozie-combobox-chips"} data-rozie-s-9546115a="">
             {chipRows().map((row, idx) => <li key={'chip-' + row.value} className={"rozie-combobox-chip"} data-rozie-s-9546115a="">
-              {(props.renderChip ?? props.slots?.['chip']) ? ((props.renderChip ?? props.slots?.['chip']) as Function)({ option: row.option, remove: () => removeChipValue(row.value), index: idx }) : <><span className={"rozie-combobox-chip__label"} data-rozie-s-9546115a="">{rozieDisplay(row.label)}</span><button type="button" className={"rozie-combobox-chip__remove"} disabled={!!props.disabled} aria-label={rozieAttr(chipRemoveLabel(row))} onClick={($event) => { removeChipValue(row.value); }} data-rozie-s-9546115a="">×</button></>}
+              {(props.renderChip ?? props.slots?.['chip']) ? ((props.renderChip ?? props.slots?.['chip']) as Function)({ option: row.option, remove: () => removeChipValue(row.value), index: idx }) : <><span className={"rozie-combobox-chip__label"} data-rozie-s-9546115a="">{rozieDisplay(row.label)}</span><button type="button" className={"rozie-combobox-chip__remove"} disabled={!!props.disabled} aria-label={rozieAttr(chipRemoveLabel(row))} onMouseDown={($event) => { $event.preventDefault(); removeChipValue(row.value); }} data-rozie-s-9546115a="">×</button></>}
             </li>)}
           </ul>}<input ref={inputEl} className={"rozie-combobox-input"} type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(props.ariaLabel)} value={query} placeholder={props.placeholder} disabled={!!props.disabled} autoComplete="off" onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur(); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-9546115a="" />
         </>)} children={<>

@@ -440,7 +440,11 @@ for (const branch of BRANCHES) {
       try {
         await openBranch(branch.name, mount);
         const target = chipEls(host).find((el) => el.textContent?.includes('Apple'))!;
-        chipRemoveBtn(target).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        // The remove control commits on @mousedown.prevent (CR-02 fix), the
+        // same idiom every other interactive row in this family uses — not
+        // click. See test (15) for the RED-first proof of the mechanism
+        // itself (preventDefault + no query clobber).
+        chipRemoveBtn(target).dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
         await nextTick();
         expect(value()).toEqual(['banana']);
         const last = changes[changes.length - 1] as { value: unknown; option: { value: string } | null; selected: boolean };
@@ -500,6 +504,42 @@ for (const branch of BRANCHES) {
         await openBranch(branch.name, mount);
         expect(host.querySelector('.rozie-combobox-chips')).toBeNull();
         expect(chipEls(host).length).toBe(0);
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(15) chips: the remove control commits on mousedown+preventDefault (the same idiom every other interactive row uses), not click, and never clears an in-progress query', async () => {
+      const mount = mountCombobox(branch.props, { initialValue: ['apple', 'banana'] });
+      const { app, host, value } = mount;
+      try {
+        const input = await openBranch(branch.name, mount);
+
+        // An in-progress, unrelated search the user has already typed BEFORE
+        // touching the chip rail.
+        input.value = 'ch';
+        input.dispatchEvent(new Event('input'));
+        await nextTick();
+
+        const target = chipEls(host).find((el) => el.textContent?.includes('Apple'))!;
+        const btn = chipRemoveBtn(target);
+        // Dispatch ONLY mousedown — never click. If the control were still
+        // bound with a bare `@click` (as it was before this fix), nothing
+        // would happen here at all: no preventDefault, no removal. A real
+        // browser's native focus-follows-mousedown would blur the input and
+        // close the popup between this mousedown and any click that might
+        // follow it, which happy-dom cannot simulate — so this test asserts
+        // on the actual mechanism (the binding + its effects) instead of a
+        // synthetic click that would not reproduce the hazard.
+        const evt = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+        btn.dispatchEvent(evt);
+        await nextTick();
+
+        expect(evt.defaultPrevented).toBe(true);
+        expect(value()).toEqual(['banana']);
+        // The chip removal must not clobber unrelated in-progress query text
+        // the way a normal pick's "clear query on commit" (D-14) would.
+        expect(input.value).toBe('ch');
       } finally {
         app.unmount();
       }

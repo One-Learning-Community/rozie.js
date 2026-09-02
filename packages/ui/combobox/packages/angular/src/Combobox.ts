@@ -79,7 +79,7 @@ interface GroupMoreCtx {
     } @else {
 
                 <span class="rozie-combobox-chip__label">{{ rozieDisplay(row.label) }}</span>
-                <button type="button" class="rozie-combobox-chip__remove" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(chipRemoveLabel(row))" (click)="removeChipValue(row.value)">×</button>
+                <button type="button" class="rozie-combobox-chip__remove" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(chipRemoveLabel(row))" (mousedown)="$event.preventDefault(); removeChipValue(row.value)">×</button>
               
     }
             </li>
@@ -1421,7 +1421,10 @@ export class Combobox {
       this.value.set(next), this.__rozieCvaOnChange(next);
       // D-14: clear the query on pick under `multiple` (not the option's label)
       // so Backspace-removes-last stays reachable immediately after a pick.
-      this.query.set('');
+      // `opt.isRemoval` (set only by removeChipValue() below) skips this —
+      // removing a chip is not a pick, and clobbering whatever the user was
+      // mid-typing in the search box is a separate, unrelated data loss.
+      if (!opt.isRemoval) this.query.set('');
       if (this.effectiveCloseOnSelect()) this.isOpen.set(false);
       this.activeIndex.set(-1);
       this.change.emit({
@@ -1452,9 +1455,12 @@ export class Combobox {
     const __options = this.options();
     const opts = Array.isArray(__options) ? __options : [];
     const found = opts.find((o: any) => this.valueOf$local(o) === v);
+    // isRemoval: true tells selectOption()'s `multiple` branch this is a
+    // removal, not a pick — see the D-14 comment there.
     this.selectOption({
       value: v,
-      option: found || null
+      option: found || null,
+      isRemoval: true
     });
   };
   // Reflect the externally-selected value into the input text. D-14: no-ops

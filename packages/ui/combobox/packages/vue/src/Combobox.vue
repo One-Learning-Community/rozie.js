@@ -8,7 +8,7 @@
         <li v-for="(row, idx) in chipRows()" :key="'chip-' + row.value" class="rozie-combobox-chip">
           <slot name="chip" :option="row.option" :remove="() => removeChipValue(row.value)" :index="idx">
             <span class="rozie-combobox-chip__label">{{ row.label }}</span>
-            <button type="button" class="rozie-combobox-chip__remove" :disabled="!!props.disabled" :aria-label="chipRemoveLabel(row)" @click="removeChipValue(row.value)">×</button>
+            <button type="button" class="rozie-combobox-chip__remove" :disabled="!!props.disabled" :aria-label="chipRemoveLabel(row)" @mousedown.prevent="removeChipValue(row.value)">×</button>
           </slot>
         </li>
       </ul><input ref="inputElRef" class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" :aria-expanded="!!isOpen" :aria-controls="listId()" :aria-activedescendant="(activeId()) ?? undefined" :aria-label="props.ariaLabel" :value="query" :placeholder="props.placeholder" :disabled="!!props.disabled" autocomplete="off" @input="onInput($event)" @focus="onFocus($event)" @blur="onBlur()" @keydown="onKeydown($event)" />
@@ -1029,7 +1029,10 @@ const selectOption = (opt: any) => {
     value.value = next;
     // D-14: clear the query on pick under `multiple` (not the option's label)
     // so Backspace-removes-last stays reachable immediately after a pick.
-    query.value = '';
+    // `opt.isRemoval` (set only by removeChipValue() below) skips this —
+    // removing a chip is not a pick, and clobbering whatever the user was
+    // mid-typing in the search box is a separate, unrelated data loss.
+    if (!opt.isRemoval) query.value = '';
     if (effectiveCloseOnSelect()) isOpen.value = false;
     activeIndex.value = -1;
     emit('change', {
@@ -1059,9 +1062,12 @@ const selectOption = (opt: any) => {
 const removeChipValue = (v: any) => {
   const opts = Array.isArray(props.options) ? props.options : [];
   const found = opts.find((o: any) => valueOf(o) === v);
+  // isRemoval: true tells selectOption()'s `multiple` branch this is a
+  // removal, not a pick — see the D-14 comment there.
   selectOption({
     value: v,
-    option: found || null
+    option: found || null,
+    isRemoval: true
   });
 };
 // Reflect the externally-selected value into the input text. D-14: no-ops

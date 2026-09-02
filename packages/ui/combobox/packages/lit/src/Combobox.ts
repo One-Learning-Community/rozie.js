@@ -537,7 +537,7 @@ private __rozieFirstUpdateDone = false;
         ${repeat<any>(this.chipRows(), (row, idx) => 'chip-' + row.value, (row, idx) => html`<li class="rozie-combobox-chip" data-rozie-s-9546115a>
           ${this.chip !== undefined ? this.chip({option: row.option, remove: () => this.removeChipValue(row.value), index: idx}) : html`<slot name="chip" data-rozie-params=${(() => { try { return JSON.stringify({option: row.option, index: idx}); } catch { return '{}'; } })()} @rozie-chip-remove=${($event: CustomEvent) => ((() => this.removeChipValue(row.value)) as (...args: any[]) => any)($event.detail)}>
             <span class="rozie-combobox-chip__label" data-rozie-s-9546115a>${rozieDisplay(row.label)}</span>
-            <button class="rozie-combobox-chip__remove" type="button" ?disabled=${!!this.disabled} aria-label=${rozieAttr(this.chipRemoveLabel(row))} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.removeChipValue(row.value); }} data-rozie-s-9546115a>×</button>
+            <button class="rozie-combobox-chip__remove" type="button" ?disabled=${!!this.disabled} aria-label=${rozieAttr(this.chipRemoveLabel(row))} @mousedown=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { $event.preventDefault(); this.removeChipValue(row.value); }} data-rozie-s-9546115a>×</button>
           </slot>`}
         </li>`)}
       </ul>` : nothing}<input class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded=${!!this._isOpen.value} aria-controls=${rozieAttr(this.listId())} aria-activedescendant=${rozieAttr(this.activeId())} aria-label=${rozieAttr(this.ariaLabel)} .value=${this._query.value} placeholder=${this.placeholder} ?disabled=${!!this.disabled} autocomplete="off" @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @focus=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onFocus($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} data-rozie-ref="inputEl" data-rozie-s-9546115a />
@@ -1450,7 +1450,10 @@ private __rozieFirstUpdateDone = false;
     this._valueControllable.write(next);
     // D-14: clear the query on pick under `multiple` (not the option's label)
     // so Backspace-removes-last stays reachable immediately after a pick.
-    this._query.value = '';
+    // `opt.isRemoval` (set only by removeChipValue() below) skips this —
+    // removing a chip is not a pick, and clobbering whatever the user was
+    // mid-typing in the search box is a separate, unrelated data loss.
+    if (!opt.isRemoval) this._query.value = '';
     if (this.effectiveCloseOnSelect()) this._isOpen.value = false;
     this._activeIndex.value = -1;
     this.dispatchEvent(new CustomEvent("change", {
@@ -1489,9 +1492,12 @@ private __rozieFirstUpdateDone = false;
   removeChipValue = (v: any) => {
   const opts = Array.isArray(this.options) ? this.options : [];
   const found = opts.find((o: any) => this.valueOf$local(o) === v);
+  // isRemoval: true tells selectOption()'s `multiple` branch this is a
+  // removal, not a pick — see the D-14 comment there.
   this.selectOption({
     value: v,
-    option: found || null
+    option: found || null,
+    isRemoval: true
   });
 };
 
