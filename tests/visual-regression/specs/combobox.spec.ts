@@ -422,3 +422,132 @@ for (const target of TARGETS) {
     expect(focused.role).toBe('combobox');
   });
 }
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// combobox-flip-exact-fit — Phase 86 UAT item 1, previously routed to manual testing
+// in `86-UAT.md` and flagged as a backstop edge in `86-SPEC.md`'s Edge Coverage table
+// for R2, on the grounds that the boundary arithmetic belongs to Floating UI and is
+// not reproducible in the happy-dom harness (no layout engine).
+//
+// It IS reproducible in a real browser once the exact-fit viewport height is derived
+// by MEASUREMENT rather than guessed — which is what this cell does.
+//
+// Distinguish this from the `combobox-floating` pixel cell above in one line: that one
+// proves a flip HAPPENS on genuine overflow and pins the result to a PNG; this one
+// proves a flip does NOT happen at a zero-slack boundary and asserts geometry only.
+// ════════════════════════════════════════════════════════════════════════════════════
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`combobox-flip-exact-fit [${target}]: the popup stays below the input at zero slack, and flips above at 8px of genuine overflow`, async ({
+    page,
+  }) => {
+    // Three navigations per cell can approach the config's 30s per-test timeout
+    // on a cold preview server — a slow load is not a behavioral failure, so the
+    // budget is raised up front rather than fixme'ing a target that trips it.
+    test.setTimeout(60_000);
+
+    // Page-scoped open helper (bound to this cell's `page`, not a module-level
+    // function) — navigates to the example, waits for the mount, waits for the
+    // input, polls [role="option"] to 4, waits for the floating panel to become
+    // visible, forces the scroll position to the top, and returns the input and
+    // panel locators. Called once per pass.
+    async function open() {
+      await page.goto(`/?example=ComboboxFloating&target=${target}`);
+      await expect(page.getByTestId('rozie-mount')).toBeVisible();
+      // The role/CSS locators pierce Lit's open shadow root.
+      const input = page.locator('input[role="combobox"]').first();
+      await expect(input).toBeVisible({ timeout: 15_000 });
+      // The demo self-opens via $refs.floatingCombobox.focus() one macrotask
+      // after its own $onMount — wait for the four options + the floating
+      // panel rather than assuming either is already there.
+      await expect
+        .poll(async () => page.locator('[role="option"]').count(), {
+          timeout: 15_000,
+        })
+        .toBe(4);
+      const panel = page.locator('.rozie-popover-floating');
+      await expect(panel).toBeVisible({ timeout: 15_000 });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      return { input, panel };
+    }
+
+    // ---- Pass A (measure): tall viewport, popup renders below the input ----
+    await page.setViewportSize({ width: 1280, height: 1400 });
+    const passA = await open();
+    const inputBoxA = await passA.input.boundingBox();
+    const panelBoxA = await passA.panel.boundingBox();
+    expect(inputBoxA).not.toBeNull();
+    expect(panelBoxA).not.toBeNull();
+    // Guard: the panel really IS below here before trusting any number derived
+    // from it — measuring a flipped panel would poison every number downstream
+    // and the cell would then pass vacuously.
+    expect(panelBoxA!.y).toBeGreaterThanOrEqual(
+      inputBoxA!.y + inputBoxA!.height - 1,
+    );
+
+    const inputBottom = inputBoxA!.y + inputBoxA!.height;
+    // The resolved offset, read from the rendered layout rather than hardcoded
+    // as the Combobox `offset` prop's default of 4 — this is what keeps the
+    // cell honest if that default, or the popover's middleware order, ever
+    // changes.
+    const gap = panelBoxA!.y - inputBottom;
+    // A single measurement of the panel HEIGHT is valid across all three
+    // viewports below: @rozie-ui/popover's `size` middleware writes the
+    // panel's WIDTH style only and never touches its height, so nothing
+    // clamps the popup as the viewport shrinks.
+    const panelHeight = panelBoxA!.height;
+    const exactFitSum = inputBottom + gap + panelHeight;
+
+    // Pass B fits the popup with at most a sub-pixel of slack — the
+    // zero-overflow side of the boundary, which is the side that must NOT
+    // flip.
+    const exactFitHeight = Math.ceil(exactFitSum);
+    // Pass C is 8px short of the same sum: comfortably above sub-pixel layout
+    // noise, but small enough that the cell is demonstrably sensitive to the
+    // boundary rather than trivially satisfied. This IS the vacuity guard —
+    // without it, a measurement off by 50px would let Pass B pass for the
+    // wrong reason.
+    const overflowHeight = Math.floor(exactFitSum) - 8;
+
+    // ---- Pass B (exact fit): re-navigate rather than resize-and-trust-
+    // autoUpdate. Popover.rozie does install autoUpdate, but a fresh mount
+    // recomputes the position deterministically and the demo self-opens on
+    // mount, so re-navigating is both simpler and immune to resize-observer
+    // timing. ----
+    await page.setViewportSize({ width: 1280, height: exactFitHeight });
+    const passB = await open();
+    const inputBoxB = await passB.input.boundingBox();
+    const panelBoxB = await passB.panel.boundingBox();
+    expect(inputBoxB).not.toBeNull();
+    expect(panelBoxB).not.toBeNull();
+    // No flip: the panel's top edge is still below the input's bottom edge
+    // (±1px tolerance for sub-pixel rounding, the same direction the
+    // combobox-floating cell above already uses).
+    expect(panelBoxB!.y).toBeGreaterThanOrEqual(
+      inputBoxB!.y + inputBoxB!.height - 1,
+    );
+    // The panel's bottom edge sits at/inside the viewport bottom.
+    expect(panelBoxB!.y + panelBoxB!.height).toBeLessThanOrEqual(
+      exactFitHeight + 1,
+    );
+
+    // ---- Pass C (negative control): genuine overflow must flip the popup
+    // ABOVE the input. ----
+    await page.setViewportSize({ width: 1280, height: overflowHeight });
+    const passC = await open();
+    const inputBoxC = await passC.input.boundingBox();
+    const panelBoxC = await passC.panel.boundingBox();
+    expect(inputBoxC).not.toBeNull();
+    expect(panelBoxC).not.toBeNull();
+    // The panel renders ENTIRELY above the input: its bottom edge sits
+    // at/above the input's own top edge (±1px tolerance, mirroring the
+    // combobox-floating cell above).
+    expect(panelBoxC!.y + panelBoxC!.height).toBeLessThanOrEqual(
+      inputBoxC!.y + 1,
+    );
+  });
+}
