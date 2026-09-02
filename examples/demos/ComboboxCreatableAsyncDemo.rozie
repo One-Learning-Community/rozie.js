@@ -31,13 +31,23 @@
   5. `SEARCH_DELAY_MS` is a named module constant the VR spec reasons about
      directly (widened to 2000ms — see the constant's own comment for why),
      never a bare sleep. `createRaced` is the fixture-side proof that the
-     window was genuinely live AT THE INSTANT of each `create` emit: it reads
-     `inFlight` (captured into a local, ROZ138 idiom) at the moment `onCreate`
-     runs and only ever flips to `'yes'` when a search was live right then —
-     immune to Playwright round-trip latency in a way no test-side timing
-     check can be, and it degrades to `'no'` the instant an emit lands outside
-     a live window. Mutation probe 2 (collapsing this constant to 0) is what
+     window was genuinely live AT THE INSTANT of each `create` emit — immune
+     to Playwright round-trip latency in a way no test-side timing check can
+     be, and it degrades to `'no'` the instant an emit lands outside a live
+     window. Mutation probe 2 (collapsing this constant to 0) is what
      empirically proves that degradation actually fires.
+  6. The race BOOKKEEPING (`seqCounter`/`inFlightCounter`/`resolvedCounter`)
+     is kept as PLAIN top-level `let`s, never `$data` — mirrors Combobox.rozie's
+     own `virtualizer`/`remeasurePending` precedent. Discovered empirically
+     while proving this fixture on React: a `setTimeout` callback scheduled
+     from inside a React function-component closes over that render's
+     `useState` values BY VALUE, not by reference, so reading `$data.x` a
+     full `SEARCH_DELAY_MS` later — after further renders have moved it on
+     — silently resolves to the STALE value from the render that scheduled
+     the timeout, not the live one (confirmed by inspecting the compiled
+     React output: `const m=s,p=c` inside the callback ARE the closed-over
+     render-time bindings). `$data` is only ever WRITTEN from these counters
+     inside the deferred callback, never read back from inside one.
 -->
 <rozie name="ComboboxCreatableAsyncDemo">
 
@@ -53,7 +63,6 @@
   options: [],
   inFlight: 0,
   resolved: 0,
-  seq: 0,
   createCount: 0,
   createLog: '',
   createRaced: '-',
@@ -79,56 +88,65 @@ const RESULTS = [
   { value: 'date', label: 'Date' },
 ]
 
+// Plain top-level `let`s (NOT `$data`) — see the header comment, point 6, for
+// why: a `setTimeout` callback scheduled from a React function component
+// closes over that render's `$data` values BY VALUE, so reading `$data.x`
+// SEARCH_DELAY_MS later silently resolves to a stale snapshot rather than
+// the live count. These counters, closed over by REFERENCE, stay live across
+// every deferred callback on every target — mirrors Combobox.rozie's own
+// `virtualizer`/`remeasurePending` plain-`let` precedent. `$data` is only
+// ever WRITTEN from these counters, never read back from inside a deferred
+// callback.
+let seqCounter = 0
+let inFlightCounter = 0
+let resolvedCounter = 0
+
 const onSearch = (e) => {
   const query = e && e.query != null ? e.query : ''
-  // Read every $data slot this handler mutates into a local BEFORE any write
-  // (ROZ138 read-then-write idiom) — locals are named DISTINCTLY from their
-  // $data counterparts, never reused verbatim: `const seq = $data.seq`
-  // followed by `$data.seq = seq + 1` reads back as `const seq = seq` once
-  // the emitter lowers `$data.seq` to the bare reactive binding `seq`, a
-  // same-scope self-reference (TDZ on Svelte) rather than the intended
-  // outer-scope read.
-  const prevSeq = $data.seq
-  const prevInFlight = $data.inFlight
-  const nextSeq = prevSeq + 1
-  $data.seq = nextSeq
-  $data.inFlight = prevInFlight + 1
+  seqCounter += 1
+  const mySeq = seqCounter
+  inFlightCounter += 1
+  $data.inFlight = inFlightCounter
   setTimeout(() => {
     // Last-write-wins: apply RESULTS only when this response is still the
-    // LIVE one (its captured seq still matches $data.seq). A stale response
-    // — superseded by a later search before this one settled — is discarded,
-    // never applied.
-    if (nextSeq === $data.seq) {
+    // LIVE one (its own captured seq still matches the live counter). A
+    // stale response — superseded by a later search before this one settled
+    // — is discarded, never applied.
+    if (mySeq === seqCounter) {
       $data.options = RESULTS
     }
     // resolved counts every SETTLED search, whether its result was applied
     // or discarded — unconditional, unlike the options write above.
-    const stillInFlight = $data.inFlight
-    const resolvedSoFar = $data.resolved
-    $data.inFlight = stillInFlight - 1
-    $data.resolved = resolvedSoFar + 1
+    inFlightCounter -= 1
+    resolvedCounter += 1
+    $data.inFlight = inFlightCounter
+    $data.resolved = resolvedCounter
   }, SEARCH_DELAY_MS)
 }
 
 // The race instrument (see the header comment, point 5, for what
-// `createRaced` proves and why).
+// `createRaced` proves and why). Unlike `onSearch` above, this handler is
+// entirely SYNCHRONOUS — it runs directly inside the `Enter` keydown that
+// triggers it, in the same render pass, so reading `$data` here is safe; the
+// stale-closure hazard documented in point 6 is specific to work deferred
+// past the render that scheduled it.
 const onCreate = (e) => {
   const query = e && e.query != null ? e.query : ''
   // Read every $data slot this handler mutates into a local BEFORE any write
-  // (ROZ138 read-then-write idiom, locals named distinctly — see onSearch's
-  // comment above for why) — `prevInFlight` in particular must be captured
-  // BEFORE any write in this same handler so it reflects the state at the
-  // instant the create gesture landed, not after.
+  // (ROZ138 read-then-write idiom, locals named distinctly from their $data
+  // counterparts — see onSearch's own header-comment discipline).
   const prevCreateCount = $data.createCount
   const prevCreateLog = $data.createLog
   const prevCreateRaced = $data.createRaced
-  const prevInFlight = $data.inFlight
   $data.createCount = prevCreateCount + 1
   $data.createLog = prevCreateLog === '' ? query : prevCreateLog + ';' + query
   // Accumulating AND: once this reads 'no' it can never read 'yes' again —
   // the fixture-side proof degrades the instant a single emit lands outside
   // a live in-flight window, rather than being satisfiable by one lucky race.
-  const wasLive = prevInFlight > 0
+  // Reads the authoritative plain-`let` counter (not the mirrored `$data`
+  // value) for the same reason `onSearch` writes it that way — one source of
+  // truth for "is a search live right now".
+  const wasLive = inFlightCounter > 0
   $data.createRaced = (prevCreateRaced !== 'no' && wasLive) ? 'yes' : 'no'
   // Deliberately does NOT push into $data.options — see the header comment,
   // point 4.

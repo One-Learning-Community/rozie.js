@@ -636,5 +636,66 @@ for (const target of TARGETS) {
     await expect(readoutInFlight).toHaveText('1');
     // R3 locked: `create` leaves `value` untouched.
     await expect(readoutValue).toHaveText('');
+
+    // ---- PHASE B: double commit inside the SAME window ----
+    // Immediately repeat End+Enter with no intervening input event. The second
+    // commit reaches selectOption()'s create branch and is suppressed by the
+    // `createdQuery` latch, not by the popup being closed (:close-on-select=
+    // "false") or the create row being gone (onCreate never adopts the created
+    // value into `options` — see the fixture's own header comment). The
+    // same-tick variant of this exact case is already owned by
+    // `creatable.behavior.test.ts` test 5; this phase exists only because it
+    // straddles a live async window.
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await expect(readoutCreateCount).toHaveText('1');
+    await expect(readoutCreateLog).toHaveText('kiwi');
+    await expect(readoutResolved).toHaveText('0');
+
+    // ---- PHASE C: the latch survives the async round trip ----
+    // Poll until the search settles, then confirm the option set changed
+    // underneath the create row (four async options landed) while the create
+    // row STILL renders last, and a third commit is STILL suppressed — this is
+    // the exact window the latch's own source comment names: the async round
+    // trip before the consumer's `options` update lands.
+    await expect.poll(async () => readoutResolved.textContent(), {
+      timeout: 15_000,
+    }).toBe('1');
+    await expect(readoutInFlight).toHaveText('0');
+    const optionsAfterResolve = page.locator('[role="option"]');
+    await expect(optionsAfterResolve).toHaveCount(5);
+    const lastRowClass = await optionsAfterResolve.last().getAttribute('class');
+    expect(lastRowClass ?? '').toContain('rozie-combobox-create');
+
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await expect(readoutCreateCount).toHaveText('1');
+    await expect(readoutValue).toHaveText('');
+
+    // ---- PHASE D: negative control — the vacuity guard ----
+    // A component that emitted once and then died entirely would pass every
+    // assertion above. A DISTINCT query re-arms the latch (onInput clears
+    // createdQuery on every input change) and starts a fresh search; a create
+    // committed inside ITS OWN in-flight window must still emit. This proves
+    // the emit path is live, the latch is query-scoped rather than global,
+    // and the "never zero" half of the contract — without this phase the cell
+    // would be vacuously satisfiable by a component that silently stopped
+    // emitting after the first create.
+    await input.fill('kiwis');
+    await expect.poll(async () => readoutInFlight.textContent(), {
+      timeout: 10_000,
+    }).toBe('1');
+    await expect(readoutResolved).toHaveText('1');
+
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await expect(readoutCreateCount).toHaveText('2');
+    await expect(readoutCreateLog).toHaveText('kiwi;kiwis');
+    await expect(readoutCreateRaced).toHaveText('yes');
+
+    await expect.poll(async () => readoutResolved.textContent(), {
+      timeout: 15_000,
+    }).toBe('2');
+    await expect(readoutCreateCount).toHaveText('2');
   });
 }
