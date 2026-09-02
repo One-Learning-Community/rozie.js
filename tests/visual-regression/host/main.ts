@@ -755,6 +755,17 @@ export const EXAMPLES = [
   // two-way r-model:value round-trip still commits on a real-option select. See
   // combobox-group-cap.spec.ts. Behavioral-only; NOT in matrix.spec.ts EXAMPLES.
   'ComboboxGroupCap',
+  // combobox-create-async — quick-260902-hmv — the BEHAVIORAL cell (loader →
+  // examples/demos/ComboboxCreatableAsyncDemo.rozie, importing packages/ui/
+  // combobox/src/Combobox.rozie) automating 86-UAT item 2 / 86-SPEC R3's
+  // `concurrency` backstop: committing `create` while an async `search` for
+  // the same query is still in flight emits `create` EXACTLY ONCE, a second
+  // commit inside the same window is suppressed by the latch, a third commit
+  // after the async response lands is also suppressed, and a fresh query
+  // still emits (the non-vacuity negative control). See combobox.spec.ts's
+  // `combobox-create-async` block. Behavioral-only; NOT in matrix.spec.ts
+  // EXAMPLES (no pixel baseline).
+  'ComboboxCreatableAsync',
   // @rozie-ui otp/dialog/combobox/toast — the four content-STABLE SCREENSHOT cells
   // (loaders → examples/demos/{Otp,Combobox,Dialog,Toaster}ScreenshotDemo.rozie,
   // each importing packages/ui/<family>/src/<Component>.rozie). Two render
@@ -1573,6 +1584,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // component is name="Combobox" → 'rozie-combobox', matching the *Groups cell's
   // base). Behavioral-only, no screenshot cell.
   ComboboxGroupCap: 'rozie-combobox-group-cap',
+  // combobox-create-async (quick-260902-hmv) — '-demo' appended on Lit → tag
+  // 'rozie-combobox-creatable-async-demo' = kebab of ComboboxCreatableAsyncDemo
+  // (the wrapper component is name="Combobox" → 'rozie-combobox', matching the
+  // *Creatable cell's base). Behavioral-only, no screenshot cell.
+  ComboboxCreatableAsync: 'rozie-combobox-creatable-async',
   // @rozie-ui otp/dialog/combobox/toast SCREENSHOT cells — '-demo' appended on Lit
   // → tags 'rozie-otp-screenshot-demo' etc. = kebab of the full *ScreenshotDemo
   // name (mirrors CodeMirrorScreenshot / ChartScreenshot).
@@ -2082,6 +2098,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // own OPTIONS/GROUPS + <data>.value and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props.
   ComboboxGroupCap: {},
+  // combobox-create-async (quick-260902-hmv) — ComboboxCreatableAsyncDemo is
+  // self-contained: it seeds its own empty options array + value:null in
+  // <data>, binds r-model:value internally, and is driven entirely by the
+  // spec (no self-open/self-seed), so no MODEL_PROPS entry. No parent props.
+  ComboboxCreatableAsync: {},
   // @rozie-ui otp/dialog/combobox/toast SCREENSHOT cells — every *ScreenshotDemo is
   // self-contained: it seeds its own FIXED state in <data>/<script> and binds
   // r-model / drives the $expose handle internally (not parent-supplied), so no

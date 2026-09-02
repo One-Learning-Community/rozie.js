@@ -551,3 +551,90 @@ for (const target of TARGETS) {
     );
   });
 }
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// quick-260902-hmv — combobox-create-async: 86-UAT item 2 / 86-SPEC R3's `concurrency`
+// backstop, previously routed to manual testing on the grounds that race timing
+// against a deliberately delayed async data source is not deterministically
+// reproducible in the happy-dom harness.
+//
+// `creatable.behavior.test.ts` test 5 already owns the SAME-TICK double-commit case
+// (two Enters with no clock advance between them, against a synchronous fixture). This
+// cell owns the one edge that test cannot reach: a `create` gesture committed while a
+// REAL async `search` for the same query is genuinely still in flight, spanning a real
+// browser round trip, not a mocked/fake-timer tick.
+//
+// `examples/demos/ComboboxCreatableAsyncDemo.rozie` wires `creatable` to a 2000ms-
+// delayed async source and instruments the race with a fixture-side `createRaced`
+// accumulator (see that file's header comment) — the proof that each `create` really
+// landed inside a live window, immune to Playwright round-trip latency.
+// ════════════════════════════════════════════════════════════════════════════════════
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`combobox-create-async [${target}]: committing create while an async search is in flight emits create exactly once`, async ({
+    page,
+  }) => {
+    // Two 2000ms in-flight windows plus six Playwright round trips per phase can
+    // approach the config's 30s per-test default on a cold preview server.
+    test.setTimeout(60_000);
+
+    await page.goto(`/?example=ComboboxCreatableAsync&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    // The role/CSS locators pierce Lit's open shadow root.
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+
+    const readoutValue = page.getByTestId('readout-value');
+    const readoutInFlight = page.getByTestId('readout-inflight');
+    const readoutResolved = page.getByTestId('readout-resolved');
+    const readoutCreateCount = page.getByTestId('readout-create-count');
+    const readoutCreateLog = page.getByTestId('readout-create-log');
+    const readoutCreateRaced = page.getByTestId('readout-create-raced');
+
+    // ---- focus as a SEPARATE step, settle BEFORE typing ----
+    // On Solid, the documented `openingInProgress` reentrancy guard recreates the
+    // anchor DOM subtree on a deferred re-focus; typing into a node that is about to
+    // be recreated is a real value-loss risk. Wait for the floating panel AND the
+    // single empty-state row (this fixture starts with zero options and no query)
+    // before typing anything.
+    await input.focus();
+    const panel = page.locator('.rozie-popover-floating');
+    await expect(panel).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.rozie-combobox-empty')).toHaveCount(1);
+
+    // ---- PHASE A: one create inside a live in-flight window ----
+    // A single fill() (one input event) — pressSequentially would put four
+    // searches in flight and make every count assertion ambiguous.
+    await input.fill('kiwi');
+    await expect.poll(async () => readoutInFlight.textContent(), {
+      timeout: 10_000,
+    }).toBe('1');
+    await expect(readoutResolved).toHaveText('0');
+    const optionsAfterFirstSearch = page.locator('[role="option"]');
+    await expect(optionsAfterFirstSearch).toHaveCount(1);
+    const createRowClass = await optionsAfterFirstSearch.first().getAttribute('class');
+    expect(createRowClass ?? '').toContain('rozie-combobox-create');
+
+    // End lands on the LAST navRow deterministically — the create row —
+    // regardless of how many async options have arrived; selectOption()'s
+    // isCreate branch resets activeIndex to -1 after every commit, so every
+    // commit gesture in this cell is End then Enter, never a bare Enter.
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+
+    await expect(readoutCreateCount).toHaveText('1');
+    await expect(readoutCreateLog).toHaveText('kiwi');
+    await expect(readoutCreateRaced).toHaveText('yes');
+    // The test-side half of the race proof: the commit landed while the search
+    // was demonstrably still unresolved and still in flight.
+    await expect(readoutResolved).toHaveText('0');
+    await expect(readoutInFlight).toHaveText('1');
+    // R3 locked: `create` leaves `value` untouched.
+    await expect(readoutValue).toHaveText('');
+  });
+}

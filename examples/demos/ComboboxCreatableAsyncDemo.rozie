@@ -1,0 +1,185 @@
+<!--
+  ComboboxCreatableAsyncDemo — behavioral VR fixture for @rozie-ui/combobox's
+  `creatable` mode wired to a DELIBERATELY DELAYED async data source (86-UAT
+  item 2 / 86-SPEC R3's `concurrency` backstop row): committing a `create`
+  gesture while an async `search` for the same query is still in flight must
+  emit `create` EXACTLY ONCE — never zero, never two.
+
+  1. This fixture exists ONLY for the live async race that happy-dom cannot
+     reach. `creatable.behavior.test.ts` test 5 already owns the SAME-TICK
+     double-commit case (two Enters with no clock advance in between) — this
+     fixture is the one edge that requires a real timer straddling a real
+     browser round trip, which is exactly what a mocked/fake-timer harness
+     cannot honestly reproduce.
+  2. `:disable-filter="true"` is what makes `options` a genuine server-filtered
+     async source rather than a local substring filter, AND it is what makes
+     the async response CHANGE the create row's index (four new options land
+     ahead of it) — that shift, straddling a live commit, is the actual hazard
+     under test, not merely "does an async callback eventually run".
+  3. `:close-on-select="false"` is load-bearing, not cosmetic: without it the
+     FIRST create commit sets `isOpen=false`, and every later `End`+`Enter` is
+     a silent no-op against a closed popup — the double-commit and post-
+     resolve assertions would then pass for the wrong reason (nothing ever
+     reached `selectOption()`'s create branch a second time), not because the
+     latch suppressed it.
+  4. `onCreate` deliberately does NOT adopt the created option into `options`,
+     even though adopting the created value IS the documented consumer
+     contract elsewhere. Adopting it here would make `isCreatableQuery()`
+     false, remove the create row entirely, and let ROW ABSENCE — not the
+     latch — do the work of suppressing the second commit, which would prove
+     nothing about the latch this fixture exists to test.
+  5. `SEARCH_DELAY_MS` is a named module constant the VR spec reasons about
+     directly (widened to 2000ms — see the constant's own comment for why),
+     never a bare sleep. `createRaced` is the fixture-side proof that the
+     window was genuinely live AT THE INSTANT of each `create` emit: it reads
+     `inFlight` (captured into a local, ROZ138 idiom) at the moment `onCreate`
+     runs and only ever flips to `'yes'` when a search was live right then —
+     immune to Playwright round-trip latency in a way no test-side timing
+     check can be, and it degrades to `'no'` the instant an emit lands outside
+     a live window. Mutation probe 2 (collapsing this constant to 0) is what
+     empirically proves that degradation actually fires.
+-->
+<rozie name="ComboboxCreatableAsyncDemo">
+
+<components>
+{
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+
+<data>
+{
+  value: null,
+  options: [],
+  inFlight: 0,
+  resolved: 0,
+  seq: 0,
+  createCount: 0,
+  createLog: '',
+  createRaced: '-',
+}
+</data>
+
+<script>
+// Widened well past the UAT note's illustrative 500ms: the VR spec below
+// performs six Playwright round trips inside a single live window (two
+// polls, two commits, and two DOM-count assertions per phase), and a window
+// too narrow to hold all of them is the one way this cell quietly degrades
+// into a no-race test that happens to pass. 2000ms comfortably covers that;
+// the fixture-side `createRaced` accumulator (see the header comment, point
+// 5) is what keeps the window honest even against slower CI hosts.
+const SEARCH_DELAY_MS = 2000
+
+// Labels match NEITHER 'kiwi' NOR 'kiwis' — the two queries the spec commits
+// — so the create row survives the async response landing in every phase.
+const RESULTS = [
+  { value: 'apple', label: 'Apple' },
+  { value: 'banana', label: 'Banana' },
+  { value: 'cherry', label: 'Cherry' },
+  { value: 'date', label: 'Date' },
+]
+
+const onSearch = (e) => {
+  const query = e && e.query != null ? e.query : ''
+  // Read every $data slot this handler mutates into a local BEFORE any write
+  // (ROZ138 read-then-write idiom) — locals are named DISTINCTLY from their
+  // $data counterparts, never reused verbatim: `const seq = $data.seq`
+  // followed by `$data.seq = seq + 1` reads back as `const seq = seq` once
+  // the emitter lowers `$data.seq` to the bare reactive binding `seq`, a
+  // same-scope self-reference (TDZ on Svelte) rather than the intended
+  // outer-scope read.
+  const prevSeq = $data.seq
+  const prevInFlight = $data.inFlight
+  const nextSeq = prevSeq + 1
+  $data.seq = nextSeq
+  $data.inFlight = prevInFlight + 1
+  setTimeout(() => {
+    // Last-write-wins: apply RESULTS only when this response is still the
+    // LIVE one (its captured seq still matches $data.seq). A stale response
+    // — superseded by a later search before this one settled — is discarded,
+    // never applied.
+    if (nextSeq === $data.seq) {
+      $data.options = RESULTS
+    }
+    // resolved counts every SETTLED search, whether its result was applied
+    // or discarded — unconditional, unlike the options write above.
+    const stillInFlight = $data.inFlight
+    const resolvedSoFar = $data.resolved
+    $data.inFlight = stillInFlight - 1
+    $data.resolved = resolvedSoFar + 1
+  }, SEARCH_DELAY_MS)
+}
+
+// The race instrument (see the header comment, point 5, for what
+// `createRaced` proves and why).
+const onCreate = (e) => {
+  const query = e && e.query != null ? e.query : ''
+  // Read every $data slot this handler mutates into a local BEFORE any write
+  // (ROZ138 read-then-write idiom, locals named distinctly — see onSearch's
+  // comment above for why) — `prevInFlight` in particular must be captured
+  // BEFORE any write in this same handler so it reflects the state at the
+  // instant the create gesture landed, not after.
+  const prevCreateCount = $data.createCount
+  const prevCreateLog = $data.createLog
+  const prevCreateRaced = $data.createRaced
+  const prevInFlight = $data.inFlight
+  $data.createCount = prevCreateCount + 1
+  $data.createLog = prevCreateLog === '' ? query : prevCreateLog + ';' + query
+  // Accumulating AND: once this reads 'no' it can never read 'yes' again —
+  // the fixture-side proof degrades the instant a single emit lands outside
+  // a live in-flight window, rather than being satisfiable by one lucky race.
+  const wasLive = prevInFlight > 0
+  $data.createRaced = (prevCreateRaced !== 'no' && wasLive) ? 'yes' : 'no'
+  // Deliberately does NOT push into $data.options — see the header comment,
+  // point 4.
+}
+</script>
+
+<template>
+<div class="combobox-creatable-async-demo">
+  <div class="controls">
+    <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
+    <span class="readout" data-testid="readout-inflight">{{ $data.inFlight }}</span>
+    <span class="readout" data-testid="readout-resolved">{{ $data.resolved }}</span>
+    <span class="readout" data-testid="readout-create-count">{{ $data.createCount }}</span>
+    <span class="readout" data-testid="readout-create-log">{{ $data.createLog }}</span>
+    <span class="readout" data-testid="readout-create-raced">{{ $data.createRaced }}</span>
+  </div>
+
+  <Combobox
+    r-model:value="$data.value"
+    :options="$data.options"
+    creatable
+    :disable-filter="true"
+    :close-on-select="false"
+    @search="onSearch($event)"
+    @create="onCreate($event)"
+    placeholder="Search fruit…"
+    ariaLabel="Fruit (creatable async)"
+    idBase="creatable-async-combobox"
+  />
+</div>
+</template>
+
+<style>
+.combobox-creatable-async-demo {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  width: 360px;
+  padding: 1rem;
+}
+.combobox-creatable-async-demo .controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.75rem;
+}
+.combobox-creatable-async-demo .readout {
+  min-width: 2ch;
+}
+</style>
+
+</rozie>
