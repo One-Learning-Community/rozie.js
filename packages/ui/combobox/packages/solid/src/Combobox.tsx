@@ -1534,7 +1534,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     <>
     <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-combobox" + " " + rozieClass({ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': local.disabled, 'rozie-combobox--inline': local.inline, 'rozie-combobox--multiple': local.multiple }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-9546115a="">
       
-      <Popover trigger="manual" open={isOpen()} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={local.virtual} disablePositioning={local.inline} disableDismiss={pinned()} placement={local.placement} offset={local.offset} disableFlip={local.disableFlip} disableShift={local.disableShift} data-rozie-s-9546115a="" anchorSlot={() => (<>
+      <Popover trigger="manual" open={isOpen()} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={local.virtual} disablePositioning={local.inline} disableDismiss={local.inline || pinned()} placement={local.placement} offset={local.offset} disableFlip={local.disableFlip} disableShift={local.disableShift} data-rozie-s-9546115a="" anchorSlot={() => (<>
           
           {<Show when={local.multiple}><ul class={"rozie-combobox-chips"} data-rozie-s-9546115a="">
             <Key each={chipRows() as readonly any[]} by={(row) => 'chip-' + row.value}>{(row, idx) => <li class={"rozie-combobox-chip"} data-rozie-s-9546115a="">

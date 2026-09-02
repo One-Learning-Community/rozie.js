@@ -1312,7 +1312,17 @@ $expose({ focus, clear, seedQuery, pinOpen })
        `:disable-positioning="$props.inline"` (D-09) makes `inline` a static
        pass-through: the popup renders in normal flow and popover never calls
        computePosition/autoUpdate, preserving the overflow-safe embedded behavior
-       with ONE copy of every branch. -->
+       with ONE copy of every branch.
+       `:disable-dismiss="$props.inline || $data.pinned"` (86-REVIEW WR-01):
+       `:disable-positioning` alone does NOT imply no-dismissal — Popover's
+       document-level Escape/click-outside listeners are gated only on
+       `open && !disableDismiss`, independently of positioning. Before this
+       fix, an `inline` consumer (e.g. command-palette's un-pinned flow) still
+       got a real document-level Escape/click-outside listener it never had
+       pre-Phase-86 (it only closed on blur) — contradicting the SPEC's own
+       "the `inline` path involves no popover" acceptance criterion. Forwarding
+       `$props.inline` here restores that: `inline` gets neither positioning
+       nor dismissal from Popover, matching its pre-composition behavior. -->
   <Popover
     trigger="manual"
     r-model:open="$data.isOpen"
@@ -1320,7 +1330,7 @@ $expose({ focus, clear, seedQuery, pinOpen })
     :match-width="true"
     :keep-mounted="$props.virtual"
     :disable-positioning="$props.inline"
-    :disable-dismiss="$data.pinned"
+    :disable-dismiss="$props.inline || $data.pinned"
     :placement="$props.placement"
     :offset="$props.offset"
     :disable-flip="$props.disableFlip"

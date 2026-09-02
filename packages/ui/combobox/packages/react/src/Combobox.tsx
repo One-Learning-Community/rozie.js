@@ -1393,7 +1393,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     <>
     <div ref={__rozieRoot} {...attrs} className={clsx(clsx("rozie-combobox", { "rozie-combobox--open": isOpen, "rozie-combobox--disabled": props.disabled, "rozie-combobox--inline": props.inline, "rozie-combobox--multiple": props.multiple }), (attrs.className as string | undefined))} data-rozie-s-9546115a="">
       
-      <Popover trigger="manual" open={isOpen} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={props.virtual} disablePositioning={props.inline} disableDismiss={pinned} placement={props.placement} offset={props.offset} disableFlip={props.disableFlip} disableShift={props.disableShift} data-rozie-s-9546115a="" renderAnchor={() => (<>
+      <Popover trigger="manual" open={isOpen} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={props.virtual} disablePositioning={props.inline} disableDismiss={props.inline || pinned} placement={props.placement} offset={props.offset} disableFlip={props.disableFlip} disableShift={props.disableShift} data-rozie-s-9546115a="" renderAnchor={() => (<>
           
           {!!(props.multiple) && <ul className={"rozie-combobox-chips"} data-rozie-s-9546115a="">
             {chipRows().map((row, idx) => <li key={'chip-' + row.value} className={"rozie-combobox-chip"} data-rozie-s-9546115a="">

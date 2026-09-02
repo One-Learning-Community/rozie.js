@@ -531,7 +531,7 @@ private __rozieFirstUpdateDone = false;
     return html`
 <div class="${Object.entries({ "rozie-combobox": true, 'rozie-combobox--open': this._isOpen.value, 'rozie-combobox--disabled': this.disabled, 'rozie-combobox--inline': this.inline, 'rozie-combobox--multiple': this.multiple }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-9546115a>
   
-  <rozie-popover trigger="manual" .open=${this._isOpen.value} @open-change=${($event: CustomEvent) => { this._isOpen.value = $event.detail; }} .bare=${true} .matchWidth=${true} .keepMounted=${this.virtual} .disablePositioning=${this.inline} .disableDismiss=${this._pinned.value} .placement=${this.placement} .offset=${this.offset} .disableFlip=${this.disableFlip} .disableShift=${this.disableShift} data-rozie-s-9546115a><div slot="anchor">
+  <rozie-popover trigger="manual" .open=${this._isOpen.value} @open-change=${($event: CustomEvent) => { this._isOpen.value = $event.detail; }} .bare=${true} .matchWidth=${true} .keepMounted=${this.virtual} .disablePositioning=${this.inline} .disableDismiss=${this.inline || this._pinned.value} .placement=${this.placement} .offset=${this.offset} .disableFlip=${this.disableFlip} .disableShift=${this.disableShift} data-rozie-s-9546115a><div slot="anchor">
       
       ${this.multiple ? html`<ul class="rozie-combobox-chips" data-rozie-s-9546115a>
         ${repeat<any>(this.chipRows(), (row, idx) => 'chip-' + row.value, (row, idx) => html`<li class="rozie-combobox-chip" data-rozie-s-9546115a>

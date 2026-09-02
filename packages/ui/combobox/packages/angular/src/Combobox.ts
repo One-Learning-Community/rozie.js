@@ -68,7 +68,7 @@ interface GroupMoreCtx {
 
     <div class="rozie-combobox" [ngClass]="{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-combobox--inline': inline(), 'rozie-combobox--multiple': multiple() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
       
-      <rozie-popover trigger="manual" [open]="isOpen()" (openChange)="isOpen.set($event)" [bare]="true" [matchWidth]="true" [keepMounted]="virtual()" [disablePositioning]="inline()" [disableDismiss]="pinned()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()"><ng-template #anchor>
+      <rozie-popover trigger="manual" [open]="isOpen()" (openChange)="isOpen.set($event)" [bare]="true" [matchWidth]="true" [keepMounted]="virtual()" [disablePositioning]="inline()" [disableDismiss]="inline() || pinned()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()"><ng-template #anchor>
           
           @if (multiple()) {
     <ul class="rozie-combobox-chips">

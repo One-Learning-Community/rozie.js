@@ -277,4 +277,32 @@ describe('Combobox floating popover — composed positioning path (behavioral, p
       app.unmount();
     }
   });
+
+  it('(6) inline: a document click-outside does NOT close the popup (86-REVIEW WR-01 — `:disable-positioning` alone did not imply no-dismissal)', async () => {
+    const { app, host } = mountCombobox({ inline: true });
+    try {
+      const input = host.querySelector('input[role="combobox"]') as HTMLInputElement;
+      input.dispatchEvent(new Event('focus'));
+      await nextTick();
+      expect(host.querySelectorAll('[role="option"]').length).toBe(4);
+
+      // A click landing outside the control entirely — never on the input,
+      // never inside any popover-owned anchor/floating element, and no
+      // synthetic blur dispatched alongside it. The ONLY thing that could
+      // close the popup here is Popover's OWN document-level click-outside
+      // listener: combobox itself has no independent click-outside handling,
+      // only blur. Before the WR-01 fix, `:disable-dismiss` forwarded only
+      // `$data.pinned`, never `$props.inline`, so `inline` consumers (e.g.
+      // command-palette's ordinary un-pinned flow) still got a real
+      // document-level Escape/click-outside listener they never had
+      // pre-Phase-86 — contradicting the SPEC's "the inline path involves no
+      // popover" acceptance criterion.
+      document.body.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await nextTick();
+
+      expect(host.querySelectorAll('[role="option"]').length).toBe(4);
+    } finally {
+      app.unmount();
+    }
+  });
 });

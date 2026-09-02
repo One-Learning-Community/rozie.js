@@ -2,7 +2,7 @@
 
 <div :class="['rozie-combobox', { 'rozie-combobox--open': isOpen, 'rozie-combobox--disabled': props.disabled, 'rozie-combobox--inline': props.inline, 'rozie-combobox--multiple': props.multiple }]" ref="__rozieRootRef" v-bind="$attrs">
   
-  <Popover trigger="manual" v-model:open="isOpen" :bare="true" :match-width="true" :keep-mounted="props.virtual" :disable-positioning="props.inline" :disable-dismiss="pinned" :placement="props.placement" :offset="props.offset" :disable-flip="props.disableFlip" :disable-shift="props.disableShift"><template #anchor>
+  <Popover trigger="manual" v-model:open="isOpen" :bare="true" :match-width="true" :keep-mounted="props.virtual" :disable-positioning="props.inline" :disable-dismiss="props.inline || pinned" :placement="props.placement" :offset="props.offset" :disable-flip="props.disableFlip" :disable-shift="props.disableShift"><template #anchor>
       
       <ul v-if="props.multiple" class="rozie-combobox-chips">
         <li v-for="(row, idx) in chipRows()" :key="'chip-' + row.value" class="rozie-combobox-chip">
