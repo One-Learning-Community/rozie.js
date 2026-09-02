@@ -160,21 +160,10 @@ export interface DataTableProps {
   renderGroupBar?: (params: { grouping: unknown; groupableColumns: unknown; applyGrouping: (...args: any[]) => any; clearGrouping: (...args: any[]) => any }) => ReactNode;
   renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: (...args: any[]) => any }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
-  renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
   renderFilter?: (params: { columnId: unknown; value: unknown; uniqueValues: unknown; minMax: unknown; setFilter: (...args: any[]) => any }) => ReactNode;
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
   renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
   renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown; autofocus: unknown }) => ReactNode;
-  renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
-  renderDetail?: (params: { row: unknown }) => ReactNode;
-  renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: (...args: any[]) => any }) => ReactNode;
-  renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
-  renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
-  renderFilter?: (params: { columnId: unknown; value: unknown; uniqueValues: unknown; minMax: unknown; setFilter: (...args: any[]) => any }) => ReactNode;
-  renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
-  renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
-  renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown; autofocus: unknown }) => ReactNode;
-  renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
   renderDetail?: (params: { row: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

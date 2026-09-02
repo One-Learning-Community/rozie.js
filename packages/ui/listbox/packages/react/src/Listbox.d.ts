@@ -72,8 +72,6 @@ export interface ListboxProps {
   renderSelected?: (params: { selected: unknown; value: unknown }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;
-  renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
-  renderEmpty?: (params: { query: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

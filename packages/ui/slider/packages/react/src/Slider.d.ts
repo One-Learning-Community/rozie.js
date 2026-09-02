@@ -58,8 +58,6 @@ export interface SliderProps {
   onChange?: (...args: unknown[]) => void;
   renderMark?: (params: { value: unknown; label: unknown; position: unknown }) => ReactNode;
   renderBubble?: (params: { value: unknown }) => ReactNode;
-  renderBubble?: (params: { value: unknown }) => ReactNode;
-  renderBubble?: (params: { value: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

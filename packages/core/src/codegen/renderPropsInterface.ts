@@ -170,6 +170,32 @@ export function renderPropsInterface(
 
   // Slots per D-84 + D-86. The slot-children type token is the per-target
   // parameter (`opts.slotChildrenType`); everything else is framework-agnostic.
+  //
+  // 86-REVIEW CR-01 — dedupe by render-field name (first occurrence wins). A
+  // template may legitimately declare the same `<slot name="X">` more than
+  // once — most commonly the same named slot repeated across several
+  // mutually-exclusive `r-if` render branches (e.g. Combobox's plain/grouped/
+  // grouped+capped/windowed branches each carry their own `<slot
+  // name="option">`) — so `ir.slots` holds one `SlotDecl` per OCCURRENCE, not
+  // one per distinct name (see `lowerSlots.ts`'s `visit()`: it has no
+  // same-name top-level dedup, only a top-level-vs-nested one). Every
+  // per-target INLINE interface emitter already guards against this —
+  // React's `emitSlotDecl.ts` (`seenPropFields`), Solid's `emitSlotDecl.ts`
+  // (`seenSlotNames`), Svelte's `refineSlotTypes.ts`
+  // (`distinctSlotsByName`/`slotIdentityKey`) — this SHARED `.d.ts`/
+  // `.d.rozie.ts` renderer, consumed by all six targets' `emitTypes.ts`, was
+  // the one place that never got the fix: it emitted a fresh `render<Slot>`
+  // (or `children`) line per occurrence, minting a duplicate-identifier
+  // (TS2300) public `.d.ts` for any component repeating a slot name across
+  // branches. Confirmed via a direct `tsc --strict` run against the emitted
+  // `@rozie-ui/combobox-react` `.d.ts`: `renderOption`×4, `renderEmpty`×4,
+  // `renderCreate`×4, `renderGroupHeading`×2 — 14 duplicates, one per
+  // occurrence, none deduped by name. Keyed on the render-field name (not
+  // `slot.name` directly) so the default slot's own repeat-occurrence case
+  // dedupes identically under its `'children'` key. First occurrence wins —
+  // no attempt to union/merge param shapes across occurrences, matching the
+  // existing, already-shipped per-target precedent exactly.
+  const seenSlotFields = new Set<string>();
   for (const slot of ir.slots) {
     const isDefault = slot.name === ''; // D-18 default-slot sentinel
     // Task 0 (79-12, R12 escape found during 79-04) — `render${capitalize(name)}`
@@ -206,6 +232,10 @@ export function renderPropsInterface(
       continue;
     }
     const renderName = isDefault ? 'children' : `render${capitalize(slot.name)}`;
+    if (seenSlotFields.has(renderName)) {
+      continue;
+    }
+    seenSlotFields.add(renderName);
     if (slot.params.length === 0) {
       if (isDefault) {
         lines.push(`  children?: ${slotChildrenType};`);

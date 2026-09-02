@@ -107,17 +107,7 @@ export interface ComboboxProps {
   renderEmpty?: (params: { query: unknown }) => ReactNode;
   renderCreate?: (params: { query: unknown }) => ReactNode;
   renderGroupHeading?: (params: { group: unknown }) => ReactNode;
-  renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
-  renderEmpty?: (params: { query: unknown }) => ReactNode;
-  renderCreate?: (params: { query: unknown }) => ReactNode;
-  renderGroupHeading?: (params: { group: unknown }) => ReactNode;
-  renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderGroupMore?: (params: { group: unknown; hidden: unknown; expand: unknown }) => ReactNode;
-  renderEmpty?: (params: { query: unknown }) => ReactNode;
-  renderCreate?: (params: { query: unknown }) => ReactNode;
-  renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
-  renderEmpty?: (params: { query: unknown }) => ReactNode;
-  renderCreate?: (params: { query: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 
