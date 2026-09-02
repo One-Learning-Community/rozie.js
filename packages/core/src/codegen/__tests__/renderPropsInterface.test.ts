@@ -81,7 +81,9 @@ describe('renderPropsInterface — 86-REVIEW CR-01 slot dedup across mutually-ex
   it('the emitted interface has no duplicate property identifiers at all (grep-level TS2300 guard)', () => {
     const ir = irFor(SRC);
     const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
-    const fieldNames = [...out.matchAll(/^\s*([A-Za-z_$][\w$]*)\??:/gm)].map((m) => m[1]);
+    const fieldNames = [...out.matchAll(/^\s*([A-Za-z_$][\w$]*)\??:/gm)]
+      .map((m) => m[1])
+      .filter((name): name is string => name !== undefined);
     const seen = new Set<string>();
     const dupes: string[] = [];
     for (const name of fieldNames) {
