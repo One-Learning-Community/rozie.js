@@ -1,7 +1,34 @@
 ---
 phase: 86-combobox-v1-gap-cluster-multi-select-floating-popup-via-popo
 verified: 2026-09-01T17:10:00Z
-status: human_needed
+status: passed
+status_history:
+  - status: human_needed
+    at: 2026-09-01T17:10:00Z
+    note: >-
+      Original verdict. 9/9 must-haves verified; 3 items routed to human
+      verification. Preserved here rather than overwritten — the verifier's
+      call was correct at the time.
+  - status: passed
+    at: 2026-09-02T00:00:00Z
+    note: >-
+      All 3 human_verification items are now closed and none required a
+      manual pass. Items 1 and 2 (both SPEC-declared `🧪 backstop` edges,
+      never automated by design) were converted to machine checks by
+      quick-260901-tpq and quick-260902-hmv; item 3 was a false
+      documentation claim, fixed in e3a13b48b. See 86-UAT.md — total 3,
+      resolved 3, pending 0.
+resolved_by:
+  - "tests/visual-regression/specs/combobox.spec.ts :: combobox-flip-exact-fit (6 targets) — item 1"
+  - "tests/visual-regression/specs/combobox.spec.ts :: combobox-create-async (6 targets) — item 2"
+  - "examples/demos/ComboboxCreatableAsyncDemo.rozie — item 2 fixture (2000ms-delayed async search)"
+  - "commit e3a13b48b — item 3 (stale click-outside prose + stale v1-scope paragraph)"
+orchestrator_verified_at_close:
+  - "24/24 combobox behavioral cells green across all 6 targets"
+  - "mutation probe re-run independently: SEARCH_DELAY_MS 2000->0 => 6/6 RED (Expected \"1\", Received \"0\"); restored => GREEN — the race cell detects loss of the in-flight window, it does not pass regardless of timing"
+  - "turbo run typecheck --force: 324/324"
+  - "@rozie-ui/combobox: 197/197"
+  - "zero new PNG baselines; toHaveScreenshot count unchanged at 4"
 score: 9/9 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
