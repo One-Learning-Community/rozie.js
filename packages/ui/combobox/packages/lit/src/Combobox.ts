@@ -537,7 +537,7 @@ private __rozieFirstUpdateDone = false;
         ${repeat<any>(this.chipRows(), (row, idx) => 'chip-' + row.value, (row, idx) => html`<li class="rozie-combobox-chip" data-rozie-s-9546115a>
           ${this.chip !== undefined ? this.chip({option: row.option, remove: () => this.removeChipValue(row.value), index: idx}) : html`<slot name="chip" data-rozie-params=${(() => { try { return JSON.stringify({option: row.option, index: idx}); } catch { return '{}'; } })()} @rozie-chip-remove=${($event: CustomEvent) => ((() => this.removeChipValue(row.value)) as (...args: any[]) => any)($event.detail)}>
             <span class="rozie-combobox-chip__label" data-rozie-s-9546115a>${rozieDisplay(row.label)}</span>
-            <button class="rozie-combobox-chip__remove" type="button" ?disabled=${!!this.disabled} aria-label=${rozieAttr(this.chipRemoveLabel(row))} @mousedown=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { $event.preventDefault(); this.onChipRemovePointerDown(); }} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onChipRemoveActivate(row.value); }} data-rozie-s-9546115a>×</button>
+            <button class="rozie-combobox-chip__remove" type="button" ?disabled=${!!this.disabled} aria-label=${rozieAttr(this.chipRemoveLabel(row))} @mousedown=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { $event.preventDefault(); this.onChipRemovePointerDown(); }} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { $event.stopPropagation(); this.onChipRemoveActivate(row.value); }} data-rozie-s-9546115a>×</button>
           </slot>`}
         </li>`)}
       </ul>` : nothing}<input class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded=${!!this._isOpen.value} aria-controls=${rozieAttr(this.listId())} aria-activedescendant=${rozieAttr(this.activeId())} aria-label=${rozieAttr(this.ariaLabel)} .value=${this._query.value} placeholder=${this.placeholder} ?disabled=${!!this.disabled} autocomplete="off" @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @focus=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onFocus($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} data-rozie-ref="inputEl" data-rozie-s-9546115a />
@@ -1533,6 +1533,21 @@ private __rozieFirstUpdateDone = false;
   // never re-enters onFocus() and never re-selects the in-progress query.
   // $refs is safe here for the same reason it is safe everywhere else in this
   // file: this is a post-mount event handler, not module-init code.
+  //
+  // `.stop` on the template's `@click` binding (real-browser VR finding,
+  // quick-260903-0s1): on Solid and Svelte specifically — the two targets whose
+  // reactivity applies a DOM mutation SYNCHRONOUSLY, inside the very handler
+  // that triggered it, rather than batched to a microtask like the other four
+  // — removing this chip's own `<li>` mid-click detaches the click event's
+  // `target` from the document BEFORE the event finishes bubbling. Popover's
+  // own document-level `@click.outside($refs.anchorEl,$refs.floatingEl)`
+  // dismiss listener (Popover.rozie) then evaluates `anchorEl.contains(target)`
+  // against the NOW-DETACHED target, which is unconditionally `false` for any
+  // detached node — misreading this internal removal as an outside click and
+  // closing the popup. `.stop` (stopPropagation) keeps this click from ever
+  // reaching that document listener, exactly like the sibling `@mousedown.stop`
+  // pattern command-palette's own action-menu-affordance row already uses to
+  // keep an inner gesture from bubbling into an ancestor's own listener.
   onChipRemoveActivate = (v: any) => {
   this.removeChipValue(v);
   queueMicrotask(() => {

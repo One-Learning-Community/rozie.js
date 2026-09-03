@@ -1322,6 +1322,21 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   // never re-enters onFocus() and never re-selects the in-progress query.
   // $refs is safe here for the same reason it is safe everywhere else in this
   // file: this is a post-mount event handler, not module-init code.
+  //
+  // `.stop` on the template's `@click` binding (real-browser VR finding,
+  // quick-260903-0s1): on Solid and Svelte specifically — the two targets whose
+  // reactivity applies a DOM mutation SYNCHRONOUSLY, inside the very handler
+  // that triggered it, rather than batched to a microtask like the other four
+  // — removing this chip's own `<li>` mid-click detaches the click event's
+  // `target` from the document BEFORE the event finishes bubbling. Popover's
+  // own document-level `@click.outside($refs.anchorEl,$refs.floatingEl)`
+  // dismiss listener (Popover.rozie) then evaluates `anchorEl.contains(target)`
+  // against the NOW-DETACHED target, which is unconditionally `false` for any
+  // detached node — misreading this internal removal as an outside click and
+  // closing the popup. `.stop` (stopPropagation) keeps this click from ever
+  // reaching that document listener, exactly like the sibling `@mousedown.stop`
+  // pattern command-palette's own action-menu-affordance row already uses to
+  // keep an inner gesture from bubbling into an ancestor's own listener.
   function onChipRemoveActivate(v: any) {
     removeChipValue(v);
     queueMicrotask(() => {
@@ -1595,7 +1610,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
           
           {<Show when={local.multiple}><ul class={"rozie-combobox-chips"} data-rozie-s-9546115a="">
             <Key each={chipRows() as readonly any[]} by={(row) => 'chip-' + row.value}>{(row, idx) => <li class={"rozie-combobox-chip"} data-rozie-s-9546115a="">
-              {(_props.chipSlot ?? _props.slots?.['chip'])?.({ option: row().option, remove: () => removeChipValue(row().value), index: idx() }) ?? <><span class={"rozie-combobox-chip__label"} data-rozie-s-9546115a="">{rozieDisplay(row().label)}</span><button type="button" aria-label={rozieAttr(chipRemoveLabel(row()))} class={"rozie-combobox-chip__remove"} disabled={!!local.disabled} onMouseDown={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { $event.preventDefault(); onChipRemovePointerDown(); }} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onChipRemoveActivate(row().value); }} data-rozie-s-9546115a="">×</button></>}
+              {(_props.chipSlot ?? _props.slots?.['chip'])?.({ option: row().option, remove: () => removeChipValue(row().value), index: idx() }) ?? <><span class={"rozie-combobox-chip__label"} data-rozie-s-9546115a="">{rozieDisplay(row().label)}</span><button type="button" aria-label={rozieAttr(chipRemoveLabel(row()))} class={"rozie-combobox-chip__remove"} disabled={!!local.disabled} onMouseDown={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { $event.preventDefault(); onChipRemovePointerDown(); }} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { $event.stopPropagation(); onChipRemoveActivate(row().value); }} data-rozie-s-9546115a="">×</button></>}
             </li>}</Key>
           </ul></Show>}<input type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen()} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(local.ariaLabel)} autocomplete="off" ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-combobox-input"} value={query()} placeholder={local.placeholder} disabled={!!local.disabled} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onFocus={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onFocus($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} data-rozie-s-9546115a="" />
         </>)}>

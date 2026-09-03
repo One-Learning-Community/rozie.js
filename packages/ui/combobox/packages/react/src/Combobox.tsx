@@ -1135,6 +1135,21 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   // never re-enters onFocus() and never re-selects the in-progress query.
   // $refs is safe here for the same reason it is safe everywhere else in this
   // file: this is a post-mount event handler, not module-init code.
+  //
+  // `.stop` on the template's `@click` binding (real-browser VR finding,
+  // quick-260903-0s1): on Solid and Svelte specifically — the two targets whose
+  // reactivity applies a DOM mutation SYNCHRONOUSLY, inside the very handler
+  // that triggered it, rather than batched to a microtask like the other four
+  // — removing this chip's own `<li>` mid-click detaches the click event's
+  // `target` from the document BEFORE the event finishes bubbling. Popover's
+  // own document-level `@click.outside($refs.anchorEl,$refs.floatingEl)`
+  // dismiss listener (Popover.rozie) then evaluates `anchorEl.contains(target)`
+  // against the NOW-DETACHED target, which is unconditionally `false` for any
+  // detached node — misreading this internal removal as an outside click and
+  // closing the popup. `.stop` (stopPropagation) keeps this click from ever
+  // reaching that document listener, exactly like the sibling `@mousedown.stop`
+  // pattern command-palette's own action-menu-affordance row already uses to
+  // keep an inner gesture from bubbling into an ancestor's own listener.
   const onChipRemoveActivate = useCallback((v: any) => {
     removeChipValue(v);
     queueMicrotask(() => {
@@ -1453,7 +1468,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
           
           {!!(props.multiple) && <ul className={"rozie-combobox-chips"} data-rozie-s-9546115a="">
             {chipRows().map((row, idx) => <li key={'chip-' + row.value} className={"rozie-combobox-chip"} data-rozie-s-9546115a="">
-              {(props.renderChip ?? props.slots?.['chip']) ? ((props.renderChip ?? props.slots?.['chip']) as Function)({ option: row.option, remove: () => removeChipValue(row.value), index: idx }) : <><span className={"rozie-combobox-chip__label"} data-rozie-s-9546115a="">{rozieDisplay(row.label)}</span><button type="button" className={"rozie-combobox-chip__remove"} disabled={!!props.disabled} aria-label={rozieAttr(chipRemoveLabel(row))} onMouseDown={($event) => { $event.preventDefault(); onChipRemovePointerDown(); }} onClick={($event) => { onChipRemoveActivate(row.value); }} data-rozie-s-9546115a="">×</button></>}
+              {(props.renderChip ?? props.slots?.['chip']) ? ((props.renderChip ?? props.slots?.['chip']) as Function)({ option: row.option, remove: () => removeChipValue(row.value), index: idx }) : <><span className={"rozie-combobox-chip__label"} data-rozie-s-9546115a="">{rozieDisplay(row.label)}</span><button type="button" className={"rozie-combobox-chip__remove"} disabled={!!props.disabled} aria-label={rozieAttr(chipRemoveLabel(row))} onMouseDown={($event) => { $event.preventDefault(); onChipRemovePointerDown(); }} onClick={($event) => { $event.stopPropagation(); onChipRemoveActivate(row.value); }} data-rozie-s-9546115a="">×</button></>}
             </li>)}
           </ul>}<input ref={inputEl} className={"rozie-combobox-input"} type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(props.ariaLabel)} value={query} placeholder={props.placeholder} disabled={!!props.disabled} autoComplete="off" onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur(); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-9546115a="" />
         </>)} children={<>

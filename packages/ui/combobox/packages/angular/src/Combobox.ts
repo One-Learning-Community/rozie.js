@@ -79,7 +79,7 @@ interface GroupMoreCtx {
     } @else {
 
                 <span class="rozie-combobox-chip__label">{{ rozieDisplay(row.label) }}</span>
-                <button type="button" class="rozie-combobox-chip__remove" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(chipRemoveLabel(row))" (mousedown)="$event.preventDefault(); onChipRemovePointerDown()" (click)="onChipRemoveActivate(row.value)">×</button>
+                <button type="button" class="rozie-combobox-chip__remove" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(chipRemoveLabel(row))" (mousedown)="$event.preventDefault(); onChipRemovePointerDown()" (click)="$event.stopPropagation(); onChipRemoveActivate(row.value)">×</button>
               
     }
             </li>
@@ -1494,6 +1494,21 @@ export class Combobox {
   // never re-enters onFocus() and never re-selects the in-progress query.
   // $refs is safe here for the same reason it is safe everywhere else in this
   // file: this is a post-mount event handler, not module-init code.
+  //
+  // `.stop` on the template's `@click` binding (real-browser VR finding,
+  // quick-260903-0s1): on Solid and Svelte specifically — the two targets whose
+  // reactivity applies a DOM mutation SYNCHRONOUSLY, inside the very handler
+  // that triggered it, rather than batched to a microtask like the other four
+  // — removing this chip's own `<li>` mid-click detaches the click event's
+  // `target` from the document BEFORE the event finishes bubbling. Popover's
+  // own document-level `@click.outside($refs.anchorEl,$refs.floatingEl)`
+  // dismiss listener (Popover.rozie) then evaluates `anchorEl.contains(target)`
+  // against the NOW-DETACHED target, which is unconditionally `false` for any
+  // detached node — misreading this internal removal as an outside click and
+  // closing the popup. `.stop` (stopPropagation) keeps this click from ever
+  // reaching that document listener, exactly like the sibling `@mousedown.stop`
+  // pattern command-palette's own action-menu-affordance row already uses to
+  // keep an inner gesture from bubbling into an ancestor's own listener.
   onChipRemoveActivate = (v: any) => {
     this.removeChipValue(v);
     queueMicrotask(() => {

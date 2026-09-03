@@ -8,7 +8,7 @@
         <li v-for="(row, idx) in chipRows()" :key="'chip-' + row.value" class="rozie-combobox-chip">
           <slot name="chip" :option="row.option" :remove="() => removeChipValue(row.value)" :index="idx">
             <span class="rozie-combobox-chip__label">{{ row.label }}</span>
-            <button type="button" class="rozie-combobox-chip__remove" :disabled="!!props.disabled" :aria-label="chipRemoveLabel(row)" @mousedown.prevent="onChipRemovePointerDown()" @click="onChipRemoveActivate(row.value)">×</button>
+            <button type="button" class="rozie-combobox-chip__remove" :disabled="!!props.disabled" :aria-label="chipRemoveLabel(row)" @mousedown.prevent="onChipRemovePointerDown()" @click.stop="onChipRemoveActivate(row.value)">×</button>
           </slot>
         </li>
       </ul><input ref="inputElRef" class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" :aria-expanded="!!isOpen" :aria-controls="listId()" :aria-activedescendant="(activeId()) ?? undefined" :aria-label="props.ariaLabel" :value="query" :placeholder="props.placeholder" :disabled="!!props.disabled" autocomplete="off" @input="onInput($event)" @focus="onFocus($event)" @blur="onBlur()" @keydown="onKeydown($event)" />
@@ -1101,6 +1101,21 @@ const onChipRemovePointerDown = () => {};
 // never re-enters onFocus() and never re-selects the in-progress query.
 // $refs is safe here for the same reason it is safe everywhere else in this
 // file: this is a post-mount event handler, not module-init code.
+//
+// `.stop` on the template's `@click` binding (real-browser VR finding,
+// quick-260903-0s1): on Solid and Svelte specifically — the two targets whose
+// reactivity applies a DOM mutation SYNCHRONOUSLY, inside the very handler
+// that triggered it, rather than batched to a microtask like the other four
+// — removing this chip's own `<li>` mid-click detaches the click event's
+// `target` from the document BEFORE the event finishes bubbling. Popover's
+// own document-level `@click.outside($refs.anchorEl,$refs.floatingEl)`
+// dismiss listener (Popover.rozie) then evaluates `anchorEl.contains(target)`
+// against the NOW-DETACHED target, which is unconditionally `false` for any
+// detached node — misreading this internal removal as an outside click and
+// closing the popup. `.stop` (stopPropagation) keeps this click from ever
+// reaching that document listener, exactly like the sibling `@mousedown.stop`
+// pattern command-palette's own action-menu-affordance row already uses to
+// keep an inner gesture from bubbling into an ancestor's own listener.
 const onChipRemoveActivate = (v: any) => {
   removeChipValue(v);
   queueMicrotask(() => {
