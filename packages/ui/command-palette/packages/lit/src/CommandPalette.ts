@@ -1771,7 +1771,22 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   // scroll). The frame wraps the panel tightly (no padding), so
   // frame-top ≈ panel-top and the flyout still aligns to its row.
   // `frame.scrollTop` is 0 — the frame does not scroll.
-  this._actionMenuTop.value = activeRow && frame ? activeRow.getBoundingClientRect().top - frame.getBoundingClientRect().top + frame.scrollTop : 0;
+  //
+  // quick-260903-0s1 (CP-08 audit finding): the geometry expression is hoisted
+  // into the plain local `anchorTop` — byte-identical to the expression that
+  // used to land directly in the holder, including the frame-relative
+  // getBoundingClientRect delta and the scrollTop term, so the geometry is
+  // provably unchanged. The holder is still assigned from it, exactly once,
+  // on the very next line — mirrors the fresh-local threading pushLevel() and
+  // jumpToLevel() already do above (their own comments document the same
+  // React/Solid/Lit setState-is-async stale-read hazard this closes here).
+  // The clamp below reads `anchorTop`, NOT the holder — see that comment for
+  // why. The holder itself CANNOT be demoted to a plain top-level binding:
+  // the template reads it for the flyout's `:style` top offset
+  // (CommandPalette.rozie's `:style="'top:' + $data.actionMenuTop + 'px'"`),
+  // so it must stay reactive.
+  const anchorTop = activeRow && frame ? activeRow.getBoundingClientRect().top - frame.getBoundingClientRect().top + frame.scrollTop : 0;
+  this._actionMenuTop.value = anchorTop;
   this._refCombobox?.pinOpen(true);
   if (typeof requestAnimationFrame !== 'undefined') {
     requestAnimationFrame(() => {
@@ -1780,13 +1795,29 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
       // never run off the viewport bottom. Reads DOM post-mount (rAF), so
       // the flyout has laid out. Shifts the menu UP only; never above the
       // frame top.
+      //
+      // Reads `anchorTop` (the LOCAL captured above), not $data.actionMenuTop
+      // (quick-260903-0s1, CP-08 audit finding): on React, a `$data` read
+      // lowers to the value the enclosing render closure captured at render
+      // time — a read DEFERRED past the current render (this rAF callback)
+      // observes the PRE-write value, not the write this very function just
+      // made moments earlier. On a session's first open that pre-write value
+      // is the initial `0`, so the old `$data.actionMenuTop > maxTop`
+      // comparison never clamped on React — the flyout could run off the
+      // viewport bottom. `anchorTop` is a plain local, captured by this
+      // closure at its declaration above; a closure capturing a local always
+      // sees that local's value at capture time, which IS the freshly-
+      // computed offset, correct on every target. The other five targets
+      // read a live holder (`.value`, a signal call, a rune) and were
+      // correct by construction; they now compare the SAME hoisted local,
+      // for consistency, not because they were broken.
       const menuEl: any = frame ? frame.querySelector('[data-command-palette-menu]') : null;
       if (menuEl && frame) {
         const frameTop = frame.getBoundingClientRect().top;
         const menuH = menuEl.getBoundingClientRect().height;
         const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
         const maxTop = Math.max(0, vh - 8 - frameTop - menuH);
-        if (this._actionMenuTop.value > maxTop) this._actionMenuTop.value = maxTop;
+        if (anchorTop > maxTop) this._actionMenuTop.value = maxTop;
       }
     });
   } else {
