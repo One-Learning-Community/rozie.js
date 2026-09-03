@@ -171,3 +171,132 @@ describe('leaf-source-contracts — E1 chip remove control (six-leaf structural 
     });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// E2 — syncQueryToValue() routes through the valueOf()/labelOf() resolvers
+// instead of reading raw `.value`/`.label` properties.
+// ─────────────────────────────────────────────────────────────────────────
+//
+// The function's definition start is located by matching common per-target
+// definition idioms (`function syncQueryToValue() {` on Solid,
+// `syncQueryToValue = () => {` / `syncQueryToValue = useCallback(() => {`
+// elsewhere) rather than a bare `indexOf('syncQueryToValue')` — Solid's
+// function declaration hoists, so it is CALLED (a bare `syncQueryToValue();`,
+// no `=`) earlier in the file than it is DEFINED; a bare indexOf would anchor
+// on that earlier call site and slice the wrong region entirely.
+const SYNC_QUERY_DEF_RE = /(?:function\s+syncQueryToValue\s*\(\)\s*\{|syncQueryToValue\s*=\s*(?:useCallback\()?\(\)\s*=>\s*\{)/;
+// Every one of the six leaves carries this literal comment immediately after
+// the function (verified by reading all six) — a stable, framework-agnostic
+// end boundary for the slice.
+const SYNC_QUERY_END_MARKER = '// ---- input + keyboard handlers';
+
+function extractSyncQueryToValueBody(source: string): string | null {
+  const match = SYNC_QUERY_DEF_RE.exec(source);
+  if (match === null) return null;
+  const endIdx = source.indexOf(SYNC_QUERY_END_MARKER, match.index);
+  if (endIdx === -1) return null;
+  return source.slice(match.index, endIdx);
+}
+
+// The unfixed defect's exact shape: `(o: any) => o.value === <model>` (or the
+// untyped `(o) => o.value === <model>` on targets that don't annotate). The
+// LHS `o.value` is the raw-property read this fix replaces with `valueOf(o)`
+// — deliberately NOT a bare `/\.value/` scan, which would false-positive on
+// the RHS of the FIXED comparison reading the model's own `.value` accessor
+// (Vue `value.value`, Lit `this.value`).
+const RAW_VALUE_COMPARISON_RE = /\bo\.value\s*===/;
+// Tolerant of the two emitted call forms per the plan: four targets emit a
+// bare `valueOf(`/`labelOf(` call, Lit and Angular emit a `this.`-qualified,
+// `$local`-suffixed member call (`this.valueOf$local(`).
+const RESOLVER_VALUEOF_RE = /(this\.)?valueOf(\$local)?\s*\(/;
+const RESOLVER_LABELOF_RE = /(this\.)?labelOf(\$local)?\s*\(/;
+
+function checkResolverRoutingContract(source: string): string[] {
+  const violations: string[] = [];
+  const body = extractSyncQueryToValueBody(source);
+  if (body === null) {
+    violations.push('syncQueryToValue body not found (definition or end marker missing)');
+    return violations;
+  }
+  if (RAW_VALUE_COMPARISON_RE.test(body)) {
+    violations.push('syncQueryToValue still compares the raw .value property (o.value ===) instead of routing through valueOf()');
+  }
+  if (!RESOLVER_VALUEOF_RE.test(body)) {
+    violations.push('syncQueryToValue does not call the valueOf() resolver');
+  }
+  if (!RESOLVER_LABELOF_RE.test(body)) {
+    violations.push('syncQueryToValue does not call the labelOf() resolver');
+  }
+  return violations;
+}
+
+describe('leaf-source-contracts — E2 syncQueryToValue resolver routing (six-leaf structural gate)', () => {
+  it('the negative fixture proves the gate fires on the unfixed raw-property shape', () => {
+    const negative = `
+const syncQueryToValue = () => {
+  if (props.multiple) return;
+  const opts = Array.isArray(props.options) ? props.options : [];
+  const opt = opts.find((o: any) => o.value === value);
+  setQuery(opt ? String(opt.label) : '');
+};
+// ---- input + keyboard handlers -----------------------------------------
+`;
+    const violations = checkResolverRoutingContract(negative);
+    expect(violations).not.toEqual([]);
+    expect(violations.some((v) => v.includes('raw .value property'))).toBe(true);
+    expect(violations.some((v) => v.includes('valueOf()'))).toBe(true);
+    expect(violations.some((v) => v.includes('labelOf()'))).toBe(true);
+  });
+
+  it('the negative fixture proves the gate fires on Solid, whose definition is hoisted above an earlier bare call site', () => {
+    const negative = `
+  useEffect(() => {
+    syncQueryToValue();
+    syncRows();
+  }, []);
+  ${'const filler = 1;\n'.repeat(40)}
+  function syncQueryToValue() {
+    if (local.multiple) return;
+    const opts = Array.isArray(local.options) ? local.options : [];
+    const opt = opts.find((o: any) => o.value === value());
+    setQuery(opt ? String(opt.label) : '');
+  }
+
+  // ---- input + keyboard handlers -----------------------------------------
+`;
+    expect(checkResolverRoutingContract(negative)).not.toEqual([]);
+  });
+
+  it('a correctly-shaped fixture (resolver-routed, undefined/null-guarded) reports zero violations', () => {
+    const positive = `
+const syncQueryToValue = () => {
+  if (props.multiple) return;
+  const opts = Array.isArray(props.options) ? props.options : [];
+  const opt = opts.find((o: any) => valueOf(o) === value);
+  setQuery(opt === undefined || opt === null ? '' : String(labelOf(opt)));
+};
+// ---- input + keyboard handlers -----------------------------------------
+`;
+    expect(checkResolverRoutingContract(positive)).toEqual([]);
+  });
+
+  it('a correctly-shaped Lit/Angular fixture (this.-qualified, $local-suffixed resolver calls) reports zero violations', () => {
+    const positive = `
+  syncQueryToValue = () => {
+  if (this.multiple) return;
+  const opts = Array.isArray(this.options) ? this.options : [];
+  const opt = opts.find((o: any) => this.valueOf$local(o) === this.value);
+  this._query.value = opt === undefined || opt === null ? '' : String(this.labelOf$local(opt));
+};
+
+  // ---- input + keyboard handlers -----------------------------------------
+`;
+    expect(checkResolverRoutingContract(positive)).toEqual([]);
+  });
+
+  for (const leaf of leaves) {
+    it(`${leaf.id}: syncQueryToValue routes through valueOf()/labelOf() instead of raw .value/.label properties`, () => {
+      expect(checkResolverRoutingContract(leaf.source)).toEqual([]);
+    });
+  }
+});

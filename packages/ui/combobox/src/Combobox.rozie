@@ -999,11 +999,29 @@ const onChipRemoveActivate = (v) => {
 // Reflect the externally-selected value into the input text. D-14: no-ops
 // under `multiple` — there is no single label to mirror into the input once
 // `value` holds an array, and the query is owned by chip-picking instead.
+//
+// quick-260903-0s1 (E2 audit finding): routed through the SAME valueOf()/
+// labelOf() resolvers every other option read in this file uses
+// (filteredOptions(), chipRows(), removeChipValue(), queryMatchesOption()) —
+// this was the single site that still read the raw `.value`/`.label`
+// properties directly. `optionValue`/`optionLabel` are documented public
+// props, and the resolvers additionally carry the primitive-option fallback
+// (`String(opt)` when `opt` has no `.label`) — bypassing them blanked the
+// input on both the mount path ($onMount → syncQueryToValue()) and the
+// external-value path ($watch(() => $props.value, ...) → syncQueryToValue()).
+//
+// The "not found" guard is on `opt` being neither `undefined` NOR `null`,
+// deliberately not on truthiness: with primitive options the found entry IS
+// the option, so a legitimate selection of an empty string or a zero would be
+// discarded by a truthiness test and re-blank the input — reintroducing the
+// bug in a new shape. `Array.prototype.find` returns `undefined` on a miss,
+// so that is the correct miss test; the `null` check keeps a `null` option
+// from rendering as the literal text "null".
 const syncQueryToValue = () => {
   if ($props.multiple) return
   const opts = Array.isArray($props.options) ? $props.options : []
-  const opt = opts.find((o) => o.value === $props.value)
-  $data.query = opt ? String(opt.label) : ''
+  const opt = opts.find((o) => valueOf(o) === $props.value)
+  $data.query = opt === undefined || opt === null ? '' : String(labelOf(opt))
 }
 
 // ---- input + keyboard handlers -----------------------------------------
