@@ -39,6 +39,13 @@
  *   (8) close behavior: the effective `closeOnSelect` default is `false` under
  *       `multiple` (the popup stays open after a pick); an explicit
  *       `:closeOnSelect="true"` still closes it.
+ *
+ * Quick task 260903-0s1 (E1 audit finding) re-aimed tests (11)/(15) and added
+ * (16)/(17) at the chip-remove-control section below: the control now splits
+ * into an empty-bodied `@mousedown.prevent` pointer half (B1-B4 regression
+ * guards) and a `@click` activation half (B5, the fix — the shape every
+ * keyboard and screen-reader activation produces). (16) is the RED-first
+ * proof: a click with no preceding mousedown removed nothing before this fix.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { createApp, h, ref, nextTick } from 'vue';
@@ -440,13 +447,24 @@ for (const branch of BRANCHES) {
       try {
         await openBranch(branch.name, mount);
         const target = chipEls(host).find((el) => el.textContent?.includes('Apple'))!;
-        // The remove control commits on @mousedown.prevent (CR-02 fix), the
-        // same idiom every other interactive row in this family uses — not
-        // click. See test (15) for the RED-first proof of the mechanism
-        // itself (preventDefault + no query clobber).
-        chipRemoveBtn(target).dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        const btn = chipRemoveBtn(target);
+        const beforeCount = changes.length;
+        // E1 fix (quick-260903-0s1): the control's real-user gesture is a full
+        // pointer press — mousedown (which the `.prevent`-only pointer handler
+        // swallows; it never removes) followed by the click a real <button>
+        // fires on release (the removal actually happens here). Dispatching
+        // BOTH is what a genuine pointer press produces; test (16) proves the
+        // click-alone keyboard/AT shape separately, and test (15) proves the
+        // mousedown-alone mechanism (preventDefault + no query clobber).
+        btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        await nextTick();
+        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         await nextTick();
         expect(value()).toEqual(['banana']);
+        // Exactly one removal — a handler bound to BOTH mousedown and click
+        // would double-fire and either desync the model or throw removing an
+        // already-absent value (B3).
+        expect(changes.length - beforeCount).toBe(1);
         const last = changes[changes.length - 1] as { value: unknown; option: { value: string } | null; selected: boolean };
         expect(last.value).toEqual(['banana']);
         expect(last.selected).toBe(false);
@@ -509,7 +527,7 @@ for (const branch of BRANCHES) {
       }
     });
 
-    it('(15) chips: the remove control commits on mousedown+preventDefault (the same idiom every other interactive row uses), not click, and never clears an in-progress query', async () => {
+    it('(15) chips: a full pointer gesture (mousedown then click) removes exactly once, mousedown alone is preventDefault-only and removes nothing, and the removal never clobbers an in-progress query', async () => {
       const mount = mountCombobox(branch.props, { initialValue: ['apple', 'banana'] });
       const { app, host, value } = mount;
       try {
@@ -523,23 +541,70 @@ for (const branch of BRANCHES) {
 
         const target = chipEls(host).find((el) => el.textContent?.includes('Apple'))!;
         const btn = chipRemoveBtn(target);
-        // Dispatch ONLY mousedown — never click. If the control were still
-        // bound with a bare `@click` (as it was before this fix), nothing
-        // would happen here at all: no preventDefault, no removal. A real
-        // browser's native focus-follows-mousedown would blur the input and
-        // close the popup between this mousedown and any click that might
-        // follow it, which happy-dom cannot simulate — so this test asserts
-        // on the actual mechanism (the binding + its effects) instead of a
-        // synthetic click that would not reproduce the hazard.
-        const evt = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
-        btn.dispatchEvent(evt);
+
+        // B1: the mousedown half is `.prevent`-only and empty-bodied — it
+        // suppresses the native focus shift (the CR-02 hazard `d02a145ef`
+        // closed) but performs NO removal on its own.
+        const downEvt = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+        btn.dispatchEvent(downEvt);
+        await nextTick();
+        expect(downEvt.defaultPrevented).toBe(true);
+        expect(value()).toEqual(['apple', 'banana']);
+
+        // The click a real pointer press subsequently fires is what actually
+        // commits the removal — B3: preventDefault on mousedown does NOT
+        // suppress the following click, so a removal bound to both events
+        // would double-remove; binding it to click only fires it once.
+        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         await nextTick();
 
-        expect(evt.defaultPrevented).toBe(true);
         expect(value()).toEqual(['banana']);
-        // The chip removal must not clobber unrelated in-progress query text
-        // the way a normal pick's "clear query on commit" (D-14) would.
+        // B2: the chip removal must not clobber unrelated in-progress query
+        // text the way a normal pick's "clear query on commit" (D-14) would.
         expect(input.value).toBe('ch');
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(16) chips: a click alone — with no preceding mousedown, exactly the shape every keyboard and screen-reader activation produces — removes the chip', async () => {
+      const mount = mountCombobox(branch.props, { initialValue: ['apple', 'banana'] });
+      const { app, host, value } = mount;
+      try {
+        await openBranch(branch.name, mount);
+        const target = chipEls(host).find((el) => el.textContent?.includes('Apple'))!;
+        const btn = chipRemoveBtn(target);
+        btn.focus();
+        // A screen reader's synthesized activation, and a real browser's
+        // Enter/Space activation of a focused <button>, both fire `click` with
+        // NO preceding `mousedown` at all. This is the E1 defect's RED-first
+        // proof: before the fix, the control's only binding is
+        // `@mousedown.prevent`, so a click-only gesture is a complete no-op.
+        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        await nextTick();
+        expect(value()).toEqual(['banana']);
+      } finally {
+        app.unmount();
+      }
+    });
+
+    it('(17) chips: after a click-only removal with focus on the remove button, focus lands back on the combobox input rather than document.body', async () => {
+      const mount = mountCombobox(branch.props, { initialValue: ['apple', 'banana'] });
+      const { app, host, value } = mount;
+      try {
+        const input = await openBranch(branch.name, mount);
+        const target = chipEls(host).find((el) => el.textContent?.includes('Apple'))!;
+        const btn = chipRemoveBtn(target);
+        btn.focus();
+        expect(document.activeElement).toBe(btn);
+        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        await nextTick();
+        expect(value()).toEqual(['banana']);
+        // Keyboard/AT activation puts focus ON the button, which the removal
+        // then unmounts — without an explicit refocus, focus would fall to
+        // document.body. The E1 fix restores it to the combobox input.
+        expect(document.activeElement).toBe(input);
+        expect(document.activeElement).not.toBe(document.body);
       } finally {
         app.unmount();
       }

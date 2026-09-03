@@ -1290,6 +1290,45 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     });
   }
 
+  // onChipRemovePointerDown() (quick-260903-0s1, E1 audit finding): the POINTER
+  // half of the chip remove control's split binding. Deliberately empty —
+  // the `.prevent` modifier this is bound to (mousedown) is its ENTIRE payload:
+  // preventDefault on mousedown suppresses the native focus shift, which is
+  // what keeps the input focused, keeps onBlur() from firing, and therefore
+  // keeps the popup open (the CR-02 hazard commit `d02a145ef` closed). The
+  // removal deliberately does NOT live here: preventDefault on mousedown does
+  // NOT suppress the click that follows it, so a handler bound to BOTH events
+  // would remove the chip twice per pointer press. See onChipRemoveActivate()
+  // below for where the removal actually happens.
+  function onChipRemovePointerDown() {}
+
+  // onChipRemoveActivate(v) (quick-260903-0s1, E1 audit finding): the CLICK half
+  // of the split binding — the actual removal. `click` is the one event every
+  // activation path produces: a real pointer press (mousedown+click), Enter or
+  // Space on the focused button (native <button> behavior fires `click`, never
+  // `keydown`-observable-as-such), AND a screen reader's synthesized activation
+  // (which emits `click` with no preceding `mousedown` at all — the E1 defect
+  // this fixes). Binding removal to `click` alone covers all three with exactly
+  // one removal per activation.
+  //
+  // Keyboard/AT activation puts DOM focus ON the button, which this removal
+  // then unmounts — without an explicit refocus, focus would fall to
+  // `document.body`. Restore it using the EXACT idiom onFocus() above already
+  // uses (proven on all six targets): a queued microtask that refocuses
+  // `$refs.inputEl` only when it exists and is not already `document.activeElement`.
+  // That activeElement guard is what makes this a strict no-op on the pointer
+  // path — a pointer press never moves focus off the input in the first place
+  // (onChipRemovePointerDown's preventDefault sees to that), so this refocus
+  // never re-enters onFocus() and never re-selects the in-progress query.
+  // $refs is safe here for the same reason it is safe everywhere else in this
+  // file: this is a post-mount event handler, not module-init code.
+  function onChipRemoveActivate(v: any) {
+    removeChipValue(v);
+    queueMicrotask(() => {
+      if (inputElRef && document.activeElement !== inputElRef) inputElRef!.focus();
+    });
+  }
+
   // Reflect the externally-selected value into the input text. D-14: no-ops
   // under `multiple` — there is no single label to mirror into the input once
   // `value` holds an array, and the query is owned by chip-picking instead.
@@ -1538,7 +1577,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
           
           {<Show when={local.multiple}><ul class={"rozie-combobox-chips"} data-rozie-s-9546115a="">
             <Key each={chipRows() as readonly any[]} by={(row) => 'chip-' + row.value}>{(row, idx) => <li class={"rozie-combobox-chip"} data-rozie-s-9546115a="">
-              {(_props.chipSlot ?? _props.slots?.['chip'])?.({ option: row().option, remove: () => removeChipValue(row().value), index: idx() }) ?? <><span class={"rozie-combobox-chip__label"} data-rozie-s-9546115a="">{rozieDisplay(row().label)}</span><button type="button" aria-label={rozieAttr(chipRemoveLabel(row()))} class={"rozie-combobox-chip__remove"} disabled={!!local.disabled} onMouseDown={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { $event.preventDefault(); removeChipValue(row().value); }} data-rozie-s-9546115a="">×</button></>}
+              {(_props.chipSlot ?? _props.slots?.['chip'])?.({ option: row().option, remove: () => removeChipValue(row().value), index: idx() }) ?? <><span class={"rozie-combobox-chip__label"} data-rozie-s-9546115a="">{rozieDisplay(row().label)}</span><button type="button" aria-label={rozieAttr(chipRemoveLabel(row()))} class={"rozie-combobox-chip__remove"} disabled={!!local.disabled} onMouseDown={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { $event.preventDefault(); onChipRemovePointerDown(); }} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onChipRemoveActivate(row().value); }} data-rozie-s-9546115a="">×</button></>}
             </li>}</Key>
           </ul></Show>}<input type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen()} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(local.ariaLabel)} autocomplete="off" ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-combobox-input"} value={query()} placeholder={local.placeholder} disabled={!!local.disabled} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onFocus={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onFocus($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} data-rozie-s-9546115a="" />
         </>)}>

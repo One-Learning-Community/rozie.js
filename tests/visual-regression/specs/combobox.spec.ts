@@ -340,6 +340,12 @@ for (const target of TARGETS) {
 // popup still open, focus still on the input, query intact — the half no unit test
 // can reach. It writes no image and needs no baseline, so unlike the three pixel
 // blocks above it, it is authorable and verifiable outside pinned Linux Docker.
+//
+// quick-260903-0s1 (E1 audit finding) extends this cell with a KEYBOARD leg after
+// the existing pointer assertions: Enter on a focused remove control, with no
+// preceding mousedown, is exactly the shape a screen reader's synthesized
+// activation also produces — the RED-first unit proof (test 16) cannot reach a
+// GENUINELY trusted click the way this real-browser cell can.
 // ════════════════════════════════════════════════════════════════════════════════════
 
 for (const target of TARGETS) {
@@ -420,6 +426,45 @@ for (const target of TARGETS) {
     });
     expect(focused.tagName).toBe('INPUT');
     expect(focused.role).toBe('combobox');
+
+    // ---- act: KEYBOARD activation — quick-260903-0s1's E1 fix. Focus the
+    // "Remove Apple" control directly (skipping a real Tab traversal, which is
+    // brittle across the six targets' differing tab-stop counts) and press
+    // Enter. A real browser fires a `click` on a focused <button> for
+    // Enter/Space with NO preceding `mousedown` at all — exactly the shape a
+    // screen reader's synthesized activation also produces, and exactly the
+    // shape the RED-first unit proof (multiple.behavior.test.ts test 16)
+    // cannot reach in happy-dom because a genuinely trusted `click` is a real
+    // browser behavior, not something a script-dispatched event reproduces. ----
+    const removeApple = page.getByRole('button', { name: 'Remove Apple' });
+    await removeApple.focus();
+    await expect(removeApple).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    // ---- assert: the chip was removed via the keyboard ----
+    await expect.poll(async () => chips.count(), { timeout: 10_000 }).toBe(1);
+    await expect(page.getByRole('button', { name: 'Remove Apple' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Remove Cherry' })).toHaveCount(1);
+
+    // ---- assert: the popup is STILL open ----
+    await expect(panel).toBeVisible();
+
+    // ---- assert: focus lands back on the combobox input, not document.body ----
+    // Enter/Space activation puts focus ON the button, which the removal then
+    // unmounts — without the E1 fix's refocus, focus would fall to
+    // document.body.
+    const focusedAfterKeyboard = await page.evaluate(() => {
+      let el: Element | null = document.activeElement;
+      while (el?.shadowRoot?.activeElement) {
+        el = el.shadowRoot.activeElement;
+      }
+      return {
+        tagName: el?.tagName ?? null,
+        role: el?.getAttribute('role') ?? null,
+      };
+    });
+    expect(focusedAfterKeyboard.tagName).toBe('INPUT');
+    expect(focusedAfterKeyboard.role).toBe('combobox');
   });
 }
 

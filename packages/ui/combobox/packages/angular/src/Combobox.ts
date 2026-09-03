@@ -79,7 +79,7 @@ interface GroupMoreCtx {
     } @else {
 
                 <span class="rozie-combobox-chip__label">{{ rozieDisplay(row.label) }}</span>
-                <button type="button" class="rozie-combobox-chip__remove" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(chipRemoveLabel(row))" (mousedown)="$event.preventDefault(); removeChipValue(row.value)">×</button>
+                <button type="button" class="rozie-combobox-chip__remove" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(chipRemoveLabel(row))" (mousedown)="$event.preventDefault(); onChipRemovePointerDown()" (click)="onChipRemoveActivate(row.value)">×</button>
               
     }
             </li>
@@ -1461,6 +1461,43 @@ export class Combobox {
       value: v,
       option: found || null,
       isRemoval: true
+    });
+  };
+  // onChipRemovePointerDown() (quick-260903-0s1, E1 audit finding): the POINTER
+  // half of the chip remove control's split binding. Deliberately empty —
+  // the `.prevent` modifier this is bound to (mousedown) is its ENTIRE payload:
+  // preventDefault on mousedown suppresses the native focus shift, which is
+  // what keeps the input focused, keeps onBlur() from firing, and therefore
+  // keeps the popup open (the CR-02 hazard commit `d02a145ef` closed). The
+  // removal deliberately does NOT live here: preventDefault on mousedown does
+  // NOT suppress the click that follows it, so a handler bound to BOTH events
+  // would remove the chip twice per pointer press. See onChipRemoveActivate()
+  // below for where the removal actually happens.
+  onChipRemovePointerDown = () => {};
+  // onChipRemoveActivate(v) (quick-260903-0s1, E1 audit finding): the CLICK half
+  // of the split binding — the actual removal. `click` is the one event every
+  // activation path produces: a real pointer press (mousedown+click), Enter or
+  // Space on the focused button (native <button> behavior fires `click`, never
+  // `keydown`-observable-as-such), AND a screen reader's synthesized activation
+  // (which emits `click` with no preceding `mousedown` at all — the E1 defect
+  // this fixes). Binding removal to `click` alone covers all three with exactly
+  // one removal per activation.
+  //
+  // Keyboard/AT activation puts DOM focus ON the button, which this removal
+  // then unmounts — without an explicit refocus, focus would fall to
+  // `document.body`. Restore it using the EXACT idiom onFocus() above already
+  // uses (proven on all six targets): a queued microtask that refocuses
+  // `$refs.inputEl` only when it exists and is not already `document.activeElement`.
+  // That activeElement guard is what makes this a strict no-op on the pointer
+  // path — a pointer press never moves focus off the input in the first place
+  // (onChipRemovePointerDown's preventDefault sees to that), so this refocus
+  // never re-enters onFocus() and never re-selects the in-progress query.
+  // $refs is safe here for the same reason it is safe everywhere else in this
+  // file: this is a post-mount event handler, not module-init code.
+  onChipRemoveActivate = (v: any) => {
+    this.removeChipValue(v);
+    queueMicrotask(() => {
+      if (this.inputEl()?.nativeElement && document.activeElement !== this.inputEl()?.nativeElement) this.inputEl()!.nativeElement.focus();
     });
   };
   // Reflect the externally-selected value into the input text. D-14: no-ops

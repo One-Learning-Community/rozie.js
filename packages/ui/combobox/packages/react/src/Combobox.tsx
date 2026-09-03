@@ -1092,7 +1092,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   // `opt.disabled`/`opt.isMore` — so removal and toggle-off can never diverge
   // into different payload shapes. Declared here, after selectOption(), not
   // alongside chipRows()/chipRemoveLabel() above — see the comment there.
-  const removeChipValue = useCallback((v: any) => {
+  function removeChipValue(v: any) {
     const opts = Array.isArray(props.options) ? props.options : [];
     const found = opts.find((o: any) => valueOf(o) === v);
     // isRemoval: true tells selectOption()'s `multiple` branch this is a
@@ -1102,7 +1102,45 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       option: found || null,
       isRemoval: true
     });
-  }, [props.options, selectOption, valueOf]);
+  }
+
+  // onChipRemovePointerDown() (quick-260903-0s1, E1 audit finding): the POINTER
+  // half of the chip remove control's split binding. Deliberately empty —
+  // the `.prevent` modifier this is bound to (mousedown) is its ENTIRE payload:
+  // preventDefault on mousedown suppresses the native focus shift, which is
+  // what keeps the input focused, keeps onBlur() from firing, and therefore
+  // keeps the popup open (the CR-02 hazard commit `d02a145ef` closed). The
+  // removal deliberately does NOT live here: preventDefault on mousedown does
+  // NOT suppress the click that follows it, so a handler bound to BOTH events
+  // would remove the chip twice per pointer press. See onChipRemoveActivate()
+  // below for where the removal actually happens.
+  const onChipRemovePointerDown = useCallback(() => {}, []);
+  // onChipRemoveActivate(v) (quick-260903-0s1, E1 audit finding): the CLICK half
+  // of the split binding — the actual removal. `click` is the one event every
+  // activation path produces: a real pointer press (mousedown+click), Enter or
+  // Space on the focused button (native <button> behavior fires `click`, never
+  // `keydown`-observable-as-such), AND a screen reader's synthesized activation
+  // (which emits `click` with no preceding `mousedown` at all — the E1 defect
+  // this fixes). Binding removal to `click` alone covers all three with exactly
+  // one removal per activation.
+  //
+  // Keyboard/AT activation puts DOM focus ON the button, which this removal
+  // then unmounts — without an explicit refocus, focus would fall to
+  // `document.body`. Restore it using the EXACT idiom onFocus() above already
+  // uses (proven on all six targets): a queued microtask that refocuses
+  // `$refs.inputEl` only when it exists and is not already `document.activeElement`.
+  // That activeElement guard is what makes this a strict no-op on the pointer
+  // path — a pointer press never moves focus off the input in the first place
+  // (onChipRemovePointerDown's preventDefault sees to that), so this refocus
+  // never re-enters onFocus() and never re-selects the in-progress query.
+  // $refs is safe here for the same reason it is safe everywhere else in this
+  // file: this is a post-mount event handler, not module-init code.
+  const onChipRemoveActivate = useCallback((v: any) => {
+    removeChipValue(v);
+    queueMicrotask(() => {
+      if (inputEl.current && document.activeElement !== inputEl.current) inputEl.current!.focus();
+    });
+  }, [removeChipValue]);
   // Reflect the externally-selected value into the input text. D-14: no-ops
   // under `multiple` — there is no single label to mirror into the input once
   // `value` holds an array, and the query is owned by chip-picking instead.
@@ -1397,7 +1435,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
           
           {!!(props.multiple) && <ul className={"rozie-combobox-chips"} data-rozie-s-9546115a="">
             {chipRows().map((row, idx) => <li key={'chip-' + row.value} className={"rozie-combobox-chip"} data-rozie-s-9546115a="">
-              {(props.renderChip ?? props.slots?.['chip']) ? ((props.renderChip ?? props.slots?.['chip']) as Function)({ option: row.option, remove: () => removeChipValue(row.value), index: idx }) : <><span className={"rozie-combobox-chip__label"} data-rozie-s-9546115a="">{rozieDisplay(row.label)}</span><button type="button" className={"rozie-combobox-chip__remove"} disabled={!!props.disabled} aria-label={rozieAttr(chipRemoveLabel(row))} onMouseDown={($event) => { $event.preventDefault(); removeChipValue(row.value); }} data-rozie-s-9546115a="">×</button></>}
+              {(props.renderChip ?? props.slots?.['chip']) ? ((props.renderChip ?? props.slots?.['chip']) as Function)({ option: row.option, remove: () => removeChipValue(row.value), index: idx }) : <><span className={"rozie-combobox-chip__label"} data-rozie-s-9546115a="">{rozieDisplay(row.label)}</span><button type="button" className={"rozie-combobox-chip__remove"} disabled={!!props.disabled} aria-label={rozieAttr(chipRemoveLabel(row))} onMouseDown={($event) => { $event.preventDefault(); onChipRemovePointerDown(); }} onClick={($event) => { onChipRemoveActivate(row.value); }} data-rozie-s-9546115a="">×</button></>}
             </li>)}
           </ul>}<input ref={inputEl} className={"rozie-combobox-input"} type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(props.ariaLabel)} value={query} placeholder={props.placeholder} disabled={!!props.disabled} autoComplete="off" onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur(); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-9546115a="" />
         </>)} children={<>
