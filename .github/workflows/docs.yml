@@ -78,8 +78,26 @@ jobs:
       # would compile those dists never runs — build them explicitly here or the
       # demos fail to resolve ("Failed to resolve entry for @rozie-ui/<x>-vue").
       # The glob also covers the source-only leaves (their build is a no-op echo).
+      #
+      # This step MUST go through turbo, not plain pnpm --filter. Run 33709402595
+      # on main reddened here with TS2307 on @rozie-ui/combobox-vue during
+      # command-palette-vue's vue-tsc --declaration: plain pnpm's recursive
+      # ordering built command-palette-vue long before combobox-vue, so the
+      # latter's dist/index.d.ts didn't exist yet. The ordering edge that fixes
+      # this is real and transitive — packages/ui/command-palette/package.json
+      # devDepends on all six @rozie-ui/combobox-* leaves at workspace:*, so
+      # turbo's ^build chains combobox-vue -> command-palette -> command-palette-vue.
+      # The previous plain-pnpm ordering happened to work only because
+      # command-palette-vue's peer range on combobox-vue matched the local
+      # version directly; once that peer was raised to ^0.5.0 and bridged with a
+      # pnpm.overrides workspace:* pin, the link became override-injected rather
+      # than a workspace edge, and pnpm's incidental ordering guarantee vanished
+      # while turbo's real dependency-graph ordering did not.
+      # This step's turbo closure already includes @rozie/runtime-vue, so the
+      # earlier explicit "Build @rozie/runtime-vue" step above is a turbo
+      # cache hit here, not duplicated work — kept intentionally.
       - name: Build @rozie-ui Vue leaves
-        run: pnpm --filter "@rozie-ui/*-vue" run build
+        run: pnpm turbo run build --filter="@rozie-ui/*-vue"
 
       - name: Build docs
         run: pnpm --filter @rozie/docs build
