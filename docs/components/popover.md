@@ -6,6 +6,8 @@ You bring the **anchor** (the `anchor` slot, or a trigger element) and the **flo
 
 Unlike DOM-creating engines (Cropper.js, flatpickr), Floating UI creates **no DOM of its own** — it only writes `left` / `top` position styles onto *your* floating element. So there is no engine-created-node styling problem: the scoped `<style>` reaches everything, every visual value is a `--rozie-popover-*` CSS custom property, and there is no `:root {}` escape hatch.
 
+Positioning itself is opt-out: `disablePositioning` renders the floating panel in normal document flow with no `computePosition`/`autoUpdate` at all, for a composing component that already owns the panel's own layout — this is what `Combobox`'s `inline` mode relies on to lay its popup out itself instead of letting Popover float it.
+
 ## The `@rozie-ui/popover` packages
 
 `Popover` ships as six pre-compiled, per-framework packages. Install the one for your framework plus the `@floating-ui/dom` engine peer; there is no build step and no Rozie toolchain to set up:

@@ -19,7 +19,7 @@ Every visual value is a CSS custom property, so the control re-skins to any desi
 | `@rozie-ui/combobox-solid` | `npm i @rozie-ui/combobox-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/combobox/packages/solid/README.md) |
 | `@rozie-ui/combobox-lit` | `npm i @rozie-ui/combobox-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/combobox/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
+Each package carries its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`) **plus a required non-optional peer chain**: `@rozie-ui/popover-<target>` `^0.2.0` — composed internally for the floating popup — which in turn requires `@floating-ui/dom` `^1.7.2`. Each leaf's own README gives one copy-paste `npm i` line covering the whole chain.
 
 ## Quick start
 
@@ -105,7 +105,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | Method | Description |
 | --- | --- |
 | `focus` | Move DOM focus to the text input. Deliberately named `focus`, overriding the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. This mirrors the slider / otp precedent; listbox took the other branch (`focusControl`). |
-| `clear` | Reset the selection: clear `value` (emits `change` with `{ value: null }`) and empty the input text. Collision-safe — not a host-element member. |
+| `clear` | Reset the selection: clear `value` (emits `change` with `{ value: null }` in single-select mode, `{ value: [] }` under `multiple`) and empty the input text. Collision-safe — not a host-element member. |
 | `seedQuery(text)` | **Imperative only** — sets the input text (and therefore the filtered option list) without touching the `value` model or selection state. Does not open the popup, select an option, or emit `change`/`search`. Not a second model (a combobox has a single `model: true` prop, `value` — a second model would forfeit the Angular `ControlValueAccessor`). Intended for repopulating the input on programmatic restore (e.g. a consumer's back-navigation). |
 | `pinOpen(boolean)` | **Imperative only** — pin the popup open so blurring the input into a host sub-surface (e.g. an action flyout) does not collapse the list. `pinOpen(true)` pins; `pinOpen(false)` unpins. Unpinning alone does not itself close the popup or restore focus — that is the host's responsibility. Render-neutral: never calling it leaves behavior unchanged. |
 

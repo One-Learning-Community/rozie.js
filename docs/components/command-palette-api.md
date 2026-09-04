@@ -16,7 +16,7 @@ The full prop surface. The two `model: true` slices (`open` and `query`, the **T
 | Model (`r-model:`) | Shape | Description |
 | --- | --- | --- |
 | `open` | `boolean` | Whether the overlay is shown. Written back `false` on every close path (backdrop click, Escape at the root, a `closeOnSelect` selection, or `close()`/`toggle()`). |
-| `query` | `string` | The current LEVEL's search text. Written back as the user types; cleared to `""` on open AND whenever a nested level is pushed. Popping a level restores the parent level's query (both the model and the visible input text) — back is a full undo. |
+| `query` | `string` | The current LEVEL's search text. Written back as the user types; cleared to `""` when the palette **closes** (not on open — a pre-seeded or `r-model`-bound query survives an open) and whenever a nested level is pushed. Popping a level restores the parent level's query (both the model and the visible input text) — back is a full undo. |
 
 ## Escaping a clipped ancestor (`appendTo`)
 
@@ -162,7 +162,7 @@ Declared once via `$expose`; obtained through each framework's native ref mechan
 
 | Method | Description |
 | --- | --- |
-| `show` | Open the palette (writes `open` → `true`). Clears the query, resets the highlight, and focuses the search input. The open verb is `show` — **not** `open` — because an `open()` verb collides with the `open` model (both collapse onto React's generated open/setOpen state). |
+| `show` | Open the palette — the whole body is one assignment, `open` → `true`. The open transition this triggers resets the highlight and focuses the search input; it does **not** clear `query` — a pre-seeded or `r-model`-bound query survives an open (the query only resets on close — see the [`query` model](#models-two-way-state)). The open verb is `show` — **not** `open` — because an `open()` verb collides with the `open` model (both collapse onto React's generated open/setOpen state). |
 | `close` | Close the palette (writes `open` → `false`), resetting the query and the level stack to root. |
 | `toggle` | Flip the open state. |
 | `focus` | Move DOM focus to the search input. Deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. |
@@ -173,7 +173,10 @@ Declared once via `$expose`; obtained through each framework's native ref mechan
 
 | Slot | Params | Description |
 | --- | --- | --- |
-| `option` | `{ option, index, active, selected, disabled }` | Custom render for a single result row, using the `@rozie-ui/listbox` `option` vocabulary (the palette composes the listbox primitive). `option` is the command (`{ id, label, group, keywords, disabled, _i }`); `index` is its position; `active` is whether it is currently highlighted; `selected` whether it is the committed value; `disabled` whether it is non-selectable. Falls back to the label plus an optional group badge. |
+| `option` | `{ option, index, active, selected, disabled }` | Custom render for a single result row, using the `@rozie-ui/combobox` `option` vocabulary (the palette composes the combobox primitive, re-projecting its own `#option` fill into the vendored `<Combobox>`'s `option` slot). `option` is the command (`{ id, label, group, keywords, disabled, _i }`); `index` is its position; `active` is whether it is currently highlighted; `selected` whether it is the committed value; `disabled` whether it is non-selectable. Falls back to the label plus an optional group badge. |
+| `icon` | `{ option }` | Custom render for a leading icon on a result row, inside the default `option` fill. Only rendered when filled (`r-if="$slots.icon"`) — no default icon. |
+| `actions` | `{ option, actions }` | Custom render for the row's actions affordance, inside the default `option` fill. `actions` is that row's resolved `actions[]` list. Renders whenever the row has actions or this slot is filled; the default fill is a small keyboard-shortcut hint (e.g. "⌘K"). |
+| `trailing` | `{ option }` | Custom render for trailing content on a result row, inside the default `option` fill. Only rendered when filled (`r-if="$slots.trailing"`) — no default trailing content. |
 | `empty` | `{ query }` | The settled-but-empty state; `query` is the current search string. Falls back to the `emptyText` prop. Not shown while `loading`/`error` (see below). |
 | `loading` | `{ query }` | Shown while the active level's async `source` is in flight. Falls back to "Loading…". |
 | `error` | `{ query, error, retry }` | Shown when the active level's async `source` rejected. `error` is the rejection value; `retry` re-invokes the source at the current query. |
