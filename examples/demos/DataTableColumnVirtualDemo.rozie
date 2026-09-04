@@ -1,0 +1,272 @@
+<!--
+  DataTableColumnVirtualDemo.rozie — Phase 87 87-03 (Wave 0) RED-first fixture for horizontal
+  (column) virtualization and content-driven auto-measure.
+
+  Drives the column-axis + auto-measure battery across all six targets via
+  data-table-grid-column-virtual.spec.ts and data-table-auto-measure.spec.ts:
+
+    D-01 — `virtual` widened to a value grammar; `'columns'` windows the leaf-column axis.
+    D-06/D-11 — header windows identically to the body under `table-layout: fixed`, with
+                clamped colspan on the two-level grouped header.
+    D-08 — the public column index is ABSOLUTE over the full leaf-column order.
+    D-10 — pinned + active + editing columns stay rendered outside the window.
+    D-12 — focusCell to an off-window column scrolls it in, then focuses.
+    D-13 — a fill drag past the column window edge auto-scrolls.
+    D-15/D-16/D-17/D-19 — content-driven auto-measure (row axis).
+
+  **60 columns x 200 rows**, shared by TWO separate `<DataTable>` mounts (a SINGLE shared
+  dataset — `feedback_minimize_duplicated_example_copies` — built once in `$onMount`):
+
+    (A) `data-testid="grid-table"` (`ref="dt"`) — `virtual="columns"` (this plan's Task 2
+        surface). Drives the column-axis battery (D-01/D-06/D-08/D-10/D-11/D-12/D-13).
+    (B) `data-testid="grid-table-both"` (`ref="dtBoth"`) — `virtual="both"` + `maxHeight` +
+        `autoMeasure`. Drives the auto-measure battery (D-15/D-16/D-17/D-19).
+
+  TWO mounts, not a live `:virtual` toggle on ONE mount: virtual-core's row Virtualizer is
+  constructed ONCE in `$onMount`, gated on `rowsWindowed()` AT THAT MOMENT (Phase 53's
+  mount-time-only lifecycle — unchanged by this plan). Verified empirically this session:
+  flipping a single instance's bound `virtual` from `'columns'` to `'both'` post-mount does
+  NOT retroactively construct the row virtualizer — the body renders a near-empty windowed
+  slice (windowedRows() takes the `rowsWindowed() === true` branch but `virtualizer` stays
+  null forever, so it hits the empty-array branch). Reconstructing the virtualizer reactively
+  on a live prop change is a lifecycle change out of THIS plan's scope (not 87-04's tracer
+  either) — two independent mounts sidesteps it entirely, matching the established
+  DataTableVirtualWarnDemo.rozie precedent (two `<DataTable>`s, each with its OWN fixed
+  `:virtual` value from mount).
+
+  Column 0 is PINNED left (D-10's mandatory pinned case). Columns 5 and 6 are EDITABLE (text
+  editor, D-10's editing-column case). Columns 20 and 21 are FILTERABLE (D-11's dedicated
+  filter row under column windowing). Columns 10-14 are wrapped in a two-level GROUPED header
+  ("Group A") spanning a contiguous run of leaf columns (D-06/D-11's colspan-clamp target).
+  Every 5th row is "tall" (a real multi-line block, not a CSS trick) so `measureElement`
+  observes genuinely variable content height — the D-15/D-16/D-17/D-19 auto-measure seed.
+
+  No loop var / slot named row/cell/header (the Svelte mount-throw discipline). The dataset is
+  static/deterministic (no clock/random) for VR determinism.
+-->
+
+<rozie name="DataTableColumnVirtualDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+}
+</components>
+
+<data>
+{
+  cols: [],
+  rows: [],
+  colCount: 0,
+  rowCount: 0,
+  // Content-driven auto-measure opt-in (Phase 87 D-02) — inert until 87-06/87-07 wire the
+  // running-mean estimator; bound on mount (B) so later plans' specs can drive this same
+  // fixture. Toggling it here has no observable effect in THIS plan (D-02 is inert).
+  autoMeasureOn: true,
+  // Last cell-edit-commit payload "columnId=newValue" + a counter (mount A).
+  lastCommit: '',
+  commitCount: 0,
+  // Last activecell-change "r,c" (the ABSOLUTE column index — D-08) + a counter (mount A).
+  lastActiveCell: '',
+  activeCellCount: 0,
+  getActiveResult: '',
+}
+</data>
+
+<script lang="ts">
+// Seed 60 leaf columns (col0 pinned left; col5/col6 editable; col20/col21 filterable) with
+// cols 10-14 wrapped in a two-level "Group A" header (D-06/D-11's colspan-clamp target), then
+// 200 rows of deterministic content with a fixed row-height PATTERN (D-15/D-16/D-17/D-19's
+// variable-height content) — no clock/random, so the window and Linux VR baselines stay
+// deterministic. Shared by BOTH mounts (A) and (B).
+$onMount(() => {
+  const leafCols: Record<string, unknown>[] = []
+  for (let i = 0; i < 60; i++) {
+    const id = 'col' + i
+    const cfg: Record<string, unknown> = { id, field: id, header: 'Col ' + i }
+    if (i === 0) cfg.pinned = 'left'
+    if (i === 5 || i === 6) { cfg.editable = true; cfg.editor = 'text' }
+    if (i === 20 || i === 21) cfg.filterable = true
+    leafCols.push(cfg)
+  }
+  // Group cols 10-14 (5 leaf columns) under a two-level "Group A" header — a CONTIGUOUS run,
+  // so the group's colSpan clamps cleanly against the column window (D-06/D-11).
+  const groupStart = 10
+  const groupSize = 5
+  const groupChildren = leafCols.slice(groupStart, groupStart + groupSize)
+  // NB the local is `colsBuilt` (NOT `cols` — self-shadows $data.cols; the windowing.rzts
+  // `rowList`-not-`rows` lesson applies to every $data key, not just `rows`).
+  const colsBuilt = leafCols
+    .slice(0, groupStart)
+    .concat([{ id: 'grpA', header: 'Group A', columns: groupChildren }])
+    .concat(leafCols.slice(groupStart + groupSize))
+  $data.cols = colsBuilt
+  $data.colCount = leafCols.length
+
+  // NB the local is `rowsBuilt` (NOT `rows` — self-shadows $data.rows, the documented
+  // React TS2448 / Svelte constant-assignment self-shadow lesson).
+  const rowsBuilt: Record<string, unknown>[] = []
+  for (let r = 0; r < 200; r++) {
+    const row: Record<string, unknown> = { id: r }
+    for (let i = 0; i < 60; i++) row['col' + i] = 'r' + r + 'c' + i
+    // Deterministic variable row height (D-15/D-16/D-19): every 5th row is visually tall
+    // (multi-line content forces real layout height past the 40px estimateRowHeight seed).
+    row.tall = r % 5 === 0
+    rowsBuilt.push(row)
+  }
+  $data.rows = rowsBuilt
+  $data.rowCount = rowsBuilt.length
+})
+
+// cell-edit-commit → "columnId=newValue" readout + counter (mount A; D-10's editing-column
+// case reads this alongside $refs.dt.editCell to keep an editor open while scrolling).
+const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue: unknown; newValue: unknown }): void => {
+  $data.lastCommit = payload ? payload.columnId + '=' + String(payload.newValue) : ''
+  $data.commitCount = $data.commitCount + 1
+}
+
+// activecell-change → "r,c" readout + counter (mount A). Per D-08 the colIndex is the
+// ABSOLUTE leaf-column position (0..59), off-window or not.
+const onActiveCellChange = (payload: { rowIndex: number; colIndex: number }): void => {
+  $data.lastActiveCell = payload ? payload.rowIndex + ',' + payload.colIndex : ''
+  $data.activeCellCount = $data.activeCellCount + 1
+}
+
+// Read $refs.dt LIVE in the handler (never cached — the GridNavDemo idiom). Mount A only.
+const callFocusCol55 = (): void => {
+  const api = $refs.dt
+  if (api && api.focusCell) api.focusCell(0, 55)
+}
+
+const callGetActiveCell = (): void => {
+  const api = $refs.dt
+  if (api && api.getActiveCell) {
+    const r = api.getActiveCell()
+    $data.getActiveResult = r ? r.rowIndex + ',' + r.colIndex : ''
+  }
+}
+
+// Open an editor on col 5 (an editable column) so D-10's "editing column stays rendered
+// outside the window" case has a live editor to keep alive across a horizontal scroll.
+const editCol5 = (): void => {
+  const api = $refs.dt
+  if (api && api.editCell) api.editCell(0, 5)
+}
+</script>
+
+<template>
+<div class="dt-col-virtual-demo">
+  <h3>DataTable — column virtualization + auto-measure (60 cols x 200 rows)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="call-focuscell-col55" @click="callFocusCol55">focusCell(0,55)</button>
+    <button type="button" data-testid="call-getactivecell" @click="callGetActiveCell">getActiveCell()</button>
+    <button type="button" data-testid="edit-col5" @click="editCol5">editCell(0,5)</button>
+    <span class="label">cols:</span>
+    <span class="readout" data-testid="col-count">{{ $data.colCount }}</span>
+    <span class="label">rows:</span>
+    <span class="readout" data-testid="row-count">{{ $data.rowCount }}</span>
+    <span class="label">last commit:</span>
+    <span class="readout" data-testid="commit-readout">{{ $data.lastCommit }}</span>
+    <span class="label">commit-count:</span>
+    <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+    <span class="label">activecell:</span>
+    <span class="readout" data-testid="activecell-readout">{{ $data.lastActiveCell }}</span>
+    <span class="label">activecell-count:</span>
+    <span class="readout" data-testid="activecell-count">{{ $data.activeCellCount }}</span>
+    <span class="label">getActiveCell:</span>
+    <span class="readout" data-testid="getactivecell-readout">{{ $data.getActiveResult }}</span>
+  </div>
+
+  <!-- (A) COLUMN-AXIS battery — virtual='columns'. D-01/D-06/D-08/D-10/D-11/D-12/D-13. -->
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      virtual="columns"
+      r-model:data="$data.rows"
+      :columns="$data.cols"
+      @cell-edit-commit="onCellEditCommit($event)"
+      @activecell-change="onActiveCellChange($event)"
+    >
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+
+  <!-- (B) AUTO-MEASURE battery — virtual='both' + autoMeasure. D-15/D-16/D-17/D-19. A
+       SEPARATE mount (see the header comment) so its row virtualizer constructs at mount
+       with rowsWindowed() already true, rather than relying on a live post-mount flip. -->
+  <div data-testid="grid-table-both">
+    <DataTable
+      ref="dtBoth"
+      interactionMode="grid"
+      virtual="both"
+      maxHeight="300px"
+      :autoMeasure="$data.autoMeasureOn"
+      :data="$data.rows"
+      :columns="$data.cols"
+    >
+      <template #cell="{ value, row }">
+        <!-- Deterministic tall content on every 5th row (D-15/D-16/D-19's variable-height
+             seed) — a real multi-line block, not a CSS trick, so measureElement observes a
+             genuinely different clientHeight. -->
+        <span data-testid="cell-display-both" :class="{ 'dt-tall-cell': row && row.tall }">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-col-virtual-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 900px;
+}
+.dt-col-virtual-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"],
+[data-testid="grid-table-both"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table-both"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+/* D-15/D-16/D-19: a real multi-line block on "tall" rows so measureElement observes a
+   genuinely different clientHeight than the 40px estimateRowHeight seed. */
+.dt-tall-cell {
+  display: block;
+  line-height: 1.4;
+  padding: 0.5rem 0;
+}
+.dt-tall-cell::after {
+  content: '\A extra line 1 \A extra line 2';
+  white-space: pre;
+  display: block;
+  font-size: 0.7rem;
+  color: #888;
+}
+</style>
+
+</rozie>

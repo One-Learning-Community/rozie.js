@@ -1,0 +1,332 @@
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { test, expect, type Page } from '@playwright/test';
+import { deepQuerySelectorFirstTextInPage } from './_shadow-utils';
+
+// tests/visual-regression/package.json sets "type": "module".
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Phase 87 87-03 (Wave 0) — the COLUMN-AXIS RED-first battery for horizontal virtualization.
+ * Drives `examples/demos/DataTableColumnVirtualDemo.rozie`'s mount (A) — a 60-column x
+ * 200-row grid with `virtual="columns"` — across all six targets.
+ *
+ * Covers the Decision -> Test map rows from 87-VALIDATION.md:
+ *   D-01      — `virtual="columns"` windows the leaf-column axis: fewer than 60
+ *               `<td data-col-index>` render in the first body row.
+ *   D-06/D-11 — the last header level windows to the SAME leaf-column set as the body
+ *               (colspan-clamp keeps header and body column counts aligned).
+ *   D-08      — `focusCell(0, 55)` addresses the ABSOLUTE leaf-column position (0..59),
+ *               off-window or not.
+ *   D-10      — a left-pinned column and an open editor's column stay rendered after
+ *               scrolling `.rdt-scroll` fully right.
+ *   D-12      — `focusCell` to a column outside the window scrolls it in, then focuses.
+ *   D-13      — a fill drag whose pointer reaches the container's right edge auto-scrolls
+ *               the column axis so the range can grow past the pre-drag window.
+ *
+ * As of THIS plan (87-03 Task 2), `virtual="columns"` renders a WRAPPED but FULLY
+ * UNWINDOWED table (D-04's two-branch template collapse landed 87-02; the body/header cell
+ * LOOPS themselves are still 87-04's tracer) — so D-01 and D-06/D-11's "windowed" cases are
+ * RED by construction: no column is ever excluded from the DOM yet. D-08/D-10/D-12 currently
+ * PASS because the absolute-index guarantee (A2, verified 87-02) and the plain "nothing is
+ * removed from the DOM" starting state trivially satisfy them; they become genuine regression
+ * guards once 87-04+ start excluding off-window columns. D-13 is RED because no per-axis
+ * edge-triggered auto-scroll exists on EITHER axis yet.
+ *
+ * DOM/behavioral assertions only (no PNG baseline) — the pinned Linux Docker run is the CI
+ * gate; macOS/Linux kerning noise flakes pixel diffs on windowing-invariant assertions (the
+ * data-table-virtual.spec.ts precedent).
+ */
+
+const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
+type Target = (typeof TARGETS)[number];
+
+const KNOWN_FAILING: ReadonlySet<Target> = new Set<Target>([]);
+
+function runnerFor(target: Target) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  return !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+}
+
+async function gotoDemo(page: Page, target: Target): Promise<void> {
+  await page.goto(`/?example=DataTableColumnVirtual&target=${target}`);
+  await expect(page.getByTestId('rozie-mount')).toBeVisible();
+  const gridTable = page.getByTestId('grid-table').locator('table[role="grid"]');
+  await expect(gridTable).toBeVisible({ timeout: 15_000 });
+  await installGridTableHelpers(page);
+}
+
+/** Read a readout testid's trimmed text (shadow-pierced), '' when absent. */
+async function readoutText(page: Page, testid: string): Promise<string> {
+  return (await page.evaluate(deepQuerySelectorFirstTextInPage, `[data-testid="${testid}"]`)) ?? '';
+}
+
+// ── Scoped shadow-piercing helpers ──────────────────────────────────────────────────────
+// This fixture mounts TWO `<DataTable>` instances on ONE page (`grid-table` and
+// `grid-table-both` — see the demo's header comment), so every query below MUST be scoped
+// to `[data-testid="grid-table"]` specifically, not the whole document (an unscoped query
+// double-counts / conflates the two grids' cells). Scoping works in TWO STEPS because a
+// compound selector like `'[data-testid="grid-table"] .rdt-scroll'` CANNOT cross a shadow
+// boundary (the Lit target renders `.rdt-scroll` inside `<rozie-data-table>`'s OWN shadow
+// root, a descendant of the light-DOM testid `<div>` — no single CSS selector spans both):
+//   1. Find the light-DOM testid anchor via a PLAIN `document.querySelector` (this always
+//      works — the wrapping `<div data-testid="grid-table">` is never itself inside a
+//      shadow root for any of the six targets).
+//   2. From that anchor, walk DOWN through every open shadow root under it (light-DOM
+//      targets: a no-op, the anchor's own subtree already has everything; Lit: descends
+//      into `<rozie-data-table>`'s shadow root) searching for the INNER selector alone.
+// The actual walker implementations are installed INTO THE PAGE by `installGridTableHelpers`
+// below (Playwright's `page.evaluate(fn)` serializes `fn` via `Function.prototype.toString()`
+// and re-executes that TEXT in the browser — a helper referenced from a SEPARATELY defined
+// evaluate callback is not part of that callback's own source text and throws `ReferenceError`
+// at runtime; installing onto `window` once per test sidesteps that constraint).
+
+/** Count of elements matching `selector` WITHIN `[data-testid="grid-table"]` only (never
+ *  the whole document — this fixture has a SECOND grid, `grid-table-both`, on the page). */
+async function gridTableCount(page: Page, selector: string): Promise<number> {
+  return page.evaluate((sel) => (window as unknown as { __findAllWithinGridTable: (s: string) => Element[] }).__findAllWithinGridTable(sel).length, selector);
+}
+
+/** All `data-col-index` attribute values (as numbers) off elements matching `selector`
+ *  WITHIN `[data-testid="grid-table"]` only, shadow-piercing (the Lit case). */
+async function colIndicesFor(page: Page, selector: string): Promise<number[]> {
+  return page.evaluate((sel) => {
+    const els = (window as unknown as { __findAllWithinGridTable: (s: string) => Element[] }).__findAllWithinGridTable(sel);
+    const out: number[] = [];
+    for (const el of els) {
+      const v = el.getAttribute('data-col-index');
+      if (v != null) out.push(parseInt(v, 10));
+    }
+    return out;
+  }, selector);
+}
+
+/** The `data-col-index` of the deepest real `document.activeElement`'s owning
+ *  `[data-grid-cell]`, shadow-piercing (the Lit open-shadow-root case). null when nothing
+ *  inside a grid cell is focused. Focus is a page-wide singleton, so this does NOT need
+ *  the grid-table scoping the other helpers require. */
+async function activeCellColIndex(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    let node: (Element & { shadowRoot?: ShadowRoot | null }) | null = document.activeElement as Element | null;
+    while (node && node.shadowRoot && node.shadowRoot.activeElement) {
+      node = node.shadowRoot.activeElement as Element & { shadowRoot?: ShadowRoot | null };
+    }
+    if (!node) return null;
+    const cell = node.closest('[data-grid-cell]');
+    return cell ? cell.getAttribute('data-col-index') : null;
+  });
+}
+
+/** Scroll `[data-testid="grid-table"] .rdt-scroll` to its current max scrollLeft (shadow-
+ *  piercing the Lit case), returning the scrollLeft reached. */
+async function scrollGridFullyRight(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const el = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable('.rdt-scroll') as HTMLElement | null;
+    if (!el) return -1;
+    el.scrollLeft = el.scrollWidth;
+    return el.scrollLeft;
+  });
+}
+
+/** Read `[data-testid="grid-table"] .rdt-scroll`'s current `scrollLeft` (shadow-piercing). */
+async function gridScrollLeft(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const el = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable('.rdt-scroll') as HTMLElement | null;
+    return el ? el.scrollLeft : -1;
+  });
+}
+
+/** Install `findWithinGridTable`/`findAllWithinGridTable` onto `window` so every
+ *  `page.evaluate` call in this file (each serialized independently — Playwright's
+ *  evaluate boundary does not share closures across calls) can reach them by name. Called
+ *  once per test, right after navigation. */
+async function installGridTableHelpers(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    function walkFind(root: Document | Element | ShadowRoot, inner: string): Element | null {
+      const direct = root.querySelector(inner);
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const found = walkFind(sr, inner);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+    function walkFindAll(root: Document | Element | ShadowRoot, inner: string, out: Element[]): void {
+      out.push(...Array.from(root.querySelectorAll(inner)));
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) walkFindAll(sr, inner, out);
+      }
+    }
+    // The anchor lookup ITSELF must shadow-pierce (from `document`, not a plain
+    // `document.querySelector`): for Lit, the WHOLE demo — including its own
+    // `<div data-testid="grid-table">` wrapper — renders inside the demo custom element's
+    // OWN open shadow root, not light DOM. Playwright's locators (`page.getByTestId`)
+    // auto-pierce shadow roots, which is why `gotoDemo`'s visibility check passes on Lit
+    // even though a raw `document.querySelector` for the same testid returns null.
+    (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable = (inner: string) => {
+      const anchor = walkFind(document, '[data-testid="grid-table"]');
+      return anchor ? walkFind(anchor, inner) : null;
+    };
+    (window as unknown as { __findAllWithinGridTable: (s: string) => Element[] }).__findAllWithinGridTable = (inner: string) => {
+      const anchor = walkFind(document, '[data-testid="grid-table"]');
+      if (!anchor) return [];
+      const out: Element[] = [];
+      walkFindAll(anchor, inner, out);
+      return out;
+    };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-01 — virtual='columns' windows the leaf-column axis.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-01 virtual='columns' renders fewer than 60 <td data-col-index> in the first body row`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await expect.poll(async () => readoutText(page, 'col-count'), { timeout: 15_000 }).toBe('60');
+    const count = await gridTableCount(page, '[data-grid-cell][data-row="0"][data-col-index]');
+    // RED today: Task 2 deliberately leaves the body cell loop unwindowed (87-04's tracer),
+    // so all 60 columns render for every body row.
+    expect(count).toBeLessThan(60);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-06/D-11 — the header windows to the SAME leaf-column set as the body.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-06/D-11 header column-index set equals the body's for the same window`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    const bodyIdx = await colIndicesFor(page, '[data-grid-cell][data-row="0"][data-col-index]');
+    // The leaf header level carries `data-header-level="1"` for this 2-level grouped
+    // header (`data-header-level="0"` is the group-parent row; the FILTER row is a
+    // separate `<tr class="rdt-filter-row">` sibling with NO [data-grid-cell] cells at
+    // all, so a plain `tr:last-child` selector would wrongly select it instead).
+    const headerIdx = await colIndicesFor(page, '[data-grid-cell][data-header-level="1"][data-col-index]');
+    const sortNum = (a: number, b: number) => a - b;
+    // An invariant that must hold WHETHER OR NOT the column axis is windowed: the leaf
+    // header row addresses exactly the same absolute columns the body renders. Currently
+    // both sets are the full [0..59] range (unwindowed), so this passes today; it becomes
+    // the regression guard for D-11's colspan-clamp once 87-04+ window the header.
+    expect(headerIdx.slice().sort(sortNum)).toEqual(bodyIdx.slice().sort(sortNum));
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-08 — the public column index is ABSOLUTE over the full leaf-column order.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-08 focusCell(0,55) resolves the ABSOLUTE leaf-column position`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await page.getByTestId('call-focuscell-col55').click();
+    // NOTE: this deliberately does NOT also assert the `activecell-readout` testid. The
+    // default active cell at mount is already (0,0), so focusCell(0,55) moves only the
+    // COLUMN — and gridActiveCellVerbs.rzts's `focusCell` emit guard
+    // (`if (absRow !== prevAbs || prevIsHeader)`) only compares the ROW, never the column,
+    // so a column-only move never fires `activecell-change` today. That is a genuine,
+    // PRE-EXISTING bug (unrelated to this plan's `files_modified`, discovered while
+    // authoring this exact case) — logged to deferred-items.md rather than fixed here
+    // (out of Task 3's declared file scope). The DOM-focus assertion above is D-08's actual
+    // claim and is unaffected by the emit gap.
+    await expect.poll(async () => activeCellColIndex(page), { timeout: 15_000 }).toBe('55');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-10 — pinned + editing columns stay rendered outside the window while scrolled.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-10 pinned + editing columns stay rendered after scrolling fully right`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    // Open an editor on col5 BEFORE scrolling (a real click on a button OUTSIDE the grid
+    // would blur+commit the editor; scrolling via page.evaluate below does not move focus).
+    await page.getByTestId('edit-col5').click();
+    await expect.poll(async () => gridTableCount(page, '[data-editing-cell]'), { timeout: 15_000 }).toBeGreaterThan(0);
+    await scrollGridFullyRight(page);
+    await page.waitForTimeout(300);
+    const pinnedCount = await gridTableCount(page, '[data-grid-cell][data-row="0"][data-col-index="0"]');
+    expect(pinnedCount).toBeGreaterThan(0);
+    const editingCount = await gridTableCount(page, '[data-editing-cell]');
+    expect(editingCount).toBeGreaterThan(0);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-12 — focusCell to an off-window column scrolls it in, then focuses.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-12 focusCell(0,55) from a left-scrolled table lands on col 55`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    // Start scrolled to the LEFT (the default mount position — col 55 is off to the right).
+    const startLeft = await gridScrollLeft(page);
+    expect(startLeft).toBe(0);
+    await page.getByTestId('call-focuscell-col55').click();
+    // Bounded poll (mirrors the existing row-axis scroll-then-focus poll's discipline):
+    // the eventual DOM focus must land on col 55, however it gets there.
+    await expect.poll(async () => activeCellColIndex(page), { timeout: 15_000 }).toBe('55');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-13 — a fill drag past the column window edge auto-scrolls.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-13 a fill drag near the container's right edge auto-scrolls the column axis`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    // Focus the top-left cell (0,0) as the fill-drag SOURCE — the pinned column, so it is
+    // never itself scrolled out of reach during the drag.
+    await page.evaluate(() => {
+      const find = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
+      const cell = find('[data-grid-cell][data-row="0"][data-col-index="0"]') as HTMLElement | null;
+      if (cell) cell.focus();
+    });
+    const before = await gridScrollLeft(page);
+    // Drive a fill-drag gesture that ends with the pointer parked near the RIGHT EDGE of
+    // the visible `.rdt-scroll` viewport (NOT at an off-screen cell's own rect — that would
+    // bypass real elementFromPoint hit-testing, the exact DOM-driven mechanism D-13 targets).
+    await page.evaluate(() => {
+      const find = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
+      const scrollEl = find('.rdt-scroll') as HTMLElement | null;
+      const handle = find('[data-fill-handle]') as HTMLElement | null;
+      if (!scrollEl || !handle) return;
+      const hr = handle.getBoundingClientRect();
+      const sr = scrollEl.getBoundingClientRect();
+      const hx = hr.left + hr.width / 2;
+      const hy = hr.top + hr.height / 2;
+      // 4px inside the container's right edge — well within the visible viewport, so
+      // elementFromPoint resolves a REAL rendered cell there, not empty space.
+      const ex = sr.right - 4;
+      const ey = sr.top + sr.height / 2;
+      handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: hx, clientY: hy }));
+      document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: ex, clientY: ey }));
+    });
+    // Give a hypothetical edge-triggered auto-scroll timer a real chance to fire.
+    await page.waitForTimeout(600);
+    await page.evaluate(() => {
+      document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    });
+    const after = await gridScrollLeft(page);
+    // RED today: no per-axis edge-triggered auto-scroll exists on the column axis (or the
+    // row axis) yet — the container never scrolls during a fill drag.
+    expect(after).toBeGreaterThan(before);
+  });
+}

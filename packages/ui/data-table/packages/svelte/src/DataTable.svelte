@@ -1295,14 +1295,23 @@ const windowedRows = () => {
   void windowVer;
   void editVer;
   if (!virtualizer) {
-    // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
-    // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
-    // the template never dereferences a null `vi` (the windowed bindings read wr.vi.index); the
-    // rows appear on the first onChange after _didMount.
+    // Rows OFF (Phase 87 D-04: this now includes the colsWindowed()-only path, since the
+    // wrapper template is entered whenever isWindowed(), not just rowsWindowed() — the row
+    // virtualizer is never constructed when only the column axis is windowed, D-04) → the FULL
+    // set, with a SYNTHETIC `vi.index` set to each row's array position (matching rowIndexOf's
+    // own `$data.rows.indexOf(row)` semantics exactly, since $data.rows IS windowSource()'s
+    // output here). Every windowed body binding reads wr.vi.index (data-row, aria-rowindex,
+    // colIndexOf, isEditing, the fill handle) — a bare `null` there is a hard crash the moment
+    // this branch is reached with the wrapper mounted, which colsWindowed()-only now does.
+    // Row-virtual ON but the virtualizer is not yet constructed (pre-$onMount first paint) →
+    // render NOTHING so the template never dereferences a not-yet-real `vi`; the rows appear on
+    // the first onChange after _didMount.
     if (!rowsWindowed()) {
       const rowList = rows || [];
-      return rowList.map((r: any) => ({
-        vi: null,
+      return rowList.map((r: any, i: any) => ({
+        vi: {
+          index: i
+        },
         row: r
       }));
     }

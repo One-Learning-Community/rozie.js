@@ -1331,6 +1331,22 @@ export const EXAMPLES = [
   // bridges/mountDecorators.lit.ts (76-09) instead of the old v1.1 no-op.
   'LexicalBehavior',
   'LexicalScreenshot',
+  // Phase 87 87-03 (Wave 0) — the column-virtualization + auto-measure RED-first fixture
+  // (loader → examples/demos/DataTableColumnVirtualDemo.rozie, importing
+  // ../../packages/ui/data-table/src/DataTable.rozie). A 60-column x 200-row grid
+  // (interactionMode='grid', virtual='columns' by default, a toggle flips to 'both') with a
+  // left-pinned column, two editable columns, two filterable columns, and a two-level grouped
+  // header over a contiguous run of leaf columns (D-06/D-11's colspan-clamp target), plus
+  // deterministic variable-height rows (D-15/D-16/D-17/D-19's content-driven auto-measure
+  // seed). Drives data-table-grid-column-virtual.spec.ts and data-table-auto-measure.spec.ts.
+  // Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no pixel baseline — DOM/behavioral
+  // assertions only per the data-table-virtual.spec.ts precedent, since macOS/Linux kerning
+  // noise flakes pixel diffs on windowing-invariant assertions). Lives under examples/demos/
+  // so no new Angular 3-file registration is needed (prebuildExtraRoots[examplesRoot] + the
+  // examples tsconfig include + the glob-driven build-cells demos sweep already cover it,
+  // importing the data-table source pkg already registered for Angular cross-tree AOT in
+  // phase 48).
+  'DataTableColumnVirtual',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -1761,6 +1777,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // bridges/mountDecorators.lit.ts.
   LexicalBehavior: 'rozie-lexical-behavior',
   LexicalScreenshot: 'rozie-lexical-screenshot',
+  // Phase 87 87-03 — the lit entry appends '-demo' → tag
+  // 'rozie-data-table-column-virtual-demo' = kebab of DataTableColumnVirtualDemo.
+  DataTableColumnVirtual: 'rozie-data-table-column-virtual',
 };
 
 export interface HostQuery {
@@ -2247,6 +2266,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // type. State is composed inside the demo (seed / controls props on the driver).
   LexicalBehavior: {},
   LexicalScreenshot: {},
+  // Phase 87 87-03 — self-contained (columns/rows built in $onMount); no parent-supplied
+  // props. This entry exists only to satisfy the Record<Example> type.
+  DataTableColumnVirtual: {},
 };
 
 /**
