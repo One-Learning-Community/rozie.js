@@ -13,6 +13,7 @@
 import { renderPropDescription } from '@rozie/core';
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
 import { runtimeDepNote } from '../../runtime-dep-note.mjs';
+import { requiredPeerNote } from '../../required-peer-note.mjs';
 
 // ---------------------------------------------------------------------------
 // IR-derivation helpers (shared by README rendering AND the docs validator).
@@ -160,7 +161,7 @@ import { CommandPalette } from '@rozie-ui/command-palette-angular';
   imports: [CommandPalette],
   template: \`
     <button (click)="open = true">Open palette (⌘K)</button>
-    <CommandPalette [(open)]="open" [(query)]="query" [items]="commands" (select)="onSelect($event)" />
+    <rozie-command-palette [(open)]="open" [(query)]="query" [items]="commands" (select)="onSelect($event)" />
   \`,
 })
 export class DemoComponent {
@@ -219,7 +220,7 @@ el.items = [
   { id: 'new', label: 'New File', group: 'File', keywords: ['create'] },
   { id: 'open', label: 'Open File', group: 'File' },
 ];
-el.addEventListener('open-change', (e) => { el.open = e.detail.open; });
+el.addEventListener('open-change', (e) => { el.open = e.detail; });
 el.addEventListener('query-change', (e) => { el.query = e.detail; });
 el.addEventListener('select', (e) => { console.log('ran:', e.detail.item.id); });
 el.open = true;`,
@@ -330,6 +331,16 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('');
   lines.push(`Peer dependencies: \`${FRAMEWORK_PEER_LABEL[target]}\`. Install them alongside this package.`);
   lines.push('');
+
+  // Disclose non-optional peers beyond the framework — derived from this
+  // leaf's own package.json, walking any @rozie-ui/* peer's own required
+  // peers transitively. Null for the (most common) leaf that requires
+  // nothing beyond its framework.
+  const peerNote = requiredPeerNote(pkgName);
+  if (peerNote) {
+    lines.push(peerNote);
+    lines.push('');
+  }
 
   // Disclose the @rozie/runtime-* dependency this leaf actually carries.
   // Derived from its package.json — null when the leaf imports none.

@@ -10,6 +10,16 @@ npm i @rozie-ui/popover-solid @floating-ui/dom
 
 Peer dependencies: `solid-js + @floating-ui/dom`. Install them alongside this package.
 
+**Required peers** — beyond the framework peer above, this package requires these non-optional peers to actually render:
+
+- `@floating-ui/dom` `^1.7.2` — required by `@rozie-ui/popover-solid`
+
+Install the whole chain in one line:
+
+```bash
+npm i @rozie-ui/popover-solid @floating-ui/dom
+```
+
 Also installed: `@rozie/runtime-solid` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
 
 ## Usage
@@ -29,7 +39,7 @@ export function Demo() {
       offset={8}
       arrow
       onChange={(next) => console.log('open:', next)}
-      anchor={({ toggle }) => <button onClick={toggle}>Menu</button>}
+      anchorSlot={({ toggle }) => <button onClick={toggle}>Menu</button>}
     >
       <div>Floating content</div>
     </Popover>

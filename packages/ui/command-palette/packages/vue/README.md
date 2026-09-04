@@ -10,6 +10,18 @@ npm i @rozie-ui/command-palette-vue
 
 Peer dependencies: `vue`. Install them alongside this package.
 
+**Required peers** — beyond the framework peer above, this package requires these non-optional peers to actually render:
+
+- `@rozie-ui/combobox-vue` `^0.5.0` — required by `@rozie-ui/command-palette-vue`
+- `@rozie-ui/popover-vue` `^0.2.0` — required by `@rozie-ui/combobox-vue`
+- `@floating-ui/dom` `^1.7.2` — required by `@rozie-ui/popover-vue`
+
+Install the whole chain in one line:
+
+```bash
+npm i @rozie-ui/command-palette-vue @rozie-ui/combobox-vue @rozie-ui/popover-vue @floating-ui/dom
+```
+
 Also installed: `@rozie/runtime-vue` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. This build imports nothing from it today, so it shakes out of your bundle entirely. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
 
 ## Usage

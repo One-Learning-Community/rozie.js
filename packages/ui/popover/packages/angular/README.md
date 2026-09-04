@@ -10,6 +10,16 @@ npm i @rozie-ui/popover-angular @floating-ui/dom
 
 Peer dependencies: `@angular/core + @angular/common + @floating-ui/dom`. Install them alongside this package.
 
+**Required peers** — beyond the framework peer above, this package requires these non-optional peers to actually render:
+
+- `@floating-ui/dom` `^1.7.2` — required by `@rozie-ui/popover-angular`
+
+Install the whole chain in one line:
+
+```bash
+npm i @rozie-ui/popover-angular @floating-ui/dom
+```
+
 Also installed: `@rozie/runtime-angular` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
 
 ## Usage
@@ -23,12 +33,14 @@ import { Popover } from '@rozie-ui/popover-angular';
   standalone: true,
   imports: [Popover],
   template: `
-    <Popover [(open)]="open" trigger="click" placement="bottom" [offset]="8" [arrow]="true" (change)="onChange($event)">
+    <rozie-popover [(open)]="open" trigger="click" placement="bottom" [offset]="8" [arrow]="true" (change)="onChange($event)">
       <ng-template #anchor let-toggle="toggle">
         <button (click)="toggle()">Menu</button>
       </ng-template>
-      <div>Floating content</div>
-    </Popover>
+      <ng-template #defaultSlot>
+        <div>Floating content</div>
+      </ng-template>
+    </rozie-popover>
   `,
 })
 export class DemoComponent {

@@ -10,6 +10,18 @@ npm i @rozie-ui/command-palette-angular
 
 Peer dependencies: `@angular/core + @angular/common + @angular/forms`. Install them alongside this package.
 
+**Required peers** — beyond the framework peer above, this package requires these non-optional peers to actually render:
+
+- `@rozie-ui/combobox-angular` `^0.5.0` — required by `@rozie-ui/command-palette-angular`
+- `@rozie-ui/popover-angular` `^0.2.0` — required by `@rozie-ui/combobox-angular`
+- `@floating-ui/dom` `^1.7.2` — required by `@rozie-ui/popover-angular`
+
+Install the whole chain in one line:
+
+```bash
+npm i @rozie-ui/command-palette-angular @rozie-ui/combobox-angular @rozie-ui/popover-angular @floating-ui/dom
+```
+
 Also installed: `@rozie/runtime-angular` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
 
 ## Usage
@@ -24,7 +36,7 @@ import { CommandPalette } from '@rozie-ui/command-palette-angular';
   imports: [CommandPalette],
   template: `
     <button (click)="open = true">Open palette (⌘K)</button>
-    <CommandPalette [(open)]="open" [(query)]="query" [items]="commands" (select)="onSelect($event)" />
+    <rozie-command-palette [(open)]="open" [(query)]="query" [items]="commands" (select)="onSelect($event)" />
   `,
 })
 export class DemoComponent {

@@ -100,7 +100,7 @@ import { CommandPalette } from '@rozie-ui/command-palette-angular';
   imports: [CommandPalette],
   template: `
     <button (click)="open = true">Open palette (⌘K)</button>
-    <CommandPalette [(open)]="open" [(query)]="query" [items]="commands" (select)="onSelect($event)" />
+    <rozie-command-palette [(open)]="open" [(query)]="query" [items]="commands" (select)="onSelect($event)" />
   `,
 })
 export class DemoComponent {
@@ -159,7 +159,7 @@ el.items = [
   { id: 'new', label: 'New File', group: 'File', keywords: ['create'] },
   { id: 'open', label: 'Open File', group: 'File' },
 ];
-el.addEventListener('open-change', (e) => { el.open = e.detail.open; });
+el.addEventListener('open-change', (e) => { el.open = e.detail; });
 el.addEventListener('query-change', (e) => { el.query = e.detail; });
 el.addEventListener('select', (e) => { console.log('ran:', e.detail.item.id); });
 el.open = true;

@@ -29,7 +29,7 @@ export function Demo() {
       offset={8}
       arrow
       onChange={(next) => console.log('open:', next)}
-      anchor={({ toggle }) => <button onClick={toggle}>Menu</button>}
+      renderAnchor={({ toggle }) => <button onClick={toggle}>Menu</button>}
     >
       <div>Floating content</div>
     </Popover>
@@ -79,12 +79,14 @@ import { Popover } from '@rozie-ui/popover-angular';
   standalone: true,
   imports: [Popover],
   template: `
-    <Popover [(open)]="open" trigger="click" placement="bottom" [offset]="8" [arrow]="true" (change)="onChange($event)">
+    <rozie-popover [(open)]="open" trigger="click" placement="bottom" [offset]="8" [arrow]="true" (change)="onChange($event)">
       <ng-template #anchor let-toggle="toggle">
         <button (click)="toggle()">Menu</button>
       </ng-template>
-      <div>Floating content</div>
-    </Popover>
+      <ng-template #defaultSlot>
+        <div>Floating content</div>
+      </ng-template>
+    </rozie-popover>
   `,
 })
 export class DemoComponent {
@@ -110,7 +112,7 @@ export function Demo() {
       offset={8}
       arrow
       onChange={(next) => console.log('open:', next)}
-      anchor={({ toggle }) => <button onClick={toggle}>Menu</button>}
+      anchorSlot={({ toggle }) => <button onClick={toggle}>Menu</button>}
     >
       <div>Floating content</div>
     </Popover>

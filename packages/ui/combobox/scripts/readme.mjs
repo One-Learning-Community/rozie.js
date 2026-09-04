@@ -11,6 +11,7 @@
 
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
 import { runtimeDepNote } from '../../runtime-dep-note.mjs';
+import { requiredPeerNote } from '../../required-peer-note.mjs';
 
 // ---------------------------------------------------------------------------
 // IR-derivation helpers (shared by README rendering AND the docs validator).
@@ -172,7 +173,7 @@ import { Combobox } from '@rozie-ui/combobox-angular';
   standalone: true,
   imports: [Combobox],
   template: \`
-    <Combobox
+    <rozie-combobox
       [(value)]="value"
       [options]="frameworks"
       placeholder="Search…"
@@ -256,7 +257,7 @@ import { Combobox } from '@rozie-ui/combobox-angular';
   imports: [Combobox, ReactiveFormsModule],
   template: \`
     <!-- The combobox selection IS the form control value -->
-    <Combobox [formControl]="framework" [options]="frameworks" />
+    <rozie-combobox [formControl]="framework" [options]="frameworks" />
   \`,
 })
 export class ComboboxFormComponent {
@@ -265,7 +266,7 @@ export class ComboboxFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <Combobox [(ngModel)]="framework" name="framework" [options]="frameworks" />`,
+//   <rozie-combobox [(ngModel)]="framework" name="framework" [options]="frameworks" />`,
 };
 
 // Per-framework "obtain the imperative handle" snippets (`$expose`).
@@ -364,6 +365,16 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('');
   lines.push(`Peer dependencies: \`${FRAMEWORK_PEER_LABEL[target]}\`. Install them alongside this package.`);
   lines.push('');
+
+  // Disclose non-optional peers beyond the framework — derived from this
+  // leaf's own package.json, walking any @rozie-ui/* peer's own required
+  // peers transitively. Null for the (most common) leaf that requires
+  // nothing beyond its framework.
+  const peerNote = requiredPeerNote(pkgName);
+  if (peerNote) {
+    lines.push(peerNote);
+    lines.push('');
+  }
 
   // Disclose the @rozie/runtime-* dependency this leaf actually carries.
   // Derived from its package.json — null when the leaf imports none.

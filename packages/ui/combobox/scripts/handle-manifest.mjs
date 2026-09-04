@@ -24,7 +24,7 @@ export const handleManifest = {
   focus:
     'Move DOM focus to the text input. NOTE: this deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element (ROZ137 warns, warn-only) — the public `focus()` handle is intended.',
   clear:
-    'Reset the selection: clear `value` (emits `change` with `{ value: null }`) and empty the input text.',
+    'Reset the selection: clear `value` (emits `change` with `{ value: null }` in single-select mode, `{ value: [] }` under `multiple`) and empty the input text.',
   seedQuery:
     'Imperative-only: set the input text (`text ?? \'\'`, coerced to a string) without touching the `value` model or selection state — the typed query AND the filtered option list reflect it. Does not open the popup or emit `change`/`search`.',
   pinOpen:

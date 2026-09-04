@@ -10,6 +10,17 @@ npm i @rozie-ui/combobox-solid
 
 Peer dependencies: `solid-js`. Install them alongside this package.
 
+**Required peers** — beyond the framework peer above, this package requires these non-optional peers to actually render:
+
+- `@rozie-ui/popover-solid` `^0.2.0` — required by `@rozie-ui/combobox-solid`
+- `@floating-ui/dom` `^1.7.2` — required by `@rozie-ui/popover-solid`
+
+Install the whole chain in one line:
+
+```bash
+npm i @rozie-ui/combobox-solid @rozie-ui/popover-solid @floating-ui/dom
+```
+
 Also installed: `@rozie/runtime-solid` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
 
 ## Usage
@@ -91,7 +102,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | Method | Description |
 | --- | --- |
 | `focus` | Move DOM focus to the text input. NOTE: this deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element (ROZ137 warns, warn-only) — the public `focus()` handle is intended. |
-| `clear` | Reset the selection: clear `value` (emits `change` with `{ value: null }`) and empty the input text. |
+| `clear` | Reset the selection: clear `value` (emits `change` with `{ value: null }` in single-select mode, `{ value: [] }` under `multiple`) and empty the input text. |
 | `seedQuery` | Imperative-only: set the input text (`text ?? ''`, coerced to a string) without touching the `value` model or selection state — the typed query AND the filtered option list reflect it. Does not open the popup or emit `change`/`search`. |
 | `pinOpen` | Imperative-only: pin (or unpin) the popup open, coercing its argument to a boolean. While pinned, onBlur() early-returns so the popup does NOT collapse when a host sub-surface (e.g. an action flyout) moves DOM focus out of the input. pinOpen(false) only unpins — it does not itself close the popup or restore focus (the host does that). Render-neutral when never called. |
 

@@ -122,7 +122,7 @@ import { Combobox } from '@rozie-ui/combobox-angular';
   standalone: true,
   imports: [Combobox],
   template: `
-    <Combobox
+    <rozie-combobox
       [(value)]="value"
       [options]="frameworks"
       placeholder="Search…"

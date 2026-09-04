@@ -15,6 +15,7 @@
 import { renderPropDescription } from '@rozie/core';
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
 import { runtimeDepNote } from '../../runtime-dep-note.mjs';
+import { requiredPeerNote } from '../../required-peer-note.mjs';
 
 // ---------------------------------------------------------------------------
 // IR-derivation helpers (shared by README rendering AND the docs validator).
@@ -91,7 +92,7 @@ export function Demo() {
       offset={8}
       arrow
       onChange={(next) => console.log('open:', next)}
-      anchor={({ toggle }) => <button onClick={toggle}>Menu</button>}
+      renderAnchor={({ toggle }) => <button onClick={toggle}>Menu</button>}
     >
       <div>Floating content</div>
     </Popover>
@@ -141,12 +142,14 @@ import { Popover } from '@rozie-ui/popover-angular';
   standalone: true,
   imports: [Popover],
   template: \`
-    <Popover [(open)]="open" trigger="click" placement="bottom" [offset]="8" [arrow]="true" (change)="onChange($event)">
+    <rozie-popover [(open)]="open" trigger="click" placement="bottom" [offset]="8" [arrow]="true" (change)="onChange($event)">
       <ng-template #anchor let-toggle="toggle">
         <button (click)="toggle()">Menu</button>
       </ng-template>
-      <div>Floating content</div>
-    </Popover>
+      <ng-template #defaultSlot>
+        <div>Floating content</div>
+      </ng-template>
+    </rozie-popover>
   \`,
 })
 export class DemoComponent {
@@ -172,7 +175,7 @@ export function Demo() {
       offset={8}
       arrow
       onChange={(next) => console.log('open:', next)}
-      anchor={({ toggle }) => <button onClick={toggle}>Menu</button>}
+      anchorSlot={({ toggle }) => <button onClick={toggle}>Menu</button>}
     >
       <div>Floating content</div>
     </Popover>
@@ -312,6 +315,16 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('');
   lines.push(`Peer dependencies: \`${FRAMEWORK_PEER_LABEL[target]}\`. Install them alongside this package.`);
   lines.push('');
+
+  // Disclose non-optional peers beyond the framework — derived from this
+  // leaf's own package.json, walking any @rozie-ui/* peer's own required
+  // peers transitively. Null for the (most common) leaf that requires
+  // nothing beyond its framework.
+  const peerNote = requiredPeerNote(pkgName);
+  if (peerNote) {
+    lines.push(peerNote);
+    lines.push('');
+  }
 
   // Disclose the @rozie/runtime-* dependency this leaf actually carries.
   // Derived from its package.json — null when the leaf imports none.
