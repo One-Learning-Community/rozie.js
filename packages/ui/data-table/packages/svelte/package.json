@@ -52,7 +52,7 @@
     "svelte": "^5",
     "@tanstack/table-core": "^8.21",
     "@tanstack/virtual-core": "^3",
-    "@rozie-ui/popover-svelte": "^0.1.0"
+    "@rozie-ui/popover-svelte": "^0.1.0 || ^0.2.0"
   },
   "peerDependenciesMeta": {
     "svelte": {
