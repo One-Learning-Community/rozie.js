@@ -20,6 +20,38 @@
 //                             defaulting to no-op): the DataTable host passes its edit-pinning hooks;
 //                             listbox passes nothing. Routing pinning through this host hook (NOT
 //                             inlining it) keeps DataTable's B13 edit-pinning behavior byte-identical.
+//   - rowsWindowed(): boolean  — is the ROW axis windowed. REQUIRED, no default — replaces every bare
+//                             truthiness read of the host's windowing prop (D-05); `windowedRows()` /
+//                             `padTop()` / `padBottom()` / `rowIsOutsideWindow()` below call it by
+//                             convention exactly as they already call `pinnedEditIndex()`.
+//   - colsWindowed(): boolean  — is the COLUMN axis windowed. REQUIRED, no default. `false` for every
+//                             host until it defines the real column-axis mechanism (87-04+).
+//   - columnCount(): number    — the leaf-column count the column virtualizer windows over. REQUIRED,
+//                             no default.
+//   - columnSize(i: number): number — the authoritative width of absolute leaf column `i`, sourced
+//                             from table-core's `getSize()` under D-06. REQUIRED, no default.
+//   - forcedColumns(): number[] — the D-10 OPTIONAL column-axis mirror of `pinnedEditIndex()`: the
+//                             DataTable host unions pinned + active-cell + editing column indices into
+//                             the column-window slice; listbox/combobox pass an empty array (host-
+//                             provided, defaulting to `[]`).
+//   - colVirtualizer           — the host's SECOND virtual-core instance, windowing the COLUMN axis
+//                             (see the AXIS MECHANISM note below). Host-provided, defaulting to `null`.
+//
+// AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source this session, NOT
+// implemented yet; this plan documents the contract only, the second instance lands starting 87-04):
+// `horizontal` is a PER-INSTANCE field of `VirtualizerOptions`
+// (`node_modules/@tanstack/virtual-core/dist/esm/index.d.ts:67`, installed version 3.17.1 per
+// `package.json`), and every axis-sensitive internal read consults `instance.options.horizontal` —
+// `measureElement`'s inlineSize/blockSize + offsetWidth/offsetHeight branch
+// (`dist/esm/index.js:137,150`), `observeElementOffset`'s scrollLeft/scrollTop branch
+// (`dist/esm/index.js:118-121`), `getMaxScrollOffset`'s scrollWidth/scrollHeight branch
+// (`dist/esm/index.js:907-915`), and `scrollWithAdjustments`'s left/top branch
+// (`dist/esm/index.js:152-161`). So ONE `Virtualizer` instance windows exactly ONE axis: the column
+// axis needs its own SECOND, independent `Virtualizer` instance constructed with `horizontal: true`,
+// sharing the SAME `getScrollElement()` (the `rdt-scroll` wrapper) the row instance already uses.
+// Two options the row axis does not set that the column instance will need: `isRtl?: boolean`
+// (data-table ships an RTL grid path) and `overscan?: number` (D-07 gives the column axis its own
+// hardcoded constant, separate from the row axis's `overscan: 8` below).
 
 // getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
 // React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row

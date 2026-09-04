@@ -39,6 +39,12 @@ Pure windowing math lifted verbatim from DataTable's Phase 53/63 baseline. Holds
 | `observeElementRect` / `observeElementOffset` / `elementScroll` / `measureElement` | virtual-core fns |
 | `scheduleRemeasure()` | the host's rAF/microtask remeasure defer |
 | `pinnedEditIndex()` / `pinnedMeasurement(pin)` | **optional** D-05 pin hook — DataTable passes its edit-pinning hooks; list families pass a **no-op**. Routing pinning through this host hook (not inlining it) keeps DataTable's B13 edit-pinning byte-identical. |
+| `rowsWindowed(): boolean` | **required** (Phase 87 D-05) — is the ROW axis windowed. Replaces every bare truthiness read of the host's windowing prop; DataTable/listbox/combobox each define it preserving today's exact truthiness (`() => !!$props.virtual` today). |
+| `colsWindowed(): boolean` | **required** (Phase 87 D-05/D-10) — is the COLUMN axis windowed. `false` for every host until it defines the real column-axis mechanism. |
+| `columnCount(): number` | **required** (Phase 87 D-10) — the leaf-column count the column virtualizer windows over. |
+| `columnSize(i: number): number` | **required** (Phase 87 D-06/D-10) — the authoritative width of absolute leaf column `i`, from table-core's `getSize()`. |
+| `forcedColumns(): number[]` | **optional** (Phase 87 D-10) — the column-axis mirror of `pinnedEditIndex()`: DataTable unions pinned + active-cell + editing column indices; list families pass an empty array. |
+| `colVirtualizer` | **optional** (Phase 87) — the host's SECOND virtual-core instance, windowing the COLUMN axis. `null` when not constructed. |
 
 > **`windowSource()` rows need a stable `.id`.** Combobox/Listbox wrap raw options into id-bearing rows (`{ id: valueOf(o), _opt, _i }`) so `virtualItemKey` keys correctly across recycling. Returning raw options with no `.id` yields `undefined` keys and node-recycling drift (Phase 64 CR-02).
 
