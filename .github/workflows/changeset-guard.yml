@@ -37,6 +37,30 @@ name: Changeset Guard
 # turns an existing, previously-valid changeset into a private-root entry.
 #
 # Cost: an install plus two node invocations. Seconds.
+#
+# QUICK 260904-6ix — TWO MORE BLOCKING STEPS, AND THE FILTER WIDENS.
+# `pnpm release:ready` adds two registry-free gates on top of the two above:
+# changeset coverage (check g — a publishable, non-ignored package's shipped
+# files drifted since its own last version-bump commit with no pending
+# changeset naming it) and the no-major preflight (a pending wave would land
+# something outside 0.x). `release-precheck.mjs --self-test` proves neither
+# check can go vacuous — a gate that silently stops working is worth nothing,
+# so the proof runs as its own blocking step alongside the gate it proves.
+#
+# The path-filter widening to `packages/**` is REQUIRED, not cosmetic: check
+# (g)'s input set is every shipped file in every publishable package, so the
+# pre-6ix filter (`.changeset/**` + `**/package.json` + two named files) would
+# miss the entire defect class it exists to catch — the `@rozie-ui/data-table-
+# react` known-positive this check replays was a `src/DataTable.d.ts` edit
+# that touched no `package.json` at all.
+#
+# `fetch-depth: 0` (below) is now LOAD-BEARING, not insurance: check (g)'s
+# anchor derivation is `git log -L '/"version"/,+1:<pkg>/package.json' HEAD`,
+# which walks the whole version-line history of every publishable package's
+# `package.json`. A shallow clone silently returns an empty anchor for most
+# packages, and the gate goes vacuous — this is exactly what the --self-test
+# `<precondition>` (release-precheck.mjs's own runSelfTest, and the plan's
+# Task 1) checks for locally; in CI, `fetch-depth: 0` is what prevents it.
 
 on:
   push:
@@ -44,14 +68,22 @@ on:
     paths:
       - '.changeset/**'
       - 'scripts/check-changeset-private-packages.mjs'
+      - 'scripts/release-precheck.mjs'
+      - 'scripts/release-ready.mjs'
+      - 'scripts/check-readme-jsx-props.mjs'
       - '.github/workflows/changeset-guard.yml'
       - '**/package.json'
+      - 'packages/**'
   pull_request:
     paths:
       - '.changeset/**'
       - 'scripts/check-changeset-private-packages.mjs'
+      - 'scripts/release-precheck.mjs'
+      - 'scripts/release-ready.mjs'
+      - 'scripts/check-readme-jsx-props.mjs'
       - '.github/workflows/changeset-guard.yml'
       - '**/package.json'
+      - 'packages/**'
   workflow_dispatch:
 
 permissions:
@@ -95,3 +127,20 @@ jobs:
       # so this is a no-op between waves rather than a nuisance failure.
       - name: Release plan assembles (mixed-changeset guard)
         run: pnpm exec changeset status
+
+      # Class 3 (quick 260904-6ix): the fast, registry-free release gate —
+      # changeset coverage (g) + no-major preflight + the private-root guard
+      # above + the README render-prop gate + release-precheck's structural
+      # (b)(c)(d) checks. Same command a releaser runs locally as step 1 of
+      # RELEASING.md §4. Blocking — no continue-on-error.
+      - name: Release ready (fast gate)
+        run: pnpm release:ready
+
+      # Class 4 (quick 260904-6ix): proves check (g) and the no-major
+      # preflight are not vacuous, against REAL repo history (the
+      # @rozie-ui/data-table-react known-positive at commit 592096a75). A
+      # gate that can silently stop catching its own defect class is worth
+      # nothing — this runs as its own blocking step so vacuity fails loudly
+      # rather than being masked by an unrelated green run.
+      - name: Release-ready self-test (vacuity proof)
+        run: node scripts/release-precheck.mjs --self-test

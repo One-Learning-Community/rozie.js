@@ -25,6 +25,15 @@
 //       ship but the tarball is missing) against the worktree. See
 //       RELEASING.md §6 item 10 (D1) for the reference derivation this check
 //       mechanizes, and §7 for the 2026-08-04 stale-publish finding.
+//   (g) CHANGESET COVERAGE — a publishable, non-ignored package's SHIPPED
+//       files drifted since the commit that last changed its own `version`
+//       field, with no pending changeset naming it (directly, or through a
+//       `fixed` group). Unlike (f), this is git-only and registry-free — it
+//       anchors per-package on the last version-bump commit rather than on
+//       registry truth, because the repo has no release tags to anchor on.
+//       That is exactly what makes it cheap enough to run in EVERY mode,
+//       including --skip-npm (CI). See RELEASING.md §4's covers/does-not-
+//       cover subsection for the full boundary.
 //
 // TWO-LAYER GUARD MODEL (see RELEASING.md for the full rationale):
 //   * The REAL pre-publish guard is the releaser's LOCAL pre-flight:
@@ -89,6 +98,16 @@ const TARBALL_DRIFT_ALLOWLIST = {
   },
 };
 
+// Check (g) allowlist — same shape/semantics as TARBALL_DRIFT_ALLOWLIST above
+// (D-07: keyed `name@version`, re-arms automatically on a version bump).
+// Ships empty; exists so a genuinely parked case never forces
+// `continue-on-error` on the CI step.
+const CHANGESET_COVERAGE_ALLOWLIST = {};
+
+// The known-positive this check's --self-test replays against real history
+// (RELEASING.md's "Design facts measured before planning" table).
+const SELF_TEST_HISTORICAL_COMMIT = '592096a75';
+
 // Fallback workspace globs if pnpm-workspace.yaml cannot be read. MUST include
 // packages/targets/* per the plan (those @rozie/target-* are inlined into core
 // and not in the publish steps, but if public they should at least be audited).
@@ -104,18 +123,31 @@ const FALLBACK_GLOBS = [
 // CLI parsing (hand-rolled; no commander)
 // ---------------------------------------------------------------------------
 function parseArgs(argv) {
-  const opts = { mode: 'audit', skipNpm: false, tarball: false, help: false, filters: [] };
+  const opts = {
+    mode: 'audit',
+    skipNpm: false,
+    tarball: false,
+    help: false,
+    filters: [],
+    selfTest: false,
+    jsonSummary: null,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--gate' || a === '--pre-publish') opts.mode = 'gate';
     else if (a === '--skip-npm' || a === '--offline') opts.skipNpm = true;
     else if (a === '--tarball') opts.tarball = true;
+    else if (a === '--self-test') opts.selfTest = true;
     else if (a === '--help' || a === '-h') opts.help = true;
     else if (a === '--filter') {
       const v = argv[++i];
       if (v) opts.filters.push(v);
     } else if (a.startsWith('--filter=')) {
       opts.filters.push(a.slice('--filter='.length));
+    } else if (a === '--json-summary') {
+      opts.jsonSummary = argv[++i] || null;
+    } else if (a.startsWith('--json-summary=')) {
+      opts.jsonSummary = a.slice('--json-summary='.length);
     } else if (a.startsWith('-')) {
       console.error(`Unknown flag: ${a} (try --help)`);
       process.exit(2);
@@ -147,11 +179,17 @@ Modes:
                        4-6 minutes unscoped across the full workspace).
   --filter <name>      Scope to a package by exact name (repeatable). Positional
                        names work too. Default = all publishable packages.
+  --self-test           Run the built-in assertions proving checks (g) and the
+                       no-major preflight are not vacuous, against REAL repo
+                       history. No registry access, no per-package audit table.
+  --json-summary <file> Write a machine-readable verdict summary to <file>
+                       (consumed by scripts/release-ready.mjs).
   --help, -h           This help.
 
 Checks: (a) version vs npm  (b) description quality  (c) url/dir accuracy
         (d) files+exports resolve on disk  (e) @rozie/* workspace deps on npm
-        (f) published-tarball drift (--tarball or --gate only)`);
+        (f) published-tarball drift (--tarball or --gate only)
+        (g) changeset coverage (every mode, incl. --skip-npm)`);
 }
 
 // ---------------------------------------------------------------------------
@@ -657,6 +695,376 @@ async function checkTarballDrift(entry, opts) {
 }
 
 // ---------------------------------------------------------------------------
+// (g) CHANGESET COVERAGE — git-only, registry-free per-package check. See the
+// header comment block above for the defect class and RELEASING.md §4 for
+// the covers/does-not-cover boundary this check owns.
+// ---------------------------------------------------------------------------
+
+// Parse a changeset .md front-matter package-name keys. Mirrors
+// scripts/check-changeset-private-packages.mjs's `parseChangesetPackageNames`
+// exactly (duplicated, not imported — each check-*.mjs gate stays standalone
+// per T-24-SC3 precedent).
+function parseChangesetPackageNames(text) {
+  const lines = text.split(/\r?\n/);
+  let dashCount = 0;
+  const names = [];
+  for (const line of lines) {
+    if (/^---\s*$/.test(line)) {
+      dashCount++;
+      if (dashCount === 2) break;
+      continue;
+    }
+    if (dashCount !== 1) continue;
+    const m = line.match(/^\s*["']?([^"':]+)["']?\s*:\s*\S+\s*$/);
+    if (m) names.push(m[1].trim());
+  }
+  return names;
+}
+
+// Read a file at an arbitrary ref via `git show <ref>:<path>`, WITHOUT
+// checking out or mutating the worktree. Returns null on any failure (path
+// did not exist at that ref, etc).
+function gitShowAt(ref, relPath) {
+  const r = spawnSync('git', ['show', `${ref}:${relPath}`], { cwd: REPO_ROOT, encoding: 'utf8' });
+  if (r.status !== 0) return null;
+  return r.stdout;
+}
+
+// `.changeset/config.json`'s `ignore` set and `fixed` groups, either from the
+// live worktree (`ref === 'WORKTREE'`) or from an arbitrary historical commit
+// via `git show` — the latter is what lets --self-test replay the exact
+// config that was live at the known-positive commit, not today's config.
+function readChangesetConfigAt(ref) {
+  const text =
+    ref === 'WORKTREE'
+      ? fs.readFileSync(path.join(REPO_ROOT, '.changeset', 'config.json'), 'utf8')
+      : gitShowAt(ref, '.changeset/config.json');
+  const cfg = JSON.parse(text);
+  return { ignore: new Set(cfg.ignore || []), fixed: cfg.fixed || [] };
+}
+
+// Every package name any pending `.changeset/*.md` (excluding README.md)
+// declares at `ref`.
+function readPendingChangesetNamesAt(ref) {
+  let files;
+  if (ref === 'WORKTREE') {
+    let entries;
+    try {
+      entries = fs.readdirSync(path.join(REPO_ROOT, '.changeset'), { withFileTypes: true });
+    } catch {
+      entries = [];
+    }
+    files = entries
+      .filter((e) => e.isFile() && e.name.endsWith('.md') && e.name.toLowerCase() !== 'readme.md')
+      .map((e) => `.changeset/${e.name}`);
+  } else {
+    const r = spawnSync('git', ['ls-tree', '-r', '--name-only', ref, '--', '.changeset'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+    files = (r.stdout || '').split('\n').filter((f) => f.endsWith('.md') && !/(^|\/)readme\.md$/i.test(f));
+  }
+  const names = new Set();
+  for (const f of files) {
+    const text = ref === 'WORKTREE' ? fs.readFileSync(path.join(REPO_ROOT, f), 'utf8') : gitShowAt(ref, f);
+    if (text == null) continue;
+    for (const name of parseChangesetPackageNames(text)) names.add(name);
+  }
+  return names;
+}
+
+// Naming any member of a `fixed` group covers every member of that group —
+// without this the gate would false-fail every other member of an 11-package
+// toolchain group on every wave that names only one of them.
+function expandThroughFixedGroups(names, fixedGroups) {
+  const out = new Set(names);
+  for (const group of fixedGroups) {
+    if (group.some((n) => names.has(n))) {
+      for (const n of group) out.add(n);
+    }
+  }
+  return out;
+}
+
+// Enumerate candidate publishable (non-private) packages at `ref`. In
+// WORKTREE mode this reuses discoverWorkspace() (fs-based, fast); in
+// historical mode it walks `git ls-tree -r --name-only <ref> -- packages`
+// filtered to `**/package.json` and reads each manifest via `git show` —
+// never checking out the historical tree.
+function listCandidatePackagesAt(ref) {
+  if (ref === 'WORKTREE') {
+    const { byName } = discoverWorkspace();
+    return [...byName.values()].map((e) => ({ name: e.name, version: e.version, dir: e.dir, pkg: e.pkg }));
+  }
+  const r = spawnSync('git', ['ls-tree', '-r', '--name-only', ref, '--', 'packages'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  });
+  const paths = (r.stdout || '').split('\n').filter((p) => /(^|\/)package\.json$/.test(p));
+  const out = [];
+  for (const p of paths) {
+    const dir = p.slice(0, p.length - '/package.json'.length);
+    const text = gitShowAt(ref, p);
+    if (text == null) continue;
+    let pkg;
+    try {
+      pkg = JSON.parse(text);
+    } catch {
+      continue;
+    }
+    if (!pkg.name || pkg.private === true) continue;
+    out.push({ name: pkg.name, version: pkg.version, dir, pkg });
+  }
+  return out;
+}
+
+// Anchor derivation: the commit that last changed <pkgDir>/package.json's
+// `version` field, as of `asOf`. `asOf === 'WORKTREE'` resolves against HEAD
+// (a version bump only counts once committed). Argv array (never a shell
+// string). Empty stdout or non-zero exit means unresolvable — callers MUST
+// treat that as WARN, never OK (the vacuity guard: a silently-empty anchor
+// would make every package report "no drift" and the gate would pass
+// forever).
+function anchorCommitFor(pkgDir, asOf) {
+  const ref = asOf === 'WORKTREE' ? 'HEAD' : asOf;
+  const r = spawnSync(
+    'git',
+    ['log', '-L', `/"version"/,+1:${pkgDir}/package.json`, '--format=%H', '-s', '--max-count=1', ref],
+    { cwd: REPO_ROOT, encoding: 'utf8' },
+  );
+  if (r.status !== 0) return null;
+  const line = (r.stdout || '').split('\n')[0].trim();
+  return line || null;
+}
+
+// Drift set between `anchor` and `asOf`, scoped to `pkgDir`. `asOf ===
+// 'WORKTREE'` diffs against the ACTUAL WORKING TREE (a single-ref `git diff
+// <anchor> -- <pkgDir>`, which git compares against the worktree) rather
+// than a committed ref — this is deliberate: a shipped-file edit that has
+// not been committed yet is exactly the case the LOCAL pre-commit/pre-push
+// run of this gate exists to catch, matching how every other check in this
+// script reads actual files on disk rather than committed state. Historical
+// replay (--self-test) passes a real commit sha and gets a genuine two-ref
+// diff instead. Excludes `dist/` (gitignored build artifact, check (f)'s
+// job) and `CHANGELOG.md` (written by `changeset version` itself, always
+// post-anchor noise). `package.json` is always kept — npm ships it
+// unconditionally, and a version-only diff is structurally impossible
+// because the anchor IS the version change. When the package's `files`
+// field ships nothing outside `dist/` (today only @rozie/core), falls back
+// to "any other tracked file under pkgDir changed" as a source-change proxy
+// for a shipped-byte change.
+function driftFilesFor(pkgDir, anchor, asOf, filesField) {
+  const diffArgs =
+    asOf === 'WORKTREE'
+      ? ['diff', '--name-only', anchor, '--', pkgDir]
+      : ['diff', '--name-only', anchor, asOf, '--', pkgDir];
+  const r = spawnSync('git', diffArgs, { cwd: REPO_ROOT, encoding: 'utf8' });
+  if (r.status !== 0) return [];
+  const shipsOutsideDist = (filesField || []).some((f) => {
+    const clean = f.replace(/^!/, '').replace(/\/+$/, '');
+    return clean !== 'dist';
+  });
+  const out = [];
+  const prefix = `${pkgDir}/`;
+  for (const line of (r.stdout || '').split('\n')) {
+    if (!line || !line.startsWith(prefix)) continue;
+    const rel = line.slice(prefix.length);
+    if (rel.startsWith('dist/') || rel === 'CHANGELOG.md') continue;
+    if (rel === 'package.json') {
+      out.push(rel);
+      continue;
+    }
+    if (shipsOutsideDist) {
+      if (shipsPath(rel, filesField)) out.push(rel);
+    } else {
+      out.push(rel); // dist-only fallback proxy (@rozie/core today)
+    }
+  }
+  return out;
+}
+
+// The per-package verdict. `ctx` bundles the repo-wide inputs computed once
+// by the caller: `ignore` (Set), `covered` (Set, already expanded through
+// `fixed` groups), and `allowlist` (CHANGESET_COVERAGE_ALLOWLIST).
+function evaluateChangesetCoverage(candidate, asOf, ctx) {
+  if (ctx.ignore.has(candidate.name)) {
+    return { status: 'SKIP', detail: 'in .changeset/config.json ignore list — cannot publish' };
+  }
+  const anchor = anchorCommitFor(candidate.dir, asOf);
+  if (!anchor) {
+    return { status: 'WARN', detail: 'unresolvable version-line anchor — cannot compute drift (vacuity guard)' };
+  }
+  const drift = driftFilesFor(candidate.dir, anchor, asOf, candidate.pkg.files);
+  if (drift.length === 0) return { status: 'OK', detail: 'no shipped-file drift since last version bump' };
+  if (ctx.covered.has(candidate.name)) {
+    return { status: 'OK', detail: `drift covered by pending changeset: ${drift.join(', ')}` };
+  }
+  const allow = ctx.allowlist[`${candidate.name}@${candidate.version}`];
+  if (allow) {
+    return {
+      status: 'WARN',
+      detail: `ALLOWLISTED — ${allow.reason} (ref: ${allow.ref}); drifted: ${drift.join(', ')}`,
+    };
+  }
+  return {
+    status: 'FAIL',
+    detail: `shipped files drifted since ${candidate.version} with no changeset naming this package: ${drift.join(', ')}`,
+  };
+}
+
+// Build the repo-wide coverage context (ignore set + expanded covered-name
+// set) once, from `configRef` ('WORKTREE' or a commit sha).
+function buildCoverageCtx(configRef) {
+  const { ignore, fixed } = readChangesetConfigAt(configRef);
+  const pending = readPendingChangesetNamesAt(configRef);
+  const covered = expandThroughFixedGroups(pending, fixed);
+  return { ignore, fixed, covered, allowlist: CHANGESET_COVERAGE_ALLOWLIST };
+}
+
+// Live per-package wrapper used by main()'s audit loop. Deterministic and
+// network-free, so it runs in EVERY mode including --skip-npm.
+function checkChangesetCoverage(entry, ctx) {
+  return evaluateChangesetCoverage(
+    { name: entry.name, version: entry.version, dir: entry.dir, pkg: entry.pkg },
+    'WORKTREE',
+    ctx,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// --self-test — prove check (g) is not vacuous against REAL repo history.
+// Exit 0 only if every assertion holds; on any failure print which one(s)
+// and exit 1. No registry access, no per-package audit table.
+// ---------------------------------------------------------------------------
+function runSelfTest() {
+  const failures = [];
+  const notes = [];
+  const fail = (label, extra) => failures.push(extra ? `${label} — ${extra}` : label);
+
+  const HIST = SELF_TEST_HISTORICAL_COMMIT;
+  const histCtx = buildCoverageCtx(HIST);
+  const histCandidates = listCandidatePackagesAt(HIST);
+  const histResults = new Map();
+  for (const c of histCandidates) {
+    histResults.set(c.name, { candidate: c, result: evaluateChangesetCoverage(c, HIST, histCtx) });
+  }
+
+  // 1. RED, real history: 592096a75 replay must FAIL data-table-react@0.2.8
+  //    citing src/DataTable.d.ts.
+  {
+    const r = histResults.get('@rozie-ui/data-table-react');
+    const pass =
+      !!r && r.candidate.version === '0.2.8' && r.result.status === 'FAIL' && r.result.detail.includes('src/DataTable.d.ts');
+    if (pass) {
+      notes.push(
+        `RED (${HIST}): @rozie-ui/data-table-react@0.2.8 -> FAIL — ${r.result.detail}`,
+      );
+    } else {
+      fail(
+        `RED-${HIST}: expected @rozie-ui/data-table-react@0.2.8 to FAIL citing src/DataTable.d.ts`,
+        r ? `got status=${r.result.status} version=${r.candidate.version} detail=${r.result.detail}` : 'package not found in historical candidates',
+      );
+    }
+  }
+
+  // 2. GREEN control, real history: same computation at HEAD → zero findings.
+  {
+    const liveCtx = buildCoverageCtx('WORKTREE');
+    const liveCandidates = listCandidatePackagesAt('WORKTREE');
+    const findings = [];
+    for (const c of liveCandidates) {
+      const res = evaluateChangesetCoverage(c, 'WORKTREE', liveCtx);
+      if (res.status === 'FAIL') findings.push(`${c.name}: ${res.detail}`);
+    }
+    if (findings.length === 0) {
+      notes.push(`GREEN (HEAD): 0 coverage findings across ${liveCandidates.length} publishable package(s)`);
+    } else {
+      fail('GREEN-HEAD: expected zero coverage findings at HEAD', `got ${findings.length}: ${findings.join(' | ')}`);
+    }
+  }
+
+  // 3. Ignore-list control: 592096a75 replay must be zero findings for any
+  //    ignore-listed name; listbox-react/slider-react are the concrete cases.
+  {
+    const names = ['@rozie-ui/listbox-react', '@rozie-ui/slider-react'];
+    const bad = [];
+    for (const name of names) {
+      const r = histResults.get(name);
+      if (!r || r.result.status !== 'SKIP') bad.push(`${name}: ${r ? r.result.status : 'not found'}`);
+    }
+    if (bad.length === 0) {
+      notes.push(`ignore-list control: ${names.join(', ')} -> SKIP`);
+    } else {
+      fail('IGNORE-LIST: expected ignore-listed packages to SKIP', bad.join(' | '));
+    }
+  }
+
+  // 4. Private-package control: replay must be zero findings for any
+  //    private:true workspace package — @rozie-ui/toast is excluded from
+  //    candidate discovery entirely (listCandidatePackagesAt filters private).
+  {
+    const found = histCandidates.find((c) => c.name === '@rozie-ui/toast');
+    if (!found) {
+      notes.push('private-package control: @rozie-ui/toast (private:true) excluded from candidates entirely');
+    } else {
+      fail('PRIVATE-PACKAGE: expected @rozie-ui/toast to be excluded from candidates (private:true)');
+    }
+  }
+
+  // 5. Fixed-group control: naming @rozie/cli must cover all 11 fixed-group
+  //    members, @rozie/core included.
+  {
+    const group = histCtx.fixed.find((g) => g.includes('@rozie/cli'));
+    const expanded = expandThroughFixedGroups(new Set(['@rozie/cli']), histCtx.fixed);
+    const pass = !!group && group.every((n) => expanded.has(n)) && expanded.has('@rozie/core');
+    if (pass) {
+      notes.push(`fixed-group control: naming @rozie/cli covers all ${group.length} fixed-group members`);
+    } else {
+      fail('FIXED-GROUP: naming @rozie/cli must expand to cover every fixed-group member incl. @rozie/core');
+    }
+  }
+
+  // 6. Coverage control: naming data-table-react must clear its 592096a75
+  //    FAIL.
+  {
+    const ctx2 = { ...histCtx, covered: expandThroughFixedGroups(new Set(['@rozie-ui/data-table-react']), histCtx.fixed) };
+    const candidate = histCandidates.find((c) => c.name === '@rozie-ui/data-table-react');
+    const res = candidate && evaluateChangesetCoverage(candidate, HIST, ctx2);
+    if (res && res.status !== 'FAIL') {
+      notes.push(`coverage control: naming @rozie-ui/data-table-react clears the ${HIST} FAIL (now ${res.status})`);
+    } else {
+      fail('COVERAGE-CONTROL: naming @rozie-ui/data-table-react must clear the FAIL', res ? res.status : 'no candidate');
+    }
+  }
+
+  // 7. Vacuity guard: an unresolvable anchor must WARN, never OK.
+  {
+    const bogus = {
+      name: '@rozie-fake/does-not-exist-6ix',
+      version: '0.0.0',
+      dir: 'packages/does-not-exist-6ix',
+      pkg: { files: ['dist'] },
+    };
+    const liveCtx = buildCoverageCtx('WORKTREE');
+    const res = evaluateChangesetCoverage(bogus, 'WORKTREE', liveCtx);
+    if (res.status === 'WARN') {
+      notes.push('vacuity guard: unresolvable anchor -> WARN (never OK)');
+    } else {
+      fail('VACUITY-GUARD: unresolvable anchor must WARN, never OK', `got ${res.status}`);
+    }
+  }
+
+  if (failures.length) {
+    console.error('release-precheck --self-test: FAILED');
+    for (const f of failures) console.error(`  - ${f}`);
+    process.exit(1);
+  }
+  console.log('release-precheck --self-test: PASSED');
+  for (const n of notes) console.log(`  ${n}`);
+  process.exit(0);
+}
+
+// ---------------------------------------------------------------------------
 // Repo-wide structural check (not per-package): a .changeset/*.md naming a
 // PRIVATE family root versions nothing under the current changesets config
 // (privatePackages.version:false silently no-ops it). Deterministic,
@@ -699,6 +1107,10 @@ async function main() {
     printHelp();
     process.exit(0);
   }
+  if (opts.selfTest) {
+    runSelfTest();
+    return;
+  }
 
   const { byName, privateNames } = discoverWorkspace();
   let entries = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -727,6 +1139,11 @@ async function main() {
   }
   console.log('');
 
+  // Check (g) inputs computed once, repo-wide (ignore set + expanded
+  // covered-name set), the same way byName/privateNames are computed once
+  // and passed to checkWorkspaceDeps.
+  const coverageCtx = buildCoverageCtx('WORKTREE');
+
   const rows = [];
   for (const entry of entries) {
     const checks = {
@@ -736,6 +1153,7 @@ async function main() {
       d: checkFilesExports(entry, opts),
       e: await checkWorkspaceDeps(entry, byName, privateNames, opts),
       f: await checkTarballDrift(entry, opts),
+      g: checkChangesetCoverage(entry, coverageCtx),
     };
     rows.push({ entry, checks, verdict: verdictOf(checks) });
   }
@@ -744,12 +1162,12 @@ async function main() {
   const nameW = Math.max(20, ...rows.map((r) => r.entry.name.length));
   const verW = Math.max(7, ...rows.map((r) => String(r.entry.version).length));
   console.log(
-    `${pad('package', nameW)}  ${pad('version', verW)}  ${pad('npm', 5)}  ${pad('desc', 5)}  ${pad('url', 5)}  ${pad('files', 5)}  ${pad('deps', 5)}  ${pad('tarball', 5)}  verdict`,
+    `${pad('package', nameW)}  ${pad('version', verW)}  ${pad('npm', 5)}  ${pad('desc', 5)}  ${pad('url', 5)}  ${pad('files', 5)}  ${pad('deps', 5)}  ${pad('tarball', 5)}  ${pad('covrg', 5)}  verdict`,
   );
-  console.log('-'.repeat(nameW + verW + 7 * 7 + 9));
+  console.log('-'.repeat(nameW + verW + 8 * 7 + 9));
   for (const { entry, checks, verdict } of rows) {
     console.log(
-      `${pad(entry.name, nameW)}  ${pad(entry.version, verW)}  ${pad(GLYPH[checks.a.status], 5)}  ${pad(GLYPH[checks.b.status], 5)}  ${pad(GLYPH[checks.c.status], 5)}  ${pad(GLYPH[checks.d.status], 5)}  ${pad(GLYPH[checks.e.status], 5)}  ${pad(GLYPH[checks.f.status], 5)}  ${verdict}`,
+      `${pad(entry.name, nameW)}  ${pad(entry.version, verW)}  ${pad(GLYPH[checks.a.status], 5)}  ${pad(GLYPH[checks.b.status], 5)}  ${pad(GLYPH[checks.c.status], 5)}  ${pad(GLYPH[checks.d.status], 5)}  ${pad(GLYPH[checks.e.status], 5)}  ${pad(GLYPH[checks.f.status], 5)}  ${pad(GLYPH[checks.g.status], 5)}  ${verdict}`,
     );
   }
   console.log('');
@@ -757,7 +1175,9 @@ async function main() {
   // Per-package detail for anything not fully OK.
   let anyFail = changesetCheck.status === 'FAIL';
   let anyWarn = false;
+  const verdictHistogram = { OK: 0, WARN: 0, FAIL: 0 };
   for (const { entry, checks, verdict } of rows) {
+    verdictHistogram[verdict] = (verdictHistogram[verdict] || 0) + 1;
     if (verdict === 'OK') continue;
     if (verdict === 'FAIL') anyFail = true;
     if (verdict === 'WARN') anyWarn = true;
@@ -769,11 +1189,29 @@ async function main() {
       ['d', 'files/exports'],
       ['e', 'workspace-deps'],
       ['f', 'tarball-drift'],
+      ['g', 'changeset-coverage'],
     ]) {
       const c = checks[key];
       if (c.status === 'FAIL' || c.status === 'WARN') {
         console.log(`    [${c.status}] (${label}) ${c.detail}`);
       }
+    }
+  }
+
+  if (opts.jsonSummary) {
+    const summary = {
+      mode: opts.mode,
+      skipNpm: opts.skipNpm,
+      scopeCount: entries.length,
+      verdictHistogram,
+      anyFail,
+      anyWarn,
+      changesetPrivatePackageGuard: changesetCheck,
+    };
+    try {
+      fs.writeFileSync(opts.jsonSummary, JSON.stringify(summary, null, 2));
+    } catch (err) {
+      console.error(`Warning: could not write --json-summary to ${opts.jsonSummary}: ${err.message}`);
     }
   }
 
