@@ -23,7 +23,7 @@
   <slot name="groupBar" :grouping="groupingKeys()" :groupableColumns="groupableColumns()" :applyGrouping="applyGrouping" :clearGrouping="clearGrouping">
     <span v-for="gk in groupingKeys()" :key="gk" class="rdt-group-token" data-group-token="">{{ gk }}</span>
   </slot>
-</div><div v-if="props.virtual" class="rdt-scroll" :style="props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto'">
+</div><div v-if="isWindowed()" class="rdt-scroll" :style="props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto'">
 <table :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
   <thead class="rdt-thead" role="rowgroup">
     <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row" :aria-rowindex="hgLevel + 1">
@@ -181,7 +181,7 @@
       </td>
     </tr></template>
   </tbody>
-</table><div v-if="!props.virtual" class="rdt-pagination" role="group" aria-label="Pagination">
+</table><div v-if="!rowsWindowed()" class="rdt-pagination" role="group" aria-label="Pagination">
   <button type="button" class="rdt-page-btn rdt-page-prev" :disabled="!canPrevPage()" @click="onPrevPage()">Prev</button>
   <span class="rdt-page-status" aria-live="polite">
     {{ 'Page ' + (pageIndex() + 1) + ' of ' + displayPageCount() }}
@@ -1177,13 +1177,55 @@ const onColumnSizingInfoChangeCb = (updater: any) => {
 // windowSource() (the row source), pinnedEditIndex()/pinnedMeasurement() (the D-05 pin hook),
 // scheduleRemeasure(), and the gridScrollEl/virtualizer/virtual-core-fn references.
 
+// ══ D-05 predicate layer (Phase 87 87-02) — resolves the windowing prop into an axis state,
+// replacing every bare truthiness read of $props.virtual (which is unsafe once the prop widens
+// to a string grammar in 87-03: 'columns' is truthy but does NOT mean "windows rows"). Modeled on
+// resolveAppendTo() in CommandPalette.rozie (the D-01 value-grammar precedent): branch on
+// typeof === 'string', switch on the known string values, fall back to the boolean cases. THIS
+// plan still declares `virtual: Boolean` (87-03 widens the declaration to [Boolean, String]), so
+// resolveVirtual() can currently only return 'off' or 'rows' and colsWindowed() is constantly
+// false — inert until 87-03/87-04 land the column axis.
+//
+// Declared BEFORE windowSource() (below): windowSource() calls rowsWindowed(), and the React
+// emitter lowers each of these to a useCallback whose dependency array is evaluated eagerly at
+// the declaration site — a forward reference here is a genuine TDZ (TS2448), not just a style
+// preference (found running the strict react typecheck gate this task, Rule 1).
+const resolveVirtual = () => {
+  const v = props.virtual;
+  if (typeof v === 'string') {
+    if (v === 'rows') return 'rows';
+    if (v === 'columns') return 'columns';
+    if (v === 'both') return 'both';
+    return 'off';
+  }
+  return v === true ? 'rows' : 'off';
+};
+// rowsWindowed(): the windowing.rzts host-contract symbol (D-05). Byte-behaviorally identical to
+// today's `$props.virtual` truthiness — this plan changes NO user-visible behavior.
+const rowsWindowed = () => {
+  const s = resolveVirtual();
+  return s === 'rows' || s === 'both';
+};
+const colsWindowed = () => {
+  const s = resolveVirtual();
+  return s === 'columns' || s === 'both';
+};
+const isWindowed = () => rowsWindowed() || colsWindowed();
+// D-10 column-axis host-contract stubs (Phase 87 87-02) — INERT until 87-04 constructs the
+// second, horizontal Virtualizer instance (see windowing.rzts's AXIS MECHANISM note). Explicit
+// return-type annotations (columnSize / forcedColumns) copy the pinMeasurement() trick
+// (windowing.rzts:65-74) so the strict bundled-leaf tsc does not flow-narrow a no-op host's
+// return to `never`.
+const columnCount = (): number => 0;
+const columnSize = (i: number): number => 0;
+const forcedColumns = (): number[] => [];
 // windowSource(): the rows fed to the virtualizer AND held in $data.rows — the windowing.rzts
 // host-contract source. When virtual, the FULL filtered+sorted PRE-PAGINATION model
 // (A2-verified table.getPrePaginationRowModel()) so windowing REPLACES client pagination (req-9);
 // else the normal (paginated) row model — the non-virtual path is byte-unchanged.
 const windowSource = () => {
   if (!table) return [];
-  if (props.virtual) return table.getPrePaginationRowModel().rows;
+  if (rowsWindowed()) return table.getPrePaginationRowModel().rows;
   return table.getRowModel().rows;
 };
 // Defer remeasureWindow() until AFTER the framework commits the recycled window (onChange fires
@@ -1286,6 +1328,38 @@ const remeasureWindow = () => {
 //                             defaulting to no-op): the DataTable host passes its edit-pinning hooks;
 //                             listbox passes nothing. Routing pinning through this host hook (NOT
 //                             inlining it) keeps DataTable's B13 edit-pinning behavior byte-identical.
+//   - rowsWindowed(): boolean  — is the ROW axis windowed. REQUIRED, no default — replaces every bare
+//                             truthiness read of the host's windowing prop (D-05); `windowedRows()` /
+//                             `padTop()` / `padBottom()` / `rowIsOutsideWindow()` below call it by
+//                             convention exactly as they already call `pinnedEditIndex()`.
+//   - colsWindowed(): boolean  — is the COLUMN axis windowed. REQUIRED, no default. `false` for every
+//                             host until it defines the real column-axis mechanism (87-04+).
+//   - columnCount(): number    — the leaf-column count the column virtualizer windows over. REQUIRED,
+//                             no default.
+//   - columnSize(i: number): number — the authoritative width of absolute leaf column `i`, sourced
+//                             from table-core's `getSize()` under D-06. REQUIRED, no default.
+//   - forcedColumns(): number[] — the D-10 OPTIONAL column-axis mirror of `pinnedEditIndex()`: the
+//                             DataTable host unions pinned + active-cell + editing column indices into
+//                             the column-window slice; listbox/combobox pass an empty array (host-
+//                             provided, defaulting to `[]`).
+//   - colVirtualizer           — the host's SECOND virtual-core instance, windowing the COLUMN axis
+//                             (see the AXIS MECHANISM note below). Host-provided, defaulting to `null`.
+//
+// AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source this session, NOT
+// implemented yet; this plan documents the contract only, the second instance lands starting 87-04):
+// `horizontal` is a PER-INSTANCE field of `VirtualizerOptions`
+// (`node_modules/@tanstack/virtual-core/dist/esm/index.d.ts:67`, installed version 3.17.1 per
+// `package.json`), and every axis-sensitive internal read consults `instance.options.horizontal` —
+// `measureElement`'s inlineSize/blockSize + offsetWidth/offsetHeight branch
+// (`dist/esm/index.js:137,150`), `observeElementOffset`'s scrollLeft/scrollTop branch
+// (`dist/esm/index.js:118-121`), `getMaxScrollOffset`'s scrollWidth/scrollHeight branch
+// (`dist/esm/index.js:907-915`), and `scrollWithAdjustments`'s left/top branch
+// (`dist/esm/index.js:152-161`). So ONE `Virtualizer` instance windows exactly ONE axis: the column
+// axis needs its own SECOND, independent `Virtualizer` instance constructed with `horizontal: true`,
+// sharing the SAME `getScrollElement()` (the `rdt-scroll` wrapper) the row instance already uses.
+// Two options the row axis does not set that the column instance will need: `isRtl?: boolean`
+// (data-table ships an RTL grid path) and `overscan?: number` (D-07 gives the column axis its own
+// hardcoded constant, separate from the row axis's `overscan: 8` below).
 
 // getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
 // React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
@@ -1365,7 +1439,7 @@ const windowedRows = () => {
     // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
     // the template never dereferences a null `vi` (the windowed bindings read wr.vi.index); the
     // rows appear on the first onChange after _didMount.
-    if (!props.virtual) {
+    if (!rowsWindowed()) {
       const rowList = rows.value || [];
       return rowList.map((r: any) => ({
         vi: null,
@@ -1424,7 +1498,7 @@ const padTop = () => {
   // and re-derives on the pin/unpin transition (the D-02 spacer subtraction below).
   void windowVer.value;
   void editVer.value;
-  if (!props.virtual || !virtualizer) return 0;
+  if (!rowsWindowed() || !virtualizer) return 0;
   const items = virtualizer.getVirtualItems();
   let pad = items.length ? items[0].start : 0;
   // D-02 spacer subtraction: when the pinned editing row sits ABOVE the window it is rendered
@@ -1444,7 +1518,7 @@ const padBottom = () => {
   // on pin/unpin.
   void windowVer.value;
   void editVer.value;
-  if (!props.virtual || !virtualizer) return 0;
+  if (!rowsWindowed() || !virtualizer) return 0;
   const items = virtualizer.getVirtualItems();
   if (!items.length) return 0;
   let pad = virtualizer.getTotalSize() - items[items.length - 1].end;
@@ -1476,7 +1550,7 @@ const pmIndexInWindow = (items: any, idx: any) => {
 // rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
 // window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
 const rowIsOutsideWindow = (r: any) => {
-  if (!props.virtual || !virtualizer) return false;
+  if (!rowsWindowed() || !virtualizer) return false;
   const items = virtualizer.getVirtualItems();
   for (const it of items as any) if (it.index === r) return false;
   return true;
@@ -2183,7 +2257,7 @@ const pinColumn = (colId: any, side: any) => {
 // or inherited Lit DOM method named getRowIndexRelativeToPage (ROZ121/124/137 clear).
 const getRowIndexRelativeToPage = (absRow: any) => {
   const abs = absRow == null ? toAbsRow(activeRow.value) : Math.trunc(Number(absRow)) || 0;
-  if (props.virtual) return abs;
+  if (rowsWindowed()) return abs;
   return abs - pageRowOffset();
 };
 // C3 (phase 63 wave-9) — the PUBLIC Cut verb: copy the current cell range to the clipboard then
@@ -2228,7 +2302,7 @@ const headerColIndexOf = (hg: any, header: any) => (hg && hg.headers ? hg.header
 // isGrid()-gated (the active-cell API is grid-only); pageIndex()/pageSize() read live table-core
 // state through the reactive tick (filterPaginationRowChrome), so this re-derives on a page change.
 const pageRowOffset = () => {
-  if (!isGrid() || props.virtual) return 0;
+  if (!isGrid() || rowsWindowed()) return 0;
   return pageIndex() * pageSize();
 };
 // page-relative active row → absolute (display-order) index.
@@ -2240,7 +2314,7 @@ const toAbsRow = (localRow: any) => localRow + pageRowOffset();
 // In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
 // non-virtual paginated body $data.rows is only the page slice, so read the live model.
 const prePaginationRowCount = () => {
-  if (!table || props.virtual) return bodyRowCount();
+  if (!table || rowsWindowed()) return bodyRowCount();
   const pm = table.getPrePaginationRowModel();
   return pm && pm.rows ? pm.rows.length : bodyRowCount();
 };
@@ -2348,7 +2422,7 @@ const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, ne
   // in-window rows keep the synchronous path below (table-mode / non-windowed stay byte-stable).
   // The guard reads the resolved `header` (NOT the raw `nextIsHeader`) so an omitted-arg call
   // while a header cell is active falls back to $data.activeIsHeader and skips the scroll path.
-  if (props.virtual && virtualizer && !header && rowIsOutsideWindow(r)) {
+  if (rowsWindowed() && virtualizer && !header && rowIsOutsideWindow(r)) {
     virtualizer.scrollToIndex(r, {
       align: 'center'
     });
@@ -2359,7 +2433,7 @@ const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, ne
     // React off-window-focus failure). Poll resolveCellEl for up to ~30 frames: the five
     // fast-committing targets resolve on the first attempt (behavior unchanged), React retries
     // across the few frames its async commit needs. The poll ONLY focuses (never measures), so it
-    // cannot re-introduce the remeasure-vs-scroll fight. Inside the $props.virtual guard only.
+    // cannot re-introduce the remeasure-vs-scroll fight. Inside the rowsWindowed() guard only.
     let focusAttempts = 0;
     // #9: capture the epoch AFTER this call's own bump (above) so the poll never aborts itself
     // (its captured value equals the current epoch). A LATER focusActiveCell / focusCell /
@@ -5199,7 +5273,7 @@ const focusCell = (rowIndex: any, colIndex: any) => {
   // active cell must NOT emit; a header→body landing (prevIsHeader) is a real move.
   const prevAbs = toAbsRow(activeRow.value);
   const prevIsHeader = activeIsHeader.value;
-  if (props.virtual) {
+  if (rowsWindowed()) {
     // Virtual mode: $data.activeRow IS the full pre-pagination index (the wr.vi.index space), so
     // the absolute index maps 1:1. focusActiveCell already runs the D-12 off-window scroll-then-
     // focus path (scrollToIndex(absRow) → deferred-rAF focus) when the row is outside the window.
@@ -5494,7 +5568,7 @@ onMounted(() => {
     // into the virtualizer + reconcile IMPERATIVELY here (the table.setOptions re-feed path),
     // NEVER in a render helper (Pitfall 1). Pass the COMPLETE options set (virtual-core's
     // setOptions replaces, not merges). Guarded so the off path executes no virtual-core code.
-    if (props.virtual && virtualizer) {
+    if (rowsWindowed() && virtualizer) {
       virtualizer.setOptions(virtualizerOptions());
       virtualizer._willUpdate();
     }
@@ -5571,7 +5645,7 @@ onMounted(() => {
   // getPrePaginationRowModel reads the live table. ENTIRELY inside the $props.virtual guard:
   // when off, NO virtual-core runtime code executes (byte-identical-off). _didMount() registers
   // the scroll-element ResizeObserver and returns the teardown stored for $onUnmount.
-  if (props.virtual) {
+  if (rowsWindowed()) {
     gridScrollEl = __rozieRootRef.value ? __rozieRootRef.value!.querySelector('.rdt-scroll') : null;
     virtualizer = new Virtualizer(virtualizerOptions());
     virtualizerCleanup = virtualizer._didMount();

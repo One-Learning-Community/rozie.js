@@ -286,6 +286,11 @@ let virtualizer = null
 let virtualizerCleanup = null
 let gridScrollEl = null
 let remeasurePending = false
+// D-05/D-10/D-18 host-contract COLUMN-axis instance state (Phase 87 87-02) — INERT: Listbox has
+// no column axis (colsWindowed() below is constantly false), so this is never constructed. Exists
+// only so the windowing.rzts host contract's `colVirtualizer` symbol resolves, mirroring `let
+// virtualizer = null` above.
+let colVirtualizer = null
 
 // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
 // set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
@@ -319,6 +324,19 @@ const windowSource = $memo(
 // to a no-op. They MUST exist or the by-convention call ReferenceErrors at mount.
 const pinnedEditIndex = () => -1
 const pinnedMeasurement = (pin) => null
+
+// D-05/D-10/D-18 windowing.rzts host-contract one-liners (Phase 87 87-02). rowsWindowed()
+// preserves today's EXACT truthiness (byte-behavior-identical) — it is the new REQUIRED symbol
+// windowing.rzts now calls in place of a bare `$props.virtual` read. The column-axis symbols are
+// INERT no-ops: Listbox never lights the column branch (D-20). NOT type-annotated — this
+// `<script>` block has no `lang="ts"` (unlike windowing.rzts / Combobox.rozie), so the
+// pinMeasurement() explicit-return-type trick (windowing.rzts:65-74) does not apply here; nothing
+// in this plan calls these through a type-narrowing wrapper.
+const rowsWindowed = () => !!$props.virtual
+const colsWindowed = () => false
+const columnCount = () => 0
+const columnSize = (i) => 0
+const forcedColumns = () => []
 
 // Keep $data.rows === windowSource() so the windowing math indexes the live option set.
 const syncRows = () => { $data.rows = windowSource() }

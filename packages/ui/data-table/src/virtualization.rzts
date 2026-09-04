@@ -15,13 +15,57 @@
 // windowSource() (the row source), pinnedEditIndex()/pinnedMeasurement() (the D-05 pin hook),
 // scheduleRemeasure(), and the gridScrollEl/virtualizer/virtual-core-fn references.
 
+// ══ D-05 predicate layer (Phase 87 87-02) — resolves the windowing prop into an axis state,
+// replacing every bare truthiness read of $props.virtual (which is unsafe once the prop widens
+// to a string grammar in 87-03: 'columns' is truthy but does NOT mean "windows rows"). Modeled on
+// resolveAppendTo() in CommandPalette.rozie (the D-01 value-grammar precedent): branch on
+// typeof === 'string', switch on the known string values, fall back to the boolean cases. THIS
+// plan still declares `virtual: Boolean` (87-03 widens the declaration to [Boolean, String]), so
+// resolveVirtual() can currently only return 'off' or 'rows' and colsWindowed() is constantly
+// false — inert until 87-03/87-04 land the column axis.
+//
+// Declared BEFORE windowSource() (below): windowSource() calls rowsWindowed(), and the React
+// emitter lowers each of these to a useCallback whose dependency array is evaluated eagerly at
+// the declaration site — a forward reference here is a genuine TDZ (TS2448), not just a style
+// preference (found running the strict react typecheck gate this task, Rule 1).
+const resolveVirtual = () => {
+  const v = $props.virtual
+  if (typeof v === 'string') {
+    if (v === 'rows') return 'rows'
+    if (v === 'columns') return 'columns'
+    if (v === 'both') return 'both'
+    return 'off'
+  }
+  return v === true ? 'rows' : 'off'
+}
+// rowsWindowed(): the windowing.rzts host-contract symbol (D-05). Byte-behaviorally identical to
+// today's `$props.virtual` truthiness — this plan changes NO user-visible behavior.
+const rowsWindowed = () => {
+  const s = resolveVirtual()
+  return s === 'rows' || s === 'both'
+}
+const colsWindowed = () => {
+  const s = resolveVirtual()
+  return s === 'columns' || s === 'both'
+}
+const isWindowed = () => rowsWindowed() || colsWindowed()
+
+// D-10 column-axis host-contract stubs (Phase 87 87-02) — INERT until 87-04 constructs the
+// second, horizontal Virtualizer instance (see windowing.rzts's AXIS MECHANISM note). Explicit
+// return-type annotations (columnSize / forcedColumns) copy the pinMeasurement() trick
+// (windowing.rzts:65-74) so the strict bundled-leaf tsc does not flow-narrow a no-op host's
+// return to `never`.
+const columnCount = (): number => 0
+const columnSize = (i: number): number => 0
+const forcedColumns = (): number[] => []
+
 // windowSource(): the rows fed to the virtualizer AND held in $data.rows — the windowing.rzts
 // host-contract source. When virtual, the FULL filtered+sorted PRE-PAGINATION model
 // (A2-verified table.getPrePaginationRowModel()) so windowing REPLACES client pagination (req-9);
 // else the normal (paginated) row model — the non-virtual path is byte-unchanged.
 const windowSource = () => {
   if (!table) return []
-  if ($props.virtual) return table.getPrePaginationRowModel().rows
+  if (rowsWindowed()) return table.getPrePaginationRowModel().rows
   return table.getRowModel().rows
 }
 
@@ -106,4 +150,4 @@ const remeasureWindow = () => {
 // `@rozie-ui/headless-core/windowing.rzts` via bare specifier — the P0-proven cross-package inline
 // path that DISSOLVES the partial into the leaf (a re-export-from THROUGH this shell would survive as
 // a runtime import, not inline — verified). The math closes over these host symbols by convention.
-export { windowSource, scheduleRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow }
+export { windowSource, scheduleRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns }

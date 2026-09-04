@@ -839,7 +839,7 @@ let refreshRowModel = null
 
 import { onSortingChangeCb, onExpandedChangeCb, onGroupingChangeCb, onGlobalFilterChangeCb, onColumnFiltersChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onColumnVisibilityChangeCb, onColumnSizingChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingInfoChangeCb } from './stateChangeCallbacks.rzts'
 
-import { windowSource, scheduleRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow } from './virtualization.rzts'
+import { windowSource, scheduleRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns } from './virtualization.rzts'
 import { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow } from '@rozie-ui/headless-core/windowing.rzts'
 
 // ── Sort/filter live-announcement (#14) ─────────────────────────────────────────────
@@ -1007,7 +1007,7 @@ $onMount(() => {
     // into the virtualizer + reconcile IMPERATIVELY here (the table.setOptions re-feed path),
     // NEVER in a render helper (Pitfall 1). Pass the COMPLETE options set (virtual-core's
     // setOptions replaces, not merges). Guarded so the off path executes no virtual-core code.
-    if ($props.virtual && virtualizer) {
+    if (rowsWindowed() && virtualizer) {
       virtualizer.setOptions(virtualizerOptions())
       virtualizer._willUpdate()
     }
@@ -1084,7 +1084,7 @@ $onMount(() => {
   // getPrePaginationRowModel reads the live table. ENTIRELY inside the $props.virtual guard:
   // when off, NO virtual-core runtime code executes (byte-identical-off). _didMount() registers
   // the scroll-element ResizeObserver and returns the teardown stored for $onUnmount.
-  if ($props.virtual) {
+  if (rowsWindowed()) {
     gridScrollEl = $el ? $el.querySelector('.rdt-scroll') : null
     virtualizer = new Virtualizer(virtualizerOptions())
     virtualizerCleanup = virtualizer._didMount()
@@ -1656,8 +1656,9 @@ $expose({
   </slot>
 </div>
 
-<!-- ══ VIRTUAL (phase 53): scroll-bounded WINDOWED table — emitted ONLY when $props.virtual ══
-     (D-05). The rdt-scroll wrapper bounds the scroll viewport (max-height from the maxHeight
+<!-- ══ VIRTUAL (phase 53): scroll-bounded WINDOWED table — the rdt-scroll wrapper is emitted when
+     EITHER axis is windowed (r-if="isWindowed()" — D-03); the <table> inside it still reads
+     rowsWindowed() for the row-specific windowing math (D-05). The rdt-scroll wrapper bounds the scroll viewport (max-height from the maxHeight
      prop inline AND mirrored to --rozie-data-table-max-height; the CSS rule supplies the
      token-only fallback — D-06, prop wins). aria-rowcount = the FULL model count (req-6). The
      <tbody> renders a leading spacer <tr>, the windowed { vi, row } slice keyed on the FULL-model
@@ -1666,7 +1667,7 @@ $expose({
      emitted render is byte-identical (req-1). -->
 <div
   class="rdt-scroll"
-  r-if="$props.virtual"
+  r-if="isWindowed()"
   :style="$props.maxHeight ? ('max-height:' + $props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + $props.maxHeight) : 'overflow:auto'"
 >
 <table
@@ -2519,9 +2520,10 @@ $expose({
 <!-- Pagination chrome (req-6) — prev/next + page-size select. Page indicator is
      1-based for display; pageIndex() is 0-based. SUPPRESSED when virtual (req-9): windowing
      renders the full pre-pagination model, so the pagination chrome is meaningless — gated by
-     `!$props.virtual`. The D-07 dev-mode warn (in $onMount) fires alongside this suppression
+     `!rowsWindowed()` (D-05: row semantics, NOT isWindowed() — a column-only window must not
+     suppress pagination). The D-07 dev-mode warn (in $onMount) fires alongside this suppression
      when the consumer ALSO configured client pagination. -->
-<div class="rdt-pagination" role="group" aria-label="Pagination" r-if="!$props.virtual">
+<div class="rdt-pagination" role="group" aria-label="Pagination" r-if="!rowsWindowed()">
   <button
     type="button"
     class="rdt-page-btn rdt-page-prev"

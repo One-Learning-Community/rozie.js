@@ -961,7 +961,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       // into the virtualizer + reconcile IMPERATIVELY here (the table.setOptions re-feed path),
       // NEVER in a render helper (Pitfall 1). Pass the COMPLETE options set (virtual-core's
       // setOptions replaces, not merges). Guarded so the off path executes no virtual-core code.
-      if (this.virtual && this.virtualizer) {
+      if (this.rowsWindowed() && this.virtualizer) {
         this.virtualizer.setOptions(this.virtualizerOptions());
         this.virtualizer._willUpdate();
       }
@@ -1054,7 +1054,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // getPrePaginationRowModel reads the live table. ENTIRELY inside the $props.virtual guard:
     // when off, NO virtual-core runtime code executes (byte-identical-off). _didMount() registers
     // the scroll-element ResizeObserver and returns the teardown stored for $onUnmount.
-    if (this.virtual) {
+    if (this.rowsWindowed()) {
       this.gridScrollEl = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rdt-scroll') : null;
       this.virtualizer = new Virtualizer(this.virtualizerOptions());
       this.virtualizerCleanup = this.virtualizer._didMount();
@@ -1184,7 +1184,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   ${this.groupBar !== undefined ? this.groupBar({grouping: this.groupingKeys(), groupableColumns: this.groupableColumns(), applyGrouping: this.applyGrouping, clearGrouping: this.clearGrouping}) : html`<slot name="groupBar" data-rozie-params=${(() => { try { return JSON.stringify({grouping: this.groupingKeys(), groupableColumns: this.groupableColumns()}); } catch { return '{}'; } })()} @rozie-group-bar-apply-grouping=${($event: CustomEvent) => ((this.applyGrouping) as (...args: any[]) => any)($event.detail)} @rozie-group-bar-clear-grouping=${($event: CustomEvent) => ((this.clearGrouping) as (...args: any[]) => any)($event.detail)}>
     ${repeat<any>(this.groupingKeys(), (gk, _idx) => gk, (gk, _idx) => html`<span class="rdt-group-token" data-group-token="" data-rozie-s-d5dcab4c>${rozieDisplay(gk)}</span>`)}
   </slot>`}
-</div>` : nothing}${this.virtual ? html`<div class="rdt-scroll" style=${rozieStyle(this.maxHeight ? 'max-height:' + this.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + this.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c>
+</div>` : nothing}${this.isWindowed() ? html`<div class="rdt-scroll" style=${rozieStyle(this.maxHeight ? 'max-height:' + this.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + this.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c>
 <table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} aria-rowcount=${rozieAttr(this.gridAriaRowCount())} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridKeyDown($event); }} @focusin=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridFocusOut($event); }} @mousedown=${($event: MouseEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridMouseDown($event); }} @dblclick=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridDblClick($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridClick($event); }} data-rozie-s-d5dcab4c>
   <thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._headerGroups.value, (hg, hgLevel) => hg.id, (hg, hgLevel) => html`<tr class="rdt-tr" role="row" aria-rowindex=${rozieAttr(hgLevel + 1)} data-rozie-s-d5dcab4c>
@@ -1338,7 +1338,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       </td>
     </tr>` : nothing}`)}
   </tbody>
-</table>`}${!this.virtual ? html`<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c>
+</table>`}${!this.rowsWindowed() ? html`<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c>
   <button class="rdt-page-btn rdt-page-prev" type="button" ?disabled=${!this.canPrevPage()} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onPrevPage(); }} data-rozie-s-d5dcab4c>Prev</button>
   <span class="rdt-page-status" aria-live="polite" data-rozie-s-d5dcab4c>
     ${rozieDisplay('Page ' + (this.pageIndex() + 1) + ' of ' + this.displayPageCount())}
@@ -2183,13 +2183,62 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // dist-parity are the net). The host satisfies the windowing.rzts contract by convention:
   // windowSource() (the row source), pinnedEditIndex()/pinnedMeasurement() (the D-05 pin hook),
   // scheduleRemeasure(), and the gridScrollEl/virtualizer/virtual-core-fn references.
+  // ══ D-05 predicate layer (Phase 87 87-02) — resolves the windowing prop into an axis state,
+  // replacing every bare truthiness read of $props.virtual (which is unsafe once the prop widens
+  // to a string grammar in 87-03: 'columns' is truthy but does NOT mean "windows rows"). Modeled on
+  // resolveAppendTo() in CommandPalette.rozie (the D-01 value-grammar precedent): branch on
+  // typeof === 'string', switch on the known string values, fall back to the boolean cases. THIS
+  // plan still declares `virtual: Boolean` (87-03 widens the declaration to [Boolean, String]), so
+  // resolveVirtual() can currently only return 'off' or 'rows' and colsWindowed() is constantly
+  // false — inert until 87-03/87-04 land the column axis.
+  //
+  // Declared BEFORE windowSource() (below): windowSource() calls rowsWindowed(), and the React
+  // emitter lowers each of these to a useCallback whose dependency array is evaluated eagerly at
+  // the declaration site — a forward reference here is a genuine TDZ (TS2448), not just a style
+  // preference (found running the strict react typecheck gate this task, Rule 1).
+  resolveVirtual = () => {
+  const v = this.virtual;
+  if (typeof v === 'string') {
+    if (v === 'rows') return 'rows';
+    if (v === 'columns') return 'columns';
+    if (v === 'both') return 'both';
+    return 'off';
+  }
+  return v === true ? 'rows' : 'off';
+};
+
+  // rowsWindowed(): the windowing.rzts host-contract symbol (D-05). Byte-behaviorally identical to
+  // today's `$props.virtual` truthiness — this plan changes NO user-visible behavior.
+  rowsWindowed = () => {
+  const s = this.resolveVirtual();
+  return s === 'rows' || s === 'both';
+};
+
+  colsWindowed = () => {
+  const s = this.resolveVirtual();
+  return s === 'columns' || s === 'both';
+};
+
+  isWindowed = () => this.rowsWindowed() || this.colsWindowed();
+
+  // D-10 column-axis host-contract stubs (Phase 87 87-02) — INERT until 87-04 constructs the
+  // second, horizontal Virtualizer instance (see windowing.rzts's AXIS MECHANISM note). Explicit
+  // return-type annotations (columnSize / forcedColumns) copy the pinMeasurement() trick
+  // (windowing.rzts:65-74) so the strict bundled-leaf tsc does not flow-narrow a no-op host's
+  // return to `never`.
+  columnCount = (): number => 0;
+
+  columnSize = (i: number): number => 0;
+
+  forcedColumns = (): number[] => [];
+
   // windowSource(): the rows fed to the virtualizer AND held in $data.rows — the windowing.rzts
   // host-contract source. When virtual, the FULL filtered+sorted PRE-PAGINATION model
   // (A2-verified table.getPrePaginationRowModel()) so windowing REPLACES client pagination (req-9);
   // else the normal (paginated) row model — the non-virtual path is byte-unchanged.
   windowSource = () => {
   if (!this.table) return [];
-  if (this.virtual) return this.table.getPrePaginationRowModel().rows;
+  if (this.rowsWindowed()) return this.table.getPrePaginationRowModel().rows;
   return this.table.getRowModel().rows;
 };
 
@@ -2303,6 +2352,38 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   //                             defaulting to no-op): the DataTable host passes its edit-pinning hooks;
   //                             listbox passes nothing. Routing pinning through this host hook (NOT
   //                             inlining it) keeps DataTable's B13 edit-pinning behavior byte-identical.
+  //   - rowsWindowed(): boolean  — is the ROW axis windowed. REQUIRED, no default — replaces every bare
+  //                             truthiness read of the host's windowing prop (D-05); `windowedRows()` /
+  //                             `padTop()` / `padBottom()` / `rowIsOutsideWindow()` below call it by
+  //                             convention exactly as they already call `pinnedEditIndex()`.
+  //   - colsWindowed(): boolean  — is the COLUMN axis windowed. REQUIRED, no default. `false` for every
+  //                             host until it defines the real column-axis mechanism (87-04+).
+  //   - columnCount(): number    — the leaf-column count the column virtualizer windows over. REQUIRED,
+  //                             no default.
+  //   - columnSize(i: number): number — the authoritative width of absolute leaf column `i`, sourced
+  //                             from table-core's `getSize()` under D-06. REQUIRED, no default.
+  //   - forcedColumns(): number[] — the D-10 OPTIONAL column-axis mirror of `pinnedEditIndex()`: the
+  //                             DataTable host unions pinned + active-cell + editing column indices into
+  //                             the column-window slice; listbox/combobox pass an empty array (host-
+  //                             provided, defaulting to `[]`).
+  //   - colVirtualizer           — the host's SECOND virtual-core instance, windowing the COLUMN axis
+  //                             (see the AXIS MECHANISM note below). Host-provided, defaulting to `null`.
+  //
+  // AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source this session, NOT
+  // implemented yet; this plan documents the contract only, the second instance lands starting 87-04):
+  // `horizontal` is a PER-INSTANCE field of `VirtualizerOptions`
+  // (`node_modules/@tanstack/virtual-core/dist/esm/index.d.ts:67`, installed version 3.17.1 per
+  // `package.json`), and every axis-sensitive internal read consults `instance.options.horizontal` —
+  // `measureElement`'s inlineSize/blockSize + offsetWidth/offsetHeight branch
+  // (`dist/esm/index.js:137,150`), `observeElementOffset`'s scrollLeft/scrollTop branch
+  // (`dist/esm/index.js:118-121`), `getMaxScrollOffset`'s scrollWidth/scrollHeight branch
+  // (`dist/esm/index.js:907-915`), and `scrollWithAdjustments`'s left/top branch
+  // (`dist/esm/index.js:152-161`). So ONE `Virtualizer` instance windows exactly ONE axis: the column
+  // axis needs its own SECOND, independent `Virtualizer` instance constructed with `horizontal: true`,
+  // sharing the SAME `getScrollElement()` (the `rdt-scroll` wrapper) the row instance already uses.
+  // Two options the row axis does not set that the column instance will need: `isRtl?: boolean`
+  // (data-table ships an RTL grid path) and `overscan?: number` (D-07 gives the column axis its own
+  // hardcoded constant, separate from the row axis's `overscan: 8` below).
   // getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
   // React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
   // id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).
@@ -2384,7 +2465,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
     // the template never dereferences a null `vi` (the windowed bindings read wr.vi.index); the
     // rows appear on the first onChange after _didMount.
-    if (!this.virtual) {
+    if (!this.rowsWindowed()) {
       const rowList = this._rows.value || [];
       return rowList.map((r: any) => ({
         vi: null,
@@ -2444,7 +2525,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // and re-derives on the pin/unpin transition (the D-02 spacer subtraction below).
   void this._windowVer.value;
   void this._editVer.value;
-  if (!this.virtual || !this.virtualizer) return 0;
+  if (!this.rowsWindowed() || !this.virtualizer) return 0;
   const items = this.virtualizer.getVirtualItems();
   let pad = items.length ? items[0].start : 0;
   // D-02 spacer subtraction: when the pinned editing row sits ABOVE the window it is rendered
@@ -2465,7 +2546,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // on pin/unpin.
   void this._windowVer.value;
   void this._editVer.value;
-  if (!this.virtual || !this.virtualizer) return 0;
+  if (!this.rowsWindowed() || !this.virtualizer) return 0;
   const items = this.virtualizer.getVirtualItems();
   if (!items.length) return 0;
   let pad = this.virtualizer.getTotalSize() - items[items.length - 1].end;
@@ -2499,7 +2580,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
   // window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
   rowIsOutsideWindow = (r: any) => {
-  if (!this.virtual || !this.virtualizer) return false;
+  if (!this.rowsWindowed() || !this.virtualizer) return false;
   const items = this.virtualizer.getVirtualItems();
   for (const it of items as any) if (it.index === r) return false;
   return true;
@@ -3289,7 +3370,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // or inherited Lit DOM method named getRowIndexRelativeToPage (ROZ121/124/137 clear).
   getRowIndexRelativeToPage = (absRow: any) => {
   const abs = absRow == null ? this.toAbsRow(this._activeRow.value) : Math.trunc(Number(absRow)) || 0;
-  if (this.virtual) return abs;
+  if (this.rowsWindowed()) return abs;
   return abs - this.pageRowOffset();
 };
 
@@ -3343,7 +3424,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // isGrid()-gated (the active-cell API is grid-only); pageIndex()/pageSize() read live table-core
   // state through the reactive tick (filterPaginationRowChrome), so this re-derives on a page change.
   pageRowOffset = () => {
-  if (!this.isGrid() || this.virtual) return 0;
+  if (!this.isGrid() || this.rowsWindowed()) return 0;
   return this.pageIndex() * this.pageSize();
 };
 
@@ -3357,7 +3438,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
   // non-virtual paginated body $data.rows is only the page slice, so read the live model.
   prePaginationRowCount = () => {
-  if (!this.table || this.virtual) return this.bodyRowCount();
+  if (!this.table || this.rowsWindowed()) return this.bodyRowCount();
   const pm = this.table.getPrePaginationRowModel();
   return pm && pm.rows ? pm.rows.length : this.bodyRowCount();
 };
@@ -3469,7 +3550,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // in-window rows keep the synchronous path below (table-mode / non-windowed stay byte-stable).
   // The guard reads the resolved `header` (NOT the raw `nextIsHeader`) so an omitted-arg call
   // while a header cell is active falls back to $data.activeIsHeader and skips the scroll path.
-  if (this.virtual && this.virtualizer && !header && this.rowIsOutsideWindow(r)) {
+  if (this.rowsWindowed() && this.virtualizer && !header && this.rowIsOutsideWindow(r)) {
     this.virtualizer.scrollToIndex(r, {
       align: 'center'
     });
@@ -3480,7 +3561,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     // React off-window-focus failure). Poll resolveCellEl for up to ~30 frames: the five
     // fast-committing targets resolve on the first attempt (behavior unchanged), React retries
     // across the few frames its async commit needs. The poll ONLY focuses (never measures), so it
-    // cannot re-introduce the remeasure-vs-scroll fight. Inside the $props.virtual guard only.
+    // cannot re-introduce the remeasure-vs-scroll fight. Inside the rowsWindowed() guard only.
     let focusAttempts = 0;
     // #9: capture the epoch AFTER this call's own bump (above) so the poll never aborts itself
     // (its captured value equals the current epoch). A LATER focusActiveCell / focusCell /
@@ -6456,7 +6537,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // active cell must NOT emit; a header→body landing (prevIsHeader) is a real move.
   const prevAbs = this.toAbsRow(this._activeRow.value);
   const prevIsHeader = this._activeIsHeader.value;
-  if (this.virtual) {
+  if (this.rowsWindowed()) {
     // Virtual mode: $data.activeRow IS the full pre-pagination index (the wr.vi.index space), so
     // the absolute index maps 1:1. focusActiveCell already runs the D-12 off-window scroll-then-
     // focus path (scrollToIndex(absRow) → deferred-rAF focus) when the row is outside the window.

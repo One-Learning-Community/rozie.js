@@ -70,7 +70,7 @@ const focusCell = (rowIndex, colIndex) => {
   // active cell must NOT emit; a header→body landing (prevIsHeader) is a real move.
   const prevAbs = toAbsRow($data.activeRow)
   const prevIsHeader = $data.activeIsHeader
-  if ($props.virtual) {
+  if (rowsWindowed()) {
     // Virtual mode: $data.activeRow IS the full pre-pagination index (the wr.vi.index space), so
     // the absolute index maps 1:1. focusActiveCell already runs the D-12 off-window scroll-then-
     // focus path (scrollToIndex(absRow) → deferred-rAF focus) when the row is outside the window.

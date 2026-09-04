@@ -42,7 +42,7 @@ const headerColIndexOf = (hg, header) => ((hg && hg.headers ? hg.headers : []).i
 // isGrid()-gated (the active-cell API is grid-only); pageIndex()/pageSize() read live table-core
 // state through the reactive tick (filterPaginationRowChrome), so this re-derives on a page change.
 const pageRowOffset = () => {
-  if (!isGrid() || $props.virtual) return 0
+  if (!isGrid() || rowsWindowed()) return 0
   return pageIndex() * pageSize()
 }
 // page-relative active row → absolute (display-order) index.
@@ -55,7 +55,7 @@ const absRowIndexOf = (row) => rowIndexOf(row) + pageRowOffset()
 // In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
 // non-virtual paginated body $data.rows is only the page slice, so read the live model.
 const prePaginationRowCount = () => {
-  if (!table || $props.virtual) return bodyRowCount()
+  if (!table || rowsWindowed()) return bodyRowCount()
   const pm = table.getPrePaginationRowModel()
   return pm && pm.rows ? pm.rows.length : bodyRowCount()
 }
@@ -167,7 +167,7 @@ const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, ne
   // in-window rows keep the synchronous path below (table-mode / non-windowed stay byte-stable).
   // The guard reads the resolved `header` (NOT the raw `nextIsHeader`) so an omitted-arg call
   // while a header cell is active falls back to $data.activeIsHeader and skips the scroll path.
-  if ($props.virtual && virtualizer && !header && rowIsOutsideWindow(r)) {
+  if (rowsWindowed() && virtualizer && !header && rowIsOutsideWindow(r)) {
     virtualizer.scrollToIndex(r, { align: 'center' })
     // Bounded rAF-poll-until-cell-present (D-12): scrollToIndex → virtual-core onChange → windowVer
     // bump → the framework commits the scrolled-in row. On React that commit is async (setState →
@@ -176,7 +176,7 @@ const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, ne
     // React off-window-focus failure). Poll resolveCellEl for up to ~30 frames: the five
     // fast-committing targets resolve on the first attempt (behavior unchanged), React retries
     // across the few frames its async commit needs. The poll ONLY focuses (never measures), so it
-    // cannot re-introduce the remeasure-vs-scroll fight. Inside the $props.virtual guard only.
+    // cannot re-introduce the remeasure-vs-scroll fight. Inside the rowsWindowed() guard only.
     let focusAttempts = 0
     // #9: capture the epoch AFTER this call's own bump (above) so the poll never aborts itself
     // (its captured value equals the current epoch). A LATER focusActiveCell / focusCell /

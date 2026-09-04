@@ -460,6 +460,38 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   //                             defaulting to no-op): the DataTable host passes its edit-pinning hooks;
   //                             listbox passes nothing. Routing pinning through this host hook (NOT
   //                             inlining it) keeps DataTable's B13 edit-pinning behavior byte-identical.
+  //   - rowsWindowed(): boolean  — is the ROW axis windowed. REQUIRED, no default — replaces every bare
+  //                             truthiness read of the host's windowing prop (D-05); `windowedRows()` /
+  //                             `padTop()` / `padBottom()` / `rowIsOutsideWindow()` below call it by
+  //                             convention exactly as they already call `pinnedEditIndex()`.
+  //   - colsWindowed(): boolean  — is the COLUMN axis windowed. REQUIRED, no default. `false` for every
+  //                             host until it defines the real column-axis mechanism (87-04+).
+  //   - columnCount(): number    — the leaf-column count the column virtualizer windows over. REQUIRED,
+  //                             no default.
+  //   - columnSize(i: number): number — the authoritative width of absolute leaf column `i`, sourced
+  //                             from table-core's `getSize()` under D-06. REQUIRED, no default.
+  //   - forcedColumns(): number[] — the D-10 OPTIONAL column-axis mirror of `pinnedEditIndex()`: the
+  //                             DataTable host unions pinned + active-cell + editing column indices into
+  //                             the column-window slice; listbox/combobox pass an empty array (host-
+  //                             provided, defaulting to `[]`).
+  //   - colVirtualizer           — the host's SECOND virtual-core instance, windowing the COLUMN axis
+  //                             (see the AXIS MECHANISM note below). Host-provided, defaulting to `null`.
+  //
+  // AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source this session, NOT
+  // implemented yet; this plan documents the contract only, the second instance lands starting 87-04):
+  // `horizontal` is a PER-INSTANCE field of `VirtualizerOptions`
+  // (`node_modules/@tanstack/virtual-core/dist/esm/index.d.ts:67`, installed version 3.17.1 per
+  // `package.json`), and every axis-sensitive internal read consults `instance.options.horizontal` —
+  // `measureElement`'s inlineSize/blockSize + offsetWidth/offsetHeight branch
+  // (`dist/esm/index.js:137,150`), `observeElementOffset`'s scrollLeft/scrollTop branch
+  // (`dist/esm/index.js:118-121`), `getMaxScrollOffset`'s scrollWidth/scrollHeight branch
+  // (`dist/esm/index.js:907-915`), and `scrollWithAdjustments`'s left/top branch
+  // (`dist/esm/index.js:152-161`). So ONE `Virtualizer` instance windows exactly ONE axis: the column
+  // axis needs its own SECOND, independent `Virtualizer` instance constructed with `horizontal: true`,
+  // sharing the SAME `getScrollElement()` (the `rdt-scroll` wrapper) the row instance already uses.
+  // Two options the row axis does not set that the column instance will need: `isRtl?: boolean`
+  // (data-table ships an RTL grid path) and `overscan?: number` (D-07 gives the column axis its own
+  // hardcoded constant, separate from the row axis's `overscan: 8` below).
 
   // getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
   // React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
@@ -543,7 +575,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
       // the template never dereferences a null `vi` (the windowed bindings read wr.vi.index); the
       // rows appear on the first onChange after _didMount.
-      if (!props.virtual) {
+      if (!rowsWindowed()) {
         const rowList = rows || [];
         return rowList.map((r: any) => ({
           vi: null,
@@ -603,7 +635,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     // and re-derives on the pin/unpin transition (the D-02 spacer subtraction below).
     void windowVer;
     void editVer;
-    if (!props.virtual || !virtualizer.current) return 0;
+    if (!rowsWindowed() || !virtualizer.current) return 0;
     const items = virtualizer.current.getVirtualItems();
     let pad = items.length ? items[0].start : 0;
     // D-02 spacer subtraction: when the pinned editing row sits ABOVE the window it is rendered
@@ -623,7 +655,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     // on pin/unpin.
     void windowVer;
     void editVer;
-    if (!props.virtual || !virtualizer.current) return 0;
+    if (!rowsWindowed() || !virtualizer.current) return 0;
     const items = virtualizer.current.getVirtualItems();
     if (!items.length) return 0;
     let pad = virtualizer.current.getTotalSize() - items[items.length - 1].end;
@@ -655,7 +687,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   // rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
   // window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
   function rowIsOutsideWindow(r: any) {
-    if (!props.virtual || !virtualizer.current) return false;
+    if (!rowsWindowed() || !virtualizer.current) return false;
     const items = virtualizer.current.getVirtualItems();
     for (const it of items as any) if (it.index === r) return false;
     return true;
@@ -665,6 +697,12 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   // module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
   // when $props.virtual. gridScrollEl is the captured .rozie-listbox-list scroll div the
   // virtualizer observes; remeasurePending dedupes the deferred sweep.
+  // D-05/D-10/D-18 host-contract COLUMN-axis instance state (Phase 87 87-02) — INERT: Listbox has
+  // no column axis (colsWindowed() below is constantly false), so this is never constructed. Exists
+  // only so the windowing.rzts host contract's `colVirtualizer` symbol resolves, mirroring `let
+  // virtualizer = null` above.
+  let colVirtualizer: any = null;
+
   // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
   // set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
   // (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
@@ -714,6 +752,29 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   }
   function pinnedMeasurement(pin: any) {
     return null;
+  }
+
+  // D-05/D-10/D-18 windowing.rzts host-contract one-liners (Phase 87 87-02). rowsWindowed()
+  // preserves today's EXACT truthiness (byte-behavior-identical) — it is the new REQUIRED symbol
+  // windowing.rzts now calls in place of a bare `$props.virtual` read. The column-axis symbols are
+  // INERT no-ops: Listbox never lights the column branch (D-20). NOT type-annotated — this
+  // `<script>` block has no `lang="ts"` (unlike windowing.rzts / Combobox.rozie), so the
+  // pinMeasurement() explicit-return-type trick (windowing.rzts:65-74) does not apply here; nothing
+  // in this plan calls these through a type-narrowing wrapper.
+  function rowsWindowed() {
+    return !!props.virtual;
+  }
+  function colsWindowed() {
+    return false;
+  }
+  function columnCount() {
+    return 0;
+  }
+  function columnSize(i: any) {
+    return 0;
+  }
+  function forcedColumns() {
+    return [];
   }
 
   // Keep $data.rows === windowSource() so the windowing math indexes the live option set.

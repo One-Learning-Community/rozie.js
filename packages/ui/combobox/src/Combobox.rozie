@@ -441,6 +441,11 @@ let virtualizer = null
 let virtualizerCleanup = null
 let gridScrollEl = null
 let remeasurePending = false
+// D-05/D-10/D-18 host-contract COLUMN-axis instance state (Phase 87 87-02) — INERT: Combobox has
+// no column axis (colsWindowed() below is constantly false), so this is never constructed. Exists
+// only so the windowing.rzts host contract's `colVirtualizer` symbol resolves, mirroring `let
+// virtualizer = null` above.
+let colVirtualizer = null
 // Non-reactive per-instance flag (Phase 86 R2, plan 86-03, Solid-only): true for
 // the duration of an onFocus-triggered open transition (set before the isOpen
 // write, cleared in the deferred microtask after). Lets onBlur distinguish a
@@ -735,6 +740,18 @@ const navRows = () => {
 // to a no-op. They MUST exist or the by-convention call ReferenceErrors at mount.
 const pinnedEditIndex = () => -1
 const pinnedMeasurement = (pin) => null
+
+// D-05/D-10/D-18 windowing.rzts host-contract one-liners (Phase 87 87-02). rowsWindowed()
+// preserves today's EXACT truthiness (byte-behavior-identical) — it is the new REQUIRED symbol
+// windowing.rzts now calls in place of a bare `$props.virtual` read. The column-axis symbols are
+// INERT no-ops: Combobox never lights the column branch (D-20). columnSize/forcedColumns carry
+// explicit return-type annotations (the pinMeasurement() trick, windowing.rzts:65-74) so the
+// strict bundled-leaf tsc does not flow-narrow a no-op host's return to `never`.
+const rowsWindowed = () => !!$props.virtual
+const colsWindowed = () => false
+const columnCount = () => 0
+const columnSize = (i: number): number => 0
+const forcedColumns = (): number[] => []
 
 // Keep $data.rows === windowSource() so the windowing math indexes the live filtered set.
 const syncRows = () => { $data.rows = windowSource() }

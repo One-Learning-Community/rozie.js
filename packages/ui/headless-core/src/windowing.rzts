@@ -129,7 +129,7 @@ const windowedRows = () => {
     // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
     // the template never dereferences a null `vi` (the windowed bindings read wr.vi.index); the
     // rows appear on the first onChange after _didMount.
-    if (!$props.virtual) {
+    if (!rowsWindowed()) {
       const rowList = $data.rows || []
       return rowList.map((r) => ({ vi: null, row: r }))
     }
@@ -173,7 +173,7 @@ const padTop = () => {
   // and re-derives on the pin/unpin transition (the D-02 spacer subtraction below).
   void $data.windowVer
   void $data.editVer
-  if (!$props.virtual || !virtualizer) return 0
+  if (!rowsWindowed() || !virtualizer) return 0
   const items = virtualizer.getVirtualItems()
   let pad = items.length ? items[0].start : 0
   // D-02 spacer subtraction: when the pinned editing row sits ABOVE the window it is rendered
@@ -193,7 +193,7 @@ const padBottom = () => {
   // on pin/unpin.
   void $data.windowVer
   void $data.editVer
-  if (!$props.virtual || !virtualizer) return 0
+  if (!rowsWindowed() || !virtualizer) return 0
   const items = virtualizer.getVirtualItems()
   if (!items.length) return 0
   let pad = virtualizer.getTotalSize() - items[items.length - 1].end
@@ -225,7 +225,7 @@ const pmIndexInWindow = (items, idx) => {
 // rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
 // window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
 const rowIsOutsideWindow = (r) => {
-  if (!$props.virtual || !virtualizer) return false
+  if (!rowsWindowed() || !virtualizer) return false
   const items = virtualizer.getVirtualItems()
   for (const it of items) if (it.index === r) return false
   return true

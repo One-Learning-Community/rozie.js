@@ -44,7 +44,7 @@ const pinColumn = (colId, side) => {
 // or inherited Lit DOM method named getRowIndexRelativeToPage (ROZ121/124/137 clear).
 const getRowIndexRelativeToPage = (absRow) => {
   const abs = absRow == null ? toAbsRow($data.activeRow) : (Math.trunc(Number(absRow)) || 0)
-  if ($props.virtual) return abs
+  if (rowsWindowed()) return abs
   return abs - pageRowOffset()
 }
 
