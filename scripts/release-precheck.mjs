@@ -1054,6 +1054,69 @@ function runSelfTest() {
     }
   }
 
+  // --- No-major preflight assertions (Task 2, quick 260904-6ix) ----------
+
+  // 8. Empty .changeset/ (today's state) MUST yield OK with a "no pending
+  //    releases" detail — the real end-to-end shell-out, not a synthetic.
+  {
+    const res = checkNoMajorRelease();
+    if (res.status === 'OK' && /no pending releases/.test(res.detail)) {
+      notes.push(`no-major (empty .changeset/): OK — ${res.detail}`);
+    } else {
+      fail('NO-MAJOR-EMPTY: expected OK "no pending releases" on today\'s empty .changeset/', `got status=${res.status} detail=${res.detail}`);
+    }
+  }
+
+  // 9. A synthetic payload mixing `type: "none"` no-ops with one real
+  //    `minor` MUST report exactly one pending release, not the total count
+  //    — the 98-package-wave trap (226 entries, most `type: "none"`).
+  {
+    const releases = [
+      { name: '@rozie-ui/toast-react', type: 'none', oldVersion: '0.3.1', newVersion: '0.3.1' },
+      { name: '@rozie-ui/toast-vue', type: 'none', oldVersion: '0.3.1', newVersion: '0.3.1' },
+      { name: '@rozie-ui/data-table-react', type: 'minor', oldVersion: '0.2.9', newVersion: '0.3.0' },
+    ];
+    const pendingCount = releases.filter((r) => r.type !== 'none').length;
+    const res = evaluateNoMajorRelease(releases);
+    if (pendingCount === 1 && res.status === 'OK' && /1 pending release/.test(res.detail)) {
+      notes.push(`no-major (none-filter): 3 entries, 1 non-none -> ${res.detail}`);
+    } else {
+      fail(
+        'NO-MAJOR-NONE-FILTER: expected exactly 1 pending release counted (not 3)',
+        `pendingCount=${pendingCount} status=${res.status} detail=${res.detail}`,
+      );
+    }
+  }
+
+  // 10. A synthetic payload where a package at 0.7.0 lands at 1.0.0 MUST
+  //     FAIL naming that package and both versions.
+  {
+    const releases = [{ name: '@rozie/core', type: 'major', oldVersion: '0.7.0', newVersion: '1.0.0' }];
+    const res = evaluateNoMajorRelease(releases);
+    const pass = res.status === 'FAIL' && res.detail.includes('@rozie/core') && res.detail.includes('0.7.0') && res.detail.includes('1.0.0');
+    if (pass) {
+      notes.push(`no-major (major-detected): @rozie/core 0.7.0 -> 1.0.0 -> FAIL`);
+    } else {
+      fail('NO-MAJOR-DETECT: expected FAIL naming @rozie/core with both 0.7.0 and 1.0.0', `got status=${res.status} detail=${res.detail}`);
+    }
+  }
+
+  // 11. A synthetic payload where every non-none entry stays inside 0.x MUST
+  //     produce OK.
+  {
+    const releases = [
+      { name: '@rozie-ui/data-table-react', type: 'minor', oldVersion: '0.2.9', newVersion: '0.3.0' },
+      { name: '@rozie-ui/data-table-vue', type: 'patch', oldVersion: '0.2.6', newVersion: '0.2.7' },
+      { name: '@rozie-ui/toast-react', type: 'none', oldVersion: '0.3.1', newVersion: '0.3.1' },
+    ];
+    const res = evaluateNoMajorRelease(releases);
+    if (res.status === 'OK') {
+      notes.push(`no-major (all-0.x): 2 pending, all within 0.x -> OK`);
+    } else {
+      fail('NO-MAJOR-ALL-0X: expected OK when every non-none entry stays inside 0.x', `got status=${res.status} detail=${res.detail}`);
+    }
+  }
+
   if (failures.length) {
     console.error('release-precheck --self-test: FAILED');
     for (const f of failures) console.error(`  - ${f}`);
@@ -1062,6 +1125,90 @@ function runSelfTest() {
   console.log('release-precheck --self-test: PASSED');
   for (const n of notes) console.log(`  ${n}`);
   process.exit(0);
+}
+
+// ---------------------------------------------------------------------------
+// NO-MAJOR PREFLIGHT — repo-wide check (Task 2, quick 260904-6ix). A pending
+// changesets wave would land something outside 0.x, most likely because
+// `___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH.
+// onlyUpdatePeerDependentsWhenOutOfRange: true` promotes a peer dependent to
+// MAJOR when the dependency's new version falls outside the dependent's
+// declared peer range (.changeset/config.json).
+//
+// Deliberately shells out to changesets' OWN computation
+// (`pnpm exec changeset status --output=<tmpfile>`) rather than
+// reimplementing from `.changeset/*.md` + config: the exact failure this
+// guards is computed inside `@changesets/assemble-release-plan` alongside
+// the `fixed` group and `updateInternalDependencies` propagation.
+// Reimplementing that would reimplement the exact trap being guarded, in
+// the one place a subtle divergence is most expensive — a gate that says
+// "no major" while changesets is about to cut 1.0.0 is worse than no gate.
+// Measured cost: 0.78s; `changeset status` is already a proven-affordable
+// step in changeset-guard.yml.
+//
+// `evaluateNoMajorRelease` is factored out from the shell-out so
+// --self-test can drive it against synthetic `releases[]` payloads without
+// touching the real changeset state.
+// ---------------------------------------------------------------------------
+
+// FILTER type:"none" entries out BEFORE any other logic — `changeset status`
+// emits one entry per publishable package INCLUDING no-ops (226 entries for
+// a 98-package wave observed 2026-09-04). Every downstream count, list, and
+// message derives from the filtered array only.
+function evaluateNoMajorRelease(releases) {
+  const pending = (releases || []).filter((r) => r.type !== 'none');
+  if (pending.length === 0) {
+    return { status: 'OK', detail: 'no pending releases' };
+  }
+  const majors = [];
+  for (const rel of pending) {
+    // Field names confirmed against a real synthetic changeset (not
+    // assumed): `changeset status --output` emits { name, type, oldVersion,
+    // newVersion, changesets } per release entry.
+    const nextVersion = rel.newVersion;
+    const majorNum = nextVersion ? parseInt(String(nextVersion).split('.')[0], 10) : NaN;
+    if (Number.isFinite(majorNum) && majorNum > 0) {
+      majors.push(`${rel.name}: ${rel.oldVersion ?? '?'} -> ${nextVersion}`);
+    }
+  }
+  if (majors.length) {
+    return {
+      status: 'FAIL',
+      detail:
+        `pending release lands outside 0.x: ${majors.join('; ')} — ` +
+        'onlyUpdatePeerDependentsWhenOutOfRange promotes a peer dependent to MAJOR when the ' +
+        "dependency's new version falls outside the dependent's declared peer range; the fix is " +
+        'usually to widen the peer range in the same wave, not to accept the major',
+    };
+  }
+  return { status: 'OK', detail: `${pending.length} pending release(s), all within 0.x` };
+}
+
+function checkNoMajorRelease() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rozie-precheck-changeset-status-'));
+  const outFile = path.join(tmp, 'release-plan.json');
+  try {
+    const r = spawnSync('pnpm', ['exec', 'changeset', 'status', `--output=${outFile}`], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+    if (r.status !== 0) {
+      // A mixed changeset (ignored + non-ignored packages) aborts `changeset
+      // status` outright — surface stderr rather than swallowing it.
+      const detail = ((r.stdout || '') + (r.stderr || '')).trim() || `exit code ${r.status}`;
+      return { status: 'FAIL', detail: `changeset status failed: ${detail}` };
+    }
+    let plan;
+    try {
+      plan = JSON.parse(fs.readFileSync(outFile, 'utf8'));
+    } catch (err) {
+      return { status: 'FAIL', detail: `could not parse changeset status output: ${err.message}` };
+    }
+    const releases = Array.isArray(plan.releases) ? plan.releases : [];
+    return evaluateNoMajorRelease(releases);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1130,12 +1277,19 @@ async function main() {
   console.log(`scope: ${opts.filters.length ? entries.map((e) => e.name).join(', ') : `all ${entries.length} publishable package(s)`}`);
   console.log('');
 
-  // Repo-wide structural check, once — not per-package (Fix B, quick 260716-npt).
+  // Repo-wide structural checks, once — not per-package (Fix B, quick 260716-npt;
+  // no-major preflight, Task 2 quick 260904-6ix).
   const changesetCheck = checkChangesetPrivatePackages();
   if (changesetCheck.status === 'FAIL') {
     console.log(`✗ changeset private-package guard: ${changesetCheck.detail}`);
   } else {
     console.log(`ok changeset private-package guard: ${changesetCheck.detail}`);
+  }
+  const noMajorCheck = checkNoMajorRelease();
+  if (noMajorCheck.status === 'FAIL') {
+    console.log(`✗ no-major preflight: ${noMajorCheck.detail}`);
+  } else {
+    console.log(`ok no-major preflight: ${noMajorCheck.detail}`);
   }
   console.log('');
 
@@ -1173,7 +1327,7 @@ async function main() {
   console.log('');
 
   // Per-package detail for anything not fully OK.
-  let anyFail = changesetCheck.status === 'FAIL';
+  let anyFail = changesetCheck.status === 'FAIL' || noMajorCheck.status === 'FAIL';
   let anyWarn = false;
   const verdictHistogram = { OK: 0, WARN: 0, FAIL: 0 };
   for (const { entry, checks, verdict } of rows) {
@@ -1207,6 +1361,7 @@ async function main() {
       anyFail,
       anyWarn,
       changesetPrivatePackageGuard: changesetCheck,
+      noMajorPreflight: noMajorCheck,
     };
     try {
       fs.writeFileSync(opts.jsonSummary, JSON.stringify(summary, null, 2));
