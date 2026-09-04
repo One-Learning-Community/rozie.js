@@ -326,6 +326,11 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     return src && src[i] ? src[i].id : undefined;
   }
 
+  // COL_OVERSCAN (D-07): the column axis's own hardcoded overscan constant, separate from the
+  // row axis's `overscan: 8` below. Columns are far wider than rows are tall, so one number
+  // cannot serve both axes; no prop is exposed because no consumer has asked to tune the row
+  // overscan across the four phases it has shipped. Unused until 87-04 constructs the second,
+  // horizontal Virtualizer instance (see the AXIS MECHANISM note above).
   // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
   // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
   // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.

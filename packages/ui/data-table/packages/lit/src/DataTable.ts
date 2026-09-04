@@ -555,13 +555,17 @@ export default class DataTable extends SignalWatcher(LitElement) {
    */
   @property({ type: Number, reflect: true }) undoLimit: number = 100;
   /**
-   * Opt-in vertical **row windowing**. When `true`, only the visible slice of rows renders inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Default `false` is byte-identical to a non-virtual table.
+   * Opt-in windowing grammar: `false` (default, off — byte-identical to a non-virtual table) | `true` or `'rows'` (vertical row windowing; `true` is byte-behavior-identical to every existing consumer, zero churn) | `'columns'` (horizontal column windowing) | `'both'` (both axes windowed). Row windowing renders only the visible slice of rows inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Column windowing renders only the visible slice of leaf columns inside the same `rdt-scroll` container. An unrecognised string behaves as `false`.
    */
-  @property({ type: Boolean, reflect: true }) virtual: boolean = false;
+  @property({ type: Boolean }) virtual: boolean | string = false;
   /**
-   * Estimated row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on.
+   * Estimated row height (px) — the first-paint seed for the windowing engine before any row has been measured. Only consulted when rows are windowed. When `autoMeasure` is `true`, later renders progressively refine the estimate from measured content; when `autoMeasure` is `false` this remains the explicit override for every render.
    */
   @property({ type: Number, reflect: true }) estimateRowHeight: number = 40;
+  /**
+   * Opt-in content-driven row-size estimation. When `true`, the windowing engine feeds `estimateSize()` a running mean of measured row heights instead of the fixed `estimateRowHeight` seed, so `getTotalSize()` converges to the true content total on a large table with variable-height rows. Falls back to `estimateRowHeight` before any row has been measured. Default `false` keeps the estimate fixed at `estimateRowHeight` for every render (today's behavior).
+   */
+  @property({ type: Boolean, reflect: true }) autoMeasure: boolean = false;
   /**
    * A CSS length string bounding the `rdt-scroll` container when `virtual` is on (e.g. `'400px'`). Mirrored to the `--rozie-data-table-max-height` custom property; the prop wins, the token is the fallback.
    */
@@ -1038,24 +1042,32 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // cell IS the first Tab-in target (matching the Wave-0 probe's "no auto-focus on
     // mount"); the consumer drives focus by Tabbing/clicking in, never the component.
 
-    // ── Vertical windowing: construct the virtualizer (req-1/2 — ONLY when virtual) ───────
-    // Built HERE (post-mount) so getScrollElement resolves the rendered .rdt-scroll div and
-    // getPrePaginationRowModel reads the live table. ENTIRELY inside the $props.virtual guard:
-    // when off, NO virtual-core runtime code executes (byte-identical-off). _didMount() registers
-    // the scroll-element ResizeObserver and returns the teardown stored for $onUnmount.
+    // ── Windowing: capture the scroll element + construct the row virtualizer (req-1/2 — the
+    // row virtual-core instance ONLY when rows are windowed; the scroll-element capture whenever
+    // EITHER axis is windowed, since both axes observe the SAME .rdt-scroll element — D-03). Built
+    // HERE (post-mount) so getScrollElement resolves the rendered .rdt-scroll div and
+    // getPrePaginationRowModel reads the live table. ENTIRELY inside the isWindowed()/rowsWindowed()
+    // guards: when both axes are off, NO virtual-core runtime code executes (byte-identical-off).
+    // _didMount() registers the scroll-element ResizeObserver and returns the teardown stored for
+    // $onUnmount.
     // WR-04: NO on-mount auto-focus of the entry cell. Auto-focusing here stole focus on
     // page load AND was non-deterministic on React/Solid (the entry cell may not be
     // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
     // cell IS the first Tab-in target (matching the Wave-0 probe's "no auto-focus on
     // mount"); the consumer drives focus by Tabbing/clicking in, never the component.
 
-    // ── Vertical windowing: construct the virtualizer (req-1/2 — ONLY when virtual) ───────
-    // Built HERE (post-mount) so getScrollElement resolves the rendered .rdt-scroll div and
-    // getPrePaginationRowModel reads the live table. ENTIRELY inside the $props.virtual guard:
-    // when off, NO virtual-core runtime code executes (byte-identical-off). _didMount() registers
-    // the scroll-element ResizeObserver and returns the teardown stored for $onUnmount.
-    if (this.rowsWindowed()) {
+    // ── Windowing: capture the scroll element + construct the row virtualizer (req-1/2 — the
+    // row virtual-core instance ONLY when rows are windowed; the scroll-element capture whenever
+    // EITHER axis is windowed, since both axes observe the SAME .rdt-scroll element — D-03). Built
+    // HERE (post-mount) so getScrollElement resolves the rendered .rdt-scroll div and
+    // getPrePaginationRowModel reads the live table. ENTIRELY inside the isWindowed()/rowsWindowed()
+    // guards: when both axes are off, NO virtual-core runtime code executes (byte-identical-off).
+    // _didMount() registers the scroll-element ResizeObserver and returns the teardown stored for
+    // $onUnmount.
+    if (this.isWindowed()) {
       this.gridScrollEl = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rdt-scroll') : null;
+    }
+    if (this.rowsWindowed()) {
       this.virtualizer = new Virtualizer(this.virtualizerOptions());
       this.virtualizerCleanup = this.virtualizer._didMount();
       // FINE-GRAINED FIRST-WINDOW KICK (Solid/Svelte): the windowed <For>/{#each} accessor was first
@@ -1068,30 +1080,55 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       // re-render wholesale anyway). One bump = one re-run that now sees the non-null virtualizer and
       // pulls getVirtualItems().
       this._windowVer.value = this._windowVer.value + 1;
-      // After the first window commits (next frame), refine heights + fire the dev-mode warns
-      // ONCE. Entirely inside the $props.virtual guard so the virtual=false emitted path adds NO
-      // code and these warns can never fire there (req-1 byte-identical-off preserved).
+    }
+    // After the first window commits (next frame), refine heights + fire the dev-mode warns ONCE.
+    // Entirely inside the isWindowed() guard so the off (neither axis windowed) emitted path adds
+    // NO code and these warns can never fire there (req-1 byte-identical-off preserved). The
+    // row-specific measurement + warns stay further guarded by rowsWindowed() (byte-identical to
+    // before this restructure); the column-axis warn (Phase 87 D-07(a)) is guarded by
+    // colsWindowed() so it can fire ONLY on the 'columns'/'both' path, never on 'rows'/true/false.
+    // After the first window commits (next frame), refine heights + fire the dev-mode warns ONCE.
+    // Entirely inside the isWindowed() guard so the off (neither axis windowed) emitted path adds
+    // NO code and these warns can never fire there (req-1 byte-identical-off preserved). The
+    // row-specific measurement + warns stay further guarded by rowsWindowed() (byte-identical to
+    // before this restructure); the column-axis warn (Phase 87 D-07(a)) is guarded by
+    // colsWindowed() so it can fire ONLY on the 'columns'/'both' path, never on 'rows'/true/false.
+    if (this.isWindowed()) {
       const afterFirstFrame = () => {
-        // D-10: measure the rendered rows.
-        this.remeasureWindow();
-        // D-08/A1: a dev-mode runtime warn when the scroll container has no bounded height (the
-        // bound may come from consumer CSS the compiler can't see — no compile diagnostic). No
-        // process.env guard (not bundler-portable); always-warn-on-misconfig is acceptable.
-        const h = this.gridScrollEl ? this.gridScrollEl.clientHeight : 0;
-        if (!h) {
-          console.warn('[rozie-data-table] virtual is on but the scroll container has no bounded height; set maxHeight or --rozie-data-table-max-height');
+        if (this.rowsWindowed()) {
+          // D-10: measure the rendered rows.
+          this.remeasureWindow();
+          // D-08/A1: a dev-mode runtime warn when the scroll container has no bounded height (the
+          // bound may come from consumer CSS the compiler can't see — no compile diagnostic). No
+          // process.env guard (not bundler-portable); always-warn-on-misconfig is acceptable.
+          const h = this.gridScrollEl ? this.gridScrollEl.clientHeight : 0;
+          if (!h) {
+            console.warn('[rozie-data-table] virtual is on but the scroll container has no bounded height; set maxHeight or --rozie-data-table-max-height');
+          }
+          // D-07 (RESOLVED — runtime warn, not a compile diagnostic): warn ONCE when the consumer
+          // CONFIGURED client pagination alongside virtual, in the non-manual case (the valid
+          // virtual+manual combo per D-09 is silent). The pagination prop carries a non-null default
+          // ({ pageIndex: 0, pageSize: 10 }) so it is never strictly null — "configured" is therefore
+          // detected as a pagination that DIFFERS from that default (a consumer who set a real page
+          // size / index). The uncontrolled default ({0,10}) does NOT trip the warn. Behavior + the
+          // virtual=false path are untouched (rowsWindowed()-guarded, as before this restructure).
+          const pg = this.pagination;
+          const pgConfigured = pg != null && !(pg.pageIndex === 0 && pg.pageSize === 10);
+          if (this.manual !== true && pgConfigured) {
+            console.warn('[rozie-data-table] virtual+pagination: client pagination is configured but virtual windowing replaces it — the pagination chrome is auto-suppressed. Remove the pagination prop or set manual to silence this.');
+          }
         }
-        // D-07 (RESOLVED — runtime warn, not a compile diagnostic): warn ONCE when the consumer
-        // CONFIGURED client pagination alongside virtual, in the non-manual case (the valid
-        // virtual+manual combo per D-09 is silent). The pagination prop carries a non-null default
-        // ({ pageIndex: 0, pageSize: 10 }) so it is never strictly null — "configured" is therefore
-        // detected as a pagination that DIFFERS from that default (a consumer who set a real page
-        // size / index). The uncontrolled default ({0,10}) does NOT trip the warn. Behavior + the
-        // virtual=false path are untouched (this lives entirely inside the $props.virtual guard).
-        const pg = this.pagination;
-        const pgConfigured = pg != null && !(pg.pageIndex === 0 && pg.pageSize === 10);
-        if (this.manual !== true && pgConfigured) {
-          console.warn('[rozie-data-table] virtual+pagination: client pagination is configured but virtual windowing replaces it — the pagination chrome is auto-suppressed. Remove the pagination prop or set manual to silence this.');
+        // Phase 87 Task 1(a) (D-07/D-08 precedent, APPROVED): a dev-mode runtime warn when the
+        // column axis is windowed but the scroll container has no bounded width — the horizontal
+        // failure mode is worse than the vertical one (an unbounded width renders every column
+        // with no scrollbar, so the feature silently does nothing and there is no compile
+        // diagnostic possible, since the bound may come from consumer CSS). Guarded by
+        // colsWindowed() so it can NEVER fire on the 'rows'/true/false path.
+        if (this.colsWindowed()) {
+          const w = this.gridScrollEl ? this.gridScrollEl.clientWidth : 0;
+          if (!w) {
+            console.warn('[rozie-data-table] virtual is on for columns but the scroll container has no bounded width; set a CSS width on an ancestor so the column window can be measured');
+          }
         }
       };
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(afterFirstFrame));else setTimeout(afterFirstFrame, 0);
@@ -1184,7 +1221,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   ${this.groupBar !== undefined ? this.groupBar({grouping: this.groupingKeys(), groupableColumns: this.groupableColumns(), applyGrouping: this.applyGrouping, clearGrouping: this.clearGrouping}) : html`<slot name="groupBar" data-rozie-params=${(() => { try { return JSON.stringify({grouping: this.groupingKeys(), groupableColumns: this.groupableColumns()}); } catch { return '{}'; } })()} @rozie-group-bar-apply-grouping=${($event: CustomEvent) => ((this.applyGrouping) as (...args: any[]) => any)($event.detail)} @rozie-group-bar-clear-grouping=${($event: CustomEvent) => ((this.clearGrouping) as (...args: any[]) => any)($event.detail)}>
     ${repeat<any>(this.groupingKeys(), (gk, _idx) => gk, (gk, _idx) => html`<span class="rdt-group-token" data-group-token="" data-rozie-s-d5dcab4c>${rozieDisplay(gk)}</span>`)}
   </slot>`}
-</div>` : nothing}${this.isWindowed() ? html`<div class="rdt-scroll" style=${rozieStyle(this.maxHeight ? 'max-height:' + this.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + this.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c>
+</div>` : nothing}${this.isWindowed() ? html`<div class="rdt-scroll" style=${rozieStyle(this.rowsWindowed() && this.maxHeight ? 'max-height:' + this.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + this.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c>
 <table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} aria-rowcount=${rozieAttr(this.gridAriaRowCount())} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridKeyDown($event); }} @focusin=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridFocusOut($event); }} @mousedown=${($event: MouseEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridMouseDown($event); }} @dblclick=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridDblClick($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridClick($event); }} data-rozie-s-d5dcab4c>
   <thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._headerGroups.value, (hg, hgLevel) => hg.id, (hg, hgLevel) => html`<tr class="rdt-tr" role="row" aria-rowindex=${rozieAttr(hgLevel + 1)} data-rozie-s-d5dcab4c>
@@ -2392,6 +2429,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return src && src[i] ? src[i].id : undefined;
 };
 
+  // COL_OVERSCAN (D-07): the column axis's own hardcoded overscan constant, separate from the
+  // row axis's `overscan: 8` below. Columns are far wider than rows are tall, so one number
+  // cannot serve both axes; no prop is exposed because no consumer has asked to tune the row
+  // overscan across the four phases it has shipped. Unused until 87-04 constructs the second,
+  // horizontal Virtualizer instance (see the AXIS MECHANISM note above).
   // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
   // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
   // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
