@@ -8,10 +8,10 @@
 // `clamp` — its querySelectorAll selector string and its `!n.disabled` filter are kept
 // byte-identical to the pre-extraction body.
 
-const clamp = (v, lo, hi) => (v < lo ? lo : (v > hi ? hi : v))
+const clamp = (v: any, lo: any, hi: any) => (v < lo ? lo : (v > hi ? hi : v))
 
 // The focusable descendants of a cell (non-disabled), in DOM order. Pure DOM — uniform ×6.
-const focusables = (cellEl) => {
+const focusables = (cellEl: any) => {
   if (!cellEl || !cellEl.querySelectorAll) return []
   const list = Array.prototype.slice.call(
     cellEl.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')
@@ -19,7 +19,7 @@ const focusables = (cellEl) => {
   return list.filter((n) => !n.disabled)
 }
 
-const applyUpdater = (updater, current) =>
+const applyUpdater = (updater: any, current: any) =>
   (typeof updater === 'function' ? updater(current) : updater)
 
 export { clamp, focusables, applyUpdater }

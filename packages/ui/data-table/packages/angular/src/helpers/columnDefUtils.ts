@@ -10,7 +10,7 @@
 // cannot pollute Object.prototype. Returns the table-core ColumnDef[]. (No per-column
 // render callbacks — cells render via the single #cell/#header scoped slot on this
 // component, dispatched by columnId; <Column> carries metadata only.)
-const isSafeKey = (k) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype'
+const isSafeKey = (k: any) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype'
 
 // wrapAggregationFn (phase 50 req-5, D-05, threat T-50-04): resolve a per-column
 // aggregationFn straight onto the ColumnDef (no component-side switch — RESEARCH
@@ -20,10 +20,10 @@ const isSafeKey = (k) => k !== '__proto__' && k !== 'constructor' && k !== 'prot
 // is DEFENSIVELY WRAPPED (the runValidator precedent): a consumer fn runs per group, so a
 // throw is coerced to `undefined` and can never crash getGroupedRowModel (DoS guard).
 // Anything else → undefined (no aggregation; the cell renders as a placeholder).
-const wrapAggregationFn = (fn) => {
+const wrapAggregationFn = (fn: any) => {
   if (typeof fn === 'string') return fn
   if (typeof fn !== 'function') return undefined
-  return (columnId, leafRows, childRows) => {
+  return (columnId: any, leafRows: any, childRows: any) => {
     try {
       return fn(columnId, leafRows, childRows)
     } catch (err) {

@@ -8,7 +8,7 @@
 // or a double-quote is wrapped in double-quotes with internal quotes DOUBLED; an ordinary
 // field is emitted verbatim. parseTsv() unescapes symmetrically, so a cell carrying a tab /
 // newline / quote round-trips without smearing into adjacent cells (T-63-03-02).
-const escapeTsvField = (s) => {
+const escapeTsvField = (s: any) => {
   if (s.indexOf('\t') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0 || s.indexOf('"') >= 0) {
     return '"' + s.replace(/"/g, '""') + '"'
   }
@@ -18,7 +18,7 @@ const escapeTsvField = (s) => {
 // parseTsv(text): a TSV string → string[][] (rows of cells). Tolerates \r\n; a trailing
 // newline does not add a phantom empty row. Pure — produces plain string DATA only (T-51-01:
 // the cells are NEVER eval'd / interpolated into a selector / rendered as markup).
-const parseTsv = (text) => {
+const parseTsv = (text: any) => {
   const str = text != null ? String(text) : ''
   // CR-03: length guard BEFORE the parse — an empty string is a no-op, and a pathologically
   // large clipboard payload (>2M chars) is rejected outright (DoS-shaped input) before the
@@ -71,7 +71,7 @@ const parseTsv = (text) => {
 // no-range "clipboard-sized block at the active cell" behavior — a 1×1 destBox + a 1×N clipboard
 // yields the full 1×N block, byte-for-byte the prior path). Pure — returns a fresh grid; applies
 // nothing. A ragged/short source row defaults the missing cell to '' (coerced per column on write).
-const tileGridToBox = (grid, box) => {
+const tileGridToBox = (grid: any, box: any) => {
   const srcRows = grid.length
   // srcCols is the MAX row width across ALL rows (not grid[0].length): a RAGGED clipboard
   // (a later row WIDER than the first, e.g. TSV "a\tb\nc\td\te") would otherwise never read
@@ -104,7 +104,7 @@ const tileGridToBox = (grid, box) => {
 // the source block), handling indices below lo (negative offset) correctly. A 1-wide source
 // (lo===hi) always returns lo. Used by fillRange to resolve, per target cell, WHICH source
 // cell it copies — so each column copies its OWN source value down its OWN column.
-const tileIndex = (i, lo, hi) => {
+const tileIndex = (i: any, lo: any, hi: any) => {
   const span = (hi - lo) + 1
   if (span <= 1) return lo
   let k = (i - lo) % span

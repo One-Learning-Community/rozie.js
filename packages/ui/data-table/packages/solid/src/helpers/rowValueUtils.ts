@@ -9,7 +9,7 @@
 // replace — in-place mutation is silently dropped on React/Solid/Angular/Lit). rowIndex
 // is over currentData() (== the visible model order for the non-virtual, unsorted/
 // unfiltered single-cell case; the row id is carried for the commit payload).
-const replaceRowValue = (rows, rowIndex, field, value) => {
+const replaceRowValue = (rows: any, rowIndex: any, field: any, value: any) => {
   const src = rows || []
   const out = []
   for (let i = 0; i < src.length; i++) {
@@ -26,7 +26,7 @@ const replaceRowValue = (rows, rowIndex, field, value) => {
 
 // replaceRowValues: like replaceRowValue but applies a MAP of field→value to ONE row object
 // in a single fresh-array replace (req-6 — the whole-row commit is ONE write, not per cell).
-const replaceRowValues = (rows, rowIndex, fieldValues) => {
+const replaceRowValues = (rows: any, rowIndex: any, fieldValues: any) => {
   const src = rows || []
   const fv = fieldValues || {}
   const out = []
@@ -48,7 +48,7 @@ const replaceRowValues = (rows, rowIndex, fieldValues) => {
 // via a fresh spread (the `original` reference changes), so match by `id` FIRST, `original`
 // only as a fallback. Returns -1 when the row filtered out of the view. PURE (the caller passes
 // the FRESH row list — refreshRowModel's just-pulled `nextRows`, never the React-stale state).
-const indexOfRowIn = (rows, rowOriginal, rowId) => {
+const indexOfRowIn = (rows: any, rowOriginal: any, rowId: any) => {
   const list = rows || []
   for (let i = 0; i < list.length; i++) {
     const r = list[i]
