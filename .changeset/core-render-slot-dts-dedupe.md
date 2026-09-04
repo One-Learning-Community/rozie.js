@@ -1,0 +1,10 @@
+---
+"@rozie/core": patch
+"@rozie-ui/data-table-react": patch
+---
+
+An emitter fix in the shared public `.d.ts` renderer closes a `TS2300` duplicate-identifier defect that shipped in the published `@rozie-ui/data-table-react` React leaf.
+
+**`@rozie/core`.** `src/codegen/renderPropsInterface.ts` — the framework-agnostic public `.d.ts` / `.d.rozie.ts` renderer shared by all six targets' `emitTypes.ts` — emitted one `render<Slot>` field (or `children`) per slot OCCURRENCE in `ir.slots` rather than one per DISTINCT slot name. A component that repeats the same named slot across several mutually-exclusive `r-if` render branches therefore minted a public `.d.ts` with duplicate identifiers — a hard TypeScript error, not a lint nit. Now deduped by name, first-occurrence-wins. Every per-target INLINE interface emitter already guarded this same defect class; only the shared public renderer did not.
+
+**`@rozie-ui/data-table-react`.** The published `0.2.8` tarball's `src/DataTable.d.ts` carried seven duplicated interface members — `renderCell`, `renderColHeader`, `renderDetail`, `renderEditor`, `renderFilter`, `renderSelectAll`, `renderSelectCell` — 14 `error TS2300: Duplicate identifier` occurrences within that file, reproducing the exact renderer defect above. Unpacking the published tarball narrows the blast radius: the duplication lives ONLY in the sidecar `src/DataTable.d.ts`; the package's actual `types` entry is `dist/index.d.mts`, which has one of each field and imports nothing but `react`, and the exports map exposes only `"."` (→ `dist`) and `"./themes/*"` (→ CSS) — `src/DataTable.d.ts` ships inside the tarball but is unreachable through the exports map and unreferenced by the type entry. This is therefore a real defect in the shipped sidecar declarations consumed by IDE and author-side tooling that reads `src/` directly, NOT a break in the ordinary consumer typecheck path (`import` resolution through `dist/index.d.mts` was never affected). This patch republishes the corrected declaration with no runtime or API change.
