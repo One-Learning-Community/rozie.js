@@ -98,7 +98,7 @@ export function Demo() {
   );
 }
 
-// Custom option rendering via the \`option\` scoped slot (a React render prop).
+// Custom option rendering via the \`renderOption\` render prop (backs the \`option\` scoped slot).
 export function CustomDemo() {
   const [value, setValue] = useState<string | null>(null);
   return (
@@ -106,7 +106,7 @@ export function CustomDemo() {
       value={value}
       onValueChange={setValue}
       options={frameworks}
-      option={({ option, selected }) => (
+      renderOption={({ option, selected }) => (
         <span style={{ fontWeight: selected ? 700 : 400 }}>{option.label}</span>
       )}
     />
