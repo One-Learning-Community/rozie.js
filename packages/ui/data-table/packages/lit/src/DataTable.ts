@@ -6,7 +6,9 @@ import { ContextProvider, createContext } from '@lit/context';
 import { repeat } from 'lit/directives/repeat.js';
 import '@rozie-ui/popover-lit';
 import { isSafeKey, wrapAggregationFn } from './helpers/columnDefUtils';
+import { applyUpdater, clamp, focusables } from './helpers/indexMath';
 import { escapeTsvField, parseTsv, tileGridToBox, tileIndex } from './helpers/tsvGrid';
+import { replaceRowValue, indexOfRowIn, replaceRowValues } from './helpers/rowValueUtils';
 import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
 // Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
 // (mirrors the expand/group models) — inert until a consumer READS a column facet via the
@@ -1007,7 +1009,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       if (this.pendingEditFollow && this.isGrid()) {
         const follow = this.pendingEditFollow;
         this.pendingEditFollow = null;
-        const followIdx = this.indexOfRowIn(nextRows, follow.rowOriginal, follow.rowId);
+        const followIdx = indexOfRowIn(nextRows, follow.rowOriginal, follow.rowId);
         if (followIdx >= 0) this.focusCellWhenReady(followIdx, follow.col);
       }
       // keep the select-all checkbox's `indeterminate` DOM property in lockstep with the
@@ -1736,8 +1738,6 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic--;
 };
 
-  applyUpdater = (updater: any, current: any) => typeof updater === 'function' ? updater(current) : updater;
-
   // ── expanded slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────────
   // table-core hands an Updater<ExpandedState> = value | (old)=>new; onExpandedChange
   // applies it against the CURRENT expanded, then this funnel writes a FRESH value to the
@@ -2119,51 +2119,51 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // fresh (recreated each render on React, reading fresh currentState) in the re-feed
   // keeps the Updater base value current. No-op cost on the other five.
   onSortingChangeCb = (updater: any) => {
-  this.writeSorting(this.applyUpdater(updater, this.currentState().sorting));
+  this.writeSorting(applyUpdater(updater, this.currentState().sorting));
 };
 
   onExpandedChangeCb = (updater: any) => {
-  this.writeExpanded(this.applyUpdater(updater, this.currentState().expanded));
+  this.writeExpanded(applyUpdater(updater, this.currentState().expanded));
 };
 
   onGroupingChangeCb = (updater: any) => {
-  this.writeGrouping(this.applyUpdater(updater, this.currentState().grouping));
+  this.writeGrouping(applyUpdater(updater, this.currentState().grouping));
 };
 
   onGlobalFilterChangeCb = (updater: any) => {
-  this.writeGlobalFilter(this.applyUpdater(updater, this.currentState().globalFilter));
+  this.writeGlobalFilter(applyUpdater(updater, this.currentState().globalFilter));
 };
 
   onColumnFiltersChangeCb = (updater: any) => {
-  this.writeColumnFilters(this.applyUpdater(updater, this.currentState().columnFilters));
+  this.writeColumnFilters(applyUpdater(updater, this.currentState().columnFilters));
 };
 
   onPaginationChangeCb = (updater: any) => {
-  this.writePagination(this.applyUpdater(updater, this.currentState().pagination));
+  this.writePagination(applyUpdater(updater, this.currentState().pagination));
 };
 
   onRowSelectionChangeCb = (updater: any) => {
-  this.writeRowSelection(this.applyUpdater(updater, this.currentState().rowSelection));
+  this.writeRowSelection(applyUpdater(updater, this.currentState().rowSelection));
 };
 
   onColumnVisibilityChangeCb = (updater: any) => {
-  this.writeColumnVisibility(this.applyUpdater(updater, this.currentState().columnVisibility));
+  this.writeColumnVisibility(applyUpdater(updater, this.currentState().columnVisibility));
 };
 
   onColumnSizingChangeCb = (updater: any) => {
-  this.writeColumnSizing(this.applyUpdater(updater, this.currentState().columnSizing));
+  this.writeColumnSizing(applyUpdater(updater, this.currentState().columnSizing));
 };
 
   onColumnOrderChangeCb = (updater: any) => {
-  this.writeColumnOrder(this.applyUpdater(updater, this.currentState().columnOrder));
+  this.writeColumnOrder(applyUpdater(updater, this.currentState().columnOrder));
 };
 
   onColumnPinningChangeCb = (updater: any) => {
-  this.writeColumnPinning(this.applyUpdater(updater, this.currentState().columnPinning));
+  this.writeColumnPinning(applyUpdater(updater, this.currentState().columnPinning));
 };
 
   onColumnSizingInfoChangeCb = (updater: any) => {
-  const next = this.applyUpdater(updater, this._columnSizingInfo.value);
+  const next = applyUpdater(updater, this._columnSizingInfo.value);
   this._columnSizingInfo.value = next != null ? next : this._columnSizingInfo.value;
 };
 
@@ -3308,11 +3308,6 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // DataTable.rozie) — so DataTable.rozie's $expose references them BY NAME with zero
   // indirection. This file stays the seam for verbs that need a rename/adapter, not a mandatory
   // stop for every $expose entry.
-  // ══ Grid interaction mode (phase 49) — STATE + STRUCTURE only ═══════════════════════════
-  // This plan (02) establishes the gated ARIA roles, the roving single-tab-stop tabindex,
-  // the active-cell index-pair state, the data-* cell markers, and the SINGLE
-  // focusActiveCell() seam. Plan 03 adds the keydown navigation math, the $expose verbs
-  // (focusCell/getActiveCell/clearActiveCell), and the activecell-change event ON TOP.
   // interactionMode gate. 'grid' lights up roving nav; 'table' (default) is byte-behaviorally
   // identical to phase 48 (roles fall back to the literals, tabindex drops).
   isGrid = () => this.interactionMode === 'grid';
@@ -3577,8 +3572,6 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   bodyRowCount = () => (this._rows.value || []).length;
 
-  clamp = (v: any, lo: any, hi: any) => v < lo ? lo : v > hi ? hi : v;
-
   // ── Multi-level (grouped) header addressing (B12) ──────────────────────────────────────
   // $data.headerGroups is ordered top→bottom; the LEAF header row (the one adjacent to the
   // body) is the LAST group. The roving active-header state carries activeHeaderLevel (the
@@ -3663,7 +3656,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // phantom cell past that level's headers. Body cells + the leaf header level keep visibleColCount().
   const count = this._activeIsHeader.value ? this.headerCountAtLevel(this._activeHeaderLevel.value) : this.visibleColCount();
   const max = count - 1;
-  const nextCol = this.clamp(this._activeColIndex.value + delta, 0, max < 0 ? 0 : max);
+  const nextCol = clamp(this._activeColIndex.value + delta, 0, max < 0 ? 0 : max);
   this._activeColIndex.value = nextCol;
   return nextCol;
 };
@@ -3708,7 +3701,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       // (delta-1) continues the descent, so PageDown (delta=GRID_PAGE_STEP) lands a real
       // page-down body row, NOT row 0 (== ArrowDown). ArrowDown (delta=1) still lands row 0
       // (delta-1 = 0); clamped to the page-last body row.
-      const landRow = this.clamp(delta - 1, 0, maxRow);
+      const landRow = clamp(delta - 1, 0, maxRow);
       this._activeIsHeader.value = false;
       this._activeRow.value = landRow;
       return {
@@ -3753,7 +3746,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       level: leafLevel
     };
   }
-  const nextRow = this.clamp(this._activeRow.value + delta, 0, maxRow);
+  const nextRow = clamp(this._activeRow.value + delta, 0, maxRow);
   this._activeRow.value = nextRow;
   this._activeIsHeader.value = false;
   return {
@@ -3821,19 +3814,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return this.resolveCellEl(rowKey, this._activeColIndex.value, this._activeIsHeader.value ? this._activeHeaderLevel.value : null);
 };
 
-  // The focusable descendants of a cell (non-disabled), in DOM order. Pure DOM — uniform ×6.
-  focusables = (cellEl: any) => {
-  if (!cellEl || !cellEl.querySelectorAll) return [];
-  const list = Array.prototype.slice.call(cellEl.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'));
-  return list.filter((n: any) => !n.disabled);
-};
-
   // Enter/F2 → enter interaction mode: focus the active cell's FIRST interactive control
   // (D-07 — uniform for header sort buttons and body controls; Enter does NOT sort directly).
   // No-op (stay in navigation mode) if the cell has no focusable control.
   enterControl = () => {
   const cellEl = this.currentCellEl();
-  const list = this.focusables(cellEl);
+  const list = focusables(cellEl);
   if (!list.length) return;
   this._activeInControl.value = true;
   list[0].focus();
@@ -3844,7 +3830,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // activeElement read: gridRoot.getRootNode().activeElement is the UNIFORM correct read on
   // ALL SIX (document in light DOM; the shadow root on Lit). Reuse verbatim — do NOT re-derive.
   cycleWithinCell = (cellEl: any, forward: any) => {
-  const list = this.focusables(cellEl);
+  const list = focusables(cellEl);
   if (!list.length) return;
   const active = this.gridRoot ? this.gridRoot.getRootNode().activeElement : null;
   const cur = list.indexOf(active);
@@ -4489,7 +4475,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     }
   }
   const maxCol = colN - 1;
-  const col = this.clamp(this._activeColIndex.value, 0, maxCol < 0 ? 0 : maxCol);
+  const col = clamp(this._activeColIndex.value, 0, maxCol < 0 ? 0 : maxCol);
   if (col !== this._activeColIndex.value) this._activeColIndex.value = col;
   // B6: an empty / all-filtered grid has NO body cell to hold the active cell. Park the active
   // cell on the leaf-header fallback (col 0) so the roving tab-stop stays on a REAL cell (never
@@ -4524,7 +4510,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (!this._activeIsHeader.value) {
     const lastRow = rowN - 1;
     const maxRow = lastRow < 0 ? 0 : lastRow;
-    const row = this.clamp(this._activeRow.value, 0, maxRow);
+    const row = clamp(this._activeRow.value, 0, maxRow);
     if (row !== this._activeRow.value) this._activeRow.value = row;
   }
   // B8: clamp the range-selection corners to the same FRESH bounds (a sort/filter/paginate that
@@ -4535,8 +4521,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // when the shrink removed the focused cell. The target is the DOOMED cell's own coords clamped
   // into the fresh bounds (React-stale-safe — see the doomedRow/doomedCol note above).
   if (recoverFocus) {
-    const recRow = this.clamp(doomedRow, 0, rowN - 1);
-    const recCol = this.clamp(doomedCol, 0, maxCol < 0 ? 0 : maxCol);
+    const recRow = clamp(doomedRow, 0, rowN - 1);
+    const recCol = clamp(doomedCol, 0, maxCol < 0 ? 0 : maxCol);
     this.recoverGridFocus(String(recRow), recCol, null);
   }
 };
@@ -4619,8 +4605,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     focus: null
   };
   const clampCorner = (c: any) => c == null ? null : {
-    rowIndex: this.clamp(c.rowIndex, 0, maxRow),
-    colIndex: this.clamp(c.colIndex, 0, maxCol)
+    rowIndex: clamp(c.rowIndex, 0, maxRow),
+    colIndex: clamp(c.colIndex, 0, maxCol)
   };
   return {
     anchor: clampCorner(a),
@@ -4680,8 +4666,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       colIndex: this._activeColIndex.value
     };
   }
-  const nextRow = this.clamp(focus.rowIndex + dRow, 0, maxRow);
-  const nextCol = this.clamp(focus.colIndex + dCol, 0, maxCol);
+  const nextRow = clamp(focus.rowIndex + dRow, 0, maxRow);
+  const nextCol = clamp(focus.colIndex + dCol, 0, maxCol);
   const nextFocus = {
     rowIndex: nextRow,
     colIndex: nextCol
@@ -4718,8 +4704,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     rowIndex: this._activeRow.value,
     colIndex: this._activeColIndex.value
   };
-  const r = this.clamp(Math.trunc(Number(rIdx)) || 0, 0, maxRow);
-  const c = this.clamp(Math.trunc(Number(cIdx)) || 0, 0, maxCol);
+  const r = clamp(Math.trunc(Number(rIdx)) || 0, 0, maxRow);
+  const c = clamp(Math.trunc(Number(cIdx)) || 0, 0, maxCol);
   const nextFocus = {
     rowIndex: r,
     colIndex: c
@@ -4796,16 +4782,16 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     return;
   }
   if (a) {
-    const ar = this.clamp(a.rowIndex, 0, maxRow);
-    const ac = this.clamp(a.colIndex, 0, maxCol);
+    const ar = clamp(a.rowIndex, 0, maxRow);
+    const ac = clamp(a.colIndex, 0, maxCol);
     if (ar !== a.rowIndex || ac !== a.colIndex) this._rangeAnchor.value = {
       rowIndex: ar,
       colIndex: ac
     };
   }
   if (f) {
-    const fr = this.clamp(f.rowIndex, 0, maxRow);
-    const fc = this.clamp(f.colIndex, 0, maxCol);
+    const fr = clamp(f.rowIndex, 0, maxRow);
+    const fc = clamp(f.colIndex, 0, maxCol);
     if (fr !== f.rowIndex || fc !== f.colIndex) this._rangeFocus.value = {
       rowIndex: fr,
       colIndex: fc
@@ -4848,10 +4834,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   const maxRow = this.bodyRowCount() - 1;
   const maxCol = this.visibleColCount() - 1;
   if (maxRow < 0 || maxCol < 0) return null;
-  const ar = this.clamp(a.rowIndex, 0, maxRow);
-  const ac = this.clamp(a.colIndex, 0, maxCol);
-  const fr = this.clamp(f.rowIndex, 0, maxRow);
-  const fc = this.clamp(f.colIndex, 0, maxCol);
+  const ar = clamp(a.rowIndex, 0, maxRow);
+  const ac = clamp(a.colIndex, 0, maxCol);
+  const fr = clamp(f.rowIndex, 0, maxRow);
+  const fc = clamp(f.colIndex, 0, maxCol);
   return {
     r0: ar < fr ? ar : fr,
     r1: ar > fr ? ar : fr,
@@ -4934,7 +4920,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       const field = this.fieldOfColId(colId);
       const srcIndex = this.sourceIndexOfRow(r);
       const oldValue = rowObj ? rowObj[field] : null;
-      next = this.replaceRowValue(next, srcIndex, field, value);
+      next = replaceRowValue(next, srcIndex, field, value);
       committed.push({
         rowId: this.rowIdAt(r),
         columnId: colId,
@@ -5318,12 +5304,6 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 };
 
-  // ══ Editable-cell lifecycle (phase 51 plan 02 — RESEARCH Pattern 1/3/4/5) ════════════════
-  // Single-cell, non-virtual. Index-based state (editingRow/editingCol over the visible model),
-  // the display↔editor branch in the keyed <td>, F2/Enter/printable entry off the reserved
-  // onGridKeyDown seam, commit on Enter/Tab/blur, cancel+revert on Escape, sync validation with
-  // D-01 keep-open. All gated by columnEditable() / the editing index pair so a table with no
-  // editable columns lowers byte-identical (the editor branch r-if is always false).
   // The column id at the active cell (the active row's visible cell list @ activeColIndex).
   // Null when out of range (no body rows, or active cell is a header / select column).
   activeCellColumnId = () => {
@@ -5394,29 +5374,6 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // :aria-invalid wired in Task 3). Empty string clears it.
   setInvalid = (msg: any) => {
   this._invalidMsg.value = msg != null ? msg : '';
-};
-
-  // replaceRowValue: build a FRESH array with ONE row object replaced (the column's field
-  // set to the new value); the rest share by reference (the family immutable whole-array
-  // replace — in-place mutation is silently dropped on React/Solid/Angular/Lit). rowIndex
-  // is over currentData() (== the visible model order for the non-virtual, unsorted/
-  // unfiltered single-cell case; the row id is carried for the commit payload).
-  replaceRowValue = (rows: any, rowIndex: any, field: any, value: any) => {
-  const src = rows || [];
-  const out = [];
-  for (let i = 0; i < src.length; i++) {
-    if (i === rowIndex) {
-      // WR-03: own-property spread, NOT `for (const k in orig)` which walks the prototype chain
-      // and would copy inherited enumerable props of typed/class-instance row objects.
-      out.push({
-        ...(src[i] || {}),
-        [field]: value
-      });
-    } else {
-      out.push(src[i]);
-    }
-  }
-  return out;
 };
 
   // Map a visible-model body-row index ($data.rows index) to its underlying currentData()
@@ -5603,23 +5560,6 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
 };
 
-  // B23: the index of a committed row WITHIN a given (fresh) visible-model array, resolved by
-  // row IDENTITY. table-core's default getRowId is source-index-based, so a row's id is stable
-  // across a re-sort (only its VISIBLE position moves); a committed edit replaces the row object
-  // via a fresh spread (the `original` reference changes), so match by `id` FIRST, `original`
-  // only as a fallback. Returns -1 when the row filtered out of the view. PURE (the caller passes
-  // the FRESH row list — refreshRowModel's just-pulled `nextRows`, never the React-stale state).
-  indexOfRowIn = (rows: any, rowOriginal: any, rowId: any) => {
-  const list = rows || [];
-  for (let i = 0; i < list.length; i++) {
-    const r = list[i];
-    if (!r) continue;
-    if (rowId != null && r.id === rowId) return i;
-    if (rowOriginal != null && r.original === rowOriginal) return i;
-  }
-  return -1;
-};
-
   // endEdit: tear down the editor (shared by commit/cancel). Clears the editing pair +
   // draft + invalid state and returns to navigation mode. Does NOT move focus (callers
   // decide where focus lands — commit/cancel return it to the owning cell).
@@ -5733,7 +5673,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.committedThisSession = true;
   if (changed) {
     const srcIndex = this.sourceIndexOfRow(this._editingRow.value);
-    const next = this.replaceRowValue(this.currentData(), srcIndex, field, newValue);
+    const next = replaceRowValue(this.currentData(), srcIndex, field, newValue);
     this.writeData(next);
     // Exactly one emit per commit, from this single call site (writeData does NOT emit).
     this.dispatchEvent(new CustomEvent("cell-edit-commit", {
@@ -5807,7 +5747,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // Sync idempotency latch: this toggle is a commit-equivalent (mirrors commitEdit's D-07
   // single-emit discipline) — flip it too so a stray re-entry after this toggle no-ops.
   this.committedThisSession = true;
-  this.writeData(this.replaceRowValue(this.currentData(), srcIndex, field, newValue));
+  this.writeData(replaceRowValue(this.currentData(), srcIndex, field, newValue));
   // Exactly one emit per toggle, from this single call site (writeData does NOT emit) —
   // mirrors commitEdit's D-07 single-emit discipline.
   this.dispatchEvent(new CustomEvent("cell-edit-commit", {
@@ -5846,12 +5786,6 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.focusCellWhenReady(focusRow, focusCol);
 };
 
-  // ══ Full-row edit lifecycle (phase 51 plan 03 / req-6 / D-06, RESEARCH Pattern 6) ════════
-  // Shift+F2 (and the editRow $expose verb) put EVERY editable cell in the active row into
-  // edit at once; one save commits the whole row in ONE writeData (a single fresh-array row
-  // replace) + ONE row-edit-commit event; Escape reverts the whole row as a unit. Per-column
-  // validation still runs on each edited cell at commit (D-01 keep-open if ANY fails). The
-  // editor template branch (isEditing's row arm) is re-used verbatim — no per-mode fork.
   // The editable [columnId, field] pairs for a body row at the given visible-model index,
   // in visible-cell order. field is the column's accessorKey (the row-object key to write).
   editableColumnsForRow = (rowIndex: any) => {
@@ -6028,7 +5962,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (changed) {
     // ONE fresh-array replace of the SINGLE row object with all field values applied at once.
     const srcIndex = this.sourceIndexOfRow(rowIndex);
-    const next = this.replaceRowValues(this.currentData(), srcIndex, fieldValues);
+    const next = replaceRowValues(this.currentData(), srcIndex, fieldValues);
     this.writeData(next);
     // EXACTLY ONE emit per row commit, from THIS single call site (React multi-emit dedup, D-07).
     this.dispatchEvent(new CustomEvent("row-edit-commit", {
@@ -6076,27 +6010,6 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.endRowEdit();
   this.editTransition = false;
   this.focusCellWhenReady(focusRow, focusCol);
-};
-
-  // replaceRowValues: like replaceRowValue but applies a MAP of field→value to ONE row object
-  // in a single fresh-array replace (req-6 — the whole-row commit is ONE write, not per cell).
-  replaceRowValues = (rows: any, rowIndex: any, fieldValues: any) => {
-  const src = rows || [];
-  const fv = fieldValues || {};
-  const out = [];
-  for (let i = 0; i < src.length; i++) {
-    if (i === rowIndex) {
-      // WR-03: own-property spread (orig then the field→value map), NOT a `for..in`
-      // prototype-walking copy. Spread copies own enumerable props only.
-      out.push({
-        ...(src[i] || {}),
-        ...fv
-      });
-    } else {
-      out.push(src[i]);
-    }
-  }
-  return out;
 };
 
   // Compute the next editable cell for Tab-advance (req-3, RESEARCH Open-Q3 deterministic
@@ -6430,8 +6343,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   const lastRow = this.bodyRowCount() - 1;
   const maxRow = lastRow < 0 ? 0 : lastRow;
   const maxCol = this.visibleColCount() - 1;
-  const r = this.clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
-  const c = this.clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
+  const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
+  const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
   // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
   this.committedThisSession = false;
   this._activeIsHeader.value = false;
@@ -6462,7 +6375,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   editRow = (rowIndex: any) => {
   const lastRow = this.bodyRowCount() - 1;
   const maxRow = lastRow < 0 ? 0 : lastRow;
-  const r = this.clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
+  const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
   const rowList = this._rows.value || [];
   const row = rowList[r];
   if (!row) return;
@@ -6534,10 +6447,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // or user nav bumps again → a pending focusAbsCellWhenReady from THIS call aborts.
   this.focusIntentEpoch = this.focusIntentEpoch + 1;
   const maxCol = this.visibleColCount() - 1;
-  const c = this.clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
+  const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
   // C1: clamp the ABSOLUTE row index to the full filtered+sorted (pre-pagination) bounds.
   const absLast = this.prePaginationRowCount() - 1;
-  const absRow = this.clamp(Math.trunc(Number(rowIndex)) || 0, 0, absLast < 0 ? 0 : absLast);
+  const absRow = clamp(Math.trunc(Number(rowIndex)) || 0, 0, absLast < 0 ? 0 : absLast);
   // B14: snapshot the PRE-write ABSOLUTE position so the activecell-change emit fires ONLY on a
   // real move (mirrors the keyboard path's WR-06 suppression). A no-op focusCell to the already-
   // active cell must NOT emit; a header→body landing (prevIsHeader) is a real move.

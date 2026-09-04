@@ -4,6 +4,12 @@
 // focusActiveCell() seam. Plan 03 adds the keydown navigation math, the $expose verbs
 // (focusCell/getActiveCell/clearActiveCell), and the activecell-change event ON TOP.
 
+// D-22 (Phase 87 plan 87-01): clamp/focusables moved to the colocated plain-TS module
+// below — pure, sigil-free, no cross-partial host-symbol calls. Re-exported unchanged
+// from this partial's trailing export list. (This partial is edited again in
+// 87-06-PLAN.md — keep this diff to the two moved declarations plus this import line.)
+import { clamp, focusables } from './helpers/indexMath'
+
 // interactionMode gate. 'grid' lights up roving nav; 'table' (default) is byte-behaviorally
 // identical to phase 48 (roles fall back to the literals, tabindex drops).
 const isGrid = () => $props.interactionMode === 'grid'
@@ -257,7 +263,6 @@ const visibleColCount = () => {
   return hg.length ? ((hg[hg.length - 1].headers || []).length) : 0
 }
 const bodyRowCount = () => ($data.rows || []).length
-const clamp = (v, lo, hi) => (v < lo ? lo : (v > hi ? hi : v))
 
 // ── Multi-level (grouped) header addressing (B12) ──────────────────────────────────────
 // $data.headerGroups is ordered top→bottom; the LEAF header row (the one adjacent to the
@@ -454,15 +459,6 @@ const gotoEnd = () => {
 const currentCellEl = () => {
   const rowKey = $data.activeIsHeader ? '__header' : String($data.activeRow)
   return resolveCellEl(rowKey, $data.activeColIndex, $data.activeIsHeader ? $data.activeHeaderLevel : null)
-}
-
-// The focusable descendants of a cell (non-disabled), in DOM order. Pure DOM — uniform ×6.
-const focusables = (cellEl) => {
-  if (!cellEl || !cellEl.querySelectorAll) return []
-  const list = Array.prototype.slice.call(
-    cellEl.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')
-  )
-  return list.filter((n) => !n.disabled)
 }
 
 // Enter/F2 → enter interaction mode: focus the active cell's FIRST interactive control

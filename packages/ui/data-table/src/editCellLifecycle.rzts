@@ -5,6 +5,12 @@
 // D-01 keep-open. All gated by columnEditable() / the editing index pair so a table with no
 // editable columns lowers byte-identical (the editor branch r-if is always false).
 
+// D-22 (Phase 87 plan 87-01): replaceRowValue/indexOfRowIn moved to the colocated plain-TS
+// module below — pure, sigil-free, no cross-partial host-symbol calls (runValidator and
+// coerceCellValue stay HERE — both call cross-partial host symbols editMetaOf/editorTypeOf).
+// Re-exported unchanged from this partial's trailing export list.
+import { replaceRowValue, indexOfRowIn } from './helpers/rowValueUtils'
+
 // The column id at the active cell (the active row's visible cell list @ activeColIndex).
 // Null when out of range (no body rows, or active cell is a header / select column).
 const activeCellColumnId = () => {
@@ -74,26 +80,6 @@ const runValidator = (colId, value, row) => {
 // setInvalid: record the current validation error (drives the aria-live region +
 // :aria-invalid wired in Task 3). Empty string clears it.
 const setInvalid = (msg) => { $data.invalidMsg = msg != null ? msg : '' }
-
-// replaceRowValue: build a FRESH array with ONE row object replaced (the column's field
-// set to the new value); the rest share by reference (the family immutable whole-array
-// replace — in-place mutation is silently dropped on React/Solid/Angular/Lit). rowIndex
-// is over currentData() (== the visible model order for the non-virtual, unsorted/
-// unfiltered single-cell case; the row id is carried for the commit payload).
-const replaceRowValue = (rows, rowIndex, field, value) => {
-  const src = rows || []
-  const out = []
-  for (let i = 0; i < src.length; i++) {
-    if (i === rowIndex) {
-      // WR-03: own-property spread, NOT `for (const k in orig)` which walks the prototype chain
-      // and would copy inherited enumerable props of typed/class-instance row objects.
-      out.push({ ...(src[i] || {}), [field]: value })
-    } else {
-      out.push(src[i])
-    }
-  }
-  return out
-}
 
 // Map a visible-model body-row index ($data.rows index) to its underlying currentData()
 // index via the row's original object identity (sorting/filtering/pagination may reorder
@@ -265,23 +251,6 @@ const focusCellWhenReady = (row, col) => {
   }
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
   else setTimeout(tryFocus, 0)
-}
-
-// B23: the index of a committed row WITHIN a given (fresh) visible-model array, resolved by
-// row IDENTITY. table-core's default getRowId is source-index-based, so a row's id is stable
-// across a re-sort (only its VISIBLE position moves); a committed edit replaces the row object
-// via a fresh spread (the `original` reference changes), so match by `id` FIRST, `original`
-// only as a fallback. Returns -1 when the row filtered out of the view. PURE (the caller passes
-// the FRESH row list — refreshRowModel's just-pulled `nextRows`, never the React-stale state).
-const indexOfRowIn = (rows, rowOriginal, rowId) => {
-  const list = rows || []
-  for (let i = 0; i < list.length; i++) {
-    const r = list[i]
-    if (!r) continue
-    if (rowId != null && r.id === rowId) return i
-    if (rowOriginal != null && r.original === rowOriginal) return i
-  }
-  return -1
 }
 
 // endEdit: tear down the editor (shared by commit/cancel). Clears the editing pair +

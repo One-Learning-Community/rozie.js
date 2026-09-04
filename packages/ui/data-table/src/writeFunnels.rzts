@@ -1,3 +1,8 @@
+// D-22 (Phase 87 plan 87-01): applyUpdater moved to the colocated plain-TS module below —
+// pure, sigil-free, no cross-partial host-symbol calls. Re-exported unchanged from this
+// partial's trailing export list.
+import { applyUpdater } from './helpers/indexMath'
+
 // ── sorting slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──────────
 // table-core hands an Updater<SortingState> = value | (old)=>new; the onSortingChange
 // callback applies it against the CURRENT sorting, then this funnel writes a FRESH
@@ -13,8 +18,6 @@ const writeSorting = (next) => {
   $emit('sort-change', next)
   programmatic--
 }
-const applyUpdater = (updater, current) =>
-  (typeof updater === 'function' ? updater(current) : updater)
 
 // ── expanded slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────────
 // table-core hands an Updater<ExpandedState> = value | (old)=>new; onExpandedChange

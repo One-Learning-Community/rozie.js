@@ -5,6 +5,11 @@
 // validation still runs on each edited cell at commit (D-01 keep-open if ANY fails). The
 // editor template branch (isEditing's row arm) is re-used verbatim — no per-mode fork.
 
+// D-22 (Phase 87 plan 87-01): replaceRowValues moved to the colocated plain-TS module below —
+// pure, sigil-free, no cross-partial host-symbol calls. Re-exported unchanged from this
+// partial's trailing export list.
+import { replaceRowValues } from './helpers/rowValueUtils'
+
 // The editable [columnId, field] pairs for a body row at the given visible-model index,
 // in visible-cell order. field is the column's accessorKey (the row-object key to write).
 const editableColumnsForRow = (rowIndex) => {
@@ -201,24 +206,6 @@ const cancelRow = () => {
   endRowEdit()
   editTransition = false
   focusCellWhenReady(focusRow, focusCol)
-}
-
-// replaceRowValues: like replaceRowValue but applies a MAP of field→value to ONE row object
-// in a single fresh-array replace (req-6 — the whole-row commit is ONE write, not per cell).
-const replaceRowValues = (rows, rowIndex, fieldValues) => {
-  const src = rows || []
-  const fv = fieldValues || {}
-  const out = []
-  for (let i = 0; i < src.length; i++) {
-    if (i === rowIndex) {
-      // WR-03: own-property spread (orig then the field→value map), NOT a `for..in`
-      // prototype-walking copy. Spread copies own enumerable props only.
-      out.push({ ...(src[i] || {}), ...fv })
-    } else {
-      out.push(src[i])
-    }
-  }
-  return out
 }
 
 // Compute the next editable cell for Tab-advance (req-3, RESEARCH Open-Q3 deterministic

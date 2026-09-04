@@ -424,7 +424,9 @@ const liveAnnounce = ref('');
 const __rozieRootRef = ref<HTMLElement>();
 
 import { isSafeKey, wrapAggregationFn } from './helpers/columnDefUtils';
+import { applyUpdater, clamp, focusables } from './helpers/indexMath';
 import { escapeTsvField, parseTsv, tileGridToBox, tileIndex } from './helpers/tsvGrid';
+import { replaceRowValue, indexOfRowIn, replaceRowValues } from './helpers/rowValueUtils';
 import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
 // Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
 // (mirrors the expand/group models) — inert until a consumer READS a column facet via the
@@ -806,7 +808,6 @@ const writeSorting = (next: any) => {
   emit('sort-change', next);
   programmatic--;
 };
-const applyUpdater = (updater: any, current: any) => typeof updater === 'function' ? updater(current) : updater;
 // ── expanded slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────────
 // table-core hands an Updater<ExpandedState> = value | (old)=>new; onExpandedChange
 // applies it against the CURRENT expanded, then this funnel writes a FRESH value to the
@@ -2193,13 +2194,11 @@ const getRowIndexRelativeToPage = (absRow: any) => {
 // inherited Lit DOM method named `cut` (ROZ121/124/137 clear) — `cut` is not on HTMLElement.
 const cut = () => cutRange();
 
+// differently-named clipboardFill export, `cutRange`), the undoHistory.rzts exports already
+// use the exact public verb names and are already component-scope (imported directly into
+// DataTable.rozie) — so DataTable.rozie's $expose references them BY NAME with zero
 // indirection. This file stays the seam for verbs that need a rename/adapter, not a mandatory
-// ══ Grid interaction mode (phase 49) — STATE + STRUCTURE only ═══════════════════════════
-// This plan (02) establishes the gated ARIA roles, the roving single-tab-stop tabindex,
-// the active-cell index-pair state, the data-* cell markers, and the SINGLE
-// focusActiveCell() seam. Plan 03 adds the keydown navigation math, the $expose verbs
-// (focusCell/getActiveCell/clearActiveCell), and the activecell-change event ON TOP.
-
+// stop for every $expose entry.
 // interactionMode gate. 'grid' lights up roving nav; 'table' (default) is byte-behaviorally
 // identical to phase 48 (roles fall back to the literals, tabindex drops).
 const isGrid = () => props.interactionMode === 'grid';
@@ -2445,7 +2444,6 @@ const visibleColCount = () => {
   return hg.length ? (hg[hg.length - 1].headers || []).length : 0;
 };
 const bodyRowCount = () => (rows.value || []).length;
-const clamp = (v: any, lo: any, hi: any) => v < lo ? lo : v > hi ? hi : v;
 // ── Multi-level (grouped) header addressing (B12) ──────────────────────────────────────
 // $data.headerGroups is ordered top→bottom; the LEAF header row (the one adjacent to the
 // body) is the LAST group. The roving active-header state carries activeHeaderLevel (the
@@ -2676,12 +2674,6 @@ const gotoEnd = () => {
 const currentCellEl = () => {
   const rowKey = activeIsHeader.value ? '__header' : String(activeRow.value);
   return resolveCellEl(rowKey, activeColIndex.value, activeIsHeader.value ? activeHeaderLevel.value : null);
-};
-// The focusable descendants of a cell (non-disabled), in DOM order. Pure DOM — uniform ×6.
-const focusables = (cellEl: any) => {
-  if (!cellEl || !cellEl.querySelectorAll) return [];
-  const list = Array.prototype.slice.call(cellEl.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'));
-  return list.filter((n: any) => !n.disabled);
 };
 // Enter/F2 → enter interaction mode: focus the active cell's FIRST interactive control
 // (D-07 — uniform for header sort buttons and body controls; Enter does NOT sort directly).
@@ -4115,13 +4107,6 @@ const beginRangeDrag = (anchorR: any, anchorC: any) => {
     document.addEventListener('pointerup', up);
   }
 };
-// ══ Editable-cell lifecycle (phase 51 plan 02 — RESEARCH Pattern 1/3/4/5) ════════════════
-// Single-cell, non-virtual. Index-based state (editingRow/editingCol over the visible model),
-// the display↔editor branch in the keyed <td>, F2/Enter/printable entry off the reserved
-// onGridKeyDown seam, commit on Enter/Tab/blur, cancel+revert on Escape, sync validation with
-// D-01 keep-open. All gated by columnEditable() / the editing index pair so a table with no
-// editable columns lowers byte-identical (the editor branch r-if is always false).
-
 // The column id at the active cell (the active row's visible cell list @ activeColIndex).
 // Null when out of range (no body rows, or active cell is a header / select column).
 const activeCellColumnId = () => {
@@ -4187,28 +4172,6 @@ const runValidator = (colId: any, value: any, row: any) => {
 // :aria-invalid wired in Task 3). Empty string clears it.
 const setInvalid = (msg: any) => {
   invalidMsg.value = msg != null ? msg : '';
-};
-// replaceRowValue: build a FRESH array with ONE row object replaced (the column's field
-// set to the new value); the rest share by reference (the family immutable whole-array
-// replace — in-place mutation is silently dropped on React/Solid/Angular/Lit). rowIndex
-// is over currentData() (== the visible model order for the non-virtual, unsorted/
-// unfiltered single-cell case; the row id is carried for the commit payload).
-const replaceRowValue = (rows: any, rowIndex: any, field: any, value: any) => {
-  const src = rows || [];
-  const out = [];
-  for (let i = 0; i < src.length; i++) {
-    if (i === rowIndex) {
-      // WR-03: own-property spread, NOT `for (const k in orig)` which walks the prototype chain
-      // and would copy inherited enumerable props of typed/class-instance row objects.
-      out.push({
-        ...(src[i] || {}),
-        [field]: value
-      });
-    } else {
-      out.push(src[i]);
-    }
-  }
-  return out;
 };
 // Map a visible-model body-row index ($data.rows index) to its underlying currentData()
 // index via the row's original object identity (sorting/filtering/pagination may reorder
@@ -4382,22 +4345,6 @@ const focusCellWhenReady = (row: any, col: any) => {
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
   };
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
-};
-// B23: the index of a committed row WITHIN a given (fresh) visible-model array, resolved by
-// row IDENTITY. table-core's default getRowId is source-index-based, so a row's id is stable
-// across a re-sort (only its VISIBLE position moves); a committed edit replaces the row object
-// via a fresh spread (the `original` reference changes), so match by `id` FIRST, `original`
-// only as a fallback. Returns -1 when the row filtered out of the view. PURE (the caller passes
-// the FRESH row list — refreshRowModel's just-pulled `nextRows`, never the React-stale state).
-const indexOfRowIn = (rows: any, rowOriginal: any, rowId: any) => {
-  const list = rows || [];
-  for (let i = 0; i < list.length; i++) {
-    const r = list[i];
-    if (!r) continue;
-    if (rowId != null && r.id === rowId) return i;
-    if (rowOriginal != null && r.original === rowOriginal) return i;
-  }
-  return -1;
 };
 // endEdit: tear down the editor (shared by commit/cancel). Clears the editing pair +
 // draft + invalid state and returns to navigation mode. Does NOT move focus (callers
@@ -4610,13 +4557,6 @@ const cancelEdit = () => {
   editTransition = false;
   focusCellWhenReady(focusRow, focusCol);
 };
-// ══ Full-row edit lifecycle (phase 51 plan 03 / req-6 / D-06, RESEARCH Pattern 6) ════════
-// Shift+F2 (and the editRow $expose verb) put EVERY editable cell in the active row into
-// edit at once; one save commits the whole row in ONE writeData (a single fresh-array row
-// replace) + ONE row-edit-commit event; Escape reverts the whole row as a unit. Per-column
-// validation still runs on each edited cell at commit (D-01 keep-open if ANY fails). The
-// editor template branch (isEditing's row arm) is re-used verbatim — no per-mode fork.
-
 // The editable [columnId, field] pairs for a body row at the given visible-model index,
 // in visible-cell order. field is the column's accessorKey (the row-object key to write).
 const editableColumnsForRow = (rowIndex: any) => {
@@ -4833,26 +4773,6 @@ const cancelRow = () => {
   endRowEdit();
   editTransition = false;
   focusCellWhenReady(focusRow, focusCol);
-};
-// replaceRowValues: like replaceRowValue but applies a MAP of field→value to ONE row object
-// in a single fresh-array replace (req-6 — the whole-row commit is ONE write, not per cell).
-const replaceRowValues = (rows: any, rowIndex: any, fieldValues: any) => {
-  const src = rows || [];
-  const fv = fieldValues || {};
-  const out = [];
-  for (let i = 0; i < src.length; i++) {
-    if (i === rowIndex) {
-      // WR-03: own-property spread (orig then the field→value map), NOT a `for..in`
-      // prototype-walking copy. Spread copies own enumerable props only.
-      out.push({
-        ...(src[i] || {}),
-        ...fv
-      });
-    } else {
-      out.push(src[i]);
-    }
-  }
-  return out;
 };
 // Compute the next editable cell for Tab-advance (req-3, RESEARCH Open-Q3 deterministic
 // rule): skip non-editable columns within the row; wrap to the NEXT row's first editable

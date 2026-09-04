@@ -1239,11 +1239,35 @@ function inlineResolvedPartial(
       }
     }
 
+    // D-22 (Phase 87 plan 87-01) / R2 extension: a partial may re-export a name that
+    // is ITSELF a plain-module pass-through — `import { applyUpdater } from
+    // './helpers/indexMath'` immediately re-exported via the partial's trailing
+    // `export { … }`, with no local declaration BODY of its own. `nameToDecl` only
+    // indexes real declarations (bindingNames() — var/function/class/interface/
+    // type/enum), so such a name has no PartialDecl and would otherwise be silently
+    // dropped by the BFS below whenever it is reached ONLY via a downstream
+    // importer's `importedNames` (a sibling partial or the host importing the
+    // re-exported binding directly, never referencing it from a LOCAL decl in this
+    // same file — the exact shape of `applyUpdater`/`indexOfRowIn`, each called only
+    // from a different partial than the one that now merely re-exports them).
+    // Recognize these local names up front so the BFS below can mark them
+    // "reached" without a synthetic decl, and so the moduleImports-hoist gate
+    // (which gates on `referencedAll`) sees them as referenced.
+    const moduleImportLocalNames = new Set<string>();
+    for (const imp of moduleImports) {
+      for (const spec of imp.specifiers) moduleImportLocalNames.add(spec.local.name);
+    }
+
     // BFS the transitive intra-file closure from the imported names (R2).
     const included = new Set<PartialDecl>();
+    const passthroughNames = new Set<string>();
     const queue: string[] = [...importedNames];
     while (queue.length > 0) {
       const name = queue.shift() as string;
+      if (moduleImportLocalNames.has(name)) {
+        passthroughNames.add(name);
+        continue;
+      }
       const decl = nameToDecl.get(name);
       if (!decl || included.has(decl)) continue;
       included.add(decl);
@@ -1252,11 +1276,14 @@ function inlineResolvedPartial(
     const includedSorted = [...included].sort((a, b) => a.order - b.order);
 
     // Union of all identifiers referenced by the live closure — drives which
-    // hoisted imports + nested partials are actually pulled in.
+    // hoisted imports + nested partials are actually pulled in. Passthrough names
+    // (above) are merged in directly since they have no decl to contribute
+    // `allRefs`.
     const referencedAll = new Set<string>();
     for (const decl of includedSorted) {
       for (const r of decl.allRefs) referencedAll.add(r);
     }
+    for (const n of passthroughNames) referencedAll.add(n);
 
     // Recurse nested partials FIRST so their decls precede the decls that
     // reference them. Recurse the whole nested import (all named specifiers) so
