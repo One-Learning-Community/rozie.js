@@ -423,6 +423,8 @@ const liveAnnounce = ref('');
 
 const __rozieRootRef = ref<HTMLElement>();
 
+import { isSafeKey, wrapAggregationFn } from './helpers/columnDefUtils';
+import { escapeTsvField, parseTsv, tileGridToBox, tileIndex } from './helpers/tsvGrid';
 import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
 // Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
 // (mirrors the expand/group models) — inert until a consumer READS a column facet via the
@@ -614,32 +616,6 @@ const currentState = (): any => ({
 // A committed edit funnels a FRESH array through writeData, which writes BOTH sinks; the
 // re-feed sources here so editing works whether or not the consumer binds r-model:data.
 const currentData = (): any => data.value != null ? data.value : dataDefault.value;
-// Prototype-safe id-keyed column resolution (T-48-PP): the `:columns` config array is
-// applied FIRST (lower precedence), then the <Column> registry OVERRIDES by id (LWW).
-// byId is a null-prototype object so a consumer column id of "__proto__"/"constructor"
-// cannot pollute Object.prototype. Returns the table-core ColumnDef[]. (No per-column
-// render callbacks — cells render via the single #cell/#header scoped slot on this
-// component, dispatched by columnId; <Column> carries metadata only.)
-const isSafeKey = (k: any) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
-// wrapAggregationFn (phase 50 req-5, D-05, threat T-50-04): resolve a per-column
-// aggregationFn straight onto the ColumnDef (no component-side switch — RESEARCH
-// anti-pattern). A built-in NAME string ('sum'/'min'/'max'/'extent'/'mean'/'median'/
-// 'unique'/'uniqueCount'/'count') passes through verbatim — table-core resolves it from its
-// built-in `aggregationFns` map. A CUSTOM function `(columnId, leafRows, childRows) => any`
-// is DEFENSIVELY WRAPPED (the runValidator precedent): a consumer fn runs per group, so a
-// throw is coerced to `undefined` and can never crash getGroupedRowModel (DoS guard).
-// Anything else → undefined (no aggregation; the cell renders as a placeholder).
-const wrapAggregationFn = (fn: any) => {
-  if (typeof fn === 'string') return fn;
-  if (typeof fn !== 'function') return undefined;
-  return (columnId: any, leafRows: any, childRows: any) => {
-    try {
-      return fn(columnId, leafRows, childRows);
-    } catch (err: any) {
-      return undefined;
-    }
-  };
-};
 // Build the table-core ColumnDef for ONE config-array entry. A LEAF entry
 // ({ id?, field, header?, … }) maps to an accessor ColumnDef; a GROUP entry
 // ({ id?, header, columns: [...] }) maps to a multi-level header GROUP column
@@ -3662,15 +3638,6 @@ const clampRange = (maxRowArg: any, maxColArg: any) => {
     };
   }
 };
-// ══ Clipboard (TSV copy/paste) + drag-fill (phase 51 plan 04 / req-8 / D-03 / D-04) ══════
-// The async Clipboard API (grantPermissions confirmed in 51-01). Copy = range→TSV; paste =
-// TSV→cells under the D-03 skip rule (editable AND validator-passing cells only) with an
-// N-of-M aria-live announce + one cell-edit-commit per committed cell; drag-fill = value-copy
-// ONLY (D-04, NO series detection). T-51-01 (BLOCKING-high): pasted TSV is UNTRUSTED — every
-// cell is written as plain string DATA through the per-column validator and rendered via the
-// SAME {{ }}/rozieDisplay text path as #cell (never innerHTML / a template / a selector); the
-// cell-resolution query interpolates integer indices only (resolveCellEl, T-49-01).
-
 // announce(msg): write the polite aria-live PASTE-announce region (D-03 — "N of M cells
 // pasted"). SEPARATE from the validation invalidMsg region (different semantics). '' clears it.
 const announce = (msg: any) => {
@@ -3714,16 +3681,6 @@ const normalizedRange = () => {
     c1: ac > fc ? ac : fc
   };
 };
-// B10: escape a TSV field per the spreadsheet convention — a field containing a tab, a CR/LF,
-// or a double-quote is wrapped in double-quotes with internal quotes DOUBLED; an ordinary
-// field is emitted verbatim. parseTsv() unescapes symmetrically, so a cell carrying a tab /
-// newline / quote round-trips without smearing into adjacent cells (T-63-03-02).
-const escapeTsvField = (s: any) => {
-  if (s.indexOf('\t') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0 || s.indexOf('"') >= 0) {
-    return '"' + s.replace(/"/g, '""') + '"';
-  }
-  return s;
-};
 // rangeToTsv(): serialize the current range to TSV — rows joined by '\n', cells by '\t',
 // reading each cell's value off the visible model by index (cellValueAt). A single active
 // cell (no range) serializes that one cell. Each field is B10-escaped. Pure read — never writes.
@@ -3743,83 +3700,6 @@ const rangeToTsv = () => {
     lines.push(cells.join('\t'));
   }
   return lines.join('\n');
-};
-// parseTsv(text): a TSV string → string[][] (rows of cells). Tolerates \r\n; a trailing
-// newline does not add a phantom empty row. Pure — produces plain string DATA only (T-51-01:
-// the cells are NEVER eval'd / interpolated into a selector / rendered as markup).
-const parseTsv = (text: any) => {
-  const str = text != null ? String(text) : '';
-  // CR-03: length guard BEFORE the parse — an empty string is a no-op, and a pathologically
-  // large clipboard payload (>2M chars) is rejected outright (DoS-shaped input) before the
-  // single-pass scan allocates a cell-per-character grid.
-  if (str === '' || str.length > 2000000) return [];
-  // B10: a quote-aware single-pass state machine (replaces the naive split, which corrupted a
-  // cell containing a tab/newline). A field that OPENS with a double-quote is "quoted": tabs,
-  // newlines, and doubled quotes ("") inside it are literal content until the closing quote;
-  // an unquoted field ends at the next tab/newline. CR/LF and CRLF all delimit a row.
-  const rows = [];
-  let row = [];
-  let field = '';
-  let inQuotes = false;
-  let i = 0;
-  const n = str.length;
-  while (i < n) {
-    const ch = str[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (i + 1 < n && str[i + 1] === '"') {
-          field = field + '"';
-          i = i + 2;
-          continue;
-        }
-        inQuotes = false;
-        i = i + 1;
-        continue;
-      }
-      field = field + ch;
-      i = i + 1;
-      continue;
-    }
-    if (ch === '"' && field === '') {
-      inQuotes = true;
-      i = i + 1;
-      continue;
-    }
-    if (ch === '\t') {
-      row.push(field);
-      field = '';
-      i = i + 1;
-      continue;
-    }
-    if (ch === '\r') {
-      if (i + 1 < n && str[i + 1] === '\n') i = i + 1;
-      row.push(field);
-      field = '';
-      rows.push(row);
-      row = [];
-      i = i + 1;
-      continue;
-    }
-    if (ch === '\n') {
-      row.push(field);
-      field = '';
-      rows.push(row);
-      row = [];
-      i = i + 1;
-      continue;
-    }
-    field = field + ch;
-    i = i + 1;
-  }
-  // Flush the trailing field + row.
-  row.push(field);
-  rows.push(row);
-  // Drop a single trailing empty row (a TSV that ends with a newline → a phantom [''] row).
-  if (rows.length > 1) {
-    const last = rows[rows.length - 1];
-    if (last.length === 1 && last[0] === '') rows.pop();
-  }
-  return rows;
 };
 // copyRange(): write the current range as TSV to the clipboard (async). No-op when the
 // async Clipboard API is unavailable (older/insecure contexts) — a copy is best-effort.
@@ -3909,42 +3789,6 @@ const rowIdAt = (rowIndex: any) => {
   const rowList = rows.value || [];
   const row = rowList[rowIndex];
   return row ? row.id : null;
-};
-// C3: tile a parsed clipboard `grid` (string[][]) to fill a destination `box` — the spreadsheet
-// paste-into-range semantics. The target rectangle is the MAX of the box dims and the source
-// dims per axis, so a SMALLER clipboard TILES across a LARGER selection (a single 1×1 cell fills
-// the whole range; a 2×2 block repeats — tiled[dr][dc] = src[dr % srcRows][dc % srcCols]), while a
-// clipboard LARGER than the selection pastes its full block from the top-left (preserving the
-// no-range "clipboard-sized block at the active cell" behavior — a 1×1 destBox + a 1×N clipboard
-// yields the full 1×N block, byte-for-byte the prior path). Pure — returns a fresh grid; applies
-// nothing. A ragged/short source row defaults the missing cell to '' (coerced per column on write).
-const tileGridToBox = (grid: any, box: any) => {
-  const srcRows = grid.length;
-  // srcCols is the MAX row width across ALL rows (not grid[0].length): a RAGGED clipboard
-  // (a later row WIDER than the first, e.g. TSV "a\tb\nc\td\te") would otherwise never read
-  // the extra column and silently drop those cells. A row SHORTER than srcCols tiles its
-  // missing cells as '' (the `v != null ? v : ''` coercion below), never undefined.
-  let srcCols = 0;
-  for (let i = 0; i < srcRows; i++) {
-    const w = grid[i] && grid[i].length ? grid[i].length : 0;
-    if (w > srcCols) srcCols = w;
-  }
-  if (srcRows <= 0 || srcCols <= 0) return grid;
-  const boxRows = box.r1 - box.r0 + 1;
-  const boxCols = box.c1 - box.c0 + 1;
-  const rows = boxRows > srcRows ? boxRows : srcRows;
-  const cols = boxCols > srcCols ? boxCols : srcCols;
-  const out = [];
-  for (let r = 0; r < rows; r++) {
-    const srcLine = grid[r % srcRows] || [];
-    const line = [];
-    for (let c = 0; c < cols; c++) {
-      const v = srcLine[c % srcCols];
-      line.push(v != null ? v : '');
-    }
-    out.push(line);
-  }
-  return out;
 };
 // pasteRange(): read TSV from the clipboard (async), parse it, TILE it over the destination
 // (C3), and apply it anchored at the destination top-left under the D-03 skip rule. The grid is
@@ -4042,17 +3886,6 @@ const clearActiveRange = () => {
     grid.push(cols);
   }
   applyGridToRange(grid, r0, c0);
-};
-// tileIndex(i, lo, hi): map an index into the inclusive [lo,hi] source span by TILING (repeat
-// the source block), handling indices below lo (negative offset) correctly. A 1-wide source
-// (lo===hi) always returns lo. Used by fillRange to resolve, per target cell, WHICH source
-// cell it copies — so each column copies its OWN source value down its OWN column.
-const tileIndex = (i: any, lo: any, hi: any) => {
-  const span = hi - lo + 1;
-  if (span <= 1) return lo;
-  let k = (i - lo) % span;
-  if (k < 0) k = k + span;
-  return lo + k;
 };
 // fillRange(sourceBox): drag-fill (D-04 — VALUE-COPY ONLY, no series detection). B7: the fill
 // SOURCE is the PRE-DRAG rectangle (`sourceBox`, captured at pointerdown before the drag grew

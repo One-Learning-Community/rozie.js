@@ -55,7 +55,8 @@
  *      resolver + resolverRoot) → write leaf src/<file>
  *        (+ run the req-1 adapter-import check on the emitted code)
  *        (React only: also write <Component>.css / .global.css / .d.ts sidecars)
- *   4. copy src/themes/ → each leaf src/themes/
+ *   4. copy src/themes/ → each leaf src/themes/ (+ src/helpers/ → each leaf src/helpers/,
+ *      D-22 — the pure-helper modules a hoisted `.rzts`-partial import resolves against)
  *   5. render each leaf README from the IR + the hand-kept event/handle manifests
  *   6. vendor the repo LICENSE per leaf
  *   7. VALIDATE-NOT-OVERWRITE the docs props-table against docs/components/data-table.md
@@ -161,6 +162,21 @@ function copyThemes(leafSrc) {
   if (!existsSync(src))
     throw new Error('codegen: src/themes/ not found (token presets must exist)');
   cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
+}
+
+/**
+ * Copy src/helpers/ → leaf src/helpers/ (D-22, Phase 87 plan 87-01 — the pure sigil-free
+ * helper modules extracted out of `.rzts` partials, e.g. `helpers/tsvGrid.ts`). Unlike a
+ * `.rzts`/`.rzjs` script partial, a plain `.ts` sibling is NEVER inlined by
+ * `inlineScriptPartials()` (PARTIAL_EXT only matches `.rzts`/`.rzjs`) — its import specifier
+ * (e.g. `./helpers/tsvGrid`) is hoisted into the host script VERBATIM, unrewritten, so the
+ * emitted leaf code keeps importing that exact relative path. Vendoring the directory into
+ * every leaf (mirroring copyThemes) is what makes that relative import resolve post-emit.
+ */
+function copyHelpers(leafSrc) {
+  const src = resolve(ROOT, 'src/helpers');
+  if (!existsSync(src)) return;
+  cpSync(src, resolve(leafSrc, 'helpers'), { recursive: true });
 }
 
 /** REQ-1: throw if the emitted code imports any per-framework @tanstack adapter. */
@@ -315,8 +331,11 @@ function main() {
       handleType;
     writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
 
-    // (4) vendor the design-token presets.
+    // (4) vendor the design-token presets, plus the D-22 pure-helper modules (when present)
+    // that the hoisted `./helpers/<name>` imports inside DataTable's emitted code resolve
+    // against.
     copyThemes(leafSrc);
+    copyHelpers(leafSrc);
 
     // (5) README from the single PARENT IR parse. The peer-dependency install
     // line is DERIVED from the leaf's real package.json peerDependencies so it
@@ -333,7 +352,7 @@ function main() {
     const sidecars = target === 'react' ? ' (+ .css/.global.css/.d.ts)' : '';
     const files = COMPONENTS.map((n) => `${n}.${cfg.ext}`).join(', ');
     console.log(
-      `codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓ (+ themes/)`,
+      `codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓ (+ themes/, helpers/)`,
     );
   }
 
