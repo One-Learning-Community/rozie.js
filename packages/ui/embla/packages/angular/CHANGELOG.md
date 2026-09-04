@@ -1,5 +1,11 @@
 # @rozie-ui/embla-angular
 
+## 0.1.8
+
+### Patch Changes
+
+- @rozie/runtime-angular@0.7.1
+
 ## 0.1.7
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/toast-solid
 
+## 0.1.5
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.7.1
+
 ## 0.1.4
 
 ### Patch Changes

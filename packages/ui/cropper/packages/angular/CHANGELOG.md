@@ -1,5 +1,11 @@
 # @rozie-ui/cropper-angular
 
+## 0.1.5
+
+### Patch Changes
+
+- @rozie/runtime-angular@0.7.1
+
 ## 0.1.4
 
 ### Patch Changes

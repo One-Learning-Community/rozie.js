@@ -1,5 +1,11 @@
 # @rozie-ui/tags-react
 
+## 0.1.6
+
+### Patch Changes
+
+- @rozie/runtime-react@0.7.1
+
 ## 0.1.5
 
 ### Patch Changes

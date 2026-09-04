@@ -1,5 +1,11 @@
 # @rozie-ui/tags-lit
 
+## 0.1.7
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.7.1
+
 ## 0.1.6
 
 ### Patch Changes

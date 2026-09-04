@@ -1,5 +1,11 @@
 # @rozie-ui/pdf-lit
 
+## 0.2.7
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.7.1
+
 ## 0.2.6
 
 ### Patch Changes

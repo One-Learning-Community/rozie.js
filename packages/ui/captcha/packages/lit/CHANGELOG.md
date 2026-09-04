@@ -1,5 +1,11 @@
 # @rozie-ui/captcha-lit
 
+## 0.1.8
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.7.1
+
 ## 0.1.7
 
 ### Patch Changes

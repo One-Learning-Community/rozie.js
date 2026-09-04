@@ -1,5 +1,11 @@
 # @rozie-ui/cropper-lit
 
+## 0.1.5
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.7.1
+
 ## 0.1.4
 
 ### Patch Changes

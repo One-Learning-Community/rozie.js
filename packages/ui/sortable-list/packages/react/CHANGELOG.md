@@ -1,5 +1,11 @@
 # @rozie-ui/sortable-list-react
 
+## 0.1.13
+
+### Patch Changes
+
+- @rozie/runtime-react@0.7.1
+
 ## 0.1.12
 
 ### Patch Changes

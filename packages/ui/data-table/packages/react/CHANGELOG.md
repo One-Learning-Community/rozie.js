@@ -1,5 +1,24 @@
 # @rozie-ui/data-table-react
 
+## 0.2.9
+
+### Patch Changes
+
+- 287dbf2: An emitter fix in the shared public `.d.ts` renderer closes a `TS2300` duplicate-identifier defect that shipped in the published `@rozie-ui/data-table-react` React leaf.
+
+  **`@rozie/core`.** `src/codegen/renderPropsInterface.ts` — the framework-agnostic public `.d.ts` / `.d.rozie.ts` renderer shared by all six targets' `emitTypes.ts` — emitted one `render<Slot>` field (or `children`) per slot OCCURRENCE in `ir.slots` rather than one per DISTINCT slot name. A component that repeats the same named slot across several mutually-exclusive `r-if` render branches therefore minted a public `.d.ts` with duplicate identifiers — a hard TypeScript error, not a lint nit. Now deduped by name, first-occurrence-wins. Every per-target INLINE interface emitter already guarded this same defect class; only the shared public renderer did not.
+
+  **`@rozie-ui/data-table-react`.** The published `0.2.8` tarball's `src/DataTable.d.ts` carried seven duplicated interface members — `renderCell`, `renderColHeader`, `renderDetail`, `renderEditor`, `renderFilter`, `renderSelectAll`, `renderSelectCell` — 14 `error TS2300: Duplicate identifier` occurrences within that file, reproducing the exact renderer defect above. Unpacking the published tarball narrows the blast radius: the duplication lives ONLY in the sidecar `src/DataTable.d.ts`; the package's actual `types` entry is `dist/index.d.mts`, which has one of each field and imports nothing but `react`, and the exports map exposes only `"."` (→ `dist`) and `"./themes/*"` (→ CSS) — `src/DataTable.d.ts` ships inside the tarball but is unreachable through the exports map and unreferenced by the type entry. This is therefore a real defect in the shipped sidecar declarations consumed by IDE and author-side tooling that reads `src/` directly, NOT a break in the ordinary consumer typecheck path (`import` resolution through `dist/index.d.mts` was never affected). This patch republishes the corrected declaration with no runtime or API change.
+
+- 287dbf2: All six `@rozie-ui/data-table-<target>` leaves widen their `@rozie-ui/popover-<target>` peer dependency from `^0.1.0` to `^0.1.0 || ^0.2.0`.
+
+  **Why both, not just the new one.** Combobox moves its own popover peer to `^0.2.0` in this same wave. A caret range on a 0.x version pins the minor, so leaving data-table's range at `^0.1.0` would give any consumer installing both the combobox family and the data-table family two mutually exclusive ranges for the same `@rozie-ui/popover-<target>` package — an unsatisfiable peer pair. Forcing data-table forward to `^0.2.0` alone would avoid that conflict but strand existing data-table consumers on a popover upgrade they have no reason to take, since data-table does not use any of popover's five new props. Admitting both ranges is the option that resolves the conflict without an unnecessary forced upgrade.
+
+  **Why it is safe to admit both.** Data-table composes a `<Popover>` at exactly two sites in source (`DataTable.rozie`), and both are byte-identical, binding only four props: `trigger="click"`, `placement="bottom-end"`, `strategy="fixed"`, `:offset="4"`. All four are present, unchanged, in both `0.1.x` and `0.2.0` — data-table binds none of popover's five new props (`bare`, `disablePositioning`, `keepMounted`, `matchWidth`, `disableDismiss`). The one behavioral change in this wave that touches existing consumers — `aria-haspopup`/`aria-expanded` gating on `hasGestureTrigger()` — only affects `trigger="manual"` popovers; data-table's `trigger="click"` stays on the gesture-trigger branch and sees no ARIA change in either version.
+
+  **Scope of the change.** There is no runtime, API, or DOM change in `@rozie-ui/data-table-<target>` itself. The entire leaf diff is the one peer dependency range line per target, six lines total. This changeset is deliberately separate from the popover-promotion changeset covering combobox and popover: it is its own story about data-table's peer contract, not a restatement of theirs.
+  - @rozie/runtime-react@0.7.1
+
 ## 0.2.8
 
 ### Patch Changes
