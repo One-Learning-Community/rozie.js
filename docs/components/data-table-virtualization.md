@@ -61,6 +61,11 @@ Set `autoMeasure` alongside row windowing (`virtual='rows'`/`true`/`'both'`) to 
 
 **`estimateRowHeight` is unchanged and still required.** It is not deprecated, superseded, or legacy — it is still read on every first paint, since the very first render has zero measurements regardless of `autoMeasure`. When `autoMeasure` is `true`, later renders progressively replace this seed with the running-mean estimate; when `autoMeasure` is `false`, `estimateRowHeight` remains the explicit, permanent override for every render, exactly as it always has been.
 
+## Known limitations
+
+- **Svelte: the horizontal spacer's declared width does not yet drive the scroll container's actual scrollable width at rest.** On the Svelte leaf specifically, `.rdt-scroll`'s real `scrollWidth` can under-report the true column-count-derived total, which narrows how far a horizontal scroll (or a `dir="rtl"` scroll to its negative extreme) can reach before the last columns are on screen. The column-index math itself is unaffected — `focusCell` / `getActiveCell` / `activecell-change` still resolve correctly — only the DOM's own scrollable extent is short on this one target. Tracked; the other five targets are unaffected.
+- **Grouped column headers: rendered width can diverge from a group's spanned leaf-column widths under `table-layout: fixed`.** When column windowing is on and a multi-level group header's leaf columns are within the current render window, the browser's fixed-layout column-width distribution can conflict with the group `<th>`'s own declared width on Solid, Svelte, and React — the group's spanned columns may render narrower than their configured size. The column SET and colspan clamping (D-11) are correct; this is a visual width-reconciliation gap specific to combining grouped headers with column windowing on those three targets. Vue, Angular, and Lit are unaffected. Tracked.
+
 ## Per-framework code
 
 The per-target consumption snippet is the [virtualized rows snippet](/components/data-table-usage#virtualized-rows-windowing) on the usage page; the [live demo](/components/data-table-demo) runs the real Vue package over 50,000 windowed rows.

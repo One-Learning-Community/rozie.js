@@ -13,7 +13,7 @@ A `<Column>` declares one column of the table. It is **renderless** — it draws
 | `id` | `String` | `''` | The column id. Defaults to `field` when omitted. |
 | `sortable` | `Boolean` | `false` | Whether this column participates in click-to-sort. |
 | `filterable` | `Boolean` | `false` | Whether this column shows a per-column filter input. |
-| `pinned` | `String` | `''` | Initial pin side: `''` (unpinned) \| `'left'` \| `'right'`. |
+| `pinned` | `String` | `''` | Declared pin side (`''` \| `'left'` \| `'right'`), carried onto the column's metadata. **Currently inert as an initial-pin seed** — it does not yet write to the real `columnPinning` state (`column.getIsPinned()` stays `false` for a column declared `pinned` this way). To actually pin a column on mount, bind `r-model:columnPinning` with an initial `{ left: [...], right: [...] }` instead; see the [API reference](/components/data-table-api)'s `columnPinning` two-way slice. |
 | `width` | `String \| Number` | `''` | Optional fixed/initial column width (CSS length or px number). |
 | `groupable` | `Boolean` | `true` | Whether this column is offered to the headless `#groupBar` as a grouping target (opt-out via `:groupable="false"`). Grouping is engaged via the parent's `grouping` model, not this flag. |
 | `aggregationFn` | `String \| Function` | `null` | The aggregation for this column's group-header value: a built-in name (`'sum'` \| `'min'` \| `'max'` \| `'extent'` \| `'mean'` \| `'median'` \| `'unique'` \| `'uniqueCount'` \| `'count'`) or a custom `(columnId, leafRows, childRows) => any`. A custom fn is defensively wrapped (a throw cannot crash the table). Null → no aggregation (placeholder cell). |
@@ -26,7 +26,7 @@ Because a bare boolean attribute on a child component (`<Column sortable />`) on
 
 ## Two coexisting column-declaration forms
 
-Columns may be declared via `<Column>` children **or** via the `:columns` config-array escape hatch **or both** — they resolve to the same internal column set via an **id-keyed last-write-wins union**: the `:columns` array is applied first (lower precedence), then the `<Column>` children override by id. Each config entry is `{ id?, field, header?, sortable?, filterable?, pinned?, width? }`:
+Columns may be declared via `<Column>` children **or** via the `:columns` config-array escape hatch **or both** — they resolve to the same internal column set via an **id-keyed last-write-wins union**: the `:columns` array is applied first (lower precedence), then the `<Column>` children override by id. Each config entry is `{ id?, field, header?, sortable?, filterable?, pinned?, width? }` (`pinned` here is the same currently-inert metadata field described above — use `r-model:columnPinning` for an actual initial pin):
 
 ```rozie
 <DataTable :data="$data.rows" :columns="[
