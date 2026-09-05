@@ -187,6 +187,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   const virtualizerCleanup = useRef<any>(null);
   const measuredRowCount = useRef(0);
   const measuredRowTotal = useRef(0);
+  const windowVerBumpPending = useRef(false);
   const remeasurePending = useRef(false);
   const openingInProgress = useRef(false);
   const [value, setValue] = useControllableState({
@@ -365,6 +366,68 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   // (T-87-07-04). measuredRowTotal/measuredRowCount together give the running MEAN of every
   // row folded in so far; lastFedRowEstimate is the estimate value most recently pushed into
   // virtual-core (the hysteresis comparison baseline). ══
+
+  // ══ Gap-closure 87-10 — windowVerBumpPending / bumpWindowVer(): coalesce EVERY $data.windowVer
+  // write behind a SINGLE microtask-deferred increment, regardless of how many callers request
+  // one within the same synchronous JS task. ══
+  //
+  // ROOT CAUSE (framework-agnostic; the Solid-specific symptom this closes only EXPOSES it) —
+  // confirmed by instrumenting the installed @tanstack/virtual-core@3.17.1 source directly
+  // (dist/esm/index.js), not by reasoning abstractly: virtual-core's resizeItem() calls
+  // `this.notify(false)` — synchronously invoking `virtualizerOptions().onChange` below — EVERY
+  // TIME a measured row's real size differs from its cached one (`delta !== 0`), independent of
+  // framework (dist/esm/index.js:836-874). remeasureWindow()'s CR-01 sweep
+  // (packages/ui/data-table/src/virtualization.rzts) measures EVERY currently-rendered `<tr>` in
+  // ONE for-loop BEFORE calling afterRowRemeasure() (refineRowEstimate() below) — so a single
+  // synchronous JS task (e.g. the very first measurement pass, which transitions N never-before-
+  // measured rows from the flat seed to their real heights) can fire onChange, and therefore an
+  // UNCOALESCED `$data.windowVer = $data.windowVer + 1`, MANY times in a row — well BEFORE
+  // refineRowEstimate()'s own fold-then-re-feed (which runs only AFTER that loop finishes) has
+  // folded those same measurements into the running mean or re-fed the converged estimate into
+  // virtual-core via setOptions(). A live trace of this exact sequence (instrumented resizeItem/
+  // getMeasurements calls, DataTableColumnVirtualDemo, autoMeasure on) showed Vue batching 3
+  // resizeItem calls before its ONE downstream re-render reads getMeasurements() — already
+  // reflecting the fully-folded, re-fed state — versus Solid re-running its padTop()/padBottom()
+  // effects SYNCHRONOUSLY and IMMEDIATELY on EVERY individual windowVer write (11 interleaved
+  // resize-then-immediate-recompute pairs, each recompute happening mid-sweep, before
+  // refineRowEstimate() had run even once). React/Vue/Svelte/Angular/Lit all batch their own
+  // reactivity to at least a microtask boundary, so their downstream reads land AFTER the whole
+  // synchronous burst (measurement sweep + fold + re-feed) completes — accidentally correct, not
+  // correct by construction. Solid does not auto-batch a signal write made from outside a
+  // Solid-owned event/effect context, so it is the one target where the mid-burst TORN read is
+  // externally observable. Because `setOptions()` + `_willUpdate()` alone do NOT invalidate
+  // virtual-core's own `getMeasurements()` memo (keyed on itemSizeCacheVersion /
+  // getMeasurementOptions() — never on the estimateSize FUNCTION reference itself; confirmed from
+  // the same installed source, dist/esm/index.js:585-587,624), Solid's LAST such mid-sweep
+  // recompute is also the LAST time getMeasurements() is ever invoked for that sweep once no
+  // further row happens to differ from its cache — so the DOM stays frozen on that stale,
+  // pre-fold/pre-re-feed snapshot indefinitely, even though the accumulator itself has already
+  // converged correctly (T-87-07's own confirmed finding).
+  //
+  // FIX: coalesce every requester of a windowVer bump — virtual-core's own onChange AND
+  // refineRowEstimate()'s explicit re-feed bump — behind ONE microtask-deferred write, the SAME
+  // idiom scheduleRemeasure() already uses in virtualization.rzts. This makes the render happen
+  // EXACTLY ONCE, strictly AFTER the entire synchronous burst (including refineRowEstimate()'s
+  // fold + re-feed) on EVERY target, by construction rather than by incidental host-framework
+  // batching. Scoped to the ROW axis only: colVirtualizer never calls resizeItem() at all (D-06 —
+  // column widths come from table-core's getSize() oracle, never measured from the DOM), so
+  // columnVirtualizerOptions()'s onChange cannot hit this burst class and is left untouched.
+  function bumpWindowVer(): void {
+    if (windowVerBumpPending.current) return;
+    windowVerBumpPending.current = true;
+    const flush = () => {
+      windowVerBumpPending.current = false;
+      setWindowVer(prev => prev + 1);
+    };
+    // Mirrors scheduleRemeasure()'s own defensive queueMicrotask-with-setTimeout-fallback
+    // (virtualization.rzts) for environments where queueMicrotask is unavailable.
+    if (typeof queueMicrotask !== 'undefined') queueMicrotask(flush);else setTimeout(flush, 0);
+  }
+
+  // ESTIMATE_REFEED_DELTA_PX (D-15): the hysteresis threshold gating a re-feed into
+  // virtual-core. Without it, a mean nudging by a fraction of a pixel on every fold would
+  // re-feed on every window commit — the T-87-07-01 DoS control, paired with virtual-core's
+  // own measureElement/resizeItem idempotence (see refineRowEstimate() below).
   // estimateRowSize(i) (D-15/D-17): the estimateSize() resolver. MUST check !autoMeasureOn()
   // FIRST so the off path touches zero accumulator state and returns $props.estimateRowHeight
   // verbatim (D-17's byte-behavioral no-op). The zero-measurements case (first paint,
@@ -382,8 +445,15 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
   // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
   // Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
-  // on virtual-core's generic option inference. onChange uses the `$data.x = $data.x + 1`
-  // increment the React emitter lowers to functional setState — correct even from a mount closure.
+  // on virtual-core's generic option inference. onChange's windowVer write is routed through
+  // bumpWindowVer() (87-10) rather than a raw `$data.x = $data.x + 1` — resizeItem() can call
+  // this onChange MANY times in a single synchronous sweep (once per row whose real measured
+  // size differs from its cache, e.g. every never-before-measured row in the FIRST window),
+  // and coalescing those into one microtask-deferred write is what keeps every target's render
+  // landing strictly AFTER the whole sweep (see bumpWindowVer()'s own comment for the confirmed
+  // Solid-specific rendering gap this closes). The React emitter still lowers the underlying
+  // `$data.windowVer = $data.windowVer + 1` to functional setState — correct even deferred to a
+  // microtask, exactly as it was correct from a mount closure before.
   function virtualizerOptions(): any {
     return {
       count: windowSource().length,
@@ -396,7 +466,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       overscan: 8,
       getItemKey: virtualItemKey,
       onChange: () => {
-        setWindowVer(prev => prev + 1);
+        bumpWindowVer();
         // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
         // virtual-core only observe()s a node you explicitly hand to measureElement (it does
         // NOT auto-discover rendered rows — measureElement is the SOLE caller of
