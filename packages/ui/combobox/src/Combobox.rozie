@@ -752,6 +752,10 @@ const colsWindowed = () => false
 const columnCount = () => 0
 const columnSize = (i: number): number => 0
 const forcedColumns = (): number[] => []
+// autoMeasureOn() (Phase 87 87-07, D-18/D-20): the content-driven-estimate host-contract
+// gate. Combobox never lights this branch — a permanent `false` keeps windowing.rzts's
+// estimateRowSize()/refineRowEstimate() accumulator dead code here.
+const autoMeasureOn = (): boolean => false
 
 // Keep $data.rows === windowSource() so the windowing math indexes the live filtered set.
 const syncRows = () => { $data.rows = windowSource() }

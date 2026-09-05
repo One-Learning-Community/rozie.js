@@ -25,7 +25,7 @@ Consequences:
 
 Pure windowing math lifted verbatim from DataTable's Phase 53/63 baseline. Holds **only** the pure math; every DOM/refs/virtualizer-instance impurity stays per-consumer in the host (ROZ123).
 
-**Exports:** `virtualItemKey`, `virtualizerOptions`, `windowedRows`, `padTop`, `padBottom`, `pmIndexInWindow`, `rowIsOutsideWindow`.
+**Exports:** `virtualItemKey`, `virtualizerOptions`, `windowedRows`, `padTop`, `padBottom`, `pmIndexInWindow`, `rowIsOutsideWindow`, `COL_OVERSCAN`, `columnVirtualizerOptions`, `windowedColIndices`, `colPadLeft`, `colPadRight`, `colIsOutsideWindow`, `ESTIMATE_REFEED_DELTA_PX`, `estimateRowSize`, `foldMeasuredRow`, `refineRowEstimate` (Phase 87 87-07, D-15/D-18 — content-driven auto-measure).
 
 **Host contract** — the consuming `.rozie` MUST define these before importing (an implicit by-convention mixin contract):
 
@@ -45,6 +45,8 @@ Pure windowing math lifted verbatim from DataTable's Phase 53/63 baseline. Holds
 | `columnSize(i: number): number` | **required** (Phase 87 D-06/D-10) — the authoritative width of absolute leaf column `i`, from table-core's `getSize()`. |
 | `forcedColumns(): number[]` | **optional** (Phase 87 D-10) — the column-axis mirror of `pinnedEditIndex()`: DataTable unions pinned + active-cell + editing column indices; list families pass an empty array. |
 | `colVirtualizer` | **optional** (Phase 87) — the host's SECOND virtual-core instance, windowing the COLUMN axis. `null` when not constructed. |
+| `autoMeasureOn(): boolean` | **required** (Phase 87 87-07, D-18) — is content-driven row-size estimation on. DataTable's real body reads `$props.autoMeasure === true`; listbox/combobox/command-palette return `false` (D-20), keeping `estimateRowSize()`'s running-mean accumulator dead code for them. |
+| `afterRowRemeasure` | **optional** (Phase 87 87-07, D-15) — a host-owned mutable `let` (defaults to a no-op), assigned to `refineRowEstimate()` (exported below). The DataTable host's DOM-measurement sweep calls it after every `measureElement` pass so the fold + hysteresis re-feed run on each window commit — routed through a mutable `let` (never a direct cross-partial call) to avoid a forward-reference TDZ on React; see `refineRowEstimate()`'s own comment in `windowing.rzts`. |
 
 > **`windowSource()` rows need a stable `.id`.** Combobox/Listbox wrap raw options into id-bearing rows (`{ id: valueOf(o), _opt, _i }`) so `virtualItemKey` keys correctly across recycling. Returning raw options with no `.id` yields `undefined` keys and node-recycling drift (Phase 64 CR-02).
 

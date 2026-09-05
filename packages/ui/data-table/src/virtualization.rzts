@@ -50,6 +50,12 @@ const colsWindowed = () => {
 }
 const isWindowed = () => rowsWindowed() || colsWindowed()
 
+// autoMeasureOn() (Phase 87 87-07, D-18): the windowing.rzts host-contract gate for the
+// running-mean row-size estimator. Real body here: $props.autoMeasure === true. listbox/
+// combobox define this as a permanent `() => false` one-liner (D-20) so estimateRowSize()'s
+// accumulator branch is dead code for them.
+const autoMeasureOn = () => $props.autoMeasure === true
+
 // D-10 column-axis host-contract symbols. columnCount()/columnSize() got REAL bodies in
 // 87-04 (the tracer); forcedColumns() stays an empty-array stub until 87-05 gives it the
 // pinned + active-cell + editing-column union. Explicit return-type annotations (columnSize /
@@ -232,6 +238,14 @@ const remeasureWindow = () => {
   if (virtualizer.scrollState) return
   const trs = gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]')
   for (const tr of trs) virtualizer.measureElement(tr)
+  // D-15 (Phase 87 87-07): trigger the shared engine's post-measurement fold + hysteresis
+  // re-feed via the afterRowRemeasure mutable-let hook (DataTable.rozie's own script,
+  // assigned to windowing.rzts's refineRowEstimate()) — NEVER a direct call from this file
+  // into windowing.rzts (see windowing.rzts's HOST CONTRACT comment for the forward-
+  // reference TDZ this indirection avoids, the same class remeasureColumnWindow()'s comment
+  // documents for columnVirtualizerOptions()). Inert (no-op) until the host assigns it; the
+  // off/pre-mount path never reaches this line since virtualizer is null there.
+  if (afterRowRemeasure) afterRowRemeasure()
 }
 
 // D-04: this shell exports ONLY the impure, data-table-specific host pieces. The pure windowing
@@ -240,4 +254,4 @@ const remeasureWindow = () => {
 // `@rozie-ui/headless-core/windowing.rzts` via bare specifier — the P0-proven cross-package inline
 // path that DISSOLVES the partial into the leaf (a re-export-from THROUGH this shell would survive as
 // a runtime import, not inline — verified). The math closes over these host symbols by convention.
-export { windowSource, scheduleRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells }
+export { windowSource, scheduleRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn }

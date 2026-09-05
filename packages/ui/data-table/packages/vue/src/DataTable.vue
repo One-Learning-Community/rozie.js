@@ -1226,6 +1226,11 @@ const colsWindowed = () => {
   return s === 'columns' || s === 'both';
 };
 const isWindowed = () => rowsWindowed() || colsWindowed();
+// autoMeasureOn() (Phase 87 87-07, D-18): the windowing.rzts host-contract gate for the
+// running-mean row-size estimator. Real body here: $props.autoMeasure === true. listbox/
+// combobox define this as a permanent `() => false` one-liner (D-20) so estimateRowSize()'s
+// accumulator branch is dead code for them.
+const autoMeasureOn = () => props.autoMeasure === true;
 // D-10 column-axis host-contract symbols. columnCount()/columnSize() got REAL bodies in
 // 87-04 (the tracer); forcedColumns() stays an empty-array stub until 87-05 gives it the
 // pinned + active-cell + editing-column union. Explicit return-type annotations (columnSize /
@@ -1409,6 +1414,14 @@ const remeasureWindow = () => {
   if (virtualizer.scrollState) return;
   const trs = gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]');
   for (const tr of trs as any) virtualizer.measureElement(tr);
+  // D-15 (Phase 87 87-07): trigger the shared engine's post-measurement fold + hysteresis
+  // re-feed via the afterRowRemeasure mutable-let hook (DataTable.rozie's own script,
+  // assigned to windowing.rzts's refineRowEstimate()) — NEVER a direct call from this file
+  // into windowing.rzts (see windowing.rzts's HOST CONTRACT comment for the forward-
+  // reference TDZ this indirection avoids, the same class remeasureColumnWindow()'s comment
+  // documents for columnVirtualizerOptions()). Inert (no-op) until the host assigns it; the
+  // off/pre-mount path never reaches this line since virtualizer is null there.
+  if (afterRowRemeasure) afterRowRemeasure();
 };
 // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
 // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
@@ -1448,6 +1461,24 @@ const remeasureWindow = () => {
 //                             provided, defaulting to `[]`).
 //   - colVirtualizer           — the host's SECOND virtual-core instance, windowing the COLUMN axis
 //                             (see the AXIS MECHANISM note below). Host-provided, defaulting to `null`.
+//   - autoMeasureOn(): boolean — the D-18 REQUIRED content-driven-estimate gate (Phase 87 87-07):
+//                             data-table's real body reads `$props.autoMeasure === true`; listbox/
+//                             combobox/command-palette return `false` so the accumulator branch
+//                             estimateRowSize() gates on is dead code for them (D-20).
+//   - afterRowRemeasure        — OPTIONAL host-owned mutable `let` (defaults to a no-op / undefined),
+//                             assigned to refineRowEstimate() (below) by the host. The DataTable
+//                             host's remeasureWindow() (virtualization.rzts) calls it AFTER its
+//                             measureElement sweep so the fold + hysteresis re-feed run on every
+//                             window commit. Routed through a mutable `let` rather than a direct
+//                             call FROM virtualization.rzts INTO this file: a relative-partial CONST
+//                             calling a bare-specifier-partial CONST is the exact forward-reference
+//                             TDZ class remeasureColumnWindow()'s own DataTable.rozie comment
+//                             documents for columnVirtualizerOptions() (inlineScriptPartials()
+//                             groups the relative partial BEFORE the bare-specifier partial in the
+//                             merged per-target output, regardless of source import order). A
+//                             mutable `let` hoists to `useRef` on React and is excluded from a
+//                             useCallback's dependency array, sidestepping the hazard entirely — the
+//                             SAME mechanism `refreshRowModel` already relies on.
 //
 // AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source in 87-02;
 // LANDED in 87-04: `columnVirtualizerOptions()` below IS the second, horizontal instance this
@@ -1502,6 +1533,90 @@ const columnVirtualizerOptions = (): any => ({
     windowVer.value = windowVer.value + 1;
   }
 });
+// ══ Phase 87 87-07 (D-15/D-18) — content-driven auto-measure: the shared engine's FIRST
+// mutable top-level state. Hoisted to `useRef` PER-INSTANCE by the React emitter's
+// hoistModuleLet — the SAME mechanism already load-bearing for `table`, `virtualizer`,
+// `remeasurePending`, and `gridScrollEl` in the DataTable host (Task 1's confirmed
+// precedent), so two DataTable instances on one page never share an accumulator
+// (T-87-07-04). measuredRowTotal/measuredRowCount together give the running MEAN of every
+// row folded in so far; lastFedRowEstimate is the estimate value most recently pushed into
+// virtual-core (the hysteresis comparison baseline). ══
+let measuredRowTotal = 0;
+let measuredRowCount = 0;
+let lastFedRowEstimate = 0;
+// foldedRowHeights: dedupe map (full-model row index -> its last-folded height) so a row
+// measured TWICE (e.g. scrolled back into view) UPDATES the running mean rather than being
+// added a second time (T-87-07-03) — a skewed mean produces a lying scrollbar, the exact
+// defect this feature exists to remove.
+let foldedRowHeights: Record<number, number> = {};
+// ESTIMATE_REFEED_DELTA_PX (D-15): the hysteresis threshold gating a re-feed into
+// virtual-core. Without it, a mean nudging by a fraction of a pixel on every fold would
+// re-feed on every window commit — the T-87-07-01 DoS control, paired with virtual-core's
+// own measureElement/resizeItem idempotence (see refineRowEstimate() below).
+const ESTIMATE_REFEED_DELTA_PX = 4;
+// estimateRowSize(i) (D-15/D-17): the estimateSize() resolver. MUST check !autoMeasureOn()
+// FIRST so the off path touches zero accumulator state and returns $props.estimateRowHeight
+// verbatim (D-17's byte-behavioral no-op). The zero-measurements case (first paint,
+// regardless of autoMeasure) still returns the seed — the very first render has nothing
+// measured yet either way (D-15).
+const estimateRowSize = (i: number): number => {
+  if (!autoMeasureOn()) return props.estimateRowHeight;
+  if (measuredRowCount === 0) return props.estimateRowHeight;
+  return Math.round(measuredRowTotal / measuredRowCount);
+};
+// foldMeasuredRow(index, height): fold ONE measured row's height into the running-mean
+// accumulator, UPDATING (not double-adding) an already-folded index (T-87-07-03).
+const foldMeasuredRow = (index: number, height: number): void => {
+  const prev = foldedRowHeights[index];
+  if (prev === height) return;
+  if (prev == null) {
+    measuredRowTotal = measuredRowTotal + height;
+    measuredRowCount = measuredRowCount + 1;
+  } else {
+    measuredRowTotal = measuredRowTotal - prev + height;
+  }
+  foldedRowHeights[index] = height;
+};
+// refineRowEstimate() (D-15, Phase 87 87-07): the shared engine's post-measurement
+// orchestration, called via the host's afterRowRemeasure hook (see the HOST CONTRACT note
+// above for why this is never called directly FROM virtualization.rzts). Folds every
+// CURRENTLY RENDERED row's REAL measurement (from virtual-core's own getMeasurements() —
+// never a DOM read), then hysteresis-gates a re-feed into virtual-core, reusing the EXACT
+// `virtualizer.scrollState` bail remeasureWindow() already applies (T-87-07-02) rather than
+// inventing a second gating mechanism. Entirely a no-op when !autoMeasureOn() — the off path
+// never folds a measurement or touches lastFedRowEstimate (D-17).
+const refineRowEstimate = (): void => {
+  if (!autoMeasureOn() || !virtualizer) return;
+  const items = virtualizer.getVirtualItems();
+  const measurements = virtualizer.getMeasurements();
+  for (let i = 0; i < items.length; i++) {
+    const idx = items[i].index;
+    const m = measurements && measurements[idx];
+    if (m) foldMeasuredRow(idx, m.size);
+  }
+  // T-87-07-02: never re-feed while a PROGRAMMATIC scroll is in flight — the exact bail
+  // remeasureWindow() already applies (virtualizer.scrollState is non-null only during
+  // scrollToIndex/scrollToOffset).
+  if (virtualizer.scrollState) return;
+  const est = estimateRowSize(0);
+  if (Math.abs(est - lastFedRowEstimate) < ESTIMATE_REFEED_DELTA_PX) return;
+  virtualizer.setOptions(virtualizerOptions());
+  virtualizer._willUpdate();
+  lastFedRowEstimate = est;
+  // Explicit windowVer bump (Rule 1, found via a Solid-specific debug probe this task):
+  // virtual-core's own onChange (which ALSO bumps windowVer) fires reliably for a change
+  // that shifts the RENDERED item set (a resize, a scroll, a count change), but an
+  // estimate-only re-feed with the SAME window still in view does not reliably re-invoke it
+  // on every target — confirmed empirically on Solid specifically: the internal accumulator
+  // and lastFedRowEstimate progressed correctly (verified via instrumentation) while the
+  // rendered spacer/total (padTop()/padBottom(), both windowVer-gated) never re-derived, so
+  // tbodyHeight stayed frozen at its pre-re-feed value indefinitely. Bumping windowVer
+  // HERE — unconditionally, right after the re-feed — makes the spacer re-derivation
+  // independent of virtual-core's own onChange decision for this specific case. Harmless
+  // when onChange ALSO fires (a tick counter incrementing twice instead of once is a no-op
+  // for every reader, which only ever checks it changed, never its exact value).
+  windowVer.value = windowVer.value + 1;
+};
 // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
 // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
 // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
@@ -1511,7 +1626,7 @@ const columnVirtualizerOptions = (): any => ({
 const virtualizerOptions = (): any => ({
   count: windowSource().length,
   getScrollElement: () => gridScrollEl,
-  estimateSize: () => props.estimateRowHeight,
+  estimateSize: (i: any) => estimateRowSize(i),
   observeElementRect,
   observeElementOffset,
   scrollToFn: elementScroll,
@@ -1789,6 +1904,40 @@ const colIsOutsideWindow = (c: any) => {
   for (const it of items as any) if (it.index === c) return false;
   return true;
 };
+// afterRowRemeasure (Phase 87 87-07, D-15): a mutable-`let` indirection so
+// virtualization.rzts's remeasureWindow() (a relative-partial CONST, textually EARLIER
+// than windowing.rzts in the merged per-target output) can trigger the shared engine's
+// post-measurement fold + hysteresis re-feed (refineRowEstimate(), windowing.rzts) without
+// calling a bare-specifier-partial CONST directly — the exact forward-reference TDZ class
+// remeasureColumnWindow()'s own comment below documents for columnVirtualizerOptions(). A
+// mutable `let` hoists to `useRef` on React and never enters a useCallback's dependency
+// array, sidestepping the hazard there.
+//
+// DECLARED HERE — a plain top-level statement placed AFTER both import lines above, NOT
+// grouped with the other windowing `let`s near the top of this file, and NOT deferred into
+// $onMount. Two Rule-1 bugs were found and fixed in this exact spot this task, both via the
+// VR suite:
+//   (a) A top-level `let X = refineRowEstimate` placed BEFORE the import statements (where
+//       the other windowing `let`s live) reads a windowing.rzts symbol at its OWN
+//       declaration's evaluation time. React's own emitter re-groups DataTable.rozie's
+//       entire top-level script AFTER both inlined partials regardless of source position,
+//       so it tolerated that placement — but Vue/Svelte/Solid/Angular/Lit splice each
+//       partial's content at its IMPORT STATEMENT's source position, so a `let` positioned
+//       BEFORE the import genuinely executes before `refineRowEstimate` exists:
+//       `ReferenceError: Cannot access 'refineRowEstimate' before initialization`. Moving the
+//       declaration to AFTER the windowing.rzts import fixes every non-React target — the
+//       splice has already run by this point in the source.
+//   (b) Deferring the assignment into $onMount instead (`afterRowRemeasure = refineRowEstimate`
+//       inside the mount body, mirroring `refreshRowModel`) fixed (a) but broke REACT: it
+//       triggered the react emitter's mount-referenced-helper stable-ref synthesis for
+//       `refineRowEstimate` (a NEW code path for a plain script helper, not the `$computed`
+//       case that mechanism was built for), producing a genuine
+//       `ReferenceError: Cannot access '...' before initialization` in the component's
+//       render body. Reverted; the emitter path itself is out of this plan's scope.
+// This placement (top-level, immediately after the windowing.rzts import) is therefore the
+// ONE spot that is simultaneously safe for React (unaffected by source position) and every
+// other target (past the import-position splice).
+let afterRowRemeasure = refineRowEstimate;
 // ── Sort/filter live-announcement (#14) ─────────────────────────────────────────────
 // A polite aria-live announcement whenever the consumer changes sorting or filtering, so a
 // screen-reader user hears that the rows were reordered / narrowed (which is otherwise silent).

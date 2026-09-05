@@ -679,6 +679,24 @@ export class Listbox {
   //                             provided, defaulting to `[]`).
   //   - colVirtualizer           — the host's SECOND virtual-core instance, windowing the COLUMN axis
   //                             (see the AXIS MECHANISM note below). Host-provided, defaulting to `null`.
+  //   - autoMeasureOn(): boolean — the D-18 REQUIRED content-driven-estimate gate (Phase 87 87-07):
+  //                             data-table's real body reads `$props.autoMeasure === true`; listbox/
+  //                             combobox/command-palette return `false` so the accumulator branch
+  //                             estimateRowSize() gates on is dead code for them (D-20).
+  //   - afterRowRemeasure        — OPTIONAL host-owned mutable `let` (defaults to a no-op / undefined),
+  //                             assigned to refineRowEstimate() (below) by the host. The DataTable
+  //                             host's remeasureWindow() (virtualization.rzts) calls it AFTER its
+  //                             measureElement sweep so the fold + hysteresis re-feed run on every
+  //                             window commit. Routed through a mutable `let` rather than a direct
+  //                             call FROM virtualization.rzts INTO this file: a relative-partial CONST
+  //                             calling a bare-specifier-partial CONST is the exact forward-reference
+  //                             TDZ class remeasureColumnWindow()'s own DataTable.rozie comment
+  //                             documents for columnVirtualizerOptions() (inlineScriptPartials()
+  //                             groups the relative partial BEFORE the bare-specifier partial in the
+  //                             merged per-target output, regardless of source import order). A
+  //                             mutable `let` hoists to `useRef` on React and is excluded from a
+  //                             useCallback's dependency array, sidestepping the hazard entirely — the
+  //                             SAME mechanism `refreshRowModel` already relies on.
   //
   // AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source in 87-02;
   // LANDED in 87-04: `columnVirtualizerOptions()` below IS the second, horizontal instance this
@@ -707,6 +725,29 @@ export class Listbox {
   // cannot serve both axes; no prop is exposed because no consumer has asked to tune the row
   // overscan across the four phases it has shipped. Unused until 87-04 constructs the second,
   // horizontal Virtualizer instance (see the AXIS MECHANISM note above).
+  // ══ Phase 87 87-07 (D-15/D-18) — content-driven auto-measure: the shared engine's FIRST
+  // mutable top-level state. Hoisted to `useRef` PER-INSTANCE by the React emitter's
+  // hoistModuleLet — the SAME mechanism already load-bearing for `table`, `virtualizer`,
+  // `remeasurePending`, and `gridScrollEl` in the DataTable host (Task 1's confirmed
+  // precedent), so two DataTable instances on one page never share an accumulator
+  // (T-87-07-04). measuredRowTotal/measuredRowCount together give the running MEAN of every
+  // row folded in so far; lastFedRowEstimate is the estimate value most recently pushed into
+  // virtual-core (the hysteresis comparison baseline). ══
+  measuredRowTotal = 0;
+  measuredRowCount = 0;
+  // estimateRowSize(i) (D-15/D-17): the estimateSize() resolver. MUST check !autoMeasureOn()
+  // FIRST so the off path touches zero accumulator state and returns $props.estimateRowHeight
+  // verbatim (D-17's byte-behavioral no-op). The zero-measurements case (first paint,
+  // regardless of autoMeasure) still returns the seed — the very first render has nothing
+  // measured yet either way (D-15).
+  estimateRowSize = (i: number): number => {
+    const __estimateRowHeight = this.estimateRowHeight();
+    if (!this.autoMeasureOn()) return __estimateRowHeight;
+    if (this.measuredRowCount === 0) return __estimateRowHeight;
+    return Math.round(this.measuredRowTotal / this.measuredRowCount);
+  };
+  // foldMeasuredRow(index, height): fold ONE measured row's height into the running-mean
+  // accumulator, UPDATING (not double-adding) an already-folded index (T-87-07-03).
   // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
   // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
   // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
@@ -716,7 +757,7 @@ export class Listbox {
   virtualizerOptions = (): any => ({
     count: this.windowSource().length,
     getScrollElement: () => this.gridScrollEl,
-    estimateSize: () => this.estimateRowHeight(),
+    estimateSize: (i: any) => this.estimateRowSize(i),
     observeElementRect,
     observeElementOffset,
     scrollToFn: elementScroll,
@@ -977,6 +1018,10 @@ export class Listbox {
   columnCount = () => 0;
   columnSize = (i: any) => 0;
   forcedColumns = () => [];
+  // autoMeasureOn() (Phase 87 87-07, D-18/D-20): the content-driven-estimate host-contract
+  // gate. Listbox never lights this branch — a permanent `false` keeps windowing.rzts's
+  // estimateRowSize()/refineRowEstimate() accumulator dead code here.
+  autoMeasureOn = () => false;
   // Keep $data.rows === windowSource() so the windowing math indexes the live option set.
   syncRows = () => {
     this.rows.set(this.windowSource());
