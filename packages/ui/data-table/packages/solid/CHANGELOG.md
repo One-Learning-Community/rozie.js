@@ -1,5 +1,17 @@
 # @rozie-ui/data-table-solid
 
+## 0.3.1
+
+### Patch Changes
+
+- Performance: `columnDefs()` is now memoized, removing an accidental O(columns² × rows) recompute from the per-cell metadata path.
+
+  `columnDefs()` rebuilt the entire column-definition array on every call, and its caller chain (`defFor` → `editMetaOf` / `columnEditable` / `editorTypeOf` / `isEditing`) runs once per rendered cell, per render commit. On a 60-column table that is roughly 72,000 column-definition rebuilds per commit — repeated on every frame during a sustained scroll gesture, because the fill-drag edge auto-scroll bumps the window version each frame.
+
+  The array is now cached on the reference identity of `:columns` and the internal `<Column>` registry — the same two dependencies the component's existing re-feed watch already treats as reference-only. A cache hit is an O(1) identity check; a miss recomputes exactly as before. Output is byte-identical; this is a pure memoization with no behavior or API change.
+
+  The cost was identical on all six targets, but it was most visible on Vue, where `:columns` and the column registry are reactive proxies and every property read the builder performs pays proxy-tracking overhead on top of the redundant work. Under CPU contention that combination could starve the fill-drag auto-scroll loop badly enough that a drag toward the bottom edge scrolled the viewport without the selection range keeping pace with the newly revealed rows. That is fixed, and the same fix removes the wasted work for every other target too.
+
 ## 0.3.0
 
 ### Minor Changes
