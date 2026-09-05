@@ -775,6 +775,17 @@ let colVirtualizerCleanup = null
 // onChange re-measures the now-stable window. Scroll-driven recycling (the CR-01 case, measured
 // once motion settles between scroll steps) is unaffected.
 let remeasurePending = false
+// Gap-closure 87-13: the deferred sweep's own rAF handle, plus a disposed latch. Until 87-07 a
+// post-unmount sweep was inert — it re-measured a detached tree and wrote nothing. 87-07's D-15
+// re-feed changed that: remeasureWindow() now reaches refineRowEstimate(), which calls
+// virtualizer.setOptions()/_willUpdate(), mutates gridScrollEl.scrollTop, and WRITES
+// $data.windowVer. remeasureWindow()'s existing `!virtualizer || !gridRoot` guard cannot catch
+// this — neither ref is ever nulled after $onMount assigns it — so a scroll/resize burst that
+// leaves a pass pending across unmount (a route transition mid-scroll) lands a state write on a
+// torn-down instance. Handle init is `null`, never 0: an Angular leaf types this as the DOM
+// handle and TS2322s on a numeric seed.
+let remeasureRaf = null
+let remeasureDisposed = false
 
 // ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
 // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
@@ -868,7 +879,7 @@ let refreshRowModel = null
 
 import { onSortingChangeCb, onExpandedChangeCb, onGroupingChangeCb, onGlobalFilterChangeCb, onColumnFiltersChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onColumnVisibilityChangeCb, onColumnSizingChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingInfoChangeCb } from './stateChangeCallbacks.rzts'
 
-import { windowSource, scheduleRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn } from './virtualization.rzts'
+import { windowSource, scheduleRemeasure, teardownRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn } from './virtualization.rzts'
 import { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow, columnVirtualizerOptions, windowedColIndices, colPadLeft, colPadRight, colIsOutsideWindow, refineRowEstimate, teardownColRtlWatch } from '@rozie-ui/headless-core/windowing.rzts'
 
 // afterRowRemeasure (Phase 87 87-07, D-15): a mutable-`let` indirection so
@@ -1257,6 +1268,11 @@ $onUnmount(() => {
   // Gap-closure 87-09: disconnect the RTL dir-attribute MutationObserver (ensureColRtlWatch(),
   // windowing.rzts). No-op if column windowing was never on (the observer was never attached).
   teardownColRtlWatch()
+  // Gap-closure 87-13 (CR-01): cancel a deferred remeasure sweep still pending at unmount.
+  // Must run here — remeasureWindow()'s `!virtualizer || !gridRoot` guard never fires, since
+  // neither ref is nulled — or the pass reaches 87-07's refineRowEstimate() and writes
+  // $data.windowVer against a torn-down instance.
+  teardownRemeasure()
   // CR-04: remove any live fill-drag document listeners if we unmount mid-drag.
   teardownFillDrag()
   // §6 (260709-3qt): remove any live drag-select document listeners on a mid-drag unmount.

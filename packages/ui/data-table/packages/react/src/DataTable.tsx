@@ -295,7 +295,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const measuredRowCount = useRef(0);
   const measuredRowTotal = useRef(0);
   const windowVerBumpPending = useRef(false);
+  const remeasureDisposed = useRef(false);
   const remeasurePending = useRef(false);
+  const remeasureRaf = useRef<any>(null);
   const afterRowRemeasure = useRef(refineRowEstimate);
   const colRtlObserverEl = useRef<any>(null);
   const colRtlObserver = useRef<any>(null);
@@ -455,6 +457,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
 
+  // Gap-closure 87-13: the deferred sweep's own rAF handle, plus a disposed latch. Until 87-07 a
+  // post-unmount sweep was inert — it re-measured a detached tree and wrote nothing. 87-07's D-15
+  // re-feed changed that: remeasureWindow() now reaches refineRowEstimate(), which calls
+  // virtualizer.setOptions()/_willUpdate(), mutates gridScrollEl.scrollTop, and WRITES
+  // $data.windowVer. remeasureWindow()'s existing `!virtualizer || !gridRoot` guard cannot catch
+  // this — neither ref is ever nulled after $onMount assigns it — so a scroll/resize burst that
+  // leaves a pass pending across unmount (a route transition mid-scroll) lands a state write on a
+  // torn-down instance. Handle init is `null`, never 0: an Angular leaf types this as the DOM
+  // handle and TS2322s on a numeric seed.
   // CR-01 remeasure scheduling state. remeasurePending dedupes the deferred sweep — at most ONE
   // rAF is in flight, so a burst of onChange ticks (a fast scroll) collapses to a single measure
   // pass per frame instead of piling up rAF callbacks that fire mid-gesture. The piled-up
@@ -1377,6 +1388,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // Each pass only OBSERVES + measures the live window; measureElement is idempotent on an
   // already-observed node, so running both is cheap and loop-free.
   function scheduleRemeasure() {
+    // 87-13: never arm a new sweep after teardown — an onChange can still fire from a
+    // virtualizer whose own ResizeObserver cleanup has run but whose queued tick was already
+    // in flight.
+    if (remeasureDisposed.current) return;
     if (remeasurePending.current) return;
     remeasurePending.current = true;
     let ranMicro = false;
@@ -1384,6 +1399,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       remeasureWindow();
     };
     const rafPass = () => {
+      remeasureRaf.current = null;
       remeasurePending.current = false;
       remeasureWindow();
     };
@@ -1391,9 +1407,26 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       ranMicro = true;
       queueMicrotask(microPass);
     }
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) remeasurePending.current = false;else setTimeout(rafPass, 0);
+    // 87-13: retain the handle so teardownRemeasure() can cancel a pass that is still pending
+    // at unmount. Without this the callback survives teardown and writes $data.windowVer.
+    if (typeof requestAnimationFrame === 'function') remeasureRaf.current = requestAnimationFrame(rafPass);else if (ranMicro) remeasurePending.current = false;else remeasureRaf.current = setTimeout(rafPass, 0);
   }
 
+  // 87-13 (CR-01): idempotent teardown for the deferred sweep — the same discipline
+  // teardownFillDrag()/teardownRangeDrag() already follow. Cancels a pending pass and latches
+  // `remeasureDisposed` so the microtask twin (which carries no cancellable handle) and any
+  // in-flight onChange both bail instead of writing to a torn-down instance.
+  const teardownRemeasure = useCallback(() => {
+    remeasureDisposed.current = true;
+    if (remeasureRaf.current != null) {
+      // Discriminate on requestAnimationFrame — the SAME predicate scheduleRemeasure() branched
+      // on when it produced this handle. Testing cancelAnimationFrame instead would hand a
+      // setTimeout id to cancelAnimationFrame in any env where the two disagree.
+      if (typeof requestAnimationFrame === 'function') cancelAnimationFrame(remeasureRaf.current);else clearTimeout(remeasureRaf.current);
+      remeasureRaf.current = null;
+    }
+    remeasurePending.current = false;
+  }, []);
   // pinnedEditIndex(): the FULL-MODEL row index of the row currently in edit (D-02 pin-row),
   // or -1 when no editor is open. Under virtualization `$data.rows` is the FULL pre-pagination
   // model, so editingRow (single-cell) / editingRowIndex (full-row) — both in that index space —
@@ -1426,6 +1459,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // idempotent on an already-observed node (the `prevNode !== node` guard), so re-sweeping the
   // visible window each commit is cheap and loop-free.
   const remeasureWindow = useCallback(() => {
+    // 87-13 (CR-01): the disposed latch, checked BEFORE the ref guard below. That guard cannot
+    // cover unmount — virtualizer/gridRoot are assigned in $onMount and never nulled — so this
+    // is the only thing standing between a pass queued pre-unmount and refineRowEstimate()'s
+    // setOptions/scrollTop/$data.windowVer writes against a torn-down instance.
+    if (remeasureDisposed.current) return;
     if (!virtualizer.current || !gridRoot.current) return;
     // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
     // exclusively during scrollToIndex / scrollToOffset (the D-12 scroll-then-focus seam) and
@@ -6751,6 +6789,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // Gap-closure 87-09: disconnect the RTL dir-attribute MutationObserver (ensureColRtlWatch(),
       // windowing.rzts). No-op if column windowing was never on (the observer was never attached).
       teardownColRtlWatch();
+      // Gap-closure 87-13 (CR-01): cancel a deferred remeasure sweep still pending at unmount.
+      // Must run here — remeasureWindow()'s `!virtualizer || !gridRoot` guard never fires, since
+      // neither ref is nulled — or the pass reaches 87-07's refineRowEstimate() and writes
+      // $data.windowVer against a torn-down instance.
+      teardownRemeasure();
       // CR-04: remove any live fill-drag document listeners if we unmount mid-drag.
       teardownFillDrag();
       // §6 (260709-3qt): remove any live drag-select document listeners on a mid-drag unmount.

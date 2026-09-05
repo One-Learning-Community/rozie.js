@@ -184,15 +184,38 @@ const windowSource = () => {
 // Each pass only OBSERVES + measures the live window; measureElement is idempotent on an
 // already-observed node, so running both is cheap and loop-free.
 const scheduleRemeasure = () => {
+  // 87-13: never arm a new sweep after teardown — an onChange can still fire from a
+  // virtualizer whose own ResizeObserver cleanup has run but whose queued tick was already
+  // in flight.
+  if (remeasureDisposed) return
   if (remeasurePending) return
   remeasurePending = true
   let ranMicro = false
   const microPass = () => { remeasureWindow() }
-  const rafPass = () => { remeasurePending = false; remeasureWindow() }
+  const rafPass = () => { remeasureRaf = null; remeasurePending = false; remeasureWindow() }
   if (typeof queueMicrotask !== 'undefined') { ranMicro = true; queueMicrotask(microPass) }
-  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass)
+  // 87-13: retain the handle so teardownRemeasure() can cancel a pass that is still pending
+  // at unmount. Without this the callback survives teardown and writes $data.windowVer.
+  if (typeof requestAnimationFrame === 'function') remeasureRaf = requestAnimationFrame(rafPass)
   else if (ranMicro) remeasurePending = false
-  else setTimeout(rafPass, 0)
+  else remeasureRaf = setTimeout(rafPass, 0)
+}
+
+// 87-13 (CR-01): idempotent teardown for the deferred sweep — the same discipline
+// teardownFillDrag()/teardownRangeDrag() already follow. Cancels a pending pass and latches
+// `remeasureDisposed` so the microtask twin (which carries no cancellable handle) and any
+// in-flight onChange both bail instead of writing to a torn-down instance.
+const teardownRemeasure = () => {
+  remeasureDisposed = true
+  if (remeasureRaf != null) {
+    // Discriminate on requestAnimationFrame — the SAME predicate scheduleRemeasure() branched
+    // on when it produced this handle. Testing cancelAnimationFrame instead would hand a
+    // setTimeout id to cancelAnimationFrame in any env where the two disagree.
+    if (typeof requestAnimationFrame === 'function') cancelAnimationFrame(remeasureRaf)
+    else clearTimeout(remeasureRaf)
+    remeasureRaf = null
+  }
+  remeasurePending = false
 }
 
 // pinnedEditIndex(): the FULL-MODEL row index of the row currently in edit (D-02 pin-row),
@@ -227,6 +250,11 @@ const pinnedMeasurement = (pin) => {
 // idempotent on an already-observed node (the `prevNode !== node` guard), so re-sweeping the
 // visible window each commit is cheap and loop-free.
 const remeasureWindow = () => {
+  // 87-13 (CR-01): the disposed latch, checked BEFORE the ref guard below. That guard cannot
+  // cover unmount — virtualizer/gridRoot are assigned in $onMount and never nulled — so this
+  // is the only thing standing between a pass queued pre-unmount and refineRowEstimate()'s
+  // setOptions/scrollTop/$data.windowVer writes against a torn-down instance.
+  if (remeasureDisposed) return
   if (!virtualizer || !gridRoot) return
   // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
   // exclusively during scrollToIndex / scrollToOffset (the D-12 scroll-then-focus seam) and
@@ -254,4 +282,4 @@ const remeasureWindow = () => {
 // `@rozie-ui/headless-core/windowing.rzts` via bare specifier — the P0-proven cross-package inline
 // path that DISSOLVES the partial into the leaf (a re-export-from THROUGH this shell would survive as
 // a runtime import, not inline — verified). The math closes over these host symbols by convention.
-export { windowSource, scheduleRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn }
+export { windowSource, scheduleRemeasure, teardownRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn }

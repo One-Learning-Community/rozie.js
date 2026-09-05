@@ -1227,6 +1227,11 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
         // Gap-closure 87-09: disconnect the RTL dir-attribute MutationObserver (ensureColRtlWatch(),
         // windowing.rzts). No-op if column windowing was never on (the observer was never attached).
         this.teardownColRtlWatch();
+        // Gap-closure 87-13 (CR-01): cancel a deferred remeasure sweep still pending at unmount.
+        // Must run here — remeasureWindow()'s `!virtualizer || !gridRoot` guard never fires, since
+        // neither ref is nulled — or the pass reaches 87-07's refineRowEstimate() and writes
+        // $data.windowVer against a torn-down instance.
+        this.teardownRemeasure();
         // CR-04: remove any live fill-drag document listeners if we unmount mid-drag.
         this.teardownFillDrag();
         // §6 (260709-3qt): remove any live drag-select document listeners on a mid-drag unmount.
@@ -1484,6 +1489,19 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // onChange re-measures the now-stable window. Scroll-driven recycling (the CR-01 case, measured
   // once motion settles between scroll steps) is unaffected.
   remeasurePending = false;
+
+  // Gap-closure 87-13: the deferred sweep's own rAF handle, plus a disposed latch. Until 87-07 a
+  // post-unmount sweep was inert — it re-measured a detached tree and wrote nothing. 87-07's D-15
+  // re-feed changed that: remeasureWindow() now reaches refineRowEstimate(), which calls
+  // virtualizer.setOptions()/_willUpdate(), mutates gridScrollEl.scrollTop, and WRITES
+  // $data.windowVer. remeasureWindow()'s existing `!virtualizer || !gridRoot` guard cannot catch
+  // this — neither ref is ever nulled after $onMount assigns it — so a scroll/resize burst that
+  // leaves a pass pending across unmount (a route transition mid-scroll) lands a state write on a
+  // torn-down instance. Handle init is `null`, never 0: an Angular leaf types this as the DOM
+  // handle and TS2322s on a numeric seed.
+  remeasureRaf: any = null;
+
+  remeasureDisposed = false;
 
   // ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
   // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
@@ -2463,6 +2481,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // Each pass only OBSERVES + measures the live window; measureElement is idempotent on an
   // already-observed node, so running both is cheap and loop-free.
   scheduleRemeasure = () => {
+  // 87-13: never arm a new sweep after teardown — an onChange can still fire from a
+  // virtualizer whose own ResizeObserver cleanup has run but whose queued tick was already
+  // in flight.
+  if (this.remeasureDisposed) return;
   if (this.remeasurePending) return;
   this.remeasurePending = true;
   let ranMicro = false;
@@ -2470,6 +2492,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this.remeasureWindow();
   };
   const rafPass = () => {
+    this.remeasureRaf = null;
     this.remeasurePending = false;
     this.remeasureWindow();
   };
@@ -2477,7 +2500,25 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     ranMicro = true;
     queueMicrotask(microPass);
   }
-  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) this.remeasurePending = false;else setTimeout(rafPass, 0);
+  // 87-13: retain the handle so teardownRemeasure() can cancel a pass that is still pending
+  // at unmount. Without this the callback survives teardown and writes $data.windowVer.
+  if (typeof requestAnimationFrame === 'function') this.remeasureRaf = requestAnimationFrame(rafPass);else if (ranMicro) this.remeasurePending = false;else this.remeasureRaf = setTimeout(rafPass, 0);
+};
+
+  // 87-13 (CR-01): idempotent teardown for the deferred sweep — the same discipline
+  // teardownFillDrag()/teardownRangeDrag() already follow. Cancels a pending pass and latches
+  // `remeasureDisposed` so the microtask twin (which carries no cancellable handle) and any
+  // in-flight onChange both bail instead of writing to a torn-down instance.
+  teardownRemeasure = () => {
+  this.remeasureDisposed = true;
+  if (this.remeasureRaf != null) {
+    // Discriminate on requestAnimationFrame — the SAME predicate scheduleRemeasure() branched
+    // on when it produced this handle. Testing cancelAnimationFrame instead would hand a
+    // setTimeout id to cancelAnimationFrame in any env where the two disagree.
+    if (typeof requestAnimationFrame === 'function') cancelAnimationFrame(this.remeasureRaf);else clearTimeout(this.remeasureRaf);
+    this.remeasureRaf = null;
+  }
+  this.remeasurePending = false;
 };
 
   // pinnedEditIndex(): the FULL-MODEL row index of the row currently in edit (D-02 pin-row),
@@ -2513,6 +2554,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // idempotent on an already-observed node (the `prevNode !== node` guard), so re-sweeping the
   // visible window each commit is cheap and loop-free.
   remeasureWindow = () => {
+  // 87-13 (CR-01): the disposed latch, checked BEFORE the ref guard below. That guard cannot
+  // cover unmount — virtualizer/gridRoot are assigned in $onMount and never nulled — so this
+  // is the only thing standing between a pass queued pre-unmount and refineRowEstimate()'s
+  // setOptions/scrollTop/$data.windowVer writes against a torn-down instance.
+  if (this.remeasureDisposed) return;
   if (!this.virtualizer || !this.gridRoot) return;
   // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
   // exclusively during scrollToIndex / scrollToOffset (the D-12 scroll-then-focus seam) and
