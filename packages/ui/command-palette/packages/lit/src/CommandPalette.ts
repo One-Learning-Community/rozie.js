@@ -467,7 +467,7 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
    * @example
    * <rozie-command-palette appendTo="body" .items=${commands}></rozie-command-palette>
    */
-  @property({ type: Boolean }) appendTo: boolean | string = false;
+  @property({ converter: { fromAttribute: (v: string | null) => (v === null ? false : v === 'true' ? true : v === 'false' ? false : v === '' ? true : v) } }) appendTo: boolean | string = false;
   /**
    * Opt-in vertical windowing for a long list, resolved PER LEVEL — this prop is the ROOT level; a navigating item's own `virtual` field windows THAT child level instead. A virtual level renders FLAT: the auto-derived groups + `groupCap` + `#groupHeading` are inactive for that level (the vendored combobox's `isGrouped` requires `!virtual`) — popping back to a grouped non-virtual level restores its groups. Windowing needs a bounded scroll height — pair with `virtualMaxHeight`. Default `false` is byte-behavior-identical to today (non-windowed).
    * @example

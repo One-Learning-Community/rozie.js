@@ -364,6 +364,29 @@ function isPrimitiveType(ann: PropTypeAnnotation): boolean {
   return false;
 }
 
+/**
+ * Phase 87 87-04 (Rule 1 fix — found via data-table's `virtual` D-01 case, but the SAME
+ * pre-existing gap affects CommandPalette.rozie's `appendTo`, the only two `[Boolean, String]`
+ * union props in the repo). `renderType()` above picks the union's FIRST member as the single
+ * `@property({ type: ... })` token Lit accepts — for `[Boolean, String]` that is `Boolean`,
+ * whose DEFAULT `fromAttribute` converter is `(value) => value !== null`: any non-null STATIC
+ * attribute value (e.g. a bare `virtual="columns"` template attribute, which is how a
+ * non-colon-prefixed literal prop compiles for Lit) collapses to `true`, silently discarding
+ * the string. Every OTHER target reads a real JS value here (Vue/Svelte/Solid/React/Angular
+ * bindings never round-trip through an HTML string attribute for a non-primitive-shaped prop),
+ * so this is Lit-only — a genuine emitter parity gap, not a per-framework workaround site
+ * (`feedback_emitter_owns_parity`). `isBooleanStringUnion()` detects the shape so
+ * `emitNonModelProp()` can swap in a CUSTOM converter instead of the bare `type: Boolean`
+ * shorthand.
+ */
+function isBooleanStringUnion(t: PropTypeAnnotation): boolean {
+  if (t.kind !== 'union') return false;
+  const names = t.members.map((m) => (m.kind === 'identifier' ? m.name : null));
+  return (
+    names.length === 2 && names.includes('Boolean') && names.includes('String')
+  );
+}
+
 function renderExpression(expr: t.Expression): string {
   return generate(expr, GEN_OPTS).code;
 }
@@ -460,6 +483,17 @@ function emitNonModelProp(prop: PropDecl): string {
   // prop → byte-identical, SC-5). The builder's trailing newline joins the
   // block directly onto the field line.
   const jsdoc = buildPropJsdoc(prop, 'lit', '  ');
+  // Phase 87 87-04 (Rule 1 fix — see isBooleanStringUnion()'s comment): a
+  // [Boolean, String] union needs a CUSTOM fromAttribute converter, not Lit's
+  // built-in `type: Boolean` (which discards any non-null string value). `'true'`/
+  // `'false'`/a bare-presence empty string still resolve to real booleans (the HTML
+  // boolean-attribute convention `resolveVirtual()`-style consumers already expect
+  // from a truthy check); every other string passes through UNCHANGED.
+  if (isBooleanStringUnion(prop.typeAnnotation)) {
+    const converter =
+      "{ fromAttribute: (v: string | null) => (v === null ? false : v === 'true' ? true : v === 'false' ? false : v === '' ? true : v) }";
+    return `${jsdoc}  @property({ converter: ${converter} }) ${prop.name}${fieldSuffix};`;
+  }
   return `${jsdoc}  @property({ type: ${litType}${reflectField} }) ${prop.name}${fieldSuffix};`;
 }
 

@@ -26,7 +26,7 @@ export default class PortalOverlay extends SignalWatcher(LitElement) {
 `;
 
   @property({ type: Boolean, reflect: true }) open: boolean = false;
-  @property({ type: Boolean }) to: boolean | string = false;
+  @property({ converter: { fromAttribute: (v: string | null) => (v === null ? false : v === 'true' ? true : v === 'false' ? false : v === '' ? true : v) } }) to: boolean | string = false;
 
   @query('[data-rozie-portal-ref="__roziePortal0"]') private __roziePortal0!: HTMLElement;
   @query('[data-rozie-portal-anchor="__roziePortal0"]') private __roziePortal0Anchor!: HTMLElement;
