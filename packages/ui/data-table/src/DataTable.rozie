@@ -1474,22 +1474,42 @@ import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, 
 
 import { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell } from './gridKeydownHandlers.rzts'
 
-// ══ Phase 87 87-04 — column-axis template windowing (the D-06/D-11 tracer, flat-header-only;
-// declared HERE (after the columnChrome/gridFocusNav imports above) so a forward cross-partial
-// reference to visibleColCount()/colsWindowed()/windowedColIndices() in the merged per-target
-// output never TDZs on React — the 87-02 useCallback-deps-array ordering lesson). ══
-// windowedHeaderRow(hg, hgLevel): the windowed slice of ONE header level's headers, restricted
-// to the LAST (leaf) level only in this plan — a group/parent level is left untouched (the
-// grouped colspan clamp is 87-05's expansion, D-11). Byte-identical to hg.headers for every
-// other path (off, a non-leaf level, or rows-only windowing).
-const windowedHeaderRow = (hg, hgLevel) => {
+// ══ Phase 87 87-04/87-05 — column-axis template windowing (D-06/D-11; declared HERE (after
+// the columnChrome/gridFocusNav imports above) so a forward cross-partial reference to
+// colsWindowed()/windowedColIndices() in the merged per-target output never TDZs on React —
+// the 87-02 useCallback-deps-array ordering lesson, the SAME reason remeasureColumnWindow()
+// below stays out of virtualization.rzts). ══
+// windowedHeadersFor(hg, hgLevel) (87-05): generalizes 87-04's windowedHeaderRow() (leaf-level
+// only) to EVERY header level with a CLAMPED colspan (D-11). A header spans the CONTIGUOUS run
+// of leaf-column indices [cursor, cursor + header.colSpan) — table-core lays out every header
+// level's `headers` array left-to-right over the SAME full leaf-column order, so walking a
+// running cursor by each header's OWN colSpan reconstructs its absolute leaf range with no
+// extra table-core calls. Intersect that range with windowedColIndices() (which already unions
+// the D-10 forced set): a header whose intersection is EMPTY is dropped entirely (a group
+// wholly outside the window renders no <th> at all — D-11); otherwise it is emitted as
+// { header, span } with span = the intersection SIZE (the clamp). Degrades to hg.headers
+// UNCHANGED (span = the header's own colSpan, or 1) when columns are not windowed — the
+// off-path the template's `:colspan="wh.span > 1 ? wh.span : null"` binding preserves
+// byte-identically (a bare colspan="1" would change the emitted markup on the unwindowed path).
+const windowedHeadersFor = (hg, hgLevel) => {
   const headers = (hg && hg.headers) || []
-  if (!colsWindowed() || hgLevel !== $data.headerGroups.length - 1) return headers
+  if (!colsWindowed()) {
+    return headers.map((h) => ({ header: h, span: h && h.colSpan > 1 ? h.colSpan : 1 }))
+  }
   const idx = windowedColIndices()
+  const idxSet = {}
+  for (let i = 0; i < idx.length; i++) idxSet[idx[i]] = true
+  let cursor = 0
   const out = []
-  for (let i = 0; i < idx.length; i++) {
-    const h = headers[idx[i]]
-    if (h) out.push(h)
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i]
+    const leafCount = h && h.colSpan ? h.colSpan : 1
+    const start = cursor
+    const end = cursor + leafCount
+    cursor = end
+    let span = 0
+    for (let c = start; c < end; c++) if (idxSet[c]) span = span + 1
+    if (span > 0) out.push({ header: h, span })
   }
   return out
 }
@@ -1815,33 +1835,34 @@ $expose({
       :key="hg.id"
       :aria-rowindex="hgLevel + 1"
     >
-      <!-- Leading horizontal spacer (Phase 87 87-04, D-06/D-11): the leaf header level
-           only, matching the body's rdt-col-spacer <td>s. No data-grid-cell/data-col-index/
-           role — invisible to the roving-tabindex grid and cellIndexFromPoint (Pitfall 5,
-           T-87-04-01). -->
+      <!-- Leading horizontal spacer (Phase 87 87-05, D-11): now on EVERY header level
+           (not just the leaf, 87-04's tracer scope) — every level must window on the SAME
+           leaf-column slice as the body under table-layout:fixed, or the header's total span
+           disagrees with the body's. No data-grid-cell/data-col-index/role — invisible to the
+           roving-tabindex grid and cellIndexFromPoint (Pitfall 5, T-87-04-01). -->
       <th
         class="rdt-col-spacer"
         aria-hidden="true"
-        r-if="colsWindowed() && hgLevel === $data.headerGroups.length - 1"
+        r-if="colsWindowed()"
         :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"
       ></th>
       <th
         class="rdt-th"
         role="columnheader"
-        r-for="header in windowedHeaderRow(hg, hgLevel)"
-        :key="header.id"
-        :data-col="header.column.id"
+        r-for="wh in windowedHeadersFor(hg, hgLevel)"
+        :key="wh.header.id"
+        :data-col="wh.header.column.id"
         data-grid-cell
         data-row="__header"
         :data-header-level="hgLevel"
-        :colspan="header.colSpan > 1 ? header.colSpan : null"
-        :data-col-index="headerColIndexOf(hg, header)"
-        :tabindex="cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)"
-        :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }"
-        :aria-sort="ariaSortFor(header.column.id)"
-        :style="thStyle(header.column.id)"
+        :colspan="wh.span > 1 ? wh.span : null"
+        :data-col-index="headerColIndexOf(hg, wh.header)"
+        :tabindex="cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel)"
+        :class="{ 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }"
+        :aria-sort="ariaSortFor(wh.header.column.id)"
+        :style="thStyle(wh.header.column.id)"
       >
-        <span style="display:contents" r-if="isSelectColumn(header.column.id)">
+        <span style="display:contents" r-if="isSelectColumn(wh.header.column.id)">
           <slot
             name="selectAll"
             :checked="isAllRowsSelected()"
@@ -1862,32 +1883,32 @@ $expose({
              Without this branch it falls into the generic-column r-else below and renders
              its raw internal id ('__rdt_expander') as the label, plus stray pin-controls and
              a resize handle that don't belong on a chevron column. -->
-        <span style="display:contents" r-else-if="isExpanderColumn(header.column.id)"></span>
+        <span style="display:contents" r-else-if="isExpanderColumn(wh.header.column.id)"></span>
         <span style="display:contents" r-else>
           <button
-            r-if="header.column.getCanSort && header.column.getCanSort()"
+            r-if="wh.header.column.getCanSort && wh.header.column.getCanSort()"
             type="button"
             class="rdt-sort-btn"
-            @click="onHeaderSort(header.column.id, $event)"
+            @click="onHeaderSort(wh.header.column.id, $event)"
           >
             <span class="rdt-header-label">
               <slot
                 name="colHeader"
-                :columnId="header.column.id"
-                :column="header.column"
-                :label="headerLabel(header.column.id)"
-              >{{ headerLabel(header.column.id) }}</slot>
+                :columnId="wh.header.column.id"
+                :column="wh.header.column"
+                :label="headerLabel(wh.header.column.id)"
+              >{{ headerLabel(wh.header.column.id) }}</slot>
             </span>
-            <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(header.column.id) }}</span>
+            <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(wh.header.column.id) }}</span>
           </button>
           <span style="display:contents" r-else>
             <span class="rdt-header-label">
               <slot
                 name="colHeader"
-                :columnId="header.column.id"
-                :column="header.column"
-                :label="headerLabel(header.column.id)"
-              >{{ headerLabel(header.column.id) }}</slot>
+                :columnId="wh.header.column.id"
+                :column="wh.header.column"
+                :label="headerLabel(wh.header.column.id)"
+              >{{ headerLabel(wh.header.column.id) }}</slot>
             </span>
           </span>
           <!-- Header ⋯ menu (phase 72, D-01/D-05/D-06): the composed Popover (Option A — the
@@ -1898,7 +1919,14 @@ $expose({
                ⋯ button; strategy=fixed escapes the table's scroll/sticky overflow ancestor. The
                inline rdt-col-filter input + #filter slot host that lived here are REMOVED — they
                relocate to the dedicated filter row (72-05); filtering is intentionally offline
-               until that wave lands. -->
+               until that wave lands.
+               D-14 (Phase 87 87-05): a column whose menu is open is allowed to unmount when its
+               column scrolls out of the window — no new state is added here, no
+               forcedColumns() entry, no r-model:open. The menu's strategy:'fixed' panel would
+               otherwise float detached over unrelated columns once its anchor left the screen;
+               losing it is the honest outcome. Converting this Popover to controlled per column
+               (on both header branches, x6) to preserve that interaction is a real surface
+               change to a shipped feature and is deliberately deferred (87-CONTEXT.md D-14). -->
           <Popover trigger="click" placement="bottom-end" strategy="fixed" :offset="4">
             <!-- No @click="toggle" here (72-06 fix): trigger="click" already wires a
                  click handler onto Popover's OWN .rozie-popover-anchor wrapper div, which
@@ -1916,7 +1944,7 @@ $expose({
               <button
                 type="button"
                 class="rdt-col-menu-trigger"
-                :aria-label="'Column options for ' + headerLabel(header.column.id)"
+                :aria-label="'Column options for ' + headerLabel(wh.header.column.id)"
               >⋯</button>
             </template>
             <div class="rdt-col-menu" role="menu">
@@ -1924,47 +1952,47 @@ $expose({
                 type="button"
                 role="menuitem"
                 class="rdt-col-menu-item"
-                :aria-pressed="columnPinSide(header.column.id) === 'left'"
-                @click="onPinColumn(header.column.id, 'left', $event)"
+                :aria-pressed="columnPinSide(wh.header.column.id) === 'left'"
+                @click="onPinColumn(wh.header.column.id, 'left', $event)"
               >Pin left</button>
               <button
                 type="button"
                 role="menuitem"
                 class="rdt-col-menu-item"
-                :aria-pressed="columnPinSide(header.column.id) === 'right'"
-                @click="onPinColumn(header.column.id, 'right', $event)"
+                :aria-pressed="columnPinSide(wh.header.column.id) === 'right'"
+                @click="onPinColumn(wh.header.column.id, 'right', $event)"
               >Pin right</button>
               <button
                 type="button"
                 role="menuitem"
                 class="rdt-col-menu-item"
-                :aria-pressed="!columnPinSide(header.column.id)"
-                @click="onPinColumn(header.column.id, false, $event)"
+                :aria-pressed="!columnPinSide(wh.header.column.id)"
+                @click="onPinColumn(wh.header.column.id, false, $event)"
               >Unpin</button>
               <hr class="rdt-col-menu-sep" />
               <button
                 type="button"
                 role="menuitem"
                 class="rdt-col-menu-item"
-                @click="onHideColumn(header.column.id, $event)"
+                @click="onHideColumn(wh.header.column.id, $event)"
               >Hide column</button>
             </div>
           </Popover>
           <button
             type="button"
             class="rdt-resize-handle"
-            :aria-label="'Resize ' + headerLabel(header.column.id)"
-            @pointerdown="onResizeStart(header.column.id, $event)"
-            @touchstart="onResizeStart(header.column.id, $event)"
+            :aria-label="'Resize ' + headerLabel(wh.header.column.id)"
+            @pointerdown="onResizeStart(wh.header.column.id, $event)"
+            @touchstart="onResizeStart(wh.header.column.id, $event)"
           ><span class="rdt-resize-grip" aria-hidden="true"></span></button>
         </span>
       </th>
-      <!-- Trailing horizontal spacer (Phase 87 87-04, D-06/D-11) — the leaf header
-           level twin of the leading spacer above. -->
+      <!-- Trailing horizontal spacer (Phase 87 87-05, D-11) — now on EVERY header
+           level, the twin of the leading spacer above. -->
       <th
         class="rdt-col-spacer"
         aria-hidden="true"
-        r-if="colsWindowed() && hgLevel === $data.headerGroups.length - 1"
+        r-if="colsWindowed()"
         :style="'width:' + colPadRight() + 'px;padding:0;border:0'"
       ></th>
     </tr>
@@ -1972,46 +2000,62 @@ $expose({
          the per-column filter input + #filter slot host removed from the header in 72-03,
          one cell per column, aligned under pinned columns. Gated on hasAnyFilterableColumn()
          so the whole row is ABSENT (byte-identical-off) when no column is filterable. Iterates
-         the LEAF header group ($data.headerGroups[length-1].headers), NOT hg from the r-for
-         above, so a multi-level-header table's filter cells align 1:1 with the body <td>
-         columns rather than an intermediate spanning group. `role="presentation"` on each
-         cell — a filter cell is not a column header. No data-grid-cell/data-row/tabindex —
-         onGridKeyDown only intercepts a focused `[data-grid-cell]` (gridKeydownHandlers.rzts),
-         so these inputs are naturally inert to the roving-tabindex grid and just tab normally
-         (mirrors the rdt-spacer inert-row precedent, minus aria-hidden since these cells hold
-         real focusable controls). -->
+         the LEAF header group ($data.headerGroups[length-1].headers) through the SAME
+         windowedHeadersFor() the leaf header level uses (Phase 87 87-05, D-11) — so a
+         windowed table's filter cells align 1:1 with the windowed body <td> columns, matching
+         leading/trailing rdt-col-spacer cells keep its pin-offset alignment (colPadLeft()/
+         colPadRight() read the SAME windowedColIndices() result the header/body use), and an
+         unwindowed table (virtual unset/'rows') keeps rendering every leaf header unchanged
+         (windowedHeadersFor()'s off-path is byte-identical to $data.headerGroups[last].headers).
+         `role="presentation"` on each cell — a filter cell is not a column header. No
+         data-grid-cell/data-row/tabindex — onGridKeyDown only intercepts a focused
+         `[data-grid-cell]` (gridKeydownHandlers.rzts), so these inputs are naturally inert to
+         the roving-tabindex grid and just tab normally (mirrors the rdt-spacer inert-row
+         precedent, minus aria-hidden since these cells hold real focusable controls). -->
     <tr class="rdt-filter-row" r-if="hasAnyFilterableColumn()">
+      <th
+        class="rdt-col-spacer"
+        aria-hidden="true"
+        r-if="colsWindowed()"
+        :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"
+      ></th>
       <th
         class="rdt-filter-cell"
         role="presentation"
-        r-for="header in $data.headerGroups[$data.headerGroups.length - 1].headers"
-        :key="header.id"
-        :style="pinStyle(header.column.id)"
+        r-for="wh in windowedHeadersFor($data.headerGroups[$data.headerGroups.length - 1], $data.headerGroups.length - 1)"
+        :key="wh.header.id"
+        :style="pinStyle(wh.header.column.id)"
       >
-        <span style="display:contents" r-if="isSelectColumn(header.column.id)"></span>
-        <span style="display:contents" r-else-if="isExpanderColumn(header.column.id)"></span>
+        <span style="display:contents" r-if="isSelectColumn(wh.header.column.id)"></span>
+        <span style="display:contents" r-else-if="isExpanderColumn(wh.header.column.id)"></span>
         <span style="display:contents" r-else>
           <input
-            r-if="columnIsFilterable(header.column.id) && !hasFilterSlot()"
+            r-if="columnIsFilterable(wh.header.column.id) && !hasFilterSlot()"
             class="rdt-col-filter"
             type="text"
-            :aria-label="'Filter ' + headerLabel(header.column.id)"
-            :value="columnFilterValue(header.column.id)"
-            @input="onColumnFilterInput(header.column.id, $event)"
+            :aria-label="'Filter ' + headerLabel(wh.header.column.id)"
+            :value="columnFilterValue(wh.header.column.id)"
+            @input="onColumnFilterInput(wh.header.column.id, $event)"
             @click="stopEvent($event)"
           />
-          <span style="display:contents" r-if="columnIsFilterable(header.column.id)">
+          <span style="display:contents" r-if="columnIsFilterable(wh.header.column.id)">
             <slot
               name="filter"
-              :columnId="header.column.id"
-              :value="columnFilterValue(header.column.id)"
-              :uniqueValues="getFacetedUniqueValues(header.column.id)"
-              :minMax="getFacetedMinMaxValues(header.column.id)"
+              :columnId="wh.header.column.id"
+              :value="columnFilterValue(wh.header.column.id)"
+              :uniqueValues="getFacetedUniqueValues(wh.header.column.id)"
+              :minMax="getFacetedMinMaxValues(wh.header.column.id)"
               :setFilter="setColumnFilter"
             />
           </span>
         </span>
       </th>
+      <th
+        class="rdt-col-spacer"
+        aria-hidden="true"
+        r-if="colsWindowed()"
+        :style="'width:' + colPadRight() + 'px;padding:0;border:0'"
+      ></th>
     </tr>
   </thead>
 
@@ -2729,6 +2773,24 @@ $expose({
    auto-fitting content exactly as before. */
 .rozie-data-table.rdt-col-windowed {
   table-layout: fixed;
+}
+/* [Rule 1 - Bug, found 87-05 Task 1] Scoped to the windowed-columns path ONLY (matching the
+   table-layout:fixed rule immediately above — same D-06 "getSize() is authoritative" contract,
+   same scoping discipline): without box-sizing:border-box, a `<th>`/`<td>` declared
+   `width:150px` under the base rule's `padding: var(--rdt-cell-padding, 0.5rem 0.75rem)`
+   renders at 150 + 24 = 174px (content-box default), so the SAME logical width table-core's
+   getSize()/columnSize() reports never equals the browser's ACTUAL rendered pixel width — a
+   silent ~16% overshoot on every rendered column. Invisible to D-01/D-06/D-11 (index-set/count
+   assertions only) but breaks D-10's forced-column spacer arithmetic: colPadLeft()/
+   colPadRight() subtract exactly columnSize(i) when a forced column enters the render, so
+   without border-box the SAME +24px-per-column overshoot leaks into `.rdt-scroll`'s actual
+   scrollWidth every time a forced column renders, growing it instead of holding steady.
+   Scoped (not the base `.rdt-th`/`.rdt-td` rule) to avoid a visual/pixel-size change to the
+   ALREADY-SHIPPED virtual=false / virtual=true column-resize behavior outside this new,
+   not-yet-released windowed-columns path. */
+.rozie-data-table.rdt-col-windowed .rdt-th,
+.rozie-data-table.rdt-col-windowed .rdt-td {
+  box-sizing: border-box;
 }
 /* Validation aria-live region (req-5/D-01): visually hidden, announced to AT. */
 .rdt-sr-live {

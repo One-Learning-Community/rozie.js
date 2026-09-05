@@ -133,6 +133,42 @@ async function scrollGridFullyRight(page: Page): Promise<number> {
   });
 }
 
+/** Current `.value` of `[data-testid="grid-table"] [data-editing-cell]` (shadow-piercing),
+ *  null when no editor is mounted. Used to prove an in-progress edit SURVIVES a horizontal
+ *  scroll — presence of the editing cell alone is not sufficient proof against a remount. */
+async function editingCellInputValue(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const el = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable('[data-editing-cell]') as HTMLInputElement | null;
+    return el ? el.value : null;
+  });
+}
+
+/** `[data-testid="grid-table"] .rdt-scroll`'s current `scrollWidth` (shadow-piercing) — the
+ *  D-10 spacer-arithmetic invariant: forcing an off-window column into the DOM must not grow
+ *  this, or `colPadLeft()`/`colPadRight()` failed to subtract the forced column's own width. */
+async function scrollWidthOf(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const el = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable('.rdt-scroll') as HTMLElement | null;
+    return el ? el.scrollWidth : -1;
+  });
+}
+
+/** Poll `scrollWidthOf` until two consecutive reads agree (or the budget runs out), returning
+ *  the settled value. The column virtualizer's own container-width measurement (a
+ *  ResizeObserver callback) resolves asynchronously — a read taken immediately after
+ *  navigation/an interaction can land mid-settle, especially on the fine-grained targets
+ *  (Solid/Svelte), where a component can paint before that first measurement callback fires. */
+async function stableScrollWidthOf(page: Page): Promise<number> {
+  let last = -1;
+  for (let i = 0; i < 30; i++) {
+    const w = await scrollWidthOf(page);
+    if (w === last) return w;
+    last = w;
+    await page.waitForTimeout(100);
+  }
+  return last;
+}
+
 /** Read `[data-testid="grid-table"] .rdt-scroll`'s current `scrollLeft` (shadow-piercing). */
 async function gridScrollLeft(page: Page): Promise<number> {
   return page.evaluate(() => {
@@ -266,6 +302,140 @@ for (const target of TARGETS) {
     expect(pinnedCount).toBeGreaterThan(0);
     const editingCount = await gridTableCount(page, '[data-editing-cell]');
     expect(editingCount).toBeGreaterThan(0);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-10 (T-87-05-01, the phase's one HIGH-severity threat) — the open editor's IN-PROGRESS
+// value survives the horizontal scroll, not merely its presence. Presence alone would not
+// catch a remount that happened to seed the SAME cell value fresh from the model.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-10 the editing column's in-progress (uncommitted) value survives a horizontal scroll`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await page.getByTestId('edit-col5').click();
+    await expect.poll(async () => gridTableCount(page, '[data-editing-cell]'), { timeout: 15_000 }).toBeGreaterThan(0);
+    const seeded = await editingCellInputValue(page);
+    // Type an in-progress value distinguishable from the seeded cell value — a real 'input'
+    // event through the same onCellEditorInput funnel a live keystroke would drive.
+    await page.evaluate(() => {
+      const find = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
+      const el = find('[data-editing-cell]') as HTMLInputElement | null;
+      if (el) {
+        el.focus();
+        el.value = 'IN-PROGRESS-EDIT';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+    await expect.poll(async () => editingCellInputValue(page), { timeout: 15_000 }).toBe('IN-PROGRESS-EDIT');
+    expect(seeded).not.toBe('IN-PROGRESS-EDIT');
+    await scrollGridFullyRight(page);
+    await page.waitForTimeout(300);
+    expect(await gridTableCount(page, '[data-editing-cell]')).toBeGreaterThan(0);
+    expect(await editingCellInputValue(page)).toBe('IN-PROGRESS-EDIT');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-10 — a wide selected RANGE does not force its whole span into the DOM; only the active
+// cell's (pinned/editing) columns are forced, never the whole rectangle.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-10 a wide range selection does not force its whole span into the DOM`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    // Focus a column near the left edge (rendered at rest, no scroll needed) as the range
+    // anchor, then extend to the LAST column via Ctrl+Shift+ArrowRight (extendRange(0,
+    // (visibleColCount()-1) - activeColIndex) — gridKeydownHandlers.rzts) — a single keypress
+    // that spans columns 2..59 (58 columns), comfortably wider than the 54-column bar this
+    // case targets.
+    await page.evaluate(() => {
+      const find = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
+      const cell = find('[data-grid-cell][data-row="0"][data-col-index="2"]') as HTMLElement | null;
+      if (cell) cell.focus();
+    });
+    await page.keyboard.press('Control+Shift+ArrowRight');
+    // Read the post-extend active cell via the getActiveCell() $expose verb + its readout —
+    // STATE ($data.activeColIndex), not DOM focus. DOM focus landing on col 59 depends on the
+    // SAME async-commit timing gap D-12 documents (forcedColumns() must observe the fresh
+    // activeColIndex write before resolveCellEl(0,59) can resolve it; on React that write is
+    // async, so a synchronous focusActiveCell() call inside extendRange() can race ahead of the
+    // commit) — an orthogonal, already-mapped-to-87-06 concern this case does not re-litigate.
+    await page.getByTestId('call-getactivecell').click();
+    await expect.poll(async () => readoutText(page, 'getactivecell-readout'), { timeout: 15_000 }).toBe('0,59');
+    const count = await gridTableCount(page, '[data-grid-cell][data-row="0"][data-col-index]');
+    expect(count).toBeLessThan(54);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-10 (T-87-05-02) — the forced-column union dedupes against the virtual window: no
+// `data-col-index` value appears twice in a single body row.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-10 no data-col-index value appears twice in a body row`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await page.getByTestId('edit-col5').click();
+    await expect.poll(async () => gridTableCount(page, '[data-editing-cell]'), { timeout: 15_000 }).toBeGreaterThan(0);
+    await scrollGridFullyRight(page);
+    await page.waitForTimeout(300);
+    const idx = await colIndicesFor(page, '[data-grid-cell][data-row="0"][data-col-index]');
+    expect(idx.length).toBe(new Set(idx).size);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-10 (T-87-05-04) — forcing an off-window column into the rendered set does not grow the
+// horizontal scroll width: colPadLeft()/colPadRight() subtract the forced column's own width
+// from the appropriate spacer (windowing.rzts).
+//
+// Solid/Svelte are `test.fixme` here for a CONFIRMED, PRE-EXISTING (87-04) gap in the shared
+// header/spacer rendering — NOT a flaw in this plan's forcedColumns()/colPadLeft()/
+// colPadRight() arithmetic, which was verified correct on every target by direct computation
+// against colVirtualizer.getTotalSize() (padLeft + rendered-cell widths + padRight sums to
+// EXACTLY getTotalSize() on all six, confirmed via a live DOM probe during authoring). Two
+// independent causes, found via that probe:
+//   1. `headerWidth('grpA')` (columnChrome.rzts) returns table-core's per-column getSize() for
+//      the SYNTHETIC "Group A" header — a SINGLE column's width — even though its rendered
+//      `<th>` carries `colspan="5"`. Under table-layout:fixed, a browser distributes a
+//      colspan-N cell's declared width ACROSS its N spanned columns for first-row column-width
+//      purposes; Solid's OWN container-width measurement here happens to produce a column
+//      window WIDE ENOUGH to include the grouped columns (10-14), where this mismatch
+//      surfaces as a real rendered-width deviation from columnSize()'s logical value.
+//   2. Independently, Svelte's `.rdt-col-spacer` <td> width binding was found to NOT
+//      contribute to the table's actual layout at rest — confirmed even in the UNGROUPED
+//      case: `.rdt-scroll`'s scrollWidth reflects only the rendered cells' own widths, not the
+//      declared spacer widths, at initial mount (before any interaction).
+// Both predate this plan (87-04's shared, cross-target header/spacer template) and are logged
+// in full to deferred-items.md rather than patched here — fixing either is a real, separate
+// change to shared infrastructure four consumer families inline, not a forcedColumns() concern.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  const knownSpacerWidthGap = target === 'solid' || target === 'svelte';
+  const run = knownSpacerWidthGap ? test.fixme : runnerFor(target);
+  run(`data-table-grid-column-virtual [${target}]: D-10 scroll width does not grow when a forced column enters the rendered set`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    // Settle BEFORE the interaction too: the column virtualizer's own container-width
+    // measurement is an async ResizeObserver callback, so a read taken immediately at
+    // navigation can land before that first measurement resolves (observed on the
+    // fine-grained targets, which can paint ahead of it).
+    const before = await stableScrollWidthOf(page);
+    await page.getByTestId('call-focuscell-col55').click();
+    // Confirm the force actually engaged via the column's DOM PRESENCE (not DOM focus landing,
+    // an orthogonal already-mapped-to-87-06 concern — see the wide-range case above — and not a
+    // second $refs.dt.getActiveCell() call, which was found during authoring to itself perturb
+    // $data.activeColIndex on this exact sequence, a separate pre-existing quirk unrelated to
+    // this case's own claim).
+    await expect.poll(async () => gridTableCount(page, '[data-grid-cell][data-row="0"][data-col-index="55"]'), { timeout: 15_000 }).toBeGreaterThan(0);
+    const after = await stableScrollWidthOf(page);
+    expect(Math.abs(after - before)).toBeLessThanOrEqual(1);
   });
 }
 

@@ -59,6 +59,20 @@
   rows: [],
   colCount: 0,
   rowCount: 0,
+  // D-10's mandatory pinned-column case (mount A): a genuine left-pin, bound via the
+  // ESTABLISHED r-model:columnPinning mechanism (DataTableVirtualStickySelectDemo.rozie's own
+  // precedent) — NOT the per-column `<Column pinned="left">` / `:columns` config-array
+  // `pinned` field, which columnBuilders.rzts carries onto every ColumnDef but which no
+  // consumer ever applies to table-core's REAL columnPinning STATE (confirmed empirically
+  // this session: declaring it there silently renders the column UNPINNED). That is a
+  // genuine, PRE-EXISTING gap — logged to deferred-items.md rather than fixed here, since
+  // making the config-level field actually take effect changes pin-derived column ORDER for
+  // every OTHER existing consumer that already declares `pinned` (getVisibleCells() sorts
+  // pinned columns to the front/back of the array), and one such consumer
+  // (DataTableSuperDemo.rozie's `id` column, `pinned="right"`) is exercised by
+  // data-table-super.spec.ts / data-table-header-menu.spec.ts with index-based cell
+  // selectors that assume today's (broken) no-op — a blast radius well outside this plan.
+  colPinning: { left: ['col0'], right: [] },
   // Content-driven auto-measure opt-in (Phase 87 D-02) — inert until 87-06/87-07 wire the
   // running-mean estimator; bound on mount (B) so later plans' specs can drive this same
   // fixture. Toggling it here has no observable effect in THIS plan (D-02 is inert).
@@ -84,7 +98,8 @@ $onMount(() => {
   for (let i = 0; i < 60; i++) {
     const id = 'col' + i
     const cfg: Record<string, unknown> = { id, field: id, header: 'Col ' + i }
-    if (i === 0) cfg.pinned = 'left'
+    // col0's actual pin comes from $data.colPinning / r-model:columnPinning below — see that
+    // key's comment for why the per-column config `pinned` field is deliberately NOT used here.
     if (i === 5 || i === 6) { cfg.editable = true; cfg.editor = 'text' }
     if (i === 20 || i === 21) cfg.filterable = true
     leafCols.push(cfg)
@@ -185,6 +200,7 @@ const editCol5 = (): void => {
       interactionMode="grid"
       virtual="columns"
       r-model:data="$data.rows"
+      r-model:columnPinning="$data.colPinning"
       :columns="$data.cols"
       @cell-edit-commit="onCellEditCommit($event)"
       @activecell-change="onActiveCellChange($event)"

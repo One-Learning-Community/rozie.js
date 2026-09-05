@@ -44,6 +44,10 @@ __rozieInjectStyle('DataTable-d5dcab4c', `.rozie-data-table[data-rozie-s-d5dcab4
 .rozie-data-table.rdt-col-windowed[data-rozie-s-d5dcab4c] {
   table-layout: fixed;
 }
+.rozie-data-table.rdt-col-windowed[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
+.rozie-data-table.rdt-col-windowed[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
+  box-sizing: border-box;
+}
 .rdt-sr-live[data-rozie-s-d5dcab4c] {
   position: absolute;
   width: 1px;
@@ -1829,8 +1833,45 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     const c = cols[i];
     return c && typeof c.getSize === 'function' ? c.getSize() : 150;
   }
+  // forcedColumns() (Phase 87 87-05, D-10): the column-axis mirror of pinnedEditIndex()/
+  // pinnedMeasurement() (the row axis's D-05 pin-extension hook) — unions pinned + active-cell +
+  // editing column indices into the window slice so none of them ever recycle out from under the
+  // user. Reads table.getVisibleLeafColumns() DIRECTLY (the SAME array columnCount()/columnSize()
+  // index against, and the array row.getVisibleCells() is itself built from) — NOT
+  // allLeafColumns() (columnChrome.rzts), which excludes the auto-injected chrome columns and
+  // returns plain POJOs with no getSize(), breaking the index alignment (the exact columnSize()
+  // Rule-1 fix from 87-04, mirrored here rather than repeated).
+  //
+  // The fill-handle corner is DELIBERATELY not forced (D-10 explicit) — no call to
+  // isFillHandleCell here. The whole selected RANGE is not forced either: a range's moving
+  // corner tracks into $data.activeColIndex (extendRange/setRangeFocus), so even a 200-column
+  // range forces at most the ONE active-cell column via the branch below, never the full span —
+  // forcing the whole range would defeat the feature precisely where it is most wanted (D-10).
   function forcedColumns(): number[] {
-    return [];
+    if (!colsWindowed()) return [];
+    const out = [];
+    if (table && table.getVisibleLeafColumns) {
+      const cols = table.getVisibleLeafColumns();
+      for (let i = 0; i < cols.length; i++) {
+        const c = cols[i];
+        if (c && c.getIsPinned && c.getIsPinned()) out.push(i);
+      }
+    }
+    // Active cell's column (D-10): required or focusActiveCell()'s [data-col-index="N"]
+    // querySelector cannot resolve for an off-window active cell. Body cells only — a header-
+    // active cell has no column-axis rendering dependency here (headers window separately).
+    if (!activeIsHeader() && activeColIndex() >= 0 && out.indexOf(activeColIndex()) === -1) {
+      out.push(activeColIndex());
+    }
+    // Editing column (D-10): required or an open editor unmounts mid-keystroke when a
+    // horizontal scroll recycles it — the exact failure D-02 was built to fix on the row axis
+    // (T-87-05-01, the phase's one HIGH-severity threat). Single-cell edit mode only
+    // ($data.editingRow/editingCol, mirroring editingColumnId()'s own index pair) — full-row
+    // edit mode (editingRowIndex) has no single "the editing column" to force.
+    if (editingRow() >= 0 && editingCol() >= 0 && out.indexOf(editingCol()) === -1) {
+      out.push(editingCol());
+    }
+    return out;
   }
 
   // windowedCells(row) (D-09): the TEMPLATE-ONLY windowed slice of a row's visible cells — wraps
@@ -2309,16 +2350,30 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
 
   // colPadLeft() / colPadRight() (D-06): the horizontal spacer <td>/<th> widths — the leading
   // spacer occupies items[0].start, the trailing spacer the gap between the last rendered
-  // item's end and getTotalSize(). Mirrors padTop()/padBottom() exactly, minus the D-02 pin-row
-  // subtraction (forcedColumns() is empty until 87-05, so there is no forced-outside-window
-  // column to subtract yet — when it lands, decide above/below by INDEX, never by start-offset,
-  // per the WR-01 lesson padBottom() already carries).
+  // item's end and getTotalSize(). Mirrors padTop()/padBottom() exactly, INCLUDING the D-02-style
+  // pin subtraction (87-05): forcedColumns() can return MULTIPLE forced indices (pinned + active +
+  // editing, not just one pin), so each forced index outside the virtual window is checked
+  // individually. A forced column rendered outside the window contributes its OWN real width to
+  // the row (via its <th>/<td>'s own inline width under table-layout:fixed), so that width must
+  // come OUT of the spacer or the row's total overshoots getTotalSize() and the horizontal
+  // scrollbar lengthens on every such scroll. WR-01: decide before/after the window by comparing
+  // the forced INDEX against the window's first/last item INDEX, never by start-OFFSET —
+  // measurement drift makes the offset comparison wrong for the variable-width case (mirrors
+  // padBottom()'s existing WR-01 discipline). A forced column's width is columnSize(i) (the
+  // table-core size oracle, D-06's authoritative source), never a DOM measurement.
   function colPadLeft() {
     void windowVer();
     void editVer();
     if (!colsWindowed() || !colVirtualizer) return 0;
     const items = colVirtualizer.getVirtualItems();
-    const pad = items.length ? items[0].start : 0;
+    let pad = items.length ? items[0].start : 0;
+    if (items.length) {
+      const firstIdx = items[0].index;
+      const forced = forcedColumns();
+      for (let i = 0; i < forced.length; i++) {
+        if (forced[i] < firstIdx) pad = pad - columnSize(forced[i]);
+      }
+    }
     return pad < 0 ? 0 : pad;
   }
   function colPadRight() {
@@ -2327,7 +2382,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     if (!colsWindowed() || !colVirtualizer) return 0;
     const items = colVirtualizer.getVirtualItems();
     if (!items.length) return 0;
-    const pad = colVirtualizer.getTotalSize() - items[items.length - 1].end;
+    let pad = colVirtualizer.getTotalSize() - items[items.length - 1].end;
+    const lastIdx = items[items.length - 1].index;
+    const forced = forcedColumns();
+    for (let i = 0; i < forced.length; i++) {
+      if (forced[i] > lastIdx) pad = pad - columnSize(forced[i]);
+    }
     return pad < 0 ? 0 : pad;
   }
   // colIsOutsideWindow(c): is the absolute leaf-column index c absent from the currently
@@ -4357,22 +4417,48 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     }
   }
 
-  // ══ Phase 87 87-04 — column-axis template windowing (the D-06/D-11 tracer, flat-header-only;
-  // declared HERE (after the columnChrome/gridFocusNav imports above) so a forward cross-partial
-  // reference to visibleColCount()/colsWindowed()/windowedColIndices() in the merged per-target
-  // output never TDZs on React — the 87-02 useCallback-deps-array ordering lesson). ══
-  // windowedHeaderRow(hg, hgLevel): the windowed slice of ONE header level's headers, restricted
-  // to the LAST (leaf) level only in this plan — a group/parent level is left untouched (the
-  // grouped colspan clamp is 87-05's expansion, D-11). Byte-identical to hg.headers for every
-  // other path (off, a non-leaf level, or rows-only windowing).
-  function windowedHeaderRow(hg: any, hgLevel: any) {
+  // ══ Phase 87 87-04/87-05 — column-axis template windowing (D-06/D-11; declared HERE (after
+  // the columnChrome/gridFocusNav imports above) so a forward cross-partial reference to
+  // colsWindowed()/windowedColIndices() in the merged per-target output never TDZs on React —
+  // the 87-02 useCallback-deps-array ordering lesson, the SAME reason remeasureColumnWindow()
+  // below stays out of virtualization.rzts). ══
+  // windowedHeadersFor(hg, hgLevel) (87-05): generalizes 87-04's windowedHeaderRow() (leaf-level
+  // only) to EVERY header level with a CLAMPED colspan (D-11). A header spans the CONTIGUOUS run
+  // of leaf-column indices [cursor, cursor + header.colSpan) — table-core lays out every header
+  // level's `headers` array left-to-right over the SAME full leaf-column order, so walking a
+  // running cursor by each header's OWN colSpan reconstructs its absolute leaf range with no
+  // extra table-core calls. Intersect that range with windowedColIndices() (which already unions
+  // the D-10 forced set): a header whose intersection is EMPTY is dropped entirely (a group
+  // wholly outside the window renders no <th> at all — D-11); otherwise it is emitted as
+  // { header, span } with span = the intersection SIZE (the clamp). Degrades to hg.headers
+  // UNCHANGED (span = the header's own colSpan, or 1) when columns are not windowed — the
+  // off-path the template's `:colspan="wh.span > 1 ? wh.span : null"` binding preserves
+  // byte-identically (a bare colspan="1" would change the emitted markup on the unwindowed path).
+  function windowedHeadersFor(hg: any, hgLevel: any) {
     const headers = hg && hg.headers || [];
-    if (!colsWindowed() || hgLevel !== headerGroups().length - 1) return headers;
+    if (!colsWindowed()) {
+      return headers.map((h: any) => ({
+        header: h,
+        span: h && h.colSpan > 1 ? h.colSpan : 1
+      }));
+    }
     const idx = windowedColIndices();
+    const idxSet = {};
+    for (let i = 0; i < idx.length; i++) idxSet[idx[i]] = true;
+    let cursor = 0;
     const out = [];
-    for (let i = 0; i < idx.length; i++) {
-      const h = headers[idx[i]];
-      if (h) out.push(h);
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
+      const leafCount = h && h.colSpan ? h.colSpan : 1;
+      const start = cursor;
+      const end = cursor + leafCount;
+      cursor = end;
+      let span = 0;
+      for (let c = start; c < end; c++) if (idxSet[c]) span = span + 1;
+      if (span > 0) out.push({
+        header: h,
+        span
+      });
     }
     return out;
   }
@@ -6589,40 +6675,40 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       <thead class={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         <Key each={headerGroups() as readonly any[]} by={(hg) => hg.id}>{(hg, hgLevel) => <tr class={"rdt-tr"} role="row" aria-rowindex={rozieAttr(hgLevel() + 1)} data-rozie-s-d5dcab4c="">
           
-          {<Show when={colsWindowed() && hgLevel() === headerGroups().length - 1}><th class={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadLeft() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" /></Show>}<Key each={windowedHeaderRow(hg(), hgLevel()) as readonly any[]} by={(header) => header.id}>{(header) => <th class={"rdt-th" + " " + rozieClass({ 'rdt-select-th': isSelectColumn(header().column.id), 'rdt-expander-th': isExpanderColumn(header().column.id), 'rdt-th-resizing': columnIsResizing(header().column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg(), header()), hgLevel()) })} role="columnheader" data-col={rozieAttr(header().column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel())} colSpan={rozieAttr(header().colSpan > 1 ? header().colSpan : null)} data-col-index={rozieAttr(headerColIndexOf(hg(), header()))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg(), header()), hgLevel()))} aria-sort={rozieAttr(ariaSortFor(header().column.id))} style={parseInlineStyle(thStyle(header().column.id))} data-rozie-s-d5dcab4c="">
-            {<Show when={isSelectColumn(header().column.id)} fallback={<Show when={isExpanderColumn(header().column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={header().column.getCanSort && header().column.getCanSort()} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+          {<Show when={colsWindowed()}><th class={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadLeft() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" /></Show>}<Key each={windowedHeadersFor(hg(), hgLevel()) as readonly any[]} by={(wh) => wh.header.id}>{(wh) => <th class={"rdt-th" + " " + rozieClass({ 'rdt-select-th': isSelectColumn(wh().header.column.id), 'rdt-expander-th': isExpanderColumn(wh().header.column.id), 'rdt-th-resizing': columnIsResizing(wh().header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg(), wh().header), hgLevel()) })} role="columnheader" data-col={rozieAttr(wh().header.column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel())} colSpan={rozieAttr(wh().span > 1 ? wh().span : null)} data-col-index={rozieAttr(headerColIndexOf(hg(), wh().header))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg(), wh().header), hgLevel()))} aria-sort={rozieAttr(ariaSortFor(wh().header.column.id))} style={parseInlineStyle(thStyle(wh().header.column.id))} data-rozie-s-d5dcab4c="">
+            {<Show when={isSelectColumn(wh().header.column.id)} fallback={<Show when={isExpanderColumn(wh().header.column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {<Show when={wh().header.column.getCanSort && wh().header.column.getCanSort()} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 <span class={"rdt-header-label"} data-rozie-s-d5dcab4c="">
-                  {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: header().column.id, column: header().column, label: headerLabel(header().column.id) }) ?? rozieDisplay(headerLabel(header().column.id))}
+                  {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: wh().header.column.id, column: wh().header.column, label: headerLabel(wh().header.column.id) }) ?? rozieDisplay(headerLabel(wh().header.column.id))}
                 </span>
-              </span>}><button type="button" class={"rdt-sort-btn"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onHeaderSort(header().column.id, $event); }} data-rozie-s-d5dcab4c="">
+              </span>}><button type="button" class={"rdt-sort-btn"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onHeaderSort(wh().header.column.id, $event); }} data-rozie-s-d5dcab4c="">
                 <span class={"rdt-header-label"} data-rozie-s-d5dcab4c="">
-                  {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: header().column.id, column: header().column, label: headerLabel(header().column.id) }) ?? rozieDisplay(headerLabel(header().column.id))}
+                  {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: wh().header.column.id, column: wh().header.column, label: headerLabel(wh().header.column.id) }) ?? rozieDisplay(headerLabel(wh().header.column.id))}
                 </span>
-                <span class={"rdt-sort-ind"} aria-hidden="true" data-rozie-s-d5dcab4c="">{rozieDisplay(sortIndicator(header().column.id))}</span>
+                <span class={"rdt-sort-ind"} aria-hidden="true" data-rozie-s-d5dcab4c="">{rozieDisplay(sortIndicator(wh().header.column.id))}</span>
               </button></Show>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" anchorSlot={() => (<>
-                  <button type="button" class={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(header().column.id))} data-rozie-s-d5dcab4c="">⋯</button>
+                  <button type="button" class={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(wh().header.column.id))} data-rozie-s-d5dcab4c="">⋯</button>
                 </>)}><div class={"rdt-col-menu"} role="menu" data-rozie-s-d5dcab4c="">
-                  <button type="button" role="menuitem" aria-pressed={columnPinSide(header().column.id) === 'left'} class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPinColumn(header().column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">Pin left</button>
-                  <button type="button" role="menuitem" aria-pressed={columnPinSide(header().column.id) === 'right'} class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPinColumn(header().column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">Pin right</button>
-                  <button type="button" role="menuitem" aria-pressed={!columnPinSide(header().column.id)} class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPinColumn(header().column.id, false, $event); }} data-rozie-s-d5dcab4c="">Unpin</button>
+                  <button type="button" role="menuitem" aria-pressed={columnPinSide(wh().header.column.id) === 'left'} class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPinColumn(wh().header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">Pin left</button>
+                  <button type="button" role="menuitem" aria-pressed={columnPinSide(wh().header.column.id) === 'right'} class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPinColumn(wh().header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">Pin right</button>
+                  <button type="button" role="menuitem" aria-pressed={!columnPinSide(wh().header.column.id)} class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPinColumn(wh().header.column.id, false, $event); }} data-rozie-s-d5dcab4c="">Unpin</button>
                   <hr class={"rdt-col-menu-sep"} data-rozie-s-d5dcab4c="" />
-                  <button type="button" role="menuitem" class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onHideColumn(header().column.id, $event); }} data-rozie-s-d5dcab4c="">Hide column</button>
+                  <button type="button" role="menuitem" class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onHideColumn(wh().header.column.id, $event); }} data-rozie-s-d5dcab4c="">Hide column</button>
                 </div></Popover>
-              <button type="button" aria-label={rozieAttr('Resize ' + headerLabel(header().column.id))} class={"rdt-resize-handle"} onPointerDown={($event: PointerEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onResizeStart(header().column.id, $event); }} onTouchStart={($event: TouchEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onResizeStart(header().column.id, $event); }} data-rozie-s-d5dcab4c=""><span class={"rdt-resize-grip"} aria-hidden="true" data-rozie-s-d5dcab4c="" /></button>
+              <button type="button" aria-label={rozieAttr('Resize ' + headerLabel(wh().header.column.id))} class={"rdt-resize-handle"} onPointerDown={($event: PointerEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onResizeStart(wh().header.column.id, $event); }} onTouchStart={($event: TouchEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onResizeStart(wh().header.column.id, $event); }} data-rozie-s-d5dcab4c=""><span class={"rdt-resize-grip"} aria-hidden="true" data-rozie-s-d5dcab4c="" /></button>
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(_props.selectAllSlot ?? _props.slots?.['selectAll'])?.({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) ?? <Show when={local.selectionMode === 'multiple'}><input type="checkbox" aria-label="Select all rows" class={"rdt-select-all"} checked={isAllRowsSelected()} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" /></Show>}
             </span></Show>}</th>}</Key>
           
-          {<Show when={colsWindowed() && hgLevel() === headerGroups().length - 1}><th class={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadRight() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" /></Show>}</tr>}</Key>
+          {<Show when={colsWindowed()}><th class={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadRight() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" /></Show>}</tr>}</Key>
         
         {<Show when={hasAnyFilterableColumn()}><tr class={"rdt-filter-row"} data-rozie-s-d5dcab4c="">
-          <Key each={headerGroups()[headerGroups().length - 1].headers as readonly any[]} by={(header) => header.id}>{(header) => <th class={"rdt-filter-cell"} role="presentation" style={parseInlineStyle(pinStyle(header().column.id))} data-rozie-s-d5dcab4c="">
-            {<Show when={isSelectColumn(header().column.id)} fallback={<Show when={isExpanderColumn(header().column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={columnIsFilterable(header().column.id) && !hasFilterSlot()}><input type="text" aria-label={rozieAttr('Filter ' + headerLabel(header().column.id))} class={"rdt-col-filter"} value={columnFilterValue(header().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onColumnFilterInput(header().column.id, $event); }} onClick={($event: MouseEvent & { currentTarget: HTMLInputElement; target: Element }) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" /></Show>}{<Show when={columnIsFilterable(header().column.id)}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(_props.filterSlot ?? _props.slots?.['filter'])?.({ columnId: header().column.id, value: columnFilterValue(header().column.id), uniqueValues: getFacetedUniqueValues(header().column.id), minMax: getFacetedMinMaxValues(header().column.id), setFilter: setColumnFilter })}
+          {<Show when={colsWindowed()}><th class={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadLeft() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" /></Show>}<Key each={windowedHeadersFor(headerGroups()[headerGroups().length - 1], headerGroups().length - 1) as readonly any[]} by={(wh) => wh.header.id}>{(wh) => <th class={"rdt-filter-cell"} role="presentation" style={parseInlineStyle(pinStyle(wh().header.column.id))} data-rozie-s-d5dcab4c="">
+            {<Show when={isSelectColumn(wh().header.column.id)} fallback={<Show when={isExpanderColumn(wh().header.column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {<Show when={columnIsFilterable(wh().header.column.id) && !hasFilterSlot()}><input type="text" aria-label={rozieAttr('Filter ' + headerLabel(wh().header.column.id))} class={"rdt-col-filter"} value={columnFilterValue(wh().header.column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onColumnFilterInput(wh().header.column.id, $event); }} onClick={($event: MouseEvent & { currentTarget: HTMLInputElement; target: Element }) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" /></Show>}{<Show when={columnIsFilterable(wh().header.column.id)}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {(_props.filterSlot ?? _props.slots?.['filter'])?.({ columnId: wh().header.column.id, value: columnFilterValue(wh().header.column.id), uniqueValues: getFacetedUniqueValues(wh().header.column.id), minMax: getFacetedMinMaxValues(wh().header.column.id), setFilter: setColumnFilter })}
               </span></Show>}</span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}</th>}</Key>
-        </tr></Show>}</thead>
+          {<Show when={colsWindowed()}><th class={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadRight() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" /></Show>}</tr></Show>}</thead>
 
       <tbody class={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         

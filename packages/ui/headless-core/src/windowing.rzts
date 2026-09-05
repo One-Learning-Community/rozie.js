@@ -312,16 +312,30 @@ const windowedColIndices = () => {
 
 // colPadLeft() / colPadRight() (D-06): the horizontal spacer <td>/<th> widths — the leading
 // spacer occupies items[0].start, the trailing spacer the gap between the last rendered
-// item's end and getTotalSize(). Mirrors padTop()/padBottom() exactly, minus the D-02 pin-row
-// subtraction (forcedColumns() is empty until 87-05, so there is no forced-outside-window
-// column to subtract yet — when it lands, decide above/below by INDEX, never by start-offset,
-// per the WR-01 lesson padBottom() already carries).
+// item's end and getTotalSize(). Mirrors padTop()/padBottom() exactly, INCLUDING the D-02-style
+// pin subtraction (87-05): forcedColumns() can return MULTIPLE forced indices (pinned + active +
+// editing, not just one pin), so each forced index outside the virtual window is checked
+// individually. A forced column rendered outside the window contributes its OWN real width to
+// the row (via its <th>/<td>'s own inline width under table-layout:fixed), so that width must
+// come OUT of the spacer or the row's total overshoots getTotalSize() and the horizontal
+// scrollbar lengthens on every such scroll. WR-01: decide before/after the window by comparing
+// the forced INDEX against the window's first/last item INDEX, never by start-OFFSET —
+// measurement drift makes the offset comparison wrong for the variable-width case (mirrors
+// padBottom()'s existing WR-01 discipline). A forced column's width is columnSize(i) (the
+// table-core size oracle, D-06's authoritative source), never a DOM measurement.
 const colPadLeft = () => {
   void $data.windowVer
   void $data.editVer
   if (!colsWindowed() || !colVirtualizer) return 0
   const items = colVirtualizer.getVirtualItems()
-  const pad = items.length ? items[0].start : 0
+  let pad = items.length ? items[0].start : 0
+  if (items.length) {
+    const firstIdx = items[0].index
+    const forced = forcedColumns()
+    for (let i = 0; i < forced.length; i++) {
+      if (forced[i] < firstIdx) pad = pad - columnSize(forced[i])
+    }
+  }
   return pad < 0 ? 0 : pad
 }
 const colPadRight = () => {
@@ -330,7 +344,12 @@ const colPadRight = () => {
   if (!colsWindowed() || !colVirtualizer) return 0
   const items = colVirtualizer.getVirtualItems()
   if (!items.length) return 0
-  const pad = colVirtualizer.getTotalSize() - items[items.length - 1].end
+  let pad = colVirtualizer.getTotalSize() - items[items.length - 1].end
+  const lastIdx = items[items.length - 1].index
+  const forced = forcedColumns()
+  for (let i = 0; i < forced.length; i++) {
+    if (forced[i] > lastIdx) pad = pad - columnSize(forced[i])
+  }
   return pad < 0 ? 0 : pad
 }
 // colIsOutsideWindow(c): is the absolute leaf-column index c absent from the currently

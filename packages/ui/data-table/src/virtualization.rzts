@@ -72,7 +72,46 @@ const columnSize = (i: number): number => {
   const c = cols[i]
   return c && typeof c.getSize === 'function' ? c.getSize() : 150
 }
-const forcedColumns = (): number[] => []
+// forcedColumns() (Phase 87 87-05, D-10): the column-axis mirror of pinnedEditIndex()/
+// pinnedMeasurement() (the row axis's D-05 pin-extension hook) — unions pinned + active-cell +
+// editing column indices into the window slice so none of them ever recycle out from under the
+// user. Reads table.getVisibleLeafColumns() DIRECTLY (the SAME array columnCount()/columnSize()
+// index against, and the array row.getVisibleCells() is itself built from) — NOT
+// allLeafColumns() (columnChrome.rzts), which excludes the auto-injected chrome columns and
+// returns plain POJOs with no getSize(), breaking the index alignment (the exact columnSize()
+// Rule-1 fix from 87-04, mirrored here rather than repeated).
+//
+// The fill-handle corner is DELIBERATELY not forced (D-10 explicit) — no call to
+// isFillHandleCell here. The whole selected RANGE is not forced either: a range's moving
+// corner tracks into $data.activeColIndex (extendRange/setRangeFocus), so even a 200-column
+// range forces at most the ONE active-cell column via the branch below, never the full span —
+// forcing the whole range would defeat the feature precisely where it is most wanted (D-10).
+const forcedColumns = (): number[] => {
+  if (!colsWindowed()) return []
+  const out = []
+  if (table && table.getVisibleLeafColumns) {
+    const cols = table.getVisibleLeafColumns()
+    for (let i = 0; i < cols.length; i++) {
+      const c = cols[i]
+      if (c && c.getIsPinned && c.getIsPinned()) out.push(i)
+    }
+  }
+  // Active cell's column (D-10): required or focusActiveCell()'s [data-col-index="N"]
+  // querySelector cannot resolve for an off-window active cell. Body cells only — a header-
+  // active cell has no column-axis rendering dependency here (headers window separately).
+  if (!$data.activeIsHeader && $data.activeColIndex >= 0 && out.indexOf($data.activeColIndex) === -1) {
+    out.push($data.activeColIndex)
+  }
+  // Editing column (D-10): required or an open editor unmounts mid-keystroke when a
+  // horizontal scroll recycles it — the exact failure D-02 was built to fix on the row axis
+  // (T-87-05-01, the phase's one HIGH-severity threat). Single-cell edit mode only
+  // ($data.editingRow/editingCol, mirroring editingColumnId()'s own index pair) — full-row
+  // edit mode (editingRowIndex) has no single "the editing column" to force.
+  if ($data.editingRow >= 0 && $data.editingCol >= 0 && out.indexOf($data.editingCol) === -1) {
+    out.push($data.editingCol)
+  }
+  return out
+}
 
 // windowedCells(row) (D-09): the TEMPLATE-ONLY windowed slice of a row's visible cells — wraps
 // visibleCellsFor(row) (columnChrome.rzts) WITHOUT modifying it. Degrades to the full,

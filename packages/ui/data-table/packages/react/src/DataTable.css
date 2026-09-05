@@ -7,6 +7,10 @@
 .rozie-data-table.rdt-col-windowed[data-rozie-s-d5dcab4c] {
   table-layout: fixed;
 }
+.rozie-data-table.rdt-col-windowed[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
+.rozie-data-table.rdt-col-windowed[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
+  box-sizing: border-box;
+}
 .rdt-sr-live[data-rozie-s-d5dcab4c] {
   position: absolute;
   width: 1px;

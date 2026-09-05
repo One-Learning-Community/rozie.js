@@ -28,41 +28,41 @@
   <thead class="rdt-thead" role="rowgroup">
     <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row" :aria-rowindex="hgLevel + 1">
       
-      <th v-if="colsWindowed() && hgLevel === headerGroups.length - 1" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th><th v-for="header in windowedHeaderRow(hg, hgLevel)" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
-        <span v-if="isSelectColumn(header.column.id)" style="display:contents">
+      <th v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th><th v-for="wh in windowedHeadersFor(hg, hgLevel)" :key="wh.header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }]" role="columnheader" :data-col="wh.header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(wh.span > 1 ? wh.span : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, wh.header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(wh.header.column.id)" :style="thStyle(wh.header.column.id)">
+        <span v-if="isSelectColumn(wh.header.column.id)" style="display:contents">
           <slot name="selectAll" :checked="isAllRowsSelected()" :indeterminate="isSomeRowsSelected()" :toggle="onToggleAllRows">
             <input v-if="props.selectionMode === 'multiple'" class="rdt-select-all" type="checkbox" aria-label="Select all rows" :checked="isAllRowsSelected()" @change="onToggleAllRows($event)" /></slot>
-        </span><span v-else-if="isExpanderColumn(header.column.id)" style="display:contents"></span><span v-else style="display:contents">
-          <button v-if="header.column.getCanSort && header.column.getCanSort()" type="button" class="rdt-sort-btn" @click="onHeaderSort(header.column.id, $event)">
+        </span><span v-else-if="isExpanderColumn(wh.header.column.id)" style="display:contents"></span><span v-else style="display:contents">
+          <button v-if="wh.header.column.getCanSort && wh.header.column.getCanSort()" type="button" class="rdt-sort-btn" @click="onHeaderSort(wh.header.column.id, $event)">
             <span class="rdt-header-label">
-              <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
+              <slot name="colHeader" :columnId="wh.header.column.id" :column="wh.header.column" :label="headerLabel(wh.header.column.id)">{{ headerLabel(wh.header.column.id) }}</slot>
             </span>
-            <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(header.column.id) }}</span>
+            <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(wh.header.column.id) }}</span>
           </button><span v-else style="display:contents">
             <span class="rdt-header-label">
-              <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
+              <slot name="colHeader" :columnId="wh.header.column.id" :column="wh.header.column" :label="headerLabel(wh.header.column.id)">{{ headerLabel(wh.header.column.id) }}</slot>
             </span>
           </span><Popover trigger="click" placement="bottom-end" strategy="fixed" :offset="4"><template #anchor>
-              <button type="button" class="rdt-col-menu-trigger" :aria-label="'Column options for ' + headerLabel(header.column.id)">⋯</button>
+              <button type="button" class="rdt-col-menu-trigger" :aria-label="'Column options for ' + headerLabel(wh.header.column.id)">⋯</button>
             </template><div class="rdt-col-menu" role="menu">
-              <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="columnPinSide(header.column.id) === 'left'" @click="onPinColumn(header.column.id, 'left', $event)">Pin left</button>
-              <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="columnPinSide(header.column.id) === 'right'" @click="onPinColumn(header.column.id, 'right', $event)">Pin right</button>
-              <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="!columnPinSide(header.column.id)" @click="onPinColumn(header.column.id, false, $event)">Unpin</button>
+              <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="columnPinSide(wh.header.column.id) === 'left'" @click="onPinColumn(wh.header.column.id, 'left', $event)">Pin left</button>
+              <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="columnPinSide(wh.header.column.id) === 'right'" @click="onPinColumn(wh.header.column.id, 'right', $event)">Pin right</button>
+              <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="!columnPinSide(wh.header.column.id)" @click="onPinColumn(wh.header.column.id, false, $event)">Unpin</button>
               <hr class="rdt-col-menu-sep" />
-              <button type="button" role="menuitem" class="rdt-col-menu-item" @click="onHideColumn(header.column.id, $event)">Hide column</button>
+              <button type="button" role="menuitem" class="rdt-col-menu-item" @click="onHideColumn(wh.header.column.id, $event)">Hide column</button>
             </div></Popover>
-          <button type="button" class="rdt-resize-handle" :aria-label="'Resize ' + headerLabel(header.column.id)" @pointerdown="onResizeStart(header.column.id, $event)" @touchstart="onResizeStart(header.column.id, $event)"><span class="rdt-resize-grip" aria-hidden="true"></span></button>
+          <button type="button" class="rdt-resize-handle" :aria-label="'Resize ' + headerLabel(wh.header.column.id)" @pointerdown="onResizeStart(wh.header.column.id, $event)" @touchstart="onResizeStart(wh.header.column.id, $event)"><span class="rdt-resize-grip" aria-hidden="true"></span></button>
         </span></th>
       
-      <th v-if="colsWindowed() && hgLevel === headerGroups.length - 1" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadRight() + 'px;padding:0;border:0'"></th></tr>
+      <th v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadRight() + 'px;padding:0;border:0'"></th></tr>
     
     <tr v-if="hasAnyFilterableColumn()" class="rdt-filter-row">
-      <th v-for="header in headerGroups[headerGroups.length - 1].headers" :key="header.id" class="rdt-filter-cell" role="presentation" :style="pinStyle(header.column.id)">
-        <span v-if="isSelectColumn(header.column.id)" style="display:contents"></span><span v-else-if="isExpanderColumn(header.column.id)" style="display:contents"></span><span v-else style="display:contents">
-          <input v-if="columnIsFilterable(header.column.id) && !hasFilterSlot()" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
-            <slot name="filter" :columnId="header.column.id" :value="columnFilterValue(header.column.id)" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter"></slot>
+      <th v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th><th v-for="wh in windowedHeadersFor(headerGroups[headerGroups.length - 1], headerGroups.length - 1)" :key="wh.header.id" class="rdt-filter-cell" role="presentation" :style="pinStyle(wh.header.column.id)">
+        <span v-if="isSelectColumn(wh.header.column.id)" style="display:contents"></span><span v-else-if="isExpanderColumn(wh.header.column.id)" style="display:contents"></span><span v-else style="display:contents">
+          <input v-if="columnIsFilterable(wh.header.column.id) && !hasFilterSlot()" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(wh.header.column.id)" :value="columnFilterValue(wh.header.column.id)" @input="onColumnFilterInput(wh.header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(wh.header.column.id)" style="display:contents">
+            <slot name="filter" :columnId="wh.header.column.id" :value="columnFilterValue(wh.header.column.id)" :uniqueValues="getFacetedUniqueValues(wh.header.column.id)" :minMax="getFacetedMinMaxValues(wh.header.column.id)" :setFilter="setColumnFilter"></slot>
           </span></span></th>
-    </tr></thead>
+      <th v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadRight() + 'px;padding:0;border:0'"></th></tr></thead>
 
   <tbody class="rdt-tbody" role="rowgroup">
     
@@ -1248,7 +1248,46 @@ const columnSize = (i: number): number => {
   const c = cols[i];
   return c && typeof c.getSize === 'function' ? c.getSize() : 150;
 };
-const forcedColumns = (): number[] => [];
+// forcedColumns() (Phase 87 87-05, D-10): the column-axis mirror of pinnedEditIndex()/
+// pinnedMeasurement() (the row axis's D-05 pin-extension hook) — unions pinned + active-cell +
+// editing column indices into the window slice so none of them ever recycle out from under the
+// user. Reads table.getVisibleLeafColumns() DIRECTLY (the SAME array columnCount()/columnSize()
+// index against, and the array row.getVisibleCells() is itself built from) — NOT
+// allLeafColumns() (columnChrome.rzts), which excludes the auto-injected chrome columns and
+// returns plain POJOs with no getSize(), breaking the index alignment (the exact columnSize()
+// Rule-1 fix from 87-04, mirrored here rather than repeated).
+//
+// The fill-handle corner is DELIBERATELY not forced (D-10 explicit) — no call to
+// isFillHandleCell here. The whole selected RANGE is not forced either: a range's moving
+// corner tracks into $data.activeColIndex (extendRange/setRangeFocus), so even a 200-column
+// range forces at most the ONE active-cell column via the branch below, never the full span —
+// forcing the whole range would defeat the feature precisely where it is most wanted (D-10).
+const forcedColumns = (): number[] => {
+  if (!colsWindowed()) return [];
+  const out = [];
+  if (table && table.getVisibleLeafColumns) {
+    const cols = table.getVisibleLeafColumns();
+    for (let i = 0; i < cols.length; i++) {
+      const c = cols[i];
+      if (c && c.getIsPinned && c.getIsPinned()) out.push(i);
+    }
+  }
+  // Active cell's column (D-10): required or focusActiveCell()'s [data-col-index="N"]
+  // querySelector cannot resolve for an off-window active cell. Body cells only — a header-
+  // active cell has no column-axis rendering dependency here (headers window separately).
+  if (!activeIsHeader.value && activeColIndex.value >= 0 && out.indexOf(activeColIndex.value) === -1) {
+    out.push(activeColIndex.value);
+  }
+  // Editing column (D-10): required or an open editor unmounts mid-keystroke when a
+  // horizontal scroll recycles it — the exact failure D-02 was built to fix on the row axis
+  // (T-87-05-01, the phase's one HIGH-severity threat). Single-cell edit mode only
+  // ($data.editingRow/editingCol, mirroring editingColumnId()'s own index pair) — full-row
+  // edit mode (editingRowIndex) has no single "the editing column" to force.
+  if (editingRow.value >= 0 && editingCol.value >= 0 && out.indexOf(editingCol.value) === -1) {
+    out.push(editingCol.value);
+  }
+  return out;
+};
 // windowedCells(row) (D-09): the TEMPLATE-ONLY windowed slice of a row's visible cells — wraps
 // visibleCellsFor(row) (columnChrome.rzts) WITHOUT modifying it. Degrades to the full,
 // unsliced set when columns are not windowed (byte-identical to today). visibleCellsFor()
@@ -1700,16 +1739,30 @@ const windowedColIndices = () => {
 };
 // colPadLeft() / colPadRight() (D-06): the horizontal spacer <td>/<th> widths — the leading
 // spacer occupies items[0].start, the trailing spacer the gap between the last rendered
-// item's end and getTotalSize(). Mirrors padTop()/padBottom() exactly, minus the D-02 pin-row
-// subtraction (forcedColumns() is empty until 87-05, so there is no forced-outside-window
-// column to subtract yet — when it lands, decide above/below by INDEX, never by start-offset,
-// per the WR-01 lesson padBottom() already carries).
+// item's end and getTotalSize(). Mirrors padTop()/padBottom() exactly, INCLUDING the D-02-style
+// pin subtraction (87-05): forcedColumns() can return MULTIPLE forced indices (pinned + active +
+// editing, not just one pin), so each forced index outside the virtual window is checked
+// individually. A forced column rendered outside the window contributes its OWN real width to
+// the row (via its <th>/<td>'s own inline width under table-layout:fixed), so that width must
+// come OUT of the spacer or the row's total overshoots getTotalSize() and the horizontal
+// scrollbar lengthens on every such scroll. WR-01: decide before/after the window by comparing
+// the forced INDEX against the window's first/last item INDEX, never by start-OFFSET —
+// measurement drift makes the offset comparison wrong for the variable-width case (mirrors
+// padBottom()'s existing WR-01 discipline). A forced column's width is columnSize(i) (the
+// table-core size oracle, D-06's authoritative source), never a DOM measurement.
 const colPadLeft = () => {
   void windowVer.value;
   void editVer.value;
   if (!colsWindowed() || !colVirtualizer) return 0;
   const items = colVirtualizer.getVirtualItems();
-  const pad = items.length ? items[0].start : 0;
+  let pad = items.length ? items[0].start : 0;
+  if (items.length) {
+    const firstIdx = items[0].index;
+    const forced = forcedColumns();
+    for (let i = 0; i < forced.length; i++) {
+      if (forced[i] < firstIdx) pad = pad - columnSize(forced[i]);
+    }
+  }
   return pad < 0 ? 0 : pad;
 };
 const colPadRight = () => {
@@ -1718,7 +1771,12 @@ const colPadRight = () => {
   if (!colsWindowed() || !colVirtualizer) return 0;
   const items = colVirtualizer.getVirtualItems();
   if (!items.length) return 0;
-  const pad = colVirtualizer.getTotalSize() - items[items.length - 1].end;
+  let pad = colVirtualizer.getTotalSize() - items[items.length - 1].end;
+  const lastIdx = items[items.length - 1].index;
+  const forced = forcedColumns();
+  for (let i = 0; i < forced.length; i++) {
+    if (forced[i] > lastIdx) pad = pad - columnSize(forced[i]);
+  }
   return pad < 0 ? 0 : pad;
 };
 // colIsOutsideWindow(c): is the absolute leaf-column index c absent from the currently
@@ -3624,22 +3682,48 @@ const clampActiveCell = (rowCount: any, colCount: any) => {
     recoverGridFocus(String(recRow), recCol, null);
   }
 };
-// ══ Phase 87 87-04 — column-axis template windowing (the D-06/D-11 tracer, flat-header-only;
-// declared HERE (after the columnChrome/gridFocusNav imports above) so a forward cross-partial
-// reference to visibleColCount()/colsWindowed()/windowedColIndices() in the merged per-target
-// output never TDZs on React — the 87-02 useCallback-deps-array ordering lesson). ══
-// windowedHeaderRow(hg, hgLevel): the windowed slice of ONE header level's headers, restricted
-// to the LAST (leaf) level only in this plan — a group/parent level is left untouched (the
-// grouped colspan clamp is 87-05's expansion, D-11). Byte-identical to hg.headers for every
-// other path (off, a non-leaf level, or rows-only windowing).
-const windowedHeaderRow = (hg: any, hgLevel: any) => {
+// ══ Phase 87 87-04/87-05 — column-axis template windowing (D-06/D-11; declared HERE (after
+// the columnChrome/gridFocusNav imports above) so a forward cross-partial reference to
+// colsWindowed()/windowedColIndices() in the merged per-target output never TDZs on React —
+// the 87-02 useCallback-deps-array ordering lesson, the SAME reason remeasureColumnWindow()
+// below stays out of virtualization.rzts). ══
+// windowedHeadersFor(hg, hgLevel) (87-05): generalizes 87-04's windowedHeaderRow() (leaf-level
+// only) to EVERY header level with a CLAMPED colspan (D-11). A header spans the CONTIGUOUS run
+// of leaf-column indices [cursor, cursor + header.colSpan) — table-core lays out every header
+// level's `headers` array left-to-right over the SAME full leaf-column order, so walking a
+// running cursor by each header's OWN colSpan reconstructs its absolute leaf range with no
+// extra table-core calls. Intersect that range with windowedColIndices() (which already unions
+// the D-10 forced set): a header whose intersection is EMPTY is dropped entirely (a group
+// wholly outside the window renders no <th> at all — D-11); otherwise it is emitted as
+// { header, span } with span = the intersection SIZE (the clamp). Degrades to hg.headers
+// UNCHANGED (span = the header's own colSpan, or 1) when columns are not windowed — the
+// off-path the template's `:colspan="wh.span > 1 ? wh.span : null"` binding preserves
+// byte-identically (a bare colspan="1" would change the emitted markup on the unwindowed path).
+const windowedHeadersFor = (hg: any, hgLevel: any) => {
   const headers = hg && hg.headers || [];
-  if (!colsWindowed() || hgLevel !== headerGroups.value.length - 1) return headers;
+  if (!colsWindowed()) {
+    return headers.map((h: any) => ({
+      header: h,
+      span: h && h.colSpan > 1 ? h.colSpan : 1
+    }));
+  }
   const idx = windowedColIndices();
+  const idxSet = {};
+  for (let i = 0; i < idx.length; i++) idxSet[idx[i]] = true;
+  let cursor = 0;
   const out = [];
-  for (let i = 0; i < idx.length; i++) {
-    const h = headers[idx[i]];
-    if (h) out.push(h);
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i];
+    const leafCount = h && h.colSpan ? h.colSpan : 1;
+    const start = cursor;
+    const end = cursor + leafCount;
+    cursor = end;
+    let span = 0;
+    for (let c = start; c < end; c++) if (idxSet[c]) span = span + 1;
+    if (span > 0) out.push({
+      header: h,
+      span
+    });
   }
   return out;
 };
@@ -6019,6 +6103,10 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
 }
 .rozie-data-table.rdt-col-windowed {
   table-layout: fixed;
+}
+.rozie-data-table.rdt-col-windowed .rdt-th,
+.rozie-data-table.rdt-col-windowed .rdt-td {
+  box-sizing: border-box;
 }
 .rdt-sr-live {
   position: absolute;
