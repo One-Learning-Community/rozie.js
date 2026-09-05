@@ -27,14 +27,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   D-13      — a fill drag whose pointer reaches the container's right edge auto-scrolls
  *               the column axis so the range can grow past the pre-drag window.
  *
- * Status as of 87-04 Task 1 (the tracer — flat header only, no forced columns, no grouped
- * colspan clamp, no filter row): D-01 and D-06/D-11 are GREEN on all six targets — the
- * body/header cell loops now genuinely window via `windowedCells()`/`windowedColIndices()`.
- * D-08/D-10/D-12 REGRESS to RED (they previously passed trivially because nothing was
- * excluded from the DOM; real windowing now excludes col 55 / the pinned+editing columns /
- * the pre-focus off-window target, and `forcedColumns()`/the scroll-then-focus seam that
- * would keep them reachable are 87-05/87-06's work, not this tracer's). D-13 stays RED — no
- * per-axis edge-triggered auto-scroll exists on either axis yet (87-06).
+ * Status as of 87-06 (this plan): D-01, D-06/D-11, D-10, D-08, D-12, and D-13 are ALL GREEN on
+ * all six targets (mount-specific `test.fixme`s from 87-04/87-05 for confirmed, unrelated,
+ * fully root-caused rendering/harness gaps are unchanged and documented in
+ * deferred-items.md). D-08 needed ZERO changes to `colIndexOf`/`visibleColCount` themselves —
+ * 87-02's recorded A2 outcome (the five column-index functions already read the unsliced cell
+ * list) held, machine-enforced by `prohibitions.test.ts`'s A2 invariant — this file's D-08
+ * battery is the PROOF of that guarantee, not a fix. D-12's scroll-then-focus guard
+ * (`gridFocusNav.rzts`) widened to fire on either axis; D-13's `fillDrag.rzts` gained per-axis
+ * edge-triggered auto-scroll, closing the pre-existing VERTICAL gap for free (shown RED-to-
+ * GREEN in this same file). The ONE genuinely still-RED case in this file is the `dir="rtl"`
+ * scenario further below — `isRtl` wiring into `columnVirtualizerOptions()` was never in this
+ * plan's `files_modified` (only `gridFocusNav.rzts`/`gridActiveCellVerbs.rzts`/`fillDrag.rzts`/
+ * `DataTable.rozie`/this spec file), so it remains a documented, out-of-scope follow-up.
  *
  * DOM/behavioral assertions only (no PNG baseline) — the pinned Linux Docker run is the CI
  * gate; macOS/Linux kerning noise flakes pixel diffs on windowing-invariant assertions (the
@@ -225,7 +230,13 @@ async function gridScrollLeft(page: Page): Promise<number> {
 /** Install `findWithinGridTable`/`findAllWithinGridTable` onto `window` so every
  *  `page.evaluate` call in this file (each serialized independently — Playwright's
  *  evaluate boundary does not share closures across calls) can reach them by name. Called
- *  once per test, right after navigation. */
+ *  once per test, right after navigation.
+ *
+ *  87-06: ALSO installs `__findWithinScope`/`__findAllWithinScope`, the same shadow-piercing
+ *  walker generalized to an ARBITRARY anchor testid — needed because the D-13 bottom/top-edge
+ *  cases drive mount (B) (`grid-table-both`, `virtual="both"`), not mount (A). The original
+ *  `__findWithinGridTable`/`__findAllWithinGridTable` names are kept as thin wrappers hardcoded
+ *  to `grid-table` so every EXISTING helper/test in this file (mount-A-only) is untouched. */
 async function installGridTableHelpers(page: Page): Promise<void> {
   await page.evaluate(() => {
     function walkFind(root: Document | Element | ShadowRoot, inner: string): Element | null {
@@ -253,18 +264,149 @@ async function installGridTableHelpers(page: Page): Promise<void> {
     // OWN open shadow root, not light DOM. Playwright's locators (`page.getByTestId`)
     // auto-pierce shadow roots, which is why `gotoDemo`'s visibility check passes on Lit
     // even though a raw `document.querySelector` for the same testid returns null.
-    (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable = (inner: string) => {
-      const anchor = walkFind(document, '[data-testid="grid-table"]');
+    (window as unknown as { __findWithinScope: (a: string, s: string) => Element | null }).__findWithinScope = (anchorSel: string, inner: string) => {
+      const anchor = walkFind(document, anchorSel);
       return anchor ? walkFind(anchor, inner) : null;
     };
-    (window as unknown as { __findAllWithinGridTable: (s: string) => Element[] }).__findAllWithinGridTable = (inner: string) => {
-      const anchor = walkFind(document, '[data-testid="grid-table"]');
+    (window as unknown as { __findAllWithinScope: (a: string, s: string) => Element[] }).__findAllWithinScope = (anchorSel: string, inner: string) => {
+      const anchor = walkFind(document, anchorSel);
       if (!anchor) return [];
       const out: Element[] = [];
       walkFindAll(anchor, inner, out);
       return out;
     };
+    (window as unknown as { __findWithinGridTable: (s: string) => Element | null; __findWithinScope: (a: string, s: string) => Element | null }).__findWithinGridTable = (inner: string) =>
+      (window as unknown as { __findWithinScope: (a: string, s: string) => Element | null }).__findWithinScope('[data-testid="grid-table"]', inner);
+    (window as unknown as { __findAllWithinGridTable: (s: string) => Element[]; __findAllWithinScope: (a: string, s: string) => Element[] }).__findAllWithinGridTable = (inner: string) =>
+      (window as unknown as { __findAllWithinScope: (a: string, s: string) => Element[] }).__findAllWithinScope('[data-testid="grid-table"]', inner);
   });
+}
+
+/** `data-col-index` (or `data-row`, `data-in-range`, …) attribute values, as numbers, off
+ *  elements matching `selector` WITHIN an arbitrary `scopeTestId` (e.g. `'grid-table-both'`),
+ *  shadow-piercing. Non-numeric / absent attribute values are dropped. */
+async function scopedAttrNumbers(page: Page, scopeTestId: string, selector: string, attr: string): Promise<number[]> {
+  return page.evaluate(({ scope, sel, a }) => {
+    const w = window as unknown as { __findAllWithinScope: (anchorSel: string, inner: string) => Element[] };
+    const els = w.__findAllWithinScope(`[data-testid="${scope}"]`, sel);
+    const out: number[] = [];
+    for (const el of els) {
+      const v = el.getAttribute(a);
+      if (v != null) {
+        const n = parseInt(v, 10);
+        if (Number.isFinite(n)) out.push(n);
+      }
+    }
+    return out;
+  }, { scope: scopeTestId, sel: selector, a: attr });
+}
+
+/** Focus `[data-grid-cell][data-row="row"][data-col-index="col"]` WITHIN an arbitrary
+ *  `scopeTestId`, shadow-piercing. No-op if the cell is not currently rendered. */
+async function focusScopedCell(page: Page, scopeTestId: string, row: number, col: number): Promise<void> {
+  await page.evaluate(({ scope, r, c }) => {
+    const w = window as unknown as { __findWithinScope: (anchorSel: string, inner: string) => Element | null };
+    const cell = w.__findWithinScope(`[data-testid="${scope}"]`, `[data-grid-cell][data-row="${r}"][data-col-index="${c}"]`) as HTMLElement | null;
+    if (cell) cell.focus();
+  }, { scope: scopeTestId, r: row, c: col });
+}
+
+/** `[data-testid="scopeTestId"] .rdt-scroll`'s current `scrollLeft`/`scrollTop`, shadow-piercing. */
+async function scopedScrollLeft(page: Page, scopeTestId: string): Promise<number> {
+  return page.evaluate((scope) => {
+    const w = window as unknown as { __findWithinScope: (anchorSel: string, inner: string) => Element | null };
+    const el = w.__findWithinScope(`[data-testid="${scope}"]`, '.rdt-scroll') as HTMLElement | null;
+    return el ? el.scrollLeft : -1;
+  }, scopeTestId);
+}
+async function scopedScrollTop(page: Page, scopeTestId: string): Promise<number> {
+  return page.evaluate((scope) => {
+    const w = window as unknown as { __findWithinScope: (anchorSel: string, inner: string) => Element | null };
+    const el = w.__findWithinScope(`[data-testid="${scope}"]`, '.rdt-scroll') as HTMLElement | null;
+    return el ? el.scrollTop : -1;
+  }, scopeTestId);
+}
+
+/** Set `[data-testid="scopeTestId"] .rdt-scroll`'s `scrollLeft`/`scrollTop` explicitly
+ *  (shadow-piercing), returning the value actually reached (the browser clamps it). */
+async function scopedScrollTo(page: Page, scopeTestId: string, opts: { left?: number; top?: number }): Promise<void> {
+  await page.evaluate(({ scope, left, top }) => {
+    const w = window as unknown as { __findWithinScope: (anchorSel: string, inner: string) => Element | null };
+    const el = w.__findWithinScope(`[data-testid="${scope}"]`, '.rdt-scroll') as HTMLElement | null;
+    if (!el) return;
+    if (left != null) el.scrollLeft = left;
+    if (top != null) el.scrollTop = top;
+  }, { scope: scopeTestId, left: opts.left, top: opts.top });
+}
+
+/** Drag the fill handle (rendered inside `scopeTestId`) from its current position to a point
+ *  `insetPx` inside the given edge of that mount's OWN `.rdt-scroll` viewport — driving REAL
+ *  `elementFromPoint` hit-testing (D-13's own framing), not an off-screen synthetic target.
+ *  Dispatches pointerdown on the handle, ONE pointermove to the edge point (the rest of the
+ *  drag is carried by the product's own rAF auto-scroll loop, which re-resolves the cell under
+ *  this same screen point every frame), waits `holdMs` for that loop to run, then pointerup. */
+async function dragFillHandleToEdge(
+  page: Page,
+  scopeTestId: string,
+  edge: 'left' | 'right' | 'top' | 'bottom',
+  holdMs = 1200,
+  insetPx = 4,
+): Promise<void> {
+  await page.evaluate(({ scope, edgeArg, inset }) => {
+    const w = window as unknown as { __findWithinScope: (anchorSel: string, inner: string) => Element | null };
+    const anchorSel = `[data-testid="${scope}"]`;
+    const scrollEl = w.__findWithinScope(anchorSel, '.rdt-scroll') as HTMLElement | null;
+    const handle = w.__findWithinScope(anchorSel, '[data-fill-handle]') as HTMLElement | null;
+    if (!scrollEl || !handle) return;
+    const hr = handle.getBoundingClientRect();
+    const sr = scrollEl.getBoundingClientRect();
+    const hx = hr.left + hr.width / 2;
+    const hy = hr.top + hr.height / 2;
+    let ex = hx;
+    let ey = hy;
+    if (edgeArg === 'left') ex = sr.left + inset;
+    else if (edgeArg === 'right') ex = sr.right - inset;
+    else if (edgeArg === 'top') ey = sr.top + inset;
+    else ey = sr.bottom - inset;
+    handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: hx, clientY: hy }));
+    document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: ex, clientY: ey }));
+  }, { scope: scopeTestId, edgeArg: edge, inset: insetPx });
+  await page.waitForTimeout(holdMs);
+  await page.evaluate(() => {
+    document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+  });
+}
+
+/** Establish a genuine DEGENERATE (1×1) range anchored+focused at the currently active cell —
+ *  the precondition `isFillHandleCell()` needs before `[data-fill-handle]` renders at all (a
+ *  bare `.focus()` alone leaves `$data.rangeAnchor`/`rangeFocus` both `null`). Shift+Arrow then
+ *  Shift+the-opposite-Arrow creates a real 2-cell range then collapses it back onto the SAME
+ *  cell, so anchor === focus === the cell just focused. `axis` picks the pair of keys
+ *  (columns for the horizontal D-13 cases, rows for the vertical ones). */
+async function establishDegenerateRange(page: Page, axis: 'col' | 'row', scopeTestId: string): Promise<void> {
+  if (axis === 'col') {
+    await page.keyboard.press('Shift+ArrowRight');
+    await page.keyboard.press('Shift+ArrowLeft');
+  } else {
+    await page.keyboard.press('Shift+ArrowDown');
+    await page.keyboard.press('Shift+ArrowUp');
+  }
+  // Angular's change-detection commit lags the keydown handlers by a tick or two — a
+  // `[data-fill-handle]` query issued immediately after these presses can race ahead of the
+  // `<td>`'s own re-render (confirmed via a live probe during authoring: the handle briefly
+  // does not exist right after the two keypresses on Angular specifically). Poll rather than a
+  // fixed sleep so the five already-synchronous targets pay no extra wait.
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(
+          (scope) =>
+            !!(window as unknown as { __findWithinScope: (a: string, s: string) => Element | null }).__findWithinScope(`[data-testid="${scope}"]`, '[data-fill-handle]'),
+          scopeTestId,
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe(true);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
@@ -435,24 +577,242 @@ for (const target of TARGETS) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
-// D-08 — the public column index is ABSOLUTE over the full leaf-column order.
+// D-08 (87-06) — the public column index is ABSOLUTE over the full leaf-column order. GREEN
+// as of 87-06: 87-02's recorded A2 outcome held (colIndexOf/visibleColCount/columnIdAt/
+// cellValueAt/beginEdit already read the unsliced cell list — machine-enforced by
+// prohibitions.test.ts's A2 invariant), so D-08 itself needed ZERO changes to those functions;
+// this battery is the proof. Also fixes and proves a genuine pre-existing bug found while
+// authoring 87-03's version of this case (logged to deferred-items.md): focusCell's
+// activecell-change emit guard compared only the ROW, so a column-only move never fired the
+// event — widened in gridActiveCellVerbs.rzts to also compare the pre-write column.
 // ═══════════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
-  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-08 focusCell(0,55) resolves the ABSOLUTE leaf-column position`, async ({
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-08 focusCell(0,55) resolves the ABSOLUTE leaf-column position (left-scrolled start) + getActiveCell + activecell-change`, async ({
     page,
   }) => {
     await gotoDemo(page, target);
+    const startLeft = await gridScrollLeft(page);
+    expect(startLeft).toBe(0);
     await page.getByTestId('call-focuscell-col55').click();
-    // NOTE: this deliberately does NOT also assert the `activecell-readout` testid. The
-    // default active cell at mount is already (0,0), so focusCell(0,55) moves only the
-    // COLUMN — and gridActiveCellVerbs.rzts's `focusCell` emit guard
-    // (`if (absRow !== prevAbs || prevIsHeader)`) only compares the ROW, never the column,
-    // so a column-only move never fires `activecell-change` today. That is a genuine,
-    // PRE-EXISTING bug (unrelated to this plan's `files_modified`, discovered while
-    // authoring this exact case) — logged to deferred-items.md rather than fixed here
-    // (out of Task 3's declared file scope). The DOM-focus assertion above is D-08's actual
-    // claim and is unaffected by the emit gap.
     await expect.poll(async () => activeCellColIndex(page), { timeout: 15_000 }).toBe('55');
+    // getActiveCell() reads back the SAME absolute pair (row 0, col 55) — this half already
+    // worked pre-fix ($data.activeColIndex is written regardless of the emit guard); asserted
+    // here alongside the fixed emit as the full D-08 behavior-block contract.
+    await page.getByTestId('call-getactivecell').click();
+    await expect.poll(async () => readoutText(page, 'getactivecell-readout'), { timeout: 15_000 }).toBe('0,55');
+    // activecell-change now fires for this column-only move (the gridActiveCellVerbs.rzts fix).
+    await expect.poll(async () => readoutText(page, 'activecell-readout'), { timeout: 15_000 }).toBe('0,55');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-08/D-12 (87-06) — the SAME focusCell(0,55) call, from a RIGHT-scrolled starting position
+// (the demo's window sitting near the far-right columns rather than column 0). Proves the
+// seam is symmetric regardless of which direction the pre-call scroll offset sits.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-08 focusCell(0,55) resolves the ABSOLUTE leaf-column position (right-scrolled start)`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await scrollGridFullyRight(page);
+    await page.waitForTimeout(300);
+    await page.getByTestId('call-focuscell-col55').click();
+    await expect.poll(async () => activeCellColIndex(page), { timeout: 15_000 }).toBe('55');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-08 (87-06) — an out-of-range column index clamps into bounds BEFORE any [data-col-index]
+// selector is built (T-87-06-01, the phase's V5 input-validation control). Asserted by the
+// resulting focus landing on visibleColCount()-1 (col 59 on this 60-column demo), never a
+// selector literally containing "9999".
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-08 focusCell(0,9999) clamps into range and focuses a real cell`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await page.getByTestId('call-focuscell-col9999').click();
+    await expect.poll(async () => activeCellColIndex(page), { timeout: 15_000 }).toBe('59');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-08/D-12 (87-06) — a BOTH-AXES case: with virtual="both" (mount B, `grid-table-both`),
+// focusCell(150, 55) must scroll BOTH the row and column virtualizers in, then land on the
+// cell whose data-row is 150 and data-col-index is 55 — the widened D-12 guard fires when
+// EITHER axis is out, and issues BOTH scrollToIndex calls when both are.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-08/D-12 both-axes focusCell(150,55) on virtual='both' lands on row 150 col 55`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await page.getByTestId('grid-table-both').locator('table[role="grid"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await page.getByTestId('call-focuscell-both').click();
+    await expect
+      .poll(async () => {
+        const coords = await page.evaluate(() => {
+          const active = document.activeElement as (Element & { shadowRoot?: ShadowRoot | null }) | null;
+          let node: (Element & { shadowRoot?: ShadowRoot | null }) | null = active;
+          while (node && node.shadowRoot && node.shadowRoot.activeElement) {
+            node = node.shadowRoot.activeElement as Element & { shadowRoot?: ShadowRoot | null };
+          }
+          const cell = node ? node.closest('[data-grid-cell]') : null;
+          return cell ? `${cell.getAttribute('data-row')},${cell.getAttribute('data-col-index')}` : null;
+        });
+        return coords;
+      }, { timeout: 15_000 })
+      .toBe('150,55');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-12 (87-06) — arrow-key navigation crosses the column-window boundary with NO skipped
+// index. From column 12, twenty successive ArrowRight presses must land on col 32 exactly
+// (moveCol()'s pure index math is unaffected by windowing per D-09; the scroll-then-focus
+// seam handles each step that crosses into an off-window column).
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-12 twenty successive ArrowRight from col 12 land on col 32 with no skipped index`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    // col12 is NOT rendered at rest (the default window sits near cols 0-8) — scroll it into
+    // view first so the anchor focus below lands on a genuinely rendered cell, matching a real
+    // "user tabs into a pre-scrolled grid" scenario. Scan increasing offsets (the
+    // data-table-grid-column-virtual.spec.ts D-11-straddle-test technique) rather than a single
+    // fixed pixel value: each target's exact scrollWidth-to-rendered-window relationship
+    // differs (Svelte's pre-existing, already-documented `.rdt-col-spacer` width gap in
+    // particular under-reports scrollWidth), so a single magic offset is not portable across
+    // all six — scanning finds whichever offset actually works on THIS target.
+    let col12Rendered = false;
+    for (let off = 300; off <= 1500 && !col12Rendered; off += 150) {
+      // eslint-disable-next-line no-await-in-loop
+      await scrollGridTo(page, off);
+      // eslint-disable-next-line no-await-in-loop
+      await page.waitForTimeout(200);
+      // eslint-disable-next-line no-await-in-loop
+      const idx = await colIndicesFor(page, '[data-grid-cell][data-row="0"][data-col-index]');
+      col12Rendered = idx.includes(12);
+    }
+    expect(col12Rendered).toBe(true);
+    await focusScopedCell(page, 'grid-table', 0, 12);
+    await expect.poll(async () => activeCellColIndex(page), { timeout: 15_000 }).toBe('12');
+    // A settle delay between presses: each step whose target crosses the column window boundary
+    // runs the D-12 scroll-then-focus seam (scrollToIndex → async commit → the bounded rAF
+    // poll), which must land BEFORE the next ArrowRight is dispatched — a keydown fired while
+    // DOM focus is mid-transfer would be lost (delegated off the grid's own cell elements).
+    for (let i = 0; i < 20; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      await page.keyboard.press('ArrowRight');
+      // eslint-disable-next-line no-await-in-loop
+      await page.waitForTimeout(150);
+    }
+    await expect.poll(async () => activeCellColIndex(page), { timeout: 15_000 }).toBe('32');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-08/D-09 (87-06) — a clipboard round-trip proves the model-based copy/paste path reaches
+// OFF-WINDOW columns with no DOM dependency. Copying a range spanning columns 2-55 (54
+// columns — cols 2-55 are ALL declared editable in this fixture as of 87-06, broadened from
+// the original col5/col6-only range specifically so this round-trip is genuine, not skipped by
+// the D-03 non-editable skip rule) and pasting it into a DIFFERENT row's same columns
+// reproduces the source values — including col55, off-window both at copy time (default
+// left-scrolled mount) and at paste-write time (paste never scrolls).
+// `rangeSelection.rzts`/`clipboardFill.rzts` are UNCHANGED by this plan (D-09) — this proves
+// their existing unsliced-model arithmetic already reaches the boundary correctly.
+//
+// Mount (A) is `virtual="columns"` ONLY — `rowsWindowed()` is false, so per D-05's
+// `windowSource()` gating pagination stays ACTIVE (its OWN suppression is column-axis-blind
+// by design: only ROW windowing replaces the paginated row model). Page 1 (the default
+// `pageSize: 10`) therefore renders rows 0-9 only; row5 (not row10) is this case's paste
+// destination so both source and destination stay on the SAME page with no pagination nav.
+//
+// COMMIT COUNT IS 49, NOT 54 — a genuine, PRE-EXISTING, orthogonal finding discovered while
+// authoring this exact case (logged in full to deferred-items.md): `columnDefs()`
+// (`columnBuilders.rzts`) flattens the `:columns` config array's TOP-LEVEL entries into its
+// `byId` lookup map, but a GROUP entry (`Array.isArray(c.columns)`, e.g. this fixture's
+// "Group A" spanning leaf cols 10-14) is stored ONLY under its OWN group id — its children are
+// nested inside `columns` and never separately added to `byId`. `defFor(colId)` therefore
+// returns `null` for any grouped LEAF column, so `columnEditable()` is unconditionally `false`
+// for cols 10-14 regardless of their own `cfg.editable = true` — 54 declared-editable columns
+// minus the 5 grouped ones = 49 actually written. This is NOT a windowing bug and NOT caused
+// by this plan's `files_modified` (`columnBuilders.rzts`/`columnChrome.rzts` are untouched) —
+// it would reproduce identically with NO virtualization at all. Neither col2 nor col55 (this
+// case's own off-window-reachability proof) is inside the group, so the D-08/D-09 claim this
+// case exists to prove is unaffected; asserting 49 here (not the naively-expected 54) is
+// documenting the true committed count, not weakening the case's actual claim.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-08/D-09 copying columns 2-55 and pasting into another row reproduces the off-window values (col55 included)`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    // Anchor the range at col2 (rendered at rest), extend to col55 via 53 Shift+ArrowRight
+    // presses — pure extendRange() index math (D-09), never dependent on col55 being rendered.
+    await focusScopedCell(page, 'grid-table', 0, 2);
+    for (let i = 0; i < 53; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      await page.keyboard.press('Shift+ArrowRight');
+    }
+    // NOTE: deliberately does NOT also click the getActiveCell button here (unlike the D-08
+    // cases above) — clicking a button OUTSIDE the grid moves DOM focus to it, so the
+    // immediately-following Ctrl+C would be captured by the button, not the grid's
+    // onGridKeyDown handler, and copyRange() would never fire at all (found while authoring
+    // this exact case). The range-extension itself is already proven state-correct by the
+    // dedicated D-08 getActiveCell case above; this case's own claim is the copy/paste
+    // round-trip, which needs the grid to KEEP focus through the Ctrl+C.
+    await page.keyboard.press('Control+c');
+    // The just-completed extend scrolled the column window rightward (toward col55, the
+    // active/moving corner) — col2 (the anchor, never itself forced) may no longer be
+    // rendered. Scroll back toward col0 first so the paste-anchor cell below is genuinely
+    // reachable via a direct DOM .focus() (the clipboard TEXT itself is already captured —
+    // independent of any DOM state — so this scroll cannot affect what Ctrl+C read).
+    await scrollGridTo(page, 0);
+    await page.waitForTimeout(300);
+    // Move to a SINGLE active cell at (5, 2) — row5 is on the SAME page-1 slice as row0 (the
+    // copy source), so it is directly focusable with no pagination nav. A plain .focus() (not
+    // a keyboard nav) fires syncActiveFromEvent's focusin, which collapses the just-copied
+    // range back to this single cell (clearRange) — the paste anchor. RETRIES the focus
+    // attempt (not just the readback) — under concurrent-worker load a target's re-render
+    // after the scroll-reset above can lag past a single focus attempt, and a one-shot
+    // `.focus()` on a not-yet-rendered cell silently no-ops with nothing to retry it.
+    await expect
+      .poll(
+        async () => {
+          await focusScopedCell(page, 'grid-table', 5, 2);
+          return activeCellColIndex(page);
+        },
+        { timeout: 15_000 },
+      )
+      .toBe('2');
+    await page.keyboard.press('Control+v');
+    // Paste is async (navigator.clipboard.readText()) — poll the commit counter rather than a
+    // fixed wait. 49, not 54 — see the header comment above (5 grouped leaf columns, 10-14,
+    // are unconditionally non-editable via a genuine, pre-existing, orthogonal columnDefs()
+    // gap, logged to deferred-items.md).
+    await expect.poll(async () => readoutText(page, 'commit-count'), { timeout: 15_000 }).toBe('49');
+    await scrollGridFullyRight(page);
+    await page.waitForTimeout(300);
+    const col2Text = await page.evaluate(() => {
+      const w = window as unknown as { __findWithinScope: (a: string, s: string) => Element | null };
+      const cell = w.__findWithinScope('[data-testid="grid-table"]', '[data-grid-cell][data-row="5"][data-col-index="2"]');
+      return cell ? (cell.textContent || '').trim() : null;
+    });
+    const col55Text = await page.evaluate(() => {
+      const w = window as unknown as { __findWithinScope: (a: string, s: string) => Element | null };
+      const cell = w.__findWithinScope('[data-testid="grid-table"]', '[data-grid-cell][data-row="5"][data-col-index="55"]');
+      return cell ? (cell.textContent || '').trim() : null;
+    });
+    // Row 0's ORIGINAL values ("r0c2"/"r0c55") now live at row 5 — proving the copy read
+    // col55's value while it was off-window, and the paste wrote it while STILL off-window
+    // (the paste itself never scrolled).
+    expect(col2Text).toBe('r0c2');
+    expect(col55Text).toBe('r0c55');
   });
 }
 
@@ -586,9 +946,25 @@ for (const target of TARGETS) {
 // Both predate this plan (87-04's shared, cross-target header/spacer template) and are logged
 // in full to deferred-items.md rather than patched here — fixing either is a real, separate
 // change to shared infrastructure four consumer families inline, not a forcedColumns() concern.
+//
+// React ALSO added to `test.fixme` here in 87-06 — the SAME Gap 1 (grouped-header width vs.
+// colspan) above, newly reproducible on React specifically because 87-06's D-12 fix makes
+// `focusCell(0,55)` actually issue a real `colVirtualizer.scrollToIndex(55, {align:'center'})`
+// (previously a no-op on React — focusCell(0,55) never scrolled anything pre-87-06, so this
+// case never exercised a window wide enough to include the grouped columns 10-14 for React).
+// Confirmed via a live DOM probe during authoring: after the click, React's window covers cols
+// 3-15 (13 columns) — WIDE ENOUGH to include Group A (10-14) — and those 5 grouped `<td>`s
+// render at 30px (150/5) instead of 150px each, a 600px (5×150 - 5×30... i.e. the SAME
+// colspan-vs-width mismatch, not a NEW arithmetic bug in this plan's own colPadLeft()/
+// colPadRight() (verified: padLeft(300) + real-cell widths + padRight(6450) sums to EXACTLY
+// getTotalSize() (9000) using the LOGICAL columnSize() per cell — the discrepancy is entirely
+// in the BROWSER's own table-layout:fixed column-width distribution across the group's
+// colspan-5 `<th>`, not in this plan's D-08/D-12 files). Not caused by `gridFocusNav.rzts`
+// (the D-12 fix only changed WHETHER a real scroll happens, not how header/body widths are
+// computed) — logged as an addendum to the existing deferred-items.md Gap 1 entry.
 // ═══════════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
-  const knownSpacerWidthGap = target === 'solid' || target === 'svelte';
+  const knownSpacerWidthGap = target === 'solid' || target === 'svelte' || target === 'react';
   const run = knownSpacerWidthGap ? test.fixme : runnerFor(target);
   run(`data-table-grid-column-virtual [${target}]: D-10 scroll width does not grow when a forced column enters the rendered set`, async ({
     page,
@@ -630,49 +1006,171 @@ for (const target of TARGETS) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
-// D-13 — a fill drag past the column window edge auto-scrolls.
+// D-13 (87-06) — a fill drag past the column window edge auto-scrolls, on BOTH horizontal
+// edges (mount A, `virtual="columns"`) and BOTH vertical edges (mount B, `grid-table-both`,
+// `virtual="both"` — closing the pre-existing VERTICAL gap for free, shown RED-to-GREEN).
+//
+// Each case first establishes a GENUINE degenerate (1×1) range at the source cell
+// (`establishDegenerateRange`) — `isFillHandleCell()` requires a real `$data.rangeAnchor`/
+// `rangeFocus` pair, so a bare `.focus()` alone (the pre-87-06 test's setup) never renders
+// `[data-fill-handle]` at all, meaning the pointerdown below silently no-ops and the case was
+// RED for the wrong reason (no gesture ever started, not "auto-scroll doesn't exist" — though
+// auto-scroll genuinely did not exist either, until this plan's fillDrag.rzts change).
 // ═══════════════════════════════════════════════════════════════════════════════════════
+
+// RIGHT edge (mount A) — drag from the pinned top-left cell (0,0) toward the right edge.
 for (const target of TARGETS) {
   runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-13 a fill drag near the container's right edge auto-scrolls the column axis`, async ({
     page,
   }) => {
     await gotoDemo(page, target);
-    // Focus the top-left cell (0,0) as the fill-drag SOURCE — the pinned column, so it is
-    // never itself scrolled out of reach during the drag.
+    await focusScopedCell(page, 'grid-table', 0, 0);
+    await establishDegenerateRange(page, 'col', 'grid-table');
+    const preDragMaxCol = Math.max(...(await colIndicesFor(page, '[data-grid-cell][data-row="0"][data-col-index]')));
+    const before = await scopedScrollLeft(page, 'grid-table');
+    await dragFillHandleToEdge(page, 'grid-table', 'right');
+    await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })));
+    const after = await scopedScrollLeft(page, 'grid-table');
+    expect(after).toBeGreaterThan(before);
+    const inRangeIdx = await scopedAttrNumbers(page, 'grid-table', '[data-in-range="true"][data-col-index]', 'data-col-index');
+    expect(Math.max(...inRangeIdx, -1)).toBeGreaterThan(preDragMaxCol);
+  });
+}
+
+// LEFT edge (mount A) — start scrolled fully right, drag from a NON-pinned rendered column
+// toward the left edge, extending the range leftward past columns that were off-window.
+//
+// Svelte is `test.fixme` here for the SAME confirmed, pre-existing (87-04/87-05) root cause
+// already logged in deferred-items.md: `.rdt-col-spacer`'s width binding does not affect
+// Svelte's actual table layout at rest, so `.rdt-scroll`'s `scrollWidth` under-reports the
+// true content width — `scrollGridFullyRight()`'s `scrollLeft = scrollWidth` is therefore a
+// NO-OP on Svelte specifically (confirmed via a live probe during authoring: the rendered
+// window after "scrolling fully right" is still cols 0-11, unchanged from rest), so this
+// case's own precondition ("start scrolled fully right") is never established — not a D-13
+// finding. The case remains a REAL, enforced assertion on the other five targets.
+for (const target of TARGETS) {
+  const run = target === 'svelte' ? test.fixme : runnerFor(target);
+  run(`data-table-grid-column-virtual [${target}]: D-13 a fill drag near the container's left edge auto-scrolls the column axis leftward`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await scrollGridFullyRight(page);
+    await page.waitForTimeout(300);
+    const renderedAtRest = await colIndicesFor(page, '[data-grid-cell][data-row="0"][data-col-index]');
+    // Exclude col0 (D-10 pinned — always rendered regardless of scroll, so it is never a
+    // meaningful "the window's own left edge" anchor).
+    const nonPinned = renderedAtRest.filter((i) => i !== 0);
+    const srcCol = Math.min(...nonPinned);
+    await focusScopedCell(page, 'grid-table', 0, srcCol);
+    await establishDegenerateRange(page, 'col', 'grid-table');
+    const before = await scopedScrollLeft(page, 'grid-table');
+    await dragFillHandleToEdge(page, 'grid-table', 'left');
+    await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })));
+    const after = await scopedScrollLeft(page, 'grid-table');
+    expect(after).toBeLessThan(before);
+    const inRangeIdx = await scopedAttrNumbers(page, 'grid-table', '[data-in-range="true"][data-col-index]', 'data-col-index');
+    const minInRangeExclPinned = Math.min(...inRangeIdx.filter((i) => i !== 0));
+    expect(minInRangeExclPinned).toBeLessThan(srcCol);
+  });
+}
+
+// BOTTOM edge (mount B, virtual="both") — the pre-existing vertical gap: RED before this
+// plan's per-axis fillDrag.rzts change (the row axis had the identical limitation the column
+// axis started with), GREEN after.
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-13 a fill drag near the container's bottom edge auto-scrolls the row axis downward (closes the pre-existing vertical gap)`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await page.getByTestId('grid-table-both').locator('table[role="grid"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await focusScopedCell(page, 'grid-table-both', 0, 0);
+    await establishDegenerateRange(page, 'row', 'grid-table-both');
+    const preDragMaxRow = Math.max(...(await scopedAttrNumbers(page, 'grid-table-both', '[data-grid-cell][data-col-index="0"][data-row]', 'data-row')));
+    const before = await scopedScrollTop(page, 'grid-table-both');
+    await dragFillHandleToEdge(page, 'grid-table-both', 'bottom');
+    await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })));
+    const after = await scopedScrollTop(page, 'grid-table-both');
+    expect(after).toBeGreaterThan(before);
+    const inRangeRows = await scopedAttrNumbers(page, 'grid-table-both', '[data-in-range="true"][data-row]', 'data-row');
+    expect(Math.max(...inRangeRows, -1)).toBeGreaterThan(preDragMaxRow);
+  });
+}
+
+// TOP edge (mount B, virtual="both") — scroll down first, then drag the topmost currently
+// rendered row's cell toward the top edge, extending the range upward past rows above it.
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-13 a fill drag near the container's top edge auto-scrolls the row axis upward`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await page.getByTestId('grid-table-both').locator('table[role="grid"]').waitFor({ state: 'visible', timeout: 15_000 });
+    await scopedScrollTo(page, 'grid-table-both', { top: 2000 });
+    await page.waitForTimeout(300);
+    const renderedAtRest = await scopedAttrNumbers(page, 'grid-table-both', '[data-grid-cell][data-col-index="0"][data-row]', 'data-row');
+    const srcRow = Math.min(...renderedAtRest);
+    await focusScopedCell(page, 'grid-table-both', srcRow, 0);
+    await establishDegenerateRange(page, 'row', 'grid-table-both');
+    const before = await scopedScrollTop(page, 'grid-table-both');
+    await dragFillHandleToEdge(page, 'grid-table-both', 'top');
+    await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })));
+    const after = await scopedScrollTop(page, 'grid-table-both');
+    expect(after).toBeLessThan(before);
+    const inRangeRows = await scopedAttrNumbers(page, 'grid-table-both', '[data-in-range="true"][data-row]', 'data-row');
+    expect(Math.min(...inRangeRows)).toBeLessThan(srcRow);
+  });
+}
+
+// Control case (87-06 acceptance): a drag that stays away from every edge produces exactly
+// the same final range as the pre-task build — no auto-scroll engages, no behavior changed.
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-13 a fill drag that never nears an edge does not auto-scroll`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await focusScopedCell(page, 'grid-table', 0, 0);
+    await establishDegenerateRange(page, 'col', 'grid-table');
+    const before = await scopedScrollLeft(page, 'grid-table');
     await page.evaluate(() => {
-      const find = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
-      const cell = find('[data-grid-cell][data-row="0"][data-col-index="0"]') as HTMLElement | null;
-      if (cell) cell.focus();
-    });
-    const before = await gridScrollLeft(page);
-    // Drive a fill-drag gesture that ends with the pointer parked near the RIGHT EDGE of
-    // the visible `.rdt-scroll` viewport (NOT at an off-screen cell's own rect — that would
-    // bypass real elementFromPoint hit-testing, the exact DOM-driven mechanism D-13 targets).
-    await page.evaluate(() => {
-      const find = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
-      const scrollEl = find('.rdt-scroll') as HTMLElement | null;
-      const handle = find('[data-fill-handle]') as HTMLElement | null;
+      const w = window as unknown as { __findWithinScope: (a: string, s: string) => Element | null };
+      const anchorSel = '[data-testid="grid-table"]';
+      const scrollEl = w.__findWithinScope(anchorSel, '.rdt-scroll') as HTMLElement | null;
+      const handle = w.__findWithinScope(anchorSel, '[data-fill-handle]') as HTMLElement | null;
       if (!scrollEl || !handle) return;
       const hr = handle.getBoundingClientRect();
       const sr = scrollEl.getBoundingClientRect();
       const hx = hr.left + hr.width / 2;
       const hy = hr.top + hr.height / 2;
-      // 4px inside the container's right edge — well within the visible viewport, so
-      // elementFromPoint resolves a REAL rendered cell there, not empty space.
-      const ex = sr.right - 4;
+      // The dead center of the visible viewport — comfortably outside FILL_EDGE_SCROLL_PX (24)
+      // of every edge.
+      const ex = sr.left + sr.width / 2;
       const ey = sr.top + sr.height / 2;
       handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: hx, clientY: hy }));
       document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: ex, clientY: ey }));
     });
-    // Give a hypothetical edge-triggered auto-scroll timer a real chance to fire.
-    await page.waitForTimeout(600);
-    await page.evaluate(() => {
-      document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
-    });
-    const after = await gridScrollLeft(page);
-    // RED today: no per-axis edge-triggered auto-scroll exists on the column axis (or the
-    // row axis) yet — the container never scrolls during a fill drag.
-    expect(after).toBeGreaterThan(before);
+    await page.waitForTimeout(500);
+    await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })));
+    const after = await scopedScrollLeft(page, 'grid-table');
+    expect(after).toBe(before);
+  });
+}
+
+// Teardown proof: after pointerup, scrollLeft/scrollTop are stable across two consecutive
+// animation frames — no orphaned auto-scroll rAF loop survives the gesture.
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-13 no orphaned auto-scroll loop survives after pointerup`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await focusScopedCell(page, 'grid-table', 0, 0);
+    await establishDegenerateRange(page, 'col', 'grid-table');
+    await dragFillHandleToEdge(page, 'grid-table', 'right', 500);
+    await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })));
+    const first = await scopedScrollLeft(page, 'grid-table');
+    // Two consecutive animation frames, well after pointerup — a leaked rAF loop would keep
+    // advancing scrollLeft across them.
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const second = await scopedScrollLeft(page, 'grid-table');
+    expect(second).toBe(first);
   });
 }
 

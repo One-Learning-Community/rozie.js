@@ -88,11 +88,13 @@
 </data>
 
 <script lang="ts">
-// Seed 60 leaf columns (col0 pinned left; col5/col6 editable; col20/col21 filterable) with
-// cols 10-14 wrapped in a two-level "Group A" header (D-06/D-11's colspan-clamp target), then
-// 200 rows of deterministic content with a fixed row-height PATTERN (D-15/D-16/D-17/D-19's
-// variable-height content) — no clock/random, so the window and Linux VR baselines stay
-// deterministic. Shared by BOTH mounts (A) and (B).
+// Seed 60 leaf columns (col0 pinned left; cols 2-55 editable — broadened from the original
+// col5/col6-only range in 87-06 so the D-08/D-09 clipboard round-trip case below can prove a
+// PASTE reaches every one of the 54 off-window columns it copies, not just two; col20/col21
+// filterable) with cols 10-14 wrapped in a two-level "Group A" header (D-06/D-11's
+// colspan-clamp target), then 200 rows of deterministic content with a fixed row-height
+// PATTERN (D-15/D-16/D-17/D-19's variable-height content) — no clock/random, so the window and
+// Linux VR baselines stay deterministic. Shared by BOTH mounts (A) and (B).
 $onMount(() => {
   const leafCols: Record<string, unknown>[] = []
   for (let i = 0; i < 60; i++) {
@@ -100,7 +102,7 @@ $onMount(() => {
     const cfg: Record<string, unknown> = { id, field: id, header: 'Col ' + i }
     // col0's actual pin comes from $data.colPinning / r-model:columnPinning below — see that
     // key's comment for why the per-column config `pinned` field is deliberately NOT used here.
-    if (i === 5 || i === 6) { cfg.editable = true; cfg.editor = 'text' }
+    if (i >= 2 && i <= 55) { cfg.editable = true; cfg.editor = 'text' }
     if (i === 20 || i === 21) cfg.filterable = true
     leafCols.push(cfg)
   }
@@ -153,6 +155,23 @@ const callFocusCol55 = (): void => {
   if (api && api.focusCell) api.focusCell(0, 55)
 }
 
+// 87-06 (D-08 out-of-range clamp acceptance case): focusCell with a column index FAR outside
+// the 60-column model — the clamp discipline (gridActiveCellVerbs.rzts) must resolve this to a
+// REAL in-range cell (visibleColCount()-1) before any [data-col-index] selector is built, never
+// a selector literally containing "9999".
+const callFocusCol9999 = (): void => {
+  const api = $refs.dt
+  if (api && api.focusCell) api.focusCell(0, 9999)
+}
+
+// 87-06 (D-08/D-12 both-axes acceptance case): drives $refs.dtBoth (mount B, virtual="both") so
+// a single focusCell call can be proven to scroll-then-focus BOTH axes at once. Mount B has no
+// other exposed-verb wiring — this is the one call this plan's tests need from it.
+const callFocusBothAxes = (): void => {
+  const api = $refs.dtBoth
+  if (api && api.focusCell) api.focusCell(150, 55)
+}
+
 const callGetActiveCell = (): void => {
   const api = $refs.dt
   if (api && api.getActiveCell) {
@@ -175,6 +194,8 @@ const editCol5 = (): void => {
 
   <div class="controls">
     <button type="button" data-testid="call-focuscell-col55" @click="callFocusCol55">focusCell(0,55)</button>
+    <button type="button" data-testid="call-focuscell-col9999" @click="callFocusCol9999">focusCell(0,9999)</button>
+    <button type="button" data-testid="call-focuscell-both" @click="callFocusBothAxes">dtBoth.focusCell(150,55)</button>
     <button type="button" data-testid="call-getactivecell" @click="callGetActiveCell">getActiveCell()</button>
     <button type="button" data-testid="edit-col5" @click="editCol5">editCell(0,5)</button>
     <span class="label">cols:</span>
