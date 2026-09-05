@@ -869,7 +869,7 @@ let refreshRowModel = null
 import { onSortingChangeCb, onExpandedChangeCb, onGroupingChangeCb, onGlobalFilterChangeCb, onColumnFiltersChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onColumnVisibilityChangeCb, onColumnSizingChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingInfoChangeCb } from './stateChangeCallbacks.rzts'
 
 import { windowSource, scheduleRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn } from './virtualization.rzts'
-import { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow, columnVirtualizerOptions, windowedColIndices, colPadLeft, colPadRight, colIsOutsideWindow, refineRowEstimate } from '@rozie-ui/headless-core/windowing.rzts'
+import { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow, columnVirtualizerOptions, windowedColIndices, colPadLeft, colPadRight, colIsOutsideWindow, refineRowEstimate, teardownColRtlWatch } from '@rozie-ui/headless-core/windowing.rzts'
 
 // afterRowRemeasure (Phase 87 87-07, D-15): a mutable-`let` indirection so
 // virtualization.rzts's remeasureWindow() (a relative-partial CONST, textually EARLIER
@@ -1254,6 +1254,9 @@ $onUnmount(() => {
   // Phase 87 87-04: tear down the column virtualizer's scroll-element ResizeObserver too.
   // No-op when column windowing was off (cleanup stays null).
   if (colVirtualizerCleanup) colVirtualizerCleanup()
+  // Gap-closure 87-09: disconnect the RTL dir-attribute MutationObserver (ensureColRtlWatch(),
+  // windowing.rzts). No-op if column windowing was never on (the observer was never attached).
+  teardownColRtlWatch()
   // CR-04: remove any live fill-drag document listeners if we unmount mid-drag.
   teardownFillDrag()
   // §6 (260709-3qt): remove any live drag-select document listeners on a mid-drag unmount.

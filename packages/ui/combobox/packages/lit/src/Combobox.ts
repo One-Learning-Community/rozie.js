@@ -727,6 +727,11 @@ private __rozieFirstUpdateDone = false;
   // Two options the row axis does not set that the column instance will need: `isRtl?: boolean`
   // (data-table ships an RTL grid path) and `overscan?: number` (D-07 gives the column axis its own
   // hardcoded constant, separate from the row axis's `overscan: 8` below).
+  //
+  // isRtl WIRING (gap-closure 87-09, LANDED — see `ensureColRtlWatch()`/`isColRtl()` below,
+  // immediately ahead of `columnVirtualizerOptions()`): data-table has no construction-time RTL
+  // signal (no `dir`/`rtl` prop), and `dir` can be set on `gridScrollEl` at ANY point relative to
+  // mount. `isRtl` is therefore computed LIVE via `getComputedStyle`, not baked in once.
   // getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
   // React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
   // id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).

@@ -1495,6 +1495,11 @@ const remeasureWindow = () => {
 // Two options the row axis does not set that the column instance will need: `isRtl?: boolean`
 // (data-table ships an RTL grid path) and `overscan?: number` (D-07 gives the column axis its own
 // hardcoded constant, separate from the row axis's `overscan: 8` below).
+//
+// isRtl WIRING (gap-closure 87-09, LANDED — see `ensureColRtlWatch()`/`isColRtl()` below,
+// immediately ahead of `columnVirtualizerOptions()`): data-table has no construction-time RTL
+// signal (no `dir`/`rtl` prop), and `dir` can be set on `gridScrollEl` at ANY point relative to
+// mount. `isRtl` is therefore computed LIVE via `getComputedStyle`, not baked in once.
 
 // getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
 // React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
@@ -1519,20 +1524,111 @@ const COL_OVERSCAN = 3;
 // NOT call scheduleRemeasure(): under D-06 column widths come from table-core's getSize()
 // oracle and are NEVER measured from the DOM, so a horizontal scroll has nothing new to
 // observe (unlike the row axis's CR-01 recycled-row remeasure sweep).
-const columnVirtualizerOptions = (): any => ({
-  count: columnCount(),
-  getScrollElement: () => gridScrollEl,
-  estimateSize: (i: any) => columnSize(i),
-  horizontal: true,
-  observeElementRect,
-  observeElementOffset,
-  scrollToFn: elementScroll,
-  measureElement,
-  overscan: COL_OVERSCAN,
-  onChange: () => {
-    windowVer.value = windowVer.value + 1;
-  }
-});
+// ══ Gap-closure 87-09 (dir="rtl" column windowing) ═══════════════════════════════════════
+// virtual-core reads `instance.options.isRtl` FRESH on every native 'scroll' event — the
+// negation lives inside `observeElementOffset`'s internal per-event closure
+// (`dist/esm/index.js:119-120`: `el.scrollLeft * (isRtl && -1 || 1)`), called anew each time
+// the browser fires 'scroll'. But `instance.options` itself is only a plain VALUE snapshot
+// taken by the LAST `setOptions()` call (`dist/esm/index.js:277-280`:
+// `for (const key in opts2) merged[key] = opts2[key]` copies the boolean, not a live binding
+// or getter) — so a static `isRtl` computed ONCE at `colVirtualizer` construction would only
+// ever reflect direction AT THAT INSTANT. `dir` can be set on `gridScrollEl` at any point
+// relative to mount (data-table has no construction-time RTL prop), so a MutationObserver on
+// `gridScrollEl`'s own `dir` attribute re-feeds `colVirtualizer`'s options — a cheap
+// object-merge via `setOptions()`, deliberately NOT a forced `_willUpdate()` recompute, since
+// nothing needs to repaint until the next real scroll — the moment direction flips. By the
+// time the NEXT native 'scroll' event's own offset read runs, `instance.options.isRtl`
+// already reflects the correction. Ordering is spec-guaranteed, not a race: MutationObserver
+// callbacks run on the microtask queue, which the HTML event loop always drains before the
+// next task — and a native 'scroll' event dispatched after a programmatic `scrollLeft` write
+// is itself a subsequent task, not a microtask racing the same tick.
+//
+// F6 STALE-CLOSURE HAZARD (found + fixed this task, React only): calling
+// columnVirtualizerOptions() FRESH from inside the MutationObserver's callback would
+// re-derive `count`/`estimateSize` via columnCount() (virtualization.rzts's
+// visibleColCount(), which reads `$data.rows`). The MutationObserver is attached ONCE,
+// inside ensureColRtlWatch() at colVirtualizer CONSTRUCTION time ($onMount) — a closure
+// FROZEN to that render's scope on React, where `$data.rows` is a useState value.
+// $onMount's row-model seed (refreshRowModel()) resolves via an ASYNC setState, so AT THE
+// EXACT INSTANT colVirtualizer is constructed, `rows` may still be `[]` in THAT render's
+// closure — and unlike a `let`-hoisted ref (virtualizer, table, gridScrollEl — always read
+// via `.current`, always live no matter which render's closure holds the reference),
+// `$data.rows` is genuine React state: a plain local binding recreated fresh EVERY render,
+// so a function captured from an OLDER render reads that OLDER render's snapshot FOREVER,
+// no matter how many later renders populate it. Confirmed empirically: calling
+// columnVirtualizerOptions() from the frozen callback read `count` back as 0 (not 60),
+// collapsing getVirtualItems() to []. This is the exact class of bug `virtualItemKey`'s own
+// header comment already documents ("never a frozen mount-render $data.rows closure") — and
+// a MUTABLE-LET INDIRECTION (the `afterRowRemeasure` shape, 87-07) does NOT fix it here,
+// because the hazard lives INSIDE columnVirtualizerOptions()'s own dependency chain
+// ($data.rows), not in "which function identity gets called" — wrapping a stale call in
+// another layer of ref does not make an inner React-state read fresh.
+//
+// FIX: never call columnVirtualizerOptions() again from this callback at all. Read
+// `colVirtualizer.options` — virtual-core's OWN internal state, mutated in place on every
+// setOptions() call regardless of which render's closure triggered it (a REAL object
+// reference the SAME way `virtualizer`/`table` are, not React state) — and merge in ONLY
+// the corrected `isRtl`. `count`/`estimateSize`/etc. keep whatever value the LAST correct
+// setOptions() call gave them (from construction, or from remeasureColumnWindow()'s own
+// FRESH-per-render re-feed via the $watch-driven refreshRowModel cycle) — untouched,
+// because this dir-flip has nothing to do with row/column count. isColRtl() itself reads
+// only `gridScrollEl` (also a ref) and does a live DOM getComputedStyle read — no React
+// state involved, so it is never stale regardless of which render's closure calls it.
+let colRtlObserver: any = null;
+let colRtlObserverEl: any = null;
+// isColRtl(): getComputedStyle (not a raw `.getAttribute('dir')` read) so an ANCESTOR's `dir`
+// or a CSS `direction: rtl` rule is honored the same way the browser's own bidi layout honors
+// it, not merely a literal attribute on gridScrollEl itself.
+const isColRtl = (): boolean => {
+  if (!gridScrollEl || typeof getComputedStyle !== 'function') return false;
+  return getComputedStyle(gridScrollEl).direction === 'rtl';
+};
+// ensureColRtlWatch(): idempotent — a no-op once already attached to the CURRENT gridScrollEl
+// (a stable ref for the component's lifetime once mounted). Self-attaching from inside
+// columnVirtualizerOptions() means no new host-contract symbol is needed: listbox/combobox/
+// command-palette never call columnVirtualizerOptions() at all (colsWindowed() is permanently
+// false for them, D-20), so this code path — and the observer it creates — never exists there.
+const ensureColRtlWatch = (): void => {
+  if (!gridScrollEl || colRtlObserverEl === gridScrollEl || typeof MutationObserver !== 'function') return;
+  if (colRtlObserver) colRtlObserver.disconnect();
+  colRtlObserver = new MutationObserver(() => {
+    if (colVirtualizer) colVirtualizer.setOptions({
+      ...colVirtualizer.options,
+      isRtl: isColRtl()
+    });
+  });
+  colRtlObserver.observe(gridScrollEl, {
+    attributes: true,
+    attributeFilter: ['dir']
+  });
+  colRtlObserverEl = gridScrollEl;
+};
+// teardownColRtlWatch(): exported so the DataTable host disconnects the observer alongside
+// colVirtualizerCleanup() in $onUnmount — mirrors virtual-core's own _didMount()/teardown
+// discipline for the ResizeObserver it manages internally. No-op if never attached.
+const teardownColRtlWatch = (): void => {
+  if (colRtlObserver) colRtlObserver.disconnect();
+  colRtlObserver = null;
+  colRtlObserverEl = null;
+};
+const columnVirtualizerOptions = (): any => {
+  ensureColRtlWatch();
+  return {
+    count: columnCount(),
+    getScrollElement: () => gridScrollEl,
+    estimateSize: (i: any) => columnSize(i),
+    horizontal: true,
+    isRtl: isColRtl(),
+    observeElementRect,
+    observeElementOffset,
+    scrollToFn: elementScroll,
+    measureElement,
+    overscan: COL_OVERSCAN,
+    onChange: () => {
+      windowVer.value = windowVer.value + 1;
+    }
+  };
+};
 // ══ Phase 87 87-07 (D-15/D-18) — content-driven auto-measure: the shared engine's FIRST
 // mutable top-level state. Hoisted to `useRef` PER-INSTANCE by the React emitter's
 // hoistModuleLet — the SAME mechanism already load-bearing for `table`, `virtualizer`,
@@ -6344,6 +6440,9 @@ onBeforeUnmount(() => {
   // Phase 87 87-04: tear down the column virtualizer's scroll-element ResizeObserver too.
   // No-op when column windowing was off (cleanup stays null).
   if (colVirtualizerCleanup) colVirtualizerCleanup();
+  // Gap-closure 87-09: disconnect the RTL dir-attribute MutationObserver (ensureColRtlWatch(),
+  // windowing.rzts). No-op if column windowing was never on (the observer was never attached).
+  teardownColRtlWatch();
   // CR-04: remove any live fill-drag document listeners if we unmount mid-drag.
   teardownFillDrag();
   // §6 (260709-3qt): remove any live drag-select document listeners on a mid-drag unmount.
