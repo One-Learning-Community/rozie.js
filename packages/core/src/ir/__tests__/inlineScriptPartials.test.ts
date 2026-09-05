@@ -692,6 +692,143 @@ describe('inlineScriptPartials', () => {
       partial.dispose();
     }
   });
+
+  // D-22 (87-01) regression-lock: a plain-module pass-through re-export with
+  // NO alias — `import { helper } from './mod'; export { helper };` — hoists
+  // its backing import under the SAME name the host requested. This is the
+  // shape 87-01 fixed (a partial re-exporting a name introduced only by its
+  // own plain-module import, no local declaration body); it had no dedicated
+  // unit test until 87-14 added the WR-01 aliased twin below.
+  it('D-22: a plain-module pass-through re-export (no alias) hoists its backing import', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      'passthrough.rzts',
+      [`import { helper } from './helpers/mod';`, `export { helper };`].join('\n'),
+    );
+    try {
+      const esc = partial.path.replace(/\\/g, '\\\\');
+      const host = moduleFile(`import { helper } from '${esc}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      const imports = bodyOf(result.ast ?? host).filter(
+        (s): s is t.ImportDeclaration => s.type === 'ImportDeclaration',
+      );
+      // No leftover partial import.
+      expect(imports.some((i) => /\.rz(ts|js)$/.test(i.source.value))).toBe(false);
+      const mod = imports.find((i) => i.source.value === './helpers/mod');
+      expect(mod).toBeDefined();
+      expect(mod?.specifiers.map((sp) => (sp.local as t.Identifier).name)).toContain('helper');
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // WR-01 (87-14 gap-closure): an ALIASED plain-module pass-through —
+  // `import { applyUpdater } from './helpers/indexMath'; export { applyUpdater
+  // as applyRowUpdater };` — must resolve and hoist its backing import under
+  // the EXPORTED alias, not the module's own local name. The BFS is seeded
+  // from the downstream importer's EXPORTED name (`applyRowUpdater`), which
+  // matches neither a real declaration nor the moduleImport's local name
+  // (`applyUpdater`) directly — the exact gap WR-01 (code review) found in the
+  // 87-01 fix.
+  it('WR-01 (87-14): an aliased plain-module pass-through re-export resolves and hoists under the alias', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      'aliasedPassthrough.rzts',
+      [
+        `import { applyUpdater } from './helpers/indexMath';`,
+        `export { applyUpdater as applyRowUpdater };`,
+      ].join('\n'),
+    );
+    try {
+      const esc = partial.path.replace(/\\/g, '\\\\');
+      const host = moduleFile(`import { applyRowUpdater } from '${esc}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      const imports = bodyOf(result.ast ?? host).filter(
+        (s): s is t.ImportDeclaration => s.type === 'ImportDeclaration',
+      );
+      // No leftover partial import.
+      expect(imports.some((i) => /\.rz(ts|js)$/.test(i.source.value))).toBe(false);
+      const mod = imports.find((i) => i.source.value === './helpers/indexMath');
+      expect(mod).toBeDefined();
+      // The host binding must be named `applyRowUpdater` (the EXPORTED alias
+      // the downstream import asked for), sourced from the module's own
+      // `applyUpdater` export — NOT a binding still named `applyUpdater`
+      // (which the host never asked for and does not reference).
+      const spec = mod?.specifiers.find(
+        (sp): sp is t.ImportSpecifier =>
+          sp.type === 'ImportSpecifier' && (sp.local as t.Identifier).name === 'applyRowUpdater',
+      );
+      expect(spec).toBeDefined();
+      expect((spec?.imported as t.Identifier).name).toBe('applyUpdater');
+      expect(
+        mod?.specifiers.some((sp) => (sp.local as t.Identifier).name === 'applyUpdater'),
+      ).toBe(false);
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // WR-01 (87-14 gap-closure): a name that resolves to NEITHER a declaration,
+  // a moduleImport local, nor a local export alias must be diagnosed — never
+  // silently dropped (D-08). This is the general failure class WR-01 exists
+  // to close: previously such a name vanished from the splice with zero
+  // diagnostic and a downstream TS2304 in the emitted leaf.
+  it('WR-01 (87-14): a genuinely unresolvable imported name produces a diagnostic, not silence', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const { RozieErrorCode } = await import('../../diagnostics/codes.js');
+    const partial = stagePartial('unresolvable.rzts', `export const usedName = $computed(() => 1);`);
+    try {
+      const esc = partial.path.replace(/\\/g, '\\\\');
+      // `doesNotExist` is not declared, not a moduleImport local, and has no
+      // local export alias in the partial — genuinely unresolvable.
+      const host = moduleFile(`import { usedName, doesNotExist } from '${esc}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      const diag = result.diagnostics.find(
+        (d) => d.code === RozieErrorCode.PARTIAL_UNSUPPORTED_IMPORT_FORM,
+      );
+      expect(diag).toBeDefined();
+      expect(diag?.severity).toBe('error');
+      expect(diag?.message ?? '').toContain('doesNotExist');
+      // The legitimately-resolvable import still inlines normally alongside
+      // the diagnostic — one bad name doesn't sink the whole splice.
+      const names = bodyOf(result.ast ?? host)
+        .filter((s): s is t.VariableDeclaration => s.type === 'VariableDeclaration')
+        .flatMap((s) => s.declarations.map((d) => (d.id as t.Identifier).name));
+      expect(names).toContain('usedName');
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // WR-01 (87-14 gap-closure): an aliased re-export of a LOCAL DECLARATION
+  // (not a moduleImport) is a DIFFERENT, still-unsupported shape — this BFS
+  // extension only rebinds the module-import passthrough case (the shape the
+  // real corpus uses). It must be diagnosed rather than silently including
+  // the declaration under its ORIGINAL name while the host references the
+  // alias (which would leave the host's reference dangling with no
+  // explanation — a false "fix").
+  it('WR-01 (87-14): an aliased re-export of a local declaration is diagnosed, not silently mis-bound', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const { RozieErrorCode } = await import('../../diagnostics/codes.js');
+    const partial = stagePartial(
+      'aliasedLocalDecl.rzts',
+      [`const helper = (n) => n * 2;`, `export { helper as helperAlias };`].join('\n'),
+    );
+    try {
+      const esc = partial.path.replace(/\\/g, '\\\\');
+      const host = moduleFile(`import { helperAlias } from '${esc}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      const diag = result.diagnostics.find(
+        (d) => d.code === RozieErrorCode.PARTIAL_UNSUPPORTED_IMPORT_FORM,
+      );
+      expect(diag).toBeDefined();
+      expect(diag?.message ?? '').toContain('helperAlias');
+    } finally {
+      partial.dispose();
+    }
+  });
 });
 
 describe('inlineScriptPartials — negative routing', () => {
