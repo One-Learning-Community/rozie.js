@@ -307,9 +307,9 @@ const disabledOf = (opt: any) => {
 //   - colVirtualizer           — the host's SECOND virtual-core instance, windowing the COLUMN axis
 //                             (see the AXIS MECHANISM note below). Host-provided, defaulting to `null`.
 //
-// AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source this session, NOT
-// implemented yet; this plan documents the contract only, the second instance lands starting 87-04):
-// `horizontal` is a PER-INSTANCE field of `VirtualizerOptions`
+// AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source in 87-02;
+// LANDED in 87-04: `columnVirtualizerOptions()` below IS the second, horizontal instance this
+// note originally only documented). `horizontal` is a PER-INSTANCE field of `VirtualizerOptions`
 // (`node_modules/@tanstack/virtual-core/dist/esm/index.d.ts:67`, installed version 3.17.1 per
 // `package.json`), and every axis-sensitive internal read consults `instance.options.horizontal` —
 // `measureElement`'s inlineSize/blockSize + offsetWidth/offsetHeight branch
@@ -532,6 +532,14 @@ const rowIsOutsideWindow = (r: any) => {
   for (const it of items as any) if (it.index === r) return false;
   return true;
 };
+
+// ══ Phase 87 87-04 — the column-axis analogs of windowedRows()/padTop()/padBottom()/
+// rowIsOutsideWindow() above. The column axis has no "row-shaped" identity to carry alongside
+// a VirtualItem (a column is not a full-model object the way a row is), so windowedColIndices()
+// returns bare ABSOLUTE leaf-column indices; the template resolves each index back to a header/
+// cell through the host's own header-group / visibleCellsFor lookups (D-08/D-09). ══
+
+// windowedColIndices(): the ordered array of ABSOLUTE leaf-column indices to render.
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally;
 // every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so

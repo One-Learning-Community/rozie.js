@@ -24,10 +24,11 @@
     <span v-for="gk in groupingKeys()" :key="gk" class="rdt-group-token" data-group-token="">{{ gk }}</span>
   </slot>
 </div><div v-if="isWindowed()" class="rdt-scroll" :style="rowsWindowed() && props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto'">
-<table :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
+<table :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader, 'rdt-col-windowed': colsWindowed() }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
   <thead class="rdt-thead" role="rowgroup">
     <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row" :aria-rowindex="hgLevel + 1">
-      <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
+      
+      <th v-if="colsWindowed() && hgLevel === headerGroups.length - 1" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th><th v-for="header in windowedHeaderRow(hg, hgLevel)" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
         <span v-if="isSelectColumn(header.column.id)" style="display:contents">
           <slot name="selectAll" :checked="isAllRowsSelected()" :indeterminate="isSomeRowsSelected()" :toggle="onToggleAllRows">
             <input v-if="props.selectionMode === 'multiple'" class="rdt-select-all" type="checkbox" aria-label="Select all rows" :checked="isAllRowsSelected()" @change="onToggleAllRows($event)" /></slot>
@@ -52,7 +53,8 @@
             </div></Popover>
           <button type="button" class="rdt-resize-handle" :aria-label="'Resize ' + headerLabel(header.column.id)" @pointerdown="onResizeStart(header.column.id, $event)" @touchstart="onResizeStart(header.column.id, $event)"><span class="rdt-resize-grip" aria-hidden="true"></span></button>
         </span></th>
-    </tr>
+      
+      <th v-if="colsWindowed() && hgLevel === headerGroups.length - 1" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadRight() + 'px;padding:0;border:0'"></th></tr>
     
     <tr v-if="hasAnyFilterableColumn()" class="rdt-filter-row">
       <th v-for="header in headerGroups[headerGroups.length - 1].headers" :key="header.id" class="rdt-filter-cell" role="presentation" :style="pinStyle(header.column.id)">
@@ -65,12 +67,13 @@
   <tbody class="rdt-tbody" role="rowgroup">
     
     <tr class="rdt-spacer" aria-hidden="true">
-      <td :colspan="(visibleColCount()) ?? undefined" :style="'height:' + padTop() + 'px;padding:0;border:0'"></td>
+      <td :colspan="(windowedColSpan()) ?? undefined" :style="'height:' + padTop() + 'px;padding:0;border:0'"></td>
     </tr>
     
     <template v-for="wr in windowedRows()" :key="wr.row.id">
     <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }]" role="row" :data-row="wr.vi.index" :aria-rowindex="headerRowCount() + wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined" :data-depth="wr.row.depth" :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined" :aria-expanded="(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined" :aria-selected="(props.selectionMode !== 'none' ? !!rowIsSelected(wr.row) : undefined) ?? undefined" :aria-level="(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined">
-      <td v-for="cell in visibleCellsFor(wr.row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cell)" :tabindex="(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell))) ?? undefined" :style="bodyCellStyle(wr.row, cell.column.id)" :aria-invalid="(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell))) ?? undefined" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
+      
+      <td v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"></td><td v-for="cell in windowedCells(wr.row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cell)" :tabindex="(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell))) ?? undefined" :style="bodyCellStyle(wr.row, cell.column.id)" :aria-invalid="(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell))) ?? undefined" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
         
         <span v-if="isExpanderColumn(cell.column.id)" style="display:contents">
           <button v-if="rowCanExpand(wr.row)" type="button" class="rdt-expander" data-expander="" :aria-expanded="!!rowIsExpanded(wr.row)" :aria-label="rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row'" @click="onToggleExpand(wr.row, $event)">{{ rowIsExpanded(wr.row) ? '▾' : '▸' }}</button></span><span v-else-if="isSelectColumn(cell.column.id)" style="display:contents">
@@ -91,16 +94,17 @@
           </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else-if="cellIsPlaceholder(cell)" style="display:contents"></span><span v-else class="rdt-cell-value">
           <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="wr.row.original" :value="cell.getValue()">{{ cell.getValue() }}</slot>
         </span><span v-if="isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cell))" class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown="onFillHandlePointerDown($event)"></span></td>
-    </tr>
+      
+      <td v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadRight() + 'px;padding:0;border:0'"></td></tr>
     
     <tr v-if="rowShowsDetail(wr.row)" class="rdt-detail-row" role="row" :data-detail-row="wr.row.id">
-      <td class="rdt-detail-cell" :colspan="(visibleColCount()) ?? undefined">
+      <td class="rdt-detail-cell" :colspan="(windowedColSpan()) ?? undefined">
         <slot name="detail" :row="wr.row.original"></slot>
       </td>
     </tr></template>
     
     <tr class="rdt-spacer" aria-hidden="true">
-      <td :colspan="(visibleColCount()) ?? undefined" :style="'height:' + padBottom() + 'px;padding:0;border:0'"></td>
+      <td :colspan="(windowedColSpan()) ?? undefined" :style="'height:' + padBottom() + 'px;padding:0;border:0'"></td>
     </tr>
   </tbody>
 </table>
@@ -466,6 +470,13 @@ let table: any = null;
 let virtualizer: any = null;
 let virtualizerCleanup: any = null;
 let gridScrollEl: any = null;
+// ── Horizontal (column-axis) windowing instance state (Phase 87 87-04) ─────────────────
+// The SECOND, independent virtual-core instance (AXIS MECHANISM, windowing.rzts): mutable
+// top-level `let`s (the `virtualizer` precedent above — React hoists to useRef). NULL until
+// $onMount, and ONLY constructed when colsWindowed(). Shares gridScrollEl (the SAME
+// .rdt-scroll element) with the row instance — D-03.
+let colVirtualizer: any = null;
+let colVirtualizerCleanup: any = null;
 // CR-01 remeasure scheduling state. remeasurePending dedupes the deferred sweep — at most ONE
 // rAF is in flight, so a burst of onChange ticks (a fast scroll) collapses to a single measure
 // pass per frame instead of piling up rAF callbacks that fire mid-gesture. The piled-up
@@ -1215,14 +1226,64 @@ const colsWindowed = () => {
   return s === 'columns' || s === 'both';
 };
 const isWindowed = () => rowsWindowed() || colsWindowed();
-// D-10 column-axis host-contract stubs (Phase 87 87-02) — INERT until 87-04 constructs the
-// second, horizontal Virtualizer instance (see windowing.rzts's AXIS MECHANISM note). Explicit
-// return-type annotations (columnSize / forcedColumns) copy the pinMeasurement() trick
-// (windowing.rzts:65-74) so the strict bundled-leaf tsc does not flow-narrow a no-op host's
-// return to `never`.
-const columnCount = (): number => 0;
-const columnSize = (i: number): number => 0;
+// D-10 column-axis host-contract symbols. columnCount()/columnSize() got REAL bodies in
+// 87-04 (the tracer); forcedColumns() stays an empty-array stub until 87-05 gives it the
+// pinned + active-cell + editing-column union. Explicit return-type annotations (columnSize /
+// forcedColumns) copy the pinMeasurement() trick (windowing.rzts) so the strict bundled-leaf
+// tsc does not flow-narrow a no-op host's return to `never`.
+//
+// columnCount(): the leaf-column count the column virtualizer windows over — visibleColCount()
+// (gridFocusNav.rzts), the SAME index space colIndexOf()/data-col-index already address (D-08).
+const columnCount = (): number => visibleColCount();
+// columnSize(i): the authoritative width of absolute leaf column i (D-06). Reads table-core's
+// OWN getVisibleLeafColumns() directly — NOT the host's allLeafColumns() wrapper
+// (columnChrome.rzts), which returns plain `{ id, label, visible }` POJOs with no getSize()
+// and also EXCLUDES the auto-injected chrome columns (select/expander), breaking the index
+// alignment with columnCount()/colIndexOf(). getVisibleLeafColumns() is the array
+// row.getVisibleCells() itself is built from, so its index space matches exactly. Falls back
+// to table-core's own default column width (150) when the index is out of range.
+const columnSize = (i: number): number => {
+  if (!table || !table.getVisibleLeafColumns) return 150;
+  const cols = table.getVisibleLeafColumns();
+  const c = cols[i];
+  return c && typeof c.getSize === 'function' ? c.getSize() : 150;
+};
 const forcedColumns = (): number[] => [];
+// windowedCells(row) (D-09): the TEMPLATE-ONLY windowed slice of a row's visible cells — wraps
+// visibleCellsFor(row) (columnChrome.rzts) WITHOUT modifying it. Degrades to the full,
+// unsliced set when columns are not windowed (byte-identical to today). visibleCellsFor()
+// itself must never be sliced: colIndexOf/visibleColCount/columnIdAt/cellValueAt/beginEdit all
+// index into its FULL result (the A2 invariant, 87-02), and slicing it would silently break
+// all five with no compile error.
+const windowedCells = (row: any) => {
+  // subscribe-first (the windowedRows() discipline) so the fine-grained targets' body <td>
+  // r-for re-derives when the column window moves.
+  void windowVer.value;
+  const cells = visibleCellsFor(row);
+  if (!colsWindowed()) return cells;
+  const idx = windowedColIndices();
+  const out = [];
+  for (let i = 0; i < idx.length; i++) {
+    // WR-01 shrink-window guard, one axis over: drop any index that outruns the row's
+    // current cell list (a brief stale-count window analogous to windowedRows()'s WR-01).
+    const cell = cells[idx[i]];
+    if (cell) out.push(cell);
+  }
+  return out;
+};
+// remeasureColumnWindow() (Phase 87 87-04) is declared in DataTable.rozie's OWN script, NOT
+// here — even though it is conceptually this file's D-10 host-shell twin of remeasureWindow()
+// above. Reason (Rule 1, found via the react typecheck gate): remeasureColumnWindow() must call
+// columnVirtualizerOptions() (headless-core windowing.rzts). inlineScriptPartials() groups a
+// RELATIVE partial import (this file) BEFORE a bare-package-specifier partial import
+// (@rozie-ui/headless-core/windowing.rzts) in the merged per-target output, regardless of which
+// import statement appears first in DataTable.rozie's own script (verified: columnVirtualizerOptions
+// emits as a `useCallback` LATER in the react output than every symbol this file exports). A
+// function declared HERE calling INTO windowing.rzts is therefore a forward reference — the
+// exact TS2448 TDZ class the 87-02 predicate-layer reordering already fixed once. DataTable.rozie's
+// OWN top-level script code lands AFTER both partial groups, so remeasureColumnWindow() is safe
+// declared there instead (see the comment beside windowedHeaderRow()/windowedColSpan()).
+
 // windowSource(): the rows fed to the virtualizer AND held in $data.rows — the windowing.rzts
 // host-contract source. When virtual, the FULL filtered+sorted PRE-PAGINATION model
 // (A2-verified table.getPrePaginationRowModel()) so windowing REPLACES client pagination (req-9);
@@ -1349,9 +1410,9 @@ const remeasureWindow = () => {
 //   - colVirtualizer           — the host's SECOND virtual-core instance, windowing the COLUMN axis
 //                             (see the AXIS MECHANISM note below). Host-provided, defaulting to `null`.
 //
-// AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source this session, NOT
-// implemented yet; this plan documents the contract only, the second instance lands starting 87-04):
-// `horizontal` is a PER-INSTANCE field of `VirtualizerOptions`
+// AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source in 87-02;
+// LANDED in 87-04: `columnVirtualizerOptions()` below IS the second, horizontal instance this
+// note originally only documented). `horizontal` is a PER-INSTANCE field of `VirtualizerOptions`
 // (`node_modules/@tanstack/virtual-core/dist/esm/index.d.ts:67`, installed version 3.17.1 per
 // `package.json`), and every axis-sensitive internal read consults `instance.options.horizontal` —
 // `measureElement`'s inlineSize/blockSize + offsetWidth/offsetHeight branch
@@ -1372,12 +1433,36 @@ const virtualItemKey = (i: any) => {
   const src = windowSource();
   return src && src[i] ? src[i].id : undefined;
 };
-
 // COL_OVERSCAN (D-07): the column axis's own hardcoded overscan constant, separate from the
 // row axis's `overscan: 8` below. Columns are far wider than rows are tall, so one number
 // cannot serve both axes; no prop is exposed because no consumer has asked to tune the row
 // overscan across the four phases it has shipped. Unused until 87-04 constructs the second,
 // horizontal Virtualizer instance (see the AXIS MECHANISM note above).
+const COL_OVERSCAN = 3;
+// columnVirtualizerOptions() (Phase 87 87-04): the SECOND, horizontal Virtualizer instance's
+// full options set — the AXIS MECHANISM note's second instance, landed. Mirrors
+// virtualizerOptions() exactly except: count/estimateSize read the COLUMN host symbols,
+// horizontal:true selects the axis, overscan is the column axis's OWN constant (D-07), and
+// there is NO getItemKey — columns have no stable per-column id in the virtual-core sense, so
+// they key by index (virtual-core's default). onChange bumps the SAME $data.windowVer counter
+// the row axis uses (87-02 checkpoint decision (b): no separate $data.colWindowVer) but does
+// NOT call scheduleRemeasure(): under D-06 column widths come from table-core's getSize()
+// oracle and are NEVER measured from the DOM, so a horizontal scroll has nothing new to
+// observe (unlike the row axis's CR-01 recycled-row remeasure sweep).
+const columnVirtualizerOptions = (): any => ({
+  count: columnCount(),
+  getScrollElement: () => gridScrollEl,
+  estimateSize: (i: any) => columnSize(i),
+  horizontal: true,
+  observeElementRect,
+  observeElementOffset,
+  scrollToFn: elementScroll,
+  measureElement,
+  overscan: COL_OVERSCAN,
+  onChange: () => {
+    windowVer.value = windowVer.value + 1;
+  }
+});
 // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
 // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
 // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
@@ -1572,6 +1657,78 @@ const rowIsOutsideWindow = (r: any) => {
   if (!rowsWindowed() || !virtualizer) return false;
   const items = virtualizer.getVirtualItems();
   for (const it of items as any) if (it.index === r) return false;
+  return true;
+};
+// ══ Phase 87 87-04 — the column-axis analogs of windowedRows()/padTop()/padBottom()/
+// rowIsOutsideWindow() above. The column axis has no "row-shaped" identity to carry alongside
+// a VirtualItem (a column is not a full-model object the way a row is), so windowedColIndices()
+// returns bare ABSOLUTE leaf-column indices; the template resolves each index back to a header/
+// cell through the host's own header-group / visibleCellsFor lookups (D-08/D-09). ══
+
+// windowedColIndices(): the ordered array of ABSOLUTE leaf-column indices to render.
+const windowedColIndices = () => {
+  // SUBSCRIBE FIRST (the windowedRows() discipline): colVirtualizer is a non-reactive `let`,
+  // null at first render, so a $data.windowVer read placed BELOW the guards below would mean
+  // Solid's <For> / Svelte's {#each} accessors never subscribe — the column window would stay
+  // blank forever on exactly those two targets. Also subscribe to editVer (mirrors the row
+  // axis's pin/unpin re-derive — the D-10 forced-column union lands on top of this in 87-05).
+  void windowVer.value;
+  void editVer.value;
+  if (!colsWindowed()) {
+    // Columns OFF (or rows-only windowed) → every absolute index, the degrade-to-full-set
+    // path that keeps the caller (windowedCells / the header loop) axis-agnostic.
+    const n = columnCount();
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(i);
+    return out;
+  }
+  // Columns windowed but the column virtualizer is not yet constructed (pre-$onMount first
+  // paint) → render NOTHING, matching windowedRows()'s pre-mount behavior.
+  if (!colVirtualizer) return [];
+  const items = colVirtualizer.getVirtualItems();
+  const idx = items.map((it: any) => it.index);
+  // D-10 forced-column union (host hook — empty array until 87-05 gives it a real body):
+  // dedupe-then-append any forced index not already in the virtualized window.
+  const forced = forcedColumns();
+  for (let i = 0; i < forced.length; i++) {
+    if (idx.indexOf(forced[i]) === -1) idx.push(forced[i]);
+  }
+  // Sorted ascending: the body <td> sequence and the header <th> sequence both follow visual
+  // left-to-right order, and the virtual items + forced union are not guaranteed sorted.
+  idx.sort((a: any, b: any) => a - b);
+  return idx;
+};
+// colPadLeft() / colPadRight() (D-06): the horizontal spacer <td>/<th> widths — the leading
+// spacer occupies items[0].start, the trailing spacer the gap between the last rendered
+// item's end and getTotalSize(). Mirrors padTop()/padBottom() exactly, minus the D-02 pin-row
+// subtraction (forcedColumns() is empty until 87-05, so there is no forced-outside-window
+// column to subtract yet — when it lands, decide above/below by INDEX, never by start-offset,
+// per the WR-01 lesson padBottom() already carries).
+const colPadLeft = () => {
+  void windowVer.value;
+  void editVer.value;
+  if (!colsWindowed() || !colVirtualizer) return 0;
+  const items = colVirtualizer.getVirtualItems();
+  const pad = items.length ? items[0].start : 0;
+  return pad < 0 ? 0 : pad;
+};
+const colPadRight = () => {
+  void windowVer.value;
+  void editVer.value;
+  if (!colsWindowed() || !colVirtualizer) return 0;
+  const items = colVirtualizer.getVirtualItems();
+  if (!items.length) return 0;
+  const pad = colVirtualizer.getTotalSize() - items[items.length - 1].end;
+  return pad < 0 ? 0 : pad;
+};
+// colIsOutsideWindow(c): is the absolute leaf-column index c absent from the currently
+// rendered column window? The column-axis analog of rowIsOutsideWindow(r) (D-12's
+// scroll-then-focus seam, wired starting 87-06). Gated on colsWindowed() (never a bare prop
+// truthiness read — the 87-02 prohibition gate).
+const colIsOutsideWindow = (c: any) => {
+  if (!colsWindowed() || !colVirtualizer) return false;
+  const items = colVirtualizer.getVirtualItems();
+  for (const it of items as any) if (it.index === c) return false;
   return true;
 };
 // ── Sort/filter live-announcement (#14) ─────────────────────────────────────────────
@@ -3466,6 +3623,46 @@ const clampActiveCell = (rowCount: any, colCount: any) => {
     const recCol = clamp(doomedCol, 0, maxCol < 0 ? 0 : maxCol);
     recoverGridFocus(String(recRow), recCol, null);
   }
+};
+// ══ Phase 87 87-04 — column-axis template windowing (the D-06/D-11 tracer, flat-header-only;
+// declared HERE (after the columnChrome/gridFocusNav imports above) so a forward cross-partial
+// reference to visibleColCount()/colsWindowed()/windowedColIndices() in the merged per-target
+// output never TDZs on React — the 87-02 useCallback-deps-array ordering lesson). ══
+// windowedHeaderRow(hg, hgLevel): the windowed slice of ONE header level's headers, restricted
+// to the LAST (leaf) level only in this plan — a group/parent level is left untouched (the
+// grouped colspan clamp is 87-05's expansion, D-11). Byte-identical to hg.headers for every
+// other path (off, a non-leaf level, or rows-only windowing).
+const windowedHeaderRow = (hg: any, hgLevel: any) => {
+  const headers = hg && hg.headers || [];
+  if (!colsWindowed() || hgLevel !== headerGroups.value.length - 1) return headers;
+  const idx = windowedColIndices();
+  const out = [];
+  for (let i = 0; i < idx.length; i++) {
+    const h = headers[idx[i]];
+    if (h) out.push(h);
+  }
+  return out;
+};
+// windowedColSpan(): the body row's rendered <td> COUNT under column windowing — the windowed
+// cell slice length plus the two rdt-col-spacer cells, so the leading/trailing full-row spacer
+// <tr>s and the #detail <tr> span the SAME column count the body row actually renders (D-06/
+// D-11's alignment obligation under table-layout:fixed). Off → visibleColCount() unchanged
+// (byte-identical).
+const windowedColSpan = () => colsWindowed() ? windowedColIndices().length + 2 : visibleColCount();
+// remeasureColumnWindow() (Phase 87 87-04): push a fresh column count/size into the SECOND
+// (horizontal) virtualizer on every row-model refresh — mirrors the row axis's
+// virtualizer.setOptions(virtualizerOptions()) + _willUpdate() re-feed in refreshRowModel, so a
+// runtime column-visibility/order/pinning change (all watched in the $watch list below) keeps
+// the column virtualizer's count in sync. Never a render helper (Pitfall 1); rides the EXISTING
+// refreshRowModel imperative re-feed cycle rather than adding a third scheduling path. Declared
+// HERE (DataTable.rozie's own script), not in virtualization.rzts — see that file's comment for
+// why: it must call columnVirtualizerOptions() (windowing.rzts), and a function inside
+// virtualization.rzts calling into windowing.rzts is a forward-reference TDZ on React (the
+// 87-02 predicate-layer lesson, one file-grouping boundary over).
+const remeasureColumnWindow = () => {
+  if (!colsWindowed() || !colVirtualizer) return;
+  colVirtualizer.setOptions(columnVirtualizerOptions());
+  colVirtualizer._willUpdate();
 };
 // B6 (phase 63 wave-11) — "the active cell is parked on the empty-grid header fallback" control
 // flag, written + read ONLY inside clampActiveCell (never bound in the template). It MUST be a
@@ -5591,6 +5788,11 @@ onMounted(() => {
       virtualizer.setOptions(virtualizerOptions());
       virtualizer._willUpdate();
     }
+    // Phase 87 87-04: re-feed the column virtualizer's count/size on the SAME re-derive cycle
+    // (a column-visibility/order/pinning change is already in the $watch list below and re-pulls
+    // through here) — guarded internally on colsWindowed() && colVirtualizer, so this is a no-op
+    // on every other path.
+    remeasureColumnWindow();
     // D-05: on every data change (re-sort/filter/paginate/page-size — all re-pull here),
     // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
     // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
@@ -5673,15 +5875,33 @@ onMounted(() => {
   if (rowsWindowed()) {
     virtualizer = new Virtualizer(virtualizerOptions());
     virtualizerCleanup = virtualizer._didMount();
-    // FINE-GRAINED FIRST-WINDOW KICK (Solid/Svelte): the windowed <For>/{#each} accessor was first
-    // evaluated at initial render — while `virtualizer` was still null — and (because windowedRows()
-    // reads $data.windowVer up top) subscribed to windowVer then returned []. `virtualizer` is a
-    // non-reactive `let`, so its assignment above does NOT notify the accessor; we must bump the
-    // SIGNAL it subscribed to. _didMount() computes the first window synchronously but its onChange
-    // only fires on SUBSEQUENT scroll/resize, so without this explicit bump the first window would
-    // never paint on the fine-grained targets. Idempotent + harmless on the coarse targets (they
-    // re-render wholesale anyway). One bump = one re-run that now sees the non-null virtualizer and
-    // pulls getVirtualItems().
+  }
+  // Phase 87 87-04: construct the SECOND, horizontal Virtualizer instance when the COLUMN
+  // axis is windowed — entirely inside its own colsWindowed() guard, byte-identical-off for
+  // 'rows'/true/false.
+  if (colsWindowed()) {
+    colVirtualizer = new Virtualizer(columnVirtualizerOptions());
+    colVirtualizerCleanup = colVirtualizer._didMount();
+  }
+  // FINE-GRAINED FIRST-WINDOW KICK (Solid/Svelte), either axis: the windowed <For>/{#each}
+  // accessor was first evaluated at initial render — while `virtualizer`/`colVirtualizer` were
+  // still null — and (because windowedRows()/windowedColIndices() read $data.windowVer up top)
+  // subscribed to windowVer then returned []/the full set. Both `let`s are non-reactive, so
+  // their assignment above does NOT notify the accessor; we must bump the SIGNAL it subscribed
+  // to. _didMount() computes the first window synchronously but its onChange only fires on
+  // SUBSEQUENT scroll/resize, so without this explicit bump the first window would never paint
+  // on the fine-grained targets. Idempotent + harmless on the coarse targets (they re-render
+  // wholesale anyway). ONE bump here (not one per axis, Rule 1 — see the ROZ138 note below)
+  // covers both: windowedRows()/windowedColIndices() each simply re-derive against their own
+  // now-non-null virtualizer instance off the SAME counter (87-02 checkpoint decision (b): no
+  // separate $data.colWindowVer). Gated on isWindowed() (either axis) rather than two separate
+  // per-axis bumps: a second `$data.windowVer = $data.windowVer + 1` write later in this SAME
+  // $onMount body would dominate-flag ROZ138 (React stale-read) on its own right-hand-side read
+  // of the counter it had just written a few lines above — a false positive (this increment
+  // idiom lowers to a functional React setState update and is safe regardless of ordering, the
+  // same reasoning virtualizerOptions()'s onChange documents), but collapsing to one bump avoids
+  // manufacturing the false-positive warning at all rather than accepting it.
+  if (isWindowed()) {
     windowVer.value = windowVer.value + 1;
   }
   // After the first window commits (next frame), refine heights + fire the dev-mode warns ONCE.
@@ -5740,6 +5960,9 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   if (virtualizerCleanup) virtualizerCleanup();
+  // Phase 87 87-04: tear down the column virtualizer's scroll-element ResizeObserver too.
+  // No-op when column windowing was off (cleanup stays null).
+  if (colVirtualizerCleanup) colVirtualizerCleanup();
   // CR-04: remove any live fill-drag document listeners if we unmount mid-drag.
   teardownFillDrag();
   // §6 (260709-3qt): remove any live drag-select document listeners on a mid-drag unmount.
@@ -5793,6 +6016,9 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
   width: 100%;
   font: var(--rdt-font, 14px system-ui, sans-serif);
   color: var(--rdt-color, inherit);
+}
+.rozie-data-table.rdt-col-windowed {
+  table-layout: fixed;
 }
 .rdt-sr-live {
   position: absolute;

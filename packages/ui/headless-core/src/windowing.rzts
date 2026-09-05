@@ -37,9 +37,9 @@
 //   - colVirtualizer           — the host's SECOND virtual-core instance, windowing the COLUMN axis
 //                             (see the AXIS MECHANISM note below). Host-provided, defaulting to `null`.
 //
-// AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source this session, NOT
-// implemented yet; this plan documents the contract only, the second instance lands starting 87-04):
-// `horizontal` is a PER-INSTANCE field of `VirtualizerOptions`
+// AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source in 87-02;
+// LANDED in 87-04: `columnVirtualizerOptions()` below IS the second, horizontal instance this
+// note originally only documented). `horizontal` is a PER-INSTANCE field of `VirtualizerOptions`
 // (`node_modules/@tanstack/virtual-core/dist/esm/index.d.ts:67`, installed version 3.17.1 per
 // `package.json`), and every axis-sensitive internal read consults `instance.options.horizontal` —
 // `measureElement`'s inlineSize/blockSize + offsetWidth/offsetHeight branch
@@ -67,6 +67,31 @@ const virtualItemKey = (i) => {
 // overscan across the four phases it has shipped. Unused until 87-04 constructs the second,
 // horizontal Virtualizer instance (see the AXIS MECHANISM note above).
 const COL_OVERSCAN = 3
+
+// columnVirtualizerOptions() (Phase 87 87-04): the SECOND, horizontal Virtualizer instance's
+// full options set — the AXIS MECHANISM note's second instance, landed. Mirrors
+// virtualizerOptions() exactly except: count/estimateSize read the COLUMN host symbols,
+// horizontal:true selects the axis, overscan is the column axis's OWN constant (D-07), and
+// there is NO getItemKey — columns have no stable per-column id in the virtual-core sense, so
+// they key by index (virtual-core's default). onChange bumps the SAME $data.windowVer counter
+// the row axis uses (87-02 checkpoint decision (b): no separate $data.colWindowVer) but does
+// NOT call scheduleRemeasure(): under D-06 column widths come from table-core's getSize()
+// oracle and are NEVER measured from the DOM, so a horizontal scroll has nothing new to
+// observe (unlike the row axis's CR-01 recycled-row remeasure sweep).
+const columnVirtualizerOptions = (): any => ({
+  count: columnCount(),
+  getScrollElement: () => gridScrollEl,
+  estimateSize: (i) => columnSize(i),
+  horizontal: true,
+  observeElementRect,
+  observeElementOffset,
+  scrollToFn: elementScroll,
+  measureElement,
+  overscan: COL_OVERSCAN,
+  onChange: () => {
+    $data.windowVer = $data.windowVer + 1
+  },
+})
 
 // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
 // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
@@ -245,4 +270,78 @@ const rowIsOutsideWindow = (r) => {
   return true
 }
 
-export { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow, COL_OVERSCAN }
+// ══ Phase 87 87-04 — the column-axis analogs of windowedRows()/padTop()/padBottom()/
+// rowIsOutsideWindow() above. The column axis has no "row-shaped" identity to carry alongside
+// a VirtualItem (a column is not a full-model object the way a row is), so windowedColIndices()
+// returns bare ABSOLUTE leaf-column indices; the template resolves each index back to a header/
+// cell through the host's own header-group / visibleCellsFor lookups (D-08/D-09). ══
+
+// windowedColIndices(): the ordered array of ABSOLUTE leaf-column indices to render.
+const windowedColIndices = () => {
+  // SUBSCRIBE FIRST (the windowedRows() discipline): colVirtualizer is a non-reactive `let`,
+  // null at first render, so a $data.windowVer read placed BELOW the guards below would mean
+  // Solid's <For> / Svelte's {#each} accessors never subscribe — the column window would stay
+  // blank forever on exactly those two targets. Also subscribe to editVer (mirrors the row
+  // axis's pin/unpin re-derive — the D-10 forced-column union lands on top of this in 87-05).
+  void $data.windowVer
+  void $data.editVer
+  if (!colsWindowed()) {
+    // Columns OFF (or rows-only windowed) → every absolute index, the degrade-to-full-set
+    // path that keeps the caller (windowedCells / the header loop) axis-agnostic.
+    const n = columnCount()
+    const out = []
+    for (let i = 0; i < n; i++) out.push(i)
+    return out
+  }
+  // Columns windowed but the column virtualizer is not yet constructed (pre-$onMount first
+  // paint) → render NOTHING, matching windowedRows()'s pre-mount behavior.
+  if (!colVirtualizer) return []
+  const items = colVirtualizer.getVirtualItems()
+  const idx = items.map((it) => it.index)
+  // D-10 forced-column union (host hook — empty array until 87-05 gives it a real body):
+  // dedupe-then-append any forced index not already in the virtualized window.
+  const forced = forcedColumns()
+  for (let i = 0; i < forced.length; i++) {
+    if (idx.indexOf(forced[i]) === -1) idx.push(forced[i])
+  }
+  // Sorted ascending: the body <td> sequence and the header <th> sequence both follow visual
+  // left-to-right order, and the virtual items + forced union are not guaranteed sorted.
+  idx.sort((a, b) => a - b)
+  return idx
+}
+
+// colPadLeft() / colPadRight() (D-06): the horizontal spacer <td>/<th> widths — the leading
+// spacer occupies items[0].start, the trailing spacer the gap between the last rendered
+// item's end and getTotalSize(). Mirrors padTop()/padBottom() exactly, minus the D-02 pin-row
+// subtraction (forcedColumns() is empty until 87-05, so there is no forced-outside-window
+// column to subtract yet — when it lands, decide above/below by INDEX, never by start-offset,
+// per the WR-01 lesson padBottom() already carries).
+const colPadLeft = () => {
+  void $data.windowVer
+  void $data.editVer
+  if (!colsWindowed() || !colVirtualizer) return 0
+  const items = colVirtualizer.getVirtualItems()
+  const pad = items.length ? items[0].start : 0
+  return pad < 0 ? 0 : pad
+}
+const colPadRight = () => {
+  void $data.windowVer
+  void $data.editVer
+  if (!colsWindowed() || !colVirtualizer) return 0
+  const items = colVirtualizer.getVirtualItems()
+  if (!items.length) return 0
+  const pad = colVirtualizer.getTotalSize() - items[items.length - 1].end
+  return pad < 0 ? 0 : pad
+}
+// colIsOutsideWindow(c): is the absolute leaf-column index c absent from the currently
+// rendered column window? The column-axis analog of rowIsOutsideWindow(r) (D-12's
+// scroll-then-focus seam, wired starting 87-06). Gated on colsWindowed() (never a bare prop
+// truthiness read — the 87-02 prohibition gate).
+const colIsOutsideWindow = (c) => {
+  if (!colsWindowed() || !colVirtualizer) return false
+  const items = colVirtualizer.getVirtualItems()
+  for (const it of items) if (it.index === c) return false
+  return true
+}
+
+export { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow, COL_OVERSCAN, columnVirtualizerOptions, windowedColIndices, colPadLeft, colPadRight, colIsOutsideWindow }

@@ -4,6 +4,9 @@
   font: var(--rdt-font, 14px system-ui, sans-serif);
   color: var(--rdt-color, inherit);
 }
+.rozie-data-table.rdt-col-windowed[data-rozie-s-d5dcab4c] {
+  table-layout: fixed;
+}
 .rdt-sr-live[data-rozie-s-d5dcab4c] {
   position: absolute;
   width: 1px;
