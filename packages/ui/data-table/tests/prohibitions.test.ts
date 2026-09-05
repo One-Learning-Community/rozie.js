@@ -105,12 +105,79 @@ interface ForbiddenViolation {
   text: string;
 }
 
-/** Strip `//` line comments before matching (comment-only mentions are not violations). */
+/**
+ * Strip `//` line comments and `/* *\/` block comments before matching
+ * (comment-only mentions are not violations) — WITHOUT treating a `//`
+ * inside a string literal (single-, double-, or backtick-quoted) as a
+ * comment start (WR-03). A naive `line.indexOf('//')` truncates everything
+ * after a `//` found inside a URL string, silently dropping a genuine
+ * violation that sits later on the same line.
+ *
+ * This is a small hand-rolled character scanner, not a full JS tokenizer —
+ * it tracks "am I inside a quote / block comment right now" character by
+ * character, honoring backslash-escaped quotes, and carries that state
+ * across line boundaries (so a multi-line template literal or block
+ * comment doesn't have its interior misread as code). That is enough to
+ * make this gate reliable against the actual shapes it scans
+ * (`.rozie`/`.rzts`/`.ts` source with URL strings and regular comments) —
+ * a full AST-based strip is deliberately not needed here.
+ */
 function stripLineComments(source: string): string[] {
-  return source.split('\n').map((line) => {
-    const idx = line.indexOf('//');
-    return idx === -1 ? line : line.slice(0, idx);
-  });
+  const out: string[] = [];
+  let quote: '\'' | '"' | '`' | null = null;
+  let inBlockComment = false;
+
+  for (const rawLine of source.split('\n')) {
+    let result = '';
+    let i = 0;
+    while (i < rawLine.length) {
+      const ch = rawLine[i];
+      const next = rawLine[i + 1];
+
+      if (inBlockComment) {
+        if (ch === '*' && next === '/') {
+          inBlockComment = false;
+          i += 2;
+        } else {
+          i += 1;
+        }
+        continue;
+      }
+
+      if (quote) {
+        result += ch;
+        if (ch === '\\' && next !== undefined) {
+          // Escaped character inside a string — consume both without
+          // letting the escaped char close the quote or start a comment.
+          result += next;
+          i += 2;
+          continue;
+        }
+        if (ch === quote) quote = null;
+        i += 1;
+        continue;
+      }
+
+      // Not inside a string or block comment.
+      if (ch === '/' && next === '/') break; // rest of the line is a line comment
+      if (ch === '/' && next === '*') {
+        inBlockComment = true;
+        i += 2;
+        continue;
+      }
+      if (ch === '\'' || ch === '"' || ch === '`') {
+        quote = ch;
+        result += ch;
+        i += 1;
+        continue;
+      }
+
+      result += ch;
+      i += 1;
+    }
+    out.push(result);
+  }
+  return out;
 }
 
 /**
@@ -174,6 +241,28 @@ describe('data-table prohibition gate (D-05, Phase 87 87-02)', () => {
         const rowsWindowed = () => resolveVirtual() === 'rows'
       `;
       expect(findForbiddenViolations(commentOnly)).toEqual([]);
+    });
+
+    // WR-03 (87-15): a naive `line.indexOf('//')` comment stripper treats the
+    // `//` inside a URL string literal as a comment start and truncates
+    // everything after it — silently dropping a genuine violation that sits
+    // later on the SAME line. This proves the stripper is string-literal
+    // aware: a `//` inside a quoted string must not swallow a real
+    // `$props.virtual` read that follows it.
+    it('does not let a // inside a string literal swallow a later genuine violation on the same line', () => {
+      const tainted = `
+        const help = 'see https://example.com/docs' + ($props.virtual ? a : b)
+      `;
+      const violations = findForbiddenViolations(tainted);
+      expect(violations.length).toBe(1);
+      expect(violations[0].text).toContain('$props.virtual');
+    });
+
+    it('still strips a real // comment that follows a closed string literal on the same line', () => {
+      const mixed = `
+        const label = 'https://example.com' // just a trailing comment, no forbidden identifier here
+      `;
+      expect(findForbiddenViolations(mixed)).toEqual([]);
     });
   });
 });
