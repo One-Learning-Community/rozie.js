@@ -1731,10 +1731,50 @@ export class DataTable {
       }
     };
   };
+  // ══ D-23 (gap-closure, Phase 87 follow-up) — columnDefs() memoization ═══════════════════
+  // ROOT CAUSE (confirmed via CPU profiling the D-13 [vue] fill-drag auto-scroll failure):
+  // defFor(colId) (columnChrome.rzts) — the sole resolver behind editMetaOf/columnEditable/
+  // editorTypeOf/isEditing, all called PER CELL, PER RENDER (isEditing's own header comment:
+  // "Called per-cell in both <td> bodies") — called columnDefs() with ZERO caching. columnDefs()
+  // rebuilds the FULL column-def array (buildConfigDef for every entry in $props.columns,
+  // including recursive group traversal) from scratch on every single invocation. With N
+  // columns and M rendered rows that is an O(N x M x N) = O(N^2 x M) cost PER RENDER COMMIT —
+  // on this plan's 60-column fixture, up to ~1200 cells x 60 rebuilt defs = ~72,000
+  // buildConfigDef calls per commit, repeated on every windowVer-driven re-render during a
+  // sustained scroll gesture (the fill-drag edge-auto-scroll rAF loop bumps windowVer on
+  // every frame). A CPU profile of the failing case showed buildConfigDef consuming ~39% of
+  // ALL wall-clock time during the gesture, with a FURTHER ~27% in Vue's own reactive-Proxy
+  // `get` trap — $props.columns/$data.colReg are reactive on Vue, so every one of the
+  // ~15 property reads buildConfigDef performs per column pays Vue's track()/Reflect.get
+  // overhead, an expense React's plain (non-Proxy) props do not pay. The SAME O(N^2 x M)
+  // algorithmic cost exists on all six targets (this is shared-engine code, dissolved
+  // identically everywhere) — Vue's per-access reactivity overhead is what tips an already
+  // wasteful recompute over the fixed real-time budget used by this test's rAF-driven
+  // auto-scroll hold, not a Vue-specific logic defect. Fixing the recompute (not the timing)
+  // removes the accidental n^2 blowup for every target, and Vue-specifically restores enough
+  // per-frame headroom to keep pace with the auto-scroll loop.
+  //
+  // FIX: cache the resolved array, keyed on the REFERENCE identity of $props.columns and
+  // $data.colReg — the exact two dependencies the reFeed() $watch (DataTable.rozie) already
+  // treats as "changed only when the reference changes" (columns is consumer-memoized like
+  // $props.data/$props.sorting; colReg is reassigned via `{ ...colReg, [key]: spec }` on every
+  // real mutation, NEVER written in place — see DataTable.rozie's own colReg-mutation comment).
+  // A cache hit is an O(1) reference-equality check; a cache miss re-runs the exact same
+  // computation as before (byte-identical output either way — this is a pure memoization, not
+  // a behavior change).
+  columnDefsCache: any[] | null = null;
+  columnDefsCacheColumnsRef: any = undefined;
+  columnDefsCacheColRegRef: any = undefined;
   columnDefs = () => {
+    const __columns = this.columns();
+    const __colReg = this.colReg();
+    const cfg = __columns || [];
+    const reg = __colReg || {};
+    if (this.columnDefsCache && __columns === this.columnDefsCacheColumnsRef && __colReg === this.columnDefsCacheColRegRef) {
+      return this.columnDefsCache;
+    }
     const byId = Object.create(null);
     const order = [];
-    const cfg = this.columns() || [];
     for (const c of cfg as any) {
       const def = this.buildConfigDef(c);
       if (!def) continue;
@@ -1742,7 +1782,6 @@ export class DataTable {
       if (!(id in byId)) order.push(id);
       byId[id] = def;
     }
-    const reg = this.colReg() || {};
     for (const id in reg) {
       if (!isSafeKey(id)) continue;
       const spec = reg[id];
@@ -1773,6 +1812,9 @@ export class DataTable {
     }
     const out = [];
     for (const id of order as any) if (byId[id]) out.push(byId[id]);
+    this.columnDefsCache = out;
+    this.columnDefsCacheColumnsRef = __columns;
+    this.columnDefsCacheColRegRef = __colReg;
     return out;
   };
   // The constant id of the auto-injected leading checkbox column (D-04). Distinct from
