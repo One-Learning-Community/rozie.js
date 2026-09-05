@@ -1921,12 +1921,13 @@ $expose({
                relocate to the dedicated filter row (72-05); filtering is intentionally offline
                until that wave lands.
                D-14 (Phase 87 87-05): a column whose menu is open is allowed to unmount when its
-               column scrolls out of the window — no new state is added here, no
-               forcedColumns() entry, no r-model:open. The menu's strategy:'fixed' panel would
-               otherwise float detached over unrelated columns once its anchor left the screen;
-               losing it is the honest outcome. Converting this Popover to controlled per column
-               (on both header branches, x6) to preserve that interaction is a real surface
-               change to a shipped feature and is deliberately deferred (87-CONTEXT.md D-14). -->
+               column scrolls out of the window — no new tracking state is added here, and this
+               Popover is not added to the D-10 forced-column union. The menu's strategy:'fixed'
+               panel would otherwise float detached over unrelated columns once its anchor left
+               the screen; losing it is the honest outcome. Converting this Popover to a
+               controlled per-column open flag (on both header branches, x6) to preserve that
+               interaction is a real surface change to a shipped feature and is deliberately
+               deferred (87-CONTEXT.md D-14). -->
           <Popover trigger="click" placement="bottom-end" strategy="fixed" :offset="4">
             <!-- No @click="toggle" here (72-06 fix): trigger="click" already wires a
                  click handler onto Popover's OWN .rozie-popover-anchor wrapper div, which

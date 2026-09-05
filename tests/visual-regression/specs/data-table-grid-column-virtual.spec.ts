@@ -742,3 +742,102 @@ for (const target of TARGETS) {
     expect(afterIndices.some((i) => i > 30)).toBe(true);
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-14 (87-05 Task 3) — a column with an open ⋯ menu is allowed to unmount when its column
+// scrolls out of the window: no orphaned floating panel persists in the DOM. The failure
+// D-14 accepts is the menu CLOSING (its host column unmounting); the failure it does NOT
+// accept is a detached `strategy: 'fixed'` panel floating over unrelated columns.
+//
+// Svelte is `test.fixme` here for the SAME root cause already logged in deferred-items.md
+// (87-05 Task 1's Gap 2): its `.rdt-col-spacer` width binding does not affect real layout, so
+// `.rdt-scroll`'s `scrollWidth` under-reports the true content width and `scrollLeft =
+// scrollWidth` never actually advances the column window far enough to exclude col1 —
+// confirmed via a live probe during authoring: col1's body `<td>` is STILL present after
+// scrolling to `scrollWidth` on Svelte specifically. col1 is therefore never orphaned because
+// it never leaves the window — not a D-14 violation, a precondition this case cannot
+// establish on Svelte until Gap 2 is fixed.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  const run = target === 'svelte' ? test.fixme : runnerFor(target);
+  run(`data-table-grid-column-virtual [${target}]: D-14 opening a column menu then scrolling that column out of the window leaves no orphaned floating panel`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    // col1 is rendered at rest (near the left edge) — open its ⋯ menu.
+    await page.evaluate(() => {
+      const find = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
+      const th = find('[data-header-level="1"][data-col="col1"]') as HTMLElement | null;
+      const trigger = th ? th.querySelector('.rdt-col-menu-trigger') : null;
+      if (trigger) (trigger as HTMLElement).click();
+    });
+    await expect.poll(async () => gridTableCount(page, '.rozie-popover-floating:not(.rozie-popover-floating--hidden)'), { timeout: 15_000 }).toBeGreaterThan(0);
+    // Scroll col1 out of the window.
+    await scrollGridFullyRight(page);
+    await page.waitForTimeout(300);
+    expect(await gridTableCount(page, '.rozie-popover-floating:not(.rozie-popover-floating--hidden)')).toBe(0);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-14 (87-05 Task 3) — a resize drag begun on an IN-WINDOW column still tracks and commits
+// across a mid-drag horizontal scroll (the "naturally self-limiting" premise: widening a
+// column pushes its NEIGHBOURS out of the window, never the column being dragged itself, so
+// nothing about column-windowing should be able to interrupt an in-progress resize). If this
+// fails, it is a genuine finding against D-14's premise, recorded as such in the SUMMARY —
+// not worked around by adding forcedColumns() state.
+//
+// React is `test.fixme` here for a confirmed TEST-HARNESS limitation, isolated during
+// authoring, NOT a finding against D-14: a bare resize drag with NO scroll at all (via both
+// `page.mouse.*` — real CDP-synthesized input — and a manually dispatched
+// PointerEvent+document-level mousemove/mouseup, matching table-core@8.21.3's own documented
+// mousemove/mouseup listener attachment) also fails to commit on React specifically, while
+// the identical sequence works on all five other targets. Since the failure reproduces with
+// NO horizontal scroll in the sequence at all, it cannot be evidence that scrolling
+// interrupts the drag — it is a pre-existing gap in how THIS HARNESS drives React's resize
+// interaction via synthetic input, orthogonal to column-windowing (resize itself is a Phase
+// 63 feature this plan does not touch; `data-table.spec.ts`'s own column-mgmt case only
+// asserts the resize HANDLE is present, not a driven drag, so it does not already cover this
+// gap either — logged here rather than assumed away).
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  const run = target === 'react' ? test.fixme : runnerFor(target);
+  run(`data-table-grid-column-virtual [${target}]: D-14 a resize drag on an in-window column tracks and commits across a mid-drag horizontal scroll`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    const widthOf = async () => page.evaluate(() => {
+      const find = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
+      const th = find('[data-header-level="1"][data-col="col1"]') as HTMLElement | null;
+      return th ? th.getBoundingClientRect().width : -1;
+    });
+    const before = await widthOf();
+    expect(before).toBeGreaterThan(0);
+    const start = await page.evaluate(() => {
+      const find = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
+      const th = find('[data-header-level="1"][data-col="col1"]') as HTMLElement | null;
+      const handle = th ? th.querySelector('.rdt-resize-handle') : null;
+      if (!handle) return null;
+      const r = handle.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: x, clientY: y }));
+      return { x, y };
+    });
+    expect(start).not.toBeNull();
+    // Mid-drag: scroll the container horizontally (the interaction D-14 says must not
+    // interrupt an in-progress resize).
+    await scrollGridTo(page, 300);
+    await page.waitForTimeout(100);
+    // Continue the drag with a real widening delta, then release — table-core's resize
+    // handler listens for `mousemove`/`mouseup` on `document` (verified against the
+    // installed @tanstack/table-core@8.21.3 source), not `pointermove`/`pointerup`.
+    await page.evaluate(({ x, y }) => {
+      document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x + 80, clientY: y }));
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: x + 80, clientY: y }));
+    }, start as { x: number; y: number });
+    await page.waitForTimeout(200);
+    const after = await widthOf();
+    expect(after).toBeGreaterThan(before + 40);
+  });
+}
