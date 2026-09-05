@@ -843,11 +843,6 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   let virtualizerCleanup: any = null;
   let gridScrollEl: any = null;
   let remeasurePending = false;
-  // D-05/D-10/D-18 host-contract COLUMN-axis instance state (Phase 87 87-02) — INERT: Combobox has
-  // no column axis (colsWindowed() below is constantly false), so this is never constructed. Exists
-  // only so the windowing.rzts host contract's `colVirtualizer` symbol resolves, mirroring `let
-  // virtualizer = null` above.
-  let colVirtualizer: any = null;
   // Non-reactive per-instance flag (Phase 86 R2, plan 86-03, Solid-only): true for
   // the duration of an onFocus-triggered open transition (set before the isOpen
   // write, cleared in the deferred microtask after). Lets onBlur distinguish a
@@ -1209,30 +1204,29 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     return null;
   }
 
-  // D-05/D-10/D-18 windowing.rzts host-contract one-liners (Phase 87 87-02). rowsWindowed()
-  // preserves today's EXACT truthiness (byte-behavior-identical) — it is the new REQUIRED symbol
-  // windowing.rzts now calls in place of a bare `$props.virtual` read. The column-axis symbols are
-  // INERT no-ops: Combobox never lights the column branch (D-20). columnSize/forcedColumns carry
-  // explicit return-type annotations (the pinMeasurement() trick, windowing.rzts:65-74) so the
-  // strict bundled-leaf tsc does not flow-narrow a no-op host's return to `never`.
+  // D-05 windowing.rzts host-contract one-liner (Phase 87 87-02). rowsWindowed() preserves
+  // today's EXACT truthiness (byte-behavior-identical) — it is the REQUIRED symbol
+  // windowing.rzts calls in place of a bare `$props.virtual` read.
+  //
+  // GAP-CLOSURE 87-16 (WR-02): the column-axis host-contract symbols (`colVirtualizer`,
+  // `colsWindowed()`, `columnCount()`, `columnSize()`, `forcedColumns()`) that 87-02 added
+  // alongside this were REMOVED here — they were dead code shipped on a mistaken premise
+  // about the compiler's tree-shaking BFS. Combobox imports only `{ virtualItemKey,
+  // virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow }`
+  // from windowing.rzts; none of those functions' bodies reference the column-axis symbols
+  // (only `columnVirtualizerOptions()`/`windowedColIndices()`/`colPadLeft()`/`colPadRight()`/
+  // `colIsOutsideWindow()` do, and Combobox never imports any of those), so
+  // `inlineScriptPartials()`'s BFS never needed them to exist. See 87-REVIEW.md WR-02 /
+  // 87-16-SUMMARY.md for the verification trail.
   function rowsWindowed() {
     return !!local.virtual;
   }
-  function colsWindowed() {
-    return false;
-  }
-  function columnCount() {
-    return 0;
-  }
-  function columnSize(i: number): number {
-    return 0;
-  }
-  function forcedColumns(): number[] {
-    return [];
-  }
   // autoMeasureOn() (Phase 87 87-07, D-18/D-20): the content-driven-estimate host-contract
   // gate. Combobox never lights this branch — a permanent `false` keeps windowing.rzts's
-  // estimateRowSize()/refineRowEstimate() accumulator dead code here.
+  // estimateRowSize()/refineRowEstimate() accumulator dead code here. RETAINED (unlike the
+  // column-axis symbols above): `virtualizerOptions()` — which Combobox DOES import and call
+  // — wires `estimateSize: (i) => estimateRowSize(i)`, and `estimateRowSize()` calls
+  // `autoMeasureOn()` as its first line. This one IS reachable through the import graph.
   function autoMeasureOn(): boolean {
     return false;
   }

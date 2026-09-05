@@ -835,12 +835,6 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   // module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
   // when $props.virtual. gridScrollEl is the captured .rozie-listbox-list scroll div the
   // virtualizer observes; remeasurePending dedupes the deferred sweep.
-  // D-05/D-10/D-18 host-contract COLUMN-axis instance state (Phase 87 87-02) — INERT: Listbox has
-  // no column axis (colsWindowed() below is constantly false), so this is never constructed. Exists
-  // only so the windowing.rzts host contract's `colVirtualizer` symbol resolves, mirroring `let
-  // virtualizer = null` above.
-  let colVirtualizer: any = null;
-
   // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
   // set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
   // (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
@@ -892,31 +886,32 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     return null;
   }
 
-  // D-05/D-10/D-18 windowing.rzts host-contract one-liners (Phase 87 87-02). rowsWindowed()
-  // preserves today's EXACT truthiness (byte-behavior-identical) — it is the new REQUIRED symbol
-  // windowing.rzts now calls in place of a bare `$props.virtual` read. The column-axis symbols are
-  // INERT no-ops: Listbox never lights the column branch (D-20). NOT type-annotated — this
+  // D-05 windowing.rzts host-contract one-liner (Phase 87 87-02). rowsWindowed() preserves
+  // today's EXACT truthiness (byte-behavior-identical) — it is the REQUIRED symbol
+  // windowing.rzts calls in place of a bare `$props.virtual` read. NOT type-annotated — this
   // `<script>` block has no `lang="ts"` (unlike windowing.rzts / Combobox.rozie), so the
   // pinMeasurement() explicit-return-type trick (windowing.rzts:65-74) does not apply here; nothing
   // in this plan calls these through a type-narrowing wrapper.
+  //
+  // GAP-CLOSURE 87-16 (WR-02): the column-axis host-contract symbols (`colVirtualizer`,
+  // `colsWindowed()`, `columnCount()`, `columnSize()`, `forcedColumns()`) that 87-02 added
+  // alongside this were REMOVED here — they were dead code shipped on a mistaken premise
+  // about the compiler's tree-shaking BFS. Listbox imports only `{ virtualItemKey,
+  // virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow }`
+  // from windowing.rzts; none of those functions' bodies reference the column-axis symbols
+  // (only `columnVirtualizerOptions()`/`windowedColIndices()`/`colPadLeft()`/`colPadRight()`/
+  // `colIsOutsideWindow()` do, and Listbox never imports any of those), so
+  // `inlineScriptPartials()`'s BFS never needed them to exist. See 87-REVIEW.md WR-02 /
+  // 87-16-SUMMARY.md for the verification trail.
   function rowsWindowed() {
     return !!props.virtual;
   }
-  function colsWindowed() {
-    return false;
-  }
-  function columnCount() {
-    return 0;
-  }
-  function columnSize(i: any) {
-    return 0;
-  }
-  function forcedColumns() {
-    return [];
-  }
   // autoMeasureOn() (Phase 87 87-07, D-18/D-20): the content-driven-estimate host-contract
   // gate. Listbox never lights this branch — a permanent `false` keeps windowing.rzts's
-  // estimateRowSize()/refineRowEstimate() accumulator dead code here.
+  // estimateRowSize()/refineRowEstimate() accumulator dead code here. RETAINED (unlike the
+  // column-axis symbols above): `virtualizerOptions()` — which Listbox DOES import and call
+  // — wires `estimateSize: (i) => estimateRowSize(i)`, and `estimateRowSize()` calls
+  // `autoMeasureOn()` as its first line. This one IS reachable through the import graph.
   function autoMeasureOn() {
     return false;
   }
