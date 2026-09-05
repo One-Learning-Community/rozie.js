@@ -8,9 +8,11 @@ import { deepQuerySelectorFirstTextInPage } from './_shadow-utils';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
- * Phase 87 87-03 (Wave 0) — the COLUMN-AXIS RED-first battery for horizontal virtualization.
- * Drives `examples/demos/DataTableColumnVirtualDemo.rozie`'s mount (A) — a 60-column x
- * 200-row grid with `virtual="columns"` — across all six targets.
+ * Phase 87 — the COLUMN-AXIS battery for horizontal virtualization. Landed RED-first in
+ * 87-03 (Wave 0); 87-04 (Task 1, the tracer) wires the real column-windowing path through
+ * the shared engine, the data-table host, and the template. Drives
+ * `examples/demos/DataTableColumnVirtualDemo.rozie`'s mount (A) — a 60-column x 200-row
+ * grid with `virtual="columns"` — across all six targets.
  *
  * Covers the Decision -> Test map rows from 87-VALIDATION.md:
  *   D-01      — `virtual="columns"` windows the leaf-column axis: fewer than 60
@@ -25,14 +27,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   D-13      — a fill drag whose pointer reaches the container's right edge auto-scrolls
  *               the column axis so the range can grow past the pre-drag window.
  *
- * As of THIS plan (87-03 Task 2), `virtual="columns"` renders a WRAPPED but FULLY
- * UNWINDOWED table (D-04's two-branch template collapse landed 87-02; the body/header cell
- * LOOPS themselves are still 87-04's tracer) — so D-01 and D-06/D-11's "windowed" cases are
- * RED by construction: no column is ever excluded from the DOM yet. D-08/D-10/D-12 currently
- * PASS because the absolute-index guarantee (A2, verified 87-02) and the plain "nothing is
- * removed from the DOM" starting state trivially satisfy them; they become genuine regression
- * guards once 87-04+ start excluding off-window columns. D-13 is RED because no per-axis
- * edge-triggered auto-scroll exists on EITHER axis yet.
+ * Status as of 87-04 Task 1 (the tracer — flat header only, no forced columns, no grouped
+ * colspan clamp, no filter row): D-01 and D-06/D-11 are GREEN on all six targets — the
+ * body/header cell loops now genuinely window via `windowedCells()`/`windowedColIndices()`.
+ * D-08/D-10/D-12 REGRESS to RED (they previously passed trivially because nothing was
+ * excluded from the DOM; real windowing now excludes col 55 / the pinned+editing columns /
+ * the pre-focus off-window target, and `forcedColumns()`/the scroll-then-focus seam that
+ * would keep them reachable are 87-05/87-06's work, not this tracer's). D-13 stays RED — no
+ * per-axis edge-triggered auto-scroll exists on either axis yet (87-06).
  *
  * DOM/behavioral assertions only (no PNG baseline) — the pinned Linux Docker run is the CI
  * gate; macOS/Linux kerning noise flakes pixel diffs on windowing-invariant assertions (the
@@ -194,8 +196,8 @@ for (const target of TARGETS) {
     await gotoDemo(page, target);
     await expect.poll(async () => readoutText(page, 'col-count'), { timeout: 15_000 }).toBe('60');
     const count = await gridTableCount(page, '[data-grid-cell][data-row="0"][data-col-index]');
-    // RED today: Task 2 deliberately leaves the body cell loop unwindowed (87-04's tracer),
-    // so all 60 columns render for every body row.
+    // GREEN as of 87-04 Task 1: the body cell loop reads windowedCells(wr.row) (windowedColIndices()
+    // under the hood), so only the columns near the viewport render.
     expect(count).toBeLessThan(60);
   });
 }
@@ -216,9 +218,10 @@ for (const target of TARGETS) {
     const headerIdx = await colIndicesFor(page, '[data-grid-cell][data-header-level="1"][data-col-index]');
     const sortNum = (a: number, b: number) => a - b;
     // An invariant that must hold WHETHER OR NOT the column axis is windowed: the leaf
-    // header row addresses exactly the same absolute columns the body renders. Currently
-    // both sets are the full [0..59] range (unwindowed), so this passes today; it becomes
-    // the regression guard for D-11's colspan-clamp once 87-04+ window the header.
+    // header row addresses exactly the same absolute columns the body renders. GREEN as of
+    // 87-04 Task 1 for the FLAT leaf-header-level case (windowedHeaderRow() reads the same
+    // windowedColIndices() the body's windowedCells() does); the grouped-header colspan
+    // clamp above the leaf level is 87-05's expansion.
     expect(headerIdx.slice().sort(sortNum)).toEqual(bodyIdx.slice().sort(sortNum));
   });
 }
@@ -328,5 +331,72 @@ for (const target of TARGETS) {
     // RED today: no per-axis edge-triggered auto-scroll exists on the column axis (or the
     // row axis) yet — the container never scrolls during a fill drag.
     expect(after).toBeGreaterThan(before);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Fine-grained first-paint (Solid/Svelte): the column window must paint on FIRST commit,
+// with NO scroll interaction — the failure this guards is windowedColIndices()'s
+// `$data.windowVer` read sitting below an early return, so the accessor never subscribes and
+// the window stays blank forever on exactly these two fine-grained targets (the same class of
+// bug windowedRows() already documents for the row axis). A positive assertion, not a manual
+// observation: the window must be BOTH non-empty AND genuinely partial (< 60) at rest.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of ['solid', 'svelte'] as const) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: fine-grained first-paint — the column window is non-empty with no scroll interaction`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    // No scroll call anywhere above or below — gotoDemo only waits for the grid to mount.
+    const count = await gridTableCount(page, '[data-grid-cell][data-row="0"][data-col-index]');
+    expect(count).toBeGreaterThan(0);
+    expect(count).toBeLessThan(60);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// RTL — the column axis is the first windowing axis for which scroll DIRECTION matters
+// (the row axis has none). `columnVirtualizerOptions()` does not pass `isRtl` to virtual-core
+// (data-table has no runtime RTL signal available at construction time — confirmed: no
+// `dir`/`rtl` read anywhere in packages/ui/data-table/src). virtual-core's own offset read is
+// `el.scrollLeft * (isRtl && -1 || 1)` (dist/esm/index.js:117-119) — under Chromium's RTL
+// scrollLeft convention (0 at rest, NEGATIVE toward the far side) an un-negated read hands
+// virtual-core a negative offset it was never built to expect.
+//
+// Demo file scope note: Task 2's `<files>` list does not include the demo `.rozie`, so this
+// case sets `dir="rtl"` directly on the LIVE `.rdt-scroll` element via `page.evaluate` (a real
+// scrollable DOM node, not a CSS-only cosmetic flip) rather than adding an RTL demo variant.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: dir="rtl" — the column window still moves on a full leftward scroll`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    const restIndices = await colIndicesFor(page, '[data-grid-cell][data-row="0"][data-col-index]');
+    await page.evaluate(() => {
+      const find = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
+      const el = find('.rdt-scroll') as HTMLElement | null;
+      if (!el) return;
+      el.setAttribute('dir', 'rtl');
+      // Chromium's RTL scrollLeft convention: 0 is the rest/rightmost position, and the
+      // fully-scrolled-left extreme is the NEGATIVE of the overflow amount. Compute it live
+      // (never hardcode) so this is robust to the fixture's exact column widths.
+      el.scrollLeft = -(el.scrollWidth - el.clientWidth);
+    });
+    await page.waitForTimeout(400);
+    const afterIndices = await colIndicesFor(page, '[data-grid-cell][data-row="0"][data-col-index]');
+    void restIndices;
+    // Documented RED (87-04 finding, no `isRtl` remedy applied in this plan): scrolling
+    // `.rdt-scroll` to its full RTL-negative extreme (the "scrolled all the way toward the
+    // high column indices" gesture) should bring HIGH absolute column indices into the
+    // window — empirically confirmed it does NOT: without `isRtl: true`, virtual-core's
+    // offset read goes negative and the window stays anchored near column 0 (its rendered
+    // set even SHRINKS relative to rest, rather than sliding toward col 59), because the
+    // unnegated negative offset confuses virtual-core's range/overscan math. Asserting
+    // "some column beyond the midpoint is now rendered" — not merely "the set changed" — is
+    // the correctness bar the RTL axis actually needs. Named follow-up: wire `isRtl` into
+    // `columnVirtualizerOptions()` (87-06, alongside the other scroll-mechanics seams — D-12
+    // scroll-then-focus, D-13 fill-drag edge auto-scroll).
+    expect(afterIndices.some((i) => i > 30)).toBe(true);
   });
 }
