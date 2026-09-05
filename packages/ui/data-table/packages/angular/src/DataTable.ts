@@ -218,7 +218,7 @@ interface DetailCtx {
           @if (colsWindowed()) {
     <th class="rdt-col-spacer" aria-hidden="true" [attr.style]="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th>
     }@for (wh of windowedHeadersFor(headerGroups()[headerGroups().length - 1], headerGroups().length - 1); track wh.header.id) {
-    <th class="rdt-filter-cell" role="presentation" [style]="pinStyle(wh.header.column.id)">
+    <th class="rdt-filter-cell" role="presentation" [attr.data-col]="rozieAttr(wh.header.column.id)" [style]="pinStyle(wh.header.column.id)">
             @if (isSelectColumn(wh.header.column.id)) {
     <span style="display:contents"></span>
     } @else if (isExpanderColumn(wh.header.column.id)) {

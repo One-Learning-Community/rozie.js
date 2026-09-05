@@ -106,6 +106,30 @@ async function colIndicesFor(page: Page, selector: string): Promise<number[]> {
   }, selector);
 }
 
+/** All `colspan` attribute values (defaulting an ABSENT attribute to 1, matching the
+ *  template's `wh.span > 1 ? wh.span : null` — a bare colspan="1" is never emitted) off
+ *  elements matching `selector` within the grid table (shadow-piercing). */
+async function colspansFor(page: Page, selector: string): Promise<number[]> {
+  return page.evaluate((sel) => {
+    const els = (window as unknown as { __findAllWithinGridTable: (s: string) => Element[] }).__findAllWithinGridTable(sel);
+    const out: number[] = [];
+    for (const el of els) {
+      const v = el.getAttribute('colspan');
+      out.push(v != null ? parseInt(v, 10) : 1);
+    }
+    return out;
+  }, selector);
+}
+
+/** `data-col` attribute values (the column id, e.g. "grpA"/"col5") off elements matching
+ *  `selector` within the grid table (shadow-piercing). */
+async function dataColsFor(page: Page, selector: string): Promise<(string | null)[]> {
+  return page.evaluate((sel) => {
+    const els = (window as unknown as { __findAllWithinGridTable: (s: string) => Element[] }).__findAllWithinGridTable(sel);
+    return els.map((el) => el.getAttribute('data-col'));
+  }, selector);
+}
+
 /** The `data-col-index` of the deepest real `document.activeElement`'s owning
  *  `[data-grid-cell]`, shadow-piercing (the Lit open-shadow-root case). null when nothing
  *  inside a grid cell is focused. Focus is a page-wide singleton, so this does NOT need
@@ -131,6 +155,27 @@ async function scrollGridFullyRight(page: Page): Promise<number> {
     el.scrollLeft = el.scrollWidth;
     return el.scrollLeft;
   });
+}
+
+/** Scroll `[data-testid="grid-table"] .rdt-scroll` to an explicit `scrollLeft` (shadow-
+ *  piercing), returning the scrollLeft actually reached (the browser clamps to
+ *  `scrollWidth - clientWidth`). */
+async function scrollGridTo(page: Page, left: number): Promise<number> {
+  return page.evaluate((l) => {
+    const el = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable('.rdt-scroll') as HTMLElement | null;
+    if (!el) return -1;
+    el.scrollLeft = l;
+    return el.scrollLeft;
+  }, left);
+}
+
+/** `getComputedStyle(el).left` (a pixel string, e.g. "40px") for the FIRST element matching
+ *  `selector` within the grid table (shadow-piercing), or null when no such element exists. */
+async function computedLeftFor(page: Page, selector: string): Promise<string | null> {
+  return page.evaluate((sel) => {
+    const el = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable(sel) as HTMLElement | null;
+    return el ? getComputedStyle(el).left : null;
+  }, selector);
 }
 
 /** Current `.value` of `[data-testid="grid-table"] [data-editing-cell]` (shadow-piercing),
@@ -259,6 +304,133 @@ for (const target of TARGETS) {
     // windowedColIndices() the body's windowedCells() does); the grouped-header colspan
     // clamp above the leaf level is 87-05's expansion.
     expect(headerIdx.slice().sort(sortNum)).toEqual(bodyIdx.slice().sort(sortNum));
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-06/D-11 (87-05 Task 2) — the alignment invariant extends to the GROUPED header level
+// (data-header-level="0"): for every header level, the sum of rendered colspan values
+// (an absent attribute defaults to 1) plus the two spacer cells equals the body row's total
+// cell count including its two spacers.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-06/D-11 every header level's total span equals the body's, including the grouped level`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    // Body "total span": every rendered <td data-col-index> has an implicit colspan of 1,
+    // plus its own 2 spacer <td>s (also colspan 1, uncounted by data-col-index).
+    const bodySpan = (await gridTableCount(page, '[data-grid-cell][data-row="0"][data-col-index]')) + 2;
+    for (const level of [0, 1]) {
+      const spans = await colspansFor(page, `[data-header-level="${level}"]`);
+      // Spacers carry no data-header-level (Pitfall 5 — invisible to the roving-tabindex grid),
+      // so they are NOT included in `spans` above — add the level's own fixed 2 spacer <th>s
+      // (leading + trailing, both colsWindowed()-gated) to match the body's own +2.
+      const total = spans.reduce((a, b) => a + b, 0) + 2;
+      expect(total).toBe(bodySpan);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-11 — a group header whose leaf span STRADDLES the window boundary renders with a colSpan
+// clamped to the count of its leaf columns actually inside the window. "Group A" spans leaf
+// columns 10-14 (columnBuilders/demo). Scans a few candidate scroll offsets (the exact window
+// width/overscan is target- and viewport-dependent) for one that genuinely straddles the
+// group — some but not all of its 5 leaf columns rendered — rather than assuming a fixed
+// scroll position works identically on all six targets.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-11 a straddling group header's colSpan clamps to its in-window leaf span`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    let bodyIdx: number[] = [];
+    let straddled = false;
+    // Half-column offsets across a wide range: the window can only shift by whole rendered
+    // columns as scrollLeft advances, so scanning at a finer-than-column granularity (and
+    // over a wide span, since the exact viewport/overscan differs per target) is what
+    // actually guarantees landing on a genuine straddle rather than jumping cleanly from
+    // "group entirely out" to "group entirely in" between two of a small set of tried offsets.
+    for (let half = 12; half <= 34; half++) {
+      await scrollGridTo(page, half * 75);
+      // eslint-disable-next-line no-await-in-loop
+      await page.waitForTimeout(150);
+      // eslint-disable-next-line no-await-in-loop
+      bodyIdx = await colIndicesFor(page, '[data-grid-cell][data-row="0"][data-col-index]');
+      const inGroup = bodyIdx.filter((i) => i >= 10 && i <= 14).length;
+      if (inGroup > 0 && inGroup < 5) { straddled = true; break; }
+    }
+    expect(straddled).toBe(true);
+    const expectedSpan = bodyIdx.filter((i) => i >= 10 && i <= 14).length;
+    const groupCols = await dataColsFor(page, '[data-header-level="0"]');
+    const groupSpans = await colspansFor(page, '[data-header-level="0"]');
+    const groupIdx = groupCols.indexOf('grpA');
+    expect(groupIdx).toBeGreaterThanOrEqual(0);
+    expect(groupSpans[groupIdx]).toBe(expectedSpan);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-11 — a group whose leaf columns are ALL outside the window renders no <th> at all. At
+// rest (scrollLeft 0) the demo's window sits near columns 0-8 (default overscan), well short
+// of "Group A" (leaf columns 10-14) — a case the fixture already exercises with no
+// interaction needed.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-11 a group entirely outside the window renders no header cell`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    const bodyIdx = await colIndicesFor(page, '[data-grid-cell][data-row="0"][data-col-index]');
+    // Guard the fixture assumption rather than assume it silently: at rest the window must
+    // NOT include any of Group A's leaf columns, or this case is not actually testing the
+    // "entirely outside" path.
+    expect(bodyIdx.some((i) => i >= 10 && i <= 14)).toBe(false);
+    const groupCols = await dataColsFor(page, '[data-header-level="0"]');
+    expect(groupCols).not.toContain('grpA');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-11 — the Phase 72 dedicated filter row windows on the SAME slice as the body, in the
+// same order.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-11 the filter row's rendered cell count and order match the body`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    const bodyIdx = await colIndicesFor(page, '[data-grid-cell][data-row="0"][data-col-index]');
+    const filterCols = await dataColsFor(page, '.rdt-filter-cell');
+    const bodyCols = await dataColsFor(page, '[data-grid-cell][data-row="0"][data-col-index]');
+    expect(filterCols.length).toBe(bodyIdx.length);
+    expect(filterCols).toEqual(bodyCols);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-11 — a pinned column's filter cell, header cell, and body cell all agree on the SAME
+// sticky `left` offset (all three read pinStyle(), which computes off table-core's LIVE
+// getStart('left') over the full column set — unaffected by the window). Checked under a
+// right-scrolled window (not just at rest) to prove the offset tracks the live pin state,
+// not a stale value baked in before the window moved.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-11 a pinned column's filter/header/body left offsets agree under a scrolled window`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await scrollGridFullyRight(page);
+    await page.waitForTimeout(300);
+    const [filterLeft, headerLeft, bodyLeft] = await Promise.all([
+      computedLeftFor(page, '.rdt-filter-cell[data-col="col0"]'),
+      computedLeftFor(page, '[data-header-level="1"][data-col="col0"]'),
+      computedLeftFor(page, '[data-grid-cell][data-row="0"][data-col="col0"]'),
+    ]);
+    expect(filterLeft).not.toBeNull();
+    expect(filterLeft).toBe(headerLeft);
+    expect(headerLeft).toBe(bodyLeft);
   });
 }
 

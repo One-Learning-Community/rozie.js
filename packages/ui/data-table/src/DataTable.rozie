@@ -2024,6 +2024,7 @@ $expose({
         role="presentation"
         r-for="wh in windowedHeadersFor($data.headerGroups[$data.headerGroups.length - 1], $data.headerGroups.length - 1)"
         :key="wh.header.id"
+        :data-col="wh.header.column.id"
         :style="pinStyle(wh.header.column.id)"
       >
         <span style="display:contents" r-if="isSelectColumn(wh.header.column.id)"></span>
