@@ -171,28 +171,26 @@ async function scrollBothToMax(page: Page): Promise<void> {
 const ROW_COUNT = 200;
 const ESTIMATE_ROW_HEIGHT = 40;
 
-// Phase 87-07 Task 2 — CONFIRMED, root-caused Solid-specific gap (not a test-calibration
-// issue): instrumented `refineRowEstimate()` directly this task and confirmed the shared
-// engine's accumulator + hysteresis re-feed genuinely progress correctly on Solid
-// (measuredRowTotal/measuredRowCount/estimateRowSize(0) advance exactly as computed, and
-// `virtualizer.setOptions()` + `_willUpdate()` + an EXPLICIT `$data.windowVer` bump all fire)
-// — yet the rendered spacer/total (`tbody`'s real DOM height, driven by padTop()/padBottom(),
-// both windowVer-gated) never reflects the new estimate; it stays frozen at its PRE-re-feed
-// value indefinitely (confirmed stable at the same reading across a 4-second wait). Two
-// Rule-1 fix attempts this task (an explicit windowVer bump after the re-feed; verifying via
-// direct row-height instrumentation that Solid's REAL per-row heights are IDENTICAL to
-// Vue's, ruling out a rendering-difference explanation) did not close it — the gap is
-// somewhere in how Solid's fine-grained reactive graph propagates a signal write made from
-// deep inside a rAF/microtask-deferred, non-component-scoped call chain
-// (scheduleRemeasure -> remeasureWindow -> afterRowRemeasure -> refineRowEstimate), a class
-// of investigation beyond this task's fix-attempt budget (the executor's 3-attempt limit).
-// D-19's own headline bar is UNAFFECTED (verified passing on Solid): virtual-core's
-// spacer/offset math ties getTotalSize() to the cumulative end of the last KNOWN index by
-// construction (87-03's own documented finding), so scroll-to-end still lands correctly
-// regardless of whether the estimate itself has genuinely refined. What IS affected is the
-// scrollbar/total ACCURACY improving on Solid specifically. Logged to deferred-items.md.
-const SOLID_REFEED_GAP_REASON =
-  'Phase 87-07: confirmed Solid-specific gap — the accumulator/re-feed mechanism computes the correct estimate (verified via instrumentation) but the rendered total never reflects it; see deferred-items.md.';
+// CLOSED — gap-closure 87-10 (was: Phase 87-07 Task 2's confirmed, root-caused Solid-specific
+// gap). Root cause (framework-agnostic; the Solid-specific symptom only EXPOSED it — confirmed
+// by instrumenting the installed @tanstack/virtual-core@3.17.1 source directly): virtual-core's
+// resizeItem() calls its own onChange SYNCHRONOUSLY, once per row whose real measured size
+// differs from its cache — which the FIRST measurement sweep does for every never-before-
+// measured row in a single synchronous loop, well BEFORE refineRowEstimate()'s own
+// fold-then-re-feed (which runs only AFTER that loop) has folded those measurements into the
+// running mean or re-fed the converged estimate. React/Vue/Svelte/Angular/Lit all batch their
+// own reactivity to at least a microtask boundary, so their downstream padTop()/padBottom()
+// reads land AFTER the whole burst settles — accidentally correct, not correct by construction.
+// Solid does not auto-batch a signal write made outside a Solid-owned event/effect context, so
+// it re-ran those reads SYNCHRONOUSLY on every individual resize, mid-sweep, before the fold had
+// even happened once — and since virtual-core's own getMeasurements() memo is never invalidated
+// again by a bare setOptions() call (it is keyed on itemSizeCacheVersion, never on the
+// estimateSize function reference), Solid's LAST such mid-sweep read stayed the ONLY read,
+// frozen on a stale pre-fold snapshot indefinitely. Fixed in `windowing.rzts` by coalescing
+// every windowVer-bump requester (virtual-core's own onChange AND refineRowEstimate()'s
+// explicit re-feed bump) behind ONE microtask-deferred write (`bumpWindowVer()`), so the render
+// lands exactly once, strictly after the whole synchronous burst, on every target by
+// construction. See deferred-items.md for the full instrumented trace.
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // D-15 — estimateSize() returns a running mean of measured rows, not the flat seed.
@@ -201,7 +199,6 @@ for (const target of TARGETS) {
   runnerFor(target)(`data-table-auto-measure [${target}]: D-15 the unrendered tail's contribution reflects the running mean, not the flat 40px seed`, async ({
     page,
   }) => {
-    test.fixme(target === 'solid', SOLID_REFEED_GAP_REASON);
     await gotoDemo(page, target);
     await page.waitForTimeout(400); // let the existing afterFirstFrame remeasure sweep settle.
     const stats = await autoMeasureStats(page);
@@ -299,7 +296,6 @@ for (const target of TARGETS) {
   runnerFor(target)(`data-table-auto-measure [${target}]: D-17 estimateRowHeight still seeds the FIRST-PAINT total regardless of autoMeasure`, async ({
     page,
   }) => {
-    test.fixme(target === 'solid', SOLID_REFEED_GAP_REASON);
     await gotoDemo(page, target);
     const stats = await autoMeasureStats(page);
     expect(stats).not.toBeNull();
@@ -395,12 +391,10 @@ for (const target of TARGETS) {
   runnerFor(target)(`data-table-auto-measure [${target}]: D-15 the total converges toward the TRUE weighted mean of measured row heights`, async ({
     page,
   }) => {
-    // Confirmed (Rule-1 investigation this task, root-caused in SOLID_REFEED_GAP_REASON
-    // above): on Solid, tbodyHeight stays frozen at its pre-re-feed reading. This case's
-    // OWN 20%-of-expectedTotal tolerance would otherwise mask that as an accidental pass
-    // (the frozen value happens to fall inside the loose band) — fixme'd explicitly rather
-    // than left as a silently-misleading green.
-    test.fixme(target === 'solid', SOLID_REFEED_GAP_REASON);
+    // Gap-closure 87-10: previously fixme'd for Solid (this case's OWN 20%-of-expectedTotal
+    // tolerance would otherwise mask the CLOSED gap-closure-87-10 bug as an accidental pass —
+    // the frozen pre-fix value happened to fall inside the loose band). Now GREEN on all six
+    // targets since windowVer bumps are coalesced (see the file-header comment above).
     await gotoDemo(page, target);
     await page.waitForTimeout(500);
     const stats = await autoMeasureStats(page);
@@ -432,7 +426,6 @@ for (const target of TARGETS) {
   runnerFor(target)(`data-table-auto-measure [${target}]: D-15 re-measuring the same rows on a back-and-forth scroll does not skew the running mean`, async ({
     page,
   }) => {
-    test.fixme(target === 'solid', SOLID_REFEED_GAP_REASON);
     await gotoDemo(page, target);
     await page.waitForTimeout(500);
     const settled = await autoMeasureStats(page);
