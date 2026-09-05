@@ -33,7 +33,7 @@
  * being silently absorbed.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -64,6 +64,18 @@ function collectSourceFiles(dir: string): SourceFile[] {
       continue;
     }
     if (SCANNED_EXTENSIONS.some((ext) => full.endsWith(ext))) {
+      // Skip codegen's regenerated per-component shims. `scripts/codegen.mjs` emits a
+      // `<Component>.ts` next to each `<Component>.rozie` in this directory; those are
+      // build output (gitignored via `packages/ui/data-table/src/*.ts`), not sources.
+      // Walking them made this suite's `it.each` case count a function of BUILD state
+      // rather than source state — it read 57 cases with a warm build and 56 after the
+      // shim for one component went missing, which is exactly the kind of silent count
+      // drift that trains a reader to ignore a real coverage drop. A `.rozie` sibling is
+      // the total discriminator here: every generated shim has one, no real source does
+      // (`src/helpers/*.ts`, the D-22 extraction, live a directory down and are untouched
+      // by this rule). Prohibition violations in emitted output are emitter bugs and
+      // belong to the target suites, not to this source-level gate.
+      if (full.endsWith('.ts') && existsSync(full.slice(0, -3) + '.rozie')) continue;
       out.push({ id: full.slice(DATA_TABLE_SRC.length + 1), path: full, source: readFileSync(full, 'utf8') });
     }
   }
