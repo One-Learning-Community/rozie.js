@@ -5357,6 +5357,48 @@ export class DataTable {
   // but a mid-drag unmount would otherwise leak a pointermove/pointerup listener on document).
   fillDragMove: any = null;
   fillDragUp: any = null;
+  // Phase 87 87-06 (D-13, T-87-06-02): the single rAF handle driving the fill-drag per-axis
+  // edge auto-scroll — a module-`let` beside fillDragMove/fillDragUp (the `let table` precedent;
+  // React hoists to useRef), cleared IDEMPOTENTLY in teardownFillDrag() so an interrupted gesture
+  // never leaves an orphaned scroll loop running forever.
+  fillEdgeScrollRaf: any = null;
+  // Phase 87 87-06 (D-13): per-axis edge-triggered auto-scroll for the fill drag.
+  // FILL_EDGE_SCROLL_PX — the pixel distance from the scroll container's edge, on either axis,
+  // that engages auto-scroll. 24px: comfortably wider than the fill handle's own hit target but
+  // well inside a typical row/column size, so the gesture recognizably nears an edge before
+  // scrolling engages (not so wide that an ordinary drag near the middle of the viewport
+  // spuriously triggers it).
+  FILL_EDGE_SCROLL_PX = 24;
+  // FILL_EDGE_SCROLL_STEP — pixels scrolled per animation frame while the pointer sits inside an
+  // edge zone. A fixed step (not distance-proportional) keeps the scroll speed predictable and
+  // the WR-01-style spacer/window math simple to reason about frame-to-frame.
+  FILL_EDGE_SCROLL_STEP = 16;
+  // edgeDelta(clientX, clientY): the per-frame (dx, dy) scroll delta for a pointer at the given
+  // screen position, relative to the scroll container `gridScrollEl` already observed by the row
+  // AND column virtualizers (D-03 — one shared `.rdt-scroll` wrapper for whichever axis/axes are
+  // windowed). Each axis is independently gated on colsWindowed()/rowsWindowed() (never a bare
+  // prop truthiness read — the 87-02 prohibition gate) so a drag near the left/right edge of a
+  // row-only-windowed table (or vice versa) never scrolls an axis that has nothing to reveal.
+  // Pure — reads no gesture state, only the live container rect + the windowing predicates.
+  edgeDelta = (clientX: any, clientY: any) => {
+    if (!this.gridScrollEl) return {
+      dx: 0,
+      dy: 0
+    };
+    const rect = this.gridScrollEl.getBoundingClientRect();
+    let dx = 0;
+    let dy = 0;
+    if (this.colsWindowed()) {
+      if (clientX - rect.left < this.FILL_EDGE_SCROLL_PX) dx = -this.FILL_EDGE_SCROLL_STEP;else if (rect.right - clientX < this.FILL_EDGE_SCROLL_PX) dx = this.FILL_EDGE_SCROLL_STEP;
+    }
+    if (this.rowsWindowed()) {
+      if (clientY - rect.top < this.FILL_EDGE_SCROLL_PX) dy = -this.FILL_EDGE_SCROLL_STEP;else if (rect.bottom - clientY < this.FILL_EDGE_SCROLL_PX) dy = this.FILL_EDGE_SCROLL_STEP;
+    }
+    return {
+      dx,
+      dy
+    };
+  };
   teardownFillDrag = () => {
     if (typeof document !== 'undefined') {
       if (this.fillDragMove) document.removeEventListener('pointermove', this.fillDragMove);
@@ -5365,6 +5407,15 @@ export class DataTable {
     this.fillDragMove = null;
     this.fillDragUp = null;
     this.fillDragging = false;
+    // D-13 (T-87-06-02): idempotent cleanup of the edge-auto-scroll rAF loop — the SAME discipline
+    // fillDragMove/fillDragUp already follow. Called both on a normal pointerup release AND at the
+    // TOP of the next onFillHandlePointerDown (the #leak guard below), so an interrupted gesture
+    // (pointer released off-window, context menu, alt-tab) can never leave a stray rAF scrolling
+    // the table forever.
+    if (this.fillEdgeScrollRaf != null) {
+      if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.fillEdgeScrollRaf);
+      this.fillEdgeScrollRaf = null;
+    }
   };
   cellIndexFromPoint = (clientX: any, clientY: any) => {
     if (typeof document === 'undefined' || !document.elementFromPoint) return null;
@@ -5400,7 +5451,8 @@ export class DataTable {
     // pointerup was missed (pointer released off-window, context menu, alt-tab), the prior fillDrag's
     // document pointermove/pointerup stay attached; overwriting fillDragMove/fillDragUp below would
     // strand them (removeEventListener could never reach the old refs) → a permanent global
-    // pointermove leak. teardownFillDrag is idempotent (no-op when nothing is attached).
+    // pointermove leak. teardownFillDrag is idempotent (no-op when nothing is attached) — it ALSO
+    // cancels any orphaned edge-auto-scroll rAF from the same prior gesture.
     this.teardownFillDrag();
     this.fillDragging = true;
     // B7: snapshot the PRE-DRAG rectangle (the fill SOURCE) NOW, before pointermove grows the
@@ -5414,21 +5466,74 @@ export class DataTable {
       r: sourceBox.r1,
       c: sourceBox.c1
     } : null;
-    const move = (ev: any) => {
-      if (!this.fillDragging) return;
-      const cell = this.cellIndexFromPoint(ev.clientX, ev.clientY);
-      // B20: dedup by target cell. setRangeFocus emits range-change, so calling it on EVERY
-      // pointermove (the pointer fires many per cell) spams the event with identical payloads.
-      // Only extend (and emit) when the pointer enters a DIFFERENT cell than the last — lastCell
-      // seeds from the pre-drag bottom-right corner, so a move that stays on the source corner
-      // or re-enters the same cell is suppressed (the range is unchanged).
+    // D-13: the pointer's LAST known screen position, updated on every real pointermove AND read
+    // by the rAF loop below on every frame. The scroll loop must re-resolve the cell under this
+    // FIXED screen point each frame — the pointer itself may not move at all while the user simply
+    // holds it at the edge, but the content sliding beneath it means a DIFFERENT cell sits there
+    // each frame, which is what must extend the range (this is the whole point of "edge-triggered
+    // auto-scroll": a real pointermove would never fire on a stationary pointer).
+    let lastClientX = 0;
+    let lastClientY = 0;
+    // applyPointAt: resolve the cell under (clientX, clientY) and extend the range to it if it is
+    // a NEW cell (B20 dedup — unchanged from the pre-87-06 shape). Shared by both a real
+    // pointermove and every frame of the edge-auto-scroll loop.
+    const applyPointAt = (clientX: any, clientY: any) => {
+      const cell = this.cellIndexFromPoint(clientX, clientY);
       if (cell && (!lastCell || cell.r !== lastCell.r || cell.c !== lastCell.c)) {
         lastCell = cell;
         this.setRangeFocus(cell.r, cell.c);
       }
     };
+    // scrollStep: the single rAF loop (T-87-06-02) — reads the LAST known pointer position each
+    // frame, scrolls the windowed axis/axes still within the edge threshold, then re-resolves the
+    // cell now under that same screen point. Self-terminates (never reschedules) the moment the
+    // gesture ends OR the pointer no longer sits in an edge zone — so leaving the edge, or a
+    // pointerup, stops the scroll immediately with no lingering frame.
+    const scrollStep = () => {
+      if (!this.fillDragging) {
+        this.fillEdgeScrollRaf = null;
+        return;
+      }
+      const d = this.edgeDelta(lastClientX, lastClientY);
+      if (d.dx === 0 && d.dy === 0) {
+        this.fillEdgeScrollRaf = null;
+        return;
+      }
+      if (this.gridScrollEl) {
+        // T-87-06-03: direct scrollLeft/scrollTop writes — NEVER virtualizer.scrollToOffset /
+        // colVirtualizer.scrollToOffset. A programmatic virtual-core scroll sets
+        // virtualizer.scrollState, which remeasureWindow() bails on for as long as it is non-null;
+        // a SUSTAINED auto-scroll driven through that API would suppress row remeasurement for the
+        // whole gesture. scrollLeft/scrollTop are ordinary user-scroll-shaped writes (scrollState
+        // stays null), so remeasureWindow() keeps observing recycled rows normally throughout.
+        if (d.dx !== 0) this.gridScrollEl.scrollLeft = this.gridScrollEl.scrollLeft + d.dx;
+        if (d.dy !== 0) this.gridScrollEl.scrollTop = this.gridScrollEl.scrollTop + d.dy;
+      }
+      applyPointAt(lastClientX, lastClientY);
+      this.fillEdgeScrollRaf = requestAnimationFrame(scrollStep);
+    };
+    const move = (ev: any) => {
+      if (!this.fillDragging) return;
+      lastClientX = ev.clientX;
+      lastClientY = ev.clientY;
+      // B20: dedup by target cell. setRangeFocus emits range-change, so calling it on EVERY
+      // pointermove (the pointer fires many per cell) spams the event with identical payloads.
+      // Only extend (and emit) when the pointer enters a DIFFERENT cell than the last — lastCell
+      // seeds from the pre-drag bottom-right corner, so a move that stays on the source corner
+      // or re-enters the same cell is suppressed (the range is unchanged).
+      applyPointAt(ev.clientX, ev.clientY);
+      // D-13: start the edge-auto-scroll loop the FIRST time the pointer enters an edge zone
+      // (idempotent — fillEdgeScrollRaf is only null when no loop is currently scheduled). The
+      // loop itself (scrollStep) re-evaluates edgeDelta every frame and self-terminates once the
+      // pointer leaves the zone, so no separate "still in zone" check is needed here.
+      if (this.fillEdgeScrollRaf == null && typeof requestAnimationFrame === 'function') {
+        const d = this.edgeDelta(ev.clientX, ev.clientY);
+        if (d.dx !== 0 || d.dy !== 0) this.fillEdgeScrollRaf = requestAnimationFrame(scrollStep);
+      }
+    };
     const up = () => {
-      // teardownFillDrag clears fillDragging + removes both listeners (CR-04 shared path).
+      // teardownFillDrag clears fillDragging + removes both listeners + cancels any in-flight
+      // edge-auto-scroll rAF (CR-04 / T-87-06-02 shared path).
       this.teardownFillDrag();
       // A plain click on the fill handle (pointerdown+up with NO intervening drag) leaves lastCell
       // at the source box's own origin corner (r1,c1), so fillRange(sourceBox, corner) would

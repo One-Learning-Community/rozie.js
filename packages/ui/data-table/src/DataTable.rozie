@@ -1594,6 +1594,11 @@ let fillDragging = false
 // but a mid-drag unmount would otherwise leak a pointermove/pointerup listener on document).
 let fillDragMove = null
 let fillDragUp = null
+// Phase 87 87-06 (D-13, T-87-06-02): the single rAF handle driving the fill-drag per-axis
+// edge auto-scroll — a module-`let` beside fillDragMove/fillDragUp (the `let table` precedent;
+// React hoists to useRef), cleared IDEMPOTENTLY in teardownFillDrag() so an interrupted gesture
+// never leaves an orphaned scroll loop running forever.
+let fillEdgeScrollRaf = null
 import { teardownFillDrag, cellIndexFromPoint, onFillHandlePointerDown } from './fillDrag.rzts'
 
 // §6 (260709-3qt) drag-to-select — mirror the fill-drag listener discipline. rangeDragging gates
