@@ -2186,14 +2186,16 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     foldedRowHeights[index] = height;
   }
 
-  // refineRowEstimate() (D-15, Phase 87 87-07): the shared engine's post-measurement
+  // refineRowEstimate() (D-15/D-16, Phase 87 87-07): the shared engine's post-measurement
   // orchestration, called via the host's afterRowRemeasure hook (see the HOST CONTRACT note
   // above for why this is never called directly FROM virtualization.rzts). Folds every
   // CURRENTLY RENDERED row's REAL measurement (from virtual-core's own getMeasurements() —
   // never a DOM read), then hysteresis-gates a re-feed into virtual-core, reusing the EXACT
   // `virtualizer.scrollState` bail remeasureWindow() already applies (T-87-07-02) rather than
-  // inventing a second gating mechanism. Entirely a no-op when !autoMeasureOn() — the off path
-  // never folds a measurement or touches lastFedRowEstimate (D-17).
+  // inventing a second gating mechanism, and finally (Task 3, D-16) anchor-corrects scrollTop
+  // around the re-feed so the row under the user's eye does not visibly lurch. Entirely a
+  // no-op when !autoMeasureOn() — the off path never folds a measurement, touches
+  // lastFedRowEstimate, or adjusts scrollTop (D-17).
   function refineRowEstimate(): void {
     if (!autoMeasureOn() || !virtualizer) return;
     const items = virtualizer.getVirtualItems();
@@ -2209,9 +2211,29 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     if (virtualizer.scrollState) return;
     const est = estimateRowSize(0);
     if (Math.abs(est - lastFedRowEstimate) < ESTIMATE_REFEED_DELTA_PX) return;
+    // D-16 anchor capture: the topmost rendered row's full-model index + its CURRENT offset,
+    // taken from virtual-core's own measurements (never a getBoundingClientRect() layout read
+    // — slower, and inconsistent with the measurements the spacer math already uses) — taken
+    // BEFORE the re-feed so the correction below can compute exactly the delta the re-feed
+    // itself introduces. Not restricted to scroll offset 0 (D-16 explicit): a table restored
+    // mid-scroll, or whose content changes height after scrolling, must refine too.
+    const anchorIndex = items.length ? items[0].index : -1;
+    const anchorStart = items.length ? items[0].start : 0;
     virtualizer.setOptions(virtualizerOptions());
     virtualizer._willUpdate();
     lastFedRowEstimate = est;
+    // D-16 anchor correction: read the SAME index's fresh measurement post-re-feed and adjust
+    // scrollTop by the delta so the row under the user's eye stays visually put. Guarded by
+    // the SAME path the re-feed itself is gated on (autoMeasureOn() && scrollState === null,
+    // both already checked above), so it can never fight a programmatic scroll (T-87-07-02).
+    if (anchorIndex >= 0 && gridScrollEl) {
+      const freshMeasurements = virtualizer.getMeasurements();
+      const fresh = freshMeasurements && freshMeasurements[anchorIndex];
+      if (fresh) {
+        const delta = fresh.start - anchorStart;
+        if (delta !== 0) gridScrollEl.scrollTop = gridScrollEl.scrollTop + delta;
+      }
+    }
     // Explicit windowVer bump (Rule 1, found via a Solid-specific debug probe this task):
     // virtual-core's own onChange (which ALSO bumps windowVer) fires reliably for a change
     // that shifts the RENDERED item set (a resize, a scroll, a count change), but an

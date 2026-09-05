@@ -239,11 +239,56 @@ for (const target of TARGETS) {
     await page.waitForTimeout(500);
     const after = await autoMeasureStats(page);
     expect(after).not.toBeNull();
-    // Currently PASSES vacuously: autoMeasure is inert, so no estimate re-feed ever fires
-    // after the initial window settles — there is nothing to lurch FROM. This becomes a
-    // genuine anchor-preservation guard once 87-07 wires a live re-estimate that could
-    // otherwise shift scrollTop out from under the user.
+    // Phase 87-07 Task 3 UPDATE: no longer vacuous — autoMeasure is now genuinely wired, so
+    // a re-feed CAN fire during this window. Task 3's anchor correction (refineRowEstimate())
+    // is what keeps lastRenderedIndex stable across it: without the correction, a re-feed
+    // shifts every row's computed offset, which would shift WHICH indices fall in the fixed
+    // viewport window even at a constant scrollTop — the visible lurch D-16 exists to prevent.
     expect(after!.lastRenderedIndex).toBe(before!.lastRenderedIndex);
+  });
+}
+
+// D-16 (Task 3, explicit anchor-hold case): scroll to a mid-table position, force an
+// estimate change by scrolling forward-then-back across new (never-before-measured) rows so
+// the mean genuinely moves, and assert the TOPMOST rendered row's own index is unchanged
+// across the refinement — the direct anchor claim, distinct from D-16's original
+// lastRenderedIndex (bottom-of-window) proxy above.
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-auto-measure [${target}]: D-16 the topmost row's own index is unchanged across a forced estimate refinement`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await scrollBothToOffset(page, 0.4);
+    await page.waitForTimeout(300);
+    const before = await autoMeasureStats(page);
+    expect(before).not.toBeNull();
+    const topBefore = Math.min(...Object.keys(before!.heightsByIndex).map(Number));
+    // Capture the ABSOLUTE scrollTop (not a fraction) so "return to the same position" is
+    // exact even though scrollHeight itself grows as the mean converges — a FRACTIONAL
+    // offset (e.g. 0.4 * scrollHeight) would resolve to a DIFFERENT pixel position once the
+    // total changes, which is a test-harness artifact, not a lurch the anchor correction is
+    // meant to prevent.
+    const scrollTopBefore = await page.evaluate(() => {
+      const find = (window as unknown as { __findWithinGridTableBoth: (s: string) => Element | null }).__findWithinGridTableBoth;
+      const el = find('.rdt-scroll') as HTMLElement | null;
+      return el ? el.scrollTop : -1;
+    });
+    // Force a genuine estimate change: scroll forward into fresh (never-before-measured)
+    // territory, then back to the EXACT original scrollTop — the mean now reflects MORE
+    // folded rows than it did before, so a re-feed is likely, without the test itself ever
+    // changing the final scroll position it is checking against.
+    await scrollBothToOffset(page, 0.7);
+    await page.waitForTimeout(300);
+    await page.evaluate((top) => {
+      const find = (window as unknown as { __findWithinGridTableBoth: (s: string) => Element | null }).__findWithinGridTableBoth;
+      const el = find('.rdt-scroll') as HTMLElement | null;
+      if (el) el.scrollTop = top;
+    }, scrollTopBefore);
+    await page.waitForTimeout(400);
+    const after = await autoMeasureStats(page);
+    expect(after).not.toBeNull();
+    const topAfter = Math.min(...Object.keys(after!.heightsByIndex).map(Number));
+    expect(topAfter).toBe(topBefore);
   });
 }
 
