@@ -3354,24 +3354,37 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // here returns the PRE-write value, resolving focus to the BODY cell instead of the
     // header. Callers pass the fresh isHeader local; falls back to $data when omitted.
     const header = nextIsHeader == null ? activeIsHeader() : nextIsHeader;
-    // ── phase 53 scroll-then-focus (D-12): when windowing AND the target body row is OUTSIDE the
-    // rendered window, scroll it in first, then defer focus to AFTER the new window commits (the
-    // double-rAF — a single rAF can fire before React's async commit, Pitfall 4). Header cells and
-    // in-window rows keep the synchronous path below (table-mode / non-windowed stay byte-stable).
-    // The guard reads the resolved `header` (NOT the raw `nextIsHeader`) so an omitted-arg call
-    // while a header cell is active falls back to $data.activeIsHeader and skips the scroll path.
-    if (rowsWindowed() && virtualizer && !header && rowIsOutsideWindow(r)) {
-      virtualizer.scrollToIndex(r, {
+    // ── phase 53 scroll-then-focus (D-12): when windowing AND the target body row and/or column
+    // is OUTSIDE the rendered window, scroll it in first, then defer focus to AFTER the new
+    // window commits (the double-rAF — a single rAF can fire before React's async commit, Pitfall
+    // 4). Header cells and fully in-window cells keep the synchronous path below (table-mode /
+    // non-windowed stay byte-stable). The guard reads the resolved `header` (NOT the raw
+    // `nextIsHeader`) so an omitted-arg call while a header cell is active falls back to
+    // $data.activeIsHeader and skips the scroll path.
+    // Phase 87 87-06 (D-12): widened to the SECOND axis — colIsOutsideWindow(c)/colsWindowed()
+    // mirror rowIsOutsideWindow(r)/rowsWindowed() exactly (both landed in windowing.rzts in
+    // 87-04). Either axis being out triggers the scroll+poll; both scrollToIndex calls fire when
+    // both are out, and the ONE existing poll below is reused unchanged — it already resolves the
+    // target cell by BOTH (row, col) via resolveCellEl(String(r), c), so a cell that becomes
+    // reachable via the column axis needs no new poll logic (per the plan's own key_links note).
+    const rowOut = rowsWindowed() && virtualizer && rowIsOutsideWindow(r);
+    const colOut = colsWindowed() && colVirtualizer && colIsOutsideWindow(c);
+    if (!header && (rowOut || colOut)) {
+      if (rowOut) virtualizer.scrollToIndex(r, {
+        align: 'center'
+      });
+      if (colOut) colVirtualizer.scrollToIndex(c, {
         align: 'center'
       });
       // Bounded rAF-poll-until-cell-present (D-12): scrollToIndex → virtual-core onChange → windowVer
-      // bump → the framework commits the scrolled-in row. On React that commit is async (setState →
-      // reconcile) and for a far scroll (e.g. row 4000) spans several frames — a one-shot double-rAF
-      // fires BEFORE resolveCellEl can find the cell, so focus is silently lost (the deterministic
-      // React off-window-focus failure). Poll resolveCellEl for up to ~30 frames: the five
-      // fast-committing targets resolve on the first attempt (behavior unchanged), React retries
-      // across the few frames its async commit needs. The poll ONLY focuses (never measures), so it
-      // cannot re-introduce the remeasure-vs-scroll fight. Inside the rowsWindowed() guard only.
+      // bump → the framework commits the scrolled-in row/column. On React that commit is async
+      // (setState → reconcile) and for a far scroll (e.g. row 4000, or col 55 on a 60-col table)
+      // spans several frames — a one-shot double-rAF fires BEFORE resolveCellEl can find the cell,
+      // so focus is silently lost (the deterministic React off-window-focus failure). Poll
+      // resolveCellEl for up to ~30 frames: the five fast-committing targets resolve on the first
+      // attempt (behavior unchanged), React retries across the few frames its async commit needs.
+      // The poll ONLY focuses (never measures), so it cannot re-introduce the remeasure-vs-scroll
+      // fight. Inside the rowOut||colOut guard only.
       let focusAttempts = 0;
       // #9: capture the epoch AFTER this call's own bump (above) so the poll never aborts itself
       // (its captured value equals the current epoch). A LATER focusActiveCell / focusCell /
@@ -6387,7 +6400,15 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // B14: snapshot the PRE-write ABSOLUTE position so the activecell-change emit fires ONLY on a
     // real move (mirrors the keyboard path's WR-06 suppression). A no-op focusCell to the already-
     // active cell must NOT emit; a header→body landing (prevIsHeader) is a real move.
+    // Phase 87 87-06 (D-08, deferred-items.md "87-03: focusCell's activecell-change emit guard
+    // ignores column-only moves"): also snapshot the PRE-write column so a column-ONLY move (e.g.
+    // focusCell(sameRow, differentCol) — the exact D-08 case) is recognized as a real move too. The
+    // pre-fix guard compared only the row, so DOM focus moved correctly but the event never fired —
+    // logged as a genuine, pre-existing bug in 87-03 and explicitly revisited here because this
+    // plan's absolute-column-index work (and its own acceptance criteria) makes fixing it correct
+    // and cheap now, rather than leaving it deferred.
     const prevAbs = toAbsRow(activeRow());
+    const prevCol = activeColIndex();
     const prevIsHeader = activeIsHeader();
     if (rowsWindowed()) {
       // Virtual mode: $data.activeRow IS the full pre-pagination index (the wr.vi.index space), so
@@ -6423,7 +6444,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         focusActiveCell(localRow, c, false);
       }
     }
-    if (absRow !== prevAbs || prevIsHeader) {
+    if (absRow !== prevAbs || c !== prevCol || prevIsHeader) {
       _props.onActivecellChange?.({
         rowIndex: absRow,
         colIndex: c

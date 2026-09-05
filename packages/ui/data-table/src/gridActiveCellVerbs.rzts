@@ -68,7 +68,15 @@ const focusCell = (rowIndex, colIndex) => {
   // B14: snapshot the PRE-write ABSOLUTE position so the activecell-change emit fires ONLY on a
   // real move (mirrors the keyboard path's WR-06 suppression). A no-op focusCell to the already-
   // active cell must NOT emit; a header→body landing (prevIsHeader) is a real move.
+  // Phase 87 87-06 (D-08, deferred-items.md "87-03: focusCell's activecell-change emit guard
+  // ignores column-only moves"): also snapshot the PRE-write column so a column-ONLY move (e.g.
+  // focusCell(sameRow, differentCol) — the exact D-08 case) is recognized as a real move too. The
+  // pre-fix guard compared only the row, so DOM focus moved correctly but the event never fired —
+  // logged as a genuine, pre-existing bug in 87-03 and explicitly revisited here because this
+  // plan's absolute-column-index work (and its own acceptance criteria) makes fixing it correct
+  // and cheap now, rather than leaving it deferred.
   const prevAbs = toAbsRow($data.activeRow)
+  const prevCol = $data.activeColIndex
   const prevIsHeader = $data.activeIsHeader
   if (rowsWindowed()) {
     // Virtual mode: $data.activeRow IS the full pre-pagination index (the wr.vi.index space), so
@@ -104,7 +112,7 @@ const focusCell = (rowIndex, colIndex) => {
       focusActiveCell(localRow, c, false)
     }
   }
-  if (absRow !== prevAbs || prevIsHeader) {
+  if (absRow !== prevAbs || c !== prevCol || prevIsHeader) {
     $emit('activecell-change', { rowIndex: absRow, colIndex: c })
   }
 }

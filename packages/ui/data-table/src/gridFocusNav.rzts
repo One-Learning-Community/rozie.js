@@ -161,22 +161,33 @@ const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, ne
   // here returns the PRE-write value, resolving focus to the BODY cell instead of the
   // header. Callers pass the fresh isHeader local; falls back to $data when omitted.
   const header = nextIsHeader == null ? $data.activeIsHeader : nextIsHeader
-  // ── phase 53 scroll-then-focus (D-12): when windowing AND the target body row is OUTSIDE the
-  // rendered window, scroll it in first, then defer focus to AFTER the new window commits (the
-  // double-rAF — a single rAF can fire before React's async commit, Pitfall 4). Header cells and
-  // in-window rows keep the synchronous path below (table-mode / non-windowed stay byte-stable).
-  // The guard reads the resolved `header` (NOT the raw `nextIsHeader`) so an omitted-arg call
-  // while a header cell is active falls back to $data.activeIsHeader and skips the scroll path.
-  if (rowsWindowed() && virtualizer && !header && rowIsOutsideWindow(r)) {
-    virtualizer.scrollToIndex(r, { align: 'center' })
+  // ── phase 53 scroll-then-focus (D-12): when windowing AND the target body row and/or column
+  // is OUTSIDE the rendered window, scroll it in first, then defer focus to AFTER the new
+  // window commits (the double-rAF — a single rAF can fire before React's async commit, Pitfall
+  // 4). Header cells and fully in-window cells keep the synchronous path below (table-mode /
+  // non-windowed stay byte-stable). The guard reads the resolved `header` (NOT the raw
+  // `nextIsHeader`) so an omitted-arg call while a header cell is active falls back to
+  // $data.activeIsHeader and skips the scroll path.
+  // Phase 87 87-06 (D-12): widened to the SECOND axis — colIsOutsideWindow(c)/colsWindowed()
+  // mirror rowIsOutsideWindow(r)/rowsWindowed() exactly (both landed in windowing.rzts in
+  // 87-04). Either axis being out triggers the scroll+poll; both scrollToIndex calls fire when
+  // both are out, and the ONE existing poll below is reused unchanged — it already resolves the
+  // target cell by BOTH (row, col) via resolveCellEl(String(r), c), so a cell that becomes
+  // reachable via the column axis needs no new poll logic (per the plan's own key_links note).
+  const rowOut = rowsWindowed() && virtualizer && rowIsOutsideWindow(r)
+  const colOut = colsWindowed() && colVirtualizer && colIsOutsideWindow(c)
+  if (!header && (rowOut || colOut)) {
+    if (rowOut) virtualizer.scrollToIndex(r, { align: 'center' })
+    if (colOut) colVirtualizer.scrollToIndex(c, { align: 'center' })
     // Bounded rAF-poll-until-cell-present (D-12): scrollToIndex → virtual-core onChange → windowVer
-    // bump → the framework commits the scrolled-in row. On React that commit is async (setState →
-    // reconcile) and for a far scroll (e.g. row 4000) spans several frames — a one-shot double-rAF
-    // fires BEFORE resolveCellEl can find the cell, so focus is silently lost (the deterministic
-    // React off-window-focus failure). Poll resolveCellEl for up to ~30 frames: the five
-    // fast-committing targets resolve on the first attempt (behavior unchanged), React retries
-    // across the few frames its async commit needs. The poll ONLY focuses (never measures), so it
-    // cannot re-introduce the remeasure-vs-scroll fight. Inside the rowsWindowed() guard only.
+    // bump → the framework commits the scrolled-in row/column. On React that commit is async
+    // (setState → reconcile) and for a far scroll (e.g. row 4000, or col 55 on a 60-col table)
+    // spans several frames — a one-shot double-rAF fires BEFORE resolveCellEl can find the cell,
+    // so focus is silently lost (the deterministic React off-window-focus failure). Poll
+    // resolveCellEl for up to ~30 frames: the five fast-committing targets resolve on the first
+    // attempt (behavior unchanged), React retries across the few frames its async commit needs.
+    // The poll ONLY focuses (never measures), so it cannot re-introduce the remeasure-vs-scroll
+    // fight. Inside the rowOut||colOut guard only.
     let focusAttempts = 0
     // #9: capture the epoch AFTER this call's own bump (above) so the poll never aborts itself
     // (its captured value equals the current epoch). A LATER focusActiveCell / focusCell /
