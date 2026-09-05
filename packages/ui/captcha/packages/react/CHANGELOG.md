@@ -1,5 +1,11 @@
 # @rozie-ui/captcha-react
 
+## 0.1.11
+
+### Patch Changes
+
+- @rozie/runtime-react@0.7.2
+
 ## 0.1.10
 
 ### Patch Changes

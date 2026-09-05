@@ -1,5 +1,11 @@
 # @rozie-ui/rete-lit
 
+## 0.3.3
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.7.2
+
 ## 0.3.2
 
 ### Patch Changes

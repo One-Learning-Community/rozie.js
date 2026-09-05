@@ -1,5 +1,11 @@
 # @rozie-ui/captcha-solid
 
+## 0.1.10
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.7.2
+
 ## 0.1.9
 
 ### Patch Changes

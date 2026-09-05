@@ -1,5 +1,11 @@
 # @rozie-ui/flatpickr-react
 
+## 0.1.9
+
+### Patch Changes
+
+- @rozie/runtime-react@0.7.2
+
 ## 0.1.8
 
 ### Patch Changes

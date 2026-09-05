@@ -1,6 +1,6 @@
 {
   "name": "@rozie/runtime-lit",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Tree-shakable Lit runtime helpers for Rozie.js-compiled components: the controllable property/attribute + change-event protocol, the r-keynav and r-portal reactive controllers, light-DOM slot distribution, shadow-boundary style bridging, spread + dynamic-listener directives, and crash-safe interpolation.",
   "type": "module",
   "sideEffects": false,

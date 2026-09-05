@@ -1,5 +1,11 @@
 # @rozie-ui/toast-react
 
+## 0.1.7
+
+### Patch Changes
+
+- @rozie/runtime-react@0.7.2
+
 ## 0.1.6
 
 ### Patch Changes

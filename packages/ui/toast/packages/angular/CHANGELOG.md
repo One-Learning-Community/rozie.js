@@ -1,5 +1,11 @@
 # @rozie-ui/toast-angular
 
+## 0.1.5
+
+### Patch Changes
+
+- @rozie/runtime-angular@0.7.2
+
 ## 0.1.4
 
 ### Patch Changes

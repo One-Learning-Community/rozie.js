@@ -1,5 +1,11 @@
 # @rozie-ui/popover-solid
 
+## 0.2.1
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.7.2
+
 ## 0.2.0
 
 ### Minor Changes

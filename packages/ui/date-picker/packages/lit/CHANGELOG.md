@@ -1,5 +1,11 @@
 # @rozie-ui/date-picker-lit
 
+## 0.1.10
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.7.2
+
 ## 0.1.9
 
 ### Patch Changes

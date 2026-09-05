@@ -1,5 +1,11 @@
 # @rozie-ui/captcha-angular
 
+## 0.1.8
+
+### Patch Changes
+
+- @rozie/runtime-angular@0.7.2
+
 ## 0.1.7
 
 ### Patch Changes

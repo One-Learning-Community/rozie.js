@@ -1,5 +1,11 @@
 # @rozie-ui/flatpickr-lit
 
+## 0.1.8
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.7.2
+
 ## 0.1.7
 
 ### Patch Changes

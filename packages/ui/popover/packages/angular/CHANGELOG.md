@@ -1,5 +1,11 @@
 # @rozie-ui/popover-angular
 
+## 0.2.1
+
+### Patch Changes
+
+- @rozie/runtime-angular@0.7.2
+
 ## 0.2.0
 
 ### Minor Changes
