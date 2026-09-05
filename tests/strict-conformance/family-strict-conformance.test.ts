@@ -202,7 +202,17 @@ const FAMILIES: FamilySpec[] = [
         // hgLevel passed to a param TS narrows to `null`) — the identical inherent
         // strict-null residual already recorded for cellTabindex's header calls.
         TS2345: 11,
-        TS7053: 4,
+        // 4 → 6 (gap-closure 87-11, correcting a misattribution in
+        // deferred-items.md that blamed gap-closure 87-09's isColRtl() RTL
+        // wiring): the actual introducing commit is gap-closure 87-05 Task 1
+        // (1598ae96d) — windowedHeadersFor()'s `const idxSet = {}` +
+        // `idxSet[idx[i]] = true` / `idxSet[c]` bracket-indexed lookup-map,
+        // confirmed via git-archive bisection across every phase-87 commit
+        // touching data-table/src + headless-core/src (live count was 4
+        // through 87-04, became 6 at 1598ae96d, unchanged through 87-09/
+        // 87-10). Identical inherent Class-6 implicit-any-index residual
+        // already tolerated for the other 4 sites in this file; not a defect.
+        TS7053: 6,
         TS2379: 1,
         TS7006: 12,
         TS2322: 4,
@@ -227,7 +237,13 @@ const FAMILIES: FamilySpec[] = [
         TS2379: 1,
         TS7023: 1,
         TS7022: 1,
-        TS7053: 4,
+        // 4 → 6 (gap-closure 87-11): windowedHeadersFor()'s idxSet
+        // bracket-indexed lookup-map, introduced by gap-closure 87-05 Task 1
+        // (1598ae96d), NOT gap-closure 87-09 as deferred-items.md originally
+        // recorded — see the react baseline's full account above (same root
+        // cause, same shared DataTable.rozie template function, all six
+        // compile targets).
+        TS7053: 6,
         // TS2322 (2) cleared 2026-07-05: the rozieAttr nullish-union type fix
         // (a nullish member of a mixed string-literal union now maps to `never`,
         // not `string`) narrows the two role/aria attr bindings that previously
@@ -257,7 +273,10 @@ const FAMILIES: FamilySpec[] = [
         TS7006: 2,
         TS7024: 1,
         TS7022: 1,
-        TS7053: 4,
+        // 4 → 6 (gap-closure 87-11): same windowedHeadersFor() idxSet
+        // bracket-indexed lookup-map introduced by gap-closure 87-05 Task 1
+        // (1598ae96d) — see the react baseline's full account above.
+        TS7053: 6,
       },
       'DetailPanel.ts': {
         TS7053: 2,

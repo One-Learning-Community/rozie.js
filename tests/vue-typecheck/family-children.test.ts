@@ -106,7 +106,26 @@ const FAMILIES: FamilySpec[] = [
         TS7006: 2,
         TS7022: 1,
         TS7023: 1,
-        TS7053: 11,
+        // 11 → 13 (gap-closure 87-11, correcting a misattribution recorded in
+        // deferred-items.md that blamed gap-closure 87-09's isColRtl()/
+        // ensureColRtlWatch() RTL wiring): the true introducing commit is
+        // gap-closure 87-05 Task 1 (1598ae96d), which renamed
+        // windowedHeaderRow() to windowedHeadersFor() in DataTable.rozie and
+        // added `const idxSet = {}` + `idxSet[idx[i]] = true` / `idxSet[c]` —
+        // a plain-object-as-boolean-map lookup, bracket-indexed by a `number`/
+        // `any` key. Confirmed by git-archive bisection across every phase-87
+        // commit touching packages/ui/data-table/src + headless-core/src: the
+        // live count was 11 through gap-closure 87-04 (bf1a2a93b) and became
+        // 13 at 1598ae96d, unchanged through 87-09/87-10 (HEAD). This is the
+        // IDENTICAL inherent Class-B body-passthrough implicit-any-indexing
+        // idiom already tolerated for the other 11 sites in this same file
+        // (e.g. `next[k] = src[k]`, `fieldValues[ec.field]`, `draft[ec.colId]`)
+        // — a bare `{}` object literal has no emitted type annotation, so ANY
+        // bracket-indexed read/write on it is implicit-any under strict +
+        // noImplicitAny. Not emitter-fixable without injecting annotations
+        // into the emitted body (the same Phase-65 SC-3 finding); not a
+        // defect — `idxSet` is a correct, ordinary JS lookup-map idiom.
+        TS7053: 13,
       },
     },
   },
