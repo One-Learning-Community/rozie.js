@@ -1,18 +1,18 @@
 ---
 gsd_state_version: 1.0
 milestone: v0.1.0
-current_phase: 86
-status: Executing
-stopped_at: Phase 86 complete — all phases complete
-last_updated: "2026-09-02T20:21:13.693Z"
-last_activity: 2026-09-02
-last_activity_desc: Phase 86 complete
-state_head: 42d693d1d0c07f9fa386537c1cdd457d5e5fecb7
+current_phase: 87
+current_phase_name: "@rozie-ui/data-table horizontal (column) virtualization + content-driven auto-measure"
+status: Phase Complete
+stopped_at: Phase 87 complete — 8/8 plans + 6 gap closures; verification passed; unpushed
+last_updated: "2026-09-05T14:18:20.759Z"
+last_activity: 2026-09-05
+state_head: 42f7b0f4d622353f885ae38f8d11aa2c36be6bf0
 progress:
-  total_phases: 110
+  total_phases: 111
   completed_phases: 55
-  total_plans: 555
-  completed_plans: 528
+  total_plans: 563
+  completed_plans: 536
 milestone_name: launch-day component port seed list
 ---
 
@@ -23,12 +23,12 @@ milestone_name: launch-day component port seed list
 See: .planning/PROJECT.md (updated 2026-08-05)
 
 **Core value:** A component-library author can write one `.rozie` file and ship working, idiomatic React + Vue + Svelte + Angular consumers from it — eliminating the manual cross-framework wrapper work that today dominates the maintenance budget of cross-framework UI libraries.
-**Current focus:** Phase 86 — Combobox v1 gap cluster — multi-select, floating popup via popover composition, and creatable mode
+**Current focus:** Phase 87 — @rozie-ui/data-table horizontal (column) virtualization + content-driven auto-measure
 
 ## Current Position
 
-Phase: 86
-Plan: Not started
+Phase: 87 (@rozie-ui/data-table horizontal (column) virtualization + content-driven auto-measure) — COMPLETE
+Plan: 8 of 8 (87-01..87-08 COMPLETE, plus gap closures 87-09/87-10/87-11 COMPLETE)
 
 **RESUME ANCHOR (2026-08-29 latest) — quick-260829-8lz CLOSED: React routes mount-frozen `$computed` reads through a live ref; premise re-aimed from a stale helper-class brief to the actually-open computed class.**
 The brief's premise ("a top-level `<script>` helper consumed by a `$onMount`-registered effect is
@@ -754,7 +754,7 @@ Plan: 4 of 4
 
 **All roadmapped phases are complete** — Phases 1–10 plus every decimal insertion (06.1–06.4, 07.1–07.5, 07.3.1, 07.3.2, 07.3.2.1, 08.1, 08.2). The compiler ships six targets end-to-end (React, Vue, Svelte, Angular, Solid, Lit); the IntelliJ plugin shipped through the 08.2 injection-first rebuild.
 
-Last activity: 2026-09-02 — Phase 86 complete
+Last activity: 2026-09-05
 Prior activity: 2026-07-16 - Quick 260716-npt (below-cap light pass, 10 commits) + VR-red repair (2 commits) + debug cp-lit-portal-virtual (4 commits + lit regen/rebless): full-matrix Docker VR exposed that main's VR CI had been RED since the 0.4.0 push — 12 pre-existing failing cells (control run at 83dd5b86 fails identically; the quick task introduced zero regressions). ALL 12 NOW FIXED — final full-matrix Docker VR 1800 passed / 0 failed, first fully green matrix since the 0.4.0 push. Then (Dan-authorized, 2026-07-17): full Lit-leaf regen pass (quick 260716-uar) + Lit-fix patch wave SHIPPED — toolchain 0.2.1, cp-lit/combobox-lit 0.4.1, 8 published lit leaves patched; pushed `83dd5b86..e7ee3fe3`, release dry-run + live both green, registry 12/12 direct-verified. Then quick 260717-8zb (`$memo` primitive + emitter "kill the caveats" batch, 19 commits) — full --validate pipeline + Docker VR 1799/0 green, UNPUSHED awaiting Dan's release call. REMAINING OPEN: push+release decision for 260717-8zb (toolchain minor — new $memo primitive + ROZ146/147; combobox/cp/toast + 3 ripple families' leaves) and trusted-publishing migration. Cluster detail: combobox-virtual-flip ×6 = demo focus-steal (`8c0d75c3`); per-level-virtual non-lit ×5 = spec one-shot sample race (`23624d68`); the 2 [lit] cells = TOOLCHAIN bugs fixed red-first in debug session cp-lit-portal-virtual (`11214af2`→`c0c12cfd`: emitter `$attrs` skip-list missing reserved `data-rozie-ref` clobbered nested child's `__rozieRoot`; renderRoot-scoped `@query` refs permanently null after r-portal relocation → `rozieResolvePortalledRef` in runtime-lit) + cp/combobox lit leaf regen + ~125 fixture reblessings. Session archived under .planning/debug/resolved/.
 
 **Phase 65 — strict-null emitter conformance (React+Solid+Lit) — EXECUTED + VERIFIED 2026-06-30, UNPUSHED on main.** 4 plans (`877184e1` Class 1, `231b7ac0` Class 2/5, `6656e31d` baseline-split gate, `f6f3817b` Class 3 windowing.rzts). Class 1+2 emitter fixes (byte-identity-safe, dist-parity 0 drift) + Class 3 cleared (windowing.rzts typed wrapper, **A==B byte-identity HELD**, listbox/lit → enforced-clean) + a regression-locking baseline-split gate (`tests/strict-conformance/`, 18/18). HONEST FINDING: no leaf reaches fully strict-clean (inherent Class-4/6 body-passthrough) → 0 tsconfig flags re-enabled; SC-3's "strict consumer builds clean" unreachable (known limitation, not a gap — baseline-split was chosen for this). Gate (reverified): build 227/227, typecheck 280/280, test 116/116, dist-parity 1001/1001 0-drift, vue-typecheck 3/3. Verifier `human_needed`: 1 OPEN item = **B13 virtual-parity VR on pinned Linux CI** (typing-only → no visual delta expected; CI-deferred per never-bless-macOS-PNGs policy). See `.planning/phases/65-.../65-VERIFICATION.md`. NEXT in Bundle C: Item 1 = Phase 66 (cross-family composition refs→Handle ×6 + Lit shadow), Item 3 = Phase 67 (Vue family-child → baseline zero).
@@ -1164,6 +1164,7 @@ Bundle C Item 4 (quick 260629-rsl, Solid `:style` literal kebab `846b5e59`) also
 | Phase 86 P05 | 58 min | 4 tasks | 38 files |
 | Phase 86 P06 | 1h 42min | 3 tasks | 41 files |
 | Phase 86 P07 | 110 min | 5 tasks | 50 files |
+| Phase 87 P08 | 45min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1768,6 +1769,7 @@ Recent decisions affecting current work:
 - [Phase 86]: Combobox's create emit lands FIRST in the derived manifest emits array (create, change, search), not last -- ir.emits follows first-textual-occurrence in source, and the isCreate branch (placed with the isMore short-circuit) precedes the pre-existing change/search emit sites. Caught a stale cross-package fixture test in the core package.
 - [Phase 86]: VR fixtures combining an exposed focus() handle call with a synchronous seedQuery() can non-deterministically diff on Solid: the R2 openingInProgress reentrancy guard's deferred re-focus can fire a second select() after the fixture's own script settles. Fix: seed before focus, plus a fixture-local root-scoped selection-highlight-neutralizing rule (the engine-DOM escape hatch pattern).
 - [Phase 86]: D-08 resolved: patch (popover), minor (combobox), patch (command-palette); data-table excluded — Human confirmed at the plan's checkpoint, relying on 86-02's byte-identity evidence
+- [Phase 87]: Excluded @rozie-ui/listbox-* from the changeset (ignore-listed, never published); added @rozie/core patch for an independently-caught release drift — npx changeset status hard-errors on a mixed ignored/non-ignored changeset; pnpm release:ready's changeset-coverage check failed on @rozie/core's uncovered drift from 87-01/87-04 fixes
 
 ### Roadmap Evolution
 
@@ -2093,8 +2095,8 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-02T13:36:00.000Z
-Stopped at: Phase 86 complete — all phases complete
+Last session: 2026-09-05T14:15:12.951Z
+Stopped at: Completed 87-08-PLAN.md — Phase 87 fully complete (8/8 plans + 3 gap closures)
 Prior stopped at: Completed 260901-tpq-combobox-behavioral-cells quick task (commits 81f43f981, 18331fa73) — added combobox-chip-remove (6 cells) + combobox-flip-exact-fit (6 cells) baseline-free Playwright behavioral cells; 18/18 behavioral combobox cells green on macOS, 0 new PNG baselines, both cells RED-then-GREEN vacuity-proofed. Not pushed.
 Prior stopped at: Completed 86-07-PLAN.md
 Prior stopped at: Phase 77 complete (UAT 2/2 passed, re-verification 9/9 must-haves; WR-01 color-mix() fallback accepted for evergreen floor, no follow-up), ready to plan Phase 999.1
