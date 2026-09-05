@@ -1074,6 +1074,15 @@ function inlineResolvedPartial(
       kind: 'value' | 'type';
       build: () => t.ImportSpecifier | t.ImportNamespaceSpecifier;
     }> = [];
+    // WR-01 (Phase 87 gap-closure 87-14): a partial-LOCAL, non-`from` re-export
+    // list (`export { applyUpdater as applyRowUpdater }` / `export { helper }`)
+    // creates NO new binding of its own — it exposes an EXISTING local name
+    // (a real decl OR a moduleImport's local name) under a possibly-different
+    // EXPORTED name. Recorded here (exported name -> local name) so the BFS
+    // below can resolve a queued EXPORTED name back to its underlying local
+    // name one hop before concluding it is unreachable — mirrors IN-01's
+    // alias handling for the re-export-FROM form, just without a `source`.
+    const exportAliasMap = new Map<string, string>();
     let order = 0;
 
     for (const stmt of partialBody) {
@@ -1166,6 +1175,24 @@ function inlineResolvedPartial(
         continue;
       }
 
+      // WR-01 (87-14): a plain (non-`from`) local re-export list — `export {
+      // applyUpdater as applyRowUpdater }` or `export { helper }` — has no
+      // `declaration` and no `source`. It introduces no local binding of its
+      // own, so it must NOT fall into the `bare`/`bindingNames()` path below;
+      // just record exported-name -> local-name for the BFS's alias
+      // resolution (see `exportAliasMap` above) and move on.
+      if (t.isExportNamedDeclaration(stmt) && !stmt.declaration && !stmt.source) {
+        for (const spec of stmt.specifiers) {
+          if (t.isExportSpecifier(spec)) {
+            const exportedName = t.isIdentifier(spec.exported)
+              ? spec.exported.name
+              : spec.exported.value;
+            exportAliasMap.set(exportedName, spec.local.name);
+          }
+        }
+        continue;
+      }
+
       let bare: Statement | null = null;
       if (t.isExportNamedDeclaration(stmt) && stmt.declaration) {
         bare = stmt.declaration;
@@ -1254,9 +1281,42 @@ function inlineResolvedPartial(
     // "reached" without a synthetic decl, and so the moduleImports-hoist gate
     // (which gates on `referencedAll`) sees them as referenced.
     const moduleImportLocalNames = new Set<string>();
+    // WR-01 (87-14): per-local-name detail (source + kind + the module's OWN
+    // exported identifier) for the subset of module imports that are NAMED
+    // specifiers — the only shape an aliased local re-export can route
+    // through. Needed to build a correctly-ALIASED re-export entry below
+    // (mirrors IN-01's re-export-FROM shape) rather than hoisting the
+    // module's own local name verbatim, which would bind the WRONG name in
+    // host scope whenever the exported alias differs from it.
+    const moduleImportSpecByLocal = new Map<
+      string,
+      { source: t.StringLiteral; kind: 'value' | 'type'; imported: t.Identifier | t.StringLiteral }
+    >();
     for (const imp of moduleImports) {
-      for (const spec of imp.specifiers) moduleImportLocalNames.add(spec.local.name);
+      const declKind = imp.importKind ?? 'value';
+      for (const spec of imp.specifiers) {
+        moduleImportLocalNames.add(spec.local.name);
+        if (t.isImportSpecifier(spec)) {
+          moduleImportSpecByLocal.set(spec.local.name, {
+            source: imp.source,
+            kind: effectiveImportKind(declKind, spec),
+            imported: spec.imported,
+          });
+        }
+      }
     }
+
+    // IN-01: names already covered by a re-export-FROM statement (`export {
+    // X } from 'pkg'`, captured into `reExports` during partition above)
+    // resolve independently of decl/moduleImport matching — via the
+    // `reExports` tree-shake gate further below, keyed on `importedNames`
+    // directly. The BFS must leave these alone (as it always has) rather than
+    // treating "doesn't match a decl" as "unresolvable" for a name this file
+    // already knows how to satisfy through a DIFFERENT mechanism. Snapshot
+    // BEFORE the BFS runs — `reExports` also grows below (WR-01 aliased
+    // module-import passthrough), and those newly-added entries must NOT
+    // suppress the not-yet-run alias-resolution branch for THEIR OWN name.
+    const reExportFromNames = new Set(reExports.map((re) => re.exportedName));
 
     // BFS the transitive intra-file closure from the imported names (R2).
     const included = new Set<PartialDecl>();
@@ -1269,9 +1329,56 @@ function inlineResolvedPartial(
         continue;
       }
       const decl = nameToDecl.get(name);
-      if (!decl || included.has(decl)) continue;
-      included.add(decl);
-      for (const ref of decl.refs) queue.push(ref);
+      if (decl) {
+        if (!included.has(decl)) {
+          included.add(decl);
+          for (const ref of decl.refs) queue.push(ref);
+        }
+        continue;
+      }
+      if (reExportFromNames.has(name)) continue;
+      // WR-01 (87-14): the queued name may be a partial-LOCAL export alias
+      // (`export { applyUpdater as applyRowUpdater }`) rather than a direct
+      // decl or moduleImport-local name. Resolve ONE hop through the
+      // export-alias map before concluding the name is unreachable — mirrors
+      // the non-aliased passthrough form above, which works only because its
+      // exported name and local name happen to be identical.
+      const aliasLocal = exportAliasMap.get(name);
+      const aliasModuleImport =
+        aliasLocal !== undefined ? moduleImportSpecByLocal.get(aliasLocal) : undefined;
+      if (aliasModuleImport) {
+        // Route through the SAME re-export mechanism IN-01 uses (do not
+        // invent a second convention): the host needs a binding under the
+        // EXPORTED alias name, sourced from the underlying module's ORIGINAL
+        // exported identifier. Simply marking `aliasLocal` passthrough (like
+        // the non-aliased branch above) would hoist `import { applyUpdater }`
+        // — a binding named `applyUpdater`, not the `applyRowUpdater` the
+        // downstream importer actually asked for and references.
+        reExports.push({
+          exportedName: name,
+          source: aliasModuleImport.source,
+          kind: aliasModuleImport.kind,
+          build: () =>
+            t.importSpecifier(t.identifier(name), t.cloneNode(aliasModuleImport.imported, true)),
+        });
+        continue;
+      }
+      // Genuinely unresolvable: not a decl, not a moduleImport local, and
+      // either no local export alias exists for this name or its target
+      // itself doesn't resolve to an inlinable module-import binding (e.g. an
+      // aliased re-export of a local declaration, which this BFS extension
+      // does not attempt to rebind under the alias). Diagnose rather than
+      // silently drop the name (D-08) — the exact failure class this whole
+      // BFS extension exists to close, one indirection further than the
+      // shape 87-01 fixed.
+      ctx.diagnostics.push({
+        code: RozieErrorCode.PARTIAL_UNSUPPORTED_IMPORT_FORM,
+        severity: 'error',
+        message: `Script partial '${absPath}' does not export a resolvable name '${name}'. It is neither a top-level declaration, a plain-module import re-exported under its own name, nor a local re-export alias (\`export { ... as ${name} }\`) of one — the requested name has no inlinable binding.`,
+        loc: nodeLoc(importStmt),
+        ...(absPath ? { filename: absPath } : {}),
+        hint: `Check '${name}' is actually exported by '${absPath}', or (if it is a re-export of a local declaration under an alias) export it directly under '${name}' instead of aliasing.`,
+      });
     }
     const includedSorted = [...included].sort((a, b) => a.order - b.order);
 
