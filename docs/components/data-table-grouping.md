@@ -14,9 +14,50 @@ Grouping is driven by the two-way `grouping` slice — an ordered `string[]` of 
 
 **Collapsible group headers.** Group-header rows ride the expand model, so they collapse/expand like any other expandable row. When grouping is active and `expanded` is untouched, group subtrees **auto-expand** (the `expanded` default of `null` keeps that path reachable).
 
-**Per-column opt-out.** Every column is `groupable` by default; opt one out with `:groupable="false"` so the headless `#groupBar` does not offer it as a grouping target. The flag gates only the group-bar surface — grouping itself is driven by the `grouping` model.
+**Per-column opt-out.** Every column is `groupable` by default; opt one out with `:groupable="false"` so the headless `#groupBar` does not offer it as a grouping target. The flag gates only the group-bar surface — grouping itself is driven by the `grouping` model. `groupableColumns` offers every groupable **leaf** column in declaration order, including leaves nested under a multi-level group header; a group header itself is never offered, since it carries no accessor and cannot be a grouping key.
+
+**Member count.** A group header shows the number of underlying **records**, e.g. `North (40)`. Nested sub-groups are not counted — under multi-level grouping a region with 2 categories and 40 records reads `North (40)`, not `North (42)`.
 
 Drive it imperatively with `applyGrouping(cols)` / `clearGrouping()` (see the [API reference](/components/data-table-api#imperative-handle)).
+
+## The `row` slot param on group-header rows
+
+A group-header row is **synthetic** — it stands for a set of records rather than being one. The `#cell` and `#selectCell` slots therefore receive a **group descriptor** as `row` on those rows, never a data record:
+
+```ts
+{
+  isGroupRow: true,
+  groupId: string,          // the group row's id
+  groupingColumnId: string, // the column this row is grouped by
+  groupingValue: unknown,   // that column's value for this group
+  leafCount: number,        // underlying records, matching the header count
+}
+```
+
+Ordinary rows are unchanged and still receive their record. Guard on `isGroupRow` before reading record fields:
+
+```rozie
+<template #cell="{ columnId, row, value }">
+  <span r-if="row.isGroupRow">{{ row.groupingValue }} · {{ row.leafCount }}</span>
+  <span r-else>{{ row.name }}</span>
+</template>
+```
+
+`value` behaves independently: on a group-header row it is the column's aggregated value, or empty when the column declares no `aggregationFn`.
+
+::: warning Changed in 0.3.2
+Before 0.3.2 these slots received the group's **first leaf record** as `row` — an unrelated row's data. A template reading <span v-pre>`{{ row.someField }}`</span> on a group-header row painted the first member's value onto the group line. If you worked around that by reading `value` instead, or by suppressing the cell, those workarounds are still safe.
+:::
+
+## Group-header rows are read-only
+
+A group-header row cannot be edited, and bulk writes skip it:
+
+- Enter, F2, Space, a printable key and click-to-edit never open an editor on one — Enter toggles the group instead.
+- Paste, cut, clear and fill-drag skip any group-header row inside the target range. A skipped cell still counts toward the "N of M cells" announcement.
+- Copy is unaffected: a group-header row serializes the aggregated values you can see.
+
+This holds regardless of the column's own `editable` flag, because a group-header row has no record of its own to write to. See [Editing](/components/data-table-editing).
 
 ## The headless `#groupBar` + `GroupBar` drop-in
 

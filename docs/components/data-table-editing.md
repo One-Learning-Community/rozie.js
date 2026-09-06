@@ -24,6 +24,12 @@ A cell enters edit mode on click, on a printable keypress (which seeds the edito
 
 The commit events are `cell-edit-commit` (payload `{ rowId, columnId, oldValue, newValue }`) and `row-edit-commit` (payload `{ rowId, changes }` for the columns whose value actually changed) — see the [Events](/components/data-table-api#events) reference. Drive editing imperatively with `editCell` / `editRow` / `commitEditing`.
 
+**Group-header rows are never editable.** When [grouping](/components/data-table-grouping) is active, a group-header row stands for a set of records rather than being one, so it has nothing to write to. No edit-entry path opens an editor on one — Enter, F2, Space, a printable key, click-to-edit and `Shift+F2` all decline, and Enter toggles the group instead. Paste, cut, clear and fill-drag skip any group-header row inside the target range (a skipped cell still counts toward the "N of M cells" announcement). Copy is unaffected. This holds regardless of the column's own `editable` flag.
+
+::: warning Changed in 0.3.2
+Before 0.3.2 an editable non-grouping column would open an editor on a group-header row, and committing wrote to the group's **first member record** — silently modifying a row the user was not editing. Paste and fill-drag wrote through the same path. If your app allowed editing while grouped, audit for records changed this way.
+:::
+
 ## Drop-in editor components
 
 The `#editor` slot is fully headless — you can render any control. For the common cases the package also ships **opt-in drop-in editor components** so you don't have to hand-roll the input wiring: `EditorText`, `EditorNumber`, `EditorSelect`, `EditorCheckbox`, and `EditorDate`. They are **additive named exports** alongside `DataTable` (which stays the headless **default** export — importing the editors is byte-identical-off if you never use them):
