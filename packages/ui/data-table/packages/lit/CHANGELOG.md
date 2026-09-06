@@ -1,5 +1,29 @@
 # @rozie-ui/data-table-lit
 
+## 0.3.2
+
+### Patch Changes
+
+- Fix eight defects in grouped columns and grouped rows. All six targets.
+
+  **Nested group leaf columns now resolve their own column definition.** A leaf declared inside a `columns:` group entry was never registered in the internal by-id lookup, so every definition-derived lookup fell back: the `<th>` rendered the raw column id instead of the declared `header`, the column could never be filterable or editable whatever its config said, and the clipboard/fill accessor fell back to the column id instead of the configured `field` — writing to the wrong key. Nested leaves now behave identically to top-level leaves.
+
+  **A group-header row no longer receives an unrelated record in scoped slots.** The table engine builds each group-header row from its first leaf's record, which the `#cell`, `#selectCell` and `#editor` slots passed straight through as `row` — so a template reading `{{ row.someField }}` painted the first leaf's value on the group line. These slots now receive a group descriptor on group-header rows:
+
+  ```js
+  {
+    isGroupRow: (true, groupId, groupingColumnId, groupingValue, leafCount);
+  }
+  ```
+
+  Ordinary rows are unchanged and still receive their record. If your template reads record fields off `row`, guard with `row.isGroupRow` — the previous value on those rows was another row's data, never this one's.
+
+  **Group-header rows are no longer editable, and bulk writes skip them.** Enter, F2, Space, a printable key, or a click on an editable non-grouping column would open an editor on a group-header row, and committing wrote to the first leaf's record. Paste, cut, clear and fill-drag wrote through the same path. Group rows are now guarded at every edit and write entry point; Enter on a group row toggles the group, as it already did for the grouping column. Copy is unaffected — it still serializes the displayed aggregate.
+
+  **The group member count now counts records, not nodes.** Under multi-level grouping the count included intermediate sub-group nodes, so a region with 2 sub-groups and 3 records displayed `(5)`. It now displays `(3)`. Single-level grouping is unchanged.
+
+  **`groupableColumns` (the `#groupBar` slot prop) now offers the right set.** Group columns are no longer offered — a group entry has no accessor and cannot be a grouping key. Groupable leaves nested under a group header are now offered, in declaration order; they were previously omitted entirely. Opt a leaf out with `groupable: false` as before.
+
 ## 0.3.1
 
 ### Patch Changes
