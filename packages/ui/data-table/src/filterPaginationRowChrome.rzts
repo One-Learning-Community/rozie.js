@@ -1,3 +1,9 @@
+// C5+C6 (quick 260906-cvo): groupableColumns()'s dedicated groupable-leaf walk — pure,
+// sigil-free, no cross-partial host-symbol calls. Re-exported unchanged from this partial's
+// trailing export list (DataTable.rozie imports it from HERE, mirroring how
+// columnBuilders.rzts wires indexDefsById).
+import { collectGroupableLeafDefs } from './helpers/columnDefUtils'
+
 // ── Filter chrome handlers ─────────────────────────────────────────────────────────
 // Global search input → funnel through table-core's setGlobalFilter so the
 // onGlobalFilterChange callback fires the echo-guarded writer. Capture the fresh local
@@ -243,14 +249,18 @@ const cellSlotRow = (row) => (rowIsGrouped(row) ? groupRowDescriptor(row) : (row
 // default styled-token reflection. Reads currentState() ($props.grouping ?? $data.groupingDefault),
 // both reactive sources, so the bar re-renders on a grouping change across all six targets.
 const groupingKeys = () => (currentState().grouping || [])
-// groupableColumns: the data columns OFFERED to the headless #groupBar (those whose Column/config
-// `groupable` is not false) — `[{ id, label }]`. Excludes the chrome columns (select/expander are
-// not in columnDefs()). The consumer builds any bar/drag UI from this; the component ships none.
+// groupableColumns: the data columns OFFERED to the headless #groupBar — `[{ id, label }]`.
+// Excludes the chrome columns (select/expander are not in columnDefs()). C5+C6 (quick
+// 260906-cvo): delegates the actual walk to collectGroupableLeafDefs (columnDefUtils.ts) —
+// a GROUP column (a `columns:` group's own entry) is NEVER offered (it has no accessor and
+// cannot produce a grouping value, regardless of any `groupable` flag on it), and every
+// groupable NESTED leaf (a `columns:` group child, opted out via `groupable: false` like any
+// top-level leaf) IS offered, in declaration order. The consumer builds any bar/drag UI from
+// this; the component ships none.
 const groupableColumns = () => {
   const out = []
-  const defs = columnDefs()
+  const defs = collectGroupableLeafDefs(columnDefs())
   for (const d of defs) {
-    if (!d || d.groupable === false) continue
     out.push({ id: d.id, label: d.header != null ? d.header : d.id })
   }
   return out

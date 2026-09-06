@@ -631,3 +631,32 @@ for (const target of TARGETS) {
     });
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════
+// C5+C6 (quick 260906-cvo, Task 5) — groupableColumns() offers every groupable NESTED
+// leaf and NO group column. Fixture: DataTableGroupBarNested.
+// ═══════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`grouped-defs C5C6 [${target}]: groupableColumns offers nested leaves, never a group column`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableGroupBarNested&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const mount = page.getByTestId('rozie-mount');
+    const container = mount.getByTestId('grid-table');
+    await expect(container.locator('table')).toBeVisible({ timeout: 15_000 });
+
+    const readout = mount.getByTestId('groupable-readout');
+    // C5: the GROUP column's own id ('demographics') must NEVER appear — RED at HEAD
+    // (buildConfigDef's GROUP branch sets no `groupable` key, so the `=== false` skip
+    // never fires for it).
+    await expect(readout).not.toHaveText(/demographics/, { timeout: 15_000 });
+    // C6: the genuinely groupable NESTED leaf ('age') must appear — RED at HEAD
+    // (groupableColumns() walks top-level columnDefs() entries only).
+    await expect(readout).toHaveText(/(^|,)age(,|$)/, { timeout: 15_000 });
+    // The exact offered list, in declaration order: region, age (nested, groupable),
+    // status. 'note' (nested, groupable:false) stays omitted throughout.
+    await expect(readout).toHaveText('region,age,status', { timeout: 15_000 });
+  });
+}

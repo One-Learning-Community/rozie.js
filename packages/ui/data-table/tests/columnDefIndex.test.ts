@@ -9,7 +9,7 @@
  * pollute `Object.prototype`.
  */
 import { describe, it, expect } from 'vitest';
-import { indexDefsById } from '../src/helpers/columnDefUtils';
+import { indexDefsById, collectGroupableLeafDefs } from '../src/helpers/columnDefUtils';
 
 describe('indexDefsById', () => {
   it('resolves a top-level leaf id to its own def', () => {
@@ -84,5 +84,59 @@ describe('indexDefsById', () => {
     // untouched.
     expect(Object.prototype).not.toHaveProperty('polluted');
     expect(({} as any).polluted).toBeUndefined();
+  });
+});
+
+/**
+ * collectGroupableLeafDefs — quick task 260906-cvo (C5+C6). A dedicated depth-first walk
+ * (NOT indexDefsById reuse — that map deliberately registers group columns too and orders
+ * top-level-first-then-nested): a group entry (`Array.isArray(d.columns)`) is NEVER pushed
+ * (recurse into its children only); a leaf is pushed unless `groupable === false`; nesting
+ * is flattened depth-first in declaration order.
+ */
+describe('collectGroupableLeafDefs', () => {
+  it('a flat list yields every entry in order', () => {
+    const a = { id: 'a' };
+    const b = { id: 'b' };
+    const c = { id: 'c' };
+    expect(collectGroupableLeafDefs([a, b, c])).toEqual([a, b, c]);
+  });
+
+  it('a columns: group yields its CHILDREN and never the group\'s own id', () => {
+    const child1 = { id: 'age' };
+    const child2 = { id: 'note' };
+    const group = { id: 'demographics', columns: [child1, child2] };
+    const out = collectGroupableLeafDefs([group]);
+    expect(out).toEqual([child1, child2]);
+    expect(out.some((d) => d.id === 'demographics')).toBe(false);
+  });
+
+  it('nesting three deep is flattened depth-first in declaration order', () => {
+    const deep = { id: 'deep' };
+    const l2 = { id: 'l2', columns: [deep] };
+    const l1 = { id: 'l1', columns: [l2] };
+    const sibling = { id: 'sibling' };
+    expect(collectGroupableLeafDefs([l1, sibling])).toEqual([deep, sibling]);
+  });
+
+  it('a leaf with groupable === false is omitted while its siblings remain', () => {
+    const a = { id: 'a' };
+    const b = { id: 'b', groupable: false };
+    const c = { id: 'c' };
+    expect(collectGroupableLeafDefs([a, b, c])).toEqual([a, c]);
+  });
+
+  it('a group entry carrying an explicit groupable: true is STILL omitted', () => {
+    const child = { id: 'child' };
+    const group = { id: 'grp', groupable: true, columns: [child] };
+    const out = collectGroupableLeafDefs([group]);
+    expect(out).toEqual([child]);
+  });
+
+  it('a non-array input yields an empty list', () => {
+    expect(collectGroupableLeafDefs(null)).toEqual([]);
+    expect(collectGroupableLeafDefs(undefined)).toEqual([]);
+    expect(collectGroupableLeafDefs('nope')).toEqual([]);
+    expect(collectGroupableLeafDefs(42)).toEqual([]);
   });
 });

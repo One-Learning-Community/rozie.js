@@ -1,0 +1,105 @@
+<!--
+  DataTableGroupBarNestedDemo.rozie — quick task 260906-cvo (C5/C6) RED-first fixture.
+
+  Proves two things about `groupableColumns()` (the headless #groupBar slot's offered-columns
+  list), both provable in ONE readout:
+
+  C5 — a GROUP column (a `columns:` group's own entry, e.g. `demographics` below) has no
+  `groupable` key set to `false` by `buildConfigDef`'s GROUP branch, so the existing
+  `d.groupable === false` skip never fires for it — `groupableColumns()` wrongly OFFERS group
+  columns to the bar even though a group column carries no accessor and cannot produce a
+  grouping value.
+
+  C6 — `groupableColumns()` walks TOP-LEVEL `columnDefs()` entries only, so a genuinely
+  groupable NESTED leaf column (a `columns:` group child, e.g. `age` below) is never OFFERED
+  at all.
+
+  The `:columns` CONFIG-ARRAY form (not `<Column>` children) is required to declare a
+  `columns:` group — the same form DataTableGridGroupedHeaderDemo uses. Declares:
+    - `region`       — top-level leaf, groupable (default true)
+    - `demographics` — a GROUP wrapping two leaves:
+        - `age`      — nested leaf, groupable (default true) — C6's target
+        - `note`     — nested leaf, `groupable: false` — must stay OMITTED (opt-out honored)
+    - `status`       — top-level leaf, groupable (default true)
+
+  Expected offered list (declaration order, depth-first, group ids EXCLUDED):
+  `region,age,status`. RED at HEAD: contains `demographics` (C5) and is MISSING `age` (C6).
+
+  data-table-grouped-defs.spec.ts (`grouped-defs C5C6`) drives this ×6. NOT registered in
+  matrix.spec.ts's EXAMPLES — assertion-only, produces no screenshot cell. No loop var or
+  slot named row/cell/header (the Svelte mount-throw discipline).
+-->
+
+<rozie name="DataTableGroupBarNestedDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 1, region: 'North', age: 30, note: 'a', status: 'active' },
+    { id: 2, region: 'South', age: 40, note: 'b', status: 'inactive' },
+  ],
+  // The grouped-header column config (the columnBuilders grouped-header form). `demographics`
+  // is a GROUP entry (must never be offered to the bar — C5); its `age` child is a genuinely
+  // groupable NESTED leaf (must be offered — C6); its `note` child opts out explicitly.
+  cols: [
+    { field: 'region', header: 'Region' },
+    {
+      id: 'demographics',
+      header: 'Demographics',
+      columns: [
+        { field: 'age', header: 'Age' },
+        { field: 'note', header: 'Note', groupable: false },
+      ],
+    },
+    { field: 'status', header: 'Status' },
+  ],
+}
+</data>
+
+<script lang="ts">
+// Angular AOT rejects an inline arrow function in a template expression
+// (`{{ x.map((c) => c.id) }}`) — a documented landmine. Hoist the transform into a plain
+// script helper so the template calls it by name instead.
+const groupableIds = (cols: any): string => (Array.isArray(cols) ? cols.map((c: any) => c.id).join(',') : '')
+</script>
+
+<template>
+<div class="dt-group-bar-nested-demo">
+  <h3>DataTable — #groupBar offered columns (nested groups)</h3>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      :groupable="true"
+      :columns="$data.cols"
+      r-model:data="$data.rows"
+    >
+      <!-- Headless #groupBar: renders ONLY the offered ids, joined — no built-in drag
+           affordance, nothing focusable (mirrors the req-6 headless contract). -->
+      <template #groupBar="{ groupableColumns }">
+        <span
+          data-testid="groupable-readout"
+        >{{ groupableIds(groupableColumns) }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-group-bar-nested-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 480px;
+}
+.dt-group-bar-nested-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+</style>
+
+</rozie>
