@@ -37,6 +37,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *      pre-existing `groupSubRowCount` quirk — unrelated to and out of scope for this task
  *      — reused as-is per the locked contract; verified against the live DOM, not assumed).
  *      A leaf row's `product` cell still reports `LEAF:<product>`.
+ *
+ * C3 (quick 260906-cvo, Task 1) — the #selectCell and #editor scoped slots STILL bound
+ *      `:row="row.original"` / `:row="wr.row.original"` (the B2 fix only rewired the #cell
+ *      slot's 4 sites), so on a group-header row they too leaked the first leaf's record.
+ *      Fixture: DataTableGroupEditGuardDemo (single-level grouping by `region`).
+ *      RED at HEAD: `[data-selectprobe]` on the North group-header row reports `LEAF:Apple`.
+ *      The #editor probe is reachable ONLY because of the STILL-LIVE C1 defect (a
+ *      group-header row is editable at HEAD) — Enter on its `qty` cell opens the editor,
+ *      and `[data-editorprobe]` also reports `LEAF:Apple`. GREEN: both report the measured
+ *      group descriptor. A leaf row's `[data-selectprobe]` is the unchanged control
+ *      (`LEAF:<product>`) throughout.
  */
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
@@ -132,5 +143,59 @@ for (const target of TARGETS) {
     const leafRow = container.locator('tbody tr[data-group-leaf]').first();
     const leafProbe = leafRow.locator('[data-col="product"] [data-testid="cell-display"]');
     await expect(leafProbe).toHaveAttribute('data-rowprobe', /^LEAF:/, { timeout: 15_000 });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════
+// C3 (quick 260906-cvo, Task 1) — #selectCell and #editor route :row through cellSlotRow.
+// ═══════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`grouped-defs C3 [${target}]: #selectCell and #editor receive a group descriptor, not the first leaf's record`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableGroupEditGuard&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const mount = page.getByTestId('rozie-mount');
+    const container = mount.getByTestId('grid-table');
+    await expect(container.locator('table')).toBeVisible({ timeout: 15_000 });
+
+    // Single-level grouping by 'region' engages one frame after mount.
+    await expect
+      .poll(async () => mount.getByTestId('grouping-readout').textContent(), { timeout: 15_000 })
+      .toBe('region');
+    await expect
+      .poll(async () => container.locator('tbody tr[data-group-header]').count(), { timeout: 15_000 })
+      .toBeGreaterThan(0);
+
+    const northRow = container.locator('tbody tr[data-group-header]').filter({
+      has: page.locator('.rdt-group-value', { hasText: 'North' }),
+    });
+    await expect(northRow).toHaveCount(1, { timeout: 15_000 });
+
+    // (a) #selectCell: RED at HEAD reports 'LEAF:Apple' (table-core's leaked first-leaf
+    // record); GREEN reports the measured group descriptor (single-level grouping — North's
+    // 3 leaf records, no multi-level over-count).
+    const selectProbe = northRow.locator('[data-selectprobe]');
+    await expect(selectProbe).toHaveAttribute('data-selectprobe', 'GROUP:region:North:3', {
+      timeout: 15_000,
+    });
+
+    // (b) #editor: reachable ONLY because C1 (Task 2) is still open at this point in the
+    // plan — a group-header row is still editable at HEAD, so Enter on its 'qty' cell opens
+    // the #editor drop-in. RED: 'LEAF:Apple'. GREEN (still pre-C1-fix): the group
+    // descriptor. Once Task 2 lands this assertion is REPLACED (see that task's handoff).
+    const qtyCell = northRow.locator('[data-col="qty"][data-grid-cell]');
+    await qtyCell.click();
+    await page.keyboard.press('Enter');
+    const editorProbe = container.locator('[data-editorprobe]');
+    await expect(editorProbe).toHaveAttribute('data-editorprobe', 'GROUP:region:North:3', {
+      timeout: 15_000,
+    });
+
+    // (c) Control: an ordinary LEAF row's #selectCell still reports its own record.
+    const leafRow = container.locator('tbody tr[data-group-leaf]').first();
+    const leafSelectProbe = leafRow.locator('[data-selectprobe]');
+    await expect(leafSelectProbe).toHaveAttribute('data-selectprobe', /^LEAF:/, { timeout: 15_000 });
   });
 }

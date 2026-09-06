@@ -1,0 +1,185 @@
+<!--
+  DataTableGroupEditGuardDemo.rozie — quick task 260906-cvo (C1/C2/C3) RED-first fixture.
+
+  Proves three things about a group-header row, all inside a single grid-mode fixture:
+
+  C3 (Task 1) — the #selectCell and #editor scoped slots must receive the SAME group
+  DESCRIPTOR the #cell slot already receives on a group-header row, never the leaked
+  first-leaf record (table-core's `createRow(table, id, leafRows[0].original, …)`).
+
+  C1 (Task 2) — a group-header row must NOT be editable: Enter/F2/a printable key/a single
+  click on its `product`/`qty` cells must open NO editor and write NOTHING; Enter on a
+  group-header row instead TOGGLES the group.
+
+  C2 (Task 3) — paste/cut/Delete-clear/fill-drag anchored on or spanning a group-header row
+  must never write through it.
+
+  Single-level grouping by `region` (applied POST-MOUNT, one frame after mount — the
+  DataTableVirtualGroupDemo pattern; an initial-bound grouping renders zero group rows on
+  React). The grouping model field is named `groupingModel` (NOT `grouping`) — the Angular
+  slot-var/signal shadow footgun. `selectionMode="multiple"` injects the leading checkbox
+  column so #selectCell has somewhere to render. `qty` uses `editor="custom"` (routed
+  through EditorText, wrapped so this fixture can stamp its OWN probe attribute) so the
+  #editor slot hosts it; `product` uses the built-in text editor.
+
+  Six records over two regions — North: Apple/1, Pear/2, Plum/3; South: Fig/4, Date/5,
+  Lime/6. Readouts: `grouping-readout` (joined grouping model), `model-readout` (every
+  record serialized as `product:qty` joined by `|` — so ANY write anywhere in the dataset
+  is visible as text), `commit-count` (incremented by @cell-edit-commit).
+
+  `rowProbe(r)` (copied from DataTableGroupPlaceholderDemo) reveals what a slot's `row`
+  scope prop actually IS: `NOROW` / `GROUP:<groupingColumnId>:<groupingValue>:<leafCount>` /
+  `LEAF:<product>`. Stamped as `data-selectprobe` on the #selectCell template's element and
+  `data-editorprobe` on the #editor template's element — both destructure `row`.
+
+  NOT registered in matrix.spec.ts's EXAMPLES — assertion-only, produces no screenshot cell.
+  No loop var / slot named row/cell/header (the Svelte mount-throw discipline) — `row` is
+  safe (already used the same way by DataTableGroupPlaceholderDemo).
+-->
+
+<rozie name="DataTableGroupEditGuardDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+  EditorText: '../../packages/ui/data-table/src/EditorText.rozie',
+}
+</components>
+
+<data>
+{
+  // Two regions, three records each. VR-deterministic (no clock/random).
+  rows: [
+    { id: 1, region: 'North', product: 'Apple', qty: 1 },
+    { id: 2, region: 'North', product: 'Pear',  qty: 2 },
+    { id: 3, region: 'North', product: 'Plum',  qty: 3 },
+    { id: 4, region: 'South', product: 'Fig',   qty: 4 },
+    { id: 5, region: 'South', product: 'Date',  qty: 5 },
+    { id: 6, region: 'South', product: 'Lime',  qty: 6 },
+  ],
+  // Controlled single-level grouping — seeded [] then APPLIED in $onMount (a post-mount
+  // write) so the grouped-model rebuild keys on the CHANGE (reliable on React; the
+  // DataTableVirtualGroupDemo / DataTableGroupPlaceholderDemo pattern). Named
+  // `groupingModel` (NOT `grouping`) — the Angular slot-var/signal shadow footgun.
+  groupingModel: [],
+  // Last cell-edit-commit counter — C1/C2 assert this NEVER moves on a group-row write.
+  commitCount: 0,
+}
+</data>
+
+<script lang="ts">
+// Apply grouping AFTER mount (one frame later) so the grouped row-model rebuild keys on
+// the CHANGE (reliable on React).
+$onMount(() => {
+  const applyGrouping = (): void => { $data.groupingModel = ['region'] }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(applyGrouping)
+  else applyGrouping()
+})
+
+// cell-edit-commit → counter only (the C1/C2 "nothing was written" assertions read this).
+const onCellEditCommit = (): void => {
+  $data.commitCount = $data.commitCount + 1
+}
+
+// rowProbe (copied from DataTableGroupPlaceholderDemo): reveals what a slot's `row` scope
+// prop actually IS. `NOROW` for a null row (defensive); `GROUP:` + groupingColumnId + `:` +
+// groupingValue + `:` + leafCount for the locked group descriptor shape; `LEAF:` + r.product
+// for an ordinary record.
+const rowProbe = (r: any): string => {
+  if (r == null) return 'NOROW'
+  if (r.isGroupRow === true) return 'GROUP:' + r.groupingColumnId + ':' + r.groupingValue + ':' + r.leafCount
+  return 'LEAF:' + r.product
+}
+</script>
+
+<template>
+<div class="dt-group-edit-guard-demo">
+  <h3>DataTable — group-header row edit/clipboard guard</h3>
+
+  <div class="controls">
+    <span class="label">grouping:</span>
+    <span class="readout" data-testid="grouping-readout">{{ $data.groupingModel.join(',') }}</span>
+    <span class="label">commit-count:</span>
+    <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+  </div>
+
+  <!-- The COMMITTED model, joined so ANY write anywhere is visible as text. -->
+  <pre class="model" data-testid="model-readout">{{ $data.rows.map((r) => r.product + ':' + r.qty).join('|') }}</pre>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      selectionMode="multiple"
+      :groupable="true"
+      r-model:data="$data.rows"
+      r-model:grouping="$data.groupingModel"
+      @cell-edit-commit="onCellEditCommit($event)"
+    >
+      <Column field="region"  header="Region"  />
+      <Column field="product" header="Product" :editable="true" editor="text" />
+      <Column field="qty"     header="Qty"     :editable="true" editor="custom" />
+
+      <!-- #selectCell (C3): destructures `row` — probed via data-selectprobe. -->
+      <template #selectCell="{ row, checked, toggle }">
+        <span data-testid="select-probe" :data-selectprobe="rowProbe(row)">
+          <input type="checkbox" aria-label="Select row" :checked="checked" @change="toggle($event)" />
+        </span>
+      </template>
+
+      <!-- #editor (C3): destructures `row` — probed via data-editorprobe. Only `qty`
+           routes through this slot (editor='custom'); `product` uses the built-in text
+           editor and is unaffected. -->
+      <template #editor="{ columnId, row, value, commit, cancel, autofocus }">
+        <span data-testid="qty-editor-wrap" :data-editorprobe="rowProbe(row)">
+          <EditorText
+            r-if="columnId === 'qty'"
+            :value="value"
+            :columnId="columnId"
+            :commit="commit"
+            :cancel="cancel"
+            :autofocus="autofocus"
+          />
+        </span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-group-edit-guard-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 620px;
+}
+.dt-group-edit-guard-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.model {
+  font-size: 0.6875rem;
+  font-family: ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0 0 0.75rem;
+  color: #333;
+}
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.rdt-cell-editor { font: inherit; }
+</style>
+
+</rozie>

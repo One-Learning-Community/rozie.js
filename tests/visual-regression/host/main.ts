@@ -1127,6 +1127,16 @@ export const EXAMPLES = [
   'DataTableGroupBar',
   'DataTableDetailPanel',
   'DataTableEditorDropins',
+  // Quick 260906-cvo — group-header row edit/clipboard guard cluster (C1/C2/C3) + the
+  // groupableColumns nested-leaf fix (C5/C6). Loaders → examples/demos/
+  // DataTableGroupEditGuardDemo.rozie / DataTableGroupBarNestedDemo.rozie, each importing
+  // ../../packages/ui/data-table/src/{DataTable,Column}.rozie. Behavioral-only (DOM
+  // assertions in data-table-grouped-defs.spec.ts); NOT in matrix.spec.ts EXAMPLES (no
+  // pixel baseline). They live under examples/demos/ so no new Angular 3-file registration
+  // is needed (prebuildExtraRoots[examplesRoot] + the examples tsconfig include + the
+  // glob-driven build-cells demos sweep already cover them).
+  'DataTableGroupEditGuard',
+  'DataTableGroupBarNested',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -1705,6 +1715,11 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableGroupBar: 'rozie-data-table-group-bar',
   DataTableDetailPanel: 'rozie-data-table-detail-panel',
   DataTableEditorDropins: 'rozie-data-table-editor-dropins',
+  // Quick 260906-cvo — '-demo' appended on Lit → tags
+  // 'rozie-data-table-group-edit-guard-demo' / 'rozie-data-table-group-bar-nested-demo' =
+  // kebab of DataTableGroupEditGuardDemo / DataTableGroupBarNestedDemo.
+  DataTableGroupEditGuard: 'rozie-data-table-group-edit-guard',
+  DataTableGroupBarNested: 'rozie-data-table-group-bar-nested',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -2191,6 +2206,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DataTableGroupBar: {},
   DataTableDetailPanel: {},
   DataTableEditorDropins: {},
+  // Quick 260906-cvo — both demos are self-contained: each seeds its own rows + grouping
+  // model + readouts in <data> and mounts the DataTable inline with its props. No
+  // parent-supplied props.
+  DataTableGroupEditGuard: {},
+  DataTableGroupBarNested: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state
