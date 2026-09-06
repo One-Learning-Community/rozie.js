@@ -161,13 +161,31 @@ const cellIsAggregated = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getIs
 // empty template so that leaked value never paints. Tick-gated exactly like cellIsGrouped so
 // the group chrome re-derives on a re-pull on the fine-grained targets (Solid/Lit).
 const cellIsPlaceholder = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder())
-// groupSubRowCount: the number of underlying LEAF RECORDS under a group-header row (the count
-// shown in the header, e.g. "North (40)"). row.subRows is the IMMEDIATE members — for MULTI-LEVEL
-// grouping those are sub-GROUPS, not records, so "North" with 2 categories / 40 records would show
-// "North (2)". getLeafRows() returns all leaf descendants (the actual record count); keep the
-// subRows fallback for safety. Single-level grouping is unchanged (getLeafRows == subRows when the
-// children are already leaves).
-const groupSubRowCount = (row) => (row && row.getLeafRows ? row.getLeafRows().length : (row && row.subRows ? row.subRows.length : 0))
+// groupSubRowCount: the number of underlying TRUE LEAF RECORDS under a group-header row (the
+// count shown in the header, e.g. "North (40)"). row.subRows is the IMMEDIATE members — for
+// MULTI-LEVEL grouping those are sub-GROUPS, not records, so "North" with 2 categories / 40
+// records would show "North (2)" off subRows alone. row.getLeafRows() is table-core's
+// `flattenBy(row.subRows, d => d.subRows)` (ColumnGrouping.js / utils.js, verified against
+// @tanstack/table-core@8.21.3) — it pushes EVERY node it walks, INCLUDING intermediate group
+// nodes, so under multi-level grouping it over-counts by exactly the number of sub-group
+// nodes between the row and its true leaves (C4, quick 260906-cvo: North with 2 city
+// sub-groups + 3 records reported 5, not 3). `row.getIsGrouped()` is `!!row.groupingColumnId`
+// — precisely the predicate that separates a group node from a real record — so filter the
+// flattened list on it rather than hand-rolling a recursive `subRows` walk (getLeafRows()
+// already flattens; the defect is purely that it does not filter). Single-level grouping is
+// numerically UNCHANGED: a leaf row has no `subRows`, so no node was ever miscounted there.
+const groupSubRowCount = (row) => {
+  if (row && row.getLeafRows) {
+    const leaves = row.getLeafRows()
+    let n = 0
+    for (let i = 0; i < leaves.length; i++) {
+      const r = leaves[i]
+      if (!(r && r.getIsGrouped && r.getIsGrouped())) n = n + 1
+    }
+    return n
+  }
+  return row && row.subRows ? row.subRows.length : 0
+}
 
 // ── B2 (quick 260906-afh) — group-header row #cell slot descriptor ─────────────────────
 // PROBLEM: table-core builds a flattened group-header row via

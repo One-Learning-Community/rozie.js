@@ -28,14 +28,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *      ['region', 'city']; `product`/`qty` are non-grouping columns → aggregated on a group
  *      row → they take the #cell r-else branch and are exactly the cells that leak `row`).
  *      RED at HEAD: the `product` cell on the North region group-header row reports
- *      `LEAF:Apple` (leaf #1's record). GREEN: it reports `GROUP:region:North:5` (the
- *      locked descriptor shape; `leafCount` REUSES the pre-existing `groupSubRowCount(row)`
- *      helper verbatim per the plan's key_links, which — under MULTI-LEVEL grouping —
- *      recursively flattens `row.subRows` via table-core's `getLeafRows()` WITHOUT filtering
- *      out intermediate group nodes, so North's count is its 2 city sub-groups (Oslo,
- *      Bergen) PLUS their 3 actual leaf records = 5, not the 3 true records. This is a
- *      pre-existing `groupSubRowCount` quirk — unrelated to and out of scope for this task
- *      — reused as-is per the locked contract; verified against the live DOM, not assumed).
+ *      `LEAF:Apple` (leaf #1's record). GREEN: it reports `GROUP:region:North:3` (the
+ *      locked descriptor shape; `leafCount` reuses the `groupSubRowCount(row)` helper
+ *      verbatim per the plan's key_links contract — CORRECTED by quick 260906-cvo C4 to
+ *      count only TRUE leaf records under multi-level grouping, excluding North's 2
+ *      intermediate city sub-group nodes (Oslo, Bergen); see `grouped-defs C4` below for the
+ *      RED-first proof of that fix. Pre-260906-cvo this read 5 — the 2 city sub-groups PLUS
+ *      the 3 true records — a since-closed `groupSubRowCount` over-count, not a B2 defect).
  *      A leaf row's `product` cell still reports `LEAF:<product>`.
  *
  * C3 (quick 260906-cvo, Task 1) — the #selectCell and #editor scoped slots STILL bound
@@ -131,11 +130,11 @@ for (const target of TARGETS) {
     // the SAME #cell slot as an ordinary leaf row (the aggregated-cell `row` leak this task
     // fixes). RED at HEAD: table-core hands the slot the FIRST LEAF's record (id 1, product
     // 'Apple') as `row`, so rowProbe(row) resolves 'LEAF:Apple'. GREEN: the group
-    // descriptor, so rowProbe(row) resolves 'GROUP:region:North:5' (leafCount reuses
-    // groupSubRowCount(row) verbatim — see the file-header doc comment for why North's
-    // count is 5, not the 3 true leaf records).
+    // descriptor, so rowProbe(row) resolves 'GROUP:region:North:3' (leafCount reuses
+    // groupSubRowCount(row) verbatim — the 3 true leaf records under North, post-C4-fix;
+    // see the file-header doc comment and `grouped-defs C4` below).
     const productProbe = northRow.locator('[data-col="product"] [data-testid="cell-display"]');
-    await expect(productProbe).toHaveAttribute('data-rowprobe', 'GROUP:region:North:5', {
+    await expect(productProbe).toHaveAttribute('data-rowprobe', 'GROUP:region:North:3', {
       timeout: 15_000,
     });
 
@@ -526,5 +525,109 @@ for (const target of TARGETS) {
       await fillDragTo(page, 4, PRODUCT_COL); // drag DOWN across the South group-header row
       await expect(mount.getByTestId('commit-count')).toHaveText('1', { timeout: 5_000 });
     }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════
+// C4 (quick 260906-cvo, Task 4) — groupSubRowCount counts TRUE leaf records under
+// MULTI-LEVEL grouping, not intermediate group nodes. Same fixture as B2
+// (DataTableGroupPlaceholder, grouped by ['region','city']).
+// ═══════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Ground-truth measurement (never assumed): walk the flattened `tbody tr` rows and, starting
+ * from the depth-0 group-header row whose `data-group-header` value starts with
+ * `topLevelPrefix`, count DESCENDANTS (every row until the next depth-0 row) split into true
+ * leaf records (`[data-group-leaf]`) vs intermediate group nodes (`[data-group-header]` at a
+ * deeper level).
+ */
+async function measureGroupDescendants(
+  page: Page,
+  containerTestId: string,
+  topLevelPrefix: string,
+): Promise<{ leafCount: number; groupNodeCount: number }> {
+  return page.evaluate(
+    ({ cid, prefix }) => {
+      const find = (root: Document | ShadowRoot, sel: string): Element | null => {
+        const direct = root.querySelector(sel);
+        if (direct) return direct;
+        for (const el of Array.from(root.querySelectorAll('*'))) {
+          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+          if (sr) { const inner = find(sr, sel); if (inner) return inner; }
+        }
+        return null;
+      };
+      // Shadow-piercing collection (Lit's <table> lives inside the DataTable custom
+      // element's OWN shadow root, nested under the light-DOM container found above —
+      // container.querySelectorAll alone does not cross that boundary).
+      const collectAll = (root: Document | ShadowRoot | Element, sel: string): Element[] => {
+        const out = Array.from(root.querySelectorAll(sel));
+        for (const el of Array.from(root.querySelectorAll('*'))) {
+          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+          if (sr) out.push(...collectAll(sr, sel));
+        }
+        return out;
+      };
+      const container = find(document, `[data-testid="${cid}"]`);
+      const rows = container ? collectAll(container, 'tbody tr') : [];
+      let leafCount = 0;
+      let groupNodeCount = 0;
+      let inSpan = false;
+      for (const row of rows) {
+        const gh = row.getAttribute('data-group-header');
+        const depth = row.getAttribute('data-depth');
+        if (gh != null && depth === '0') {
+          inSpan = gh.indexOf(prefix) === 0;
+          continue;
+        }
+        if (!inSpan) continue;
+        if (row.getAttribute('data-group-leaf') != null) leafCount += 1;
+        else if (gh != null) groupNodeCount += 1;
+      }
+      return { leafCount, groupNodeCount };
+    },
+    { cid: containerTestId, prefix: topLevelPrefix },
+  );
+}
+
+for (const target of TARGETS) {
+  runnerFor(target)(`grouped-defs C4 [${target}]: groupSubRowCount counts true leaf records under multi-level grouping`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableGroupPlaceholder&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const mount = page.getByTestId('rozie-mount');
+    const container = mount.getByTestId('placeholder-table');
+    await expect(container.locator('table')).toBeVisible({ timeout: 15_000 });
+
+    await expect
+      .poll(async () => mount.getByTestId('grouping-readout').textContent(), { timeout: 15_000 })
+      .toBe('region,city');
+    await expect
+      .poll(async () => container.locator('tbody tr[data-group-header]').count(), { timeout: 15_000 })
+      .toBeGreaterThan(0);
+
+    // Ground truth, measured from the live DOM (not assumed): North's true leaf records vs
+    // its intermediate city sub-group nodes.
+    const { leafCount, groupNodeCount } = await measureGroupDescendants(page, 'placeholder-table', 'region:North');
+    expect(groupNodeCount).toBeGreaterThan(0); // sanity: multi-level grouping is genuinely engaged
+
+    const northRow = container.locator('tbody tr[data-group-header]').filter({
+      has: page.locator('.rdt-group-value', { hasText: 'North' }),
+    });
+    await expect(northRow).toHaveCount(1, { timeout: 15_000 });
+
+    // The rendered count chip reports the MEASURED true-record count (leafCount), never
+    // leafCount + groupNodeCount (the over-count this task fixes).
+    await expect(northRow.locator('.rdt-group-count')).toHaveText(`(${leafCount})`, { timeout: 15_000 });
+
+    // The #cell slot's descriptor `leafCount` field (via data-rowprobe's trailing segment)
+    // reports the SAME measured value — groupRowDescriptor's leafCount reuses
+    // groupSubRowCount(row) verbatim.
+    const productProbe = northRow.locator('[data-col="product"] [data-testid="cell-display"]');
+    await expect(productProbe).toHaveAttribute('data-rowprobe', `GROUP:region:North:${leafCount}`, {
+      timeout: 15_000,
+    });
   });
 }

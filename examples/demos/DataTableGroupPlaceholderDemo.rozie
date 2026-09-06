@@ -27,6 +27,12 @@
   table-core's leaked first-leaf record (`LEAF:<first leaf's product>`); post-fix it is the
   locked group descriptor (`GROUP:<groupingColumnId>:<groupingValue>:<leafCount>`).
   data-table-grouped-defs.spec.ts (`grouped-defs B2`) drives this assertion ×6.
+
+  C4 (quick 260906-cvo): the descriptor's `leafCount` field is `groupSubRowCount(row)` — for
+  the North region row (2 city sub-groups: Oslo [2 records], Bergen [1 record]) this now
+  correctly reports 3 (the true leaf-record count), not 5 (the pre-fix over-count that also
+  included the 2 intermediate city sub-group nodes). `grouped-defs C4` drives the RED-first
+  proof against this same fixture.
 -->
 
 <rozie name="DataTableGroupPlaceholderDemo">
