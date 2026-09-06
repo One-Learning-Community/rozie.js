@@ -67,6 +67,10 @@
   commitCount: 0,
   // C1 single-click-to-edit toggle (mirrors DataTableGridEditDemo's singleClickEdit idiom).
   singleClickEdit: false,
+  // C2 (Task 3): last @range-change focus "r,c" — the fill-drag flush gate (DataTableGrid-
+  // ClipboardDemo idiom; React setState is async, so a fill-drag spec polls this before
+  // firing pointerup).
+  rangeReadout: '',
 }
 </data>
 
@@ -98,6 +102,13 @@ const rowProbe = (r: any): string => {
 // both the OFF (default) and ON paths against the same fixture (the DataTableGridEditDemo
 // idiom).
 const toggleSingleClickEdit = (): void => { $data.singleClickEdit = !$data.singleClickEdit }
+
+// C2 (Task 3) — @range-change → "r,c" of the moving focus corner (the DataTableGridClipboard-
+// Demo fill-drag flush-gate idiom).
+const onRangeChange = (payload: { anchor: { rowIndex: number; colIndex: number } | null; focus: { rowIndex: number; colIndex: number } | null }): void => {
+  const f = payload ? payload.focus : null
+  $data.rangeReadout = f ? f.rowIndex + ',' + f.colIndex : ''
+}
 </script>
 
 <template>
@@ -112,6 +123,8 @@ const toggleSingleClickEdit = (): void => { $data.singleClickEdit = !$data.singl
     <button type="button" data-testid="toggle-single-click-edit" @click="toggleSingleClickEdit">toggle single-click-edit</button>
     <span class="label">single-click-edit:</span>
     <span class="readout" data-testid="single-click-edit-state">{{ $data.singleClickEdit ? 'on' : 'off' }}</span>
+    <span class="label">range:</span>
+    <span class="readout" data-testid="range-readout">{{ $data.rangeReadout }}</span>
   </div>
 
   <!-- The COMMITTED model, joined so ANY write anywhere is visible as text. -->
@@ -127,6 +140,7 @@ const toggleSingleClickEdit = (): void => { $data.singleClickEdit = !$data.singl
       r-model:data="$data.rows"
       r-model:grouping="$data.groupingModel"
       @cell-edit-commit="onCellEditCommit($event)"
+      @range-change="onRangeChange($event)"
     >
       <Column field="region"  header="Region"  />
       <Column field="product" header="Product" :editable="true" editor="text" />

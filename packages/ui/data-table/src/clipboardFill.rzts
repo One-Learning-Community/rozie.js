@@ -61,6 +61,11 @@ const normalizedRange = () => {
 // rangeToTsv(): serialize the current range to TSV — rows joined by '\n', cells by '\t',
 // reading each cell's value off the visible model by index (cellValueAt). A single active
 // cell (no range) serializes that one cell. Each field is B10-escaped. Pure read — never writes.
+// C2 (quick 260906-cvo) — DELIBERATE NON-CHANGE: this is a READ, unlike applyGridToRange's
+// write funnel, and stays UNGUARDED for a group-header row on purpose. cellValueAt reads the
+// column's DISPLAYED aggregate value on a group row (table-core's cell.getValue()), which is
+// exactly what the user sees — serializing it is correct behavior, not a leak. Do not "fix"
+// this asymmetry; it is intentional.
 const rangeToTsv = () => {
   const box = normalizedRange()
   const r0 = box ? box.r0 : $data.activeRow
@@ -111,11 +116,22 @@ const applyGridToRange = (grid, originRow, originCol) => {
   for (let gr = 0; gr < grid.length; gr++) {
     const r = originRow + gr
     if (r > maxRow) break
+    // C2 (quick 260906-cvo) — hoisted ONCE per ROW (never per cell): a group-header row's
+    // `original` is table-core's `leafRows[0].original` (a synthetic row), so a write
+    // resolved through it silently lands on an unrelated record. This ONE placement closes
+    // pasteRange, cutRange, clearActiveRange AND fillRange — all four build a grid and hand
+    // it to this single funnel, so guarding the four callers individually would be four
+    // chances to miss one.
+    const rowGrouped = rowIndexIsGrouped(r)
     const cols = grid[gr] || []
     for (let gc = 0; gc < cols.length; gc++) {
       const c = originCol + gc
       if (c > maxCol) break
+      // A group-row cell still counts toward `total` — it is a skipped TARGET, exactly like
+      // a non-editable or validator-rejected cell — so the "N of M cells pasted" / "no cells
+      // pasted" announce keeps its existing semantics (never silently under-reports M).
       total = total + 1
+      if (rowGrouped) continue
       const colId = columnIdAt(r, c)
       if (colId == null || !columnEditable(colId)) continue
       const rowObj = rowOriginalAt(r)

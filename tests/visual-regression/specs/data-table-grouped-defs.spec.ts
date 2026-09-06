@@ -307,3 +307,224 @@ for (const target of TARGETS) {
     }
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════
+// C2 (quick 260906-cvo, Task 3) — paste, cut, clear and fill never write through a
+// group-header row. Same fixture as C1/C3 (DataTableGroupEditGuard). Helpers copied
+// verbatim from data-table-grid-clipboard.spec.ts (readoutText / focusBodyCell /
+// focusBodyCellStable / activeCellCoords / extendRangeBy / fillDragTo).
+// ═══════════════════════════════════════════════════════════════════════════════════
+
+/** Read a readout testid's trimmed text (shadow-pierced). */
+async function readoutText(page: Page, testid: string): Promise<string> {
+  return page.evaluate((id) => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector(`[data-testid="${id}"]`);
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) { const inner = find(sr); if (inner) return inner; }
+      }
+      return null;
+    };
+    const el = find(document);
+    return el ? (el.textContent || '').trim() : '';
+  }, testid);
+}
+
+/** The active cell's [data-row]/[data-col-index], shadow-pierced. */
+async function activeCellCoords(page: Page): Promise<{ row: string | null; col: string | null } | null> {
+  return page.evaluate(() => {
+    const findGridTable = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('table[role="grid"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) { const inner = findGridTable(sr); if (inner) return inner; }
+      }
+      return null;
+    };
+    const grid = findGridTable(document);
+    if (!grid) return null;
+    const active = grid.getRootNode
+      ? (grid.getRootNode() as Document | ShadowRoot).activeElement
+      : document.activeElement;
+    if (!active) return null;
+    const cell = active.closest('[data-grid-cell]');
+    return {
+      row: cell ? cell.getAttribute('data-row') : null,
+      col: cell ? cell.getAttribute('data-col-index') : null,
+    };
+  });
+}
+
+/** Focus a body cell directly by (row, col) — drives @focusin -> activeRow/activeColIndex sync. */
+async function focusBodyCell(page: Page, row: number, col: number): Promise<void> {
+  await page.evaluate(({ r, c }) => {
+    const findGridTable = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('table[role="grid"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) { const inner = findGridTable(sr); if (inner) return inner; }
+      }
+      return null;
+    };
+    const grid = findGridTable(document);
+    if (!grid) return;
+    const cell = grid.querySelector(`[data-grid-cell][data-row="${r}"][data-col-index="${c}"]`) as HTMLElement | null;
+    if (cell) cell.focus();
+  }, { r: row, c: col });
+}
+
+/** Focus (row, col) and KEEP it until the active cell settles there AND holds. */
+async function focusBodyCellStable(page: Page, row: number, col: number): Promise<void> {
+  await focusBodyCell(page, row, col);
+  let stableHits = 0;
+  await expect
+    .poll(
+      async () => {
+        const a = await activeCellCoords(page);
+        if (a?.row === String(row) && a?.col === String(col)) stableHits += 1;
+        else { stableHits = 0; await focusBodyCell(page, row, col); }
+        return stableHits;
+      },
+      { timeout: 5_000, intervals: [40, 40, 40, 60, 100] },
+    )
+    .toBeGreaterThanOrEqual(2);
+}
+
+/** Build a range from the active cell by pressing Shift+<dir> `steps` times, then wait for
+ *  @range-change to flush the moving focus corner to (toRow,toCol). */
+async function extendRangeBy(page: Page, dir: 'Right' | 'Left' | 'Down' | 'Up', steps: number, toRow: number, toCol: number): Promise<void> {
+  for (let i = 0; i < steps; i++) await page.keyboard.press(`Shift+Arrow${dir}`);
+  await expect.poll(async () => readoutText(page, 'range-readout'), { timeout: 10_000 }).toBe(`${toRow},${toCol}`);
+}
+
+/** Drive a fill-handle drag to the cell (toRow,toCol) — pointerdown on [data-fill-handle],
+ *  a document pointermove to the target cell's center, wait for @range-change to flush, then
+ *  a document pointerup (-> fillRange). Coordinates come from getBoundingClientRect. */
+async function fillDragTo(page: Page, toRow: number, toCol: number): Promise<void> {
+  await page.waitForTimeout(150);
+  await page.evaluate(({ tr, tc }) => {
+    const findGridTable = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('table[role="grid"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) { const inner = findGridTable(sr); if (inner) return inner; }
+      }
+      return null;
+    };
+    const grid = findGridTable(document);
+    if (!grid) return;
+    const handle = grid.querySelector('[data-fill-handle]') as HTMLElement | null;
+    const target = grid.querySelector(`[data-grid-cell][data-row="${tr}"][data-col-index="${tc}"]`) as HTMLElement | null;
+    if (!handle || !target) return;
+    const hr = handle.getBoundingClientRect();
+    const trc = target.getBoundingClientRect();
+    const hx = hr.left + hr.width / 2;
+    const hy = hr.top + hr.height / 2;
+    const cx = trc.left + trc.width / 2;
+    const cy = trc.top + trc.height / 2;
+    handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: hx, clientY: hy }));
+    document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: cx, clientY: cy }));
+  }, { tr: toRow, tc: toCol });
+  await expect.poll(async () => readoutText(page, 'range-readout'), { timeout: 10_000 }).toBe(`${toRow},${toCol}`);
+  await page.waitForTimeout(200);
+  await page.evaluate(({ tr, tc }) => {
+    const findGridTable = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('table[role="grid"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) { const inner = findGridTable(sr); if (inner) return inner; }
+      }
+      return null;
+    };
+    const grid = findGridTable(document);
+    if (!grid) return;
+    const target = grid.querySelector(`[data-grid-cell][data-row="${tr}"][data-col-index="${tc}"]`) as HTMLElement | null;
+    if (!target) return;
+    const r = target.getBoundingClientRect();
+    document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
+  }, { tr: toRow, tc: toCol });
+}
+
+// Column indices in DataTableGroupEditGuardDemo (select=0, region=1, product=2, qty=3).
+// Row indices (absolute, over $data.rows incl. group rows): 0=North-header, 1=Apple,
+// 2=Pear, 3=Plum, 4=South-header, 5=Fig, 6=Date, 7=Lime.
+const PRODUCT_COL = 2;
+
+for (const target of TARGETS) {
+  runnerFor(target)(`grouped-defs C2 [${target}]: paste/cut/clear/fill never write through a group-header row`, async ({
+    page,
+  }) => {
+    // (a) A 1x1 paste anchored ON the North group-header row's 'product' cell writes
+    // NOTHING: model-readout unchanged, commit-count 0, the announce reports zero written.
+    {
+      const { mount } = await gotoGroupEditGuard(page, target);
+      await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+      await page.evaluate(() => navigator.clipboard.writeText('Zzz'));
+      await focusBodyCellStable(page, 0, PRODUCT_COL);
+      await page.keyboard.press('Control+v');
+      await expect(mount.getByTestId('commit-count')).toHaveText('0', { timeout: 5_000 });
+      await expect(mount.getByTestId('model-readout')).toHaveText(
+        'Apple:1|Pear:2|Plum:3|Fig:4|Date:5|Lime:6',
+      );
+      await expect
+        .poll(async () => readoutText(page, 'paste-announce'), { timeout: 5_000 })
+        .toBe('No cells pasted — 1 cells were invalid or read-only');
+    }
+
+    // (b) A range spanning the 3 North leaf rows AND the South group-header row
+    // (Delete-clear) writes ONLY the 3 leaf cells: commit-count === 3 (N < M=4 total
+    // targets), the leaf products blank, the South-header's own leaked record untouched.
+    {
+      const { mount } = await gotoGroupEditGuard(page, target);
+      await focusBodyCellStable(page, 1, PRODUCT_COL);
+      await extendRangeBy(page, 'Down', 3, 4, PRODUCT_COL);
+      await page.keyboard.press('Delete');
+      await expect(mount.getByTestId('commit-count')).toHaveText('3', { timeout: 5_000 });
+      await expect(mount.getByTestId('model-readout')).toHaveText(
+        ':1|:2|:3|Fig:4|Date:5|Lime:6',
+        { timeout: 5_000 },
+      );
+      await expect
+        .poll(async () => readoutText(page, 'paste-announce'), { timeout: 5_000 })
+        .toBe('3 of 4 cells pasted');
+    }
+
+    // (c) Control: the IDENTICAL Delete-clear operation anchored ENTIRELY on leaf rows
+    // (the 3 North leaves — no group row in range) writes EVERY cell.
+    {
+      const { mount } = await gotoGroupEditGuard(page, target);
+      await focusBodyCellStable(page, 1, PRODUCT_COL);
+      await extendRangeBy(page, 'Down', 2, 3, PRODUCT_COL);
+      await page.keyboard.press('Delete');
+      await expect(mount.getByTestId('commit-count')).toHaveText('3', { timeout: 5_000 });
+      await expect(mount.getByTestId('model-readout')).toHaveText(
+        ':1|:2|:3|Fig:4|Date:5|Lime:6',
+        { timeout: 5_000 },
+      );
+      await expect
+        .poll(async () => readoutText(page, 'paste-announce'), { timeout: 5_000 })
+        .toBe('3 of 3 cells pasted');
+    }
+
+    // (d) Fill-drag: a true 1x1 SOURCE at Plum's 'product' cell (row 3) dragged DOWN across
+    // the South group-header row (row 4) writes ONLY the source cell itself (a self-write,
+    // same value) — the group row is SKIPPED. commit-count is the unambiguous discriminator
+    // here: a fill-drag across a group row happens to write the group row's leaked record
+    // with the SAME value the source cell already holds, so model-readout alone cannot tell
+    // the two apart.
+    {
+      const { mount } = await gotoGroupEditGuard(page, target);
+      await focusBodyCellStable(page, 3, PRODUCT_COL);
+      await extendRangeBy(page, 'Down', 1, 4, PRODUCT_COL);
+      await extendRangeBy(page, 'Up', 1, 3, PRODUCT_COL); // back to a true 1x1 range at row 3
+      await fillDragTo(page, 4, PRODUCT_COL); // drag DOWN across the South group-header row
+      await expect(mount.getByTestId('commit-count')).toHaveText('1', { timeout: 5_000 });
+    }
+  });
+}
