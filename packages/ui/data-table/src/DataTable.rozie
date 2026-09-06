@@ -1486,7 +1486,7 @@ const onHeaderSort = (colId, evt) => {
 const tick = () => $data.rowModelVer
 import { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, hasFilterSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle } from './columnChrome.rzts'
 
-import { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, displayPageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn } from './filterPaginationRowChrome.rzts'
+import { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, displayPageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupRowDescriptor, cellSlotRow, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn } from './filterPaginationRowChrome.rzts'
 // `indeterminate` is a DOM PROPERTY, not an HTML attribute — a `:indeterminate="…"`
 // binding only takes effect on Vue (which binds known DOM props); on
 // React/Solid/Angular/Lit/Svelte it lands as an inert attribute and `el.indeterminate`
@@ -2230,7 +2230,7 @@ $expose({
               name="cell"
               :columnId="cell.column.id"
               :column="cell.column"
-              :row="wr.row.original"
+              :row="cellSlotRow(wr.row)"
               :value="cell.getValue()"
             >{{ cell.getValue() }}</slot>
           </span>
@@ -2305,7 +2305,7 @@ $expose({
             name="cell"
             :columnId="cell.column.id"
             :column="cell.column"
-            :row="wr.row.original"
+            :row="cellSlotRow(wr.row)"
             :value="cell.getValue()"
           >{{ cell.getValue() }}</slot>
         </span>
@@ -2668,7 +2668,7 @@ $expose({
               name="cell"
               :columnId="cell.column.id"
               :column="cell.column"
-              :row="row.original"
+              :row="cellSlotRow(row)"
               :value="cell.getValue()"
             >{{ cell.getValue() }}</slot>
           </span>
@@ -2750,7 +2750,7 @@ $expose({
             name="cell"
             :columnId="cell.column.id"
             :column="cell.column"
-            :row="row.original"
+            :row="cellSlotRow(row)"
             :value="cell.getValue()"
           >{{ cell.getValue() }}</slot>
         </span>

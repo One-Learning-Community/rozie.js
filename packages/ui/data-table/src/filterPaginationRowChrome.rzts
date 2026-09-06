@@ -138,11 +138,20 @@ const groupingActive = () => (tick() >= 0 && ((currentState().grouping || []).le
 // Art). A placeholder cell (neither) falls through to the #cell r-else and renders its empty value.
 const cellIsGrouped = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped())
 const cellIsAggregated = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated())
-// cellIsPlaceholder: a PLACEHOLDER cell on a group-header row — a non-grouped, non-aggregated
-// cell that table-core fills with the FIRST leaf row's value (cell.getValue() leaks e.g.
-// "Services"/"Edsger Dijkstra" onto the group line). Renders BLANK via a dedicated empty
-// template branch so the leaked leaf value never paints. Tick-gated exactly like cellIsGrouped
-// so the group chrome re-derives on a re-pull on the fine-grained targets (Solid/Lit).
+// cellIsPlaceholder: VERIFIED against @tanstack/table-core@8.21.3 (ColumnGrouping.js:120-121,
+// quick 260906-afh premise correction). A placeholder cell is a cell IN A GROUPING COLUMN
+// that is NOT the row's OWN grouping column — `!cell.getIsGrouped() && column.getIsGrouped()`.
+// That is true both on a group-header row (for every OTHER grouping column) and on every leaf
+// row (for every grouping column) — it is NOT "never true on a group-header row" and it is NOT
+// "any non-grouped, non-aggregated cell". The operative consequence for this component: a
+// placeholder can only EVER be a grouping-column cell, so this branch can never reach a
+// non-grouping column — it does NOT and CANNOT guard the AGGREGATED-cell `row` leak
+// (cellSlotRow, below) fixes. Where it DOES apply (e.g. under multi-level grouping, the
+// OTHER grouping column on a group-header row), table-core still fills cell.getValue() with
+// the FIRST leaf row's value (cell.getValue() leaks e.g. "Oslo" onto a region-level group
+// line whose grouping is 'region', not 'city'); this branch renders BLANK via a dedicated
+// empty template so that leaked value never paints. Tick-gated exactly like cellIsGrouped so
+// the group chrome re-derives on a re-pull on the fine-grained targets (Solid/Lit).
 const cellIsPlaceholder = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder())
 // groupSubRowCount: the number of underlying LEAF RECORDS under a group-header row (the count
 // shown in the header, e.g. "North (40)"). row.subRows is the IMMEDIATE members — for MULTI-LEVEL
@@ -151,6 +160,59 @@ const cellIsPlaceholder = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getI
 // subRows fallback for safety. Single-level grouping is unchanged (getLeafRows == subRows when the
 // children are already leaves).
 const groupSubRowCount = (row) => (row && row.getLeafRows ? row.getLeafRows().length : (row && row.subRows ? row.subRows.length : 0))
+
+// ── B2 (quick 260906-afh) — group-header row #cell slot descriptor ─────────────────────
+// PROBLEM: table-core builds a flattened group-header row via
+// `createRow(table, id, leafRows[0].original, …)` (getGroupedRowModel.js), so `row.original`
+// on a group row IS the FIRST LEAF's record. The #cell scoped slot's existing 4 call sites
+// all bound `:row="row.original"` (or `wr.row.original`), so an AGGREGATED cell (a
+// non-grouping column on a group row — cellIsGrouped()===false, cellIsPlaceholder()===false,
+// so it takes the #cell r-else branch, same as any ordinary leaf cell) silently handed a
+// consumer template the WRONG record's fields (T-AFH-05). The grouped cell itself (the
+// group's own column, .rdt-group-value) has the same #cell binding and the same leak.
+//
+// FIX: `cellSlotRow(row)` returns a STABLE GROUP DESCRIPTOR — never `row.original` — for a
+// group-header row, and `row.original` unchanged for every other row. The descriptor is an
+// OBJECT, never `null` (T-AFH-06 — a consumer already reading `row.foo` would throw on
+// Vue/Angular if handed null).
+//
+// Descriptor cache (T-AFH-02/T-AFH-04): a null-prototype map keyed on `String(row.id)`,
+// invalidated wholesale whenever `$data.rowModelVer` (bumped by every refreshRowModel, the
+// SAME reactive re-derivation discipline visibleCellsFor/rowIsGrouped use) differs from the
+// generation the map was built for — so the descriptor's REFERENCE IDENTITY is stable
+// across every cell of one group row within a row-model generation (an unstable reference
+// would thrash the fine-grained targets, Solid/Lit) and refreshed the moment the grouping
+// changes. Group row ids are built from consumer grouping VALUES, so the map MUST be
+// null-prototype — a `__proto__` grouping value must not reach Object.prototype.
+let groupRowDescriptorCache: any = null
+let groupRowDescriptorCacheVer: any = undefined
+const groupRowDescriptor = (row) => {
+  const ver = $data.rowModelVer
+  if (!groupRowDescriptorCache || groupRowDescriptorCacheVer !== ver) {
+    groupRowDescriptorCache = Object.create(null)
+    groupRowDescriptorCacheVer = ver
+  }
+  const key = String(row.id)
+  let d = groupRowDescriptorCache[key]
+  if (!d) {
+    const groupingColumnId = row.groupingColumnId != null ? row.groupingColumnId : ''
+    const groupingValue = row.getGroupingValue
+      ? row.getGroupingValue(groupingColumnId)
+      : row.groupingValue
+    d = {
+      isGroupRow: true,
+      groupId: row.id,
+      groupingColumnId,
+      groupingValue,
+      leafCount: groupSubRowCount(row),
+    }
+    groupRowDescriptorCache[key] = d
+  }
+  return d
+}
+// cellSlotRow: the #cell slot's `:row=` value. A group-header row gets the stable
+// descriptor above (never the leaked first-leaf record); every other row is unchanged.
+const cellSlotRow = (row) => (rowIsGrouped(row) ? groupRowDescriptor(row) : (row ? row.original : null))
 // groupingKeys: the live ordered grouping array — slot prop for the headless #groupBar + the
 // default styled-token reflection. Reads currentState() ($props.grouping ?? $data.groupingDefault),
 // both reactive sources, so the bar re-renders on a grouping change across all six targets.
@@ -222,4 +284,4 @@ const hasAnyFilterableColumn = () => {
   return false
 }
 
-export { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, displayPageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn }
+export { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, displayPageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupRowDescriptor, cellSlotRow, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn }

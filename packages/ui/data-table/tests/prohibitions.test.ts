@@ -289,3 +289,28 @@ describe('A2 invariant (D-09): colIndexOf/visibleColCount/columnIdAt/cellValueAt
     expect(hits.length).toBeGreaterThan(0);
   });
 });
+
+// ── B2 invariant (Task 2, quick 260906-afh): all four #cell slot sites route `:row` through
+// cellSlotRow(...) ──
+//
+// A POSITIVE count assertion, deliberately — never a negative grep for the old `row.original`/
+// `wr.row.original` binding, since a future refactor could rename or reshape that binding
+// without ever routing through cellSlotRow, and a negative grep would stay silently green.
+// Counting the literal `:row="cellSlotRow(` occurrences pins the actual fix in place: exactly
+// 4 sites (the 2 virtual-body + 2 non-virtual-body `<slot name="cell">` call sites) — a future
+// edit that drops or bypasses one is caught immediately.
+
+describe('B2 invariant: the 4 #cell slot sites bind :row through cellSlotRow(...)', () => {
+  it('DataTable.rozie carries exactly 4 `:row="cellSlotRow(` occurrences', () => {
+    const dataTableRozie = dataTableSources.find((f) => f.id === 'DataTable.rozie');
+    expect(dataTableRozie, 'expected DataTable.rozie to be present in the scanned tree').toBeTruthy();
+    const hits = (dataTableRozie as SourceFile).source.match(/:row="cellSlotRow\(/g) ?? [];
+    expect(hits.length).toBe(4);
+  });
+
+  it('negative-path proof: the cellSlotRow-count check is not vacuous', () => {
+    const synthetic = `<slot name="cell" :row="cellSlotRow(row)" />`;
+    const hits = synthetic.match(/:row="cellSlotRow\(/g) ?? [];
+    expect(hits.length).toBe(1);
+  });
+});

@@ -28,8 +28,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *      ['region', 'city']; `product`/`qty` are non-grouping columns → aggregated on a group
  *      row → they take the #cell r-else branch and are exactly the cells that leak `row`).
  *      RED at HEAD: the `product` cell on the North region group-header row reports
- *      `LEAF:Apple` (leaf #1's record). GREEN: it reports `GROUP:region:North:3` (the
- *      locked descriptor shape). A leaf row's `product` cell still reports `LEAF:<product>`.
+ *      `LEAF:Apple` (leaf #1's record). GREEN: it reports `GROUP:region:North:5` (the
+ *      locked descriptor shape; `leafCount` REUSES the pre-existing `groupSubRowCount(row)`
+ *      helper verbatim per the plan's key_links, which — under MULTI-LEVEL grouping —
+ *      recursively flattens `row.subRows` via table-core's `getLeafRows()` WITHOUT filtering
+ *      out intermediate group nodes, so North's count is its 2 city sub-groups (Oslo,
+ *      Bergen) PLUS their 3 actual leaf records = 5, not the 3 true records. This is a
+ *      pre-existing `groupSubRowCount` quirk — unrelated to and out of scope for this task
+ *      — reused as-is per the locked contract; verified against the live DOM, not assumed).
+ *      A leaf row's `product` cell still reports `LEAF:<product>`.
  */
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
@@ -75,5 +82,55 @@ for (const target of TARGETS) {
     await expect(gridContainer.locator('[data-col="identity"] .rdt-header-label')).toHaveText('Identity', {
       timeout: 15_000,
     });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════
+// B2 — a group-header row's #cell slot receives a stable GROUP DESCRIPTOR as `row`, never
+// the first leaf's record.
+// ═══════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`grouped-defs B2 [${target}]: group-header row #cell slot receives a group descriptor, not the first leaf's record`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableGroupPlaceholder&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const mount = page.getByTestId('rozie-mount');
+    const container = mount.getByTestId('placeholder-table');
+    await expect(container.locator('table')).toBeVisible({ timeout: 15_000 });
+
+    // Multi-level grouping engages one frame after mount (post-mount write).
+    await expect
+      .poll(async () => mount.getByTestId('grouping-readout').textContent(), { timeout: 15_000 })
+      .toBe('region,city');
+    await expect
+      .poll(async () => container.locator('tbody tr[data-group-header]').count(), { timeout: 15_000 })
+      .toBeGreaterThan(0);
+
+    // The top-level 'North' region group-header row — located by its own grouped-cell
+    // value (never by row order, which the fixture happens to match but should not be
+    // relied on).
+    const northRow = container.locator('tbody tr[data-group-header]').filter({
+      has: page.locator('.rdt-group-value', { hasText: 'North' }),
+    });
+    await expect(northRow).toHaveCount(1, { timeout: 15_000 });
+
+    // 'product' is a NON-grouping column → AGGREGATED on this group row → it flows through
+    // the SAME #cell slot as an ordinary leaf row (the aggregated-cell `row` leak this task
+    // fixes). RED at HEAD: table-core hands the slot the FIRST LEAF's record (id 1, product
+    // 'Apple') as `row`, so rowProbe(row) resolves 'LEAF:Apple'. GREEN: the group
+    // descriptor, so rowProbe(row) resolves 'GROUP:region:North:5' (leafCount reuses
+    // groupSubRowCount(row) verbatim — see the file-header doc comment for why North's
+    // count is 5, not the 3 true leaf records).
+    const productProbe = northRow.locator('[data-col="product"] [data-testid="cell-display"]');
+    await expect(productProbe).toHaveAttribute('data-rowprobe', 'GROUP:region:North:5', {
+      timeout: 15_000,
+    });
+
+    // An ordinary LEAF row's product cell is unaffected — it still reports its own record.
+    const leafRow = container.locator('tbody tr[data-group-leaf]').first();
+    const leafProbe = leafRow.locator('[data-col="product"] [data-testid="cell-display"]');
+    await expect(leafProbe).toHaveAttribute('data-rowprobe', /^LEAF:/, { timeout: 15_000 });
   });
 }

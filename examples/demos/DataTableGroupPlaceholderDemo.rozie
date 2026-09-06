@@ -17,8 +17,16 @@
   placeholder city cell is blank ×6 while an aggregated cell stays non-empty. RED pre-fix
   (city cell leaked "Oslo"), GREEN post-fix (blank). DOM assertion only — NOT a PNG cell.
   Static dataset (no clock / no random) for determinism. NO loop var or slot named
-  `cell`/`row`/`header` (the slot binding name is `value`); the grouping model field is
-  `groupingModel` (NOT `grouping`) per the Angular slot-var/signal shadow note.
+  `cell`/`header` (`row` is safe — already used the same way by DataTableColumnVirtualDemo);
+  the grouping model field is `groupingModel` (NOT `grouping`) per the Angular slot-var/
+  signal shadow note.
+
+  B2 (quick 260906-afh): the #cell slot now also destructures `row` and stamps a
+  `data-rowprobe` attribute via `rowProbe(row)` — see the <script> block. This proves what
+  `row` actually IS on a group-header row's AGGREGATED cell (product/qty): pre-fix it is
+  table-core's leaked first-leaf record (`LEAF:<first leaf's product>`); post-fix it is the
+  locked group descriptor (`GROUP:<groupingColumnId>:<groupingValue>:<leafCount>`).
+  data-table-grouped-defs.spec.ts (`grouped-defs B2`) drives this assertion ×6.
 -->
 
 <rozie name="DataTableGroupPlaceholderDemo">
@@ -57,6 +65,19 @@ $onMount(() => {
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(applyGrouping)
   else applyGrouping()
 })
+
+// B2 (quick 260906-afh) probe: reveals WHAT the #cell slot's `row` param actually is on a
+// group-header row. `NOROW` for a null row (defensive — should never happen); `GROUP:` +
+// groupingColumnId + `:` + groupingValue + `:` + leafCount for the locked group descriptor
+// shape; `LEAF:` + r.product otherwise (an ordinary record, r.isGroupRow absent/falsy).
+// Pre-fix table-core hands an aggregated group-row cell the FIRST LEAF's record as `row`,
+// so this resolves to `LEAF:<first leaf's product>` even on a group-header row — the leak
+// this task fixes.
+const rowProbe = (r: any): string => {
+  if (r == null) return 'NOROW'
+  if (r.isGroupRow === true) return 'GROUP:' + r.groupingColumnId + ':' + r.groupingValue + ':' + r.leafCount
+  return 'LEAF:' + r.product
+}
 </script>
 
 <template>
@@ -82,8 +103,8 @@ $onMount(() => {
            real rolled-up value (3+5+2 = 10 for North), proving aggregated cells still render
            through the #cell r-else (unchanged by the placeholder-blank fix). -->
       <Column field="qty" header="Qty" aggregationFn="sum" />
-      <template #cell="{ value }">
-        <span data-testid="cell-display">{{ value }}</span>
+      <template #cell="{ value, row }">
+        <span data-testid="cell-display" :data-rowprobe="rowProbe(row)">{{ value }}</span>
       </template>
     </DataTable>
   </div>
