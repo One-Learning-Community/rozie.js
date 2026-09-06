@@ -111,9 +111,13 @@ describe('ROZ138 corpus precision (quick task 260829-8w1)', () => {
       .sort();
     expect(survivorSet).toEqual(
       [
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:567',
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:570',
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:571',
+        // Quick 260906-cvo (C1): shifted from 567/570/571 by the corrected
+        // gridKeydownHandlers.rzts comment above this cluster (the now-false "verified
+        // invariant" claim was replaced with the actual isActiveCellEditable/
+        // rowIndexIsGrouped mechanism) — same 3 sites, same semantics, +7 lines.
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:574',
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:577',
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:578',
       ].sort(),
     );
   });

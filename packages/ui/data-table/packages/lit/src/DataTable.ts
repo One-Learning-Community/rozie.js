@@ -5,7 +5,7 @@ import { RozieSlotDistributor, createLitControllableProperty, rozieAttr, rozieDi
 import { ContextProvider, createContext } from '@lit/context';
 import { repeat } from 'lit/directives/repeat.js';
 import '@rozie-ui/popover-lit';
-import { isSafeKey, wrapAggregationFn, indexDefsById } from './helpers/columnDefUtils';
+import { isSafeKey, wrapAggregationFn, indexDefsById, collectGroupableLeafDefs } from './helpers/columnDefUtils';
 import { applyUpdater, clamp, focusables } from './helpers/indexMath';
 import { escapeTsvField, parseTsv, tileGridToBox, tileIndex } from './helpers/tsvGrid';
 import { replaceRowValue, indexOfRowIn, replaceRowValues } from './helpers/rowValueUtils';
@@ -1335,7 +1335,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
         
         ${this.isExpanderColumn(cell.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.rowCanExpand(wr.row) ? html`<button class="rdt-expander" type="button" data-expander="" aria-expanded=${!!this.rowIsExpanded(wr.row)} aria-label=${rozieAttr(this.rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row')} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onToggleExpand(wr.row, $event); }} data-rozie-s-d5dcab4c>${rozieDisplay(this.rowIsExpanded(wr.row) ? '▾' : '▸')}</button>` : nothing}</span>` : this.isSelectColumn(cell.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-          ${this.selectCell !== undefined ? this.selectCell({row: wr.row.original, checked: this.rowIsSelected(wr.row), toggle: e => this.onToggleRow(wr.row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: wr.row.original, checked: this.rowIsSelected(wr.row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(wr.row, e)) as (...args: any[]) => any)($event.detail)}>
+          ${this.selectCell !== undefined ? this.selectCell({row: this.cellSlotRow(wr.row), checked: this.rowIsSelected(wr.row), toggle: e => this.onToggleRow(wr.row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: this.cellSlotRow(wr.row), checked: this.rowIsSelected(wr.row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(wr.row, e)) as (...args: any[]) => any)($event.detail)}>
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" ?checked=${this.rowIsSelected(wr.row)} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c />
           </slot>`}
         </span>` : this.cellIsGrouped(cell) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
@@ -1346,7 +1346,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
           <span class="rdt-group-count" data-rozie-s-d5dcab4c>${rozieDisplay('(' + this.groupSubRowCount(wr.row) + ')')}</span>
         </span>` : this.isEditing(wr.vi.index, this.colIndexOf(wr.row, cell)) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.hasEditorSlot(cell.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: wr.row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: wr.row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}); } catch { return '{}'; } })()}></slot>`}
+            ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(wr.row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(wr.row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}); } catch { return '{}'; } })()}></slot>`}
           </span>` : this.editorTypeOf(cell.column.id) === 'number' ? html`<input class="rdt-cell-editor" type="number" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : this.editorTypeOf(cell.column.id) === 'select' ? html`<select class="rdt-cell-editor" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c>
             ${repeat<any>(this.editorOptionsOf(cell.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option value=${rozieAttr(opt.value)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
           </select>` : this.editorTypeOf(cell.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${this.editorCheckedFor(cell.column.id)} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorCheckbox(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : this.cellIsPlaceholder(cell) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
@@ -1416,7 +1416,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
         
         ${this.isExpanderColumn(cell.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.rowCanExpand(row) ? html`<button class="rdt-expander" type="button" data-expander="" aria-expanded=${!!this.rowIsExpanded(row)} aria-label=${rozieAttr(this.rowIsExpanded(row) ? 'Collapse row' : 'Expand row')} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onToggleExpand(row, $event); }} data-rozie-s-d5dcab4c>${rozieDisplay(this.rowIsExpanded(row) ? '▾' : '▸')}</button>` : nothing}</span>` : this.isSelectColumn(cell.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-          ${this.selectCell !== undefined ? this.selectCell({row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: row.original, checked: this.rowIsSelected(row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(row, e)) as (...args: any[]) => any)($event.detail)}>
+          ${this.selectCell !== undefined ? this.selectCell({row: this.cellSlotRow(row), checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: this.cellSlotRow(row), checked: this.rowIsSelected(row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(row, e)) as (...args: any[]) => any)($event.detail)}>
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" ?checked=${this.rowIsSelected(row)} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />
           </slot>`}
         </span>` : this.cellIsGrouped(cell) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
@@ -1427,7 +1427,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
           <span class="rdt-group-count" data-rozie-s-d5dcab4c>${rozieDisplay('(' + this.groupSubRowCount(row) + ')')}</span>
         </span>` : this.isEditing(this.rowIndexOf(row), this.colIndexOf(row, cell)) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.hasEditorSlot(cell.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}); } catch { return '{}'; } })()}></slot>`}
+            ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}); } catch { return '{}'; } })()}></slot>`}
           </span>` : this.editorTypeOf(cell.column.id) === 'number' ? html`<input class="rdt-cell-editor" type="number" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : this.editorTypeOf(cell.column.id) === 'select' ? html`<select class="rdt-cell-editor" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c>
             ${repeat<any>(this.editorOptionsOf(cell.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option value=${rozieAttr(opt.value)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
           </select>` : this.editorTypeOf(cell.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${this.editorCheckedFor(cell.column.id)} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorCheckbox(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : this.cellIsPlaceholder(cell) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
@@ -3951,6 +3951,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // rowIsGrouped: this flattened row is a group-header row.
   rowIsGrouped = (row: any) => !!(this.tick() >= 0 && row && row.getIsGrouped && row.getIsGrouped());
 
+  // rowIndexIsGrouped (quick 260906-cvo, C1/C2): THE single row-level editability/writability
+  // predicate — a group-header row is a SYNTHETIC row whose `original` is table-core's
+  // `leafRows[0].original` (the same fact cellSlotRow's header comment documents), so any
+  // edit or bulk write resolved through it silently lands on an UNRELATED record. Every edit/
+  // write guard in this component calls THIS predicate — never a re-implemented inline
+  // `getIsGrouped()` check — so the invariant has one definition. Indexes into the SAME
+  // `$data.rows` flattened row list rowIsGrouped reads.
+  rowIndexIsGrouped = (rowIndex: any) => this.rowIsGrouped((this._rows.value || [])[rowIndex]);
+
   // groupingActive: grouping is currently engaged (a non-empty ordered key list). Drives the
   // data-group-leaf marker so it is ABSENT when ungrouped (byte-identical-off, req-10).
   groupingActive = () => this.tick() >= 0 && (this.currentState().grouping || []).length > 0;
@@ -3979,13 +3988,31 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // the group chrome re-derives on a re-pull on the fine-grained targets (Solid/Lit).
   cellIsPlaceholder = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder());
 
-  // groupSubRowCount: the number of underlying LEAF RECORDS under a group-header row (the count
-  // shown in the header, e.g. "North (40)"). row.subRows is the IMMEDIATE members — for MULTI-LEVEL
-  // grouping those are sub-GROUPS, not records, so "North" with 2 categories / 40 records would show
-  // "North (2)". getLeafRows() returns all leaf descendants (the actual record count); keep the
-  // subRows fallback for safety. Single-level grouping is unchanged (getLeafRows == subRows when the
-  // children are already leaves).
-  groupSubRowCount = (row: any) => row && row.getLeafRows ? row.getLeafRows().length : row && row.subRows ? row.subRows.length : 0;
+  // groupSubRowCount: the number of underlying TRUE LEAF RECORDS under a group-header row (the
+  // count shown in the header, e.g. "North (40)"). row.subRows is the IMMEDIATE members — for
+  // MULTI-LEVEL grouping those are sub-GROUPS, not records, so "North" with 2 categories / 40
+  // records would show "North (2)" off subRows alone. row.getLeafRows() is table-core's
+  // `flattenBy(row.subRows, d => d.subRows)` (ColumnGrouping.js / utils.js, verified against
+  // @tanstack/table-core@8.21.3) — it pushes EVERY node it walks, INCLUDING intermediate group
+  // nodes, so under multi-level grouping it over-counts by exactly the number of sub-group
+  // nodes between the row and its true leaves (C4, quick 260906-cvo: North with 2 city
+  // sub-groups + 3 records reported 5, not 3). `row.getIsGrouped()` is `!!row.groupingColumnId`
+  // — precisely the predicate that separates a group node from a real record — so filter the
+  // flattened list on it rather than hand-rolling a recursive `subRows` walk (getLeafRows()
+  // already flattens; the defect is purely that it does not filter). Single-level grouping is
+  // numerically UNCHANGED: a leaf row has no `subRows`, so no node was ever miscounted there.
+  groupSubRowCount = (row: any) => {
+  if (row && row.getLeafRows) {
+    const leaves = row.getLeafRows();
+    let n = 0;
+    for (let i = 0; i < leaves.length; i++) {
+      const r = leaves[i];
+      if (!(r && r.getIsGrouped && r.getIsGrouped())) n = n + 1;
+    }
+    return n;
+  }
+  return row && row.subRows ? row.subRows.length : 0;
+};
 
   // ── B2 (quick 260906-afh) — group-header row #cell slot descriptor ─────────────────────
   // PROBLEM: table-core builds a flattened group-header row via
@@ -4046,14 +4073,18 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // both reactive sources, so the bar re-renders on a grouping change across all six targets.
   groupingKeys = () => this.currentState().grouping || [];
 
-  // groupableColumns: the data columns OFFERED to the headless #groupBar (those whose Column/config
-  // `groupable` is not false) — `[{ id, label }]`. Excludes the chrome columns (select/expander are
-  // not in columnDefs()). The consumer builds any bar/drag UI from this; the component ships none.
+  // groupableColumns: the data columns OFFERED to the headless #groupBar — `[{ id, label }]`.
+  // Excludes the chrome columns (select/expander are not in columnDefs()). C5+C6 (quick
+  // 260906-cvo): delegates the actual walk to collectGroupableLeafDefs (columnDefUtils.ts) —
+  // a GROUP column (a `columns:` group's own entry) is NEVER offered (it has no accessor and
+  // cannot produce a grouping value, regardless of any `groupable` flag on it), and every
+  // groupable NESTED leaf (a `columns:` group child, opted out via `groupable: false` like any
+  // top-level leaf) IS offered, in declaration order. The consumer builds any bar/drag UI from
+  // this; the component ships none.
   groupableColumns = () => {
   const out = [];
-  const defs = this.columnDefs();
+  const defs = collectGroupableLeafDefs(this.columnDefs());
   for (const d of defs as any) {
-    if (!d || d.groupable === false) continue;
     out.push({
       id: d.id,
       label: d.header != null ? d.header : d.id
@@ -5065,11 +5096,18 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     return;
   }
   // ── C2 (phase 63 wave-8): Enter on a GROUP-HEADER cell toggles that group's collapse/
-  // expand (APG treegrid). A group cell is NON-editable (isActiveCellEditable=false, the
-  // verified invariant) so it never hits the edit branches above and would otherwise fall to
-  // enterControl() — which merely FOCUSES the group-toggle button (requiring a second key).
-  // Route it to the SAME onToggleExpand path the chevron uses (group rows ride the expand
-  // model) so one Enter toggles the group. Body cells only (a header-active Enter is unchanged);
+  // expand (APG treegrid). C1 (quick 260906-cvo) CORRECTION: the comment here used to claim
+  // "a group cell is non-editable" as "the verified invariant" — that was FALSE AS WRITTEN.
+  // It held only for the grouping column's OWN cell (cellIsGrouped's branch renders before
+  // the editor branch); a non-grouping EDITABLE column's cell on a group row fell straight
+  // through the branch chain to isEditing(...) and opened an editor (the C1 defect this
+  // quick task closed). What is now TRUE, and WHY: isActiveCellEditable() carries an
+  // explicit rowIndexIsGrouped(...) row guard (filterPaginationRowChrome.rzts), so EVERY
+  // editable column's cell on a group row is non-editable — that is what makes the four
+  // edit-entry branches above fall through to this one, not an incidental property of the
+  // grouping column alone. Route it to the SAME onToggleExpand path the chevron uses (group
+  // rows ride the expand model) so one Enter toggles the group. Body cells only (a
+  // header-active Enter is unchanged);
   // ($data.rows || [])[$data.activeRow] is the active flattened row (page-relative non-virtual /
   // full-model virtual — both index $data.rows). Placed BEFORE the reserved enterControl branch.
   else if (key === 'Enter' && !this._activeIsHeader.value && this.rowIsGrouped((this._rows.value || [])[this._activeRow.value])) {
@@ -5866,6 +5904,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // rangeToTsv(): serialize the current range to TSV — rows joined by '\n', cells by '\t',
   // reading each cell's value off the visible model by index (cellValueAt). A single active
   // cell (no range) serializes that one cell. Each field is B10-escaped. Pure read — never writes.
+  // C2 (quick 260906-cvo) — DELIBERATE NON-CHANGE: this is a READ, unlike applyGridToRange's
+  // write funnel, and stays UNGUARDED for a group-header row on purpose. cellValueAt reads the
+  // column's DISPLAYED aggregate value on a group row (table-core's cell.getValue()), which is
+  // exactly what the user sees — serializing it is correct behavior, not a leak. Do not "fix"
+  // this asymmetry; it is intentional.
   rangeToTsv = () => {
   const box = this.normalizedRange();
   const r0 = box ? box.r0 : this._activeRow.value;
@@ -5919,11 +5962,22 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   for (let gr = 0; gr < grid.length; gr++) {
     const r = originRow + gr;
     if (r > maxRow) break;
+    // C2 (quick 260906-cvo) — hoisted ONCE per ROW (never per cell): a group-header row's
+    // `original` is table-core's `leafRows[0].original` (a synthetic row), so a write
+    // resolved through it silently lands on an unrelated record. This ONE placement closes
+    // pasteRange, cutRange, clearActiveRange AND fillRange — all four build a grid and hand
+    // it to this single funnel, so guarding the four callers individually would be four
+    // chances to miss one.
+    const rowGrouped = this.rowIndexIsGrouped(r);
     const cols = grid[gr] || [];
     for (let gc = 0; gc < cols.length; gc++) {
       const c = originCol + gc;
       if (c > maxCol) break;
+      // A group-row cell still counts toward `total` — it is a skipped TARGET, exactly like
+      // a non-editable or validator-rejected cell — so the "N of M cells pasted" / "no cells
+      // pasted" announce keeps its existing semantics (never silently under-reports M).
       total = total + 1;
+      if (rowGrouped) continue;
       const colId = this.columnIdAt(r, c);
       if (colId == null || !this.columnEditable(colId)) continue;
       const rowObj = this.rowOriginalAt(r);
@@ -6445,7 +6499,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // isActiveCellEditable: the active cell sits in an editable column AND is a body cell
   // (req-1). Gates the F2/Enter/printable edit-entry branches in onGridKeyDown; a
   // non-editable active cell falls through to the reserved enterControl path.
+  // C1 (quick 260906-cvo) — Layer 1: a group-header row is NEVER editable, regardless of
+  // column. This is the single highest-value guard in the cluster: it closes Shift+F2, the
+  // checkbox toggle, and the F2/Enter/printable edit-entry branches in ONE edit (they are all
+  // `else if` branches gated on this predicate), AND restores fallthrough so Enter on a group
+  // row reaches the group-toggle branch below them instead of opening an editor.
   isActiveCellEditable = () => {
+  if (this.rowIndexIsGrouped(this._activeRow.value)) return false;
   const colId = this.activeCellColumnId();
   return colId != null && this.columnEditable(colId);
 };
@@ -6463,6 +6523,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // non-virtual, wr.vi.index virtual).
   isEditing = (rowIndex: any, colIndex: any) => {
   if (this._editVer.value < 0) return false;
+  // C1 (quick 260906-cvo) — Layer 6: the ONLY layer whose reachability does not depend on a
+  // keystroke. Editing state is INDEX-based over the visible model, and nothing clears it
+  // when the row model re-derives — a consumer that changes the grouping model WHILE a cell
+  // editor is open can move a group-header row under the index $data.editingRow/
+  // editingRowIndex still holds, rendering the editor on a group row with no beginEdit
+  // involved. Placed AFTER the editVer read (preserves the Svelte/Solid re-derivation
+  // discipline the header comment above documents).
+  if (this.rowIndexIsGrouped(rowIndex)) return false;
   if (this._editingRowIndex.value != null && this._editingRowIndex.value === rowIndex) {
     const colId = this.columnIdAt(rowIndex, colIndex);
     return colId != null && this.columnEditable(colId);
@@ -6640,6 +6708,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // $data) so a Tab-advance that just setState'd activeRow/Col works on React. Clears any
   // prior invalid state. Focus moves into the editor.
   beginEdit = (rowIndex: any, colIndex: any, seed: any) => {
+  // C1 (quick 260906-cvo) — Layer 2: closes the `onGridClick` (singleClickEdit) path, which
+  // calls beginEdit directly gated ONLY on columnEditable — isActiveCellEditable (Layer 1)
+  // does not run on that path at all.
+  if (this.rowIndexIsGrouped(rowIndex)) return;
   const colId = this.columnIdAt(rowIndex, colIndex);
   if (colId == null || !this.columnEditable(colId)) return;
   // A new edit session starts — reset the sync idempotency latch so THIS session's eventual
@@ -6850,6 +6922,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // editor:'checkbox' columns only (Space/Enter/F2), full-row edit mode is unaffected (the
   // editingRowIndex early return in onGridKeyDown already excludes it).
   toggleActiveBooleanCell = () => {
+  // C1 (quick 260906-cvo) — Layer 4: the only write funnel bypassing both beginEdit/
+  // commitEdit and applyGridToRange. Reachable today only through the Layer-1-gated
+  // checkbox branch, so this line is redundant AT HEAD — it earns its place by making "no
+  // write ever targets a group row" a property of the write funnels themselves.
+  if (this.rowIndexIsGrouped(this._activeRow.value)) return;
   const colId = this.columnIdAt(this._activeRow.value, this._activeColIndex.value);
   if (colId == null || !this.columnEditable(colId)) return;
   const rowList = this._rows.value || [];
@@ -6981,6 +7058,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   beginRowEdit = (row: any) => {
   const rowIndex = this.rowIndexOf(row);
   if (rowIndex < 0) return;
+  // C1 (quick 260906-cvo) — Layer 5: a second, independent editing-state funnel that takes a
+  // row OBJECT from its caller. Reachable today only via Shift+F2 (Layer 1), so also
+  // redundant at HEAD; kept for the same reason as Layer 4 — it is a mutation entry point,
+  // and the natural call site for a future #rowActions "Edit" drop-in button.
+  if (this.rowIndexIsGrouped(rowIndex)) return;
   const editable = this.editableColumnsForRow(rowIndex);
   if (editable.length === 0) return;
   // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).

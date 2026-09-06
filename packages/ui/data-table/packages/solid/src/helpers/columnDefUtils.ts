@@ -75,4 +75,37 @@ const indexDefsById = (defs: any): any => {
   return out
 }
 
-export { isSafeKey, wrapAggregationFn, collectNestedDefs, indexDefsById }
+// ── C5+C6 (quick 260906-cvo) — groupable-leaf collection for the #groupBar ──────────────
+// C5: buildConfigDef's GROUP branch (columnBuilders.rzts) returns `{ id, header, columns }`
+// with NO `groupable` key and no accessor, so the OLD `groupableColumns()` loop's
+// `d.groupable === false` skip never fired for a group column — it was wrongly OFFERED to
+// the bar even though a group column can never produce a grouping value.
+// C6: that same loop walked TOP-LEVEL `columnDefs()` entries only, so a genuinely groupable
+// NESTED leaf (a `columns:` group child) was never offered at all.
+//
+// collectGroupableLeafDefs: a DEDICATED depth-first walk, NOT a reuse of `indexDefsById`.
+// `indexDefsById` is a LOOKUP index — it deliberately registers group columns too (a group
+// id must keep resolving for `defFor`), and its insertion order is all-top-level-first-then-
+// nested, which would both offer group columns AND hand the group bar an order that does not
+// match the rendered header order. This walk instead: recurses into a `columns:` array
+// WITHOUT ever pushing the group entry itself (closes C5 — a group column has no accessor
+// and cannot be a grouping target, so an explicit `groupable: true` on a group entry is
+// meaningless and is likewise never pushed); pushes every other (leaf) entry unless it opts
+// out via `groupable === false` (closes C6 — nested leaves are now reachable); walks in
+// DECLARATION order, depth-first, matching the rendered header order.
+const collectGroupableLeafDefs = (defs: any): any[] => {
+  const out: any[] = []
+  if (!Array.isArray(defs)) return out
+  for (const d of defs) {
+    if (!d) continue
+    if (Array.isArray(d.columns)) {
+      out.push(...collectGroupableLeafDefs(d.columns))
+      continue
+    }
+    if (d.groupable === false) continue
+    out.push(d)
+  }
+  return out
+}
+
+export { isSafeKey, wrapAggregationFn, collectNestedDefs, indexDefsById, collectGroupableLeafDefs }
