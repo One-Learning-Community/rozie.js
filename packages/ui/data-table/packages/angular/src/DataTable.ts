@@ -4,7 +4,7 @@ import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, ro
 
 import { Popover } from '@rozie-ui/popover-angular';
 
-import { isSafeKey, wrapAggregationFn } from './helpers/columnDefUtils';
+import { isSafeKey, wrapAggregationFn, indexDefsById } from './helpers/columnDefUtils';
 import { applyUpdater, clamp, focusables } from './helpers/indexMath';
 import { escapeTsvField, parseTsv, tileGridToBox, tileIndex } from './helpers/tsvGrid';
 import { replaceRowValue, indexOfRowIn, replaceRowValues } from './helpers/rowValueUtils';
@@ -274,7 +274,7 @@ interface DetailCtx {
               <button type="button" class="rdt-expander rdt-group-toggle" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(wr.row)" [attr.aria-label]="rozieAttr(rowIsExpanded(wr.row) ? 'Collapse group' : 'Expand group')" (click)="onToggleExpand(wr.row, $event)">{{ rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸') }}</button>
               <span class="rdt-group-value">
                 @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
-    <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }" />
+    <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }" />
     } @else {
     {{ rozieDisplay(cell.getValue()) }}
     }
@@ -305,7 +305,7 @@ interface DetailCtx {
     } @else {
     <span class="rdt-cell-value">
               @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
-    <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }" />
+    <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }" />
     } @else {
     {{ rozieDisplay(cell.getValue()) }}
     }
@@ -449,7 +449,7 @@ interface DetailCtx {
               <button type="button" class="rdt-expander rdt-group-toggle" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(row)" [attr.aria-label]="rozieAttr(rowIsExpanded(row) ? 'Collapse group' : 'Expand group')" (click)="onToggleExpand(row, $event)">{{ rozieDisplay(rowIsExpanded(row) ? '▾' : '▸') }}</button>
               <span class="rdt-group-value">
                 @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
-    <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }" />
+    <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }" />
     } @else {
     {{ rozieDisplay(cell.getValue()) }}
     }
@@ -480,7 +480,7 @@ interface DetailCtx {
     } @else {
     <span class="rdt-cell-value">
               @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
-    <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }" />
+    <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }" />
     } @else {
     {{ rozieDisplay(cell.getValue()) }}
     }
@@ -1765,6 +1765,12 @@ export class DataTable {
   columnDefsCache: any[] | null = null;
   columnDefsCacheColumnsRef: any = undefined;
   columnDefsCacheColRegRef: any = undefined;
+  // B1 (quick 260906-afh) — the def-lookup index, populated INSIDE this SAME memo block on
+  // a cache MISS only (never rebuilt per call — a per-call recursive scan would restore the
+  // O(N^2 x M) blowup D-23 removed, T-AFH-03). A top-level `let` lowers to a per-instance
+  // `useRef` on React (verified in the emitted leaf), so this is instance-scoped like
+  // columnDefsCache above.
+  columnDefsIndexCache: any = null;
   columnDefs = () => {
     const __columns = this.columns();
     const __colReg = this.colReg();
@@ -1815,7 +1821,17 @@ export class DataTable {
     this.columnDefsCache = out;
     this.columnDefsCacheColumnsRef = __columns;
     this.columnDefsCacheColRegRef = __colReg;
+    this.columnDefsIndexCache = indexDefsById(out);
     return out;
+  };
+  // defIndex: the def-lookup map for the CURRENT columnDefs() array. Calling columnDefs()
+  // first is deliberate — either an O(1) reference-equality cache hit (columnDefsIndexCache
+  // is already fresh) or a miss that repopulates BOTH slots together, so the index can never
+  // go stale relative to the array. Falls back to an empty null-prototype map (never null/
+  // undefined) so a caller can read it unconditionally.
+  defIndex = () => {
+    this.columnDefs();
+    return this.columnDefsIndexCache || Object.create(null);
   };
   // The constant id of the auto-injected leading checkbox column (D-04). Distinct from
   // any consumer column id (the registry/config guard never produces a leading "__").
@@ -3417,10 +3433,18 @@ export class DataTable {
   };
   // Template helpers reading the resolved column-def metadata by id (plain fns — used
   // in template predicates + interpolation; uniform on all 6, no $computed alias trap).
+  // B1 (quick 260906-afh): reads the O(1) def-lookup index (defIndex(), columnBuilders.rzts)
+  // instead of linearly scanning columnDefs() — which only ever held TOP-LEVEL entries, so a
+  // NESTED group leaf (a `columns:` group child) was invisible to every caller (headerLabel,
+  // columnIsFilterable, editMetaOf/columnEditable/editorTypeOf/editorOptionsOf) and silently
+  // took the "no def" fallback. defIndex() resolves both top-level AND nested leaf ids. This
+  // also removes the per-cell O(N) scan D-23 left in place — defIndex() is memoized in the
+  // SAME cache-invalidation block as columnDefs() itself, never rebuilt per call.
   defFor = (colId: any) => {
-    const defs = this.columnDefs();
-    for (const d of defs as any) if (d.id === colId) return d;
-    return null;
+    if (colId == null) return null;
+    const idx = this.defIndex();
+    const d = idx[String(colId)];
+    return d != null ? d : null;
   };
   // Per-row visible cells for the body loop. table-core memoizes row objects by id,
   // so a re-pull after a column change (visibility/reorder/pin, or the late <Column>
@@ -3751,11 +3775,20 @@ export class DataTable {
   // Art). A placeholder cell (neither) falls through to the #cell r-else and renders its empty value.
   cellIsGrouped = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped());
   cellIsAggregated = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated());
-  // cellIsPlaceholder: a PLACEHOLDER cell on a group-header row — a non-grouped, non-aggregated
-  // cell that table-core fills with the FIRST leaf row's value (cell.getValue() leaks e.g.
-  // "Services"/"Edsger Dijkstra" onto the group line). Renders BLANK via a dedicated empty
-  // template branch so the leaked leaf value never paints. Tick-gated exactly like cellIsGrouped
-  // so the group chrome re-derives on a re-pull on the fine-grained targets (Solid/Lit).
+  // cellIsPlaceholder: VERIFIED against @tanstack/table-core@8.21.3 (ColumnGrouping.js:120-121,
+  // quick 260906-afh premise correction). A placeholder cell is a cell IN A GROUPING COLUMN
+  // that is NOT the row's OWN grouping column — `!cell.getIsGrouped() && column.getIsGrouped()`.
+  // That is true both on a group-header row (for every OTHER grouping column) and on every leaf
+  // row (for every grouping column) — it is NOT "never true on a group-header row" and it is NOT
+  // "any non-grouped, non-aggregated cell". The operative consequence for this component: a
+  // placeholder can only EVER be a grouping-column cell, so this branch can never reach a
+  // non-grouping column — it does NOT and CANNOT guard the AGGREGATED-cell `row` leak
+  // (cellSlotRow, below) fixes. Where it DOES apply (e.g. under multi-level grouping, the
+  // OTHER grouping column on a group-header row), table-core still fills cell.getValue() with
+  // the FIRST leaf row's value (cell.getValue() leaks e.g. "Oslo" onto a region-level group
+  // line whose grouping is 'region', not 'city'); this branch renders BLANK via a dedicated
+  // empty template so that leaked value never paints. Tick-gated exactly like cellIsGrouped so
+  // the group chrome re-derives on a re-pull on the fine-grained targets (Solid/Lit).
   cellIsPlaceholder = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder());
   // groupSubRowCount: the number of underlying LEAF RECORDS under a group-header row (the count
   // shown in the header, e.g. "North (40)"). row.subRows is the IMMEDIATE members — for MULTI-LEVEL
@@ -3764,6 +3797,56 @@ export class DataTable {
   // subRows fallback for safety. Single-level grouping is unchanged (getLeafRows == subRows when the
   // children are already leaves).
   groupSubRowCount = (row: any) => row && row.getLeafRows ? row.getLeafRows().length : row && row.subRows ? row.subRows.length : 0;
+  // ── B2 (quick 260906-afh) — group-header row #cell slot descriptor ─────────────────────
+  // PROBLEM: table-core builds a flattened group-header row via
+  // `createRow(table, id, leafRows[0].original, …)` (getGroupedRowModel.js), so `row.original`
+  // on a group row IS the FIRST LEAF's record. The #cell scoped slot's existing 4 call sites
+  // all bound `:row="row.original"` (or `wr.row.original`), so an AGGREGATED cell (a
+  // non-grouping column on a group row — cellIsGrouped()===false, cellIsPlaceholder()===false,
+  // so it takes the #cell r-else branch, same as any ordinary leaf cell) silently handed a
+  // consumer template the WRONG record's fields (T-AFH-05). The grouped cell itself (the
+  // group's own column, .rdt-group-value) has the same #cell binding and the same leak.
+  //
+  // FIX: `cellSlotRow(row)` returns a STABLE GROUP DESCRIPTOR — never `row.original` — for a
+  // group-header row, and `row.original` unchanged for every other row. The descriptor is an
+  // OBJECT, never `null` (T-AFH-06 — a consumer already reading `row.foo` would throw on
+  // Vue/Angular if handed null).
+  //
+  // Descriptor cache (T-AFH-02/T-AFH-04): a null-prototype map keyed on `String(row.id)`,
+  // invalidated wholesale whenever `$data.rowModelVer` (bumped by every refreshRowModel, the
+  // SAME reactive re-derivation discipline visibleCellsFor/rowIsGrouped use) differs from the
+  // generation the map was built for — so the descriptor's REFERENCE IDENTITY is stable
+  // across every cell of one group row within a row-model generation (an unstable reference
+  // would thrash the fine-grained targets, Solid/Lit) and refreshed the moment the grouping
+  // changes. Group row ids are built from consumer grouping VALUES, so the map MUST be
+  // null-prototype — a `__proto__` grouping value must not reach Object.prototype.
+  groupRowDescriptorCache: any = null;
+  groupRowDescriptorCacheVer: any = undefined;
+  groupRowDescriptor = (row: any) => {
+    const ver = this.rowModelVer();
+    if (!this.groupRowDescriptorCache || this.groupRowDescriptorCacheVer !== ver) {
+      this.groupRowDescriptorCache = Object.create(null);
+      this.groupRowDescriptorCacheVer = ver;
+    }
+    const key = String(row.id);
+    let d = this.groupRowDescriptorCache[key];
+    if (!d) {
+      const groupingColumnId = row.groupingColumnId != null ? row.groupingColumnId : '';
+      const groupingValue = row.getGroupingValue ? row.getGroupingValue(groupingColumnId) : row.groupingValue;
+      d = {
+        isGroupRow: true,
+        groupId: row.id,
+        groupingColumnId,
+        groupingValue,
+        leafCount: this.groupSubRowCount(row)
+      };
+      this.groupRowDescriptorCache[key] = d;
+    }
+    return d;
+  };
+  // cellSlotRow: the #cell slot's `:row=` value. A group-header row gets the stable
+  // descriptor above (never the leaked first-leaf record); every other row is unchanged.
+  cellSlotRow = (row: any) => this.rowIsGrouped(row) ? this.groupRowDescriptor(row) : row ? row.original : null;
   // groupingKeys: the live ordered grouping array — slot prop for the headless #groupBar + the
   // default styled-token reflection. Reads currentState() ($props.grouping ?? $data.groupingDefault),
   // both reactive sources, so the bar re-renders on a grouping change across all six targets.

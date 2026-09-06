@@ -732,20 +732,22 @@ for (const target of TARGETS) {
 // `pageSize: 10`) therefore renders rows 0-9 only; row5 (not row10) is this case's paste
 // destination so both source and destination stay on the SAME page with no pagination nav.
 //
-// COMMIT COUNT IS 49, NOT 54 — a genuine, PRE-EXISTING, orthogonal finding discovered while
-// authoring this exact case (logged in full to deferred-items.md): `columnDefs()`
-// (`columnBuilders.rzts`) flattens the `:columns` config array's TOP-LEVEL entries into its
+// COMMIT COUNT IS 54 (quick 260906-afh, B1 FIXED — was 49 pre-fix). The PRE-EXISTING finding
+// this case originally documented (87-06, logged to deferred-items.md): `columnDefs()`
+// (`columnBuilders.rzts`) flattened the `:columns` config array's TOP-LEVEL entries into its
 // `byId` lookup map, but a GROUP entry (`Array.isArray(c.columns)`, e.g. this fixture's
-// "Group A" spanning leaf cols 10-14) is stored ONLY under its OWN group id — its children are
-// nested inside `columns` and never separately added to `byId`. `defFor(colId)` therefore
-// returns `null` for any grouped LEAF column, so `columnEditable()` is unconditionally `false`
-// for cols 10-14 regardless of their own `cfg.editable = true` — 54 declared-editable columns
-// minus the 5 grouped ones = 49 actually written. This is NOT a windowing bug and NOT caused
-// by this plan's `files_modified` (`columnBuilders.rzts`/`columnChrome.rzts` are untouched) —
-// it would reproduce identically with NO virtualization at all. Neither col2 nor col55 (this
-// case's own off-window-reachability proof) is inside the group, so the D-08/D-09 claim this
-// case exists to prove is unaffected; asserting 49 here (not the naively-expected 54) is
-// documenting the true committed count, not weakening the case's actual claim.
+// "Group A" spanning leaf cols 10-14) was stored ONLY under its OWN group id — its children
+// were nested inside `columns` and never separately added to `byId`. `defFor(colId)` therefore
+// returned `null` for any grouped LEAF column, so `columnEditable()` was unconditionally
+// `false` for cols 10-14 regardless of their own `cfg.editable = true` — 54 declared-editable
+// columns minus the 5 grouped ones = 49 actually written. That was a genuine, orthogonal
+// defect (B1) — not caused by column virtualization (it reproduced identically with no
+// windowing at all) and not caused by THIS plan's `files_modified` at the time. `defFor` now
+// resolves nested leaves via the O(1) `defIndex()` (columnBuilders.rzts/columnChrome.rzts,
+// quick 260906-afh), so cols 10-14 are correctly recognized as editable — all 54
+// declared-editable columns in the copied range are now genuinely written. Neither col2 nor
+// col55 (this case's own off-window-reachability proof) is inside the group, so the D-08/D-09
+// claim this case exists to prove was never affected either way.
 // ═══════════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
   runnerFor(target)(`data-table-grid-column-virtual [${target}]: D-08/D-09 copying columns 2-55 and pasting into another row reproduces the off-window values (col55 included)`, async ({
@@ -793,10 +795,9 @@ for (const target of TARGETS) {
       .toBe('2');
     await page.keyboard.press('Control+v');
     // Paste is async (navigator.clipboard.readText()) — poll the commit counter rather than a
-    // fixed wait. 49, not 54 — see the header comment above (5 grouped leaf columns, 10-14,
-    // are unconditionally non-editable via a genuine, pre-existing, orthogonal columnDefs()
-    // gap, logged to deferred-items.md).
-    await expect.poll(async () => readoutText(page, 'commit-count'), { timeout: 15_000 }).toBe('49');
+    // fixed wait. 54 (quick 260906-afh, B1 fixed) — see the header comment above (the 5 grouped
+    // leaf columns, 10-14, are now correctly recognized as editable via defIndex()).
+    await expect.poll(async () => readoutText(page, 'commit-count'), { timeout: 15_000 }).toBe('54');
     await scrollGridFullyRight(page);
     await page.waitForTimeout(300);
     const col2Text = await page.evaluate(() => {
