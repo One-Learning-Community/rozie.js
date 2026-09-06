@@ -860,7 +860,7 @@ let expandedTouched = false
 
 import { groupingActiveDefault, currentState, currentData } from './stateAssembly.rzts'
 
-import { isSafeKey, wrapAggregationFn, columnDefs, SELECT_COL_ID, EXPANDER_COL_ID, selectionEnabled, tableColumns } from './columnBuilders.rzts'
+import { isSafeKey, wrapAggregationFn, columnDefs, defIndex, SELECT_COL_ID, EXPANDER_COL_ID, selectionEnabled, tableColumns } from './columnBuilders.rzts'
 
 import { writeSorting, applyUpdater, writeExpanded, writeGrouping, writeGlobalFilter, writeColumnFilters, writePagination, writeRowSelection, writeColumnVisibility, writeColumnSizing, writeColumnOrder, writeColumnPinning, writeData, columnFilterValue, setColumnFilter } from './writeFunnels.rzts'
 

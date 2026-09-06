@@ -1,7 +1,7 @@
 // D-22 (Phase 87 plan 87-01): isSafeKey/wrapAggregationFn moved to the colocated plain-TS
 // module below — pure, sigil-free, no cross-partial host-symbol calls. Re-exported unchanged
 // from this partial's trailing export list (DataTable.rozie imports them from HERE).
-import { isSafeKey, wrapAggregationFn } from './helpers/columnDefUtils'
+import { isSafeKey, wrapAggregationFn, indexDefsById } from './helpers/columnDefUtils'
 // Build the table-core ColumnDef for ONE config-array entry. A LEAF entry
 // ({ id?, field, header?, … }) maps to an accessor ColumnDef; a GROUP entry
 // ({ id?, header, columns: [...] }) maps to a multi-level header GROUP column
@@ -102,6 +102,12 @@ const buildConfigDef = (c) => {
 let columnDefsCache: any[] | null = null
 let columnDefsCacheColumnsRef: any = undefined
 let columnDefsCacheColRegRef: any = undefined
+// B1 (quick 260906-afh) — the def-lookup index, populated INSIDE this SAME memo block on
+// a cache MISS only (never rebuilt per call — a per-call recursive scan would restore the
+// O(N^2 x M) blowup D-23 removed, T-AFH-03). A top-level `let` lowers to a per-instance
+// `useRef` on React (verified in the emitted leaf), so this is instance-scoped like
+// columnDefsCache above.
+let columnDefsIndexCache: any = null
 const columnDefs = () => {
   const cfg = $props.columns || []
   const reg = $data.colReg || {}
@@ -150,7 +156,18 @@ const columnDefs = () => {
   columnDefsCache = out
   columnDefsCacheColumnsRef = $props.columns
   columnDefsCacheColRegRef = $data.colReg
+  columnDefsIndexCache = indexDefsById(out)
   return out
+}
+
+// defIndex: the def-lookup map for the CURRENT columnDefs() array. Calling columnDefs()
+// first is deliberate — either an O(1) reference-equality cache hit (columnDefsIndexCache
+// is already fresh) or a miss that repopulates BOTH slots together, so the index can never
+// go stale relative to the array. Falls back to an empty null-prototype map (never null/
+// undefined) so a caller can read it unconditionally.
+const defIndex = () => {
+  columnDefs()
+  return columnDefsIndexCache || Object.create(null)
 }
 
 // The constant id of the auto-injected leading checkbox column (D-04). Distinct from
@@ -217,4 +234,4 @@ const tableColumns = () => {
   return withExpander
 }
 
-export { isSafeKey, wrapAggregationFn, columnDefs, SELECT_COL_ID, EXPANDER_COL_ID, selectionEnabled, tableColumns }
+export { isSafeKey, wrapAggregationFn, columnDefs, defIndex, SELECT_COL_ID, EXPANDER_COL_ID, selectionEnabled, tableColumns }

@@ -23,10 +23,18 @@ const sortIndicator = (colId) => {
 
 // Template helpers reading the resolved column-def metadata by id (plain fns — used
 // in template predicates + interpolation; uniform on all 6, no $computed alias trap).
+// B1 (quick 260906-afh): reads the O(1) def-lookup index (defIndex(), columnBuilders.rzts)
+// instead of linearly scanning columnDefs() — which only ever held TOP-LEVEL entries, so a
+// NESTED group leaf (a `columns:` group child) was invisible to every caller (headerLabel,
+// columnIsFilterable, editMetaOf/columnEditable/editorTypeOf/editorOptionsOf) and silently
+// took the "no def" fallback. defIndex() resolves both top-level AND nested leaf ids. This
+// also removes the per-cell O(N) scan D-23 left in place — defIndex() is memoized in the
+// SAME cache-invalidation block as columnDefs() itself, never rebuilt per call.
 const defFor = (colId) => {
-  const defs = columnDefs()
-  for (const d of defs) if (d.id === colId) return d
-  return null
+  if (colId == null) return null
+  const idx = defIndex()
+  const d = idx[String(colId)]
+  return d != null ? d : null
 }
 // Per-row visible cells for the body loop. table-core memoizes row objects by id,
 // so a re-pull after a column change (visibility/reorder/pin, or the late <Column>
