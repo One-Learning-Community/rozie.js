@@ -129,6 +129,14 @@ const bodyCellStyle = (row, colId) => {
 // listbox aria lesson — a bound boolean must be UNWRAPPED, never a rozieAttr string → TS2322).
 // rowIsGrouped: this flattened row is a group-header row.
 const rowIsGrouped = (row) => !!(tick() >= 0 && row && row.getIsGrouped && row.getIsGrouped())
+// rowIndexIsGrouped (quick 260906-cvo, C1/C2): THE single row-level editability/writability
+// predicate — a group-header row is a SYNTHETIC row whose `original` is table-core's
+// `leafRows[0].original` (the same fact cellSlotRow's header comment documents), so any
+// edit or bulk write resolved through it silently lands on an UNRELATED record. Every edit/
+// write guard in this component calls THIS predicate — never a re-implemented inline
+// `getIsGrouped()` check — so the invariant has one definition. Indexes into the SAME
+// `$data.rows` flattened row list rowIsGrouped reads.
+const rowIndexIsGrouped = (rowIndex) => rowIsGrouped(($data.rows || [])[rowIndex])
 // groupingActive: grouping is currently engaged (a non-empty ordered key list). Drives the
 // data-group-leaf marker so it is ABSENT when ungrouped (byte-identical-off, req-10).
 const groupingActive = () => (tick() >= 0 && ((currentState().grouping || []).length > 0))
@@ -284,4 +292,4 @@ const hasAnyFilterableColumn = () => {
   return false
 }
 
-export { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, displayPageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupRowDescriptor, cellSlotRow, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn }
+export { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, displayPageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, rowIndexIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupRowDescriptor, cellSlotRow, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn }

@@ -193,11 +193,18 @@ const onGridKeyDown = (e) => {
     beginEdit($data.activeRow, $data.activeColIndex, seed); return
   }
   // ── C2 (phase 63 wave-8): Enter on a GROUP-HEADER cell toggles that group's collapse/
-  // expand (APG treegrid). A group cell is NON-editable (isActiveCellEditable=false, the
-  // verified invariant) so it never hits the edit branches above and would otherwise fall to
-  // enterControl() — which merely FOCUSES the group-toggle button (requiring a second key).
-  // Route it to the SAME onToggleExpand path the chevron uses (group rows ride the expand
-  // model) so one Enter toggles the group. Body cells only (a header-active Enter is unchanged);
+  // expand (APG treegrid). C1 (quick 260906-cvo) CORRECTION: the comment here used to claim
+  // "a group cell is non-editable" as "the verified invariant" — that was FALSE AS WRITTEN.
+  // It held only for the grouping column's OWN cell (cellIsGrouped's branch renders before
+  // the editor branch); a non-grouping EDITABLE column's cell on a group row fell straight
+  // through the branch chain to isEditing(...) and opened an editor (the C1 defect this
+  // quick task closed). What is now TRUE, and WHY: isActiveCellEditable() carries an
+  // explicit rowIndexIsGrouped(...) row guard (filterPaginationRowChrome.rzts), so EVERY
+  // editable column's cell on a group row is non-editable — that is what makes the four
+  // edit-entry branches above fall through to this one, not an incidental property of the
+  // grouping column alone. Route it to the SAME onToggleExpand path the chevron uses (group
+  // rows ride the expand model) so one Enter toggles the group. Body cells only (a
+  // header-active Enter is unchanged);
   // ($data.rows || [])[$data.activeRow] is the active flattened row (page-relative non-virtual /
   // full-model virtual — both index $data.rows). Placed BEFORE the reserved enterControl branch.
   else if (key === 'Enter' && !$data.activeIsHeader && rowIsGrouped(($data.rows || [])[$data.activeRow])) {

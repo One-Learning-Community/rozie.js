@@ -12,8 +12,12 @@
       group depth, 1-based) + aria-expanded reflecting expanded/collapsed; leaf rows
       carry aria-level too (treegrid hierarchy). Collapsing flips aria-expanded → false.
     - ENTER TOGGLE: with the active cell on a group cell, Enter toggles that group's
-      collapse/expand (leaf rows appear/disappear) — group cells stay non-editable so
-      Enter never mis-routes to cell edit.
+      collapse/expand (leaf rows appear/disappear). C1 (quick 260906-cvo) CORRECTION:
+      this fixture declares NO editable column (`category`/`name`/`qty` all lack
+      `:editable="true"`), so "group cells stay non-editable so Enter never mis-routes
+      to cell edit" was VACUOUSLY true here, not a proof of the general invariant — a
+      group row with an editable non-grouping column (DataTableGroupEditGuardDemo,
+      quick 260906-cvo) is the fixture that actually exercises the row-level guard.
     - CROSS-BOUNDARY COHERENCE: ArrowDown from an EXPANDED group header lands on its
       first leaf; ArrowUp from a group's first leaf lands back on the group header;
       ArrowDown from a COLLAPSED group header lands on the NEXT group header.

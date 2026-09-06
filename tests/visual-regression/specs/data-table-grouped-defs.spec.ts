@@ -181,21 +181,129 @@ for (const target of TARGETS) {
       timeout: 15_000,
     });
 
-    // (b) #editor: reachable ONLY because C1 (Task 2) is still open at this point in the
-    // plan — a group-header row is still editable at HEAD, so Enter on its 'qty' cell opens
-    // the #editor drop-in. RED: 'LEAF:Apple'. GREEN (still pre-C1-fix): the group
-    // descriptor. Once Task 2 lands this assertion is REPLACED (see that task's handoff).
+    // (b) #editor — Task 1 -> Task 2 HANDOFF (per <verification>): this assertion was
+    // originally "Enter on the group row's 'qty' cell opens the #editor drop-in, reporting
+    // the group descriptor" — reachable ONLY because C1 was still open when Task 1 ran.
+    // Task 2 (C1) closes that: a group-header row is no longer editable at all, so no
+    // editor renders on it — REPLACED here with that fact, plus a LEAF-row control proving
+    // the #editor slot still receives that leaf's own record (never `cellSlotRow`-wrapped —
+    // C3 only rewrites the GROUP-ROW case; a leaf row's `row` was never leaked).
     const qtyCell = northRow.locator('[data-col="qty"][data-grid-cell]');
     await qtyCell.click();
     await page.keyboard.press('Enter');
-    const editorProbe = container.locator('[data-editorprobe]');
-    await expect(editorProbe).toHaveAttribute('data-editorprobe', 'GROUP:region:North:3', {
-      timeout: 15_000,
-    });
+    await expect(container.locator('[data-editorprobe]')).toHaveCount(0, { timeout: 5_000 });
+
+    const leafRow = container.locator('tbody tr[data-group-leaf]').first();
+    const leafQtyCell = leafRow.locator('[data-col="qty"][data-grid-cell]');
+    await leafQtyCell.click();
+    await page.keyboard.press('Enter');
+    const leafEditorProbe = container.locator('[data-editorprobe]');
+    await expect(leafEditorProbe).toHaveAttribute('data-editorprobe', /^LEAF:/, { timeout: 15_000 });
 
     // (c) Control: an ordinary LEAF row's #selectCell still reports its own record.
-    const leafRow = container.locator('tbody tr[data-group-leaf]').first();
     const leafSelectProbe = leafRow.locator('[data-selectprobe]');
     await expect(leafSelectProbe).toHaveAttribute('data-selectprobe', /^LEAF:/, { timeout: 15_000 });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════
+// C1 (quick 260906-cvo, Task 2) — a group-header row is not editable; Enter toggles the
+// group instead. Same fixture as C3 (DataTableGroupEditGuard). Each sub-case starts from a
+// fresh page.goto so a prior cell's group toggle cannot leak into the next.
+// ═══════════════════════════════════════════════════════════════════════════════════
+async function gotoGroupEditGuard(page: Page, target: Target) {
+  await page.goto(`/?example=DataTableGroupEditGuard&target=${target}`);
+  const mount = page.getByTestId('rozie-mount');
+  await expect(mount).toBeVisible();
+  const container = mount.getByTestId('grid-table');
+  await expect(container.locator('table')).toBeVisible({ timeout: 15_000 });
+  await expect
+    .poll(async () => mount.getByTestId('grouping-readout').textContent(), { timeout: 15_000 })
+    .toBe('region');
+  await expect
+    .poll(async () => container.locator('tbody tr[data-group-header]').count(), { timeout: 15_000 })
+    .toBeGreaterThan(0);
+  const northRow = container.locator('tbody tr[data-group-header]').filter({
+    has: page.locator('.rdt-group-value', { hasText: 'North' }),
+  });
+  await expect(northRow).toHaveCount(1, { timeout: 15_000 });
+  return { mount, container, northRow };
+}
+
+for (const target of TARGETS) {
+  runnerFor(target)(`grouped-defs C1 [${target}]: a group-header row is not editable; Enter toggles the group instead`, async ({
+    page,
+  }) => {
+    // (a) Enter on the group row's 'product' cell: opens NO editor, TOGGLES the group
+    // (aria-expanded flips), and writes NOTHING (model-readout/commit-count unchanged).
+    {
+      const { mount, container, northRow } = await gotoGroupEditGuard(page, target);
+      const beforeExpanded = await northRow.getAttribute('aria-expanded');
+      const productCell = northRow.locator('[data-col="product"][data-grid-cell]');
+      await productCell.click();
+      await page.keyboard.press('Enter');
+      await expect(container.locator('[data-editing-cell]')).toHaveCount(0, { timeout: 5_000 });
+      await expect(northRow).toHaveAttribute(
+        'aria-expanded',
+        beforeExpanded === 'true' ? 'false' : 'true',
+        { timeout: 5_000 },
+      );
+      await expect(mount.getByTestId('model-readout')).toHaveText(
+        'Apple:1|Pear:2|Plum:3|Fig:4|Date:5|Lime:6',
+      );
+      await expect(mount.getByTestId('commit-count')).toHaveText('0');
+    }
+
+    // (b) F2 on the group row's 'product' cell: opens NO editor.
+    {
+      const { container, northRow } = await gotoGroupEditGuard(page, target);
+      const productCell = northRow.locator('[data-col="product"][data-grid-cell]');
+      await productCell.click();
+      await page.keyboard.press('F2');
+      await expect(container.locator('[data-editing-cell]')).toHaveCount(0, { timeout: 5_000 });
+    }
+
+    // (c) A printable key on the group row's 'product' cell: opens NO editor.
+    {
+      const { container, northRow } = await gotoGroupEditGuard(page, target);
+      const productCell = northRow.locator('[data-col="product"][data-grid-cell]');
+      await productCell.click();
+      await page.keyboard.press('a');
+      await expect(container.locator('[data-editing-cell]')).toHaveCount(0, { timeout: 5_000 });
+    }
+
+    // (d) singleClickEdit ON: a single click on the group row's editable cell opens NO
+    // editor (the same click on a leaf row, case (e)'s control, still opens one via F2 —
+    // singleClickEdit's own click-to-edit path is covered here on the group row only, the
+    // defect this guard closes).
+    {
+      const { mount, container, northRow } = await gotoGroupEditGuard(page, target);
+      await mount.getByTestId('toggle-single-click-edit').click();
+      await expect(mount.getByTestId('single-click-edit-state')).toHaveText('on');
+      const productCell = northRow.locator('[data-col="product"][data-grid-cell]');
+      await productCell.click();
+      await expect(container.locator('[data-editing-cell]')).toHaveCount(0, { timeout: 5_000 });
+    }
+
+    // (e) Control: an ordinary LEAF row's 'product' cell is UNAFFECTED — F2 still opens its
+    // editor, typing still seeds/replaces the draft, and Enter-to-commit still writes the
+    // model and bumps commit-count.
+    {
+      const { mount, container } = await gotoGroupEditGuard(page, target);
+      const leafRow = container.locator('tbody tr[data-group-leaf]').first();
+      const productCell = leafRow.locator('[data-col="product"][data-grid-cell]');
+      await productCell.click();
+      await page.keyboard.press('F2');
+      const editorInput = container.locator('[data-editing-cell]');
+      await expect(editorInput).toHaveCount(1, { timeout: 5_000 });
+      await expect(editorInput).toBeFocused({ timeout: 5_000 });
+      await page.keyboard.type('Zeta');
+      await page.keyboard.press('Enter');
+      await expect(mount.getByTestId('commit-count')).toHaveText('1', { timeout: 5_000 });
+      await expect(mount.getByTestId('model-readout')).toHaveText(
+        'Zeta:1|Pear:2|Plum:3|Fig:4|Date:5|Lime:6',
+        { timeout: 5_000 },
+      );
+    }
   });
 }

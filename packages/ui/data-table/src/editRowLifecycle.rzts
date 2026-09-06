@@ -69,6 +69,11 @@ const focusRowEditorAt = (rowIndex, colIndex) => {
 const beginRowEdit = (row) => {
   const rowIndex = rowIndexOf(row)
   if (rowIndex < 0) return
+  // C1 (quick 260906-cvo) — Layer 5: a second, independent editing-state funnel that takes a
+  // row OBJECT from its caller. Reachable today only via Shift+F2 (Layer 1), so also
+  // redundant at HEAD; kept for the same reason as Layer 4 — it is a mutation entry point,
+  // and the natural call site for a future #rowActions "Edit" drop-in button.
+  if (rowIndexIsGrouped(rowIndex)) return
   const editable = editableColumnsForRow(rowIndex)
   if (editable.length === 0) return
   // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).

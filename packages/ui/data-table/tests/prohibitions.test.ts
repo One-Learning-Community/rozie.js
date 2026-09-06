@@ -318,3 +318,49 @@ describe('B2/C3 invariant: every #cell/#selectCell/#editor slot site binds :row 
     expect(hits.length).toBe(1);
   });
 });
+
+// ── C1 invariant (Task 2, quick 260906-cvo): every edit/write guard calls the SINGLE
+// rowIndexIsGrouped(...) predicate ──
+//
+// A POSITIVE count assertion, deliberately — a negative grep for an inline
+// `getIsGrouped()` re-implementation would miss a NEW guard written without the shared
+// predicate just as easily as it would miss one written with it. Comment lines are
+// stripped before counting (this repo's grep-gate hygiene rule — a comment MENTIONING the
+// symbol, e.g. explaining why a guard is redundant-but-kept, must not satisfy the gate).
+// The five call sites: isActiveCellEditable, beginEdit, isEditing, toggleActiveBooleanCell
+// (editCellLifecycle.rzts) + beginRowEdit (editRowLifecycle.rzts).
+
+function countNonCommentOccurrences(source: string, needle: string): number {
+  const stripped = source
+    .split('\n')
+    .map((line) => {
+      const idx = line.indexOf('//');
+      return idx === -1 ? line : line.slice(0, idx);
+    })
+    .join('\n');
+  return (stripped.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length;
+}
+
+describe('C1 invariant: rowIndexIsGrouped(...) is the single shared edit/write row guard', () => {
+  const C1_COVERED_FILES = ['filterPaginationRowChrome.rzts', 'editCellLifecycle.rzts', 'editRowLifecycle.rzts', 'gridKeydownHandlers.rzts'];
+
+  it('rowIndexIsGrouped( appears at least 5 times in non-comment source across the covered files', () => {
+    let total = 0;
+    for (const name of C1_COVERED_FILES) {
+      const file = dataTableSources.find((f) => f.id === name);
+      expect(file, `expected ${name} to be present in the scanned tree`).toBeTruthy();
+      total += countNonCommentOccurrences((file as SourceFile).source, 'rowIndexIsGrouped(');
+    }
+    expect(total).toBeGreaterThanOrEqual(5);
+  });
+
+  it('negative-path proof: a comment-only mention does not satisfy the gate', () => {
+    const synthetic = `// rowIndexIsGrouped(rowIndex) is redundant here but kept for defense-in-depth\nconst x = 1`;
+    expect(countNonCommentOccurrences(synthetic, 'rowIndexIsGrouped(')).toBe(0);
+  });
+
+  it('negative-path proof: the count check is not vacuous against real code', () => {
+    const synthetic = `if (rowIndexIsGrouped(rowIndex)) return`;
+    expect(countNonCommentOccurrences(synthetic, 'rowIndexIsGrouped(')).toBe(1);
+  });
+});

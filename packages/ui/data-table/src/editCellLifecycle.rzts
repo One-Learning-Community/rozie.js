@@ -26,7 +26,13 @@ const activeCellColumnId = () => {
 // isActiveCellEditable: the active cell sits in an editable column AND is a body cell
 // (req-1). Gates the F2/Enter/printable edit-entry branches in onGridKeyDown; a
 // non-editable active cell falls through to the reserved enterControl path.
+// C1 (quick 260906-cvo) — Layer 1: a group-header row is NEVER editable, regardless of
+// column. This is the single highest-value guard in the cluster: it closes Shift+F2, the
+// checkbox toggle, and the F2/Enter/printable edit-entry branches in ONE edit (they are all
+// `else if` branches gated on this predicate), AND restores fallthrough so Enter on a group
+// row reaches the group-toggle branch below them instead of opening an editor.
 const isActiveCellEditable = () => {
+  if (rowIndexIsGrouped($data.activeRow)) return false
   const colId = activeCellColumnId()
   return colId != null && columnEditable(colId)
 }
@@ -44,6 +50,14 @@ const isActiveCellEditable = () => {
 // non-virtual, wr.vi.index virtual).
 const isEditing = (rowIndex, colIndex) => {
   if ($data.editVer < 0) return false
+  // C1 (quick 260906-cvo) — Layer 6: the ONLY layer whose reachability does not depend on a
+  // keystroke. Editing state is INDEX-based over the visible model, and nothing clears it
+  // when the row model re-derives — a consumer that changes the grouping model WHILE a cell
+  // editor is open can move a group-header row under the index $data.editingRow/
+  // editingRowIndex still holds, rendering the editor on a group row with no beginEdit
+  // involved. Placed AFTER the editVer read (preserves the Svelte/Solid re-derivation
+  // discipline the header comment above documents).
+  if (rowIndexIsGrouped(rowIndex)) return false
   if ($data.editingRowIndex != null && $data.editingRowIndex === rowIndex) {
     const colId = columnIdAt(rowIndex, colIndex)
     return colId != null && columnEditable(colId)
@@ -208,6 +222,10 @@ const cellValueAt = (rowIndex, colIndex) => {
 // $data) so a Tab-advance that just setState'd activeRow/Col works on React. Clears any
 // prior invalid state. Focus moves into the editor.
 const beginEdit = (rowIndex, colIndex, seed) => {
+  // C1 (quick 260906-cvo) — Layer 2: closes the `onGridClick` (singleClickEdit) path, which
+  // calls beginEdit directly gated ONLY on columnEditable — isActiveCellEditable (Layer 1)
+  // does not run on that path at all.
+  if (rowIndexIsGrouped(rowIndex)) return
   const colId = columnIdAt(rowIndex, colIndex)
   if (colId == null || !columnEditable(colId)) return
   // A new edit session starts — reset the sync idempotency latch so THIS session's eventual
@@ -401,6 +419,11 @@ const commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
 // editor:'checkbox' columns only (Space/Enter/F2), full-row edit mode is unaffected (the
 // editingRowIndex early return in onGridKeyDown already excludes it).
 const toggleActiveBooleanCell = () => {
+  // C1 (quick 260906-cvo) — Layer 4: the only write funnel bypassing both beginEdit/
+  // commitEdit and applyGridToRange. Reachable today only through the Layer-1-gated
+  // checkbox branch, so this line is redundant AT HEAD — it earns its place by making "no
+  // write ever targets a group row" a property of the write funnels themselves.
+  if (rowIndexIsGrouped($data.activeRow)) return
   const colId = columnIdAt($data.activeRow, $data.activeColIndex)
   if (colId == null || !columnEditable(colId)) return
   const rowList = $data.rows || []

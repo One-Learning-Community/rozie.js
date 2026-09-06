@@ -65,6 +65,8 @@
   groupingModel: [],
   // Last cell-edit-commit counter — C1/C2 assert this NEVER moves on a group-row write.
   commitCount: 0,
+  // C1 single-click-to-edit toggle (mirrors DataTableGridEditDemo's singleClickEdit idiom).
+  singleClickEdit: false,
 }
 </data>
 
@@ -91,6 +93,11 @@ const rowProbe = (r: any): string => {
   if (r.isGroupRow === true) return 'GROUP:' + r.groupingColumnId + ':' + r.groupingValue + ':' + r.leafCount
   return 'LEAF:' + r.product
 }
+
+// C1 (quick 260906-cvo, Task 2): flip the single-click-to-edit prop so the spec can drive
+// both the OFF (default) and ON paths against the same fixture (the DataTableGridEditDemo
+// idiom).
+const toggleSingleClickEdit = (): void => { $data.singleClickEdit = !$data.singleClickEdit }
 </script>
 
 <template>
@@ -102,6 +109,9 @@ const rowProbe = (r: any): string => {
     <span class="readout" data-testid="grouping-readout">{{ $data.groupingModel.join(',') }}</span>
     <span class="label">commit-count:</span>
     <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+    <button type="button" data-testid="toggle-single-click-edit" @click="toggleSingleClickEdit">toggle single-click-edit</button>
+    <span class="label">single-click-edit:</span>
+    <span class="readout" data-testid="single-click-edit-state">{{ $data.singleClickEdit ? 'on' : 'off' }}</span>
   </div>
 
   <!-- The COMMITTED model, joined so ANY write anywhere is visible as text. -->
@@ -113,6 +123,7 @@ const rowProbe = (r: any): string => {
       interactionMode="grid"
       selectionMode="multiple"
       :groupable="true"
+      :singleClickEdit="$data.singleClickEdit"
       r-model:data="$data.rows"
       r-model:grouping="$data.groupingModel"
       @cell-edit-commit="onCellEditCommit($event)"
