@@ -1,0 +1,64 @@
+<!--
+  Visual-regression rig producer for NestedSlotFallbackDemo (Phase 88 D-09/D-10).
+
+  Proves, at runtime on all six targets, that a static `<slot>` nested inside a
+  dynamic-name family slot's fallback distributes correctly under `r-for`. This
+  is the one item in Phase 88 that static reading cannot settle: compile-time
+  wiring for a nested slot in a dynamic-name slot's fallback is confirmed
+  correct on all six targets, but whether Lit's `RozieSlotDistributor` actually
+  DISTRIBUTES it at runtime under `r-for` is unproven until this spec runs.
+
+  Mirrors DynamicSlotNameDemoProducer.rozie's `data-rozie-slot-name` wrapper
+  convention, extended to a per-row dynamic key via `{{ col.key }}` attribute
+  interpolation (mustache-in-attribute-value is a Rozie feature) so the spec's
+  target-agnostic reader can address each row independently of class hashing
+  and shadow-DOM differences across targets.
+
+  Each iteration authors the three-tier precedence shape:
+    1. a dynamic-name family slot `cell-<col.key>` (exact/family fills land here)
+    2. whose inline fallback is a static generic slot `cell` (generic fills land here)
+    3. whose own inline fallback is literal `builtin:<value>` text (no fill at all)
+
+  The family and generic slots share the same scoped params (`row`, `value`) so
+  emission routes through the params-bearing branch — the branch 88-01 fixed
+  (D-06's `??`/`?:` precedence fix in React's renderInvocationFallback).
+-->
+<rozie name="NestedSlotFallbackDemoProducer">
+
+<props>
+{
+  columns: { type: Array,  default: () => [] },
+  row:     { type: Object, default: () => ({}) },
+}
+</props>
+
+<template>
+<div class="nsf-producer">
+  <div r-for="col in $props.columns" :key="col.key" data-rozie-slot-name="{{ col.key }}">
+    <slot :name="`cell-${col.key}`" :row="$props.row" :value="$props.row[col.key]">
+      <slot name="cell" :row="$props.row" :value="$props.row[col.key]">builtin:{{ $props.row[col.key] }}</slot>
+    </slot>
+  </div>
+</div>
+</template>
+
+<style>
+.nsf-producer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  font: 14px system-ui, sans-serif;
+  background: #fff;
+  width: 240px;
+}
+.nsf-producer > div {
+  padding: 4px 8px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.03);
+}
+</style>
+
+</rozie>

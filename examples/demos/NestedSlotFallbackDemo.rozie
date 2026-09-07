@@ -1,0 +1,98 @@
+<!--
+  Visual-regression rig demo for the nested-slot-in-fallback runtime proof
+  (tests/visual-regression/specs/nested-slot-fallback.spec.ts, Phase 88 D-09/D-10).
+
+  Mounts TWO NestedSlotFallbackDemoProducer instances so all three precedence
+  tiers are observable simultaneously, with no conditional fill:
+
+    - `data-nsf-instance="with-generic"` — columns a1/a2. Column a1 gets an
+      exact family fill (`#cell-a1`) AND the instance gets a generic `#cell`
+      fill; column a2 has no family fill, so it falls through to the generic.
+      Expected: a1 → "family: …", a2 → "generic: …".
+
+    - `data-nsf-instance="no-generic"` — columns b1/b2. Column b1 gets an
+      exact family fill (`#cell-b1`); no generic fill exists at all for this
+      instance, so column b2 falls all the way through to the producer's
+      built-in fallback text.
+      Expected: b1 → "family: …", b2 → "builtin:…".
+
+  The `data-testid="toggle-columns"` button reverses both column arrays'
+  order in place, forcing the `r-for` loop to re-render, so the spec can
+  re-assert the same four outcomes post-toggle and prove the Lit distributor
+  re-distributes rather than latching its first assignment.
+
+  Per D-10, this demo stays diagnostic and minimal: no data-table import, no
+  grouping, no windowing — a failure here has exactly one candidate cause.
+-->
+<rozie name="NestedSlotFallbackDemo">
+
+<components>
+{
+  NestedSlotFallbackDemoProducer: './NestedSlotFallbackDemoProducer.rozie',
+}
+</components>
+
+<data>
+{
+  columnsA: [{ key: 'a1' }, { key: 'a2' }],
+  columnsB: [{ key: 'b1' }, { key: 'b2' }],
+  row: { a1: 'A1val', a2: 'A2val', b1: 'B1val', b2: 'B2val' },
+}
+</data>
+
+<script>
+function toggleColumns() {
+  $data.columnsA = [...$data.columnsA].reverse()
+  $data.columnsB = [...$data.columnsB].reverse()
+}
+</script>
+
+<template>
+<div class="nsf-demo">
+  <button
+    type="button"
+    data-testid="toggle-columns"
+    @click="toggleColumns()"
+  >Toggle columns</button>
+
+  <div data-nsf-instance="with-generic">
+    <NestedSlotFallbackDemoProducer :columns="$data.columnsA" :row="$data.row">
+      <template #cell-a1="{ row, value }">
+        <span>family: {{ value }}</span>
+      </template>
+      <template #cell="{ row, value }">
+        <span>generic: {{ value }}</span>
+      </template>
+    </NestedSlotFallbackDemoProducer>
+  </div>
+
+  <div data-nsf-instance="no-generic">
+    <NestedSlotFallbackDemoProducer :columns="$data.columnsB" :row="$data.row">
+      <template #cell-b1="{ row, value }">
+        <span>family: {{ value }}</span>
+      </template>
+    </NestedSlotFallbackDemoProducer>
+  </div>
+</div>
+</template>
+
+<style>
+.nsf-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  font: 14px system-ui, sans-serif;
+}
+button[data-testid="toggle-columns"] {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  background: #f5f5f5;
+  cursor: pointer;
+  font: inherit;
+}
+</style>
+
+</rozie>
