@@ -1367,6 +1367,11 @@ export const EXAMPLES = [
   // distinguish a correct distribution from a coincidentally identical
   // fallback render).
   'NestedSlotFallback',
+  // Phase 88 88-05 (D-03) — the editor-owns-focus contract proof, pinned before
+  // 88-07 reworks the focus polls. Loader falls through to the sibling
+  // examples/demos/ file, no canonical top-level flat file. Drives
+  // data-table-editor-family-focus.spec.ts. DOM assertions only.
+  'DataTableEditorFamily',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -1807,6 +1812,8 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableColumnVirtual: 'rozie-data-table-column-virtual',
   // Phase 88 88-03 (D-09/D-10) — the lit entry appends '-demo' to this tag.
   NestedSlotFallback: 'rozie-nested-slot-fallback',
+  // Phase 88 88-05 (D-03) — the lit entry appends '-demo' to this tag.
+  DataTableEditorFamily: 'rozie-data-table-editor-family',
 };
 
 export interface HostQuery {
@@ -2305,6 +2312,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // no parent-supplied props. This entry exists only to satisfy the
   // Record<Example> type.
   NestedSlotFallback: {},
+  // Phase 88 88-05 — self-contained (mixedRows/nofillRows seeded in <data>); no
+  // parent-supplied props. This entry exists only to satisfy the Record<Example> type.
+  DataTableEditorFamily: {},
 };
 
 /**
