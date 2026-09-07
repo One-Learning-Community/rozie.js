@@ -86,8 +86,8 @@ Alongside the generic `#cell` / `#colHeader` / `#filter` / `#editor` slots (each
 
 Consumer typing note: on five of six targets the family key is template-literal-typed with an inferred scoped-parameter shape, but the emitted type also carries a trailing catch-all index signature, so a misspelled column id still typechecks (it is inert at runtime rather than a compile error) — see [Dynamic slot names](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) for the exact emitted shape and the Angular divergence.
 
-- [Editing](/components/data-table-editing#per-column-slot-families) — the `editor-<columnId>` family and its `editor:'custom'` gate, plus the drop-in editor components.
-- [Faceted filtering](/components/data-table-faceted-filtering#per-column-slot-families) — the `filter-<columnId>` family and its `filterable` gate, plus the drop-in filter components.
+- [Editing](/components/data-table-editing) — the `editor-<columnId>` family and its `editor:'custom'` gate, plus the drop-in editor components.
+- [Faceted filtering](/components/data-table-faceted-filtering) — the `filter-<columnId>` family and its `filterable` gate, plus the drop-in filter components.
 
 ## See also
 
