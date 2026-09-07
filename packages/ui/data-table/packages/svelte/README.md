@@ -366,6 +366,44 @@ Columns may be declared as a `:columns` config array **or** as `<Column>` childr
 </DataTable>
 ```
 
+### Per-column slot families (`cell-<id>` / `colHeader-<id>` / `filter-<id>` / `editor-<id>`)
+
+```svelte
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  // A family fill is a STATIC per-column override — the additive `snippets` record prop,
+  // NOT an extension of the generic cell/colHeader/filter/editor snippets. Precedence per
+  // seam: snippets['<seam>-<id>'] → the generic snippet → the built-in render. editor-<id>
+  // needs editor="custom"; filter-<id> needs filterable (shown on `category` below);
+  // cell-<id> / colHeader-<id> have no gate.
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+</script>
+
+{#snippet cellPrice({ value })}💲 {value}{/snippet}
+{#snippet colHeaderPrice({ label })}🏷️ {label}{/snippet}
+{#snippet filterCategory({ columnId, uniqueValues, setFilter })}
+  <select onchange={(e) => setFilter(columnId, e.currentTarget.value || null)}>
+    <option value="">All</option>
+    {#each uniqueValues as v}<option value={v}>{v}</option>{/each}
+  </select>
+{/snippet}
+
+<DataTable
+  data={rows}
+  snippets={{ 'cell-price': cellPrice, 'colHeader-price': colHeaderPrice, 'filter-category': filterCategory }}
+>
+  <Column field="name" header="Name" />
+  <Column field="category" header="Category" filterable />
+  <Column field="price" header="Price" />
+</DataTable>
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
@@ -490,12 +528,20 @@ All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metad
 
 The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filtering) scoped slots follow the SAME render-prop convention: on React they are `renderDetail` / `renderGroupBar` / `renderFilter`; on Solid they are `detailSlot` / `groupBarSlot` / `filterSlot`; on Lit they are the `.detail` / `.groupBar` / `.filter` properties — the documented React render-prop edge (per the cross-framework compatibility bar). On Vue / Svelte / Angular they are ordinary named scoped slots (`#detail` / `#groupBar` / `#filter`). The `groupBar` and `filter` slots are HEADLESS — the component ships NO built-in group-bar / facet control, so the consumer builds the UI purely from the exposed slot props.
 
+`cell`, `colHeader`, `filter` and `editor` each also have a **per-column slot family** — a statically-named fill per `columnId` (`cell-price`, `colHeader-price`, `filter-category`, `editor-score`, …) that takes precedence OVER the matching generic slot above it: `<seam>-<id>` → the generic `<seam>` slot → the built-in render. `editor-<id>` (and `editor`) only render on a column declared `editor="custom"`; `filter-<id>` (and `filter`) only render on a column declared `filterable`; `cell-<id>` / `colHeader-<id>` have no gate. The auto-injected row-select / row-expander chrome columns never reach any family — they are excluded structurally. On Svelte the family is the additive **`snippets`** record prop — `snippets={{ 'cell-price': cellPriceSnippet }}` — keyed by the exact `<seam>-<id>` string.
+
+A misspelled family key does not fail to compile — the emitted type carries a trailing catch-all index signature alongside the templated key, so it typechecks but is simply never invoked. See the "Per-column slot families" example in Usage above for the full per-target syntax.
+
 | Slot | Params |
 | --- | --- |
 | (default) |  |
 | groupBar | grouping, groupableColumns, applyGrouping, clearGrouping |
 | selectAll | checked, indeterminate, toggle |
+| colHeader-<id> | columnId, column, label |
+| filter-<id> | columnId, value, uniqueValues, minMax, setFilter |
 | selectCell | row, checked, toggle |
+| cell-<id> | columnId, column, row, value |
+| editor-<id> | columnId, column, row, value, commit, cancel, autofocus |
 | detail | row |
 | colHeader | columnId, column, label |
 | filter | columnId, value, uniqueValues, minMax, setFilter |

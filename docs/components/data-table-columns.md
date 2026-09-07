@@ -86,6 +86,8 @@ Alongside the generic `#cell` / `#colHeader` / `#filter` / `#editor` slots (each
 
 Consumer typing note: on five of six targets the family key is template-literal-typed with an inferred scoped-parameter shape, but the emitted type also carries a trailing catch-all index signature, so a misspelled column id still typechecks (it is inert at runtime rather than a compile error) — see [Dynamic slot names](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) for the exact emitted shape and the Angular divergence.
 
+See the [per-column slot families usage snippet](/components/data-table-usage#per-column-slot-families-cell-id-colheader-id-filter-id-editor-id) for the concrete syntax on every target (React/Solid `slots`, Vue native `#cell-<id>`, Svelte `snippets`, Angular `[templates]`, Lit `.rozieSlots`) and the [Slots reference](/components/data-table-api#slots) for the full row-by-row param list.
+
 - [Editing](/components/data-table-editing) — the `editor-<columnId>` family and its `editor:'custom'` gate, plus the drop-in editor components.
 - [Faceted filtering](/components/data-table-faceted-filtering) — the `filter-<columnId>` family and its `filterable` gate, plus the drop-in filter components.
 

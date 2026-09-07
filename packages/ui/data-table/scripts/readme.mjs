@@ -100,6 +100,38 @@ const SET_G_TITLE = 'Faceted filtering exposure (headless `#filter`)';
 const SET_H_TITLE = 'Drop-in editor components (`#editor`)';
 const SET_I_TITLE = 'Drop-in filter components (`#filter`)';
 const SET_J_TITLE = 'Drop-in group bar + detail panel (`#groupBar` / `#detail`)';
+const SET_K_TITLE = 'Per-column slot families (`cell-<id>` / `colHeader-<id>` / `filter-<id>` / `editor-<id>`)';
+
+// Phase 88 shipped four DYNAMIC-NAME slot families (cell-<id> / colHeader-<id> /
+// filter-<id> / editor-<id>, one per `<column>-scoped seam) but this generator was
+// never taught about them — every family declaration's `SlotDecl.name` is the SAME
+// empty-string sentinel (its public identity lives in `SlotDecl.namePrefix` instead),
+// so the pre-fix Slots-table dedup (keyed on `s.name`) silently collapsed all four
+// families onto the ONE existing default `<slot />` entry, and no per-target Usage
+// example ever demonstrated the syntax. Same blind spot docs/scripts/surface-hash.mjs
+// had — see commit 7f6abc104 for the sibling fix on that file.
+const FAMILY_SYNTAX_NOTE = {
+  react:
+    'On React the family is the additive **`slots`** record prop — ' +
+    "`slots={{ 'cell-price': (ctx) => … }}` — keyed by the exact `<seam>-<id>` string.",
+  solid:
+    'On Solid the family is the additive **`slots`** record prop — ' +
+    "`slots={{ 'cell-price': (ctx) => … }}` — keyed by the exact `<seam>-<id>` string.",
+  vue:
+    'On Vue a family fill is an ordinary **native named slot** — ' +
+    '`<template #cell-price="ctx">…</template>` — no special Rozie syntax.',
+  svelte:
+    'On Svelte the family is the additive **`snippets`** record prop — ' +
+    "`snippets={{ 'cell-price': cellPriceSnippet }}` — keyed by the exact `<seam>-<id>` string.",
+  angular:
+    'On Angular the family is the additive **`templates`** input — ' +
+    '`[templates]="{ \'cell-price\': cellPriceTpl }"` — a **type-erased** ' +
+    '`Record<string, TemplateRef<unknown>>` (the one documented Angular divergence: no ' +
+    'per-key scoped-param typing).',
+  lit:
+    'On Lit the family is the additive **`.rozieSlots`** record property — ' +
+    "`.rozieSlots=${{ 'cell-price': (ctx) => html`…` }}` — keyed by the exact `<seam>-<id>` string.",
+};
 
 // Editing example dataset — one field per built-in editor type (text/number/select/
 // checkbox) + the `score` field routed through the custom `#editor` scoped slot. The
@@ -492,6 +524,41 @@ export function Demo() {
   );
 }`,
     },
+    {
+      title: SET_K_TITLE,
+      lang: 'tsx',
+      code: `import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // A family fill is a STATIC per-column override — the additive \`slots\` record prop,
+  // NOT an extension of renderCell/renderColHeader/renderFilter/renderEditor. Precedence
+  // per seam: slots['<seam>-<id>'] → the generic render<Seam> prop → the built-in render.
+  // editor-<id> only reaches a column declared editor="custom"; filter-<id> only reaches
+  // a column declared filterable (shown on \`category\` below); cell-<id> / colHeader-<id>
+  // have no gate. A misspelled key silently no-ops — it typechecks (a trailing catch-all
+  // index signature) but is never invoked.
+  const rows = ${FACET_ROWS};
+  return (
+    <DataTable
+      data={rows}
+      slots={{
+        'cell-price': ({ value }) => <>💲 {value}</>,
+        'colHeader-price': ({ label }) => <>🏷️ {label}</>,
+        'filter-category': ({ columnId, uniqueValues, setFilter }) => (
+          <select onChange={(e) => setFilter(columnId, e.target.value || null)}>
+            <option value="">All</option>
+            {uniqueValues.map((v) => <option key={String(v)} value={String(v)}>{String(v)}</option>)}
+          </select>
+        ),
+      }}
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" />
+    </DataTable>
+  );
+}`,
+    },
   ],
   vue: [
     {
@@ -805,6 +872,36 @@ const expanded = ref<Record<string, boolean>>({});
   </DataTable>
 </template>`,
     },
+    {
+      title: SET_K_TITLE,
+      lang: 'vue',
+      code: `<script setup lang="ts">
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+const rows = ${FACET_ROWS};
+</script>
+
+<template>
+  <!-- A family fill is an ordinary NATIVE named slot — Vue's own convention, not special
+       Rozie syntax. Precedence per seam: #cell-<id> → the generic #cell → the built-in
+       render. #editor-<id> needs editor="custom"; #filter-<id> needs :filterable="true"
+       (shown on category below); #cell-<id> / #colHeader-<id> have no gate. -->
+  <DataTable :data="rows">
+    <Column field="name" header="Name" />
+    <Column field="category" header="Category" :filterable="true" />
+    <Column field="price" header="Price" />
+
+    <template #cell-price="{ value }">💲 {{ value }}</template>
+    <template #colHeader-price="{ label }">🏷️ {{ label }}</template>
+    <template #filter-category="{ columnId, uniqueValues, setFilter }">
+      <select @change="setFilter(columnId, ($event.target as HTMLSelectElement).value || null)">
+        <option value="">All</option>
+        <option v-for="v in uniqueValues" :key="String(v)" :value="v">{{ v }}</option>
+      </select>
+    </template>
+  </DataTable>
+</template>`,
+    },
   ],
   svelte: [
     {
@@ -1088,6 +1185,38 @@ const expanded = ref<Record<string, boolean>>({});
   {#snippet detail(scope)}
     <DetailPanel {...scope} />
   {/snippet}
+</DataTable>`,
+    },
+    {
+      title: SET_K_TITLE,
+      lang: 'svelte',
+      code: `<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  // A family fill is a STATIC per-column override — the additive \`snippets\` record prop,
+  // NOT an extension of the generic cell/colHeader/filter/editor snippets. Precedence per
+  // seam: snippets['<seam>-<id>'] → the generic snippet → the built-in render. editor-<id>
+  // needs editor="custom"; filter-<id> needs filterable (shown on \`category\` below);
+  // cell-<id> / colHeader-<id> have no gate.
+  const rows = ${FACET_ROWS};
+</script>
+
+{#snippet cellPrice({ value })}💲 {value}{/snippet}
+{#snippet colHeaderPrice({ label })}🏷️ {label}{/snippet}
+{#snippet filterCategory({ columnId, uniqueValues, setFilter })}
+  <select onchange={(e) => setFilter(columnId, e.currentTarget.value || null)}>
+    <option value="">All</option>
+    {#each uniqueValues as v}<option value={v}>{v}</option>{/each}
+  </select>
+{/snippet}
+
+<DataTable
+  data={rows}
+  snippets={{ 'cell-price': cellPrice, 'colHeader-price': colHeaderPrice, 'filter-category': filterCategory }}
+>
+  <Column field="name" header="Name" />
+  <Column field="category" header="Category" filterable />
+  <Column field="price" header="Price" />
 </DataTable>`,
     },
   ],
@@ -1474,6 +1603,47 @@ export class DemoComponent {
   expanded: Record<string, boolean> = {};
 }`,
     },
+    {
+      title: SET_K_TITLE,
+      lang: 'ts',
+      code: `import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: \`
+    <!-- A family fill is a STATIC per-column override wired through the [templates]
+         input — a plain Record<string, TemplateRef<unknown>>, type-erased per key (the
+         one documented Angular divergence: no per-key scoped-param typing). Precedence
+         per seam: templates()['<seam>-<id>'] → the generic #<seam> ng-template → the
+         built-in render. editor-<id> needs editor="custom"; filter-<id> needs
+         [filterable]="true" (shown on category below); cell-<id> / colHeader-<id> have
+         no gate. -->
+    <DataTable
+      [data]="rows"
+      [templates]="{ 'cell-price': cellPriceTpl, 'colHeader-price': colHeaderPriceTpl, 'filter-category': filterCategoryTpl }"
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" [filterable]="true" />
+      <Column field="price" header="Price" />
+    </DataTable>
+
+    <ng-template #cellPriceTpl let-value="value">💲 {{ value }}</ng-template>
+    <ng-template #colHeaderPriceTpl let-label="label">🏷️ {{ label }}</ng-template>
+    <ng-template #filterCategoryTpl let-columnId="columnId" let-uniqueValues="uniqueValues" let-setFilter="setFilter">
+      <select (change)="setFilter(columnId, $any($event.target).value || null)">
+        <option value="">All</option>
+        @for (v of uniqueValues; track v) { <option [value]="v">{{ v }}</option> }
+      </select>
+    </ng-template>
+  \`,
+})
+export class DemoComponent {
+  rows = ${FACET_ROWS};
+}`,
+    },
   ],
   solid: [
     {
@@ -1792,6 +1962,41 @@ export function Demo() {
   );
 }`,
     },
+    {
+      title: SET_K_TITLE,
+      lang: 'tsx',
+      code: `import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // A family fill is a STATIC per-column override — the additive \`slots\` record prop,
+  // NOT an extension of cellSlot/colHeaderSlot/filterSlot/editorSlot. Precedence per
+  // seam: slots['<seam>-<id>'] → the generic <seam>Slot prop → the built-in render.
+  // editor-<id> only reaches a column declared editor="custom"; filter-<id> only reaches
+  // a column declared filterable (shown on \`category\` below); cell-<id> / colHeader-<id>
+  // have no gate. A misspelled key silently no-ops — it typechecks (a trailing catch-all
+  // index signature) but is never invoked.
+  const rows = ${FACET_ROWS};
+  return (
+    <DataTable
+      data={rows}
+      slots={{
+        'cell-price': ({ value }) => <>💲 {value}</>,
+        'colHeader-price': ({ label }) => <>🏷️ {label}</>,
+        'filter-category': ({ columnId, uniqueValues, setFilter }) => (
+          <select onChange={(e) => setFilter(columnId, e.currentTarget.value || null)}>
+            <option value="">All</option>
+            {uniqueValues.map((v) => <option value={String(v)}>{String(v)}</option>)}
+          </select>
+        ),
+      }}
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" />
+    </DataTable>
+  );
+}`,
+    },
   ],
   lit: [
     {
@@ -2073,6 +2278,38 @@ render(html\`
     <rozie-column field="region" header="Region"></rozie-column>
     <rozie-column field="category" header="Category"></rozie-column>
     <rozie-column field="units" header="Units" .aggregationFn=\${'sum'}></rozie-column>
+  </rozie-data-table>
+\`, document.body);`,
+    },
+    {
+      title: SET_K_TITLE,
+      lang: 'ts',
+      code: `import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = ${FACET_ROWS};
+
+// A family fill is a STATIC per-column override — the \`.rozieSlots\` record property
+// (NOT an extension of \`.cell\` / \`.colHeader\` / \`.filter\` / \`.editor\`). Precedence per
+// seam: rozieSlots['<seam>-<id>'] → the generic .<seam> property → the built-in render.
+// editor-<id> needs editor="custom"; filter-<id> needs filterable (shown on category
+// below); cell-<id> / colHeader-<id> have no gate.
+render(html\`
+  <rozie-data-table
+    .data=\${rows}
+    .rozieSlots=\${{
+      'cell-price': ({ value }) => html\`💲 \${value}\`,
+      'colHeader-price': ({ label }) => html\`🏷️ \${label}\`,
+      'filter-category': ({ columnId, uniqueValues, setFilter }) => html\`
+        <select @change=\${(e: Event) => setFilter(columnId, (e.target as HTMLSelectElement).value || null)}>
+          <option value="">All</option>
+          \${uniqueValues.map((v) => html\`<option value=\${String(v)}>\${String(v)}</option>\`)}
+        </select>\`,
+    }}
+  >
+    <rozie-column field="name" header="Name"></rozie-column>
+    <rozie-column field="category" header="Category" filterable></rozie-column>
+    <rozie-column field="price" header="Price"></rozie-column>
   </rozie-data-table>
 \`, document.body);`,
     },
@@ -2360,17 +2597,47 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       'facet control, so the consumer builds the UI purely from the exposed slot props.',
   );
   lines.push('');
+  lines.push(
+    '`cell`, `colHeader`, `filter` and `editor` each also have a **per-column slot ' +
+      'family** — a statically-named fill per `columnId` (`cell-price`, `colHeader-price`, ' +
+      '`filter-category`, `editor-score`, …) that takes precedence OVER the matching ' +
+      'generic slot above it: `<seam>-<id>` → the generic `<seam>` slot → the built-in ' +
+      'render. `editor-<id>` (and `editor`) only render on a column declared ' +
+      '`editor="custom"`; `filter-<id>` (and `filter`) only render on a column declared ' +
+      '`filterable`; `cell-<id>` / `colHeader-<id>` have no gate. The auto-injected ' +
+      'row-select / row-expander chrome columns never reach any family — they are ' +
+      `excluded structurally. ${FAMILY_SYNTAX_NOTE[target] || ''}`,
+  );
+  lines.push('');
+  lines.push(
+    'A misspelled family key does not fail to compile — the emitted type carries a ' +
+      'trailing catch-all index signature alongside the templated key, so it typechecks ' +
+      'but is simply never invoked. See the "Per-column slot families" example in Usage ' +
+      'above for the full per-target syntax.',
+  );
+  lines.push('');
   lines.push('| Slot | Params |');
   lines.push('| --- | --- |');
-  // De-duplicate by name: the same logical slot can be DECLARED more than once in the source
-  // when a template branch is duplicated for an r-if/r-else structural guard (phase 53 windowing
-  // duplicates the <table> — and thus its #cell/#colHeader/#selectAll/#selectCell slots — across
-  // the virtual and non-virtual branches). The README should list each slot once.
+  // De-duplicate by IDENTITY = `namePrefix ?? name`, NOT by `name` alone. Two reasons a
+  // slot repeats in `ir.slots`:
+  //  1. The same logical slot is DECLARED more than once in the source when a template
+  //     branch is duplicated for an r-if/r-else structural guard (phase 53 windowing
+  //     duplicates the <table> — and thus its #cell/#colHeader/#selectAll/#selectCell
+  //     slots — across the virtual and non-virtual branches).
+  //  2. A DYNAMIC-NAME slot FAMILY (`:name="`cell-${id}`"`) carries its public identity in
+  //     `namePrefix` ('cell-'), NOT in `name` — `name` is the SAME empty-string sentinel
+  //     for every family declaration AND for the plain default `<slot />`. Deduping on
+  //     `name` alone collapsed all four of this component's families onto that one
+  //     existing default-slot row — the exact blind spot docs/scripts/surface-hash.mjs
+  //     had before commit 7f6abc104 (see that commit for the sibling fix). Keying on
+  //     `namePrefix ?? name` gives each family its own row instead.
   const seenSlots = new Set();
   for (const s of ir.slots) {
-    if (seenSlots.has(s.name)) continue;
-    seenSlots.add(s.name);
-    lines.push(`| ${renderSlotName(s.name)} | ${slotParams(s)} |`);
+    const identity = s.namePrefix ?? s.name;
+    if (seenSlots.has(identity)) continue;
+    seenSlots.add(identity);
+    const label = s.namePrefix ? `${s.namePrefix}<id>` : renderSlotName(s.name);
+    lines.push(`| ${label} | ${slotParams(s)} |`);
   }
   lines.push('');
 

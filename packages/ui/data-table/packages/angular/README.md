@@ -465,6 +465,53 @@ export class DemoComponent {
 }
 ```
 
+### Per-column slot families (`cell-<id>` / `colHeader-<id>` / `filter-<id>` / `editor-<id>`)
+
+```ts
+import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: `
+    <!-- A family fill is a STATIC per-column override wired through the [templates]
+         input — a plain Record<string, TemplateRef<unknown>>, type-erased per key (the
+         one documented Angular divergence: no per-key scoped-param typing). Precedence
+         per seam: templates()['<seam>-<id>'] → the generic #<seam> ng-template → the
+         built-in render. editor-<id> needs editor="custom"; filter-<id> needs
+         [filterable]="true" (shown on category below); cell-<id> / colHeader-<id> have
+         no gate. -->
+    <DataTable
+      [data]="rows"
+      [templates]="{ 'cell-price': cellPriceTpl, 'colHeader-price': colHeaderPriceTpl, 'filter-category': filterCategoryTpl }"
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" [filterable]="true" />
+      <Column field="price" header="Price" />
+    </DataTable>
+
+    <ng-template #cellPriceTpl let-value="value">💲 {{ value }}</ng-template>
+    <ng-template #colHeaderPriceTpl let-label="label">🏷️ {{ label }}</ng-template>
+    <ng-template #filterCategoryTpl let-columnId="columnId" let-uniqueValues="uniqueValues" let-setFilter="setFilter">
+      <select (change)="setFilter(columnId, $any($event.target).value || null)">
+        <option value="">All</option>
+        @for (v of uniqueValues; track v) { <option [value]="v">{{ v }}</option> }
+      </select>
+    </ng-template>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+}
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
@@ -589,12 +636,20 @@ All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metad
 
 The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filtering) scoped slots follow the SAME render-prop convention: on React they are `renderDetail` / `renderGroupBar` / `renderFilter`; on Solid they are `detailSlot` / `groupBarSlot` / `filterSlot`; on Lit they are the `.detail` / `.groupBar` / `.filter` properties — the documented React render-prop edge (per the cross-framework compatibility bar). On Vue / Svelte / Angular they are ordinary named scoped slots (`#detail` / `#groupBar` / `#filter`). The `groupBar` and `filter` slots are HEADLESS — the component ships NO built-in group-bar / facet control, so the consumer builds the UI purely from the exposed slot props.
 
+`cell`, `colHeader`, `filter` and `editor` each also have a **per-column slot family** — a statically-named fill per `columnId` (`cell-price`, `colHeader-price`, `filter-category`, `editor-score`, …) that takes precedence OVER the matching generic slot above it: `<seam>-<id>` → the generic `<seam>` slot → the built-in render. `editor-<id>` (and `editor`) only render on a column declared `editor="custom"`; `filter-<id>` (and `filter`) only render on a column declared `filterable`; `cell-<id>` / `colHeader-<id>` have no gate. The auto-injected row-select / row-expander chrome columns never reach any family — they are excluded structurally. On Angular the family is the additive **`templates`** input — `[templates]="{ 'cell-price': cellPriceTpl }"` — a **type-erased** `Record<string, TemplateRef<unknown>>` (the one documented Angular divergence: no per-key scoped-param typing).
+
+A misspelled family key does not fail to compile — the emitted type carries a trailing catch-all index signature alongside the templated key, so it typechecks but is simply never invoked. See the "Per-column slot families" example in Usage above for the full per-target syntax.
+
 | Slot | Params |
 | --- | --- |
 | (default) |  |
 | groupBar | grouping, groupableColumns, applyGrouping, clearGrouping |
 | selectAll | checked, indeterminate, toggle |
+| colHeader-<id> | columnId, column, label |
+| filter-<id> | columnId, value, uniqueValues, minMax, setFilter |
 | selectCell | row, checked, toggle |
+| cell-<id> | columnId, column, row, value |
+| editor-<id> | columnId, column, row, value, commit, cancel, autofocus |
 | detail | row |
 | colHeader | columnId, column, label |
 | filter | columnId, value, uniqueValues, minMax, setFilter |

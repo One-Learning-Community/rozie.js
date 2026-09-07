@@ -2263,6 +2263,241 @@ render(html`
 
 :::
 
+### Per-column slot families (`cell-<id>` / `colHeader-<id>` / `filter-<id>` / `editor-<id>`)
+
+::: code-group
+
+```tsx [React]
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // A family fill is a STATIC per-column override — the additive `slots` record prop,
+  // NOT an extension of renderCell/renderColHeader/renderFilter/renderEditor. Precedence
+  // per seam: slots['<seam>-<id>'] → the generic render<Seam> prop → the built-in render.
+  // editor-<id> only reaches a column declared editor="custom"; filter-<id> only reaches
+  // a column declared filterable (shown on `category` below); cell-<id> / colHeader-<id>
+  // have no gate. A misspelled key silently no-ops — it typechecks (a trailing catch-all
+  // index signature) but is never invoked.
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  return (
+    <DataTable
+      data={rows}
+      slots={{
+        'cell-price': ({ value }) => <>💲 {value}</>,
+        'colHeader-price': ({ label }) => <>🏷️ {label}</>,
+        'filter-category': ({ columnId, uniqueValues, setFilter }) => (
+          <select onChange={(e) => setFilter(columnId, e.target.value || null)}>
+            <option value="">All</option>
+            {uniqueValues.map((v) => <option key={String(v)} value={String(v)}>{String(v)}</option>)}
+          </select>
+        ),
+      }}
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" />
+    </DataTable>
+  );
+}
+```
+
+```vue [Vue]
+<script setup lang="ts">
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+</script>
+
+<template>
+  <!-- A family fill is an ordinary NATIVE named slot — Vue's own convention, not special
+       Rozie syntax. Precedence per seam: #cell-<id> → the generic #cell → the built-in
+       render. #editor-<id> needs editor="custom"; #filter-<id> needs :filterable="true"
+       (shown on category below); #cell-<id> / #colHeader-<id> have no gate. -->
+  <DataTable :data="rows">
+    <Column field="name" header="Name" />
+    <Column field="category" header="Category" :filterable="true" />
+    <Column field="price" header="Price" />
+
+    <template #cell-price="{ value }">💲 {{ value }}</template>
+    <template #colHeader-price="{ label }">🏷️ {{ label }}</template>
+    <template #filter-category="{ columnId, uniqueValues, setFilter }">
+      <select @change="setFilter(columnId, ($event.target as HTMLSelectElement).value || null)">
+        <option value="">All</option>
+        <option v-for="v in uniqueValues" :key="String(v)" :value="v">{{ v }}</option>
+      </select>
+    </template>
+  </DataTable>
+</template>
+```
+
+```svelte [Svelte]
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  // A family fill is a STATIC per-column override — the additive `snippets` record prop,
+  // NOT an extension of the generic cell/colHeader/filter/editor snippets. Precedence per
+  // seam: snippets['<seam>-<id>'] → the generic snippet → the built-in render. editor-<id>
+  // needs editor="custom"; filter-<id> needs filterable (shown on `category` below);
+  // cell-<id> / colHeader-<id> have no gate.
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+</script>
+
+{#snippet cellPrice({ value })}💲 {value}{/snippet}
+{#snippet colHeaderPrice({ label })}🏷️ {label}{/snippet}
+{#snippet filterCategory({ columnId, uniqueValues, setFilter })}
+  <select onchange={(e) => setFilter(columnId, e.currentTarget.value || null)}>
+    <option value="">All</option>
+    {#each uniqueValues as v}<option value={v}>{v}</option>{/each}
+  </select>
+{/snippet}
+
+<DataTable
+  data={rows}
+  snippets={{ 'cell-price': cellPrice, 'colHeader-price': colHeaderPrice, 'filter-category': filterCategory }}
+>
+  <Column field="name" header="Name" />
+  <Column field="category" header="Category" filterable />
+  <Column field="price" header="Price" />
+</DataTable>
+```
+
+```ts [Angular]
+import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: `
+    <!-- A family fill is a STATIC per-column override wired through the [templates]
+         input — a plain Record<string, TemplateRef<unknown>>, type-erased per key (the
+         one documented Angular divergence: no per-key scoped-param typing). Precedence
+         per seam: templates()['<seam>-<id>'] → the generic #<seam> ng-template → the
+         built-in render. editor-<id> needs editor="custom"; filter-<id> needs
+         [filterable]="true" (shown on category below); cell-<id> / colHeader-<id> have
+         no gate. -->
+    <DataTable
+      [data]="rows"
+      [templates]="{ 'cell-price': cellPriceTpl, 'colHeader-price': colHeaderPriceTpl, 'filter-category': filterCategoryTpl }"
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" [filterable]="true" />
+      <Column field="price" header="Price" />
+    </DataTable>
+
+    <ng-template #cellPriceTpl let-value="value">💲 {{ value }}</ng-template>
+    <ng-template #colHeaderPriceTpl let-label="label">🏷️ {{ label }}</ng-template>
+    <ng-template #filterCategoryTpl let-columnId="columnId" let-uniqueValues="uniqueValues" let-setFilter="setFilter">
+      <select (change)="setFilter(columnId, $any($event.target).value || null)">
+        <option value="">All</option>
+        @for (v of uniqueValues; track v) { <option [value]="v">{{ v }}</option> }
+      </select>
+    </ng-template>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+}
+```
+
+```tsx [Solid]
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // A family fill is a STATIC per-column override — the additive `slots` record prop,
+  // NOT an extension of cellSlot/colHeaderSlot/filterSlot/editorSlot. Precedence per
+  // seam: slots['<seam>-<id>'] → the generic <seam>Slot prop → the built-in render.
+  // editor-<id> only reaches a column declared editor="custom"; filter-<id> only reaches
+  // a column declared filterable (shown on `category` below); cell-<id> / colHeader-<id>
+  // have no gate. A misspelled key silently no-ops — it typechecks (a trailing catch-all
+  // index signature) but is never invoked.
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  return (
+    <DataTable
+      data={rows}
+      slots={{
+        'cell-price': ({ value }) => <>💲 {value}</>,
+        'colHeader-price': ({ label }) => <>🏷️ {label}</>,
+        'filter-category': ({ columnId, uniqueValues, setFilter }) => (
+          <select onChange={(e) => setFilter(columnId, e.currentTarget.value || null)}>
+            <option value="">All</option>
+            {uniqueValues.map((v) => <option value={String(v)}>{String(v)}</option>)}
+          </select>
+        ),
+      }}
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" />
+    </DataTable>
+  );
+}
+```
+
+```ts [Lit]
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+
+// A family fill is a STATIC per-column override — the `.rozieSlots` record property
+// (NOT an extension of `.cell` / `.colHeader` / `.filter` / `.editor`). Precedence per
+// seam: rozieSlots['<seam>-<id>'] → the generic .<seam> property → the built-in render.
+// editor-<id> needs editor="custom"; filter-<id> needs filterable (shown on category
+// below); cell-<id> / colHeader-<id> have no gate.
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    .rozieSlots=${{
+      'cell-price': ({ value }) => html`💲 ${value}`,
+      'colHeader-price': ({ label }) => html`🏷️ ${label}`,
+      'filter-category': ({ columnId, uniqueValues, setFilter }) => html`
+        <select @change=${(e: Event) => setFilter(columnId, (e.target as HTMLSelectElement).value || null)}>
+          <option value="">All</option>
+          ${uniqueValues.map((v) => html`<option value=${String(v)}>${String(v)}</option>`)}
+        </select>`,
+    }}
+  >
+    <rozie-column field="name" header="Name"></rozie-column>
+    <rozie-column field="category" header="Category" filterable></rozie-column>
+    <rozie-column field="price" header="Price"></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
+:::
+
 ## Imperative handle
 
 Beyond props and events, `DataTable` exposes imperative methods (declared once in the `.rozie` source via `$expose`). Grab a handle through your framework's native ref mechanism and call them directly:
