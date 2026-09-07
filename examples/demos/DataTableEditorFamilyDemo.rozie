@@ -1,0 +1,114 @@
+<!--
+  DataTableEditorFamilyDemo.rozie — Phase 88 Plan 05 (D-03) fixture pinning the
+  editor-owns-focus contract (CONTEXT.md D-01/D-02/D-03) BEFORE 88-07 reworks the
+  focus polls. Drives data-table-editor-family-focus.spec.ts.
+
+  Two independently-addressable table instances (each wrapped in an element carrying an
+  instance-identifying attribute so the spec can resolve the RIGHT grid — this demo mounts
+  TWO, and a helper that resolves the first table[role="grid"] would always pick the wrong
+  one for the second instance):
+
+    mixed  — three editable columns in DOM order name(built-in text), status(custom editor kind,
+             filled by an EditorText drop-in), qty(built-in number). name-first/status-second
+             is deliberate: row edit's initial focus target is always the row's FIRST editable
+             column (editableColumnsForRow / beginRowEdit), so this arrangement makes that
+             target a BUILT-IN column while a drop-in is mounted alongside it in the same row.
+    nofill — name(built-in text), notes(custom editor kind, NO fill anywhere in this instance) —
+             the degrade-to-built-in-and-still-focus case (D-01's rejected-alternative note:
+             a bare editorTypeOf-is-custom gate would leave this column unfocused; the
+             current hasEditorSlot() gate correctly does not).
+
+  interactionMode="grid" (mirrors DataTableGridEditDemo.rozie) makes both F2 single-cell edit
+  and Shift+F2 full-row edit reachable via the keyboard, no extra props needed.
+
+  Static deterministic seed data — no Date/Math.random/now() (a known flake source in this
+  suite, T-88-11).
+-->
+
+<rozie name="DataTableEditorFamilyDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+  EditorText: '../../packages/ui/data-table/src/EditorText.rozie',
+}
+</components>
+
+<data>
+{
+  // mixed instance: name(built-in) / status(drop-in via generic fill) / qty(built-in).
+  mixedRows: [
+    { id: 1, name: 'Alpha', status: 'active',   qty: 3 },
+    { id: 2, name: 'Beta',  status: 'archived', qty: 7 },
+  ],
+  // nofill instance: name(built-in) / notes(declared custom, no fill anywhere).
+  nofillRows: [
+    { id: 1, name: 'Gamma', notes: 'first note' },
+    { id: 2, name: 'Delta', notes: 'second note' },
+  ],
+}
+</data>
+
+<template>
+<div class="dt-editor-family-demo">
+  <h3>DataTable — editor-owns-focus contract (built-in / drop-in / no-fill)</h3>
+
+  <div data-dt-instance="mixed">
+    <h4>mixed: name (built-in) / status (drop-in) / qty (built-in)</h4>
+    <DataTable interactionMode="grid" r-model:data="$data.mixedRows">
+      <Column field="name"   header="Name"   :editable="true" editor="text"   />
+      <Column field="status" header="Status" :editable="true" editor="custom" />
+      <Column field="qty"    header="Qty"    :editable="true" editor="number" />
+
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <!-- Generic fill: only `status` declares the custom editor kind in this instance, so
+           this dispatches for exactly one column — no columnId branch needed. Forwards the
+           verified slot scope (value/commit/cancel/column/row/columnId) plus the reactive
+           `autofocus` prop the editor-owns-focus contract relies on. -->
+      <template #editor="{ columnId, column, row, value, commit, cancel, autofocus }">
+        <EditorText
+          :columnId="columnId"
+          :column="column"
+          :row="row"
+          :value="value"
+          :commit="commit"
+          :cancel="cancel"
+          :autofocus="autofocus"
+        />
+      </template>
+    </DataTable>
+  </div>
+
+  <div data-dt-instance="nofill">
+    <h4>nofill: name (built-in) / notes (custom, no fill anywhere)</h4>
+    <DataTable interactionMode="grid" r-model:data="$data.nofillRows">
+      <Column field="name"  header="Name"  :editable="true" editor="text"   />
+      <Column field="notes" header="Notes" :editable="true" editor="custom" />
+
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <!-- Deliberately NO editor slot fill at all — `notes` must degrade to the built-in
+           text editor and still be focused (case c). -->
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-editor-family-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 640px;
+}
+.dt-editor-family-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.dt-editor-family-demo h4 { margin: 1rem 0 0.375rem; font-size: 0.8125rem; color: #444; }
+</style>
+
+</rozie>
