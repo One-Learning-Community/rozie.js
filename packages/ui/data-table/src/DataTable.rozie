@@ -1484,7 +1484,7 @@ const onHeaderSort = (colId, evt) => {
 // aria-sort never flips, the pin position never sticks. Touching rowModelVer puts each
 // helper in the reactive scope. The chrome helpers prefix `tick()` in their guard.
 const tick = () => $data.rowModelVer
-import { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, hasFilterSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle } from './columnChrome.rzts'
+import { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle } from './columnChrome.rzts'
 
 import { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, displayPageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, rowIndexIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupRowDescriptor, cellSlotRow, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn } from './filterPaginationRowChrome.rzts'
 // `indeterminate` is a DOM PROPERTY, not an HTML attribute — a `:indeterminate="…"`
@@ -2104,24 +2104,33 @@ $expose({
         <span style="display:contents" r-if="isSelectColumn(wh.header.column.id)"></span>
         <span style="display:contents" r-else-if="isExpanderColumn(wh.header.column.id)"></span>
         <span style="display:contents" r-else>
-          <input
-            r-if="columnIsFilterable(wh.header.column.id) && !hasFilterSlot()"
-            class="rdt-col-filter"
-            type="text"
-            :aria-label="'Filter ' + headerLabel(wh.header.column.id)"
-            :value="columnFilterValue(wh.header.column.id)"
-            @input="onColumnFilterInput(wh.header.column.id, $event)"
-            @click="stopEvent($event)"
-          />
           <span style="display:contents" r-if="columnIsFilterable(wh.header.column.id)">
             <slot
-              name="filter"
+              :name="`filter-${wh.header.column.id}`"
               :columnId="wh.header.column.id"
               :value="columnFilterValue(wh.header.column.id)"
               :uniqueValues="getFacetedUniqueValues(wh.header.column.id)"
               :minMax="getFacetedMinMaxValues(wh.header.column.id)"
               :setFilter="setColumnFilter"
-            />
+            >
+              <slot
+                name="filter"
+                :columnId="wh.header.column.id"
+                :value="columnFilterValue(wh.header.column.id)"
+                :uniqueValues="getFacetedUniqueValues(wh.header.column.id)"
+                :minMax="getFacetedMinMaxValues(wh.header.column.id)"
+                :setFilter="setColumnFilter"
+              >
+                <input
+                  class="rdt-col-filter"
+                  type="text"
+                  :aria-label="'Filter ' + headerLabel(wh.header.column.id)"
+                  :value="columnFilterValue(wh.header.column.id)"
+                  @input="onColumnFilterInput(wh.header.column.id, $event)"
+                  @click="stopEvent($event)"
+                />
+              </slot>
+            </slot>
           </span>
         </span>
       </th>
@@ -2593,24 +2602,33 @@ $expose({
         <span style="display:contents" r-if="isSelectColumn(header.column.id)"></span>
         <span style="display:contents" r-else-if="isExpanderColumn(header.column.id)"></span>
         <span style="display:contents" r-else>
-          <input
-            r-if="columnIsFilterable(header.column.id) && !hasFilterSlot()"
-            class="rdt-col-filter"
-            type="text"
-            :aria-label="'Filter ' + headerLabel(header.column.id)"
-            :value="columnFilterValue(header.column.id)"
-            @input="onColumnFilterInput(header.column.id, $event)"
-            @click="stopEvent($event)"
-          />
           <span style="display:contents" r-if="columnIsFilterable(header.column.id)">
             <slot
-              name="filter"
+              :name="`filter-${header.column.id}`"
               :columnId="header.column.id"
               :value="columnFilterValue(header.column.id)"
               :uniqueValues="getFacetedUniqueValues(header.column.id)"
               :minMax="getFacetedMinMaxValues(header.column.id)"
               :setFilter="setColumnFilter"
-            />
+            >
+              <slot
+                name="filter"
+                :columnId="header.column.id"
+                :value="columnFilterValue(header.column.id)"
+                :uniqueValues="getFacetedUniqueValues(header.column.id)"
+                :minMax="getFacetedMinMaxValues(header.column.id)"
+                :setFilter="setColumnFilter"
+              >
+                <input
+                  class="rdt-col-filter"
+                  type="text"
+                  :aria-label="'Filter ' + headerLabel(header.column.id)"
+                  :value="columnFilterValue(header.column.id)"
+                  @input="onColumnFilterInput(header.column.id, $event)"
+                  @click="stopEvent($event)"
+                />
+              </slot>
+            </slot>
           </span>
         </span>
       </th>

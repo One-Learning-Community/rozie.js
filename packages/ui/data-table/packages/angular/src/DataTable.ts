@@ -53,15 +53,6 @@ interface SelectAllCtx {
   toggle: any;
 }
 
-interface FilterCtx {
-  $implicit: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any };
-  columnId: any;
-  value: any;
-  uniqueValues: any;
-  minMax: any;
-  setFilter: any;
-}
-
 interface SelectCellCtx {
   $implicit: { row: any; checked: any; toggle: any };
   row: any;
@@ -92,6 +83,15 @@ interface ColHeaderCtx {
   label: any;
 }
 
+interface FilterCtx {
+  $implicit: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any };
+  columnId: any;
+  value: any;
+  uniqueValues: any;
+  minMax: any;
+  setFilter: any;
+}
+
 interface CellCtx {
   $implicit: { columnId: any; column: any; row: any; value: any };
   columnId: any;
@@ -105,6 +105,15 @@ interface ColHeaderCtx {
   columnId: any;
   column: any;
   label: any;
+}
+
+interface FilterCtx {
+  $implicit: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any };
+  columnId: any;
+  value: any;
+  uniqueValues: any;
+  minMax: any;
+  setFilter: any;
 }
 
 interface CellCtx {
@@ -252,11 +261,21 @@ interface CellCtx {
     <span style="display:contents"></span>
     } @else {
     <span style="display:contents">
-              @if (columnIsFilterable(wh.header.column.id) && !hasFilterSlot()) {
-    <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(wh.header.column.id))" [value]="columnFilterValue(wh.header.column.id)" (input)="onColumnFilterInput(wh.header.column.id, $event)" (click)="stopEvent($event)" />
-    }@if (columnIsFilterable(wh.header.column.id)) {
+              @if (columnIsFilterable(wh.header.column.id)) {
     <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter']); context: { $implicit: { columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), setFilter: setColumnFilter }, columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), setFilter: setColumnFilter }" />
+                @if ((__rozieFillMap()[\`filter-\${wh.header.column.id}\`] ?? templates()?.[\`filter-\${wh.header.column.id}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`filter-\${wh.header.column.id}\`] ?? templates()?.[\`filter-\${wh.header.column.id}\`]); context: { $implicit: { columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), setFilter: setColumnFilter }, columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), setFilter: setColumnFilter }" />
+    } @else {
+
+                  @if ((filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter'])) {
+    <ng-container *ngTemplateOutlet="(filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter']); context: { $implicit: { columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), setFilter: setColumnFilter }, columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), setFilter: setColumnFilter }" />
+    } @else {
+
+                    <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(wh.header.column.id))" [value]="columnFilterValue(wh.header.column.id)" (input)="onColumnFilterInput(wh.header.column.id, $event)" (click)="stopEvent($event)" />
+                  
+    }
+                
+    }
               </span>
     }</span>
     }</th>
@@ -460,11 +479,21 @@ interface CellCtx {
     <span style="display:contents"></span>
     } @else {
     <span style="display:contents">
-              @if (columnIsFilterable(header.column.id) && !hasFilterSlot()) {
-    <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="stopEvent($event)" />
-    }@if (columnIsFilterable(header.column.id)) {
+              @if (columnIsFilterable(header.column.id)) {
     <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }" />
+                @if ((__rozieFillMap()[\`filter-\${header.column.id}\`] ?? templates()?.[\`filter-\${header.column.id}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`filter-\${header.column.id}\`] ?? templates()?.[\`filter-\${header.column.id}\`]); context: { $implicit: { columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }" />
+    } @else {
+
+                  @if ((filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter'])) {
+    <ng-container *ngTemplateOutlet="(filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }" />
+    } @else {
+
+                    <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="stopEvent($event)" />
+                  
+    }
+                
+    }
               </span>
     }</span>
     }</th>
@@ -1114,11 +1143,11 @@ export class DataTable {
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('groupBar', { read: TemplateRef }) groupBarTpl?: TemplateRef<GroupBarCtx>;
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
-  @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
   @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
   @ContentChild('detail', { read: TemplateRef }) detailTpl?: TemplateRef<DetailCtx>;
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
+  @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
   @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   __rozieFills = contentChildren(RozieSlot, { descendants: true });
@@ -1212,7 +1241,7 @@ export class DataTable {
 
   ngAfterContentInit() {
     if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;
-    const claimedByStaticRefs = [this.defaultTpl, this.groupBarTpl, this.selectAllTpl, this.filterTpl, this.selectCellTpl, this.editorTpl, this.detailTpl, this.colHeaderTpl, this.cellTpl].filter((t) => t != null).length;
+    const claimedByStaticRefs = [this.defaultTpl, this.groupBarTpl, this.selectAllTpl, this.selectCellTpl, this.editorTpl, this.detailTpl, this.colHeaderTpl, this.filterTpl, this.cellTpl].filter((t) => t != null).length;
     if (this.__rozieFills().length === 0 && this.__rozieProjectedTpls().length > claimedByStaticRefs) {
       this.__rozieSlotWarned = true;
       console.warn('[ROZ750] DataTable: projected template content was found but no keyed fills were collected — did you forget to add RozieSlot to the consumer\'s imports: array?');
@@ -3575,10 +3604,6 @@ export class DataTable {
   // provided an #editor slot. Falls through to the built-in editor otherwise (e.g. a
   // column marked 'custom' with no slot supplied degrades to the text editor, never blank).
   hasEditorSlot = (colId: any) => this.editorTypeOf(colId) === 'custom' && !!(this.editorTpl ?? this.__rozieFillMap()['editor'] ?? this.templates()?.['editor']);
-  // hasFilterSlot: the consumer supplied a #filter scoped slot, so it OWNS the per-column
-  // filter UI (re-added in 72-05 alongside the dedicated filter row's `<slot name="filter">`
-  // host — see the 72-03 removal note in that plan's SUMMARY for why this was briefly gone).
-  hasFilterSlot = () => !!(this.filterTpl ?? this.__rozieFillMap()['filter'] ?? this.templates()?.['filter']);
   columnIsFilterable = (colId: any) => {
     const d = this.defFor(colId);
     return !!(d && d.filterable);
@@ -7611,7 +7636,7 @@ export class DataTable {
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | FilterCtx | SelectCellCtx | EditorCtx | DetailCtx | ColHeaderCtx | CellCtx {
+  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | SelectCellCtx | EditorCtx | DetailCtx | ColHeaderCtx | FilterCtx | CellCtx {
     return true;
   }
 

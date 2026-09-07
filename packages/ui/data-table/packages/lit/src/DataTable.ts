@@ -58,7 +58,7 @@ interface RozieDynamicColHeaderSlotCtx {
   label: any;
 }
 
-interface RozieFilterSlotCtx {
+interface RozieDynamicFilterSlotCtx {
   columnId: any;
   value: any;
   uniqueValues: any;
@@ -97,6 +97,14 @@ interface RozieColHeaderSlotCtx {
   columnId: any;
   column: any;
   label: any;
+}
+
+interface RozieFilterSlotCtx {
+  columnId: any;
+  value: any;
+  uniqueValues: any;
+  minMax: any;
+  setFilter: any;
 }
 
 interface RozieCellSlotCtx {
@@ -673,9 +681,8 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   @property({ attribute: false }) selectAll?: (scope: { checked: any; indeterminate: any; toggle: any }) => unknown;
   @state() private _hasSlotDynamicColHeader = false;
   @queryAssignedElements({ flatten: true }) private _slotDynamicColHeaderElements!: Element[];
-  @state() private _hasSlotFilter = false;
-  @queryAssignedElements({ slot: 'filter', flatten: true }) private _slotFilterElements!: Element[];
-  @property({ attribute: false }) filter?: (scope: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => unknown;
+  @state() private _hasSlotDynamicFilter = false;
+  @queryAssignedElements({ flatten: true }) private _slotDynamicFilterElements!: Element[];
   @state() private _hasSlotSelectCell = false;
   @queryAssignedElements({ slot: 'selectCell', flatten: true }) private _slotSelectCellElements!: Element[];
   @property({ attribute: false }) selectCell?: (scope: { row: any; checked: any; toggle: any }) => unknown;
@@ -690,6 +697,9 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   @state() private _hasSlotColHeader = false;
   @queryAssignedElements({ slot: 'colHeader', flatten: true }) private _slotColHeaderElements!: Element[];
   @property({ attribute: false }) colHeader?: (scope: { columnId: any; column: any; label: any }) => unknown;
+  @state() private _hasSlotFilter = false;
+  @queryAssignedElements({ slot: 'filter', flatten: true }) private _slotFilterElements!: Element[];
+  @property({ attribute: false }) filter?: (scope: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => unknown;
   @state() private _hasSlotCell = false;
   @queryAssignedElements({ slot: 'cell', flatten: true }) private _slotCellElements!: Element[];
   @property({ attribute: false }) cell?: (scope: { columnId: any; column: any; row: any; value: any }) => unknown;
@@ -702,7 +712,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   // named function-prop / <slot> fallback (AC-9). Attribute
   // deserialization is disabled — this is a function-valued record,
   // never reflected to/from an HTML attribute.
-  @property({ attribute: false }) rozieSlots?: { [key: `colHeader-${string}`]: (scope: { columnId: any; column: any; label: any }) => unknown; [key: `cell-${string}`]: (scope: { columnId: any; column: any; row: any; value: any }) => unknown; } & Record<string, (scope: any) => unknown>;
+  @property({ attribute: false }) rozieSlots?: { [key: `colHeader-${string}`]: (scope: { columnId: any; column: any; label: any }) => unknown; [key: `filter-${string}`]: (scope: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => unknown; [key: `cell-${string}`]: (scope: { columnId: any; column: any; row: any; value: any }) => unknown; } & Record<string, (scope: any) => unknown>;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -755,9 +765,9 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     }
 
     {
-      const slotEl = this.shadowRoot?.querySelector('slot[name="filter"]');
+      const slotEl = this.shadowRoot?.querySelector('slot:not([name])');
       if (slotEl !== null && slotEl !== undefined) {
-        const update = () => { this._hasSlotFilter = this._slotFilterElements.length > 0; };
+        const update = () => { this._hasSlotDynamicFilter = this._slotDynamicFilterElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
         // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
         this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
@@ -821,6 +831,17 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     }
 
     {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="filter"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotFilter = this._slotFilterElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
       const slotEl = this.shadowRoot?.querySelector('slot[name="cell"]');
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotCell = this._slotCellElements.length > 0; };
@@ -838,12 +859,13 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     this._hasSlotGroupBar = Array.from(this.children).some((el) => el.getAttribute('slot') === 'groupBar');
     this._hasSlotSelectAll = Array.from(this.children).some((el) => el.getAttribute('slot') === 'selectAll');
     this._hasSlotDynamicColHeader = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
-    this._hasSlotFilter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'filter');
+    this._hasSlotDynamicFilter = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     this._hasSlotSelectCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'selectCell');
     this._hasSlotDynamicCell = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     this._hasSlotEditor = Array.from(this.children).some((el) => el.getAttribute('slot') === 'editor');
     this._hasSlotDetail = Array.from(this.children).some((el) => el.getAttribute('slot') === 'detail');
     this._hasSlotColHeader = Array.from(this.children).some((el) => el.getAttribute('slot') === 'colHeader');
+    this._hasSlotFilter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'filter');
     this._hasSlotCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'cell');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
@@ -1362,8 +1384,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     ${this.hasAnyFilterableColumn() ? html`<tr class="rdt-filter-row" data-rozie-s-d5dcab4c>
       ${this.colsWindowed() ? html`<th class="rdt-col-spacer" aria-hidden="true" style=${rozieStyle('width:' + this.colPadLeft() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c></th>` : nothing}${repeat<any>(this.windowedHeadersFor(this._headerGroups.value[this._headerGroups.value.length - 1], this._headerGroups.value.length - 1), (wh, _idx) => wh.header.id, (wh, _idx) => html`<th class="rdt-filter-cell" role="presentation" data-col=${rozieAttr(wh.header.column.id)} style=${rozieStyle(this.pinStyle(wh.header.column.id))} data-rozie-s-d5dcab4c>
         ${this.isSelectColumn(wh.header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : this.isExpanderColumn(wh.header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : html`<span style="display:contents" data-rozie-s-d5dcab4c>
-          ${this.columnIsFilterable(wh.header.column.id) && !this.hasFilterSlot() ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(wh.header.column.id))} .value=${this.columnFilterValue(wh.header.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onColumnFilterInput(wh.header.column.id, $event); }} @click=${($event: MouseEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />` : nothing}${this.columnIsFilterable(wh.header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.filter !== undefined ? this.filter({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id)}); } catch { return '{}'; } })()} @rozie-filter-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}></slot>`}
+          ${this.columnIsFilterable(wh.header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+            ${this.rozieSlots?.[`filter-${wh.header.column.id}`] !== undefined ? this.rozieSlots?.[`filter-${wh.header.column.id}`]!({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="${`filter-${wh.header.column.id}`}" data-rozie-params=${(() => { try { return JSON.stringify({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id)}); } catch { return '{}'; } })()} @rozie-default-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}>
+              ${this.filter !== undefined ? this.filter({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id)}); } catch { return '{}'; } })()} @rozie-filter-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}>
+                <input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(wh.header.column.id))} .value=${this.columnFilterValue(wh.header.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onColumnFilterInput(wh.header.column.id, $event); }} @click=${($event: MouseEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />
+              </slot>`}
+            </slot>`}
           </span>` : nothing}</span>`}</th>`)}
       ${this.colsWindowed() ? html`<th class="rdt-col-spacer" aria-hidden="true" style=${rozieStyle('width:' + this.colPadRight() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c></th>` : nothing}</tr>` : nothing}</thead>
 
@@ -1456,8 +1482,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     ${this.hasAnyFilterableColumn() ? html`<tr class="rdt-filter-row" data-rozie-s-d5dcab4c>
       ${repeat<any>(this._headerGroups.value[this._headerGroups.value.length - 1].headers, (header, _idx) => header.id, (header, _idx) => html`<th class="rdt-filter-cell" role="presentation" style=${rozieStyle(this.pinStyle(header.column.id))} data-rozie-s-d5dcab4c>
         ${this.isSelectColumn(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : this.isExpanderColumn(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : html`<span style="display:contents" data-rozie-s-d5dcab4c>
-          ${this.columnIsFilterable(header.column.id) && !this.hasFilterSlot() ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: MouseEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />` : nothing}${this.columnIsFilterable(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.filter !== undefined ? this.filter({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id)}); } catch { return '{}'; } })()} @rozie-filter-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}></slot>`}
+          ${this.columnIsFilterable(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+            ${this.rozieSlots?.[`filter-${header.column.id}`] !== undefined ? this.rozieSlots?.[`filter-${header.column.id}`]!({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="${`filter-${header.column.id}`}" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id)}); } catch { return '{}'; } })()} @rozie-default-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}>
+              ${this.filter !== undefined ? this.filter({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id)}); } catch { return '{}'; } })()} @rozie-filter-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}>
+                <input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: MouseEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />
+              </slot>`}
+            </slot>`}
           </span>` : nothing}</span>`}</th>`)}
     </tr>` : nothing}</thead>
 
@@ -3694,11 +3724,6 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // provided an #editor slot. Falls through to the built-in editor otherwise (e.g. a
   // column marked 'custom' with no slot supplied degrades to the text editor, never blank).
   hasEditorSlot = (colId: any) => this.editorTypeOf(colId) === 'custom' && !!(this._hasSlotEditor || this.editor !== undefined);
-
-  // hasFilterSlot: the consumer supplied a #filter scoped slot, so it OWNS the per-column
-  // filter UI (re-added in 72-05 alongside the dedicated filter row's `<slot name="filter">`
-  // host — see the 72-03 removal note in that plan's SUMMARY for why this was briefly gone).
-  hasFilterSlot = () => !!(this._hasSlotFilter || this.filter !== undefined);
 
   columnIsFilterable = (colId: any) => {
   const d = this.defFor(colId);

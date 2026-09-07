@@ -495,9 +495,9 @@ The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filt
 | (default) |  |
 | groupBar | grouping, groupableColumns, applyGrouping, clearGrouping |
 | selectAll | checked, indeterminate, toggle |
-| filter | columnId, value, uniqueValues, minMax, setFilter |
 | selectCell | row, checked, toggle |
 | editor | columnId, column, row, value, commit, cancel, autofocus |
 | detail | row |
 | colHeader | columnId, column, label |
+| filter | columnId, value, uniqueValues, minMax, setFilter |
 | cell | columnId, column, row, value |

@@ -63,8 +63,12 @@
     <tr v-if="hasAnyFilterableColumn()" class="rdt-filter-row">
       <th v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th><th v-for="wh in windowedHeadersFor(headerGroups[headerGroups.length - 1], headerGroups.length - 1)" :key="wh.header.id" class="rdt-filter-cell" role="presentation" :data-col="wh.header.column.id" :style="pinStyle(wh.header.column.id)">
         <span v-if="isSelectColumn(wh.header.column.id)" style="display:contents"></span><span v-else-if="isExpanderColumn(wh.header.column.id)" style="display:contents"></span><span v-else style="display:contents">
-          <input v-if="columnIsFilterable(wh.header.column.id) && !hasFilterSlot()" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(wh.header.column.id)" :value="columnFilterValue(wh.header.column.id)" @input="onColumnFilterInput(wh.header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(wh.header.column.id)" style="display:contents">
-            <slot name="filter" :columnId="wh.header.column.id" :value="columnFilterValue(wh.header.column.id)" :uniqueValues="getFacetedUniqueValues(wh.header.column.id)" :minMax="getFacetedMinMaxValues(wh.header.column.id)" :setFilter="setColumnFilter"></slot>
+          <span v-if="columnIsFilterable(wh.header.column.id)" style="display:contents">
+            <slot :name="`filter-${wh.header.column.id}`" :columnId="wh.header.column.id" :value="columnFilterValue(wh.header.column.id)" :uniqueValues="getFacetedUniqueValues(wh.header.column.id)" :minMax="getFacetedMinMaxValues(wh.header.column.id)" :setFilter="setColumnFilter">
+              <slot name="filter" :columnId="wh.header.column.id" :value="columnFilterValue(wh.header.column.id)" :uniqueValues="getFacetedUniqueValues(wh.header.column.id)" :minMax="getFacetedMinMaxValues(wh.header.column.id)" :setFilter="setColumnFilter">
+                <input class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(wh.header.column.id)" :value="columnFilterValue(wh.header.column.id)" @input="onColumnFilterInput(wh.header.column.id, $event)" @click="stopEvent($event)" />
+              </slot>
+            </slot>
           </span></span></th>
       <th v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadRight() + 'px;padding:0;border:0'"></th></tr></thead>
 
@@ -159,8 +163,12 @@
     <tr v-if="hasAnyFilterableColumn()" class="rdt-filter-row">
       <th v-for="header in headerGroups[headerGroups.length - 1].headers" :key="header.id" class="rdt-filter-cell" role="presentation" :style="pinStyle(header.column.id)">
         <span v-if="isSelectColumn(header.column.id)" style="display:contents"></span><span v-else-if="isExpanderColumn(header.column.id)" style="display:contents"></span><span v-else style="display:contents">
-          <input v-if="columnIsFilterable(header.column.id) && !hasFilterSlot()" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
-            <slot name="filter" :columnId="header.column.id" :value="columnFilterValue(header.column.id)" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter"></slot>
+          <span v-if="columnIsFilterable(header.column.id)" style="display:contents">
+            <slot :name="`filter-${header.column.id}`" :columnId="header.column.id" :value="columnFilterValue(header.column.id)" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter">
+              <slot name="filter" :columnId="header.column.id" :value="columnFilterValue(header.column.id)" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter">
+                <input class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" />
+              </slot>
+            </slot>
           </span></span></th>
     </tr></thead>
 
@@ -376,17 +384,17 @@ defineSlots<{
   groupBar(props: { grouping: any; groupableColumns: any; applyGrouping: any; clearGrouping: any }): any;
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   [key: `colHeader-${string}`]: ((props: { columnId: any; column: any; label: any }) => any) | undefined;
-  filter(props: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }): any;
+  [key: `filter-${string}`]: ((props: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => any) | undefined;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   [key: `cell-${string}`]: ((props: { columnId: any; column: any; row: any; value: any }) => any) | undefined;
   editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }): any;
   detail(props: { row: any }): any;
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
-  filter(props: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }): any;
   detail(props: { row: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
+  filter(props: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
 }>();
 
@@ -2471,10 +2479,6 @@ const editorOptionsOf = (colId: any) => {
 // provided an #editor slot. Falls through to the built-in editor otherwise (e.g. a
 // column marked 'custom' with no slot supplied degrades to the text editor, never blank).
 const hasEditorSlot = (colId: any) => editorTypeOf(colId) === 'custom' && !!slots.editor;
-// hasFilterSlot: the consumer supplied a #filter scoped slot, so it OWNS the per-column
-// filter UI (re-added in 72-05 alongside the dedicated filter row's `<slot name="filter">`
-// host — see the 72-03 removal note in that plan's SUMMARY for why this was briefly gone).
-const hasFilterSlot = () => !!slots.filter;
 const columnIsFilterable = (colId: any) => {
   const d = defFor(colId);
   return !!(d && d.filterable);
