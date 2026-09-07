@@ -60,17 +60,6 @@ interface SelectCellCtx {
   toggle: any;
 }
 
-interface EditorCtx {
-  $implicit: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any };
-  columnId: any;
-  column: any;
-  row: any;
-  value: any;
-  commit: any;
-  cancel: any;
-  autofocus: any;
-}
-
 interface DetailCtx {
   $implicit: { row: any };
   row: any;
@@ -100,6 +89,17 @@ interface CellCtx {
   value: any;
 }
 
+interface EditorCtx {
+  $implicit: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any };
+  columnId: any;
+  column: any;
+  row: any;
+  value: any;
+  commit: any;
+  cancel: any;
+  autofocus: any;
+}
+
 interface ColHeaderCtx {
   $implicit: { columnId: any; column: any; label: any };
   columnId: any;
@@ -122,6 +122,17 @@ interface CellCtx {
   column: any;
   row: any;
   value: any;
+}
+
+interface EditorCtx {
+  $implicit: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any };
+  columnId: any;
+  column: any;
+  row: any;
+  value: any;
+  commit: any;
+  cancel: any;
+  autofocus: any;
 }
 
 @Component({
@@ -335,11 +346,7 @@ interface CellCtx {
             </span>
     } @else if (isEditing(wr.vi.index, colIndexOf(wr.row, cell))) {
     <span style="display:contents">
-              @if (hasEditorSlot(cell.column.id)) {
-    <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
-              </span>
-    } @else if (editorTypeOf(cell.column.id) === 'number') {
+              @if (editorTypeOf(cell.column.id) === 'number') {
     <input class="rdt-cell-editor" type="number" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     } @else if (editorTypeOf(cell.column.id) === 'select') {
     <select class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (change)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)">
@@ -349,6 +356,22 @@ interface CellCtx {
               </select>
     } @else if (editorTypeOf(cell.column.id) === 'checkbox') {
     <input class="rdt-cell-editor" type="checkbox" data-editing-cell="" data-builtin-editor="" [checked]="editorCheckedFor(cell.column.id)" (change)="onCellEditorCheckbox(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    } @else if (editorTypeOf(cell.column.id) === 'custom') {
+    <span style="display:contents">
+                @if ((__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
+    } @else {
+
+                  @if ((editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor'])) {
+    <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
+    } @else {
+
+                    <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+                  
+    }
+                
+    }
+              </span>
     } @else {
     <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     }</span>
@@ -544,11 +567,7 @@ interface CellCtx {
             </span>
     } @else if (isEditing(rowIndexOf(row), colIndexOf(row, cell))) {
     <span style="display:contents">
-              @if (hasEditorSlot(cell.column.id)) {
-    <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
-              </span>
-    } @else if (editorTypeOf(cell.column.id) === 'number') {
+              @if (editorTypeOf(cell.column.id) === 'number') {
     <input class="rdt-cell-editor" type="number" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     } @else if (editorTypeOf(cell.column.id) === 'select') {
     <select class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (change)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)">
@@ -558,6 +577,22 @@ interface CellCtx {
               </select>
     } @else if (editorTypeOf(cell.column.id) === 'checkbox') {
     <input class="rdt-cell-editor" type="checkbox" data-editing-cell="" data-builtin-editor="" [checked]="editorCheckedFor(cell.column.id)" (change)="onCellEditorCheckbox(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    } @else if (editorTypeOf(cell.column.id) === 'custom') {
+    <span style="display:contents">
+                @if ((__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
+    } @else {
+
+                  @if ((editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor'])) {
+    <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
+    } @else {
+
+                    <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+                  
+    }
+                
+    }
+              </span>
     } @else {
     <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     }</span>
@@ -1144,11 +1179,11 @@ export class DataTable {
   @ContentChild('groupBar', { read: TemplateRef }) groupBarTpl?: TemplateRef<GroupBarCtx>;
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
-  @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
   @ContentChild('detail', { read: TemplateRef }) detailTpl?: TemplateRef<DetailCtx>;
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
   @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
   @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
+  @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   __rozieFills = contentChildren(RozieSlot, { descendants: true });
   __rozieFillMap = computed(() => {
@@ -1241,7 +1276,7 @@ export class DataTable {
 
   ngAfterContentInit() {
     if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;
-    const claimedByStaticRefs = [this.defaultTpl, this.groupBarTpl, this.selectAllTpl, this.selectCellTpl, this.editorTpl, this.detailTpl, this.colHeaderTpl, this.filterTpl, this.cellTpl].filter((t) => t != null).length;
+    const claimedByStaticRefs = [this.defaultTpl, this.groupBarTpl, this.selectAllTpl, this.selectCellTpl, this.detailTpl, this.colHeaderTpl, this.filterTpl, this.cellTpl, this.editorTpl].filter((t) => t != null).length;
     if (this.__rozieFills().length === 0 && this.__rozieProjectedTpls().length > claimedByStaticRefs) {
       this.__rozieSlotWarned = true;
       console.warn('[ROZ750] DataTable: projected template content was found but no keyed fills were collected — did you forget to add RozieSlot to the consumer\'s imports: array?');
@@ -3599,11 +3634,6 @@ export class DataTable {
     const m = this.editMetaOf(colId);
     return m && m.editorOptions != null ? m.editorOptions : [];
   };
-  // hasEditorSlot: this column routes through the consumer's #editor scoped slot (req-2)
-  // — true only when the column declared editor='custom' AND the consumer actually
-  // provided an #editor slot. Falls through to the built-in editor otherwise (e.g. a
-  // column marked 'custom' with no slot supplied degrades to the text editor, never blank).
-  hasEditorSlot = (colId: any) => this.editorTypeOf(colId) === 'custom' && !!(this.editorTpl ?? this.__rozieFillMap()['editor'] ?? this.templates()?.['editor']);
   columnIsFilterable = (colId: any) => {
     const d = this.defFor(colId);
     return !!(d && d.filterable);
@@ -6470,40 +6500,72 @@ export class DataTable {
     const row = rowList[this.editingRow()];
     return row ? row.id : null;
   };
+  // resolveEditFocusCellEl(rowIndex, colIndex): the DOM cell element for an edit-focus
+  // target, given an EXPLICIT index pair — NEVER a $data re-read inside this function or its
+  // caller's poll closure. Every call site already knows this pair SYNCHRONOUSLY at the
+  // moment it calls (beginEdit's own rowIndex/colIndex params; commitEdit's stable, already-
+  // settled $data.editingRow/editingCol; beginRowEdit's rowIndex + the target column's
+  // editable[].colIndex from editableColumnsForRow) — threading them through as PARAMETERS,
+  // mirroring focusRowEditorAt's already-proven resolveCellEl(String(rowIndex), colIndex)
+  // shape, closes the React batched-setState staleness class 88-05-SUMMARY.md documented
+  // (REACT_STALE_GATE_SINGLE_CELL_BUG): the OLD gate read $data.editFocusColId SYNCHRONOUSLY,
+  // in the SAME tick beginEdit's own setState call set it, and React's batching meant that
+  // read saw the PRE-edit (null) value. A plain function argument threaded through — never a
+  // reactive re-read — is not subject to that race, uniformly on all 6 targets.
+  resolveEditFocusCellEl = (rowIndex: any, colIndex: any) => {
+    if (rowIndex == null || colIndex == null || rowIndex < 0 || colIndex < 0) return null;
+    return this.resolveCellEl(String(rowIndex), colIndex);
+  };
   // Focus the freshly-mounted editor (Pitfall 1, ROZ123): after beginEdit flips the editing
   // state, the editor <input> does not exist until the framework commits the r-if branch
-  // (React setState async; Solid/Lit/Svelte next reactive tick). Poll for the
-  // [data-editing-cell] element off gridRoot for ~30 frames — the five fast targets resolve
-  // on attempt 1, React retries across its async commit. NEVER read $refs eagerly.
+  // (React setState async; Solid/Lit/Svelte next reactive tick). Poll for the target CELL's
+  // marked built-in editor for ~30 frames — the five fast targets resolve on attempt 1, React
+  // retries across its async commit. NEVER read $refs eagerly.
   // B2: selectAll gates the post-focus el.select(). Select-all is right when entering
   // edit IN PLACE (F2/Enter/click/row-edit/validation-reject — no seeded char, the user
   // retypes), but WRONG on a type-to-edit entry where a printable key already seeded the
   // draft (selecting the seeded char makes the next keystroke replace it: Zeta → eta).
   // beginEdit threads `seed == null` so a seeded entry skips the select and the caret sits
   // AFTER the seeded char; every other caller keeps the default select-all.
-  // Editor-owns-focus contract (quick 260711-i5m): REVERTS the g52 shadow-piercing helper
-  // (commit 5fa30045) that recursed into descendant shadow roots. Built-in editors are
-  // host-DOM — the plain direct query resolves them on all 6 targets (no shadow to cross). A
-  // #editor DROP-IN now owns its OWN focus via the reactive `autofocus` prop (EditorText's
-  // $onMount + lazy $watch), so the host never needs to reach across a Lit drop-in's nested
-  // shadow root at all — see the !hasEditorSlot gate below, which skips the host focus call
-  // entirely for a drop-in target.
-  focusEditorWhenReady = (selectAll: any = true) => {
-    const __editFocusColId = this.editFocusColId();
+  // D-01/D-02 (88-07): REPLACES the deleted presence-check early-return gate AND the
+  // gridRoot-wide `[data-editing-cell]` first-match query with a column-scoped, marker-driven
+  // poll. Resolves the TARGET cell first (resolveEditFocusCellEl, mirroring
+  // focusRowEditorAt's already-shipped two-step resolve), then queries for an editor carrying
+  // BOTH `data-editing-cell` and the host-owned `data-builtin-editor` marker WITHIN that one
+  // cell — "no marker found" (a drop-in target, D-01) bails immediately rather than reaching
+  // into DOM the host does not own; "no editor at all yet" keeps polling (the framework hasn't
+  // committed the r-if branch). This closes the D-02 wrong-column hole the old grid-wide query
+  // left open (every editable cell mounts an editor at once in row-edit mode) AND fixes the
+  // React staleness race documented above, as a side effect of no longer reading
+  // $data.editFocusColId anywhere in this function.
+  focusEditorWhenReady = (rowIndex: any, colIndex: any, selectAll: any = true) => {
     if (!this.gridRoot) return;
-    // Editor-owns-focus contract: when the CURRENT focus target is a #editor drop-in, the host
-    // does NOT reach into its DOM — the drop-in self-focuses via its own autofocus prop.
-    if (__editFocusColId != null && this.hasEditorSlot(__editFocusColId)) return;
     let attempts = 0;
     const tryFocus = () => {
-      const el = this.gridRoot ? this.gridRoot.querySelector('[data-editing-cell]') : null;
+      const cellEl = this.resolveEditFocusCellEl(rowIndex, colIndex);
+      const el = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell][data-builtin-editor]') : null;
+      if (!el) {
+        // Editor-owns-focus contract (quick 260711-i5m, D-01): if the cell ALREADY holds an
+        // editor that carries only the base marker, it's a consumer drop-in — it owns its own
+        // focus (EditorText's own $onMount + reactive `autofocus`). Bail immediately, zero
+        // wasted frames, rather than burning the retry ceiling on DOM the host does not own.
+        const anyEditor = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null;
+        if (anyEditor) return;
+        attempts = attempts + 1;
+        if (attempts >= 30) return;
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+        return;
+      }
       // Do NOT stomp focus a later interaction already placed in a DIFFERENT column's editor of
       // this row: focusEditorWhenReady only needs to get focus INTO the (first) freshly-mounted
       // editor; if focus already sits in another editable cell, a late rAF re-focus would steal it
       // back to the first editor and break row-mode Tab containment (the non-deterministic B21
       // focus-theft). Compare the OWNING cell's data-col-index (NOT node identity) so a stale
       // SAME-column editor node on Solid's node-replacing re-render still resolves as the target —
-      // a genuinely dropped focus is still recovered.
+      // a genuinely dropped focus is still recovered. Stays BROAD on `data-editing-cell` (NOT
+      // narrowed to the builtin marker, D-02): focus validly placed inside a drop-in must still
+      // count as "already placed" — narrowing this check would let a late rAF poll steal focus
+      // back from a drop-in that legitimately holds it.
       const ae = this.gridRoot && this.gridRoot.getRootNode ? this.gridRoot.getRootNode().activeElement : null;
       if (ae && el && ae !== el && ae.closest && this.gridRoot.contains(ae) && ae.hasAttribute && ae.hasAttribute('data-editing-cell')) {
         const aeCell = ae.closest('[data-grid-cell]');
@@ -6512,18 +6574,12 @@ export class DataTable {
         const elCol = elCell ? elCell.getAttribute('data-col-index') : null;
         if (aeCol != null && aeCol !== elCol) return;
       }
-      if (el) {
-        el.focus();
-        if (selectAll && el.select) {
-          try {
-            el.select();
-          } catch (e: any) {}
-        }
-        return;
+      el.focus();
+      if (selectAll && el.select) {
+        try {
+          el.select();
+        } catch (e: any) {}
       }
-      attempts = attempts + 1;
-      if (attempts >= 30) return;
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
     };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
   };
@@ -6576,8 +6632,10 @@ export class DataTable {
     // from it. Cleared on endEdit.
     this.editFocusColId.set(colId);
     // B2: a seeded (type-to-edit) entry must NOT select-all — keep the caret after the
-    // seeded char so subsequent typing appends instead of replacing it.
-    this.focusEditorWhenReady(seed == null);
+    // seeded char so subsequent typing appends instead of replacing it. rowIndex/colIndex
+    // are THIS call's own params — passed through directly (D-02), never re-read off
+    // $data.editingRow/editingCol inside the poll.
+    this.focusEditorWhenReady(rowIndex, colIndex, seed == null);
   };
   // Return focus to a body cell AFTER the editor unmounts (commit/cancel). The display↔
   // editor re-render must commit before the <td> is focusable with its roving tabindex —
@@ -6666,6 +6724,7 @@ export class DataTable {
   // immediate re-read of editingRow still shows the OLD value (the ROZ138 stale-read class).
   commitEdit = (overrideValue: any = undefined, skipFocusReturn: any = false) => {
     const __editingRow = this.editingRow();
+    const __editingCol = this.editingCol();
     if (__editingRow < 0) return false;
     // Sync idempotency latch (drop-in double cell-edit-commit fix): a second commitEdit call
     // within the SAME edit session — the deferred drop-in's unmount-blur re-entry, which on
@@ -6688,8 +6747,10 @@ export class DataTable {
     const err = this.runValidator(colId, newValue, rowOriginal);
     if (err !== true) {
       // D-01: reject — keep the editor open, announce, re-trap focus, NEVER write the model.
+      // $data.editingRow/editingCol are STABLE here (set by a prior beginEdit call, not this
+      // same tick) — safe to read directly, unlike the deleted $data.editFocusColId gate.
       this.setInvalid(err);
-      this.focusEditorWhenReady();
+      this.focusEditorWhenReady(__editingRow, __editingCol);
       return false;
     }
     this.setInvalid('');
@@ -6701,7 +6762,7 @@ export class DataTable {
     const changed = !Object.is(newValue, oldValue);
     // Snapshot the EDITING cell to return focus to BEFORE endEdit clears editing state.
     const focusRow = __editingRow;
-    const focusCol = this.editingCol();
+    const focusCol = __editingCol;
     // Guard the teardown blur: writeData/endEdit re-render unmounts the editor → its blur
     // must NOT re-enter commitEdit (double cell-edit-commit). Cleared after the focus return.
     this.editTransition = true;
@@ -6849,22 +6910,22 @@ export class DataTable {
   };
   // B21/B22: focus the row-mode editor at a given VISIBLE col index. In full-row edit every
   // editable cell is already mounted as an editor, so this resolves the cell off gridRoot and
-  // focuses its [data-editing-cell] control. Bounded rAF-poll (mirrors focusEditorWhenReady)
-  // so a React re-render that recreates the input across the focus call still lands it. select-
-  // all on text/number editors (a no-op try/catch on select/checkbox).
-  // Editor-owns-focus contract (quick 260711-i5m): when the TARGET column is a #editor
-  // drop-in, the host does NOT reach into its DOM (early return, before starting the rAF poll
-  // at all) — the drop-in self-focuses via its own reactive `autofocus` prop, which the caller
-  // (commitRow's B22 reject path / rowEditTab) already flips via $data.editFocusColId. Built-in
-  // columns are unaffected (hasEditorSlot is false for them) — unchanged host direct-focus.
+  // focuses its [data-editing-cell][data-builtin-editor] control. Bounded rAF-poll (mirrors
+  // focusEditorWhenReady) so a React re-render that recreates the input across the focus call
+  // still lands it. select-all on text/number editors (a no-op try/catch on select/checkbox).
+  // D-01/D-02 (88-07): the old columnIdAt + presence-check early-return gate is DELETED — the
+  // host-owned data-builtin-editor marker replaces it. If the resolved cell already holds an
+  // editor carrying ONLY the base data-editing-cell marker (no builtin marker), that's a
+  // consumer drop-in — bail immediately, it owns its own focus (EditorText's own $onMount +
+  // reactive `autofocus`, which the caller already flips via $data.editFocusColId). This
+  // two-step resolve (resolveCellEl THEN a scoped query within that one cell) was ALREADY
+  // column-scoped and correct — it is the shape focusEditorWhenReady's D-02 rework adopts.
   focusRowEditorAt = (rowIndex: any, colIndex: any) => {
     if (!this.gridRoot) return;
-    const colId = this.columnIdAt(rowIndex, colIndex);
-    if (colId != null && this.hasEditorSlot(colId)) return;
     let attempts = 0;
     const tryFocus = () => {
       const cellEl = this.resolveCellEl(String(rowIndex), colIndex);
-      const ed = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null;
+      const ed = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell][data-builtin-editor]') : null;
       if (ed) {
         ed.focus();
         if (ed.select) {
@@ -6874,6 +6935,11 @@ export class DataTable {
         }
         return;
       }
+      // No marked built-in editor yet in this cell: a drop-in mounted there owns its own
+      // focus — bail immediately (D-02) rather than burning the retry ceiling on DOM the
+      // host does not own. No editor at all yet just means "keep polling."
+      const any = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null;
+      if (any) return;
       attempts = attempts + 1;
       if (attempts >= 30) return;
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
@@ -6919,9 +6985,11 @@ export class DataTable {
     // Editor-owns-focus contract (quick 260711-i5m): the row's FIRST editable column is the
     // initial focus target — editorAutofocusFor derives the reactive `autofocus` #editor scope
     // prop from it (a built-in column is also host-focused below via focusEditorWhenReady; a
-    // drop-in column self-focuses via its own $onMount, gated off the host reach-in in Task 3).
+    // drop-in column self-focuses via its own $onMount, gated off the host reach-in via D-01's
+    // marker). editable[0].colIndex is THIS call's own already-resolved value (D-02) — passed
+    // through directly, never re-read off $data.editFocusColId inside the poll.
     this.editFocusColId.set(editable[0].colId);
-    this.focusEditorWhenReady();
+    this.focusEditorWhenReady(rowIndex, editable[0].colIndex);
   };
   // commitRow(): validate EVERY edited column (D-01 — keep the row open if ANY fails: set
   // invalid + announce, NEVER write the model); on all-valid build ONE fresh array replacing
@@ -7636,7 +7704,7 @@ export class DataTable {
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | SelectCellCtx | EditorCtx | DetailCtx | ColHeaderCtx | FilterCtx | CellCtx {
+  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | SelectCellCtx | DetailCtx | ColHeaderCtx | FilterCtx | CellCtx | EditorCtx {
     return true;
   }
 

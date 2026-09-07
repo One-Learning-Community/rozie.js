@@ -164,12 +164,12 @@ export interface DataTableProps {
   renderGroupBar?: (params: { grouping: unknown; groupableColumns: unknown; applyGrouping: (...args: any[]) => any; clearGrouping: (...args: any[]) => any }) => ReactNode;
   renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: (...args: any[]) => any }) => ReactNode;
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
-  renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown; autofocus: unknown }) => ReactNode;
   renderDetail?: (params: { row: unknown }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
   renderFilter?: (params: { columnId: unknown; value: unknown; uniqueValues: unknown; minMax: unknown; setFilter: (...args: any[]) => any }) => ReactNode;
   renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
-  slots?: { [key: `colHeader-${string}`]: ((params: { columnId: any; column: any; label: any }) => ReactNode) | undefined; [key: `filter-${string}`]: ((params: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => ReactNode) | undefined; [key: `cell-${string}`]: ((params: { columnId: any; column: any; row: any; value: any }) => ReactNode) | undefined; [key: string]: ((...args: any[]) => ReactNode) | undefined; };
+  renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown; autofocus: unknown }) => ReactNode;
+  slots?: { [key: `colHeader-${string}`]: ((params: { columnId: any; column: any; label: any }) => ReactNode) | undefined; [key: `filter-${string}`]: ((params: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => ReactNode) | undefined; [key: `cell-${string}`]: ((params: { columnId: any; column: any; row: any; value: any }) => ReactNode) | undefined; [key: `editor-${string}`]: ((params: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }) => ReactNode) | undefined; [key: string]: ((...args: any[]) => ReactNode) | undefined; };
 }
 
 export interface DataTableHandle {

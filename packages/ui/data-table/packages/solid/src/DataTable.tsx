@@ -355,8 +355,6 @@ interface SelectAllSlotCtx { checked: any; indeterminate: any; toggle: any; }
 
 interface SelectCellSlotCtx { row: any; checked: any; toggle: any; }
 
-interface EditorSlotCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any; }
-
 interface DetailSlotCtx { row: any; }
 
 interface ColHeaderSlotCtx { columnId: any; column: any; label: any; }
@@ -364,6 +362,8 @@ interface ColHeaderSlotCtx { columnId: any; column: any; label: any; }
 interface FilterSlotCtx { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any; }
 
 interface CellSlotCtx { columnId: any; column: any; row: any; value: any; }
+
+interface EditorSlotCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any; }
 
 interface DataTableProps {
   /**
@@ -528,12 +528,12 @@ interface DataTableProps {
   groupBarSlot?: (ctx: GroupBarSlotCtx) => JSX.Element;
   selectAllSlot?: (ctx: SelectAllSlotCtx) => JSX.Element;
   selectCellSlot?: (ctx: SelectCellSlotCtx) => JSX.Element;
-  editorSlot?: (ctx: EditorSlotCtx) => JSX.Element;
   detailSlot?: (ctx: DetailSlotCtx) => JSX.Element;
   colHeaderSlot?: (ctx: ColHeaderSlotCtx) => JSX.Element;
   filterSlot?: (ctx: FilterSlotCtx) => JSX.Element;
   cellSlot?: (ctx: CellSlotCtx) => JSX.Element;
-  slots?: { [key: `colHeader-${string}`]: ((ctx: { columnId: any; column: any; label: any }) => JSX.Element) | undefined; [key: `filter-${string}`]: ((ctx: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => JSX.Element) | undefined; [key: `cell-${string}`]: ((ctx: { columnId: any; column: any; row: any; value: any }) => JSX.Element) | undefined; [key: string]: ((...args: any[]) => JSX.Element) | undefined; };
+  editorSlot?: (ctx: EditorSlotCtx) => JSX.Element;
+  slots?: { [key: `colHeader-${string}`]: ((ctx: { columnId: any; column: any; label: any }) => JSX.Element) | undefined; [key: `filter-${string}`]: ((ctx: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => JSX.Element) | undefined; [key: `cell-${string}`]: ((ctx: { columnId: any; column: any; row: any; value: any }) => JSX.Element) | undefined; [key: `editor-${string}`]: ((ctx: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }) => JSX.Element) | undefined; [key: string]: ((...args: any[]) => JSX.Element) | undefined; };
   ref?: (h: DataTableHandle) => void;
 }
 
@@ -3101,13 +3101,6 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   function editorOptionsOf(colId: any) {
     const m = editMetaOf(colId);
     return m && m.editorOptions != null ? m.editorOptions : [];
-  }
-  // hasEditorSlot: this column routes through the consumer's #editor scoped slot (req-2)
-  // — true only when the column declared editor='custom' AND the consumer actually
-  // provided an #editor slot. Falls through to the built-in editor otherwise (e.g. a
-  // column marked 'custom' with no slot supplied degrades to the text editor, never blank).
-  function hasEditorSlot(colId: any) {
-    return editorTypeOf(colId) === 'custom' && !!(_props.editorSlot ?? _props.slots?.["editor"]);
   }
   function columnIsFilterable(colId: any) {
     const d = defFor(colId);
@@ -6112,39 +6105,73 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     return row ? row.id : null;
   }
 
+  // resolveEditFocusCellEl(rowIndex, colIndex): the DOM cell element for an edit-focus
+  // target, given an EXPLICIT index pair — NEVER a $data re-read inside this function or its
+  // caller's poll closure. Every call site already knows this pair SYNCHRONOUSLY at the
+  // moment it calls (beginEdit's own rowIndex/colIndex params; commitEdit's stable, already-
+  // settled $data.editingRow/editingCol; beginRowEdit's rowIndex + the target column's
+  // editable[].colIndex from editableColumnsForRow) — threading them through as PARAMETERS,
+  // mirroring focusRowEditorAt's already-proven resolveCellEl(String(rowIndex), colIndex)
+  // shape, closes the React batched-setState staleness class 88-05-SUMMARY.md documented
+  // (REACT_STALE_GATE_SINGLE_CELL_BUG): the OLD gate read $data.editFocusColId SYNCHRONOUSLY,
+  // in the SAME tick beginEdit's own setState call set it, and React's batching meant that
+  // read saw the PRE-edit (null) value. A plain function argument threaded through — never a
+  // reactive re-read — is not subject to that race, uniformly on all 6 targets.
+  function resolveEditFocusCellEl(rowIndex: any, colIndex: any) {
+    if (rowIndex == null || colIndex == null || rowIndex < 0 || colIndex < 0) return null;
+    return resolveCellEl(String(rowIndex), colIndex);
+  }
+
   // Focus the freshly-mounted editor (Pitfall 1, ROZ123): after beginEdit flips the editing
   // state, the editor <input> does not exist until the framework commits the r-if branch
-  // (React setState async; Solid/Lit/Svelte next reactive tick). Poll for the
-  // [data-editing-cell] element off gridRoot for ~30 frames — the five fast targets resolve
-  // on attempt 1, React retries across its async commit. NEVER read $refs eagerly.
+  // (React setState async; Solid/Lit/Svelte next reactive tick). Poll for the target CELL's
+  // marked built-in editor for ~30 frames — the five fast targets resolve on attempt 1, React
+  // retries across its async commit. NEVER read $refs eagerly.
   // B2: selectAll gates the post-focus el.select(). Select-all is right when entering
   // edit IN PLACE (F2/Enter/click/row-edit/validation-reject — no seeded char, the user
   // retypes), but WRONG on a type-to-edit entry where a printable key already seeded the
   // draft (selecting the seeded char makes the next keystroke replace it: Zeta → eta).
   // beginEdit threads `seed == null` so a seeded entry skips the select and the caret sits
   // AFTER the seeded char; every other caller keeps the default select-all.
-  // Editor-owns-focus contract (quick 260711-i5m): REVERTS the g52 shadow-piercing helper
-  // (commit 5fa30045) that recursed into descendant shadow roots. Built-in editors are
-  // host-DOM — the plain direct query resolves them on all 6 targets (no shadow to cross). A
-  // #editor DROP-IN now owns its OWN focus via the reactive `autofocus` prop (EditorText's
-  // $onMount + lazy $watch), so the host never needs to reach across a Lit drop-in's nested
-  // shadow root at all — see the !hasEditorSlot gate below, which skips the host focus call
-  // entirely for a drop-in target.
-  function focusEditorWhenReady(selectAll = true) {
+  // D-01/D-02 (88-07): REPLACES the deleted presence-check early-return gate AND the
+  // gridRoot-wide `[data-editing-cell]` first-match query with a column-scoped, marker-driven
+  // poll. Resolves the TARGET cell first (resolveEditFocusCellEl, mirroring
+  // focusRowEditorAt's already-shipped two-step resolve), then queries for an editor carrying
+  // BOTH `data-editing-cell` and the host-owned `data-builtin-editor` marker WITHIN that one
+  // cell — "no marker found" (a drop-in target, D-01) bails immediately rather than reaching
+  // into DOM the host does not own; "no editor at all yet" keeps polling (the framework hasn't
+  // committed the r-if branch). This closes the D-02 wrong-column hole the old grid-wide query
+  // left open (every editable cell mounts an editor at once in row-edit mode) AND fixes the
+  // React staleness race documented above, as a side effect of no longer reading
+  // $data.editFocusColId anywhere in this function.
+  function focusEditorWhenReady(rowIndex: any, colIndex: any, selectAll = true) {
     if (!gridRoot) return;
-    // Editor-owns-focus contract: when the CURRENT focus target is a #editor drop-in, the host
-    // does NOT reach into its DOM — the drop-in self-focuses via its own autofocus prop.
-    if (editFocusColId() != null && hasEditorSlot(editFocusColId())) return;
     let attempts = 0;
     const tryFocus = () => {
-      const el = gridRoot ? gridRoot.querySelector('[data-editing-cell]') : null;
+      const cellEl = resolveEditFocusCellEl(rowIndex, colIndex);
+      const el = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell][data-builtin-editor]') : null;
+      if (!el) {
+        // Editor-owns-focus contract (quick 260711-i5m, D-01): if the cell ALREADY holds an
+        // editor that carries only the base marker, it's a consumer drop-in — it owns its own
+        // focus (EditorText's own $onMount + reactive `autofocus`). Bail immediately, zero
+        // wasted frames, rather than burning the retry ceiling on DOM the host does not own.
+        const anyEditor = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null;
+        if (anyEditor) return;
+        attempts = attempts + 1;
+        if (attempts >= 30) return;
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+        return;
+      }
       // Do NOT stomp focus a later interaction already placed in a DIFFERENT column's editor of
       // this row: focusEditorWhenReady only needs to get focus INTO the (first) freshly-mounted
       // editor; if focus already sits in another editable cell, a late rAF re-focus would steal it
       // back to the first editor and break row-mode Tab containment (the non-deterministic B21
       // focus-theft). Compare the OWNING cell's data-col-index (NOT node identity) so a stale
       // SAME-column editor node on Solid's node-replacing re-render still resolves as the target —
-      // a genuinely dropped focus is still recovered.
+      // a genuinely dropped focus is still recovered. Stays BROAD on `data-editing-cell` (NOT
+      // narrowed to the builtin marker, D-02): focus validly placed inside a drop-in must still
+      // count as "already placed" — narrowing this check would let a late rAF poll steal focus
+      // back from a drop-in that legitimately holds it.
       const ae = gridRoot && gridRoot.getRootNode ? gridRoot.getRootNode().activeElement : null;
       if (ae && el && ae !== el && ae.closest && gridRoot.contains(ae) && ae.hasAttribute && ae.hasAttribute('data-editing-cell')) {
         const aeCell = ae.closest('[data-grid-cell]');
@@ -6153,18 +6180,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         const elCol = elCell ? elCell.getAttribute('data-col-index') : null;
         if (aeCol != null && aeCol !== elCol) return;
       }
-      if (el) {
-        el.focus();
-        if (selectAll && el.select) {
-          try {
-            el.select();
-          } catch (e: any) {}
-        }
-        return;
+      el.focus();
+      if (selectAll && el.select) {
+        try {
+          el.select();
+        } catch (e: any) {}
       }
-      attempts = attempts + 1;
-      if (attempts >= 30) return;
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
     };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
   }
@@ -6219,8 +6240,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // from it. Cleared on endEdit.
     setEditFocusColId(colId);
     // B2: a seeded (type-to-edit) entry must NOT select-all — keep the caret after the
-    // seeded char so subsequent typing appends instead of replacing it.
-    focusEditorWhenReady(seed == null);
+    // seeded char so subsequent typing appends instead of replacing it. rowIndex/colIndex
+    // are THIS call's own params — passed through directly (D-02), never re-read off
+    // $data.editingRow/editingCol inside the poll.
+    focusEditorWhenReady(rowIndex, colIndex, seed == null);
   }
 
   // Return focus to a body cell AFTER the editor unmounts (commit/cancel). The display↔
@@ -6334,8 +6357,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     const err = runValidator(colId, newValue, rowOriginal);
     if (err !== true) {
       // D-01: reject — keep the editor open, announce, re-trap focus, NEVER write the model.
+      // $data.editingRow/editingCol are STABLE here (set by a prior beginEdit call, not this
+      // same tick) — safe to read directly, unlike the deleted $data.editFocusColId gate.
       setInvalid(err);
-      focusEditorWhenReady();
+      focusEditorWhenReady(editingRow(), editingCol());
       return false;
     }
     setInvalid('');
@@ -6496,22 +6521,22 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
 
   // B21/B22: focus the row-mode editor at a given VISIBLE col index. In full-row edit every
   // editable cell is already mounted as an editor, so this resolves the cell off gridRoot and
-  // focuses its [data-editing-cell] control. Bounded rAF-poll (mirrors focusEditorWhenReady)
-  // so a React re-render that recreates the input across the focus call still lands it. select-
-  // all on text/number editors (a no-op try/catch on select/checkbox).
-  // Editor-owns-focus contract (quick 260711-i5m): when the TARGET column is a #editor
-  // drop-in, the host does NOT reach into its DOM (early return, before starting the rAF poll
-  // at all) — the drop-in self-focuses via its own reactive `autofocus` prop, which the caller
-  // (commitRow's B22 reject path / rowEditTab) already flips via $data.editFocusColId. Built-in
-  // columns are unaffected (hasEditorSlot is false for them) — unchanged host direct-focus.
+  // focuses its [data-editing-cell][data-builtin-editor] control. Bounded rAF-poll (mirrors
+  // focusEditorWhenReady) so a React re-render that recreates the input across the focus call
+  // still lands it. select-all on text/number editors (a no-op try/catch on select/checkbox).
+  // D-01/D-02 (88-07): the old columnIdAt + presence-check early-return gate is DELETED — the
+  // host-owned data-builtin-editor marker replaces it. If the resolved cell already holds an
+  // editor carrying ONLY the base data-editing-cell marker (no builtin marker), that's a
+  // consumer drop-in — bail immediately, it owns its own focus (EditorText's own $onMount +
+  // reactive `autofocus`, which the caller already flips via $data.editFocusColId). This
+  // two-step resolve (resolveCellEl THEN a scoped query within that one cell) was ALREADY
+  // column-scoped and correct — it is the shape focusEditorWhenReady's D-02 rework adopts.
   function focusRowEditorAt(rowIndex: any, colIndex: any) {
     if (!gridRoot) return;
-    const colId = columnIdAt(rowIndex, colIndex);
-    if (colId != null && hasEditorSlot(colId)) return;
     let attempts = 0;
     const tryFocus = () => {
       const cellEl = resolveCellEl(String(rowIndex), colIndex);
-      const ed = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null;
+      const ed = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell][data-builtin-editor]') : null;
       if (ed) {
         ed.focus();
         if (ed.select) {
@@ -6521,6 +6546,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         }
         return;
       }
+      // No marked built-in editor yet in this cell: a drop-in mounted there owns its own
+      // focus — bail immediately (D-02) rather than burning the retry ceiling on DOM the
+      // host does not own. No editor at all yet just means "keep polling."
+      const any = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null;
+      if (any) return;
       attempts = attempts + 1;
       if (attempts >= 30) return;
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
@@ -6567,9 +6597,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // Editor-owns-focus contract (quick 260711-i5m): the row's FIRST editable column is the
     // initial focus target — editorAutofocusFor derives the reactive `autofocus` #editor scope
     // prop from it (a built-in column is also host-focused below via focusEditorWhenReady; a
-    // drop-in column self-focuses via its own $onMount, gated off the host reach-in in Task 3).
+    // drop-in column self-focuses via its own $onMount, gated off the host reach-in via D-01's
+    // marker). editable[0].colIndex is THIS call's own already-resolved value (D-02) — passed
+    // through directly, never re-read off $data.editFocusColId inside the poll.
     setEditFocusColId(editable[0].colId);
-    focusEditorWhenReady();
+    focusEditorWhenReady(rowIndex, editable[0].colIndex);
   }
 
   // commitRow(): validate EVERY edited column (D-01 — keep the row open if ANY fails: set
@@ -7412,11 +7444,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
             {<Show when={isExpanderColumn(cell().column.id)} fallback={<Show when={isSelectColumn(cell().column.id)} fallback={<Show when={cellIsGrouped(cell())} fallback={<Show when={isEditing(rowIndexOf(row()), colIndexOf(row(), cell()))} fallback={<Show when={cellIsPlaceholder(cell())} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {_props.slots?.[`cell-${cell().column.id}`]?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(row()), value: cell().getValue() }) ?? (_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(row()), value: cell().getValue() }) ?? rozieDisplay(cell().getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={hasEditorSlot(cell().column.id)} fallback={<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
+              {<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<Show when={editorTypeOf(cell().column.id) === 'custom'} fallback={<input type="text" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {_props.slots?.[`editor-${cell().column.id}`]?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(row()), value: editorValueFor(cell().column.id), commit: editorCommitFor(cell().column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell().column.id, rowIndexOf(row())) }) ?? (_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(row()), value: editorValueFor(cell().column.id), commit: editorCommitFor(cell().column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell().column.id, rowIndexOf(row())) }) ?? <input type="text" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}
+              </span></Show>}><input type="checkbox" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 <Key each={editorOptionsOf(cell().column.id) as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt().label)}</option>}</Key>
-              </select></Show>}><input type="number" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(row()), value: editorValueFor(cell().column.id), commit: editorCommitFor(cell().column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell().column.id, rowIndexOf(row())) })}
-              </span></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              </select></Show>}><input type="number" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               <button type="button" data-expander="" aria-expanded={!!rowIsExpanded(row())} aria-label={rozieAttr(rowIsExpanded(row()) ? 'Collapse group' : 'Expand group')} class={"rdt-expander rdt-group-toggle"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onToggleExpand(row(), $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(row()) ? '▾' : '▸')}</button>
               <span class={"rdt-group-value"} data-rozie-s-d5dcab4c="">
                 {_props.slots?.[`cell-${cell().column.id}`]?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(row()), value: cell().getValue() }) ?? (_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(row()), value: cell().getValue() }) ?? rozieDisplay(cell().getValue())}
@@ -7488,11 +7520,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
             {<Show when={isExpanderColumn(cell().column.id)} fallback={<Show when={isSelectColumn(cell().column.id)} fallback={<Show when={cellIsGrouped(cell())} fallback={<Show when={isEditing(wr().vi.index, colIndexOf(wr().row, cell()))} fallback={<Show when={cellIsPlaceholder(cell())} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {_props.slots?.[`cell-${cell().column.id}`]?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(wr().row), value: cell().getValue() }) ?? (_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(wr().row), value: cell().getValue() }) ?? rozieDisplay(cell().getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={hasEditorSlot(cell().column.id)} fallback={<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
+              {<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<Show when={editorTypeOf(cell().column.id) === 'custom'} fallback={<input type="text" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {_props.slots?.[`editor-${cell().column.id}`]?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(wr().row), value: editorValueFor(cell().column.id), commit: editorCommitFor(cell().column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell().column.id, wr().vi.index) }) ?? (_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(wr().row), value: editorValueFor(cell().column.id), commit: editorCommitFor(cell().column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell().column.id, wr().vi.index) }) ?? <input type="text" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}
+              </span></Show>}><input type="checkbox" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 <Key each={editorOptionsOf(cell().column.id) as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt().label)}</option>}</Key>
-              </select></Show>}><input type="number" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(wr().row), value: editorValueFor(cell().column.id), commit: editorCommitFor(cell().column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell().column.id, wr().vi.index) })}
-              </span></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              </select></Show>}><input type="number" data-editing-cell="" data-builtin-editor="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               <button type="button" data-expander="" aria-expanded={!!rowIsExpanded(wr().row)} aria-label={rozieAttr(rowIsExpanded(wr().row) ? 'Collapse group' : 'Expand group')} class={"rdt-expander rdt-group-toggle"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onToggleExpand(wr().row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr().row) ? '▾' : '▸')}</button>
               <span class={"rdt-group-value"} data-rozie-s-d5dcab4c="">
                 {_props.slots?.[`cell-${cell().column.id}`]?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(wr().row), value: cell().getValue() }) ?? (_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cell().column.id, column: cell().column, row: cellSlotRow(wr().row), value: cell().getValue() }) ?? rozieDisplay(cell().getValue())}

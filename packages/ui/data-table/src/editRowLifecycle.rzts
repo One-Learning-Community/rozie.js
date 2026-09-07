@@ -34,23 +34,28 @@ const editableColumnsForRow = (rowIndex) => {
 
 // B21/B22: focus the row-mode editor at a given VISIBLE col index. In full-row edit every
 // editable cell is already mounted as an editor, so this resolves the cell off gridRoot and
-// focuses its [data-editing-cell] control. Bounded rAF-poll (mirrors focusEditorWhenReady)
-// so a React re-render that recreates the input across the focus call still lands it. select-
-// all on text/number editors (a no-op try/catch on select/checkbox).
-// Editor-owns-focus contract (quick 260711-i5m): when the TARGET column is a #editor
-// drop-in, the host does NOT reach into its DOM (early return, before starting the rAF poll
-// at all) — the drop-in self-focuses via its own reactive `autofocus` prop, which the caller
-// (commitRow's B22 reject path / rowEditTab) already flips via $data.editFocusColId. Built-in
-// columns are unaffected (hasEditorSlot is false for them) — unchanged host direct-focus.
+// focuses its [data-editing-cell][data-builtin-editor] control. Bounded rAF-poll (mirrors
+// focusEditorWhenReady) so a React re-render that recreates the input across the focus call
+// still lands it. select-all on text/number editors (a no-op try/catch on select/checkbox).
+// D-01/D-02 (88-07): the old columnIdAt + presence-check early-return gate is DELETED — the
+// host-owned data-builtin-editor marker replaces it. If the resolved cell already holds an
+// editor carrying ONLY the base data-editing-cell marker (no builtin marker), that's a
+// consumer drop-in — bail immediately, it owns its own focus (EditorText's own $onMount +
+// reactive `autofocus`, which the caller already flips via $data.editFocusColId). This
+// two-step resolve (resolveCellEl THEN a scoped query within that one cell) was ALREADY
+// column-scoped and correct — it is the shape focusEditorWhenReady's D-02 rework adopts.
 const focusRowEditorAt = (rowIndex, colIndex) => {
   if (!gridRoot) return
-  const colId = columnIdAt(rowIndex, colIndex)
-  if (colId != null && hasEditorSlot(colId)) return
   let attempts = 0
   const tryFocus = () => {
     const cellEl = resolveCellEl(String(rowIndex), colIndex)
-    const ed = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null
+    const ed = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell][data-builtin-editor]') : null
     if (ed) { ed.focus(); if (ed.select) { try { ed.select() } catch (e) {} } return }
+    // No marked built-in editor yet in this cell: a drop-in mounted there owns its own
+    // focus — bail immediately (D-02) rather than burning the retry ceiling on DOM the
+    // host does not own. No editor at all yet just means "keep polling."
+    const any = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null
+    if (any) return
     attempts = attempts + 1
     if (attempts >= 30) return
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
@@ -99,9 +104,11 @@ const beginRowEdit = (row) => {
   // Editor-owns-focus contract (quick 260711-i5m): the row's FIRST editable column is the
   // initial focus target — editorAutofocusFor derives the reactive `autofocus` #editor scope
   // prop from it (a built-in column is also host-focused below via focusEditorWhenReady; a
-  // drop-in column self-focuses via its own $onMount, gated off the host reach-in in Task 3).
+  // drop-in column self-focuses via its own $onMount, gated off the host reach-in via D-01's
+  // marker). editable[0].colIndex is THIS call's own already-resolved value (D-02) — passed
+  // through directly, never re-read off $data.editFocusColId inside the poll.
   $data.editFocusColId = editable[0].colId
-  focusEditorWhenReady()
+  focusEditorWhenReady(rowIndex, editable[0].colIndex)
 }
 
 // commitRow(): validate EVERY edited column (D-01 — keep the row open if ANY fails: set

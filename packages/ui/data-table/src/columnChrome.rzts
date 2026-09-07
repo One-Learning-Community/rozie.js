@@ -72,12 +72,6 @@ const editorOptionsOf = (colId) => {
   const m = editMetaOf(colId)
   return m && m.editorOptions != null ? m.editorOptions : []
 }
-// hasEditorSlot: this column routes through the consumer's #editor scoped slot (req-2)
-// — true only when the column declared editor='custom' AND the consumer actually
-// provided an #editor slot. Falls through to the built-in editor otherwise (e.g. a
-// column marked 'custom' with no slot supplied degrades to the text editor, never blank).
-const hasEditorSlot = (colId) => editorTypeOf(colId) === 'custom' && !!$slots.editor
-
 const columnIsFilterable = (colId) => {
   const d = defFor(colId)
   return !!(d && d.filterable)
@@ -236,4 +230,4 @@ const thStyle = (header) => {
   return s
 }
 
-export { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle }
+export { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle }

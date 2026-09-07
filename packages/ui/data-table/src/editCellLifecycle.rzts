@@ -145,39 +145,74 @@ const editingRowId = () => {
   return row ? row.id : null
 }
 
+// resolveEditFocusCellEl(rowIndex, colIndex): the DOM cell element for an edit-focus
+// target, given an EXPLICIT index pair — NEVER a $data re-read inside this function or its
+// caller's poll closure. Every call site already knows this pair SYNCHRONOUSLY at the
+// moment it calls (beginEdit's own rowIndex/colIndex params; commitEdit's stable, already-
+// settled $data.editingRow/editingCol; beginRowEdit's rowIndex + the target column's
+// editable[].colIndex from editableColumnsForRow) — threading them through as PARAMETERS,
+// mirroring focusRowEditorAt's already-proven resolveCellEl(String(rowIndex), colIndex)
+// shape, closes the React batched-setState staleness class 88-05-SUMMARY.md documented
+// (REACT_STALE_GATE_SINGLE_CELL_BUG): the OLD gate read $data.editFocusColId SYNCHRONOUSLY,
+// in the SAME tick beginEdit's own setState call set it, and React's batching meant that
+// read saw the PRE-edit (null) value. A plain function argument threaded through — never a
+// reactive re-read — is not subject to that race, uniformly on all 6 targets.
+const resolveEditFocusCellEl = (rowIndex, colIndex) => {
+  if (rowIndex == null || colIndex == null || rowIndex < 0 || colIndex < 0) return null
+  return resolveCellEl(String(rowIndex), colIndex)
+}
+
 // Focus the freshly-mounted editor (Pitfall 1, ROZ123): after beginEdit flips the editing
 // state, the editor <input> does not exist until the framework commits the r-if branch
-// (React setState async; Solid/Lit/Svelte next reactive tick). Poll for the
-// [data-editing-cell] element off gridRoot for ~30 frames — the five fast targets resolve
-// on attempt 1, React retries across its async commit. NEVER read $refs eagerly.
+// (React setState async; Solid/Lit/Svelte next reactive tick). Poll for the target CELL's
+// marked built-in editor for ~30 frames — the five fast targets resolve on attempt 1, React
+// retries across its async commit. NEVER read $refs eagerly.
 // B2: selectAll gates the post-focus el.select(). Select-all is right when entering
 // edit IN PLACE (F2/Enter/click/row-edit/validation-reject — no seeded char, the user
 // retypes), but WRONG on a type-to-edit entry where a printable key already seeded the
 // draft (selecting the seeded char makes the next keystroke replace it: Zeta → eta).
 // beginEdit threads `seed == null` so a seeded entry skips the select and the caret sits
 // AFTER the seeded char; every other caller keeps the default select-all.
-// Editor-owns-focus contract (quick 260711-i5m): REVERTS the g52 shadow-piercing helper
-// (commit 5fa30045) that recursed into descendant shadow roots. Built-in editors are
-// host-DOM — the plain direct query resolves them on all 6 targets (no shadow to cross). A
-// #editor DROP-IN now owns its OWN focus via the reactive `autofocus` prop (EditorText's
-// $onMount + lazy $watch), so the host never needs to reach across a Lit drop-in's nested
-// shadow root at all — see the !hasEditorSlot gate below, which skips the host focus call
-// entirely for a drop-in target.
-const focusEditorWhenReady = (selectAll = true) => {
+// D-01/D-02 (88-07): REPLACES the deleted presence-check early-return gate AND the
+// gridRoot-wide `[data-editing-cell]` first-match query with a column-scoped, marker-driven
+// poll. Resolves the TARGET cell first (resolveEditFocusCellEl, mirroring
+// focusRowEditorAt's already-shipped two-step resolve), then queries for an editor carrying
+// BOTH `data-editing-cell` and the host-owned `data-builtin-editor` marker WITHIN that one
+// cell — "no marker found" (a drop-in target, D-01) bails immediately rather than reaching
+// into DOM the host does not own; "no editor at all yet" keeps polling (the framework hasn't
+// committed the r-if branch). This closes the D-02 wrong-column hole the old grid-wide query
+// left open (every editable cell mounts an editor at once in row-edit mode) AND fixes the
+// React staleness race documented above, as a side effect of no longer reading
+// $data.editFocusColId anywhere in this function.
+const focusEditorWhenReady = (rowIndex, colIndex, selectAll = true) => {
   if (!gridRoot) return
-  // Editor-owns-focus contract: when the CURRENT focus target is a #editor drop-in, the host
-  // does NOT reach into its DOM — the drop-in self-focuses via its own autofocus prop.
-  if ($data.editFocusColId != null && hasEditorSlot($data.editFocusColId)) return
   let attempts = 0
   const tryFocus = () => {
-    const el = gridRoot ? gridRoot.querySelector('[data-editing-cell]') : null
+    const cellEl = resolveEditFocusCellEl(rowIndex, colIndex)
+    const el = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell][data-builtin-editor]') : null
+    if (!el) {
+      // Editor-owns-focus contract (quick 260711-i5m, D-01): if the cell ALREADY holds an
+      // editor that carries only the base marker, it's a consumer drop-in — it owns its own
+      // focus (EditorText's own $onMount + reactive `autofocus`). Bail immediately, zero
+      // wasted frames, rather than burning the retry ceiling on DOM the host does not own.
+      const anyEditor = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null
+      if (anyEditor) return
+      attempts = attempts + 1
+      if (attempts >= 30) return
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
+      else setTimeout(tryFocus, 16)
+      return
+    }
     // Do NOT stomp focus a later interaction already placed in a DIFFERENT column's editor of
     // this row: focusEditorWhenReady only needs to get focus INTO the (first) freshly-mounted
     // editor; if focus already sits in another editable cell, a late rAF re-focus would steal it
     // back to the first editor and break row-mode Tab containment (the non-deterministic B21
     // focus-theft). Compare the OWNING cell's data-col-index (NOT node identity) so a stale
     // SAME-column editor node on Solid's node-replacing re-render still resolves as the target —
-    // a genuinely dropped focus is still recovered.
+    // a genuinely dropped focus is still recovered. Stays BROAD on `data-editing-cell` (NOT
+    // narrowed to the builtin marker, D-02): focus validly placed inside a drop-in must still
+    // count as "already placed" — narrowing this check would let a late rAF poll steal focus
+    // back from a drop-in that legitimately holds it.
     const ae = gridRoot && gridRoot.getRootNode ? gridRoot.getRootNode().activeElement : null
     if (ae && el && ae !== el && ae.closest && gridRoot.contains(ae) && ae.hasAttribute && ae.hasAttribute('data-editing-cell')) {
       const aeCell = ae.closest('[data-grid-cell]')
@@ -186,11 +221,7 @@ const focusEditorWhenReady = (selectAll = true) => {
       const elCol = elCell ? elCell.getAttribute('data-col-index') : null
       if (aeCol != null && aeCol !== elCol) return
     }
-    if (el) { el.focus(); if (selectAll && el.select) { try { el.select() } catch (e) {} } return }
-    attempts = attempts + 1
-    if (attempts >= 30) return
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
-    else setTimeout(tryFocus, 16)
+    el.focus(); if (selectAll && el.select) { try { el.select() } catch (e) {} }
   }
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
   else setTimeout(tryFocus, 0)
@@ -246,8 +277,10 @@ const beginEdit = (rowIndex, colIndex, seed) => {
   // from it. Cleared on endEdit.
   $data.editFocusColId = colId
   // B2: a seeded (type-to-edit) entry must NOT select-all — keep the caret after the
-  // seeded char so subsequent typing appends instead of replacing it.
-  focusEditorWhenReady(seed == null)
+  // seeded char so subsequent typing appends instead of replacing it. rowIndex/colIndex
+  // are THIS call's own params — passed through directly (D-02), never re-read off
+  // $data.editingRow/editingCol inside the poll.
+  focusEditorWhenReady(rowIndex, colIndex, seed == null)
 }
 
 // Return focus to a body cell AFTER the editor unmounts (commit/cancel). The display↔
@@ -357,8 +390,10 @@ const commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
   const err = runValidator(colId, newValue, rowOriginal)
   if (err !== true) {
     // D-01: reject — keep the editor open, announce, re-trap focus, NEVER write the model.
+    // $data.editingRow/editingCol are STABLE here (set by a prior beginEdit call, not this
+    // same tick) — safe to read directly, unlike the deleted $data.editFocusColId gate.
     setInvalid(err)
-    focusEditorWhenReady()
+    focusEditorWhenReady($data.editingRow, $data.editingCol)
     return false
   }
   setInvalid('')

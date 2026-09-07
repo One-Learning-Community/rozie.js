@@ -1484,7 +1484,7 @@ const onHeaderSort = (colId, evt) => {
 // aria-sort never flips, the pin position never sticks. Touching rowModelVer puts each
 // helper in the reactive scope. The chrome helpers prefix `tick()` in their guard.
 const tick = () => $data.rowModelVer
-import { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle } from './columnChrome.rzts'
+import { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle } from './columnChrome.rzts'
 
 import { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, displayPageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, rowIndexIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupRowDescriptor, cellSlotRow, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn } from './filterPaginationRowChrome.rzts'
 // `indeterminate` is a DOM PROPERTY, not an HTML attribute — a `:indeterminate="…"`
@@ -2272,20 +2272,8 @@ $expose({
              cell editing under virtualization (the D-02 pin-row) lands in Plan 51-04; this
              keeps both <td> bodies in lockstep so the branch is structurally consistent. -->
         <span style="display:contents" r-else-if="isEditing(wr.vi.index, colIndexOf(wr.row, cell))">
-          <span style="display:contents" r-if="hasEditorSlot(cell.column.id)">
-            <slot
-              name="editor"
-              :columnId="cell.column.id"
-              :column="cell.column"
-              :row="cellSlotRow(wr.row)"
-              :value="editorValueFor(cell.column.id)"
-              :commit="editorCommitFor(cell.column.id)"
-              :cancel="editorCancelFor()"
-              :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)"
-            />
-          </span>
           <input
-            r-else-if="editorTypeOf(cell.column.id) === 'number'"
+            r-if="editorTypeOf(cell.column.id) === 'number'"
             class="rdt-cell-editor"
             type="number"
             data-editing-cell
@@ -2318,6 +2306,50 @@ $expose({
             @keydown="onEditorKeyDown($event)"
             @blur="onEditorBlur($event)"
           />
+          <!-- D-01/D-04 (88-07): editor='custom' gate, shared by BOTH the family and generic
+               tiers (one gate rule per seam). The family slot's inline fallback is the generic
+               slot, moved unchanged; the generic slot's inline fallback is a built-in text
+               editor — custom always degrades to text specifically, never to number/select/
+               checkbox (unreachable inside this branch by construction: editorTypeOf() is
+               already known to be 'custom' here). This text input is a SEPARATE, ADDITIONAL
+               occurrence from the r-else branch below (empirically required — see 88-07-SUMMARY
+               "Deviations from Plan": a single r-if="editorTypeOf===custom" wrapping the whole
+               branch with NO sibling ladder was proven, via a compiled-React probe, to render
+               genuinely-typed number/select/checkbox/text columns BLANK). -->
+          <span style="display:contents" r-else-if="editorTypeOf(cell.column.id) === 'custom'">
+            <slot
+              :name="`editor-${cell.column.id}`"
+              :columnId="cell.column.id"
+              :column="cell.column"
+              :row="cellSlotRow(wr.row)"
+              :value="editorValueFor(cell.column.id)"
+              :commit="editorCommitFor(cell.column.id)"
+              :cancel="editorCancelFor()"
+              :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)"
+            >
+              <slot
+                name="editor"
+                :columnId="cell.column.id"
+                :column="cell.column"
+                :row="cellSlotRow(wr.row)"
+                :value="editorValueFor(cell.column.id)"
+                :commit="editorCommitFor(cell.column.id)"
+                :cancel="editorCancelFor()"
+                :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)"
+              >
+                <input
+                  class="rdt-cell-editor"
+                  type="text"
+                  data-editing-cell
+                  data-builtin-editor
+                  :value="editorValueFor(cell.column.id)"
+                  @input="onCellEditorInput(cell.column.id, $event)"
+                  @keydown="onEditorKeyDown($event)"
+                  @blur="onEditorBlur($event)"
+                />
+              </slot>
+            </slot>
+          </span>
           <input
             r-else
             class="rdt-cell-editor"
@@ -2755,20 +2787,8 @@ $expose({
              element carries data-editing-cell so focusEditorWhenReady resolves it off
              gridRoot (NEVER $refs.cellEditor — ROZ123 + last-ref-wins + Solid TDZ). -->
         <span style="display:contents" r-else-if="isEditing(rowIndexOf(row), colIndexOf(row, cell))">
-          <span style="display:contents" r-if="hasEditorSlot(cell.column.id)">
-            <slot
-              name="editor"
-              :columnId="cell.column.id"
-              :column="cell.column"
-              :row="cellSlotRow(row)"
-              :value="editorValueFor(cell.column.id)"
-              :commit="editorCommitFor(cell.column.id)"
-              :cancel="editorCancelFor()"
-              :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))"
-            />
-          </span>
           <input
-            r-else-if="editorTypeOf(cell.column.id) === 'number'"
+            r-if="editorTypeOf(cell.column.id) === 'number'"
             class="rdt-cell-editor"
             type="number"
             data-editing-cell
@@ -2801,6 +2821,43 @@ $expose({
             @keydown="onEditorKeyDown($event)"
             @blur="onEditorBlur($event)"
           />
+          <!-- D-01/D-04 (88-07): editor='custom' gate, shared by BOTH the family and generic
+               tiers. See the windowed site's identical comment (above, ~L2308) for the
+               empirical justification of the additional text-input occurrence below. -->
+          <span style="display:contents" r-else-if="editorTypeOf(cell.column.id) === 'custom'">
+            <slot
+              :name="`editor-${cell.column.id}`"
+              :columnId="cell.column.id"
+              :column="cell.column"
+              :row="cellSlotRow(row)"
+              :value="editorValueFor(cell.column.id)"
+              :commit="editorCommitFor(cell.column.id)"
+              :cancel="editorCancelFor()"
+              :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))"
+            >
+              <slot
+                name="editor"
+                :columnId="cell.column.id"
+                :column="cell.column"
+                :row="cellSlotRow(row)"
+                :value="editorValueFor(cell.column.id)"
+                :commit="editorCommitFor(cell.column.id)"
+                :cancel="editorCancelFor()"
+                :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))"
+              >
+                <input
+                  class="rdt-cell-editor"
+                  type="text"
+                  data-editing-cell
+                  data-builtin-editor
+                  :value="editorValueFor(cell.column.id)"
+                  @input="onCellEditorInput(cell.column.id, $event)"
+                  @keydown="onEditorKeyDown($event)"
+                  @blur="onEditorBlur($event)"
+                />
+              </slot>
+            </slot>
+          </span>
           <input
             r-else
             class="rdt-cell-editor"

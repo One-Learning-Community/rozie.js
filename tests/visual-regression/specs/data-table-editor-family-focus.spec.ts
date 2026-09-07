@@ -7,11 +7,12 @@ import { expect, type Page, test } from '@playwright/test';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
- * Phase 88 Plan 05 (D-03) — the editor-owns-focus contract, pinned red-first (against
- * TODAY's shipped behavior, not the transient 88-07 deleted-helper state) BEFORE 88-07
- * reworks `focusEditorWhenReady` / `focusRowEditorAt` (D-01: the `data-builtin-editor`
- * marker; D-02: column-scoping both polls). Focus bugs pass typecheck, build, and
- * dist-parity clean — this is a silent-failure class with no other gate.
+ * Phase 88 Plan 05 (D-03) — the editor-owns-focus contract, originally pinned red-first
+ * (against the pre-88-07 shipped behavior) BEFORE 88-07 reworked `focusEditorWhenReady` /
+ * `focusRowEditorAt` (D-01: the `data-builtin-editor` marker; D-02: column-scoping both
+ * polls, threading rowIndex/colIndex as plain parameters instead of a `$data` re-read).
+ * Focus bugs pass typecheck, build, and dist-parity clean — this is a silent-failure class
+ * with no other gate.
  *
  * Fixture: examples/demos/DataTableEditorFamilyDemo.rozie mounts TWO independently
  * addressable table instances (`[data-dt-instance="mixed"]` / `[data-dt-instance="nofill"]`
@@ -28,12 +29,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * it; Lit would find nothing across its shadow boundary and burn 30 idle rAF frames.
  *
  *   (a) DROP-IN TARGET — F2 on `mixed`'s `status` cell. The INTENDED contract: the host
- *       must NOT reach into the drop-in's DOM at all (`hasEditorSlot('status')` gates
- *       `focusEditorWhenReady` off before it starts); EditorText's own `$onMount` lands
- *       focus via its reactive `autofocus` prop and NEVER calls `.select()`. THIS is the
- *       case that goes RED in 88-07's transient deleted-helper state (the plain
- *       `hasEditorSlot` presence test is exactly what gets deleted and replaced by the
- *       `data-builtin-editor` marker) — every other case here is a regression pin, not a
+ *       must NOT reach into the drop-in's DOM at all — the resolved cell holds an editor
+ *       carrying only the base `data-editing-cell` marker (no `data-builtin-editor`), which
+ *       makes `focusEditorWhenReady` bail immediately (D-01); EditorText's own `$onMount`
+ *       lands focus via its reactive `autofocus` prop and NEVER calls `.select()`. THIS is
+ *       the case that was RED against 88-07's transient deleted-helper state (helper and
+ *       gates removed, marker-based narrowing not yet applied — see 88-07-SUMMARY.md's
+ *       verbatim red-first observation) — every other case here is a regression pin, not a
  *       red-first probe.
  *
  *       Discriminator: COLLAPSED text selection. Verified empirically (throwaway,
@@ -44,24 +46,22 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *       EditorText's own `$onMount`/`$watch` focus path never does (selectionStart ===
  *       selectionEnd).
  *
- *       DISCOVERED PRE-EXISTING DEFECT — REACT ONLY (`REACT_STALE_GATE_SINGLE_CELL_BUG`,
- *       see 88-05-SUMMARY.md for the full trace): on React specifically, this case's
- *       INTENDED contract is ALREADY broken TODAY, independent of 88-07. The `.select()`
- *       call-site trace shows `focusEditorWhenReady`'s early-return
- *       (`editFocusColId != null && hasEditorSlot(editFocusColId)`) does not fire on the
- *       FIRST single-cell F2 entry of a page session — `editFocusColId` reads back its
+ *       FIXED (was: DISCOVERED PRE-EXISTING DEFECT — REACT ONLY, see 88-05-SUMMARY.md for
+ *       the original trace): 88-05 found that, pre-88-07, React specifically broke this
+ *       case's intended contract on the FIRST single-cell F2 entry of a page session — the
+ *       old `editFocusColId != null && hasEditorSlot(editFocusColId)` gate read back its
  *       PRE-edit (null) value via React's batched-setState closure the instant after
- *       `beginEdit` set it, so the gate's `!= null` check fails and the poll falls through
- *       to `gridRoot.querySelector('[data-editing-cell]')`, which (React has no shadow
- *       boundary) finds and select-alls the drop-in's own input on its very first rAF
- *       attempt. This is a genuine, 100%-reproducible bug in code OUTSIDE this plan's
- *       `files_modified` (`editCellLifecycle.rzts`) — out of scope to fix here per the
- *       executor's Scope Boundary. This spec PINS what is actually shipping: React's case
- *       (a) is asserted `selectionCollapsed: false` (matching the observed defect), the
- *       other five targets `true` (the intended, working contract). If 88-07's D-01/D-02
- *       rework (replacing the `$data`-state gate with a DOM-attribute check) incidentally
- *       fixes this React race, React's assertion here should be tightened back to `true`
- *       at that time — a welcome outcome this pin does not currently claim.
+ *       `beginEdit` set it, so the poll fell through to a grid-wide
+ *       `gridRoot.querySelector('[data-editing-cell]')` and select-alled the drop-in's own
+ *       input. 88-07's D-01/D-02 rework incidentally fixes this race as a side effect:
+ *       `focusEditorWhenReady` no longer reads any `$data` state inside its poll at
+ *       all — every call site (`beginEdit`, `commitEdit`'s validation-reject path,
+ *       `beginRowEdit`) now threads rowIndex/colIndex through as plain function arguments,
+ *       synchronously known at the call site, closing the staleness class entirely
+ *       (confirmed empirically post-rework: React's case (a) now asserts
+ *       `selectionCollapsed: true`, uniformly with the other five targets — the
+ *       `REACT_STALE_GATE_SINGLE_CELL_BUG` exemption this file previously carried has been
+ *       removed).
  *
  *   (b) BUILT-IN TARGET WITH A SIBLING DROP-IN MOUNTED — Shift+F2 on `mixed` row 0 enters
  *       full-row edit, mounting every editable cell's editor at once (name + status‘s
@@ -73,26 +73,29 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *       `editRowLifecycle.rzts`): `beginRowEdit` always seeds `$data.editFocusColId` from
  *       `editableColumnsForRow(...)[0].colId` — the FIRST editable column in visible-cell
  *       (DOM) order. That is, BY CONSTRUCTION, always the same column `focusEditorWhenReady`'s
- *       current `gridRoot.querySelector('[data-editing-cell]')` (first-DOM-match, the D-02
+ *       pre-88-07 `gridRoot.querySelector('[data-editing-cell]')` (first-DOM-match, the D-02
  *       bug) would ALSO resolve — the two selection strategies coincide on THIS entry path no
  *       matter which column is built-in vs drop-in, so this arrangement, reached through
  *       Shift+F2, cannot by itself distinguish "resolved by column id" from "resolved by
  *       first-DOM-match." The genuinely wrong-column-manifesting path (target column ≠ first
  *       DOM match) has NO reachable public-API trigger today: `rowEditTab` (Tab within row
  *       edit) and `commitRow`'s validation-reject retarget both already call the
- *       ALREADY-column-scoped `focusRowEditorAt`, never the buggy `focusEditorWhenReady`. Per
- *       the plan's explicit guidance, this case pins what IS reachable (Shift+F2 must focus
- *       `name`, and must leave the `status` drop-in untouched) rather than inventing a
- *       private-API backdoor to manufacture the unreachable divergence. It still protects
- *       98-07's D-02 rewrite from a regression that would make row-edit's initial focus skip
- *       the first editable column entirely.
+ *       ALREADY-column-scoped `focusRowEditorAt`. 88-07's red-first observation (recorded
+ *       verbatim in 88-07-SUMMARY.md) confirms this case does NOT discriminate the D-01/D-02
+ *       regression either — it stayed green across all six targets in the transient
+ *       deleted-helper state, for exactly this reason. It still protects the D-02 rework
+ *       from a regression that would make row-edit's initial focus skip the first editable
+ *       column entirely.
  *
  *   (c) CUSTOM WITH NO FILL ANYWHERE — F2 on `nofill`'s `notes` cell (declared
- *       `editor="custom"`, no `#editor` fill exists in this instance at all —
- *       `$slots.editor` is undefined, so `hasEditorSlot('notes')` is false). Assert a
+ *       `editor="custom"`, no `#editor` fill exists in this instance at all). Assert a
  *       built-in text editor mounts (not a blank cell) and holds focus — the degrade-to-
  *       built-in contract D-01's rejected alternative (a bare `editorTypeOf === 'custom'`
- *       gate) would have broken.
+ *       gate skipping the focus poll) would have broken. 88-07's red-first observation
+ *       confirms this case also does NOT discriminate the D-01/D-02 regression (green
+ *       throughout the transient state) — the resolved cell holds exactly one
+ *       `[data-editing-cell]` element regardless of marker-narrowing, so removing the
+ *       marker check has no effect here.
  *
  * No pixel-diff assertion, no PNG baseline directory — DOM/behavioral assertions only.
  *
@@ -108,14 +111,6 @@ type Target = (typeof TARGETS)[number];
 // Empty known-failing set — the CURRENT shipped behavior is the thing being pinned, so
 // every target must be genuinely green, not permanently fixme'd.
 const KNOWN_FAILING: ReadonlySet<Target> = new Set<Target>([]);
-
-// Discovered pre-existing defect (see the header comment's DISCOVERED PRE-EXISTING DEFECT
-// note and 88-05-SUMMARY.md) — NOT a KNOWN_FAILING skip. React's `focusEditorWhenReady`
-// early-return gate reads a stale `editFocusColId` on the FIRST single-cell F2 entry of a
-// page session, so the host reaches into and select-alls the drop-in's input in case (a).
-// This is a real, currently-shipping behavior this spec pins as-is (a regression pin still
-// needs to notice if this DEFECT itself regresses further, e.g. spreading to other cases).
-const REACT_STALE_GATE_SINGLE_CELL_BUG: ReadonlySet<Target> = new Set<Target>(['react']);
 
 function runnerFor(target: Target) {
   const built = existsSync(resolve(__dirname, `../dist/${target}/host/entry.${target}.html`));
@@ -379,20 +374,17 @@ async function enterEditAtInstance(
 }
 
 for (const target of TARGETS) {
-  const reactBug = REACT_STALE_GATE_SINGLE_CELL_BUG.has(target);
   runnerFor(target)(
-    reactBug
-      ? `data-table-editor-family-focus [${target}] (a): drop-in target — DISCOVERED PRE-EXISTING DEFECT pinned as-is (host DOES reach in on the first single-cell F2 entry; see header comment)`
-      : `data-table-editor-family-focus [${target}] (a): drop-in target — host never reaches in, focus lands via the drop-in's own autofocus, selection collapsed`,
+    `data-table-editor-family-focus [${target}] (a): drop-in target — host never reaches in, focus lands via the drop-in's own autofocus, selection collapsed`,
     async ({ page }) => {
       await page.goto(`/?example=DataTableEditorFamily&target=${target}`);
       await expect(page.getByTestId('rozie-mount')).toBeVisible();
 
       // F2 on mixed's `status` cell (col 1) — a drop-in target.
       await enterEditAtInstance(page, 'mixed', 0, 1);
-      // Settle window (generous over the empirically-observed ~3-6ms lag) so a target
-      // exhibiting the discovered React defect is read AFTER its second focus+select()
-      // call lands, not mid-race — this reads the TRUE settled state, not a lucky snapshot.
+      // Settle window (generous over the empirically-observed ~3-6ms lag pre-88-07) so a
+      // late rAF settle is read AFTER it lands, not mid-race — this reads the TRUE settled
+      // state, not a lucky snapshot.
       await page.waitForTimeout(100);
 
       const info = await activeEditorInfo(page);
@@ -402,9 +394,10 @@ for (const target of TARGETS) {
       expect(info?.tag).toBe('input');
       // The discriminator: EditorText's own $onMount/$watch focus path never calls
       // .select() — a collapsed selection proves the host stayed out of this drop-in's DOM.
-      // React is the sole EXCEPTION today (see header + REACT_STALE_GATE_SINGLE_CELL_BUG) —
-      // this pins the ACTUAL shipped behavior per target, not a uniform assumption.
-      expect(info?.selectionCollapsed).toBe(!reactBug);
+      // Uniform across all six targets post-88-07 (D-01/D-02 fixed the React-only stale-gate
+      // race documented in the header comment as a side effect of no longer reading any
+      // $data state inside focusEditorWhenReady's poll).
+      expect(info?.selectionCollapsed).toBe(true);
     },
   );
 
