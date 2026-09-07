@@ -53,13 +53,6 @@ interface SelectAllCtx {
   toggle: any;
 }
 
-interface ColHeaderCtx {
-  $implicit: { columnId: any; column: any; label: any };
-  columnId: any;
-  column: any;
-  label: any;
-}
-
 interface FilterCtx {
   $implicit: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any };
   columnId: any;
@@ -98,6 +91,20 @@ interface EditorCtx {
 interface DetailCtx {
   $implicit: { row: any };
   row: any;
+}
+
+interface ColHeaderCtx {
+  $implicit: { columnId: any; column: any; label: any };
+  columnId: any;
+  column: any;
+  label: any;
+}
+
+interface ColHeaderCtx {
+  $implicit: { columnId: any; column: any; label: any };
+  columnId: any;
+  column: any;
+  label: any;
 }
 
 @Component({
@@ -176,10 +183,16 @@ interface DetailCtx {
               @if (wh.header.column.getCanSort && wh.header.column.getCanSort()) {
     <button type="button" class="rdt-sort-btn" (click)="onHeaderSort(wh.header.column.id, $event)">
                 <span class="rdt-header-label">
-                  @if ((colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader'])) {
+                  @if ((__rozieFillMap()[\`colHeader-\${wh.header.column.id}\`] ?? templates()?.[\`colHeader-\${wh.header.column.id}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`colHeader-\${wh.header.column.id}\`] ?? templates()?.[\`colHeader-\${wh.header.column.id}\`]); context: { $implicit: { columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }, columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }" />
+    } @else {
+
+                    @if ((colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader'])) {
     <ng-container *ngTemplateOutlet="(colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader']); context: { $implicit: { columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }, columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }" />
     } @else {
     {{ rozieDisplay(headerLabel(wh.header.column.id)) }}
+    }
+                  
     }
                 </span>
                 <span class="rdt-sort-ind" aria-hidden="true">{{ rozieDisplay(sortIndicator(wh.header.column.id)) }}</span>
@@ -187,10 +200,16 @@ interface DetailCtx {
     } @else {
     <span style="display:contents">
                 <span class="rdt-header-label">
-                  @if ((colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader'])) {
+                  @if ((__rozieFillMap()[\`colHeader-\${wh.header.column.id}\`] ?? templates()?.[\`colHeader-\${wh.header.column.id}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`colHeader-\${wh.header.column.id}\`] ?? templates()?.[\`colHeader-\${wh.header.column.id}\`]); context: { $implicit: { columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }, columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }" />
+    } @else {
+
+                    @if ((colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader'])) {
     <ng-container *ngTemplateOutlet="(colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader']); context: { $implicit: { columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }, columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }" />
     } @else {
     {{ rozieDisplay(headerLabel(wh.header.column.id)) }}
+    }
+                  
     }
                 </span>
               </span>
@@ -364,10 +383,16 @@ interface DetailCtx {
     <button type="button" class="rdt-sort-btn" (click)="onHeaderSort(header.column.id, $event)">
                 
                 <span class="rdt-header-label">
-                  @if ((colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader'])) {
+                  @if ((__rozieFillMap()[\`colHeader-\${header.column.id}\`] ?? templates()?.[\`colHeader-\${header.column.id}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`colHeader-\${header.column.id}\`] ?? templates()?.[\`colHeader-\${header.column.id}\`]); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
+    } @else {
+
+                    @if ((colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader'])) {
     <ng-container *ngTemplateOutlet="(colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
     } @else {
     {{ rozieDisplay(headerLabel(header.column.id)) }}
+    }
+                  
     }
                 </span>
                 <span class="rdt-sort-ind" aria-hidden="true">{{ rozieDisplay(sortIndicator(header.column.id)) }}</span>
@@ -375,10 +400,16 @@ interface DetailCtx {
     } @else {
     <span style="display:contents">
                 <span class="rdt-header-label">
-                  @if ((colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader'])) {
+                  @if ((__rozieFillMap()[\`colHeader-\${header.column.id}\`] ?? templates()?.[\`colHeader-\${header.column.id}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`colHeader-\${header.column.id}\`] ?? templates()?.[\`colHeader-\${header.column.id}\`]); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
+    } @else {
+
+                    @if ((colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader'])) {
     <ng-container *ngTemplateOutlet="(colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
     } @else {
     {{ rozieDisplay(headerLabel(header.column.id)) }}
+    }
+                  
     }
                 </span>
               </span>
@@ -1051,12 +1082,12 @@ export class DataTable {
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('groupBar', { read: TemplateRef }) groupBarTpl?: TemplateRef<GroupBarCtx>;
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
-  @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
   @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
   @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
   @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
   @ContentChild('detail', { read: TemplateRef }) detailTpl?: TemplateRef<DetailCtx>;
+  @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   __rozieFills = contentChildren(RozieSlot, { descendants: true });
   __rozieFillMap = computed(() => {
@@ -1069,6 +1100,8 @@ export class DataTable {
     }
     return map;
   });
+  __rozieProjectedTpls = contentChildren(TemplateRef, { descendants: true });
+  __rozieSlotWarned = false;
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
 
@@ -1104,6 +1137,21 @@ export class DataTable {
       this.lastDataLen = d.length;
       this.reFeed();
     });
+    effect(() => {
+      if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;
+      const fills = this.__rozieFills();
+      const seen = new Set<string>();
+      for (const f of fills) {
+        const k = f.rozieSlot();
+        if (k == null) continue;
+        if (seen.has(k)) {
+          this.__rozieSlotWarned = true;
+          console.warn('[ROZ750] DataTable: duplicate keyed fill "' + k + '" — the last fill (in content-query order) wins.');
+          return;
+        }
+        seen.add(k);
+      }
+    });
     effect(() => { const __watchVal = (() => [this.sorting(), this.globalFilter(), this.columnFilters(), this.pagination(),
     // Server-side page-count sources (#2): re-feed when the consumer's rowCount/pageCount
     // changes at runtime (e.g. a server response updates the total) so getPageCount() and the
@@ -1128,6 +1176,15 @@ export class DataTable {
       const msg = this.buildSortFilterAnnounce();
       if (msg) this.liveAnnounce.set(msg);
     })(); }); });
+  }
+
+  ngAfterContentInit() {
+    if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;
+    const claimedByStaticRefs = [this.defaultTpl, this.groupBarTpl, this.selectAllTpl, this.filterTpl, this.selectCellTpl, this.cellTpl, this.editorTpl, this.detailTpl, this.colHeaderTpl].filter((t) => t != null).length;
+    if (this.__rozieFills().length === 0 && this.__rozieProjectedTpls().length > claimedByStaticRefs) {
+      this.__rozieSlotWarned = true;
+      console.warn('[ROZ750] DataTable: projected template content was found but no keyed fills were collected — did you forget to add RozieSlot to the consumer\'s imports: array?');
+    }
   }
 
   ngAfterViewInit() {
@@ -7473,7 +7530,7 @@ export class DataTable {
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | ColHeaderCtx | FilterCtx | SelectCellCtx | CellCtx | EditorCtx | DetailCtx {
+  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | FilterCtx | SelectCellCtx | CellCtx | EditorCtx | DetailCtx | ColHeaderCtx {
     return true;
   }
 

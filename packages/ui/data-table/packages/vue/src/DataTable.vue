@@ -35,12 +35,16 @@
         </span><span v-else-if="isExpanderColumn(wh.header.column.id)" style="display:contents"></span><span v-else style="display:contents">
           <button v-if="wh.header.column.getCanSort && wh.header.column.getCanSort()" type="button" class="rdt-sort-btn" @click="onHeaderSort(wh.header.column.id, $event)">
             <span class="rdt-header-label">
-              <slot name="colHeader" :columnId="wh.header.column.id" :column="wh.header.column" :label="headerLabel(wh.header.column.id)">{{ headerLabel(wh.header.column.id) }}</slot>
+              <slot :name="`colHeader-${wh.header.column.id}`" :columnId="wh.header.column.id" :column="wh.header.column" :label="headerLabel(wh.header.column.id)">
+                <slot name="colHeader" :columnId="wh.header.column.id" :column="wh.header.column" :label="headerLabel(wh.header.column.id)">{{ headerLabel(wh.header.column.id) }}</slot>
+              </slot>
             </span>
             <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(wh.header.column.id) }}</span>
           </button><span v-else style="display:contents">
             <span class="rdt-header-label">
-              <slot name="colHeader" :columnId="wh.header.column.id" :column="wh.header.column" :label="headerLabel(wh.header.column.id)">{{ headerLabel(wh.header.column.id) }}</slot>
+              <slot :name="`colHeader-${wh.header.column.id}`" :columnId="wh.header.column.id" :column="wh.header.column" :label="headerLabel(wh.header.column.id)">
+                <slot name="colHeader" :columnId="wh.header.column.id" :column="wh.header.column" :label="headerLabel(wh.header.column.id)">{{ headerLabel(wh.header.column.id) }}</slot>
+              </slot>
             </span>
           </span><Popover trigger="click" placement="bottom-end" strategy="fixed" :offset="4"><template #anchor>
               <button type="button" class="rdt-col-menu-trigger" :aria-label="'Column options for ' + headerLabel(wh.header.column.id)">⋯</button>
@@ -123,12 +127,16 @@
           <button v-if="header.column.getCanSort && header.column.getCanSort()" type="button" class="rdt-sort-btn" @click="onHeaderSort(header.column.id, $event)">
             
             <span class="rdt-header-label">
-              <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
+              <slot :name="`colHeader-${header.column.id}`" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">
+                <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
+              </slot>
             </span>
             <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(header.column.id) }}</span>
           </button><span v-else style="display:contents">
             <span class="rdt-header-label">
-              <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
+              <slot :name="`colHeader-${header.column.id}`" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">
+                <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
+              </slot>
             </span>
           </span><Popover trigger="click" placement="bottom-end" strategy="fixed" :offset="4"><template #anchor>
               <button type="button" class="rdt-col-menu-trigger" :aria-label="'Column options for ' + headerLabel(header.column.id)">⋯</button>
@@ -359,8 +367,7 @@ defineSlots<{
   default(props: {  }): any;
   groupBar(props: { grouping: any; groupableColumns: any; applyGrouping: any; clearGrouping: any }): any;
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
-  colHeader(props: { columnId: any; column: any; label: any }): any;
-  colHeader(props: { columnId: any; column: any; label: any }): any;
+  [key: `colHeader-${string}`]: ((props: { columnId: any; column: any; label: any }) => any) | undefined;
   filter(props: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
@@ -368,14 +375,13 @@ defineSlots<{
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
   detail(props: { row: any }): any;
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
-  colHeader(props: { columnId: any; column: any; label: any }): any;
-  colHeader(props: { columnId: any; column: any; label: any }): any;
   filter(props: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
   editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
   detail(props: { row: any }): any;
+  colHeader(props: { columnId: any; column: any; label: any }): any;
 }>();
 
 const slots = useSlots();

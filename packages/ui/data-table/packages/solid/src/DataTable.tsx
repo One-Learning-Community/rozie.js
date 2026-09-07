@@ -353,8 +353,6 @@ interface GroupBarSlotCtx { grouping: any; groupableColumns: any; applyGrouping:
 
 interface SelectAllSlotCtx { checked: any; indeterminate: any; toggle: any; }
 
-interface ColHeaderSlotCtx { columnId: any; column: any; label: any; }
-
 interface FilterSlotCtx { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any; }
 
 interface SelectCellSlotCtx { row: any; checked: any; toggle: any; }
@@ -364,6 +362,8 @@ interface CellSlotCtx { columnId: any; column: any; row: any; value: any; }
 interface EditorSlotCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any; }
 
 interface DetailSlotCtx { row: any; }
+
+interface ColHeaderSlotCtx { columnId: any; column: any; label: any; }
 
 interface DataTableProps {
   /**
@@ -527,13 +527,13 @@ interface DataTableProps {
   children?: JSX.Element;
   groupBarSlot?: (ctx: GroupBarSlotCtx) => JSX.Element;
   selectAllSlot?: (ctx: SelectAllSlotCtx) => JSX.Element;
-  colHeaderSlot?: (ctx: ColHeaderSlotCtx) => JSX.Element;
   filterSlot?: (ctx: FilterSlotCtx) => JSX.Element;
   selectCellSlot?: (ctx: SelectCellSlotCtx) => JSX.Element;
   cellSlot?: (ctx: CellSlotCtx) => JSX.Element;
   editorSlot?: (ctx: EditorSlotCtx) => JSX.Element;
   detailSlot?: (ctx: DetailSlotCtx) => JSX.Element;
-  slots?: Record<string, (ctx: any) => JSX.Element>;
+  colHeaderSlot?: (ctx: ColHeaderSlotCtx) => JSX.Element;
+  slots?: { [key: `colHeader-${string}`]: ((ctx: { columnId: any; column: any; label: any }) => JSX.Element) | undefined; [key: string]: ((...args: any[]) => JSX.Element) | undefined; };
   ref?: (h: DataTableHandle) => void;
 }
 
@@ -7328,12 +7328,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
               
               {<Show when={header().column.getCanSort && header().column.getCanSort()} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 <span class={"rdt-header-label"} data-rozie-s-d5dcab4c="">
-                  {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: header().column.id, column: header().column, label: headerLabel(header().column.id) }) ?? rozieDisplay(headerLabel(header().column.id))}
+                  {_props.slots?.[`colHeader-${header().column.id}`]?.({ columnId: header().column.id, column: header().column, label: headerLabel(header().column.id) }) ?? (_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: header().column.id, column: header().column, label: headerLabel(header().column.id) }) ?? rozieDisplay(headerLabel(header().column.id))}
                 </span>
               </span>}><button type="button" class={"rdt-sort-btn"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onHeaderSort(header().column.id, $event); }} data-rozie-s-d5dcab4c="">
                 
                 <span class={"rdt-header-label"} data-rozie-s-d5dcab4c="">
-                  {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: header().column.id, column: header().column, label: headerLabel(header().column.id) }) ?? rozieDisplay(headerLabel(header().column.id))}
+                  {_props.slots?.[`colHeader-${header().column.id}`]?.({ columnId: header().column.id, column: header().column, label: headerLabel(header().column.id) }) ?? (_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: header().column.id, column: header().column, label: headerLabel(header().column.id) }) ?? rozieDisplay(headerLabel(header().column.id))}
                 </span>
                 <span class={"rdt-sort-ind"} aria-hidden="true" data-rozie-s-d5dcab4c="">{rozieDisplay(sortIndicator(header().column.id))}</span>
               </button></Show>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" anchorSlot={() => (<>
@@ -7400,11 +7400,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
             {<Show when={isSelectColumn(wh().header.column.id)} fallback={<Show when={isExpanderColumn(wh().header.column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={wh().header.column.getCanSort && wh().header.column.getCanSort()} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 <span class={"rdt-header-label"} data-rozie-s-d5dcab4c="">
-                  {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: wh().header.column.id, column: wh().header.column, label: headerLabel(wh().header.column.id) }) ?? rozieDisplay(headerLabel(wh().header.column.id))}
+                  {_props.slots?.[`colHeader-${wh().header.column.id}`]?.({ columnId: wh().header.column.id, column: wh().header.column, label: headerLabel(wh().header.column.id) }) ?? (_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: wh().header.column.id, column: wh().header.column, label: headerLabel(wh().header.column.id) }) ?? rozieDisplay(headerLabel(wh().header.column.id))}
                 </span>
               </span>}><button type="button" class={"rdt-sort-btn"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onHeaderSort(wh().header.column.id, $event); }} data-rozie-s-d5dcab4c="">
                 <span class={"rdt-header-label"} data-rozie-s-d5dcab4c="">
-                  {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: wh().header.column.id, column: wh().header.column, label: headerLabel(wh().header.column.id) }) ?? rozieDisplay(headerLabel(wh().header.column.id))}
+                  {_props.slots?.[`colHeader-${wh().header.column.id}`]?.({ columnId: wh().header.column.id, column: wh().header.column, label: headerLabel(wh().header.column.id) }) ?? (_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: wh().header.column.id, column: wh().header.column, label: headerLabel(wh().header.column.id) }) ?? rozieDisplay(headerLabel(wh().header.column.id))}
                 </span>
                 <span class={"rdt-sort-ind"} aria-hidden="true" data-rozie-s-d5dcab4c="">{rozieDisplay(sortIndicator(wh().header.column.id))}</span>
               </button></Show>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" anchorSlot={() => (<>

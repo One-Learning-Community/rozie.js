@@ -39,8 +39,6 @@ interface GroupBarCtx { grouping: any; groupableColumns: any; applyGrouping: any
 
 interface SelectAllCtx { checked: any; indeterminate: any; toggle: any; }
 
-interface ColHeaderCtx { columnId: any; column: any; label: any; }
-
 interface FilterCtx { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any; }
 
 interface SelectCellCtx { row: any; checked: any; toggle: any; }
@@ -50,6 +48,8 @@ interface CellCtx { columnId: any; column: any; row: any; value: any; }
 interface EditorCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any; }
 
 interface DetailCtx { row: any; }
+
+interface ColHeaderCtx { columnId: any; column: any; label: any; }
 
 interface DataTableProps {
   /**
@@ -212,13 +212,13 @@ interface DataTableProps {
   children?: ReactNode;
   renderGroupBar?: (ctx: GroupBarCtx) => ReactNode;
   renderSelectAll?: (ctx: SelectAllCtx) => ReactNode;
-  renderColHeader?: (ctx: ColHeaderCtx) => ReactNode;
   renderFilter?: (ctx: FilterCtx) => ReactNode;
   renderSelectCell?: (ctx: SelectCellCtx) => ReactNode;
   renderCell?: (ctx: CellCtx) => ReactNode;
   renderEditor?: (ctx: EditorCtx) => ReactNode;
   renderDetail?: (ctx: DetailCtx) => ReactNode;
-  slots?: Record<string, () => import('react').ReactNode>;
+  renderColHeader?: (ctx: ColHeaderCtx) => ReactNode;
+  slots?: { [key: `colHeader-${string}`]: ((params: { columnId: any; column: any; label: any }) => import('react').ReactNode) | undefined; [key: string]: ((...args: any[]) => import('react').ReactNode) | undefined; };
 }
 
 export interface DataTableHandle {
@@ -7090,12 +7090,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
             </span> : (isExpanderColumn(wh.header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(wh.header.column.getCanSort && wh.header.column.getCanSort()) ? <button type="button" className={"rdt-sort-btn"} onClick={($event) => { onHeaderSort(wh.header.column.id, $event); }} data-rozie-s-d5dcab4c="">
                 <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
-                  {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }) : (rozieDisplay(headerLabel(wh.header.column.id)))}
+                  {typeof props.slots?.[`colHeader-${wh.header.column.id}`] === 'function' ? (props.slots?.[`colHeader-${wh.header.column.id}`] as Function)({ columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }) : (props.slots?.[`colHeader-${wh.header.column.id}`] ?? ((props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }) : (rozieDisplay(headerLabel(wh.header.column.id)))))}
                 </span>
                 <span className={"rdt-sort-ind"} aria-hidden="true" data-rozie-s-d5dcab4c="">{rozieDisplay(sortIndicator(wh.header.column.id))}</span>
               </button> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
-                  {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }) : (rozieDisplay(headerLabel(wh.header.column.id)))}
+                  {typeof props.slots?.[`colHeader-${wh.header.column.id}`] === 'function' ? (props.slots?.[`colHeader-${wh.header.column.id}`] as Function)({ columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }) : (props.slots?.[`colHeader-${wh.header.column.id}`] ?? ((props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: wh.header.column.id, column: wh.header.column, label: headerLabel(wh.header.column.id) }) : (rozieDisplay(headerLabel(wh.header.column.id)))))}
                 </span>
               </span>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" renderAnchor={() => (<>
                   <button type="button" className={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(wh.header.column.id))} data-rozie-s-d5dcab4c="">⋯</button>
@@ -7174,12 +7174,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
               {(header.column.getCanSort && header.column.getCanSort()) ? <button type="button" className={"rdt-sort-btn"} onClick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c="">
                 
                 <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
-                  {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : (rozieDisplay(headerLabel(header.column.id)))}
+                  {typeof props.slots?.[`colHeader-${header.column.id}`] === 'function' ? (props.slots?.[`colHeader-${header.column.id}`] as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : (props.slots?.[`colHeader-${header.column.id}`] ?? ((props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : (rozieDisplay(headerLabel(header.column.id)))))}
                 </span>
                 <span className={"rdt-sort-ind"} aria-hidden="true" data-rozie-s-d5dcab4c="">{rozieDisplay(sortIndicator(header.column.id))}</span>
               </button> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
-                  {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : (rozieDisplay(headerLabel(header.column.id)))}
+                  {typeof props.slots?.[`colHeader-${header.column.id}`] === 'function' ? (props.slots?.[`colHeader-${header.column.id}`] as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : (props.slots?.[`colHeader-${header.column.id}`] ?? ((props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : (rozieDisplay(headerLabel(header.column.id)))))}
                 </span>
               </span>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" renderAnchor={() => (<>
                   <button type="button" className={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">⋯</button>

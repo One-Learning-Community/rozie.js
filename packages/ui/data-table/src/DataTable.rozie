@@ -1952,22 +1952,36 @@ $expose({
           >
             <span class="rdt-header-label">
               <slot
-                name="colHeader"
+                :name="`colHeader-${wh.header.column.id}`"
                 :columnId="wh.header.column.id"
                 :column="wh.header.column"
                 :label="headerLabel(wh.header.column.id)"
-              >{{ headerLabel(wh.header.column.id) }}</slot>
+              >
+                <slot
+                  name="colHeader"
+                  :columnId="wh.header.column.id"
+                  :column="wh.header.column"
+                  :label="headerLabel(wh.header.column.id)"
+                >{{ headerLabel(wh.header.column.id) }}</slot>
+              </slot>
             </span>
             <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(wh.header.column.id) }}</span>
           </button>
           <span style="display:contents" r-else>
             <span class="rdt-header-label">
               <slot
-                name="colHeader"
+                :name="`colHeader-${wh.header.column.id}`"
                 :columnId="wh.header.column.id"
                 :column="wh.header.column"
                 :label="headerLabel(wh.header.column.id)"
-              >{{ headerLabel(wh.header.column.id) }}</slot>
+              >
+                <slot
+                  name="colHeader"
+                  :columnId="wh.header.column.id"
+                  :column="wh.header.column"
+                  :label="headerLabel(wh.header.column.id)"
+                >{{ headerLabel(wh.header.column.id) }}</slot>
+              </slot>
             </span>
           </span>
           <!-- Header ⋯ menu (phase 72, D-01/D-05/D-06): the composed Popover (Option A — the
@@ -2441,11 +2455,18 @@ $expose({
             <!-- #header scoped slot, dispatched by columnId; fallback = plain label. -->
             <span class="rdt-header-label">
               <slot
-                name="colHeader"
+                :name="`colHeader-${header.column.id}`"
                 :columnId="header.column.id"
                 :column="header.column"
                 :label="headerLabel(header.column.id)"
-              >{{ headerLabel(header.column.id) }}</slot>
+              >
+                <slot
+                  name="colHeader"
+                  :columnId="header.column.id"
+                  :column="header.column"
+                  :label="headerLabel(header.column.id)"
+                >{{ headerLabel(header.column.id) }}</slot>
+              </slot>
             </span>
             <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(header.column.id) }}</span>
           </button>
@@ -2453,11 +2474,18 @@ $expose({
           <span style="display:contents" r-else>
             <span class="rdt-header-label">
               <slot
-                name="colHeader"
+                :name="`colHeader-${header.column.id}`"
                 :columnId="header.column.id"
                 :column="header.column"
                 :label="headerLabel(header.column.id)"
-              >{{ headerLabel(header.column.id) }}</slot>
+              >
+                <slot
+                  name="colHeader"
+                  :columnId="header.column.id"
+                  :column="header.column"
+                  :label="headerLabel(header.column.id)"
+                >{{ headerLabel(header.column.id) }}</slot>
+              </slot>
             </span>
           </span>
           <!-- Header ⋯ menu (phase 72, D-01/D-05/D-06): the composed Popover (Option A — the
