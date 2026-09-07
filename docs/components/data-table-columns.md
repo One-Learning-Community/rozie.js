@@ -59,6 +59,36 @@ A `<Column>` is **renderless** and carries **metadata only** — it never render
 
 > **React / Solid / Lit render-prop form (the one documented cross-framework divergence).** On the JSX/property targets the slot surfaces as a prop holding a render function rather than a `<template>`: React `renderCell` / `renderColHeader`, Solid `cellSlot` / `colHeaderSlot` — `(ctx) => ReactNode` / `JSX.Element` — and Lit the `.cell` / `.colHeader` properties (a function returning a Lit template). The scope object (`{ columnId, column, row, value }` / `{ columnId, column, label }`) is identical across all six. Vue, Svelte (a `{#snippet cell()}`), and Angular (an `<ng-template #cell>`) use their native slot/snippet/template mechanism. See the [declarative `<Column>` children + custom cell usage snippet](/components/data-table-usage#declarative-column-children-a-custom-cell) for the exact per-target form.
 
+## Per-column slot families {#per-column-slot-families}
+
+Alongside the generic `#cell` / `#colHeader` / `#filter` / `#editor` slots (each dispatched by `columnId` inside a single fill), `@rozie-ui/data-table` also exposes a **per-column dynamic-name slot family** on all four column-scoped seams: `cell-<columnId>`, `colHeader-<columnId>`, `filter-<columnId>`, `editor-<columnId>`. A family member is an ordinary **static** named fill — no runtime dispatch on your side:
+
+```rozie
+<DataTable :data="$data.rows">
+  <Column field="price" header="Price" sortable />
+  <!-- Targets ONLY the price column — no columnId branch needed -->
+  <template #cell-price="{ row, value }">
+    <strong :class="{ negative: value < 0 }">{{ formatCurrency(value) }}</strong>
+  </template>
+</DataTable>
+```
+
+**Three-tier precedence**, per seam, resolved structurally (not by a runtime presence check): the per-column family fill (`#cell-price`) wins if supplied, falling back to the shared generic fill (`#cell`) if supplied, falling back to the built-in render if neither is supplied. Filling `#cell-price` does not disable `#cell` for every *other* column — the two tiers compose.
+
+**Two gate rules**, applied identically to both the family and the generic tier of the same seam:
+
+- The **editor** family (`editor-<columnId>`, and the generic `#editor`) reaches only columns declaring `editor="custom"`. A column with a built-in editor type (`'text'` / `'number'` / `'select'` / `'checkbox'`) never routes through either editor tier.
+- The **filter** family (`filter-<columnId>`, and the generic `#filter`) reaches only columns declaring `filterable`. A non-filterable column never routes through either filter tier.
+
+`cell` and `colHeader` carry no such gate — every column reaches those two seams.
+
+**Chrome columns are structurally excluded, not gated.** The auto-injected row-expander column (`__rdt_expander`) and the row-selection column each take their own dedicated branch earlier in the render chain — they never reach the generic `#cell` / `#colHeader` slot, so they never reach the family tier either. A fill named for one of them (e.g. `#cell-__rdt_expander`) is legal Rozie but structurally inert — it will never be invoked.
+
+Consumer typing note: on five of six targets the family key is template-literal-typed with an inferred scoped-parameter shape, but the emitted type also carries a trailing catch-all index signature, so a misspelled column id still typechecks (it is inert at runtime rather than a compile error) — see [Dynamic slot names](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) for the exact emitted shape and the Angular divergence.
+
+- [Editing](/components/data-table-editing#per-column-slot-families) — the `editor-<columnId>` family and its `editor:'custom'` gate, plus the drop-in editor components.
+- [Faceted filtering](/components/data-table-faceted-filtering#per-column-slot-families) — the `filter-<columnId>` family and its `filterable` gate, plus the drop-in filter components.
+
 ## See also
 
 - [API reference](/components/data-table-api) — every prop, two-way slice, event, slot, and handle verb.

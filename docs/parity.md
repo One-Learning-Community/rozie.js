@@ -136,9 +136,32 @@ import DynamicSlots from '@my-design-system/dynamic-slots';
 That is the idiomatic shape in those frameworks rather than a Rozie-specific
 concession — none of them has a template-slot syntax for Vue's bracketed form to
 be more native than. The producer's emitted `.d.ts` types the record for the
-consumer, family index signatures included, so the keys are checked and
-completed. The runtime dispatch order is
-`slots?.[name]?.(ctx) ?? renderNamed?.(ctx) ?? defaultContent`.
+consumer with a family index signature, but **the key itself is not validated**:
+the emitted type is a template-literal index signature (`` `cell-${string}` ``)
+**plus a trailing catch-all index signature** (`[key: string]`), so a near-miss
+key (`cell-pric`) and an arbitrary key (`cel-price`) both typecheck —
+```ts
+slots?: { 'cell-total'?: ((params: { value: any }) => import('react').ReactNode) | undefined;
+          [key: `cell-${string}`]: ((params: { row: any; value: any }) => import('react').ReactNode) | undefined;
+          [key: string]:          ((...args: any[]) => import('react').ReactNode) | undefined; };
+```
+(`tests/dist-parity/fixtures/DynamicSlots.tsx:13`). What the family typing
+genuinely provides is **scoped-parameter typing** — a typed `{ row, value }`
+context on a matching fill instead of an untyped variadic `(...args: any[])`
+signature — a real and worthwhile gain, but not key validation. The runtime
+dispatch order is `slots?.[name]?.(ctx) ?? renderNamed?.(ctx) ?? defaultContent`.
+
+#### Angular — the lone consumer-typing divergence
+
+Angular's producer-side intake for a dynamic-name slot family is
+`templates?: Record<string, TemplateRef<unknown>>` — type-erased per key.
+The per-family context interfaces the compiler emits exist only to satisfy the
+static `ngTemplateContextGuard`, not to type a keyed record the way the other
+five targets' `slots?` / `snippets?` / `rozieSlots?` inputs do. This is
+**documented, not closed** — every other target (React, Vue, Svelte, Solid,
+Lit) gets a keyed, scoped-parameter-typed record for a dynamic-name family;
+Angular's consumer intake stays a plain `Record<string, TemplateRef<unknown>>`
+until a future phase takes it up.
 
 ### Lit — scoped slot params arrive via a data attribute
 
