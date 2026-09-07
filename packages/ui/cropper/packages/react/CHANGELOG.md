@@ -1,5 +1,11 @@
 # @rozie-ui/cropper-react
 
+## 0.1.9
+
+### Patch Changes
+
+- @rozie/runtime-react@0.7.3
+
 ## 0.1.8
 
 ### Patch Changes

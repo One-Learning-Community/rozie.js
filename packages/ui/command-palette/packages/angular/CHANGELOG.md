@@ -1,5 +1,11 @@
 # @rozie-ui/command-palette-angular
 
+## 0.4.6
+
+### Patch Changes
+
+- @rozie/runtime-angular@0.7.3
+
 ## 0.4.5
 
 ### Patch Changes

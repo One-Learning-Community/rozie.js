@@ -1,5 +1,11 @@
 # @rozie-ui/popover-lit
 
+## 0.2.2
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.7.3
+
 ## 0.2.1
 
 ### Patch Changes

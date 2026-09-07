@@ -1,5 +1,11 @@
 # @rozie-ui/tiptap-lit
 
+## 0.3.6
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.7.3
+
 ## 0.3.5
 
 ### Patch Changes

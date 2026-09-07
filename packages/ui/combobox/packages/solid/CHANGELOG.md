@@ -1,5 +1,11 @@
 # @rozie-ui/combobox-solid
 
+## 0.5.2
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.7.3
+
 ## 0.5.1
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/sortable-list-solid
 
+## 0.1.14
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.7.3
+
 ## 0.1.13
 
 ### Patch Changes

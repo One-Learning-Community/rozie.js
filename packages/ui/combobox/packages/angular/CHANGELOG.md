@@ -1,5 +1,11 @@
 # @rozie-ui/combobox-angular
 
+## 0.5.2
+
+### Patch Changes
+
+- @rozie/runtime-angular@0.7.3
+
 ## 0.5.1
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/combobox-lit
 
+## 0.5.2
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.7.3
+
 ## 0.5.1
 
 ### Patch Changes

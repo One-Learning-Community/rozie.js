@@ -1,5 +1,11 @@
 # @rozie-ui/embla-lit
 
+## 0.1.11
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.7.3
+
 ## 0.1.10
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/fullcalendar-angular
 
+## 0.1.7
+
+### Patch Changes
+
+- @rozie/runtime-angular@0.7.3
+
 ## 0.1.6
 
 ### Patch Changes
