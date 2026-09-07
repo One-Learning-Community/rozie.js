@@ -215,7 +215,37 @@ function renderInvocationFallback(
     const single = parts[0]!;
     // Strip a single `{...}` wrap so the result is suitable inside a JSX expr.
     if (single.startsWith('{') && single.endsWith('}') && single.length > 2) {
-      return single.slice(1, -1);
+      const inner = single.slice(1, -1);
+      // Phase 88 D-06 — a single fallback child of type `TemplateInterpolation`
+      // (`{{ expr }}`, whose `expr` may itself be a ternary the author wrote)
+      // or `TemplateSlotInvocation` (a nested `<slot>` invocation, whose own
+      // emission is a bare ternary or `??`-chain per this function's other
+      // branches / the "Named"/"Default" branches below) strips down to a
+      // BARE top-level JS expression, not a JSX element or string literal.
+      // All 4 callers of this function (`:249`, `:254`, `:332`, `:354`,
+      // approximate — shifted by this comment) interpolate the return value
+      // as the right operand of a `??`: `` `(${fieldRef} ?? ${inner})` ``.
+      // `??` (spec precedence tier 6) binds TIGHTER than `?:` (tier 5), so an
+      // unparenthesized ternary/`??`-chain here mis-parses as
+      // `(fieldRef ?? cond) ? x : y` instead of the intended
+      // `fieldRef ?? (cond ? x : y)` — an off-type non-function `slots`
+      // record entry then throws `TypeError` (calling `undefined` as a
+      // function) or silently renders the wrong branch, even though the
+      // passed value was truthy. Parenthesizing here, at the single shared
+      // strip point, closes the hazard for every caller uniformly. JSX
+      // elements (start with `<`, can't contain a top-level `??`/`?:`
+      // outside their own `{}` slots) and string literals (routed through
+      // the `JSON.stringify` branch below, never reaching this branch) are
+      // UNCHANGED — D-06 explicitly rejects unconditional parens on every
+      // return, since that would cosmetically drift every inline element
+      // fallback in the corpus for a hazard that doesn't apply to them.
+      if (
+        realChildren[0]!.type === 'TemplateInterpolation' ||
+        realChildren[0]!.type === 'TemplateSlotInvocation'
+      ) {
+        return `(${inner})`;
+      }
+      return inner;
     }
     // Bare text from emitStaticText needs string-literal wrap when used as a JS
     // expression (e.g. right-hand side of `??`).
