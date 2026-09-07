@@ -3392,7 +3392,7 @@ Plans:
 **Ships:** 6 leaf regenerations (`@rozie-ui/data-table` 0.4.0 ×6), regenerated `usage.md` + comparison-page `surface_hash`, dist-parity fixtures for the nested-family shape, the Lit DOM/VR cell above, and the `docs/parity.md` Angular type-erasure note.
 
 **Requirements**: none registered in REQUIREMENTS.md — acceptance for this phase is decision-derived from `88-CONTEXT.md` D-01..D-11 (plus the derived D-03b/D-04b), the convention data-table phases 48+ have used.
-**Plans:** 7/9 plans executed
+**Plans:** 9/9 plans complete. **Release AUTHORIZED 2026-09-07 — both waves, in D-07 order** (`@rozie/*` toolchain patch first, then `@rozie-ui/data-table` 0.4.0 x6 consuming both data-table changesets). Full acceptance battery green: build 243/243, test 149/149, typecheck 324/324, dist-parity zero drift, Linux-rendered VR union 947 passed / 7 pre-existing fixme. All 12 slot sites verified.
 
 Plans:
 
@@ -3402,7 +3402,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 88-02-PLAN.md — Release wave 1: `@rozie/*` toolchain patch changeset, precheck audit, human-gated release decision (D-07)
+- [x] 88-02-PLAN.md — Release wave 1: `@rozie/*` toolchain patch changeset, precheck audit, human-gated release decision (D-07)
 - [x] 88-03-PLAN.md — Six-target runtime proof that a nested slot in a family slot's fallback distributes under `r-for`: minimal demo pair, host registration, DOM-assertion spec, no PNGs (D-09, D-10)
 - [x] 88-04-PLAN.md — `colHeader-<columnId>` and `cell-<columnId>` families at all 8 of their sites, no gate added (D-04b, D-11)
 
@@ -3421,7 +3421,7 @@ Plans:
 
 **Wave 6** *(blocked on 88-02, 88-03 and 88-08)*
 
-- [ ] 88-09-PLAN.md — Full acceptance battery including a Linux-rendered VR run, then release wave 2: `@rozie-ui/data-table` 0.4.0 ×6 (D-07, D-09, D-11)
+- [x] 88-09-PLAN.md — Full acceptance battery including a Linux-rendered VR run, then release wave 2: `@rozie-ui/data-table` 0.4.0 ×6 (D-07, D-09, D-11)
 
 **Cross-cutting constraints** — `must_haves` themes binding two or more plans; a change to any of these is a phase-wide change, not a plan-local one:
 
