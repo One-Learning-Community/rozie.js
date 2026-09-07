@@ -340,17 +340,17 @@ interface CellCtx {
                 <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
               </span>
     } @else if (editorTypeOf(cell.column.id) === 'number') {
-    <input class="rdt-cell-editor" type="number" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    <input class="rdt-cell-editor" type="number" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     } @else if (editorTypeOf(cell.column.id) === 'select') {
-    <select class="rdt-cell-editor" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (change)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)">
+    <select class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (change)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)">
                 @for (opt of editorOptionsOf(cell.column.id); track opt.value) {
     <option [attr.value]="rozieAttr(opt.value)">{{ rozieDisplay(opt.label) }}</option>
     }
               </select>
     } @else if (editorTypeOf(cell.column.id) === 'checkbox') {
-    <input class="rdt-cell-editor" type="checkbox" data-editing-cell="" [checked]="editorCheckedFor(cell.column.id)" (change)="onCellEditorCheckbox(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    <input class="rdt-cell-editor" type="checkbox" data-editing-cell="" data-builtin-editor="" [checked]="editorCheckedFor(cell.column.id)" (change)="onCellEditorCheckbox(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     } @else {
-    <input class="rdt-cell-editor" type="text" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     }</span>
     } @else if (cellIsPlaceholder(cell)) {
     <span style="display:contents"></span>
@@ -549,17 +549,17 @@ interface CellCtx {
                 <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
               </span>
     } @else if (editorTypeOf(cell.column.id) === 'number') {
-    <input class="rdt-cell-editor" type="number" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    <input class="rdt-cell-editor" type="number" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     } @else if (editorTypeOf(cell.column.id) === 'select') {
-    <select class="rdt-cell-editor" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (change)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)">
+    <select class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (change)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)">
                 @for (opt of editorOptionsOf(cell.column.id); track opt.value) {
     <option [attr.value]="rozieAttr(opt.value)">{{ rozieDisplay(opt.label) }}</option>
     }
               </select>
     } @else if (editorTypeOf(cell.column.id) === 'checkbox') {
-    <input class="rdt-cell-editor" type="checkbox" data-editing-cell="" [checked]="editorCheckedFor(cell.column.id)" (change)="onCellEditorCheckbox(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    <input class="rdt-cell-editor" type="checkbox" data-editing-cell="" data-builtin-editor="" [checked]="editorCheckedFor(cell.column.id)" (change)="onCellEditorCheckbox(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     } @else {
-    <input class="rdt-cell-editor" type="text" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     }</span>
     } @else if (cellIsPlaceholder(cell)) {
     <span style="display:contents"></span>

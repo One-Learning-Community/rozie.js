@@ -2289,6 +2289,7 @@ $expose({
             class="rdt-cell-editor"
             type="number"
             data-editing-cell
+            data-builtin-editor
             :value="editorValueFor(cell.column.id)"
             @input="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2298,6 +2299,7 @@ $expose({
             r-else-if="editorTypeOf(cell.column.id) === 'select'"
             class="rdt-cell-editor"
             data-editing-cell
+            data-builtin-editor
             :value="editorValueFor(cell.column.id)"
             @change="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2310,6 +2312,7 @@ $expose({
             class="rdt-cell-editor"
             type="checkbox"
             data-editing-cell
+            data-builtin-editor
             :checked="editorCheckedFor(cell.column.id)"
             @change="onCellEditorCheckbox(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2320,6 +2323,7 @@ $expose({
             class="rdt-cell-editor"
             type="text"
             data-editing-cell
+            data-builtin-editor
             :value="editorValueFor(cell.column.id)"
             @input="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2768,6 +2772,7 @@ $expose({
             class="rdt-cell-editor"
             type="number"
             data-editing-cell
+            data-builtin-editor
             :value="editorValueFor(cell.column.id)"
             @input="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2777,6 +2782,7 @@ $expose({
             r-else-if="editorTypeOf(cell.column.id) === 'select'"
             class="rdt-cell-editor"
             data-editing-cell
+            data-builtin-editor
             :value="editorValueFor(cell.column.id)"
             @change="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2789,6 +2795,7 @@ $expose({
             class="rdt-cell-editor"
             type="checkbox"
             data-editing-cell
+            data-builtin-editor
             :checked="editorCheckedFor(cell.column.id)"
             @change="onCellEditorCheckbox(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2799,6 +2806,7 @@ $expose({
             class="rdt-cell-editor"
             type="text"
             data-editing-cell
+            data-builtin-editor
             :value="editorValueFor(cell.column.id)"
             @input="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
