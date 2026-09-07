@@ -69,14 +69,6 @@ interface SelectCellCtx {
   toggle: any;
 }
 
-interface CellCtx {
-  $implicit: { columnId: any; column: any; row: any; value: any };
-  columnId: any;
-  column: any;
-  row: any;
-  value: any;
-}
-
 interface EditorCtx {
   $implicit: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any };
   columnId: any;
@@ -100,11 +92,27 @@ interface ColHeaderCtx {
   label: any;
 }
 
+interface CellCtx {
+  $implicit: { columnId: any; column: any; row: any; value: any };
+  columnId: any;
+  column: any;
+  row: any;
+  value: any;
+}
+
 interface ColHeaderCtx {
   $implicit: { columnId: any; column: any; label: any };
   columnId: any;
   column: any;
   label: any;
+}
+
+interface CellCtx {
+  $implicit: { columnId: any; column: any; row: any; value: any };
+  columnId: any;
+  column: any;
+  row: any;
+  value: any;
 }
 
 @Component({
@@ -292,10 +300,16 @@ interface ColHeaderCtx {
     <span style="display:contents">
               <button type="button" class="rdt-expander rdt-group-toggle" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(wr.row)" [attr.aria-label]="rozieAttr(rowIsExpanded(wr.row) ? 'Collapse group' : 'Expand group')" (click)="onToggleExpand(wr.row, $event)">{{ rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸') }}</button>
               <span class="rdt-group-value">
-                @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
+                @if ((__rozieFillMap()[\`cell-\${cell.column.id}\`] ?? templates()?.[\`cell-\${cell.column.id}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`cell-\${cell.column.id}\`] ?? templates()?.[\`cell-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }" />
+    } @else {
+
+                  @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
     <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }" />
     } @else {
     {{ rozieDisplay(cell.getValue()) }}
+    }
+                
     }
               </span>
               <span class="rdt-group-count">{{ rozieDisplay('(' + groupSubRowCount(wr.row) + ')') }}</span>
@@ -323,10 +337,16 @@ interface ColHeaderCtx {
     <span style="display:contents"></span>
     } @else {
     <span class="rdt-cell-value">
-              @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
+              @if ((__rozieFillMap()[\`cell-\${cell.column.id}\`] ?? templates()?.[\`cell-\${cell.column.id}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`cell-\${cell.column.id}\`] ?? templates()?.[\`cell-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }" />
+    } @else {
+
+                @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
     <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }" />
     } @else {
     {{ rozieDisplay(cell.getValue()) }}
+    }
+              
     }
             </span>
     }@if (isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cell))) {
@@ -479,10 +499,16 @@ interface ColHeaderCtx {
     <span style="display:contents">
               <button type="button" class="rdt-expander rdt-group-toggle" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(row)" [attr.aria-label]="rozieAttr(rowIsExpanded(row) ? 'Collapse group' : 'Expand group')" (click)="onToggleExpand(row, $event)">{{ rozieDisplay(rowIsExpanded(row) ? '▾' : '▸') }}</button>
               <span class="rdt-group-value">
-                @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
+                @if ((__rozieFillMap()[\`cell-\${cell.column.id}\`] ?? templates()?.[\`cell-\${cell.column.id}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`cell-\${cell.column.id}\`] ?? templates()?.[\`cell-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }" />
+    } @else {
+
+                  @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
     <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }" />
     } @else {
     {{ rozieDisplay(cell.getValue()) }}
+    }
+                
     }
               </span>
               <span class="rdt-group-count">{{ rozieDisplay('(' + groupSubRowCount(row) + ')') }}</span>
@@ -510,10 +536,16 @@ interface ColHeaderCtx {
     <span style="display:contents"></span>
     } @else {
     <span class="rdt-cell-value">
-              @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
+              @if ((__rozieFillMap()[\`cell-\${cell.column.id}\`] ?? templates()?.[\`cell-\${cell.column.id}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`cell-\${cell.column.id}\`] ?? templates()?.[\`cell-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }" />
+    } @else {
+
+                @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
     <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }" />
     } @else {
     {{ rozieDisplay(cell.getValue()) }}
+    }
+              
     }
             </span>
     }@if (isFillHandleCell(rowIndexOf(row), colIndexOf(row, cell))) {
@@ -1084,10 +1116,10 @@ export class DataTable {
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
   @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
-  @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
   @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
   @ContentChild('detail', { read: TemplateRef }) detailTpl?: TemplateRef<DetailCtx>;
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
+  @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   __rozieFills = contentChildren(RozieSlot, { descendants: true });
   __rozieFillMap = computed(() => {
@@ -1180,7 +1212,7 @@ export class DataTable {
 
   ngAfterContentInit() {
     if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;
-    const claimedByStaticRefs = [this.defaultTpl, this.groupBarTpl, this.selectAllTpl, this.filterTpl, this.selectCellTpl, this.cellTpl, this.editorTpl, this.detailTpl, this.colHeaderTpl].filter((t) => t != null).length;
+    const claimedByStaticRefs = [this.defaultTpl, this.groupBarTpl, this.selectAllTpl, this.filterTpl, this.selectCellTpl, this.editorTpl, this.detailTpl, this.colHeaderTpl, this.cellTpl].filter((t) => t != null).length;
     if (this.__rozieFills().length === 0 && this.__rozieProjectedTpls().length > claimedByStaticRefs) {
       this.__rozieSlotWarned = true;
       console.warn('[ROZ750] DataTable: projected template content was found but no keyed fills were collected — did you forget to add RozieSlot to the consumer\'s imports: array?');
@@ -7530,7 +7562,7 @@ export class DataTable {
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | FilterCtx | SelectCellCtx | CellCtx | EditorCtx | DetailCtx | ColHeaderCtx {
+  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | FilterCtx | SelectCellCtx | EditorCtx | DetailCtx | ColHeaderCtx | CellCtx {
     return true;
   }
 

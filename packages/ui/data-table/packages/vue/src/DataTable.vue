@@ -87,7 +87,9 @@
         </span><span v-else-if="cellIsGrouped(cell)" style="display:contents">
           <button type="button" class="rdt-expander rdt-group-toggle" data-expander="" :aria-expanded="!!rowIsExpanded(wr.row)" :aria-label="rowIsExpanded(wr.row) ? 'Collapse group' : 'Expand group'" @click="onToggleExpand(wr.row, $event)">{{ rowIsExpanded(wr.row) ? '▾' : '▸' }}</button>
           <span class="rdt-group-value">
-            <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="cell.getValue()">{{ cell.getValue() }}</slot>
+            <slot :name="`cell-${cell.column.id}`" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="cell.getValue()">
+              <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="cell.getValue()">{{ cell.getValue() }}</slot>
+            </slot>
           </span>
           <span class="rdt-group-count">{{ '(' + groupSubRowCount(wr.row) + ')' }}</span>
         </span><span v-else-if="isEditing(wr.vi.index, colIndexOf(wr.row, cell))" style="display:contents">
@@ -96,7 +98,9 @@
           </span><input v-else-if="editorTypeOf(cell.column.id) === 'number'" class="rdt-cell-editor" type="number" data-editing-cell="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><select v-else-if="editorTypeOf(cell.column.id) === 'select'" class="rdt-cell-editor" data-editing-cell="" :value="editorValueFor(cell.column.id)" @change="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)">
             <option v-for="opt in editorOptionsOf(cell.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else-if="cellIsPlaceholder(cell)" style="display:contents"></span><span v-else class="rdt-cell-value">
-          <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="cell.getValue()">{{ cell.getValue() }}</slot>
+          <slot :name="`cell-${cell.column.id}`" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="cell.getValue()">
+            <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="cell.getValue()">{{ cell.getValue() }}</slot>
+          </slot>
         </span><span v-if="isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cell))" class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown="onFillHandlePointerDown($event)"></span></td>
       
       <td v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadRight() + 'px;padding:0;border:0'"></td></tr>
@@ -174,7 +178,9 @@
         </span><span v-else-if="cellIsGrouped(cell)" style="display:contents">
           <button type="button" class="rdt-expander rdt-group-toggle" data-expander="" :aria-expanded="!!rowIsExpanded(row)" :aria-label="rowIsExpanded(row) ? 'Collapse group' : 'Expand group'" @click="onToggleExpand(row, $event)">{{ rowIsExpanded(row) ? '▾' : '▸' }}</button>
           <span class="rdt-group-value">
-            <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="cell.getValue()">{{ cell.getValue() }}</slot>
+            <slot :name="`cell-${cell.column.id}`" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="cell.getValue()">
+              <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="cell.getValue()">{{ cell.getValue() }}</slot>
+            </slot>
           </span>
           <span class="rdt-group-count">{{ '(' + groupSubRowCount(row) + ')' }}</span>
         </span><span v-else-if="isEditing(rowIndexOf(row), colIndexOf(row, cell))" style="display:contents">
@@ -183,7 +189,9 @@
           </span><input v-else-if="editorTypeOf(cell.column.id) === 'number'" class="rdt-cell-editor" type="number" data-editing-cell="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><select v-else-if="editorTypeOf(cell.column.id) === 'select'" class="rdt-cell-editor" data-editing-cell="" :value="editorValueFor(cell.column.id)" @change="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)">
             <option v-for="opt in editorOptionsOf(cell.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else-if="cellIsPlaceholder(cell)" style="display:contents"></span><span v-else class="rdt-cell-value">
-          <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="cell.getValue()">{{ cell.getValue() }}</slot>
+          <slot :name="`cell-${cell.column.id}`" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="cell.getValue()">
+            <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="cell.getValue()">{{ cell.getValue() }}</slot>
+          </slot>
         </span><span v-if="isFillHandleCell(rowIndexOf(row), colIndexOf(row, cell))" class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown="onFillHandlePointerDown($event)"></span></td>
     </tr>
     
@@ -370,18 +378,16 @@ defineSlots<{
   [key: `colHeader-${string}`]: ((props: { columnId: any; column: any; label: any }) => any) | undefined;
   filter(props: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
-  cell(props: { columnId: any; column: any; row: any; value: any }): any;
+  [key: `cell-${string}`]: ((props: { columnId: any; column: any; row: any; value: any }) => any) | undefined;
   editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }): any;
-  cell(props: { columnId: any; column: any; row: any; value: any }): any;
   detail(props: { row: any }): any;
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   filter(props: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
-  cell(props: { columnId: any; column: any; row: any; value: any }): any;
   editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }): any;
-  cell(props: { columnId: any; column: any; row: any; value: any }): any;
   detail(props: { row: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
+  cell(props: { columnId: any; column: any; row: any; value: any }): any;
 }>();
 
 const slots = useSlots();

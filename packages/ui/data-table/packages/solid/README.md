@@ -530,7 +530,7 @@ The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filt
 | selectAll | checked, indeterminate, toggle |
 | filter | columnId, value, uniqueValues, minMax, setFilter |
 | selectCell | row, checked, toggle |
-| cell | columnId, column, row, value |
 | editor | columnId, column, row, value, commit, cancel, autofocus |
 | detail | row |
 | colHeader | columnId, column, label |
+| cell | columnId, column, row, value |

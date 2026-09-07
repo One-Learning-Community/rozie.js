@@ -2241,12 +2241,20 @@ $expose({
           >{{ rowIsExpanded(wr.row) ? '▾' : '▸' }}</button>
           <span class="rdt-group-value">
             <slot
-              name="cell"
+              :name="`cell-${cell.column.id}`"
               :columnId="cell.column.id"
               :column="cell.column"
               :row="cellSlotRow(wr.row)"
               :value="cell.getValue()"
-            >{{ cell.getValue() }}</slot>
+            >
+              <slot
+                name="cell"
+                :columnId="cell.column.id"
+                :column="cell.column"
+                :row="cellSlotRow(wr.row)"
+                :value="cell.getValue()"
+              >{{ cell.getValue() }}</slot>
+            </slot>
           </span>
           <span class="rdt-group-count">{{ '(' + groupSubRowCount(wr.row) + ')' }}</span>
         </span>
@@ -2316,12 +2324,20 @@ $expose({
         <span style="display:contents" r-else-if="cellIsPlaceholder(cell)"></span>
         <span r-else class="rdt-cell-value">
           <slot
-            name="cell"
+            :name="`cell-${cell.column.id}`"
             :columnId="cell.column.id"
             :column="cell.column"
             :row="cellSlotRow(wr.row)"
             :value="cell.getValue()"
-          >{{ cell.getValue() }}</slot>
+          >
+            <slot
+              name="cell"
+              :columnId="cell.column.id"
+              :column="cell.column"
+              :row="cellSlotRow(wr.row)"
+              :value="cell.getValue()"
+            >{{ cell.getValue() }}</slot>
+          </slot>
         </span>
         <!-- Fill handle (req-8 / D-04): the small draggable affordance on the range's
              bottom-right cell. A pointer drag extends the range + value-fills the dragged
@@ -2693,12 +2709,20 @@ $expose({
           >{{ rowIsExpanded(row) ? '▾' : '▸' }}</button>
           <span class="rdt-group-value">
             <slot
-              name="cell"
+              :name="`cell-${cell.column.id}`"
               :columnId="cell.column.id"
               :column="cell.column"
               :row="cellSlotRow(row)"
               :value="cell.getValue()"
-            >{{ cell.getValue() }}</slot>
+            >
+              <slot
+                name="cell"
+                :columnId="cell.column.id"
+                :column="cell.column"
+                :row="cellSlotRow(row)"
+                :value="cell.getValue()"
+              >{{ cell.getValue() }}</slot>
+            </slot>
           </span>
           <span class="rdt-group-count">{{ '(' + groupSubRowCount(row) + ')' }}</span>
         </span>
@@ -2775,12 +2799,20 @@ $expose({
              plain accessor value (the template-less fast path). -->
         <span r-else class="rdt-cell-value">
           <slot
-            name="cell"
+            :name="`cell-${cell.column.id}`"
             :columnId="cell.column.id"
             :column="cell.column"
             :row="cellSlotRow(row)"
             :value="cell.getValue()"
-          >{{ cell.getValue() }}</slot>
+          >
+            <slot
+              name="cell"
+              :columnId="cell.column.id"
+              :column="cell.column"
+              :row="cellSlotRow(row)"
+              :value="cell.getValue()"
+            >{{ cell.getValue() }}</slot>
+          </slot>
         </span>
         <!-- Fill handle (req-8 / D-04) — non-virtual body. Identical shape to the virtual
              body; keyed on rowIndexOf(row). Renders only on the range's bottom-right corner. -->
