@@ -239,9 +239,29 @@ function renderInvocationFallback(
       // UNCHANGED — D-06 explicitly rejects unconditional parens on every
       // return, since that would cosmetically drift every inline element
       // fallback in the corpus for a hazard that doesn't apply to them.
+      //
+      // Phase 88 Plan 01 Task 2 (RESEARCH.md Assumption A1, closed) —
+      // `TemplateConditional` (r-if/r-else-if/r-else) ALSO strips to a bare
+      // top-level ternary or `!!(...) && body` short-circuit: `emitConditional`
+      // (emitConditional.ts) unconditionally returns `` `{${out}}` `` where
+      // `out` is that exact chain, confirmed by direct compilation of an
+      // r-if/r-else fallback nested in a params-bearing dynamic-name slot
+      // (produces the identical `?? cond ? a : b` mis-parse this phase's
+      // slot-invocation case does). `TemplateMatch` delegates to
+      // `emitConditional` via `delegateMatchToConditional`
+      // (emitTemplateNode.ts) and shares the SAME braced-ternary shape in the
+      // common (non-hoisted-discriminant) case — confirmed identically by
+      // direct compilation of an r-match/r-case/r-default fallback. (The
+      // hoisted-discriminant match variant wraps in an IIFE, `{(() => {
+      // ... })()}`, which is a call expression and therefore safe
+      // unparenthesized — but parenthesizing a call expression is harmless,
+      // so both TemplateMatch shapes are covered by treating the node type
+      // uniformly.) Both are added to the predicate.
       if (
         realChildren[0]!.type === 'TemplateInterpolation' ||
-        realChildren[0]!.type === 'TemplateSlotInvocation'
+        realChildren[0]!.type === 'TemplateSlotInvocation' ||
+        realChildren[0]!.type === 'TemplateConditional' ||
+        realChildren[0]!.type === 'TemplateMatch'
       ) {
         return `(${inner})`;
       }
