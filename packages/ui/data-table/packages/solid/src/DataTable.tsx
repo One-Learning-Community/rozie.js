@@ -3126,13 +3126,27 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   }
 
   // ── Column-management chrome (req-8/9/10/11) ────────────────────────────────────────
-  // Live header width (px) for a column — drives the <th> :style width binding. Reads the
-  // table-core column size (post-mount) with a fallback to undefined (auto width).
-  function headerWidth(colId: any) {
-    if (tick() < 0 || !table) return null;
-    const col = table.getColumn(colId);
-    if (!col) return null;
-    const w = col.getSize();
+  // Live header width (px) for a <th> — drives the :style width binding. Takes the table-core
+  // HEADER object (not a column id / Column lookup) and reads header.getSize() — deliberately,
+  // NOT column.getSize(). table-core's own ColumnSizing feature (createHeader, always present —
+  // it is in table-core's builtInFeatures, never opt-in) gives Header.getSize() a recursive
+  // implementation: a LEAF header returns its own column's getSize() (identical to the old
+  // column.getSize() path — byte-identical output there), but a GROUP header (one with
+  // subHeaders, e.g. a multi-level `columns:` entry from buildConfigDef) SUMS every descendant
+  // leaf column's getSize() instead of returning the group's own meaningless single-column
+  // default (150px, table-core's defaultColumnSizing.size — group ColumnDefs never set `size`).
+  // Before this fix, a colspan-N grouped <th> asked the browser for ONE column's worth of width
+  // (150px) while spanning N columns; under `table-layout:fixed` the browser then divides that
+  // single declared width ACROSS all N spanned <th>s (150/5 = 30px for this codebase's 5-column
+  // "Group A" fixture) — a 5x collapse of the actual rendered column width, independent of (and
+  // invisible to) columnSize()/the column virtualizer's windowing math, which reads
+  // table.getVisibleLeafColumns()[i].getSize() directly and was never affected. Root cause +
+  // fix confirmed via .planning/debug/datatable-d13-column-axis-all-targets.md and previously
+  // documented as "Gap 1" in .planning/phases/87-.../deferred-items.md (the identical grouped-
+  // header/colspan mismatch, found independently during 87-05/87-06 authoring and deferred).
+  function headerWidth(header: any) {
+    if (tick() < 0 || !header || typeof header.getSize !== 'function') return null;
+    const w = header.getSize();
     return w != null && w > 0 ? w + 'px' : null;
   }
 
@@ -3249,15 +3263,18 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     }
     return '';
   }
-  // Combined inline style for a <th> (width + pin) and a <td> (pin). Plain string concat —
-  // uniform on all 6, no bound-object trap. zIndex=2 (see pinStyle) so a pinned header cell
-  // — which hosts the ⋯ menu's floating content — always stacks above the pinned filter-row
-  // cell for the same column (zIndex=1, its own default).
-  function thStyle(colId: any) {
+  // Combined inline style for a <th> (width + pin). Plain string concat — uniform on all 6, no
+  // bound-object trap. zIndex=2 (see pinStyle) so a pinned header cell — which hosts the ⋯ menu's
+  // floating content — always stacks above the pinned filter-row cell for the same column
+  // (zIndex=1, its own default). Takes the HEADER object (not a bare colId) so headerWidth() can
+  // read header.getSize() — the group-aware size (see headerWidth's own comment). pinStyle still
+  // keys off the plain column id (pinning is a leaf-column-only concern; a grouped header never
+  // pins as a unit in this codebase's model).
+  function thStyle(header: any) {
     let s = '';
-    const w = headerWidth(colId);
+    const w = headerWidth(header);
     if (w) s += 'width:' + w + ';';
-    s += pinStyle(colId, 2);
+    s += pinStyle(header && header.column ? header.column.id : null, 2);
     return s;
   }
 
@@ -5719,8 +5736,25 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       fillEdgeScrollRaf = null;
     }
   }
-  function cellIndexFromPoint(clientX: any, clientY: any) {
-    if (typeof document === 'undefined' || !document.elementFromPoint) return null;
+  // FILL_HITTEST_PROBE_RADIUS_PX / FILL_HITTEST_PROBE_STEP_PX (hardening, authorized alongside the
+  // D-13 grouped-header width fix — .planning/debug/datatable-d13-column-axis-all-targets.md):
+  // resolveCellAt() below hit-tests document.elementFromPoint at ONE exact pixel — structurally
+  // fragile against a scrolling DOM by construction: any narrow column transiting past that fixed
+  // screen point (the edge-auto-scroll rAF loop in fillDrag re-probes the SAME fixed point every
+  // frame while gridScrollEl's content slides underneath it) has only a single-frame-scale window
+  // to be caught, and a probe pixel landing exactly on a border/rounding edge between two adjacent
+  // `<td>`/`<th>`s can miss both. cellIndexFromPoint widens the miss case ONLY: it tries the exact
+  // point first (byte-identical to the pre-hardening behavior on a hit — this is not a behavior
+  // change to the common case) and, only if that misses, fans out a small nearest-first horizontal
+  // search before giving up. Vertical-only misses are not probed (rows are >=24px tall by design —
+  // FILL_EDGE_SCROLL_PX itself — so a row is never narrower than a single scroll step; only COLUMN
+  // width has no such floor, hence a horizontal-only widening).
+  const FILL_HITTEST_PROBE_RADIUS_PX = 8;
+  const FILL_HITTEST_PROBE_STEP_PX = 2;
+
+  // resolveCellAt: the exact-point hit-test (identical logic to the pre-hardening
+  // cellIndexFromPoint body) extracted so it can be re-tried at nearby x-offsets below.
+  function resolveCellAt(clientX: any, clientY: any) {
     let el = document.elementFromPoint(clientX, clientY);
     // Pierce OPEN shadow roots (Lit): document.elementFromPoint retargets to the shadow HOST, so
     // a drag over the Lit data-table's shadow content would otherwise resolve the host (no cell)
@@ -5744,6 +5778,22 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       r,
       c
     };
+  }
+  function cellIndexFromPoint(clientX: any, clientY: any) {
+    if (typeof document === 'undefined' || !document.elementFromPoint) return null;
+    const direct = resolveCellAt(clientX, clientY);
+    if (direct) return direct;
+    // Widened nearest-cell search: only reached when the exact point misses. Fans outward
+    // (nearest-first, alternating +/-x) up to FILL_HITTEST_PROBE_RADIUS_PX before giving up —
+    // catches a narrow column that transited past the fixed probe point on this exact frame
+    // without changing which cell wins on an ordinary (non-edge-case) hit.
+    for (let d = FILL_HITTEST_PROBE_STEP_PX; d <= FILL_HITTEST_PROBE_RADIUS_PX; d += FILL_HITTEST_PROBE_STEP_PX) {
+      const right = resolveCellAt(clientX + d, clientY);
+      if (right) return right;
+      const left = resolveCellAt(clientX - d, clientY);
+      if (left) return left;
+    }
+    return null;
   }
   function onFillHandlePointerDown(e: any) {
     if (!e) return;
@@ -7321,7 +7371,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     </div></Show>}{<Show when={isWindowed()} fallback={<table aria-rowcount={rozieAttr(gridAriaRowCount())} class={"rozie-data-table" + " " + rozieClass({ 'rdt-sticky': local.stickyHeader })} role={rozieAttr(tableRole())} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridKeyDown($event); }} onFocusIn={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { syncActiveFromEvent($event); }} onFocusOut={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridFocusOut($event); }} onMouseDown={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridMouseDown($event); }} onDblClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridDblClick($event); }} onClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
       <thead class={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         <Key each={headerGroups() as readonly any[]} by={(hg) => hg.id}>{(hg, hgLevel) => <tr class={"rdt-tr"} role="row" aria-rowindex={rozieAttr(hgLevel() + 1)} data-rozie-s-d5dcab4c="">
-          <Key each={hg().headers as readonly any[]} by={(header) => header.id}>{(header) => <th class={"rdt-th" + " " + rozieClass({ 'rdt-select-th': isSelectColumn(header().column.id), 'rdt-expander-th': isExpanderColumn(header().column.id), 'rdt-th-resizing': columnIsResizing(header().column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg(), header()), hgLevel()) })} role="columnheader" data-col={rozieAttr(header().column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel())} colSpan={rozieAttr(header().colSpan > 1 ? header().colSpan : null)} data-col-index={rozieAttr(headerColIndexOf(hg(), header()))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg(), header()), hgLevel()))} aria-sort={rozieAttr(ariaSortFor(header().column.id))} style={parseInlineStyle(thStyle(header().column.id))} data-rozie-s-d5dcab4c="">
+          <Key each={hg().headers as readonly any[]} by={(header) => header.id}>{(header) => <th class={"rdt-th" + " " + rozieClass({ 'rdt-select-th': isSelectColumn(header().column.id), 'rdt-expander-th': isExpanderColumn(header().column.id), 'rdt-th-resizing': columnIsResizing(header().column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg(), header()), hgLevel()) })} role="columnheader" data-col={rozieAttr(header().column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel())} colSpan={rozieAttr(header().colSpan > 1 ? header().colSpan : null)} data-col-index={rozieAttr(headerColIndexOf(hg(), header()))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg(), header()), hgLevel()))} aria-sort={rozieAttr(ariaSortFor(header().column.id))} style={parseInlineStyle(thStyle(header()))} data-rozie-s-d5dcab4c="">
             
             
             {<Show when={isSelectColumn(header().column.id)} fallback={<Show when={isExpanderColumn(header().column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
@@ -7396,7 +7446,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       <thead class={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         <Key each={headerGroups() as readonly any[]} by={(hg) => hg.id}>{(hg, hgLevel) => <tr class={"rdt-tr"} role="row" aria-rowindex={rozieAttr(hgLevel() + 1)} data-rozie-s-d5dcab4c="">
           
-          {<Show when={colsWindowed()}><th class={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadLeft() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" /></Show>}<Key each={windowedHeadersFor(hg(), hgLevel()) as readonly any[]} by={(wh) => wh.header.id}>{(wh) => <th class={"rdt-th" + " " + rozieClass({ 'rdt-select-th': isSelectColumn(wh().header.column.id), 'rdt-expander-th': isExpanderColumn(wh().header.column.id), 'rdt-th-resizing': columnIsResizing(wh().header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg(), wh().header), hgLevel()) })} role="columnheader" data-col={rozieAttr(wh().header.column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel())} colSpan={rozieAttr(wh().span > 1 ? wh().span : null)} data-col-index={rozieAttr(headerColIndexOf(hg(), wh().header))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg(), wh().header), hgLevel()))} aria-sort={rozieAttr(ariaSortFor(wh().header.column.id))} style={parseInlineStyle(thStyle(wh().header.column.id))} data-rozie-s-d5dcab4c="">
+          {<Show when={colsWindowed()}><th class={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadLeft() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" /></Show>}<Key each={windowedHeadersFor(hg(), hgLevel()) as readonly any[]} by={(wh) => wh.header.id}>{(wh) => <th class={"rdt-th" + " " + rozieClass({ 'rdt-select-th': isSelectColumn(wh().header.column.id), 'rdt-expander-th': isExpanderColumn(wh().header.column.id), 'rdt-th-resizing': columnIsResizing(wh().header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg(), wh().header), hgLevel()) })} role="columnheader" data-col={rozieAttr(wh().header.column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel())} colSpan={rozieAttr(wh().span > 1 ? wh().span : null)} data-col-index={rozieAttr(headerColIndexOf(hg(), wh().header))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg(), wh().header), hgLevel()))} aria-sort={rozieAttr(ariaSortFor(wh().header.column.id))} style={parseInlineStyle(thStyle(wh().header))} data-rozie-s-d5dcab4c="">
             {<Show when={isSelectColumn(wh().header.column.id)} fallback={<Show when={isExpanderColumn(wh().header.column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={wh().header.column.getCanSort && wh().header.column.getCanSort()} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 <span class={"rdt-header-label"} data-rozie-s-d5dcab4c="">

@@ -172,7 +172,7 @@ interface CellCtx {
           @if (colsWindowed()) {
     <th class="rdt-col-spacer" aria-hidden="true" [attr.style]="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th>
     }@for (wh of windowedHeadersFor(hg, hgLevel); track wh.header.id) {
-    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(wh.header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(wh.span > 1 ? wh.span : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, wh.header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(wh.header.column.id))" [style]="thStyle(wh.header.column.id)">
+    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(wh.header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(wh.span > 1 ? wh.span : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, wh.header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(wh.header.column.id))" [style]="thStyle(wh.header)">
             @if (isSelectColumn(wh.header.column.id)) {
     <span style="display:contents">
               @if ((selectAllTpl ?? __rozieFillMap()['selectAll'] ?? templates()?.['selectAll'])) {
@@ -379,7 +379,7 @@ interface CellCtx {
         @for (hg of headerGroups(); track hg.id; let hgLevel = $index) {
     <tr class="rdt-tr" role="row" [attr.aria-rowindex]="rozieAttr(hgLevel + 1)">
           @for (header of hg.headers; track header.id) {
-    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
+    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header)">
             
             
             @if (isSelectColumn(header.column.id)) {
@@ -3588,13 +3588,27 @@ export class DataTable {
     return d ? d.header : colId;
   };
   // ── Column-management chrome (req-8/9/10/11) ────────────────────────────────────────
-  // Live header width (px) for a column — drives the <th> :style width binding. Reads the
-  // table-core column size (post-mount) with a fallback to undefined (auto width).
-  headerWidth = (colId: any) => {
-    if (this.tick() < 0 || !this.table) return null;
-    const col = this.table.getColumn(colId);
-    if (!col) return null;
-    const w = col.getSize();
+  // Live header width (px) for a <th> — drives the :style width binding. Takes the table-core
+  // HEADER object (not a column id / Column lookup) and reads header.getSize() — deliberately,
+  // NOT column.getSize(). table-core's own ColumnSizing feature (createHeader, always present —
+  // it is in table-core's builtInFeatures, never opt-in) gives Header.getSize() a recursive
+  // implementation: a LEAF header returns its own column's getSize() (identical to the old
+  // column.getSize() path — byte-identical output there), but a GROUP header (one with
+  // subHeaders, e.g. a multi-level `columns:` entry from buildConfigDef) SUMS every descendant
+  // leaf column's getSize() instead of returning the group's own meaningless single-column
+  // default (150px, table-core's defaultColumnSizing.size — group ColumnDefs never set `size`).
+  // Before this fix, a colspan-N grouped <th> asked the browser for ONE column's worth of width
+  // (150px) while spanning N columns; under `table-layout:fixed` the browser then divides that
+  // single declared width ACROSS all N spanned <th>s (150/5 = 30px for this codebase's 5-column
+  // "Group A" fixture) — a 5x collapse of the actual rendered column width, independent of (and
+  // invisible to) columnSize()/the column virtualizer's windowing math, which reads
+  // table.getVisibleLeafColumns()[i].getSize() directly and was never affected. Root cause +
+  // fix confirmed via .planning/debug/datatable-d13-column-axis-all-targets.md and previously
+  // documented as "Gap 1" in .planning/phases/87-.../deferred-items.md (the identical grouped-
+  // header/colspan mismatch, found independently during 87-05/87-06 authoring and deferred).
+  headerWidth = (header: any) => {
+    if (this.tick() < 0 || !header || typeof header.getSize !== 'function') return null;
+    const w = header.getSize();
     return w != null && w > 0 ? w + 'px' : null;
   };
   // Pointer-drag resize handler for a resizable header — table-core's getResizeHandler()
@@ -3708,15 +3722,18 @@ export class DataTable {
     }
     return '';
   };
-  // Combined inline style for a <th> (width + pin) and a <td> (pin). Plain string concat —
-  // uniform on all 6, no bound-object trap. zIndex=2 (see pinStyle) so a pinned header cell
-  // — which hosts the ⋯ menu's floating content — always stacks above the pinned filter-row
-  // cell for the same column (zIndex=1, its own default).
-  thStyle = (colId: any) => {
+  // Combined inline style for a <th> (width + pin). Plain string concat — uniform on all 6, no
+  // bound-object trap. zIndex=2 (see pinStyle) so a pinned header cell — which hosts the ⋯ menu's
+  // floating content — always stacks above the pinned filter-row cell for the same column
+  // (zIndex=1, its own default). Takes the HEADER object (not a bare colId) so headerWidth() can
+  // read header.getSize() — the group-aware size (see headerWidth's own comment). pinStyle still
+  // keys off the plain column id (pinning is a leaf-column-only concern; a grouped header never
+  // pins as a unit in this codebase's model).
+  thStyle = (header: any) => {
     let s = '';
-    const w = this.headerWidth(colId);
+    const w = this.headerWidth(header);
     if (w) s += 'width:' + w + ';';
-    s += this.pinStyle(colId, 2);
+    s += this.pinStyle(header && header.column ? header.column.id : null, 2);
     return s;
   };
   // ── Filter chrome handlers ─────────────────────────────────────────────────────────
@@ -6059,8 +6076,24 @@ export class DataTable {
       this.fillEdgeScrollRaf = null;
     }
   };
-  cellIndexFromPoint = (clientX: any, clientY: any) => {
-    if (typeof document === 'undefined' || !document.elementFromPoint) return null;
+  // FILL_HITTEST_PROBE_RADIUS_PX / FILL_HITTEST_PROBE_STEP_PX (hardening, authorized alongside the
+  // D-13 grouped-header width fix — .planning/debug/datatable-d13-column-axis-all-targets.md):
+  // resolveCellAt() below hit-tests document.elementFromPoint at ONE exact pixel — structurally
+  // fragile against a scrolling DOM by construction: any narrow column transiting past that fixed
+  // screen point (the edge-auto-scroll rAF loop in fillDrag re-probes the SAME fixed point every
+  // frame while gridScrollEl's content slides underneath it) has only a single-frame-scale window
+  // to be caught, and a probe pixel landing exactly on a border/rounding edge between two adjacent
+  // `<td>`/`<th>`s can miss both. cellIndexFromPoint widens the miss case ONLY: it tries the exact
+  // point first (byte-identical to the pre-hardening behavior on a hit — this is not a behavior
+  // change to the common case) and, only if that misses, fans out a small nearest-first horizontal
+  // search before giving up. Vertical-only misses are not probed (rows are >=24px tall by design —
+  // FILL_EDGE_SCROLL_PX itself — so a row is never narrower than a single scroll step; only COLUMN
+  // width has no such floor, hence a horizontal-only widening).
+  FILL_HITTEST_PROBE_RADIUS_PX = 8;
+  FILL_HITTEST_PROBE_STEP_PX = 2;
+  // resolveCellAt: the exact-point hit-test (identical logic to the pre-hardening
+  // cellIndexFromPoint body) extracted so it can be re-tried at nearby x-offsets below.
+  resolveCellAt = (clientX: any, clientY: any) => {
     let el = document.elementFromPoint(clientX, clientY);
     // Pierce OPEN shadow roots (Lit): document.elementFromPoint retargets to the shadow HOST, so
     // a drag over the Lit data-table's shadow content would otherwise resolve the host (no cell)
@@ -6084,6 +6117,22 @@ export class DataTable {
       r,
       c
     };
+  };
+  cellIndexFromPoint = (clientX: any, clientY: any) => {
+    if (typeof document === 'undefined' || !document.elementFromPoint) return null;
+    const direct = this.resolveCellAt(clientX, clientY);
+    if (direct) return direct;
+    // Widened nearest-cell search: only reached when the exact point misses. Fans outward
+    // (nearest-first, alternating +/-x) up to FILL_HITTEST_PROBE_RADIUS_PX before giving up —
+    // catches a narrow column that transited past the fixed probe point on this exact frame
+    // without changing which cell wins on an ordinary (non-edge-case) hit.
+    for (let d = this.FILL_HITTEST_PROBE_STEP_PX; d <= this.FILL_HITTEST_PROBE_RADIUS_PX; d += this.FILL_HITTEST_PROBE_STEP_PX) {
+      const right = this.resolveCellAt(clientX + d, clientY);
+      if (right) return right;
+      const left = this.resolveCellAt(clientX - d, clientY);
+      if (left) return left;
+    }
+    return null;
   };
   onFillHandlePointerDown = (e: any) => {
     if (!e) return;

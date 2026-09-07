@@ -51,8 +51,25 @@ const teardownFillDrag = () => {
     fillEdgeScrollRaf = null
   }
 }
-const cellIndexFromPoint = (clientX, clientY) => {
-  if (typeof document === 'undefined' || !document.elementFromPoint) return null
+// FILL_HITTEST_PROBE_RADIUS_PX / FILL_HITTEST_PROBE_STEP_PX (hardening, authorized alongside the
+// D-13 grouped-header width fix — .planning/debug/datatable-d13-column-axis-all-targets.md):
+// resolveCellAt() below hit-tests document.elementFromPoint at ONE exact pixel — structurally
+// fragile against a scrolling DOM by construction: any narrow column transiting past that fixed
+// screen point (the edge-auto-scroll rAF loop in fillDrag re-probes the SAME fixed point every
+// frame while gridScrollEl's content slides underneath it) has only a single-frame-scale window
+// to be caught, and a probe pixel landing exactly on a border/rounding edge between two adjacent
+// `<td>`/`<th>`s can miss both. cellIndexFromPoint widens the miss case ONLY: it tries the exact
+// point first (byte-identical to the pre-hardening behavior on a hit — this is not a behavior
+// change to the common case) and, only if that misses, fans out a small nearest-first horizontal
+// search before giving up. Vertical-only misses are not probed (rows are >=24px tall by design —
+// FILL_EDGE_SCROLL_PX itself — so a row is never narrower than a single scroll step; only COLUMN
+// width has no such floor, hence a horizontal-only widening).
+const FILL_HITTEST_PROBE_RADIUS_PX = 8
+const FILL_HITTEST_PROBE_STEP_PX = 2
+
+// resolveCellAt: the exact-point hit-test (identical logic to the pre-hardening
+// cellIndexFromPoint body) extracted so it can be re-tried at nearby x-offsets below.
+const resolveCellAt = (clientX, clientY) => {
   let el = document.elementFromPoint(clientX, clientY)
   // Pierce OPEN shadow roots (Lit): document.elementFromPoint retargets to the shadow HOST, so
   // a drag over the Lit data-table's shadow content would otherwise resolve the host (no cell)
@@ -73,6 +90,22 @@ const cellIndexFromPoint = (clientX, clientY) => {
   const c = parseInt(colAttr, 10)
   if (!Number.isFinite(r) || !Number.isFinite(c)) return null
   return { r, c }
+}
+const cellIndexFromPoint = (clientX, clientY) => {
+  if (typeof document === 'undefined' || !document.elementFromPoint) return null
+  const direct = resolveCellAt(clientX, clientY)
+  if (direct) return direct
+  // Widened nearest-cell search: only reached when the exact point misses. Fans outward
+  // (nearest-first, alternating +/-x) up to FILL_HITTEST_PROBE_RADIUS_PX before giving up —
+  // catches a narrow column that transited past the fixed probe point on this exact frame
+  // without changing which cell wins on an ordinary (non-edge-case) hit.
+  for (let d = FILL_HITTEST_PROBE_STEP_PX; d <= FILL_HITTEST_PROBE_RADIUS_PX; d += FILL_HITTEST_PROBE_STEP_PX) {
+    const right = resolveCellAt(clientX + d, clientY)
+    if (right) return right
+    const left = resolveCellAt(clientX - d, clientY)
+    if (left) return left
+  }
+  return null
 }
 const onFillHandlePointerDown = (e) => {
   if (!e) return

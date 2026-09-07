@@ -92,13 +92,27 @@ const headerLabel = (colId) => {
 }
 
 // ── Column-management chrome (req-8/9/10/11) ────────────────────────────────────────
-// Live header width (px) for a column — drives the <th> :style width binding. Reads the
-// table-core column size (post-mount) with a fallback to undefined (auto width).
-const headerWidth = (colId) => {
-  if (tick() < 0 || !table) return null
-  const col = table.getColumn(colId)
-  if (!col) return null
-  const w = col.getSize()
+// Live header width (px) for a <th> — drives the :style width binding. Takes the table-core
+// HEADER object (not a column id / Column lookup) and reads header.getSize() — deliberately,
+// NOT column.getSize(). table-core's own ColumnSizing feature (createHeader, always present —
+// it is in table-core's builtInFeatures, never opt-in) gives Header.getSize() a recursive
+// implementation: a LEAF header returns its own column's getSize() (identical to the old
+// column.getSize() path — byte-identical output there), but a GROUP header (one with
+// subHeaders, e.g. a multi-level `columns:` entry from buildConfigDef) SUMS every descendant
+// leaf column's getSize() instead of returning the group's own meaningless single-column
+// default (150px, table-core's defaultColumnSizing.size — group ColumnDefs never set `size`).
+// Before this fix, a colspan-N grouped <th> asked the browser for ONE column's worth of width
+// (150px) while spanning N columns; under `table-layout:fixed` the browser then divides that
+// single declared width ACROSS all N spanned <th>s (150/5 = 30px for this codebase's 5-column
+// "Group A" fixture) — a 5x collapse of the actual rendered column width, independent of (and
+// invisible to) columnSize()/the column virtualizer's windowing math, which reads
+// table.getVisibleLeafColumns()[i].getSize() directly and was never affected. Root cause +
+// fix confirmed via .planning/debug/datatable-d13-column-axis-all-targets.md and previously
+// documented as "Gap 1" in .planning/phases/87-.../deferred-items.md (the identical grouped-
+// header/colspan mismatch, found independently during 87-05/87-06 authoring and deferred).
+const headerWidth = (header) => {
+  if (tick() < 0 || !header || typeof header.getSize !== 'function') return null
+  const w = header.getSize()
   return w != null && w > 0 ? w + 'px' : null
 }
 
@@ -211,15 +225,18 @@ const pinStyle = (colId, zIndex = 1) => {
   }
   return ''
 }
-// Combined inline style for a <th> (width + pin) and a <td> (pin). Plain string concat —
-// uniform on all 6, no bound-object trap. zIndex=2 (see pinStyle) so a pinned header cell
-// — which hosts the ⋯ menu's floating content — always stacks above the pinned filter-row
-// cell for the same column (zIndex=1, its own default).
-const thStyle = (colId) => {
+// Combined inline style for a <th> (width + pin). Plain string concat — uniform on all 6, no
+// bound-object trap. zIndex=2 (see pinStyle) so a pinned header cell — which hosts the ⋯ menu's
+// floating content — always stacks above the pinned filter-row cell for the same column
+// (zIndex=1, its own default). Takes the HEADER object (not a bare colId) so headerWidth() can
+// read header.getSize() — the group-aware size (see headerWidth's own comment). pinStyle still
+// keys off the plain column id (pinning is a leaf-column-only concern; a grouped header never
+// pins as a unit in this codebase's model).
+const thStyle = (header) => {
   let s = ''
-  const w = headerWidth(colId)
+  const w = headerWidth(header)
   if (w) s += 'width:' + w + ';'
-  s += pinStyle(colId, 2)
+  s += pinStyle(header && header.column ? header.column.id : null, 2)
   return s
 }
 

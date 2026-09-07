@@ -1919,7 +1919,7 @@ $expose({
         :tabindex="cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel)"
         :class="{ 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }"
         :aria-sort="ariaSortFor(wh.header.column.id)"
-        :style="thStyle(wh.header.column.id)"
+        :style="thStyle(wh.header)"
       >
         <span style="display:contents" r-if="isSelectColumn(wh.header.column.id)">
           <slot
@@ -2422,7 +2422,7 @@ $expose({
         :tabindex="cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)"
         :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }"
         :aria-sort="ariaSortFor(header.column.id)"
-        :style="thStyle(header.column.id)"
+        :style="thStyle(header)"
       >
         <!-- auto-injected select-all header (D-04) — slot-overridable via #selectAll;
              default = a select-all checkbox (indeterminate when partial, D-06). The
