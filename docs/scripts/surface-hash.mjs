@@ -101,7 +101,17 @@ export function computeSurfaceHash(slug) {
       if (p.isModel) models.push(p.name);
     }
     for (const e of ir.emits ?? []) emits.push(e);
-    for (const s of ir.slots ?? []) slots.push(s.name);
+    for (const s of ir.slots ?? []) {
+      // Phase 88 — a DYNAMIC-NAME slot family (`:name="`cell-${id}`"`) carries its public
+      // identity in `namePrefix` ('cell-'), NOT in `name`, which is the empty-string
+      // sentinel for every such declaration. Pushing only `s.name` collapsed all 12 of
+      // data-table's family declarations onto the one empty entry a plain default
+      // `<slot />` already contributed, so four NEW public slot families moved the hash
+      // by exactly zero — the surface guard was structurally blind to the one kind of
+      // surface change it was added to catch. Record the prefix with a trailing `*` so a
+      // family reads distinctly from a static slot that happened to be named `cell-`.
+      slots.push(s.namePrefix ? `${s.namePrefix}*` : s.name);
+    }
     for (const e of ir.expose ?? []) expose.push(e.name);
   }
 
