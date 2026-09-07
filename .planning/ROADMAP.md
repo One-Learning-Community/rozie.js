@@ -3374,3 +3374,60 @@ Plans:
 - [x] 87-09 (gap closure) — `dir="rtl"` column windowing: live `isColRtl()` + `MutationObserver` re-feed; green on 5/6 targets (Svelte blocked on a pre-existing, unrelated rendering gap)
 - [x] 87-10 (gap closure) — Solid auto-measure rendering gap: `bumpWindowVer()` microtask-coalescing in the shared engine closes a framework-agnostic virtual-core `onChange` burst that only Solid's non-batched reactivity exposed; `data-table-auto-measure.spec.ts` 50/4-skip → 54/54
 - [x] 87-11 (gap closure) — TS7053 strict-typecheck baseline drift: corrected misattribution (actual origin was 87-05 Task 1's `windowedHeadersFor()`, not 87-09) via full commit-range bisection; both typecheck gates green
+
+### Phase 88: @rozie-ui/data-table per-column slot families — `cell-<columnId>` and its three sibling seams
+
+**Goal:** Now that `columns` is runtime-driven, a consumer who wants to customize one column's rendering has exactly one escape hatch: the single catch-all `#cell` slot, branched on the `columnId` slot prop. That branch does not compose, and it is the same story on `#colHeader`, `#filter`, and `#editor`. This phase exposes a **per-column dynamic-name slot family** on each of those four seams — `cell-<columnId>`, `colHeader-<columnId>`, `filter-<columnId>`, `editor-<columnId>` — using the producer-side dynamic-slot-name machinery Phase 79 shipped and proved at six targets. Consumers fill them with ordinary static named fills (`#cell-price="{ row, value }"`), and on five of six targets the key is template-literal-typed with inferred scoped params. **Correction (D-05):** that typing does not validate the key — the emitted record type carries a template-literal index signature (`` `cell-${string}` ``) AND a trailing catch-all index signature (`[key: string]`), so a near-miss key (`cell-pric`) and an arbitrary key (`cel-price`) both typecheck (evidence: `tests/dist-parity/fixtures/DynamicSlots.tsx:13`). What the family genuinely buys is scoped-parameter typing — a typed `{ row, value }` context instead of an untyped variadic `(...args: any[])` signature — a real and worthwhile gain, but not key validation. Three-tier precedence per seam — `#cell-price` → `#cell` → built-in render — expressed structurally as the static generic `<slot>` nested inside the family slot's fallback. **Correction (D-11):** this is not byte-identical off-path. Emitted markup is no longer character-identical; non-regression is carried by the data-table behavioral specs and the 25 `tests/visual-regression/specs/data-table-*.spec.ts` files, not by byte comparison. Emitted source changes on all six targets for three concrete reasons: the filter seam's built-in `<input>` relocates from a gated sibling into a slot fallback, the editor chain nests inside a fourth branch, and the built-in editors gain a `data-builtin-editor` marker attribute. Covers all 12 existing generic-slot sites (4 `cell`, 4 `colHeader`, 2 `filter`, 2 `editor`) — each seam spans the windowed and non-windowed bodies, and `cell` additionally spans the grouped and normal branches. Skipping any one site would make the API silently change when windowing or grouping switches on, which is precisely the defect class 0.3.2 just closed.
+
+**Pre-planning gap research (done, this session — findings are load-bearing for the plan split):**
+
+- **The consumer surface is already good.** The family lands as a template-literal-keyed, param-typed record on React/Solid (`slots`), Svelte (`snippets`), Lit (`rozieSlots`), and as a `defineSlots` index signature on Vue. **Angular is the lone divergence** — its `templates()` intake is `Record<string, TemplateRef<unknown>>`, type-erased per key, with the per-family ctx interfaces existing only to satisfy the static `ngTemplateContextGuard`. Document it in `docs/parity.md`; do not try to close it here.
+- **`$slots['editor-' + colId]` is ROZ106** — computed access on a magic accessor is rejected by a *core* semantic validator, so it fails identically at all six targets. This does **not** block the phase: the nested fallback chain makes the runtime presence test unnecessary. **Correction (D-01):** only `hasFilterSlot` in `columnChrome.rzts` deletes cleanly — it gated a *global* `!!$slots.filter` presence test with no other caller, and the relocated built-in input subsumes it structurally. `hasEditorSlot` does **not** delete cleanly: it has two non-render callers (`editCellLifecycle.rzts`, `editRowLifecycle.rzts`) implementing the editor-owns-focus contract, so deleting it outright would have been a six-target regression. It is instead replaced by a host-owned `data-builtin-editor` marker on the built-in editor elements plus a column-scoped, marker-driven query in both focus polls — inverting the test from "is a slot filled for this id?" (unanswerable under ROZ106) to "is this editor mine?" (always answerable). The "column marked `editor='custom'` with no slot supplied degrades to the text editor, never blank" behavior falls out of the structure for free. Verified: an `r-if`/`r-else-if`/`r-else` chain inside a *doubly*-nested slot fallback compiles clean at 6/6.
+- **Nesting a static `<slot>` in a dynamic-named slot's fallback works** — compiles 6/6, with a correct nested `@else` on Angular, `{:else}` on Svelte, `??` chain on Solid, native fallback on Vue. Lit auto-detects the nested-slot-under-`r-for` collision and wires `RozieSlotDistributor` with `slotAssignment: 'manual'` on its own. A record miss renders the fallback on every target.
+- **One React emitter defect found, and it gates the phase.** Composing a nested slot invocation into a dynamic-name slot's fallback emits `(A ?? B) ? C : D` — `??` binds tighter than `?:`. Every *in-type* path is correct; an off-type non-function record entry throws `TypeError` when no generic fill exists, or silently renders the generic instead of the node. The two-tier form degrades gracefully there and the nested form loses that. Solid's `?.() ?? ?.() ?? default` is the correct shape. Per the emitter-owns-parity principle this is an emitter fix, red-first, landing **before** any data-table work — not a per-target workaround.
+- **Still unproven, and only provable at runtime:** whether Lit's `RozieSlotDistributor` actually distributes a nested-slot-in-fallback under `r-for`. Compile-time wiring is right; this needs a DOM/VR cell, not static reading.
+
+**Depends on:** Phase 79 (producer-side dynamic slot names + family matching — the machinery this phase consumes); Phase 80 (Angular `RozieSlot` marker directive + `@rozie/runtime-angular`, the Angular record-fill path); Phase 87 (immediately prior — the windowed/non-windowed body split that doubles every slot site, and the additive/byte-identical-off discipline).
+
+**Ships:** 6 leaf regenerations (`@rozie-ui/data-table` 0.4.0 ×6), regenerated `usage.md` + comparison-page `surface_hash`, dist-parity fixtures for the nested-family shape, the Lit DOM/VR cell above, and the `docs/parity.md` Angular type-erasure note.
+
+**Requirements**: none registered in REQUIREMENTS.md — acceptance for this phase is decision-derived from `88-CONTEXT.md` D-01..D-11 (plus the derived D-03b/D-04b), the convention data-table phases 48+ have used.
+**Plans:** 6/9 plans executed
+
+Plans:
+
+**Wave 1** — the tracer slice. `DataTable.rozie` is the serialization bottleneck for the four seams, so they land sequentially in waves 2–4 with `editor` last.
+
+- [x] 88-01-PLAN.md — React `??`/`?:` precedence fix: red-first two-layer proof, surgical paren in `renderInvocationFallback`, zero-drift blast-radius sweep (D-06, D-08)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 88-02-PLAN.md — Release wave 1: `@rozie/*` toolchain patch changeset, precheck audit, human-gated release decision (D-07)
+- [x] 88-03-PLAN.md — Six-target runtime proof that a nested slot in a family slot's fallback distributes under `r-for`: minimal demo pair, host registration, DOM-assertion spec, no PNGs (D-09, D-10)
+- [x] 88-04-PLAN.md — `colHeader-<columnId>` and `cell-<columnId>` families at all 8 of their sites, no gate added (D-04b, D-11)
+
+**Wave 3** *(88-05 blocked on 88-03; 88-06 blocked on 88-04)*
+
+- [x] 88-05-PLAN.md — Editor-owns-focus contract pinned: mixed built-in/drop-in demo plus a three-case six-target focus spec, green against today's behavior (D-03)
+- [x] 88-06-PLAN.md — `filter-<columnId>` family at both sites; the filter presence helper deletes and the built-in input relocates into the innermost fallback (D-03b, D-04, D-11)
+
+**Wave 4** *(blocked on 88-05 and 88-06)*
+
+- [x] 88-07-PLAN.md — Editor seam: the `data-builtin-editor` marker on all 8 built-in editors, `editor-<columnId>` family, the editor presence helper deleted, both focus polls column-scoped (D-01, D-02, D-03, D-04)
+
+**Wave 5** *(blocked on 88-07)*
+
+- [ ] 88-08-PLAN.md — Correct the three false roadmap premises in place, add the Angular type-erasure note, document the four families, regenerate the generated docs and reseed the comparison-page surface hash (D-05, D-11, D-01)
+
+**Wave 6** *(blocked on 88-02, 88-03 and 88-08)*
+
+- [ ] 88-09-PLAN.md — Full acceptance battery including a Linux-rendered VR run, then release wave 2: `@rozie-ui/data-table` 0.4.0 ×6 (D-07, D-09, D-11)
+
+**Cross-cutting constraints** — `must_haves` themes binding two or more plans; a change to any of these is a phase-wide change, not a plan-local one:
+
+- **Behaviour-identical off-path** (88-01, 88-04, 88-05, 88-06, 88-08, 88-09) — a consumer who fills no family sees no behavior change. Per D-11 this is NOT byte-identity: emitted source changes on all six targets and the rendered DOM gains `data-builtin-editor`. Non-regression is carried by the data-table behavioral specs and the 25 VR spec files.
+- **Six-target parity** (88-03, 88-05, 88-07, 88-09) — every new spec asserts on all six targets with an empty known-failing set. A subset can be accidentally correct and mask a shared ordering bug.
+- **Red-first evidence recorded verbatim** (88-01, 88-03, 88-07) — the first observed run of each new test artifact is recorded as raw output, before any corrective edit. A green first observation on a discovery spec is a legitimate result but must be shown to have been observed.
+- **No PNG baselines on the new specs** (88-03, 88-05) — both new specs are DOM-assertion only. A screenshot cannot distinguish a correct distribution from a coincidentally identical fallback render.
+- **Linux-rendered VR baselines** (88-03, 88-05, 88-09) — any PNG work runs through the containerized runner; a macOS baseline fails every CI cell.
+- **Two release waves, human-gated** (88-02, 88-09) — the `@rozie/*` toolchain patch publishes before the `@rozie-ui/data-table` 0.4.0 ×6 leaf wave. Both release checkpoints are `gate="blocking-human"`, so an unattended run cannot publish.
