@@ -3392,7 +3392,7 @@ Plans:
 **Ships:** 6 leaf regenerations (`@rozie-ui/data-table` 0.4.0 ×6), regenerated `usage.md` + comparison-page `surface_hash`, dist-parity fixtures for the nested-family shape, the Lit DOM/VR cell above, and the `docs/parity.md` Angular type-erasure note.
 
 **Requirements**: none registered in REQUIREMENTS.md — acceptance for this phase is decision-derived from `88-CONTEXT.md` D-01..D-11 (plus the derived D-03b/D-04b), the convention data-table phases 48+ have used.
-**Plans:** 6/9 plans executed
+**Plans:** 7/9 plans executed
 
 Plans:
 
@@ -3417,7 +3417,7 @@ Plans:
 
 **Wave 5** *(blocked on 88-07)*
 
-- [ ] 88-08-PLAN.md — Correct the three false roadmap premises in place, add the Angular type-erasure note, document the four families, regenerate the generated docs and reseed the comparison-page surface hash (D-05, D-11, D-01)
+- [x] 88-08-PLAN.md — Correct the three false roadmap premises in place, add the Angular type-erasure note, document the four families, regenerate the generated docs and reseed the comparison-page surface hash (D-05, D-11, D-01)
 
 **Wave 6** *(blocked on 88-02, 88-03 and 88-08)*
 
