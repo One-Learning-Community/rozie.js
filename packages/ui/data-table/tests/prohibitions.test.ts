@@ -297,19 +297,23 @@ describe('A2 invariant (D-09): colIndexOf/visibleColCount/columnIdAt/cellValueAt
 // `wr.row.original` binding, since a future refactor could rename or reshape that binding
 // without ever routing through cellSlotRow, and a negative grep would stay silently green.
 // Counting the literal `:row="cellSlotRow(` occurrences pins the actual fix in place: exactly
-// 8 sites — the 2 virtual-body + 2 non-virtual-body `#cell` call sites (afh), PLUS the 2
-// virtual-body + 2 non-virtual-body `#selectCell`/`#editor` call sites (cvo C3) — a future edit
-// that drops or bypasses one is caught immediately. `#detail` is DELIBERATELY EXCLUDED: it is
-// already guarded by `rowShowsDetail`'s `!rowIsGrouped(row)` check, so a group-header row can
-// never reach `#detail`'s `:row="row.original"` binding at all — routing it through
-// cellSlotRow would be a no-op wrapped around dead code, not a fix.
+// 12 sites — the 2 virtual-body + 2 non-virtual-body `#selectCell`/`#editor` call sites (cvo
+// C3), PLUS the 4 `#cell` call sites (afh) EACH NOW DOUBLED to 2 occurrences apiece (phase 88
+// plan 04, D-04b): the `cell-<columnId>` family slot nests directly around the pre-existing
+// generic `#cell` slot as its inline fallback, and both tiers carry the identical scoped params
+// — including `:row="cellSlotRow(...)"`. 4 sites × 2 tiers = 8, plus the unchanged 4 editor
+// sites = 12. A future edit that drops or bypasses either tier at any site is caught
+// immediately. `#detail` is DELIBERATELY EXCLUDED: it is already guarded by
+// `rowShowsDetail`'s `!rowIsGrouped(row)` check, so a group-header row can never reach
+// `#detail`'s `:row="row.original"` binding at all — routing it through cellSlotRow would be a
+// no-op wrapped around dead code, not a fix.
 
 describe('B2/C3 invariant: every #cell/#selectCell/#editor slot site binds :row through cellSlotRow(...)', () => {
-  it('DataTable.rozie carries exactly 8 `:row="cellSlotRow(` occurrences', () => {
+  it('DataTable.rozie carries exactly 12 `:row="cellSlotRow(` occurrences', () => {
     const dataTableRozie = dataTableSources.find((f) => f.id === 'DataTable.rozie');
     expect(dataTableRozie, 'expected DataTable.rozie to be present in the scanned tree').toBeTruthy();
     const hits = (dataTableRozie as SourceFile).source.match(/:row="cellSlotRow\(/g) ?? [];
-    expect(hits.length).toBe(8);
+    expect(hits.length).toBe(12);
   });
 
   it('negative-path proof: the cellSlotRow-count check is not vacuous', () => {

@@ -437,6 +437,49 @@ describe('threadParamTypes — ROZ093 SLOT_FAMILY_PREFIX_DUPLICATE (Phase 79 Pla
     const { diagnostics } = compileAndThread(consumerSrc, consumerPath, tmpRoot);
     expect(diagnostics.filter((d) => d.code === RozieErrorCode.SLOT_FAMILY_PREFIX_DUPLICATE)).toEqual([]);
   });
+
+  // Phase 88 Plan 04 (D-04b) — data-table's windowed/non-windowed x
+  // sortable/non-sortable (and grouped/normal) branch ladders legitimately
+  // declare the SAME dynamic family prefix at MULTIPLE mutually-exclusive
+  // template positions, each carrying the IDENTICAL scoped-param shape (same
+  // param names, same order) — e.g. `colHeader-${wh.header.column.id}` in the
+  // sortable arm and `colHeader-${wh.header.column.id}` again in the sibling
+  // r-else arm, both threading :columnId/:column/:label. Only ONE of the two
+  // branches ever renders for a given column at runtime, and since the param
+  // shapes match exactly, a consumer fill matching the prefix has exactly ONE
+  // unambiguous type to resolve to regardless of which branch is live — this
+  // is NOT the ambiguity ROZ093 exists to catch. The existing "fires exactly
+  // once" test above (deliberately using :row vs :value — DIFFERENT params)
+  // stays an error; only an identical param-name signature is exempted.
+  it('does NOT fire when two declarations derive an identical namePrefix AND carry an identical scoped-param signature (same names, same order)', () => {
+    writeFileSync(
+      path.join(tmpRoot, 'Producer.rozie'),
+      `<rozie name="Producer">
+<template>
+  <span r-if="cond">
+    <slot :name="\`colHeader-\${col.id}\`" :columnId="col.id" :column="col" :label="lbl">a</slot>
+  </span>
+  <span r-else>
+    <slot :name="\`colHeader-\${col.id}\`" :columnId="col.id" :column="col" :label="lbl">b</slot>
+  </span>
+</template>
+</rozie>
+`,
+      'utf8',
+    );
+    const consumerSrc = `<rozie name="Consumer">
+<components>{ Producer: './Producer.rozie' }</components>
+<template>
+<Producer />
+</template>
+</rozie>
+`;
+    const consumerPath = path.join(tmpRoot, 'Consumer.rozie');
+    writeFileSync(consumerPath, consumerSrc, 'utf8');
+
+    const { diagnostics } = compileAndThread(consumerSrc, consumerPath, tmpRoot);
+    expect(diagnostics.filter((d) => d.code === RozieErrorCode.SLOT_FAMILY_PREFIX_DUPLICATE)).toEqual([]);
+  });
 });
 
 describe('threadParamTypes — ROZ941 tried-prefixes message (Phase 79 Plan 79-07, R7 / AC-7 / AC-13)', () => {

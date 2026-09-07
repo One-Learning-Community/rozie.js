@@ -365,6 +365,23 @@ export function threadParamTypes(
     // in the loop below — two producer <slot>s deriving an identical
     // `namePrefix` is a hard error so a tie is never silently resolved by
     // declaration order (T-79-15).
+    //
+    // Phase 88 Plan 04 (D-04b) — a duplicate prefix is exempted from ROZ093
+    // when BOTH declarations carry an identical scoped-param signature (same
+    // param names, same order). This is the legitimate three-tier-precedence
+    // shape a mutually-exclusive branch ladder produces (e.g. a sortable-arm
+    // and non-sortable-arm each declaring `colHeader-${columnId}` with the
+    // exact same :columnId/:column/:label params) — only ONE branch ever
+    // renders for a given column at runtime, and since the param shapes
+    // match byte-for-byte, a consumer fill matching the prefix resolves to
+    // exactly ONE type regardless of which branch is live: there is no
+    // "which family?" ambiguity for ROZ093 to protect against. A prefix
+    // collision between declarations with DIFFERENT param shapes (the
+    // original T-79-15 hazard — genuinely no way to know which shape a
+    // consumer fill should be typed against) still hard-errors exactly as
+    // before. `dynamicFamilies` keeps only the FIRST-declared SlotDecl per
+    // prefix either way — downstream family-matching only needs one
+    // representative per prefix, never a duplicate entry.
     const dynamicFamilies: SlotDecl[] = [];
     const seenPrefixes = new Map<string, SlotDecl>();
     for (const slot of producerSlots) {
@@ -372,6 +389,10 @@ export function threadParamTypes(
       if (prefix === undefined || prefix.length === 0) continue;
       const firstDeclared = seenPrefixes.get(prefix);
       if (firstDeclared !== undefined) {
+        const sameParamShape =
+          firstDeclared.params.length === slot.params.length &&
+          firstDeclared.params.every((p, i) => p.name === slot.params[i]?.name);
+        if (sameParamShape) continue;
         diagnostics.push({
           code: RozieErrorCode.SLOT_FAMILY_PREFIX_DUPLICATE,
           severity: 'error',
