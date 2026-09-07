@@ -1357,6 +1357,16 @@ export const EXAMPLES = [
   // importing the data-table source pkg already registered for Angular cross-tree AOT in
   // phase 48).
   'DataTableColumnVirtual',
+  // Phase 88 88-03 (D-09/D-10) — the BEHAVIORAL-only proof that a static
+  // `<slot>` nested inside a dynamic-name family slot's fallback distributes
+  // correctly under `r-for`. Loader falls through to the sibling
+  // `examples/demos/` producer/consumer pair — no canonical top-level flat
+  // file, per the DynamicSlotName precedent above. Drives
+  // nested-slot-fallback.spec.ts. NOT in matrix.spec.ts EXAMPLES — DOM
+  // assertions only, no pixel baseline (D-09 rejects a PNG cell: it cannot
+  // distinguish a correct distribution from a coincidentally identical
+  // fallback render).
+  'NestedSlotFallback',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -1795,6 +1805,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 87 87-03 — the lit entry appends '-demo' → tag
   // 'rozie-data-table-column-virtual-demo' = kebab of DataTableColumnVirtualDemo.
   DataTableColumnVirtual: 'rozie-data-table-column-virtual',
+  // Phase 88 88-03 (D-09/D-10) — the lit entry appends '-demo' to this tag.
+  NestedSlotFallback: 'rozie-nested-slot-fallback',
 };
 
 export interface HostQuery {
@@ -2289,6 +2301,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Phase 87 87-03 — self-contained (columns/rows built in $onMount); no parent-supplied
   // props. This entry exists only to satisfy the Record<Example> type.
   DataTableColumnVirtual: {},
+  // Phase 88 88-03 — self-contained (columnsA/columnsB/row seeded in <data>);
+  // no parent-supplied props. This entry exists only to satisfy the
+  // Record<Example> type.
+  NestedSlotFallback: {},
 };
 
 /**
