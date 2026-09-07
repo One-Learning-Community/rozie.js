@@ -1056,14 +1056,40 @@ function runSelfTest() {
 
   // --- No-major preflight assertions (Task 2, quick 260904-6ix) ----------
 
-  // 8. Empty .changeset/ (today's state) MUST yield OK with a "no pending
-  //    releases" detail — the real end-to-end shell-out, not a synthetic.
+  // 8. The REAL end-to-end shell-out (not a synthetic) MUST yield OK and a
+  //    detail consistent with what is actually pending.
+  //
+  //    Originally (quick 260904-6ix) this asserted the literal string "no
+  //    pending releases", because `.changeset/` happened to be empty the day
+  //    it was written ("today's state"). That made the check green ONLY while
+  //    nothing was staged — so it fired on every release wave, i.e. on exactly
+  //    the pushes it most needed to be trustworthy on. Observed failing at
+  //    3b941dd7a (Phase 87 tip, mid-wave) and again in Phase 88 with four
+  //    legitimate changesets pending.
+  //
+  //    Keep the end-to-end shell-out the original intent called for, but branch
+  //    the expectation on the directory's ACTUAL state so it stays meaningful
+  //    in both: empty => "no pending releases"; non-empty => an OK reporting a
+  //    pending count, still with no major bumps (which is what this preflight
+  //    exists to enforce). A FAIL/WARN status is a real failure either way.
   {
+    const pendingChangesets = fs
+      .readdirSync(path.join(REPO_ROOT, '.changeset'))
+      .filter((f) => f.endsWith('.md') && f.toLowerCase() !== 'readme.md');
     const res = checkNoMajorRelease();
-    if (res.status === 'OK' && /no pending releases/.test(res.detail)) {
-      notes.push(`no-major (empty .changeset/): OK — ${res.detail}`);
+    const expectEmpty = pendingChangesets.length === 0;
+    const detailOk = expectEmpty
+      ? /no pending releases/.test(res.detail)
+      : /\d+ pending release/.test(res.detail);
+    if (res.status === 'OK' && detailOk) {
+      notes.push(
+        `no-major (${expectEmpty ? 'empty' : `${pendingChangesets.length} staged`} .changeset/): OK — ${res.detail}`,
+      );
     } else {
-      fail('NO-MAJOR-EMPTY: expected OK "no pending releases" on today\'s empty .changeset/', `got status=${res.status} detail=${res.detail}`);
+      fail(
+        `NO-MAJOR-LIVE: expected OK with a ${expectEmpty ? '"no pending releases"' : 'pending-count'} detail for the ${expectEmpty ? 'empty' : 'non-empty'} .changeset/`,
+        `got status=${res.status} detail=${res.detail}`,
+      );
     }
   }
 
