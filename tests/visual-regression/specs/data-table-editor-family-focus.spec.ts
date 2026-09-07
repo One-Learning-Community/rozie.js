@@ -19,23 +19,29 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * — a helper resolving the first `table[role="grid"]` would always pick the wrong one for
  * the second instance mounted in this demo):
  *   - `mixed`: name(built-in text, col 0) / status(editor="custom", filled by an EditorText
- *     drop-in via a generic #editor fill, col 1) / qty(built-in number, col 2).
+ *     drop-in via the FAMILY fill `#editor-status`, col 1 — changed from a generic `#editor`
+ *     fill in 88-07 Task 3 to exercise the editor-<columnId> family tier D-01/D-04 land) /
+ *     qty(built-in number, col 2).
  *   - `nofill`: name(built-in text, col 0) / notes(editor="custom", NO #editor fill anywhere
  *     in this instance, col 1).
  *
- * Three cases, six targets each (D-03) — not a subset, because the failure mode differs
- * per target (per `project_five_targets_accidentally_correct_masks_shared_bug`): five
- * targets would find a drop-in's input via a host DOM reach-in and double-focus + select-all
- * it; Lit would find nothing across its shadow boundary and burn 30 idle rAF frames.
+ * Four cases, six targets each (D-03, D-11 — case (d) added in 88-07 Task 3) — not a
+ * subset, because the failure mode differs per target (per
+ * `project_five_targets_accidentally_correct_masks_shared_bug`): five targets would find a
+ * drop-in's input via a host DOM reach-in and double-focus + select-all it; Lit would find
+ * nothing across its shadow boundary and burn 30 idle rAF frames.
  *
- *   (a) DROP-IN TARGET — F2 on `mixed`'s `status` cell. The INTENDED contract: the host
- *       must NOT reach into the drop-in's DOM at all — the resolved cell holds an editor
- *       carrying only the base `data-editing-cell` marker (no `data-builtin-editor`), which
- *       makes `focusEditorWhenReady` bail immediately (D-01); EditorText's own `$onMount`
- *       lands focus via its reactive `autofocus` prop and NEVER calls `.select()`. THIS is
- *       the case that was RED against 88-07's transient deleted-helper state (helper and
- *       gates removed, marker-based narrowing not yet applied — see 88-07-SUMMARY.md's
- *       verbatim red-first observation) — every other case here is a regression pin, not a
+ *   (a) DROP-IN TARGET — F2 on `mixed`'s `status` cell. Now runs against the FAMILY path
+ *       (`#editor-status`) rather than the generic path the original 88-05 fixture used —
+ *       the demo's `mixed` instance was changed to a family fill in 88-07 Task 3. The
+ *       INTENDED contract: the host must NOT reach into the drop-in's DOM at all — the
+ *       resolved cell holds an editor carrying only the base `data-editing-cell` marker (no
+ *       `data-builtin-editor`), which makes `focusEditorWhenReady` bail immediately (D-01);
+ *       EditorText's own `$onMount` lands focus via its reactive `autofocus` prop and NEVER
+ *       calls `.select()`. THIS is the case that was RED against 88-07's transient
+ *       deleted-helper state (helper and gates removed, marker-based narrowing not yet
+ *       applied — see 88-07-SUMMARY.md's verbatim red-first observation) — every other case
+ *       here is a regression pin, not a
  *       red-first probe.
  *
  *       Discriminator: COLLAPSED text selection. Verified empirically (throwaway,
@@ -96,6 +102,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *       throughout the transient state) — the resolved cell holds exactly one
  *       `[data-editing-cell]` element regardless of marker-narrowing, so removing the
  *       marker check has no effect here.
+ *
+ *   (d) FAMILY FILL PRESERVES THE CONTRACT (88-07 Task 3, D-11) — the same `mixed`/`status`
+ *       target as case (a), asserting an ADDITIONAL discriminator case (a) does not check:
+ *       the focused element carries `hasBuiltinEditorMarker: false`. Where case (a) proves
+ *       "the host never touched the drop-in's selection," case (d) proves it via the exact
+ *       mechanism D-01 introduced — the marker's absence — independent of the
+ *       selection-collapsed signal.
  *
  * No pixel-diff assertion, no PNG baseline directory — DOM/behavioral assertions only.
  *
@@ -453,6 +466,36 @@ for (const target of TARGETS) {
       expect(info?.col).toBe('1');
       // A real text input mounted (not a blank cell) and it holds focus.
       expect(info?.tag).toBe('input');
+    },
+  );
+
+  runnerFor(target)(
+    `data-table-editor-family-focus [${target}] (d): family fill (#editor-status) preserves the editor-owns-focus contract — no builtin marker, selection collapsed`,
+    async ({ page }) => {
+      await page.goto(`/?example=DataTableEditorFamily&target=${target}`);
+      await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+      // F2 on mixed's `status` cell (col 1) — same target as case (a), but the demo's
+      // `mixed` instance now fills it via the FAMILY tier (#editor-status), not the
+      // generic tier (#editor) case (a) originally exercised (see header comment: case
+      // (a) "now runs against the family path rather than the generic path"). This case
+      // adds an assertion case (a) does not make: the focused element carries NO
+      // data-builtin-editor marker at all — the sharpest possible proof that D-01's
+      // marker-based poll correctly identified this as a drop-in and never reached in,
+      // independent of the selection-collapsed discriminator case (a) already checks.
+      await enterEditAtInstance(page, 'mixed', 0, 1);
+      await page.waitForTimeout(100);
+
+      const info = await activeEditorInfo(page);
+      expect(info?.instance).toBe('mixed');
+      expect(info?.row).toBe('0');
+      expect(info?.col).toBe('1');
+      expect(info?.tag).toBe('input');
+      expect(info?.hasEditingCell).toBe(true);
+      // The sharpest discriminator: this drop-in NEVER carries the host-owned marker,
+      // on any target, family-routed or not.
+      expect(info?.hasBuiltinEditorMarker).toBe(false);
+      expect(info?.selectionCollapsed).toBe(true);
     },
   );
 }

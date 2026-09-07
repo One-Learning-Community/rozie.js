@@ -65,11 +65,13 @@
         <span data-testid="cell-display">{{ value }}</span>
       </template>
 
-      <!-- Generic fill: only `status` declares the custom editor kind in this instance, so
-           this dispatches for exactly one column — no columnId branch needed. Forwards the
+      <!-- Family fill (88-07, D-01/D-04): the tag below dispatches for the `status` column
+           specifically, exercising the editor-<columnId> family tier introduced this plan
+           rather than the generic #editor tier the demo used before. Forwards the identical
            verified slot scope (value/commit/cancel/column/row/columnId) plus the reactive
-           `autofocus` prop the editor-owns-focus contract relies on. -->
-      <template #editor="{ columnId, column, row, value, commit, cancel, autofocus }">
+           `autofocus` prop the editor-owns-focus contract relies on — the family and generic
+           tiers carry the same seven scoped params (D-04). -->
+      <template #editor-status="{ columnId, column, row, value, commit, cancel, autofocus }">
         <EditorText
           :columnId="columnId"
           :column="column"
