@@ -3392,7 +3392,7 @@ Plans:
 **Ships:** 6 leaf regenerations (`@rozie-ui/data-table` 0.4.0 ×6), regenerated `usage.md` + comparison-page `surface_hash`, dist-parity fixtures for the nested-family shape, the Lit DOM/VR cell above, and the `docs/parity.md` Angular type-erasure note.
 
 **Requirements**: none registered in REQUIREMENTS.md — acceptance for this phase is decision-derived from `88-CONTEXT.md` D-01..D-11 (plus the derived D-03b/D-04b), the convention data-table phases 48+ have used.
-**Plans:** 9/9 plans complete. **Release AUTHORIZED 2026-09-07 — both waves, in D-07 order** (`@rozie/*` toolchain patch first, then `@rozie-ui/data-table` 0.4.0 x6 consuming both data-table changesets). Full acceptance battery green: build 243/243, test 149/149, typecheck 324/324, dist-parity zero drift, Linux-rendered VR union 947 passed / 7 pre-existing fixme. All 12 slot sites verified.
+**Plans:** 9/9 plans complete. **RELEASED 2026-09-07** — both D-07 waves published in order (run 34145171985): `@rozie/*` toolchain 0.7.3 first, then `@rozie-ui/data-table` **0.4.0 x6**. 92 packages total (6 minor + 86 @rozie/core cascade patches), all verified live via direct registry GET. Pre-release deep audit ran per the standing rule and returned SHIP-WITH-FIXES; its one embarrassment-class finding (the four slot families were undiscoverable from every leaf README) was fixed before publish.
 
 Plans:
 

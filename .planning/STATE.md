@@ -4,8 +4,8 @@ milestone: v0.1.0
 milestone_name: launch-day component port seed list
 current_phase: 88
 current_phase_name: rozie-ui-data-table-per-column-slot-families-cell-colheader
-status: Releasing
-stopped_at: "Phase 88 complete, 9/9 plans. Release AUTHORIZED for both waves in D-07 order — toolchain @rozie/* patch, then @rozie-ui/data-table 0.4.0 x6. Acceptance battery fully green."
+status: Phase Complete
+stopped_at: "Phase 88 COMPLETE and RELEASED — @rozie-ui/data-table 0.4.0 x6 + @rozie/* 0.7.3, 92 packages live on npm (verified by direct registry GET). Deep audit SHIP-WITH-FIXES; embarrassment-class finding closed pre-publish. Second-tier deferred: cell-/colHeader-/filter- product-level coverage gap; CSV/XLSX export undisclosed in the comparison doc."
 last_updated: "2026-09-07T14:01:04.650Z"
 last_activity: 2026-09-07
 progress:
