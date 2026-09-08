@@ -1372,6 +1372,12 @@ export const EXAMPLES = [
   // examples/demos/ file, no canonical top-level flat file. Drives
   // data-table-editor-family-focus.spec.ts. DOM assertions only.
   'DataTableEditorFamily',
+  // Quick task 260907-u14 — product-level six-target coverage for the
+  // cell-/colHeader-/filter- per-column slot families on the real <DataTable>.
+  // Loader falls through to the sibling examples/demos/ file, no canonical
+  // top-level flat file. Drives data-table-slot-family.spec.ts. DOM
+  // assertions only.
+  'DataTableSlotFamily',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -1814,6 +1820,8 @@ export const LIT_TAGS: Record<Example, string> = {
   NestedSlotFallback: 'rozie-nested-slot-fallback',
   // Phase 88 88-05 (D-03) — the lit entry appends '-demo' to this tag.
   DataTableEditorFamily: 'rozie-data-table-editor-family',
+  // Quick task 260907-u14 — the lit entry appends '-demo' to this tag.
+  DataTableSlotFamily: 'rozie-data-table-slot-family',
 };
 
 export interface HostQuery {
@@ -2315,6 +2323,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Phase 88 88-05 — self-contained (mixedRows/nofillRows seeded in <data>); no
   // parent-supplied props. This entry exists only to satisfy the Record<Example> type.
   DataTableEditorFamily: {},
+  // Quick task 260907-u14 — self-contained (rows/groupingModel seeded in <data>); no
+  // parent-supplied props. This entry exists only to satisfy the Record<Example> type.
+  DataTableSlotFamily: {},
 };
 
 /**

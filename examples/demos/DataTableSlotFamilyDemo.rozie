@@ -1,0 +1,224 @@
+<!--
+  DataTableSlotFamilyDemo.rozie — Quick task 260907-u14. Product-level six-target coverage
+  for the `cell-<columnId>`, `colHeader-<columnId>` and `filter-<columnId>` per-column slot
+  families on the REAL <DataTable> (`editor-<columnId>` already has
+  data-table-editor-family-focus.spec.ts). Drives data-table-slot-family.spec.ts.
+
+  THREE instances, IDENTICAL four-column set (region/name/status/units) so column ids are
+  stable across instances:
+
+    <Column field="region" header="Region" :groupable="true" />
+    <Column field="name"   header="Name"   :sortable="true" :filterable="true" />
+    <Column field="status" header="Status" :filterable="true" />
+    <Column field="units"  header="Units"  aggregationFn="sum" />
+
+  `name` is the only sortable column (sortable header branch, button.rdt-sort-btn); `status`
+  and `units` take the default sortable:false (plain-label header branch). `units` is
+  deliberately NOT filterable — the `filter-` gate probe (its filter cell must render nothing
+  at all, not even a generic fill).
+
+    - plain    (data-dt-instance="plain"):    :groupable + r-model:grouping, NOT virtual,
+               selectionMode="multiple" (auto-injects the __rdt_select chrome column).
+               Carries the GENERIC fill for cell/colHeader/filter alongside the family fills
+               — proves family-beats-generic AND generic-where-no-family, in the NON-WINDOWED
+               <tbody> branch (DataTable.rozie ~2435).
+    - windowed (data-dt-instance="windowed"): identical to `plain` plus :virtual="true"
+               maxHeight="300px", NO selectionMode. Same generic+family fill set — proves the
+               same tiering inside the WINDOWED <tbody> branch (DataTable.rozie ~1877).
+    - bare     (data-dt-instance="bare"):     :virtual="true" maxHeight="300px", NO
+               selectionMode. NO generic fills at all — only family fills on region/name.
+               Proves family-beats-BUILT-IN (no generic tier exists to intercept) AND
+               built-in-where-neither-exists (status/units carry no fill of any kind).
+
+  Slot fills, and the DataTable.rozie site(s) each one reaches:
+
+    #cell            (plain/windowed only) — generic cell tier.                    :2372 / :2884
+    #cell-region     (all three)   — family cell tier, GROUPED branch.             :2253 / :2765
+    #cell-name       (all three)   — family cell tier, LEAF branch.                :2372 / :2884
+    #cell-__rdt_select (plain only) — declared but INERT: isSelectColumn short-circuits
+                        before the family slot is ever reached (chrome exclusion probe).
+    #colHeader       (plain/windowed only) — generic header tier.
+    #colHeader-name   (all three)  — family header tier, SORTABLE branch (button.rdt-sort-btn).
+                                                                                     :1955 / :2519
+    #colHeader-status (plain/windowed only) — family header tier, NON-SORTABLE branch.
+                                                                                     :1973 / :2538
+    #filter          (plain/windowed only) — generic filter tier.
+    #filter-name      (all three)  — family filter tier, the RELOCATION seam (replaces the
+                        built-in `input.rdt-col-filter` entirely, not just wraps it).
+                                                                                     :2109 / :2643
+
+  The 10 uncovered sites (editor- already covered elsewhere) are all reached: colHeader-
+  sortable/non-sortable x2 branches, filter- x2 branches, cell-grouped/leaf x2 branches x2
+  body branches = 10.
+
+  Static deterministic seed data — no Date/Math.random/now() (known flake source, T-88-11).
+  12 rows across 3 `region` groups (4 rows each) so even the windowed instance's first slice
+  shows a group-header row plus leaves.
+
+  Naming discipline (DataTable.rozie Svelte mount-throw precedent, DataTableVirtualGroupDemo):
+  the grouping model field is `groupingModel`, NOT `grouping` (Angular slot-var/signal
+  shadow); no slot-scope destructured param is named `cell`. Every boolean prop is bound
+  `:prop="true"` — a bare attribute only coerces on Vue+Lit.
+
+  Deferred grouping (probe finding, this session — mirrors DataTableVirtualGroupDemo's
+  documented gotcha): `groupingModel` starts EMPTY and is applied in `$onMount`, one frame
+  later, rather than as a static initial-prop literal. Confirmed empirically this session —
+  setting `groupingModel: ['region']` directly in `<data>` leaves React/Solid/Lit's rendered
+  row model FLAT (every row still carries `data-group-leaf`, since `groupingActive()` reads
+  the model's length immediately, but table-core's actual grouped/expanded row model never
+  recomputes from the initial-prop value on those three targets — Vue/Svelte/Angular happen
+  to rebuild correctly from the initial value, masking the shared gap per
+  `project_five_targets_accidentally_correct_masks_shared_bug`). Applying the SAME value one
+  frame after mount makes all six targets rebuild the grouped row model correctly.
+-->
+
+<rozie name="DataTableSlotFamilyDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 1,  region: 'north', name: 'Alpha',   status: 'active',   units: 3 },
+    { id: 2,  region: 'north', name: 'Bravo',   status: 'archived', units: 5 },
+    { id: 3,  region: 'north', name: 'Charlie', status: 'active',   units: 2 },
+    { id: 4,  region: 'north', name: 'Delta',   status: 'archived', units: 8 },
+    { id: 5,  region: 'south', name: 'Echo',    status: 'active',   units: 4 },
+    { id: 6,  region: 'south', name: 'Foxtrot', status: 'archived', units: 6 },
+    { id: 7,  region: 'south', name: 'Golf',    status: 'active',   units: 1 },
+    { id: 8,  region: 'south', name: 'Hotel',   status: 'archived', units: 9 },
+    { id: 9,  region: 'east',  name: 'India',   status: 'active',   units: 7 },
+    { id: 10, region: 'east',  name: 'Juliet',  status: 'archived', units: 3 },
+    { id: 11, region: 'east',  name: 'Kilo',    status: 'active',   units: 5 },
+    { id: 12, region: 'east',  name: 'Lima',    status: 'archived', units: 2 },
+  ],
+  // Empty at mount — applied one frame later in $onMount below (see the header comment's
+  // "Deferred grouping" note). [] here is what lets the byte-identical-off/on distinction
+  // stay meaningful; the grouped row model rebuilds reliably across all six targets only
+  // from a POST-mount write, never the initial-prop value.
+  groupingModel: [],
+}
+</data>
+
+<script lang="ts">
+// Apply grouping AFTER mount (one frame later, mirroring DataTableVirtualGroupDemo's proven
+// precedent) so the grouped row model rebuilds uniformly on all six targets. Falls back to a
+// microtask where rAF is unavailable.
+$onMount(() => {
+  const applyGrouping = () => { $data.groupingModel = ['region'] }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(applyGrouping)
+  else applyGrouping()
+})
+</script>
+
+<template>
+<div class="dt-slot-family-demo">
+  <h3>DataTable — cell-/colHeader-/filter- per-column slot families</h3>
+
+  <div data-dt-instance="plain">
+    <h4>plain: non-windowed, generic fills present</h4>
+    <DataTable
+      :groupable="true"
+      :data="$data.rows"
+      r-model:grouping="$data.groupingModel"
+      selectionMode="multiple"
+    >
+      <Column field="region" header="Region" :groupable="true" />
+      <Column field="name"   header="Name"   :sortable="true" :filterable="true" />
+      <Column field="status" header="Status" :filterable="true" />
+      <Column field="units"  header="Units"  aggregationFn="sum" />
+
+      <template #cell="{ value }"><span data-testid="gen-cell">{{ value }}</span></template>
+      <template #cell-region="{ value }"><span data-testid="fam-cell-region">{{ value }}</span></template>
+      <template #cell-name="{ value }"><span data-testid="fam-cell-name">{{ value }}</span></template>
+      <!-- Declared but expected INERT — chrome-exclusion probe. Do NOT "fix" this: the
+           select column short-circuits before the family slot is ever reached, so this
+           fill must render nothing at all on the __rdt_select column. -->
+      <template #cell-__rdt_select="{ value }"><span data-testid="fam-cell-chrome">{{ value }}</span></template>
+
+      <template #colHeader="{ label }"><span data-testid="gen-colheader">{{ label }}</span></template>
+      <template #colHeader-name="{ label }"><span data-testid="fam-colheader-name">{{ label }}</span></template>
+      <template #colHeader-status="{ label }"><span data-testid="fam-colheader-status">{{ label }}</span></template>
+
+      <template #filter="{ columnId, value, setFilter }">
+        <input data-testid="gen-filter" :value="value" @input="setFilter(columnId, $event.target.value)" />
+      </template>
+      <template #filter-name="{ columnId, value, setFilter }">
+        <input data-testid="fam-filter-name" :value="value" @input="setFilter(columnId, $event.target.value)" />
+      </template>
+    </DataTable>
+  </div>
+
+  <div data-dt-instance="windowed">
+    <h4>windowed: virtual body, generic fills present</h4>
+    <DataTable
+      :groupable="true"
+      :data="$data.rows"
+      r-model:grouping="$data.groupingModel"
+      :virtual="true"
+      maxHeight="300px"
+    >
+      <Column field="region" header="Region" :groupable="true" />
+      <Column field="name"   header="Name"   :sortable="true" :filterable="true" />
+      <Column field="status" header="Status" :filterable="true" />
+      <Column field="units"  header="Units"  aggregationFn="sum" />
+
+      <template #cell="{ value }"><span data-testid="gen-cell">{{ value }}</span></template>
+      <template #cell-region="{ value }"><span data-testid="fam-cell-region">{{ value }}</span></template>
+      <template #cell-name="{ value }"><span data-testid="fam-cell-name">{{ value }}</span></template>
+
+      <template #colHeader="{ label }"><span data-testid="gen-colheader">{{ label }}</span></template>
+      <template #colHeader-name="{ label }"><span data-testid="fam-colheader-name">{{ label }}</span></template>
+      <template #colHeader-status="{ label }"><span data-testid="fam-colheader-status">{{ label }}</span></template>
+
+      <template #filter="{ columnId, value, setFilter }">
+        <input data-testid="gen-filter" :value="value" @input="setFilter(columnId, $event.target.value)" />
+      </template>
+      <template #filter-name="{ columnId, value, setFilter }">
+        <input data-testid="fam-filter-name" :value="value" @input="setFilter(columnId, $event.target.value)" />
+      </template>
+    </DataTable>
+  </div>
+
+  <div data-dt-instance="bare">
+    <h4>bare: virtual body, NO generic fills — family vs built-in only</h4>
+    <DataTable
+      :groupable="true"
+      :data="$data.rows"
+      r-model:grouping="$data.groupingModel"
+      :virtual="true"
+      maxHeight="300px"
+    >
+      <Column field="region" header="Region" :groupable="true" />
+      <Column field="name"   header="Name"   :sortable="true" :filterable="true" />
+      <Column field="status" header="Status" :filterable="true" />
+      <Column field="units"  header="Units"  aggregationFn="sum" />
+
+      <template #cell-region="{ value }"><span data-testid="fam-cell-region">{{ value }}</span></template>
+      <template #cell-name="{ value }"><span data-testid="fam-cell-name">{{ value }}</span></template>
+      <template #colHeader-name="{ label }"><span data-testid="fam-colheader-name">{{ label }}</span></template>
+      <template #filter-name="{ columnId, value, setFilter }">
+        <input data-testid="fam-filter-name" :value="value" @input="setFilter(columnId, $event.target.value)" />
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-slot-family-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 640px;
+}
+.dt-slot-family-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.dt-slot-family-demo h4 { margin: 1rem 0 0.375rem; font-size: 0.8125rem; color: #444; }
+</style>
+
+</rozie>
