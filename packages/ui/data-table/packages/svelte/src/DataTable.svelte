@@ -1172,9 +1172,42 @@ const onColumnOrderChangeCb = (updater: any) => {
 const onColumnPinningChangeCb = (updater: any) => {
   writeColumnPinning(applyUpdater(updater, currentState().columnPinning));
 };
+// columnSizingInfo is the ONLY slice table-core drives as a rapid, multi-call gesture: a resize
+// drag fires this updater once on pointerdown (seeding startOffset/startSize/isResizingColumn)
+// and then again on EVERY mousemove, each call reading the values the previous one wrote.
+//
+// That read-your-own-last-write requirement is what makes a plain `$data` read wrong here on
+// React. These callbacks are handed to createTable in $onMount, so on React the closure binds a
+// MOUNT-TIME `$data.columnSizingInfo` and never sees its own writes. Measured on the shipped
+// leaf (quick 260909, instrumented build): pointerdown correctly wrote
+// `{ startOffset: 163, isResizingColumn: 'col0' }`, and then every single mousemove still saw
+// `startOffset: null, isResizingColumn: false` — so it computed deltaOffset from 0 instead of
+// 163 (179, 195, 211… instead of 16, 32, 48…) AND wrote `isResizingColumn: false` back, wiping
+// the gesture on the first move. Net effect: column resizing did nothing at all on React while
+// working on the other five. It was masked because the one VR case that drives a real drag was
+// `test.fixme`'d on React as a presumed harness limitation (87-05 Task 3) — a real CDP drag
+// with intermediate steps fails there too, which is what proved it a product bug.
+//
+// Why not just read `currentState().columnSizingInfo` like the eleven siblings above: that
+// idiom relies on the re-feed $watch re-passing fresh callbacks into setOptions, and that watch
+// fires on data/column changes — NOT on every render, and never mid-gesture. It is sufficient
+// for one-shot updaters (a sort toggle, a selection click) and insufficient here, where
+// table-core issues a burst of updaters between any two re-feeds.
+//
+// Fix: a synchronous module-scope mirror, written on the same tick as the state. Reads prefer
+// the mirror, so each updater in a gesture composes on the previous one's result regardless of
+// when the host framework commits. Behaviourally identical on the five targets whose state read
+// was already synchronous (mirror and state agree), and the slice is transient gesture state
+// owned entirely by table-core — nothing else writes it — so the mirror cannot drift.
+// Same trick as the `committedThisSession` commit latch (editCellLifecycle.rzts), for the same
+// reason: a sync latch survives React's async window.
+let columnSizingInfoSync: any = null;
 const onColumnSizingInfoChangeCb = (updater: any) => {
-  const next = applyUpdater(updater, columnSizingInfo);
-  columnSizingInfo = next != null ? next : columnSizingInfo;
+  const base = columnSizingInfoSync != null ? columnSizingInfoSync : columnSizingInfo;
+  const next = applyUpdater(updater, base);
+  if (next == null) return;
+  columnSizingInfoSync = next;
+  columnSizingInfo = next;
 };
 // ══ Vertical row windowing (phase 53, req-1/2/3/6/9/10) — the virtual-core bridge ════════
 // virtual-core is a pure state machine EXACTLY like table-core: constructed once in $onMount

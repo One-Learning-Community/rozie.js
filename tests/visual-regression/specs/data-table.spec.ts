@@ -314,7 +314,7 @@ for (const target of TARGETS) {
 // 5. Column management — visibility / reorder / pin / resize (req-8-11)
 // ---------------------------------------------------------------------------
 for (const target of TARGETS) {
-  runnerFor(target)(`data-table-column-mgmt [${target}]: hide drops a column; reorder moves it; pin makes it sticky; resize handle present`, async ({
+  runnerFor(target)(`data-table-column-mgmt [${target}]: hide drops a column; reorder moves it; pin makes it sticky; a resize drag widens it`, async ({
     page,
   }) => {
     await page.goto(`/?example=DataTableColumnMgmt&target=${target}`);
@@ -362,13 +362,40 @@ for (const target of TARGETS) {
       )
       .toBe('sticky');
 
-    // Resize (req-9): the resize handle button is present on a sortable header and
-    // resetColumnSizing (the imperative verb) is reachable. The width-delta is owned
-    // by table-core's drag; here we assert the handle exists + the reset seam runs
-    // without error (a structural proof of the resize wiring).
-    await expect(mount.locator('button.rdt-resize-handle').first()).toBeVisible({
-      timeout: 10_000,
-    });
+    // Resize (req-9): drive a REAL drag and assert the column actually widens — not merely
+    // that the handle renders.
+    //
+    // This used to assert handle-visibility only, calling that "a structural proof of the
+    // resize wiring". It was not: quick 260909 found column resizing was completely broken on
+    // React (onColumnSizingInfoChangeCb read a mount-time $data value, so every mousemove
+    // wiped the gesture) and this case stayed green throughout, because a visible button
+    // proves nothing about whether dragging it does anything. The only case that drove a real
+    // drag lived in data-table-grid-column-virtual.spec.ts and was `test.fixme`'d on React —
+    // so the defect had no enforced coverage anywhere, on any table, for either axis.
+    //
+    // Deliberately on the NON-virtual demo: the React bug reproduced on plain tables too, and
+    // the column-virtual file only ever exercises the windowed path.
+    const resizeHandle = mount.locator('button.rdt-resize-handle').first();
+    await expect(resizeHandle).toBeVisible({ timeout: 10_000 });
+    const resizeTarget = mount.locator('th.rdt-th').first();
+    const widthBefore = await resizeTarget.evaluate((el) => el.getBoundingClientRect().width);
+    const hb = await resizeHandle.boundingBox();
+    if (hb) {
+      // Intermediate moves, not a single jump: table-core seeds startOffset on pointerdown and
+      // reads it back on every move, so a one-shot move would not exercise the read-your-own-
+      // last-write path that was broken.
+      await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+      await page.mouse.down();
+      for (const dx of [20, 45, 70]) {
+        await page.mouse.move(hb.x + hb.width / 2 + dx, hb.y + hb.height / 2, { steps: 2 });
+      }
+      await page.mouse.up();
+      await expect
+        .poll(async () => resizeTarget.evaluate((el) => el.getBoundingClientRect().width), {
+          timeout: 10_000,
+        })
+        .toBeGreaterThan(widthBefore + 20);
+    }
     await page.getByTestId('reset-sizing').click();
     // Table still intact after the reset.
     await expect.poll(async () => headers.count(), { timeout: 10_000 }).toBe(3);

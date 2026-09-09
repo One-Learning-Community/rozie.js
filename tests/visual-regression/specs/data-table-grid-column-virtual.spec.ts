@@ -27,12 +27,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   D-13      — a fill drag whose pointer reaches the container's right edge auto-scrolls
  *               the column axis so the range can grow past the pre-drag window.
  *
- * Status as of quick 260908-vcy: EVERY case in this file is enforced on ALL SIX targets, with
- * exactly one `test.fixme` remaining — the D-14 resize-drag case on React, a confirmed
- * test-harness event-simulation limitation (documented at its own call site), not a product
- * gap. The 87-04/87-05/87-06/87-09 per-target fixmes for the grouped-header colspan gap
- * (Gap 1) and the column-spacer width gap (Gap 2) are gone; both were root-caused and closed
- * (see the D-10 block below for both mechanisms).
+ * Status as of quick 260909: EVERY case in this file is enforced on ALL SIX targets, with
+ * ZERO `test.fixme` and zero skips — 170/170. Three separate per-target gaps were root-caused
+ * and closed to get here: the grouped-header colspan gap (Gap 1, 87-04/87-06), the
+ * column-spacer width gap (Gap 2, 87-05/87-09 — see the D-10 block below for both), and the
+ * D-14 resize-drag case on React, which had been fixme'd since 87-05 Task 3 as a presumed
+ * test-harness limitation and turned out to be a real product bug in
+ * `onColumnSizingInfoChangeCb` (see that case's own comment).
  *
  * D-08 needed ZERO changes to `colIndexOf`/`visibleColCount` themselves — 87-02's recorded A2
  * outcome (the five column-index functions already read the unsliced cell list) held,
@@ -1271,21 +1272,22 @@ for (const target of TARGETS) {
 // fails, it is a genuine finding against D-14's premise, recorded as such in the SUMMARY —
 // not worked around by adding forcedColumns() state.
 //
-// React is `test.fixme` here for a confirmed TEST-HARNESS limitation, isolated during
-// authoring, NOT a finding against D-14: a bare resize drag with NO scroll at all (via both
-// `page.mouse.*` — real CDP-synthesized input — and a manually dispatched
-// PointerEvent+document-level mousemove/mouseup, matching table-core@8.21.3's own documented
-// mousemove/mouseup listener attachment) also fails to commit on React specifically, while
-// the identical sequence works on all five other targets. Since the failure reproduces with
-// NO horizontal scroll in the sequence at all, it cannot be evidence that scrolling
-// interrupts the drag — it is a pre-existing gap in how THIS HARNESS drives React's resize
-// interaction via synthetic input, orthogonal to column-windowing (resize itself is a Phase
-// 63 feature this plan does not touch; `data-table.spec.ts`'s own column-mgmt case only
-// asserts the resize HANDLE is present, not a driven drag, so it does not already cover this
-// gap either — logged here rather than assumed away).
-// ═══════════════════════════════════════════════════════════════════════════════════════
+// ENFORCED on all six as of quick 260909. React was `test.fixme` here since 87-05 Task 3 as a
+// presumed TEST-HARNESS limitation ("this harness's synthetic-input approach does not
+// successfully drive React's resize handler"). That diagnosis was wrong, and the fixme was
+// hiding a real product bug: a REAL CDP drag (page.mouse.down + intermediate moves + up) also
+// failed on React while succeeding on the other five, on virtual AND non-virtual demos alike.
+//
+// Root cause was in `onColumnSizingInfoChangeCb` (stateChangeCallbacks.rzts), not in the test:
+// the callback is handed to createTable in $onMount, so on React it read a MOUNT-TIME
+// `$data.columnSizingInfo` and never saw its own writes. table-core drives a resize as a
+// multi-call gesture that must read its own last write, so every mousemove computed
+// deltaOffset from 0 instead of the seeded startOffset AND wrote `isResizingColumn: false`
+// back — wiping the gesture on the first move. Column resizing did nothing at all on React.
+// Fixed with a synchronous module-scope mirror; see that function's comment for the measured
+// evidence.
 for (const target of TARGETS) {
-  const run = target === 'react' ? test.fixme : runnerFor(target);
+  const run = runnerFor(target);
   run(`data-table-grid-column-virtual [${target}]: D-14 a resize drag on an in-window column tracks and commits across a mid-drag horizontal scroll`, async ({
     page,
   }) => {
