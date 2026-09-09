@@ -27,20 +27,22 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   D-13      — a fill drag whose pointer reaches the container's right edge auto-scrolls
  *               the column axis so the range can grow past the pre-drag window.
  *
- * Status as of gap-closure 87-09: D-01, D-06/D-11, D-10, D-08, D-12, D-13, and the `dir="rtl"`
- * case are ALL GREEN (mount-specific `test.fixme`s from 87-04/87-05/87-09 for confirmed,
- * unrelated, fully root-caused rendering/harness gaps are unchanged and documented in
- * deferred-items.md). D-08 needed ZERO changes to `colIndexOf`/`visibleColCount` themselves —
- * 87-02's recorded A2 outcome (the five column-index functions already read the unsliced cell
- * list) held, machine-enforced by `prohibitions.test.ts`'s A2 invariant — this file's D-08
- * battery is the PROOF of that guarantee, not a fix. D-12's scroll-then-focus guard
- * (`gridFocusNav.rzts`) widened to fire on either axis; D-13's `fillDrag.rzts` gained per-axis
- * edge-triggered auto-scroll, closing the pre-existing VERTICAL gap for free (shown RED-to-
- * GREEN in this same file). `dir="rtl"` (gap-closure 87-09) wires a LIVE `isRtl` into
- * `columnVirtualizerOptions()` (`windowing.rzts`), computed via `getComputedStyle` and kept
- * current across a runtime `dir` flip via a `MutationObserver` — GREEN on 5/6 targets; Svelte
- * is `test.fixme` for the SAME already-documented Gap 2 (`.rdt-col-spacer` width not applied)
- * that also affects the D-10/D-14 cases in this file.
+ * Status as of quick 260908-vcy: EVERY case in this file is enforced on ALL SIX targets, with
+ * exactly one `test.fixme` remaining — the D-14 resize-drag case on React, a confirmed
+ * test-harness event-simulation limitation (documented at its own call site), not a product
+ * gap. The 87-04/87-05/87-06/87-09 per-target fixmes for the grouped-header colspan gap
+ * (Gap 1) and the column-spacer width gap (Gap 2) are gone; both were root-caused and closed
+ * (see the D-10 block below for both mechanisms).
+ *
+ * D-08 needed ZERO changes to `colIndexOf`/`visibleColCount` themselves — 87-02's recorded A2
+ * outcome (the five column-index functions already read the unsliced cell list) held,
+ * machine-enforced by `prohibitions.test.ts`'s A2 invariant — this file's D-08 battery is the
+ * PROOF of that guarantee, not a fix. D-12's scroll-then-focus guard (`gridFocusNav.rzts`)
+ * widened to fire on either axis; D-13's `fillDrag.rzts` gained per-axis edge-triggered
+ * auto-scroll, closing the pre-existing VERTICAL gap for free (shown RED-to-GREEN in this same
+ * file). `dir="rtl"` (gap-closure 87-09) wires a LIVE `isRtl` into `columnVirtualizerOptions()`
+ * (`windowing.rzts`), computed via `getComputedStyle` and kept current across a runtime `dir`
+ * flip via a `MutationObserver`.
  *
  * DOM/behavioral assertions only (no PNG baseline) — the pinned Linux Docker run is the CI
  * gate; macOS/Linux kerning noise flakes pixel diffs on windowing-invariant assertions (the
@@ -928,46 +930,30 @@ for (const target of TARGETS) {
 // horizontal scroll width: colPadLeft()/colPadRight() subtract the forced column's own width
 // from the appropriate spacer (windowing.rzts).
 //
-// Solid/Svelte are `test.fixme` here for a CONFIRMED, PRE-EXISTING (87-04) gap in the shared
-// header/spacer rendering — NOT a flaw in this plan's forcedColumns()/colPadLeft()/
-// colPadRight() arithmetic, which was verified correct on every target by direct computation
-// against colVirtualizer.getTotalSize() (padLeft + rendered-cell widths + padRight sums to
-// EXACTLY getTotalSize() on all six, confirmed via a live DOM probe during authoring). Two
-// independent causes, found via that probe:
-//   1. `headerWidth('grpA')` (columnChrome.rzts) returns table-core's per-column getSize() for
-//      the SYNTHETIC "Group A" header — a SINGLE column's width — even though its rendered
-//      `<th>` carries `colspan="5"`. Under table-layout:fixed, a browser distributes a
-//      colspan-N cell's declared width ACROSS its N spanned columns for first-row column-width
-//      purposes; Solid's OWN container-width measurement here happens to produce a column
-//      window WIDE ENOUGH to include the grouped columns (10-14), where this mismatch
-//      surfaces as a real rendered-width deviation from columnSize()'s logical value.
-//   2. Independently, Svelte's `.rdt-col-spacer` <td> width binding was found to NOT
-//      contribute to the table's actual layout at rest — confirmed even in the UNGROUPED
-//      case: `.rdt-scroll`'s scrollWidth reflects only the rendered cells' own widths, not the
-//      declared spacer widths, at initial mount (before any interaction).
-// Both predate this plan (87-04's shared, cross-target header/spacer template) and are logged
-// in full to deferred-items.md rather than patched here — fixing either is a real, separate
-// change to shared infrastructure four consumer families inline, not a forcedColumns() concern.
-//
-// React ALSO added to `test.fixme` here in 87-06 — the SAME Gap 1 (grouped-header width vs.
-// colspan) above, newly reproducible on React specifically because 87-06's D-12 fix makes
-// `focusCell(0,55)` actually issue a real `colVirtualizer.scrollToIndex(55, {align:'center'})`
-// (previously a no-op on React — focusCell(0,55) never scrolled anything pre-87-06, so this
-// case never exercised a window wide enough to include the grouped columns 10-14 for React).
-// Confirmed via a live DOM probe during authoring: after the click, React's window covers cols
-// 3-15 (13 columns) — WIDE ENOUGH to include Group A (10-14) — and those 5 grouped `<td>`s
-// render at 30px (150/5) instead of 150px each, a 600px (5×150 - 5×30... i.e. the SAME
-// colspan-vs-width mismatch, not a NEW arithmetic bug in this plan's own colPadLeft()/
-// colPadRight() (verified: padLeft(300) + real-cell widths + padRight(6450) sums to EXACTLY
-// getTotalSize() (9000) using the LOGICAL columnSize() per cell — the discrepancy is entirely
-// in the BROWSER's own table-layout:fixed column-width distribution across the group's
-// colspan-5 `<th>`, not in this plan's D-08/D-12 files). Not caused by `gridFocusNav.rzts`
-// (the D-12 fix only changed WHETHER a real scroll happens, not how header/body widths are
-// computed) — logged as an addendum to the existing deferred-items.md Gap 1 entry.
+// ALL SIX TARGETS ENFORCED as of quick 260908-vcy. Solid/Svelte (87-05) and React (87-06)
+// were `test.fixme` here for two independent, fully root-caused rendering gaps, both now
+// closed:
+//   Gap 1 — grouped-header width vs. colspan. `headerWidth()` returned table-core's flat
+//     per-column getSize() for a SYNTHETIC group header whose <th> carries colspan="5", and
+//     under table-layout:fixed the browser divides that single declared width across the
+//     spanned columns (150 -> 30px each). Closed 2026-09-07 by reading `header.getSize()`,
+//     which recurses subHeaders.
+//   Gap 2 — the column spacer's declared width did not reach layout on Svelte. Root-caused in
+//     260908-vcy: colPadLeft()/colPadRight() early-return 0 while the column virtualizer has
+//     not measured, and that early return reads ONLY windowVer/editVer — so a fine-grained
+//     subscriber created inside the measure gap registered a dependency set of two counters
+//     that were never bumped again. The first header row's trailing spacer froze at 0px, and
+//     under table-layout:fixed the first row alone establishes column widths, collapsing
+//     scrollWidth from 9000 to 1350. Closed by bumping windowVer once the first column window
+//     materializes (DataTable.rozie's afterFirstFrame) — the column-axis equivalent of the
+//     bump the row axis already got for free via remeasureWindow().
+// The forcedColumns()/colPadLeft()/colPadRight() arithmetic these cases exercise was correct
+// throughout, and was verified on every target by direct computation against
+// colVirtualizer.getTotalSize() (padLeft + rendered-cell widths + padRight sums to EXACTLY
+// getTotalSize() on all six).
 // ═══════════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
-  const knownSpacerWidthGap = target === 'solid' || target === 'svelte' || target === 'react';
-  const run = knownSpacerWidthGap ? test.fixme : runnerFor(target);
+  const run = runnerFor(target);
   run(`data-table-grid-column-virtual [${target}]: D-10 scroll width does not grow when a forced column enters the rendered set`, async ({
     page,
   }) => {
@@ -1042,16 +1028,13 @@ for (const target of TARGETS) {
 // LEFT edge (mount A) — start scrolled fully right, drag from a NON-pinned rendered column
 // toward the left edge, extending the range leftward past columns that were off-window.
 //
-// Svelte is `test.fixme` here for the SAME confirmed, pre-existing (87-04/87-05) root cause
-// already logged in deferred-items.md: `.rdt-col-spacer`'s width binding does not affect
-// Svelte's actual table layout at rest, so `.rdt-scroll`'s `scrollWidth` under-reports the
-// true content width — `scrollGridFullyRight()`'s `scrollLeft = scrollWidth` is therefore a
-// NO-OP on Svelte specifically (confirmed via a live probe during authoring: the rendered
-// window after "scrolling fully right" is still cols 0-11, unchanged from rest), so this
-// case's own precondition ("start scrolled fully right") is never established — not a D-13
-// finding. The case remains a REAL, enforced assertion on the other five targets.
+// ENFORCED on all six as of quick 260908-vcy. Svelte was `test.fixme` here because this
+// case's precondition ("start scrolled fully right") could never be established: the Gap 2
+// spacer collapse left scrollWidth at 1350 instead of 9000, so scrolling "fully right" moved
+// the window barely at all. Closing Gap 2 (the column-axis windowVer bump) restores the real
+// scroll extent and the precondition holds. See the D-10 block above for the root cause.
 for (const target of TARGETS) {
-  const run = target === 'svelte' ? test.fixme : runnerFor(target);
+  const run = runnerFor(target);
   run(`data-table-grid-column-virtual [${target}]: D-13 a fill drag near the container's left edge auto-scrolls the column axis leftward`, async ({
     page,
   }) => {
@@ -1215,21 +1198,12 @@ for (const target of ['solid', 'svelte'] as const) {
 // adding an RTL demo variant — exercising the SAME real scroll-container mechanics an RTL
 // demo prop would.
 //
-// Svelte `test.fixme`: a SEPARATE, already-documented, pre-existing gap (deferred-items.md,
-// 87-05 Task 1's "Gap 2" — Svelte's `.rdt-col-spacer` width binding does not affect real
-// table layout) means `.rdt-scroll.scrollWidth` under-reports the true content width on
-// Svelte specifically (confirmed via a live probe: 1350px measured vs. 9000px expected for
-// this 60×150px fixture) — so the RTL-negative-extreme scroll this case computes
-// (`-(scrollWidth - clientWidth)`) is far too small to move the window past column ~11. The
-// RTL wiring ITSELF is unaffected: `isColRtl()`/`ensureColRtlWatch()` are framework-agnostic
-// windowing.rzts logic with no Svelte-specific branch, and the SAME mechanism verified GREEN
-// on all five other targets. This is Gap 2's PRECONDITION problem (the column window
-// genuinely cannot reach column 30+ given the under-reported scrollWidth), not a regression
-// in the isRtl fix — re-enable once Gap 2 is closed (see deferred-items.md for the suggested
-// fix: instrument the compiled Svelte `.rdt-col-spacer` `:style` binding directly).
-// ═══════════════════════════════════════════════════════════════════════════════════════
+// ENFORCED on all six as of quick 260908-vcy. Svelte was `test.fixme` here for Gap 2, not for
+// anything about the isRtl wiring: this case computes its RTL-negative scroll extreme as
+// -(scrollWidth - clientWidth), and Gap 2's collapsed scrollWidth made that extreme far too
+// small to move the window. A precondition failure, now closed — see the D-10 block above.
 for (const target of TARGETS) {
-  const run = target === 'svelte' ? test.fixme : runnerFor(target);
+  const run = runnerFor(target);
   run(`data-table-grid-column-virtual [${target}]: dir="rtl" — the column window still moves on a full leftward scroll`, async ({
     page,
   }) => {
@@ -1264,17 +1238,12 @@ for (const target of TARGETS) {
 // D-14 accepts is the menu CLOSING (its host column unmounting); the failure it does NOT
 // accept is a detached `strategy: 'fixed'` panel floating over unrelated columns.
 //
-// Svelte is `test.fixme` here for the SAME root cause already logged in deferred-items.md
-// (87-05 Task 1's Gap 2): its `.rdt-col-spacer` width binding does not affect real layout, so
-// `.rdt-scroll`'s `scrollWidth` under-reports the true content width and `scrollLeft =
-// scrollWidth` never actually advances the column window far enough to exclude col1 —
-// confirmed via a live probe during authoring: col1's body `<td>` is STILL present after
-// scrolling to `scrollWidth` on Svelte specifically. col1 is therefore never orphaned because
-// it never leaves the window — not a D-14 violation, a precondition this case cannot
-// establish on Svelte until Gap 2 is fixed.
-// ═══════════════════════════════════════════════════════════════════════════════════════
+// ENFORCED on all six as of quick 260908-vcy. Svelte was `test.fixme` here for Gap 2: with
+// scrollWidth collapsed, `scrollLeft = scrollWidth` never advanced the window far enough to
+// push the menu's column out, so the case could not establish the situation it asserts about.
+// Closed — see the D-10 block above.
 for (const target of TARGETS) {
-  const run = target === 'svelte' ? test.fixme : runnerFor(target);
+  const run = runnerFor(target);
   run(`data-table-grid-column-virtual [${target}]: D-14 opening a column menu then scrolling that column out of the window leaves no orphaned floating panel`, async ({
     page,
   }) => {
