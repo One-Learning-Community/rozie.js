@@ -516,7 +516,16 @@ const seedColumnPinning = (): void => {
   // persisted (invariant 3). Writes the uncontrolled holder AND the two-way model so both
   // binding modes observe the pinning that is actually in effect; deliberately does NOT route
   // through writeColumnPinning(), whose job is to emit `pin-change` for real user actions.
-  const seeded = {
+  // Annotated `any` for the same reason currentState() is (see its comment below): the
+  // uncontrolled holder's initial value is the empty literal `{ left: [], right: [] }`, so the
+  // emitted per-target state holder infers `{ left: never[]; right: never[] }` and a genuinely
+  // populated `{ left: string[]; right: string[] }` will not assign to it under the strict
+  // bundled-leaf tsc (react TS2345 on setColumnPinningDefault, solid TS2769, lit TS2322 — one
+  // per target, all the same never[] inference). The runtime shape is correct; this is the
+  // established idiom here rather than widening three per-leaf strict baselines for it.
+  // writeColumnPinning() never hits this because its payload flows through `strip()`, which
+  // returns `any[]`.
+  const seeded: any = {
     left,
     right
   };
