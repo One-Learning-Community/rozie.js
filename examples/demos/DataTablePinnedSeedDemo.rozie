@@ -1,0 +1,133 @@
+<!--
+  DataTablePinnedSeedDemo.rozie — BEHAVIORAL consumer proving the per-column `pinned`
+  declaration is a REAL initial columnPinning seed (quick 260908-vcy).
+
+  Before this, `pinned` was carried onto every ColumnDef by columnBuilders.rzts and read by
+  nobody: `column.getIsPinned()` returned false for a column declared `pinned="left"`, so the
+  documented per-column API was inert and `r-model:columnPinning` was the only mechanism that
+  actually pinned anything. seedColumnPinning() (stateAssembly.rzts) applies the declaration
+  once, as initial state.
+
+  THREE mounts, one per contract:
+
+    - #seed-declarative — `<Column pinned="right">` (the children form). `amount` must render
+      LAST with `position: sticky; right: 0`. This is the entry point that registers DURING
+      mount, so it exercises the re-feed-watch call rather than the $onMount one.
+
+    - #seed-config — the `:columns` config-array form with `pinned: 'left'`. `amount` must
+      render FIRST with `position: sticky; left: 0` — table-core's getVisibleCells() returns
+      [left-pinned, center, right-pinned], so a genuine pin REORDERS the column. This mount is
+      also the one-shot proof: clicking `unpin-amount` unpins it, and the column must STAY
+      unpinned (the seed must not re-apply on the re-feed that follows).
+
+    - #seed-preempted — the consumer binds `r-model:columnPinning` with `name` already pinned
+      left AND declares `pinned="right"` on `amount`. The consumer's pin wins outright and the
+      declaration is ignored, because a consumer who has expressed a pin owns the slice.
+
+  The pin readouts expose the live two-way model so a spec can assert the seed reached the
+  consumer's own binding, not just the DOM.
+-->
+
+<rozie name="DataTablePinnedSeedDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 1, name: 'Alpha',   status: 'active',   amount: 1299 },
+    { id: 2, name: 'Beta',    status: 'pending',  amount: 4250 },
+    { id: 3, name: 'Gamma',   status: 'inactive', amount: 875 },
+  ],
+  // Config-array form declaring a LEFT pin on the last-declared column, so a working seed is
+  // visible as a REORDER (amount moves to the front), not merely as a style change.
+  configColumns: [
+    { field: 'name',   header: 'Name'   },
+    { field: 'status', header: 'Status' },
+    { field: 'amount', header: 'Amount', pinned: 'left' },
+  ],
+  // Same columns, but the consumer pre-pins `name` themselves — the seed must stand down.
+  preemptedColumns: [
+    { field: 'name',   header: 'Name'   },
+    { field: 'status', header: 'Status' },
+    { field: 'amount', header: 'Amount', pinned: 'right' },
+  ],
+  // Two-way sinks so the specs can read what the component pushed back to the consumer.
+  configPinning: { left: [], right: [] },
+  preemptedPinning: { left: ['name'], right: [] },
+}
+</data>
+
+<script>
+// Unpin everything on the config mount. The point is not the unpin itself but what must NOT
+// happen afterwards: the write re-feeds, seedColumnPinning() is called again, and its latch
+// has to keep the column unpinned rather than re-seeding it from the still-present
+// `pinned: 'left'` declaration.
+const unpinAmount = () => {
+  $data.configPinning = { left: [], right: [] }
+}
+</script>
+
+<template>
+<div class="dt-demo">
+  <h3>DataTable — per-column pinned as an initial pin seed</h3>
+
+  <!-- ─── <Column pinned="right"> (children form) ─── -->
+  <section data-testid="seed-declarative">
+    <h4>&lt;Column pinned="right"&gt;</h4>
+    <DataTable :data="$data.rows">
+      <Column field="name"   header="Name" />
+      <Column field="status" header="Status" />
+      <Column field="amount" header="Amount" pinned="right" />
+    </DataTable>
+  </section>
+
+  <!-- ─── :columns config array with pinned:'left' + the one-shot unpin probe ─── -->
+  <section data-testid="seed-config">
+    <h4>:columns pinned left</h4>
+    <DataTable
+      :data="$data.rows"
+      :columns="$data.configColumns"
+      r-model:columnPinning="$data.configPinning"
+    />
+    <button type="button" data-testid="unpin-amount" @click="unpinAmount()">Unpin all</button>
+    <code data-testid="config-pinning">{{ JSON.stringify($data.configPinning) }}</code>
+  </section>
+
+  <!-- ─── consumer pin pre-empts the declaration ─── -->
+  <section data-testid="seed-preempted">
+    <h4>consumer pin wins</h4>
+    <DataTable
+      :data="$data.rows"
+      :columns="$data.preemptedColumns"
+      r-model:columnPinning="$data.preemptedPinning"
+    />
+    <code data-testid="preempted-pinning">{{ JSON.stringify($data.preemptedPinning) }}</code>
+  </section>
+</div>
+</template>
+
+<style>
+.dt-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 620px;
+}
+.dt-demo h4 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.dt-demo code {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+}
+</style>
+</rozie>

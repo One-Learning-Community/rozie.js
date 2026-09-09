@@ -1378,6 +1378,11 @@ export const EXAMPLES = [
   // top-level flat file. Drives data-table-slot-family.spec.ts. DOM
   // assertions only.
   'DataTableSlotFamily',
+  // Quick task 260908-vcy — proves the per-column `pinned` declaration seeds real
+  // columnPinning state (both declaration forms), that a consumer's own pin pre-empts
+  // it, and that the seed is one-shot (an unpin is not re-seeded). Drives
+  // data-table-pinned-seed.spec.ts. DOM assertions only.
+  'DataTablePinnedSeed',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -1822,6 +1827,8 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableEditorFamily: 'rozie-data-table-editor-family',
   // Quick task 260907-u14 — the lit entry appends '-demo' to this tag.
   DataTableSlotFamily: 'rozie-data-table-slot-family',
+  // Quick task 260908-vcy — the lit entry appends '-demo' to this tag.
+  DataTablePinnedSeed: 'rozie-data-table-pinned-seed',
 };
 
 export interface HostQuery {
@@ -2326,6 +2333,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Quick task 260907-u14 — self-contained (rows/groupingModel seeded in <data>); no
   // parent-supplied props. This entry exists only to satisfy the Record<Example> type.
   DataTableSlotFamily: {},
+  // Quick task 260908-vcy — self-contained (rows/columns/pinning seeded in <data>); no
+  // parent-supplied props. This entry exists only to satisfy the Record<Example> type.
+  DataTablePinnedSeed: {},
 };
 
 /**

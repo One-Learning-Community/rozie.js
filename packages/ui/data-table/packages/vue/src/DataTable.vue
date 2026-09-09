@@ -624,6 +624,85 @@ const effectiveColumnPinning = (): any => {
     left: rail.concat(deduped)
   };
 };
+// seedColumnPinning(): apply the per-column `pinned` declaration ('left' | 'right') — from the
+// `:columns` config array or a `<Column pinned="...">` child — as the INITIAL columnPinning
+// state, exactly once.
+//
+// Until now that field was carried onto every ColumnDef by columnBuilders.rzts and then read by
+// nobody: `column.getIsPinned()` returned false for a column declared `pinned="left"`, so the
+// documented per-column API was inert while `r-model:columnPinning` was the only mechanism that
+// actually pinned anything.
+//
+// Three invariants, each load-bearing:
+//   1. ONE-SHOT, LATCHED ON THE OUTCOME — never merely on "we ran". The latch flips only when
+//      a seed is actually applied, or when a consumer pin is observed; a call that finds no
+//      declared pins leaves it DOWN and will look again on the next re-feed. Latching on the
+//      first call that saw any column at all was wrong, and Lit proved it: `<Column>` children
+//      register INCREMENTALLY there, one re-feed per child, so the first call sees only
+//      `name` — no pins declared yet — and a run-once latch would disable the seed
+//      permanently before `amount pinned="right"` ever registered. The other five targets
+//      batch all children into a single flush, which hid the race entirely. Once a seed HAS
+//      been applied the latch holds, so a subsequent interactive UNPIN is never re-seeded —
+//      which is the whole reason this is not folded into effectiveColumnPinning().
+//   2. ONLY WHEN NOTHING IS PINNED YET. Note this is NOT an `$props.columnPinning == null`
+//      check: the prop carries `default: () => ({ left: [], right: [] })`, so it is never null
+//      and a bound-vs-unbound test is impossible here. The meaningful question is whether the
+//      consumer has actually expressed a pin — if they have, they own the slice and the
+//      per-column declaration must not fight it; if the state is empty, `pinned` IS the
+//      initial state and applying it is the whole point.
+//   3. NO CHROME IDS. The select/expander rail is injected by effectiveColumnPinning() on read
+//      and stripped by writeColumnPinning() on write; the persisted state must never contain
+//      them. Seeding only real column ids keeps that discipline.
+//
+// Writes BOTH the uncontrolled holder and `$model.columnPinning` so a consumer with a two-way
+// binding sees the pinning that is actually in effect rather than a stale empty object — but
+// does NOT emit `pin-change`: this is initial state derived from the consumer's own markup, not
+// a user action, and firing a change event for it on mount would be noise.
+//
+// Called from $onMount (covers the `:columns` config-array form, known at mount) AND from the
+// re-feed watch (covers `<Column>` children, which register during mount, and a runtime
+// `:columns` swap that arrives before any pin interaction). The `!defs.length` bail is what
+// makes the mount call harmless when columns are not known yet — the latch stays down and the
+// next re-feed seeds instead.
+let pinSeedApplied = false;
+const seedColumnPinning = (): void => {
+  if (pinSeedApplied) return;
+  // Invariant 2: bail if the consumer already pinned something (either an initial bound value
+  // or an interaction that beat us here). Read the same source order effectiveColumnPinning()
+  // does, minus the chrome rail it injects on read — the rail is structural, not a consumer pin.
+  const live = columnPinning.value != null ? columnPinning.value : columnPinningDefault.value;
+  const isRealPin = (id: string) => id !== SELECT_COL_ID && id !== EXPANDER_COL_ID;
+  const pinnedAlready = (live && live.left ? live.left : []).filter(isRealPin).length > 0 || (live && live.right ? live.right : []).filter(isRealPin).length > 0;
+  if (pinnedAlready) {
+    pinSeedApplied = true;
+    return;
+  }
+  const defs = columnDefs();
+  if (!defs.length) return;
+  const left: string[] = [];
+  const right: string[] = [];
+  for (let i = 0; i < defs.length; i++) {
+    const def = defs[i];
+    if (!def) continue;
+    if (def.pinned === 'left') left.push(def.id);else if (def.pinned === 'right') right.push(def.id);
+  }
+  // Invariant 1: no declared pins in the column set we can currently SEE is not evidence there
+  // are none — on Lit the set is still filling in. Leave the latch down and try again on the
+  // next re-feed; the only exits are "seeded" (below) and "consumer already pinned" (above).
+  if (!left.length && !right.length) return;
+  pinSeedApplied = true;
+  // Nothing was pinned (invariant 2 above), so this is a plain assignment, not a merge — the
+  // only ids that could be in `live` are the structural chrome rail, which must never be
+  // persisted (invariant 3). Writes the uncontrolled holder AND the two-way model so both
+  // binding modes observe the pinning that is actually in effect; deliberately does NOT route
+  // through writeColumnPinning(), whose job is to emit `pin-change` for real user actions.
+  const seeded = {
+    left,
+    right
+  };
+  columnPinningDefault.value = seeded;
+  columnPinning.value = seeded;
+};
 // Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
 // All NINE slices are wired (each ?? its own $data.<slice>Default). table-core reads
 // this whole object as `state`. Return type annotated `any`: the inferred object-literal
@@ -6555,6 +6634,13 @@ onMounted(() => {
   // a one-way `:data`) has a base array to whole-array-replace. currentData() then sources
   // the bound prop when controlled, this fallback otherwise.
   dataDefault.value = data.value || [];
+  // Apply any per-column `pinned` declaration as the INITIAL pinning state BEFORE createTable
+  // reads currentState() below, so the first row model table-core builds is already correctly
+  // ordered (getVisibleCells() returns [left-pinned, center, right-pinned]) rather than
+  // re-ordering a render later. Covers the `:columns` config-array form, which is available
+  // now; `<Column>` children register during mount and are covered by the re-feed watch's own
+  // call. One-shot and self-latching — see seedColumnPinning() in stateAssembly.rzts.
+  seedColumnPinning();
   // Build the table instance HERE so the closures below capture the live `table`.
   table = createTable({
     // Plain value (NOT a `get data()` getter): an object-literal getter rebinds
@@ -6916,6 +7002,12 @@ data.value, dataDefault.value,
 // (Consumers memoize the array as with $props.data/$props.sorting; the uncontrolled
 // <Column>-children path leaves $props.columns undefined — a stable no-op getter.)
 props.columns, colReg.value], () => {
+  // Seed BEFORE the re-feed so the pinning this call may write is part of the state object
+  // table-core receives on this same tick (rather than landing a frame late and re-ordering
+  // getVisibleCells() a render after the columns appear). One-shot and self-latching — see
+  // seedColumnPinning() in stateAssembly.rzts. This is the `<Column>`-children entry point:
+  // those register during mount, so the $onMount call below can find zero columns.
+  seedColumnPinning();
   reFeed();
   maybeClearHistoryOnExternalSwap();
 }, { flush: 'post' });

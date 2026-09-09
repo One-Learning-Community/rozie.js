@@ -858,7 +858,7 @@ let restoringHistory: boolean = false
 // exactly as before, both for the plain table AND the expandable-rows feature).
 let expandedTouched = false
 
-import { groupingActiveDefault, currentState, currentData } from './stateAssembly.rzts'
+import { groupingActiveDefault, seedColumnPinning, currentState, currentData } from './stateAssembly.rzts'
 
 import { isSafeKey, wrapAggregationFn, columnDefs, defIndex, SELECT_COL_ID, EXPANDER_COL_ID, selectionEnabled, tableColumns } from './columnBuilders.rzts'
 
@@ -968,6 +968,13 @@ $onMount(() => {
   // a one-way `:data`) has a base array to whole-array-replace. currentData() then sources
   // the bound prop when controlled, this fallback otherwise.
   $data.dataDefault = $props.data || []
+  // Apply any per-column `pinned` declaration as the INITIAL pinning state BEFORE createTable
+  // reads currentState() below, so the first row model table-core builds is already correctly
+  // ordered (getVisibleCells() returns [left-pinned, center, right-pinned]) rather than
+  // re-ordering a render later. Covers the `:columns` config-array form, which is available
+  // now; `<Column>` children register during mount and are covered by the re-feed watch's own
+  // call. One-shot and self-latching — see seedColumnPinning() in stateAssembly.rzts.
+  seedColumnPinning()
   // Build the table instance HERE so the closures below capture the live `table`.
   table = createTable({
     // Plain value (NOT a `get data()` getter): an object-literal getter rebinds
@@ -1346,7 +1353,16 @@ $watch(
     $props.columns,
     $data.colReg,
   ],
-  () => { reFeed(); maybeClearHistoryOnExternalSwap() },
+  () => {
+    // Seed BEFORE the re-feed so the pinning this call may write is part of the state object
+    // table-core receives on this same tick (rather than landing a frame late and re-ordering
+    // getVisibleCells() a render after the columns appear). One-shot and self-latching — see
+    // seedColumnPinning() in stateAssembly.rzts. This is the `<Column>`-children entry point:
+    // those register during mount, so the $onMount call below can find zero columns.
+    seedColumnPinning()
+    reFeed()
+    maybeClearHistoryOnExternalSwap()
+  },
 )
 
 // #14: sort/filter live announcement. Registered AFTER the re-feed watch above so it runs

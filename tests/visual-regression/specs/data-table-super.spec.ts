@@ -99,13 +99,17 @@ test('editing a Customer cell fires cellEditCommit', async ({ page }) => {
   // 'table' mode (ctl-gridMode), so the smoke test must switch modes first — the
   // real keymap requirement, not a weakened assertion.
   await page.getByTestId('ctl-gridMode').selectOption('grid');
-  // The demo's default selectionMode is 'multiple' (see ctl-selectionMode), which
-  // auto-injects a LEADING checkbox column (D-04/IN-02), and Task 5's
-  // `:expandable="true"` auto-injects a chevron expander column right after it
-  // (DataTable.rozie: "a leading chevron expander column auto-injects (after the
-  // select column)") — so the visible order is [select, expand, id, customer, …].
-  // `nth(3)` is the Customer cell, not `nth(2)`.
-  const cell = page.locator('tbody tr').first().locator('td').nth(3);
+  // Resolved by COLUMN ID, never by index. This was `.locator('td').nth(3)`, justified by a
+  // hand-counted visible order of [select, expand, id, customer, …] — and quick 260908-vcy
+  // invalidated that count: the demo declares `<Column field="id" … pinned="right">`, and now
+  // that the per-column `pinned` declaration actually seeds columnPinning, table-core's
+  // getVisibleCells() moves `id` to the right rail. The order became
+  // [select, expand, customer, category, …], so `nth(3)` silently addressed CATEGORY while the
+  // assertion below still demanded 'customer' — the exact index-drift failure phase 87-05's
+  // deferred-items entry predicted when it deferred making `pinned` real. Body `<td>`s carry
+  // `:data-col="cell.column.id"` on both the windowed and non-windowed branches, so this
+  // selector is immune to any future pin/reorder/visibility change.
+  const cell = page.locator('tbody tr').first().locator('td[data-col="customer"]');
   await cell.click();
   await page.keyboard.press('Enter');
   await cell.locator('input').fill('Zzz Edited');
