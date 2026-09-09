@@ -368,3 +368,55 @@ for (const target of TARGETS) {
     await expect.poll(async () => cellDisplays.nth(2).textContent(), { timeout: 10_000 }).toBe('2026-06-15');
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════
+// EDITOR-OWNS-FOCUS — the `autofocus` #editor scope prop actually focuses the drop-in.
+//
+// Added by quick 260909 after re-investigating deferred-items 63-01, which recorded this as
+// a Lit-only gap ("a drop-in editor opens but its <input> is not auto-focused; the 5
+// light-DOM targets focus it fine"). Measured against the shipped build, that framing was
+// wrong twice over: NO target focused the drop-in, and the cause was not shadow-DOM at all.
+//
+// `focusEditorWhenReady` (editCellLifecycle.rzts) deliberately BAILS when it finds a
+// consumer drop-in — drop-ins own their own focus. The host instead flips the reactive
+// `autofocus` slot-scope prop (editorAutofocusFor + $data.editFocusColId) for the one editor
+// that should hold focus, and the drop-in focuses its OWN input. That indirection is
+// precisely what makes the contract shadow-safe on Lit with no piercing.
+//
+// The demo simply never destructured `autofocus` out of the slot scope, so nothing told any
+// drop-in to focus. Forwarding it makes all six focus correctly — Lit included — which is
+// what this case now locks. Without this assertion the contract had ZERO runtime coverage:
+// the editor cases above all call `.fill()`, which focuses the element itself and therefore
+// cannot distinguish "autofocus worked" from "autofocus never fired".
+// ═══════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-dropins editor [${target}]: F2 auto-focuses the #editor drop-in via the autofocus scope prop`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableEditorDropins&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount.getByTestId('edit-table').locator('table')).toBeVisible({ timeout: 15_000 });
+
+    // Real click + F2 (not a JS .focus()) so the grid's own active-cell path runs.
+    await mount.locator('[data-grid-cell][data-row="0"][data-col-index="0"]').first().click();
+    await page.keyboard.press('F2');
+
+    // Shadow-piercing deep activeElement: on Lit the drop-in's <input> lives inside the
+    // drop-in's OWN shadow root, nested within the grid's — document.activeElement stops at
+    // the outermost host, so a naive check reports the host element and never the input.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            let ae: Element | null = document.activeElement;
+            while (ae && (ae as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot?.activeElement) {
+              ae = (ae as Element & { shadowRoot: ShadowRoot }).shadowRoot.activeElement;
+            }
+            return !!(ae && ae.hasAttribute && ae.hasAttribute('data-editing-cell'));
+          }),
+        { timeout: 10_000 },
+      )
+      .toBe(true);
+  });
+}

@@ -88,8 +88,15 @@ const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue:
 
       <!-- The #editor scoped slot, dispatched by columnId to the real drop-ins. Each
            receives the verified slot scope ({ columnId, column, row, value, commit,
-           cancel }) and calls commit(value) / cancel(). -->
-      <template #editor="{ columnId, column, row, value, commit, cancel }">
+           cancel, autofocus }) and calls commit(value) / cancel().
+
+           `autofocus` is FORWARDED deliberately (quick 260909): it is the editor-owns-focus
+           contract (260711-i5m) — the host flips this reactively for the ONE editor that
+           should hold focus, and the drop-in focuses its OWN input in response, which is what
+           makes the contract shadow-safe on Lit without any piercing. A consumer who omits it
+           gets an editor that opens but never takes focus, on EVERY target. This demo omitted
+           it, which is why deferred-items 63-01 read as a Lit-only auto-focus gap. -->
+      <template #editor="{ columnId, column, row, value, commit, cancel, autofocus }">
         <EditorText
           r-if="columnId === 'name'"
           :columnId="columnId"
@@ -98,6 +105,7 @@ const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue:
           :value="value"
           :commit="commit"
           :cancel="cancel"
+          :autofocus="autofocus"
         />
         <EditorSelect
           r-else-if="columnId === 'status'"
@@ -107,6 +115,7 @@ const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue:
           :value="value"
           :commit="commit"
           :cancel="cancel"
+          :autofocus="autofocus"
           :options="$data.statusOptions"
         />
         <EditorDate
@@ -117,6 +126,7 @@ const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue:
           :value="value"
           :commit="commit"
           :cancel="cancel"
+          :autofocus="autofocus"
         />
       </template>
     </DataTable>
