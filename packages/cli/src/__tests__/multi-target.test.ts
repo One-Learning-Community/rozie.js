@@ -92,8 +92,17 @@ describe('runBuildMatrix — multi-target multi-input (M2)', () => {
   it('M2: 5 examples × 4 targets = 20 primary files; React adds 5 .d.ts (D-90 default)', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-m2-'));
     const { ctx } = makeBufs();
+    // Top-level glob, NOT the whole `examples/` tree. This test asserts on five reference
+    // examples that live directly in examples/, but passing the directory made it compile
+    // every .rozie underneath — 341 files x 4 targets, of which 186 are examples/demos/.
+    // That is ~4x the work for zero extra assertions, and its cost grew every time anyone
+    // added a demo, against a fixed 180s wall-clock timeout: it tipped over in quick 260909
+    // (194s) purely because unrelated demos had accumulated. Directory-input expansion is
+    // covered directly and cheaply by expand-inputs.test.ts (D-88), so nothing is lost here —
+    // this test's job is the multi-target x multi-input BUILD matrix, which 81 top-level
+    // inputs exercise just as well.
     await runBuildMatrix(
-      [EXAMPLES_DIR],
+      [join(EXAMPLES_DIR, '*.rozie')],
       { target: ALL_TARGETS, out: tmp, root: REPO_ROOT },
       ctx,
     );
