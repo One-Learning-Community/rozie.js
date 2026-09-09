@@ -1267,6 +1267,31 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
           if (!w) {
             console.warn('[rozie-data-table] virtual is on for columns but the scroll container has no bounded width; set a CSS width on an ancestor so the column window can be measured');
           }
+          // COLUMN-AXIS FIRST-WINDOW BUMP (quick 260908-vcy). The mount-kick above fires right
+          // after `new Virtualizer(...)` — BEFORE colVirtualizer has measured, and before the
+          // spacer effects even exist. Any fine-grained subscriber created inside that measure
+          // gap takes colPadLeft()/colPadRight()'s `if (!items.length) return 0` early return,
+          // which reads ONLY windowVer + editVer and never reaches the live path's reads
+          // (forcedColumns()/columnSize()/column state). Its dependency set is therefore those
+          // two counters alone — and without this bump nothing ever touches them again, so the
+          // subscriber stays frozen at 0 for the lifetime of the component. Measured on Svelte:
+          // the FIRST header row's trailing spacer froze at 0px while its siblings (created
+          // after measurement, on the live path) tracked correctly; under table-layout:fixed the
+          // first row alone establishes column widths, so that one cell collapsed the whole
+          // table's scrollWidth from 9000 to 1350. The five other targets re-render wholesale
+          // (Solid re-creates these rows), which masked it.
+          //
+          // The ROW axis has always been safe here only by accident: remeasureWindow() above
+          // already routes through bumpWindowVer() on this same post-first-frame callback. This
+          // is the column axis's missing equivalent — not a Svelte workaround (the emitted
+          // Svelte binding is a correct reactive template_effect; the dependency set is what was
+          // wrong), so it is fixed once, in the shared engine's consumer, for all six targets.
+          //
+          // Routed through bumpWindowVer() rather than a raw `$data.windowVer = $data.windowVer + 1`
+          // to keep 87-10's microtask coalescing AND to avoid manufacturing the ROZ138
+          // false positive that a second in-body counter self-read would trip (see the
+          // mount-kick's own comment above).
+          this.bumpWindowVer();
         }
       };
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(afterFirstFrame));else setTimeout(afterFirstFrame, 0);

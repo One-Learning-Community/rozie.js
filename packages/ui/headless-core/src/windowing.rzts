@@ -649,4 +649,4 @@ const colIsOutsideWindow = (c) => {
   return true
 }
 
-export { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow, COL_OVERSCAN, columnVirtualizerOptions, windowedColIndices, colPadLeft, colPadRight, colIsOutsideWindow, ESTIMATE_REFEED_DELTA_PX, estimateRowSize, foldMeasuredRow, refineRowEstimate, teardownColRtlWatch }
+export { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow, COL_OVERSCAN, columnVirtualizerOptions, windowedColIndices, colPadLeft, colPadRight, bumpWindowVer, colIsOutsideWindow, ESTIMATE_REFEED_DELTA_PX, estimateRowSize, foldMeasuredRow, refineRowEstimate, teardownColRtlWatch }
