@@ -2013,6 +2013,11 @@ el.addEventListener('sort-change', (e) => {
   console.log('sorting', e.detail);
 });`,
     },
+    // Lit derives an observed attribute as propertyName.toLowerCase() with NO dash insertion unless the
+    // @property declaration passes an explicit `attribute:`. None of these five do, so `interaction-mode`
+    // is NOT observed — it is silently ignored, and because the props are `reflect: true` Lit also writes
+    // the lowercase form back onto the element. Use the lowercase attribute here. Do NOT "tidy" these to
+    // kebab-case; that shipped two dead editable examples in 0.4.0 (audit 260910, D-15).
     {
       title: SET_B_TITLE,
       lang: 'ts',
@@ -2026,8 +2031,8 @@ const rows = ${ROWS};
 render(html\`
   <rozie-data-table
     .data=\${rows}
-    selection-mode="multiple"
-    sticky-header
+    selectionmode="multiple"
+    stickyheader
     .cell=\${({ columnId, value }) =>
       columnId === 'status' ? html\`<span class="badge">\${value}</span>\` : value}
   >
@@ -2045,9 +2050,9 @@ import '@rozie-ui/data-table-lit';
 
 const rows = ${MANY_ROWS};
 
-// PROP form — the \`max-height\` attribute sizes the scroll container.
+// PROP form — the \`maxheight\` attribute sizes the scroll container.
 render(html\`
-  <rozie-data-table .data=\${rows} virtual max-height="400px">
+  <rozie-data-table .data=\${rows} virtual maxheight="400px">
     <rozie-column field="name" header="Name"></rozie-column>
     <rozie-column field="email" header="Email"></rozie-column>
     <rozie-column field="status" header="Status"></rozie-column>
@@ -2055,8 +2060,8 @@ render(html\`
 \`, document.body);
 
 // TOKEN form — the same height via the CSS custom property (the prop wins when
-// both are set; the token is the fallback). \`estimate-row-height\` tunes the seed:
-//   <rozie-data-table .data=\${rows} virtual estimate-row-height="48"
+// both are set; the token is the fallback). \`estimaterowheight\` tunes the seed:
+//   <rozie-data-table .data=\${rows} virtual estimaterowheight="48"
 //     style="--rozie-data-table-max-height: 400px"> … </rozie-data-table>`,
     },
     {
@@ -2072,7 +2077,7 @@ const validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
 
 render(html\`
   <rozie-data-table
-    interaction-mode="grid"
+    interactionmode="grid"
     .data=\${rows}
     @data-change=\${(e: CustomEvent) => { rows = e.detail; }}
     @cell-edit-commit=\${(e: CustomEvent) => console.log('cell commit', e.detail)}
@@ -2192,7 +2197,7 @@ const statusOptions = ${STATUS_OPTIONS};
 // cancel }) as element properties; <rozie-editor-select> also takes \`.options\`.
 render(html\`
   <rozie-data-table
-    interaction-mode="grid"
+    interactionmode="grid"
     .data=\${rows}
     @data-change=\${(e: CustomEvent) => { rows = e.detail; }}
     @cell-edit-commit=\${(e: CustomEvent) => console.log('cell commit', e.detail)}
