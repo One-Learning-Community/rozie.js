@@ -102,8 +102,8 @@
   // defensively anyway.
   //
   // Phase 51 (req-4): `data` is now the 10TH two-way slice — a committed cell edit
-  // writes a FRESH array back through the `writeData` funnel (consumer binds ONE
-  // `r-model:data`; component owns state, Dan's principle). required + model is
+  // writes a FRESH array back through the `writeData` funnel (the consumer owns a
+  // single two-way `data` binding; component owns state, Dan's principle). required + model is
   // coherent (no default). The uncontrolled fallback is $data.dataDefault (so editing
   // still works when the consumer passes a one-way `:data`). A1/A2: the 10th two-way
   // slice keeps Angular CVA disabled (already disabled at 9 — ROZ125 warns, never an
@@ -114,7 +114,7 @@
     model: true,
     docs: {
       description:
-        'The row data — `model: true`, so a committed cell/row edit writes a **fresh** array back through `r-model:data` (uncontrolled fallback `dataDefault`). A stable reference per Rozie\'s setup-once model — fed directly into table-core (never map/cloned in the watcher).',
+        'The row data — `model: true`, so a committed cell/row edit writes a **fresh** array back through the two-way `data` binding (uncontrolled fallback `dataDefault`). A stable reference per Rozie\'s setup-once model — fed directly into table-core (never map/cloned in the watcher).',
       example: '<DataTable r-model:data="rows" :columns="cols" />',
     },
   },
@@ -125,14 +125,14 @@
   // A `pinned` value of 'left' or 'right' is applied once as the table's initial
   // columnPinning state — identical to <Column pinned> — which also REORDERS that
   // column, since table-core orders visible cells [left-pinned, center, right-pinned].
-  // A consumer who has already expressed a pin (an initial r-model:columnPinning value
-  // or an interactive pin) owns the slice and this declaration is ignored.
+  // A consumer who has already expressed a pin (an initial two-way `columnPinning`
+  // model value or an interactive pin) owns the slice and this declaration is ignored.
   columns: {
     type: Array,
     default: () => [],
     docs: {
       description:
-        'Config-array column fallback (lower precedence than `<Column>` children). Each entry: `{ id?, field, header?, sortable?, filterable?, pinned?, width? }`. Columns may come from this array, from `<Column>` children, or both (id-keyed last-write-wins union). A `pinned` value of `\'left\'` or `\'right\'` is applied once as the table\'s initial `columnPinning` state — identical to `<Column pinned>` — which also REORDERS that column, since table-core orders visible cells `[left-pinned, center, right-pinned]`. A consumer who has already expressed a pin (an initial `r-model:columnPinning` value or an interactive pin) owns the slice and this declaration is ignored.',
+        'Config-array column fallback (lower precedence than `<Column>` children). Each entry: `{ id?, field, header?, sortable?, filterable?, pinned?, width? }`. Columns may come from this array, from `<Column>` children, or both (id-keyed last-write-wins union). A `pinned` value of `\'left\'` or `\'right\'` is applied once as the table\'s initial `columnPinning` state — identical to `<Column pinned>` — which also REORDERS that column, since table-core orders visible cells `[left-pinned, center, right-pinned]`. A consumer who has already expressed a pin (an initial two-way `columnPinning` model value or an interactive pin) owns the slice and this declaration is ignored.',
     },
   },
 
@@ -324,7 +324,7 @@
   // groupingActiveDefault() needs an UNBOUND grouping to read as null so the uncontrolled
   // fallback ($data.groupingDefault, default []) is reachable and the grouping auto-expand
   // default (req-4) can activate when a consumer applies grouping WITHOUT binding
-  // r-model:grouping. A non-null `[]` default would make $props.grouping always non-null →
+  // the two-way `grouping` model. A non-null `[]` default would make $props.grouping always non-null →
   // the first ternary branch always wins → the uncontrolled fallback is dead code. Bound
   // consumers are unaffected (the bound value is a non-null array); all reads go through the
   // null-guarded currentState().grouping / groupingActiveDefault() (`|| []`), so table-core
@@ -336,7 +336,7 @@
     model: true,
     docs: {
       description:
-        '`GroupingState` — an ordered `string[]` of column ids (multi-column → nested groups, e.g. `[\'region\',\'category\']`). An empty/unbound list is ungrouped (byte-identical-off). Group-header rows are collapsible (they ride the expand model). Surfaces through `group-change`; uncontrolled fallback (`$data.groupingDefault`, default `[]`) when unbound — the default is `null` (mirroring `expanded`) so the uncontrolled fallback is reachable and the grouping auto-expand default can activate when a consumer applies grouping without binding `r-model:grouping` (a non-null `[]` default would short-circuit it). All reads are null-guarded, so table-core still receives an array.',
+        '`GroupingState` — an ordered `string[]` of column ids (multi-column → nested groups, e.g. `[\'region\',\'category\']`). An empty/unbound list is ungrouped (byte-identical-off). Group-header rows are collapsible (they ride the expand model). Surfaces through `group-change`; uncontrolled fallback (`$data.groupingDefault`, default `[]`) when unbound — the default is `null` (mirroring `expanded`) so the uncontrolled fallback is reachable and the grouping auto-expand default can activate when a consumer applies grouping without binding the two-way `grouping` model (a non-null `[]` default would short-circuit it). All reads are null-guarded, so table-core still receives an array.',
     },
   },
 
@@ -540,13 +540,13 @@
 <data>
 {
   // Uncontrolled fallback for the `data` slice (Phase 51 req-4) — used when the
-  // consumer passes a one-way `:data` rather than `r-model:data`. A committed edit
+  // consumer passes `data` one-way rather than binding the two-way form. A committed edit
   // whole-array-replaces this (never in-place mutation → silent on
   // React/Solid/Angular/Lit). Seeded from $props.data in $onMount.
   dataDefault: [],
 
   // Uncontrolled fallback for the sorting slice (used when the consumer did NOT bind
-  // r-model:sorting). Whole-array-replace on write (never in-place push → silent on
+  // the two-way `sorting` model). Whole-array-replace on write (never in-place push → silent on
   // React/Solid/Angular/Lit).
   sortingDefault: [],
 
@@ -559,13 +559,13 @@
   rowSelectionDefault: {},
 
   // Uncontrolled fallback for the expanded slice (phase 50 req-1/3) — used when the
-  // consumer did NOT bind r-model:expanded. ExpandedState ({ [rowId]: true } | true).
+  // consumer did NOT bind the two-way `expanded` model. ExpandedState ({ [rowId]: true } | true).
   // Whole-value-replace on write (never in-place mutation → silent on
   // React/Solid/Angular/Lit).
   expandedDefault: {},
 
   // Uncontrolled fallback for the grouping slice (phase 50 reqs 4-7) — used when the
-  // consumer did NOT bind r-model:grouping. GroupingState (ordered string[] of column ids).
+  // consumer did NOT bind the two-way `grouping` model. GroupingState (ordered string[] of column ids).
   // Whole-array-replace on write (never in-place push → silent on React/Solid/Angular/Lit).
   // [] = ungrouped (byte-identical-off, req-10).
   groupingDefault: [],
@@ -1500,8 +1500,8 @@ $onUpdate(() => {
   maybeClearHistoryOnExternalSwap()
   if (!table) return
   // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
-  // $data.dataDefault) so a committed edit re-feeds on Lit whether or not r-model:data is
-  // bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
+  // $data.dataDefault) so a committed edit re-feeds on Lit whether or not the two-way
+  // `data` model is bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
   // identical length) still re-feeds.
   const d = currentData() || []
   if (d === lastData && d.length === lastDataLen) return
