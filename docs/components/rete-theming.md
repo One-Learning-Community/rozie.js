@@ -7,7 +7,7 @@ outline: [2, 3]
 
 # FlowCanvas theming
 
-Every cosmetic value `FlowCanvas` renders is a `--rozie-flow-*` custom property with a built-in fallback, so the component works with **zero configuration** and stays fully re-skinnable. The structural rules compile per-leaf and are **not** consumer-overridable — only the values below flow through tokens.
+The values listed below are exposed as `--rozie-flow-*` custom properties, each with a built-in fallback, so `FlowCanvas` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
 .rozie-flow-canvas {

@@ -7,7 +7,7 @@ outline: [2, 3]
 
 # NumberField theming
 
-Every cosmetic value `NumberField` renders is a `--rozie-number-field-*` custom property with a built-in fallback, so the component works with **zero configuration** and stays fully re-skinnable. The structural rules compile per-leaf and are **not** consumer-overridable — only the values below flow through tokens.
+The values listed below are exposed as `--rozie-number-field-*` custom properties, each with a built-in fallback, so `NumberField` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
 .rozie-number-field {

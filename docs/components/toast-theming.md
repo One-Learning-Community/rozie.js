@@ -7,7 +7,7 @@ outline: [2, 3]
 
 # Toaster theming
 
-Every cosmetic value `Toaster` renders is a `--rozie-toast-*` custom property with a built-in fallback, so the component works with **zero configuration** and stays fully re-skinnable. The structural rules compile per-leaf and are **not** consumer-overridable — only the values below flow through tokens.
+The values listed below are exposed as `--rozie-toast-*` custom properties, each with a built-in fallback, so `Toaster` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
 .rozie-toaster {

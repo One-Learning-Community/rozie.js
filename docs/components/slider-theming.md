@@ -7,7 +7,7 @@ outline: [2, 3]
 
 # Slider theming
 
-Every cosmetic value `Slider` renders is a `--rozie-slider-*` custom property with a built-in fallback, so the component works with **zero configuration** and stays fully re-skinnable. The structural rules compile per-leaf and are **not** consumer-overridable — only the values below flow through tokens.
+The values listed below are exposed as `--rozie-slider-*` custom properties, each with a built-in fallback, so `Slider` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
 .rozie-slider {

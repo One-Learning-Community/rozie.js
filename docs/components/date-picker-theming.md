@@ -7,7 +7,7 @@ outline: [2, 3]
 
 # DatePicker theming
 
-Every cosmetic value `DatePicker` renders is a `--rozie-datepicker-*` custom property with a built-in fallback, so the component works with **zero configuration** and stays fully re-skinnable. The structural rules compile per-leaf and are **not** consumer-overridable — only the values below flow through tokens.
+The values listed below are exposed as `--rozie-datepicker-*` custom properties, each with a built-in fallback, so `DatePicker` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
 .rozie-datepicker {

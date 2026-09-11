@@ -7,7 +7,7 @@ outline: [2, 3]
 
 # DataTable theming
 
-Every cosmetic value `DataTable` renders is a `--rozie-data-table-*` custom property with a built-in fallback, so the component works with **zero configuration** and stays fully re-skinnable. The structural rules compile per-leaf and are **not** consumer-overridable — only the values below flow through tokens.
+The values listed below are exposed as `--rozie-data-table-*` custom properties, each with a built-in fallback, so `DataTable` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
 .rozie-data-table-wrap,
@@ -23,7 +23,7 @@ Every cosmetic value `DataTable` renders is a `--rozie-data-table-*` custom prop
 
 ### palette (the few values most consumers will set)
 
-NOTE (see file-head comment): most of the tokens below are declared but never read via a CSS var() inside THIS component's own scoped &lt;style> — that is by design. This is the public surface; the "Wire the PUBLIC tokens..." block further down assigns each one onto the short internal --rdt-* custom property the component actually reads. A future audit must not delete these as dead — they are the intended public API.
+These public tokens aren't read directly by a CSS var() inside this component's own scoped &lt;style> — that is by design. This is the public surface; the "Wire the PUBLIC tokens..." block further down assigns each one onto the short internal --rdt-* custom property the component actually reads.
 
 | Token | Default |
 | --- | --- |
@@ -55,27 +55,27 @@ OPAQUE (was rgba(0,0,0,0.03)): a translucent header lets the scrolling body blee
 | --- | --- |
 | `--rozie-data-table-sort-indicator-opacity` | `0.7` |
 
-### resize handle (req-9)
+### resize handle
 
 | Token | Default |
 | --- | --- |
 | `--rozie-data-table-resize-grip-color` | `rgba(0, 0, 0, 0.12)` |
 | `--rozie-data-table-resize-grip-active` | `var(--rozie-data-table-accent)` |
 
-### pin controls (req-11)
+### pin controls
 
 | Token | Default |
 | --- | --- |
 | `--rozie-data-table-pin-active-bg` | `rgba(0, 0, 0, 0.1)` |
 
-### column-visibility menu (req-8)
+### column-visibility menu
 
 | Token | Default |
 | --- | --- |
 | `--rozie-data-table-menu-bg` | `#fff` |
 | `--rozie-data-table-menu-shadow` | `0 2px 8px rgba(0, 0, 0, 0.12)` |
 
-### selection checkboxes (req-7)
+### selection checkboxes
 
 | Token | Default |
 | --- | --- |
@@ -87,7 +87,7 @@ OPAQUE (was rgba(0,0,0,0.03)): a translucent header lets the scrolling body blee
 | --- | --- |
 | `--rozie-data-table-disabled-opacity` | `0.4` |
 
-### virtual scroll (row windowing, req-3/D-06)
+### virtual scroll (row windowing)
 
 Read with NO fallback at its one use site (`max-height: var(--rozie-data-table-max-height);` on `.rdt-scroll`) — when unset the property is invalid at computed-value time and the rule behaves as if `max-height` were never declared there, i.e. `none` (unbounded). Declaring `none` here is the render-neutral equivalent of that unset behavior, made explicit and overridable.
 

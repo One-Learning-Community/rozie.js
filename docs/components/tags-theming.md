@@ -7,7 +7,7 @@ outline: [2, 3]
 
 # Tags theming
 
-Every cosmetic value `Tags` renders is a `--rozie-tags-*` custom property with a built-in fallback, so the component works with **zero configuration** and stays fully re-skinnable. The structural rules compile per-leaf and are **not** consumer-overridable — only the values below flow through tokens.
+The values listed below are exposed as `--rozie-tags-*` custom properties, each with a built-in fallback, so `Tags` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
 .rozie-tags {

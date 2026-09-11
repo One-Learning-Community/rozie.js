@@ -7,7 +7,7 @@ outline: [2, 3]
 
 # CommandPalette theming
 
-Every cosmetic value `CommandPalette` renders is a `--rozie-command-palette-*` custom property with a built-in fallback, so the component works with **zero configuration** and stays fully re-skinnable. The structural rules compile per-leaf and are **not** consumer-overridable — only the values below flow through tokens.
+The values listed below are exposed as `--rozie-command-palette-*` custom properties, each with a built-in fallback, so `CommandPalette` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
 .rozie-command-palette {
