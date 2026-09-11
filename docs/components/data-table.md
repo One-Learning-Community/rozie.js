@@ -10,7 +10,7 @@
 - **Row selection** — single or multiple, with select-all
 - **Column management** — visibility, resize, reorder, pinning
 - **Sticky header**
-- **Row virtualization** — windowed rendering, tested to 100,000 rows
+- **Row and column virtualization** — windowed rendering on either or both axes (`virtual="rows"` / `"columns"` / `"both"`), with content-driven `autoMeasure` row heights, tested to 100,000 rows.
 - **Expandable rows & master-detail**
 - **Grouping & aggregation** — multi-column, collapsible group rows
 - **Inline editing** — single cell or full row, with validation
@@ -55,7 +55,7 @@ This page is the front door. Each concept below has its own page — start at **
 - [**Row selection**](/components/data-table-selection) — none / single / multiple selection, the auto-injected checkbox column, and select-all scoping to the filtered rows.
 - [**Expandable rows & master-detail**](/components/data-table-expandable) — the `#detail` panel, nested sub-rows via `getSubRows`, multi-expand, and the imperative expand verbs.
 - [**Grouping & aggregation**](/components/data-table-grouping) — multi-column grouping, the `aggregationFn` per column, collapsible group headers, and the headless `#groupBar`.
-- [**Virtualization**](/components/data-table-virtualization) — opt-in vertical row windowing (tested to 100,000 rows) with `virtual` / `estimateRowHeight` / `maxHeight`.
+- [**Virtualization**](/components/data-table-virtualization) — opt-in row and column windowing (tested to 100,000 rows) with `virtual` / `estimateRowHeight` / `maxHeight` / `autoMeasure`.
 - [**Editing**](/components/data-table-editing) — editable cells and full-row edit, the five built-in editor types, validation, and the `#editor` slot + drop-in editor components.
 - [**Grid mode & keyboard**](/components/data-table-grid-mode) — the opt-in WAI-ARIA grid pattern (`role="grid"`, roving tab-stop, 2-D arrow-key navigation, cell range selection) and the accessibility contract.
 - [**API reference**](/components/data-table-api) — the dense Props / Models / Events / Imperative handle / Slots tables.

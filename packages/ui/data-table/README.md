@@ -45,7 +45,7 @@ const [sorting, setSorting] = useState([]);
 - **Expandable + nested rows** — a `#detail` panel under any open row, or depth-indented sub-rows via `getSubRows`. Multi-expand.
 - **Grouping + aggregation** — an ordered, multi-column `grouping` model (nested groups) with per-column `aggregationFn` (built-in name or custom fn) and a **headless** `#groupBar`.
 - **Faceted filtering** — cross-filtered distinct values + numeric min/max exposed to a **headless** `#filter` slot (build any checkbox list / range slider).
-- **Virtualization** — opt-in vertical row windowing over the full filtered + sorted model, driven by `@tanstack/virtual-core`.
+- **Virtualization** — opt-in row and column windowing over the full filtered + sorted model, driven by `@tanstack/virtual-core`.
 - **Editing** — inline cell editing with validation, full-row editing, and five built-in editors (text / number / select / checkbox / date) plus a `custom` editor slot.
 - **Grid interaction mode** (`interactionMode="grid"`) — a WAI-ARIA `role="grid"` with a roving single tab-stop, 2-D APG arrow-key cell navigation, rectangular range selection, TSV clipboard copy / paste / cut, drag-fill, Delete/Backspace clear, and `Ctrl+A` / `Ctrl+Arrow`.
 - **Undo / redo** — opt-in grid-wide history (`undoable`): every committed mutation (edit, paste, fill, cut, clear) is one `Ctrl/Cmd+Z` step, with `history-change` events to drive a toolbar.

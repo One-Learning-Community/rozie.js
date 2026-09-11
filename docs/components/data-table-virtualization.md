@@ -63,8 +63,11 @@ Set `autoMeasure` alongside row windowing (`virtual='rows'`/`true`/`'both'`) to 
 
 ## Known limitations
 
-- **Svelte: the horizontal spacer's declared width does not yet drive the scroll container's actual scrollable width at rest.** On the Svelte leaf specifically, `.rdt-scroll`'s real `scrollWidth` can under-report the true column-count-derived total, which narrows how far a horizontal scroll (or a `dir="rtl"` scroll to its negative extreme) can reach before the last columns are on screen. The column-index math itself is unaffected — `focusCell` / `getActiveCell` / `activecell-change` still resolve correctly — only the DOM's own scrollable extent is short on this one target. Tracked; the other five targets are unaffected.
-- **Grouped column headers: rendered width can diverge from a group's spanned leaf-column widths under `table-layout: fixed`.** When column windowing is on and a multi-level group header's leaf columns are within the current render window, the browser's fixed-layout column-width distribution can conflict with the group `<th>`'s own declared width on Solid, Svelte, and React — the group's spanned columns may render narrower than their configured size. The column SET and colspan clamping (D-11) are correct; this is a visual width-reconciliation gap specific to combining grouped headers with column windowing on those three targets. Vue, Angular, and Lit are unaffected. Tracked.
+None currently open for column windowing. Two limitations documented here previously — the Svelte
+horizontal-spacer `scrollWidth` under-report, and grouped-header width divergence under
+`table-layout: fixed` on Solid/Svelte/React — were both root-caused and closed, and every case in
+`tests/visual-regression/specs/data-table-grid-column-virtual.spec.ts` is now enforced on all six
+targets with no exclusions.
 
 ## Per-framework code
 
