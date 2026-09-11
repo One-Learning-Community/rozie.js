@@ -246,14 +246,15 @@
   // column injects and getExpandedRowModel is inert (empty `expanded` + no getSubRows →
   // getRowModel().rows unchanged). When true, a LEADING chevron expander column auto-
   // injects (after the select column) and every row can expand (the #detail seam) unless
-  // getSubRows is supplied (then only rows with children expand). Bare `<DataTable
-  // expandable>` only coerces "" → true on Vue+Lit, so consumers bind `:expandable="true"`.
+  // getSubRows is supplied (then only rows with children expand). Pass `expandable` as a
+  // real boolean — a bare `<DataTable expandable>` attribute only coerces "" → true on
+  // Vue+Lit, so consumers bind `:expandable="true"`.
   expandable: {
     type: Boolean,
     default: false,
     docs: {
       description:
-        'Opt-in **expandable rows**. When `true`, a leading chevron expander column auto-injects (after the select column) and `getExpandedRowModel` activates; default `false` is byte-identical-off. Every row can expand to reveal a `#detail` panel unless `getSubRows` is supplied (then only rows with children expand). Opt in via the unbound `expandable` attribute (bare-attribute coercion only applies on Vue+Lit).',
+        'Opt-in **expandable rows**. When `true`, a leading chevron expander column auto-injects (after the select column) and `getExpandedRowModel` activates; default `false` is byte-identical-off. Every row can expand to reveal a `#detail` panel unless `getSubRows` is supplied (then only rows with children expand). Pass `expandable` as a real boolean — a valueless attribute only coerces to `true` on Vue and Lit.',
     },
   },
 

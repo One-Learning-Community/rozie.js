@@ -1828,7 +1828,10 @@ export function Demo() {
     <DataTable
       data={rows}
       columnFilters={columnFilters()}
-      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      onFilterChange={(...args: unknown[]) => {
+        const p = args[0] as { columnFilters?: { id: string; value: unknown }[] };
+        if (p.columnFilters) setColumnFilters(p.columnFilters);
+      }}
       // The #filter scoped slot is a render prop on Solid (the documented edge).
       filterSlot={({ columnId, uniqueValues, minMax }) =>
         columnId === 'category' ? (
@@ -1909,7 +1912,10 @@ export function Demo() {
     <DataTable
       data={rows}
       columnFilters={columnFilters()}
-      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      onFilterChange={(...args: unknown[]) => {
+        const p = args[0] as { columnFilters?: { id: string; value: unknown }[] };
+        if (p.columnFilters) setColumnFilters(p.columnFilters);
+      }}
       // The #filter scoped slot is a render prop on Solid (the documented edge).
       filterSlot={(scope) => (
         <Switch>
@@ -2462,11 +2468,13 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push(
     `Idiomatic **${target}** \`DataTable\` — a headless, fully-accessible (WAI-ARIA) ` +
       `data table (sorting, global + per-column filtering, pagination, row selection, ` +
-      `column visibility / resize / reorder / pinning, sticky header) compiled from one ` +
+      `column visibility / resize / pinning (plus a programmatic \`columnOrder\` slice, ` +
+      `no drag affordance), sticky header) compiled from one ` +
       `[Rozie](https://github.com/One-Learning-Community/rozie.js) source. ` +
       `The state engine is \`@tanstack/table-core\` — the SAME framework-agnostic core ` +
       `behind TanStack Table, wired to this framework's reactivity with NO per-framework ` +
-      `adapter. Every visual value is a CSS custom property, so it re-skins to any design ` +
+      `adapter. The table's primary surfaces are themed through 19 ` +
+      `\`--rozie-data-table-*\` custom properties, so it re-skins to any design ` +
       `system. This package is generated; do not edit \`src/\` by hand.`,
   );
   lines.push('');
@@ -2512,9 +2520,17 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('## Theming');
   lines.push('');
   lines.push(
-    'Every visual value is a `--rozie-data-table-*` CSS custom property — override any of ' +
-      'them at any ancestor scope. Ready-made design-system bridges ship in the package ' +
-      '(import `base.css` first, then a bridge):',
+    'The table\'s primary surfaces are themed through 19 `--rozie-data-table-*` CSS custom ' +
+      'properties — override any of them at any ancestor scope' +
+      (target === 'lit'
+        ? ' (currently ineffective on the Lit leaf, whose shadow root the class-scoped ' +
+          'mapping cannot cross — only `--rozie-data-table-max-height` inherits through it)'
+        : '') +
+      '. Some internal details (the grid active-cell ring, range highlight, fill handle, ' +
+      'the per-header column ⋯ menu, and most of the pagination bar beyond its control ' +
+      'border/radius/disabled-opacity) are not yet part of the public token surface. ' +
+      'Ready-made design-system bridges ship in the package (import `base.css` first, ' +
+      'then a bridge):',
   );
   lines.push('');
   lines.push('```' + (target === 'lit' ? 'ts' : primaryLang === 'vue' ? 'ts' : primaryLang));
