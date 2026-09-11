@@ -1,6 +1,6 @@
 # `@rozie-ui/data-table`
 
-A headless, fully-accessible (WAI-ARIA) **data table** for React, Vue, Svelte, Solid, Lit, and Angular — sorting, filtering, pagination, row selection, column visibility / resize / reorder / pinning, sticky header, expandable + nested rows, grouping + aggregation, faceted filtering, row virtualization, inline editing, a spreadsheet-grade grid mode, and grid-wide undo/redo. Every visual value is a CSS custom property, so it re-skins to any design system.
+A headless, fully-accessible (WAI-ARIA) **data table** for React, Vue, Svelte, Solid, Lit, and Angular — sorting, filtering, pagination, row selection, column visibility / resize / pinning (plus a programmatic `columnOrder` slice), sticky header, expandable + nested rows, grouping + aggregation, faceted filtering, row virtualization, inline editing, a spreadsheet-grade grid mode, and grid-wide undo/redo. The table's primary surfaces are themed through 19 `--rozie-data-table-*` custom properties, so it re-skins to any design system.
 
 The state engine is [`@tanstack/table-core`](https://tanstack.com/table) — the same framework-agnostic core behind TanStack Table — wired to each framework's native reactivity with **no per-framework adapter**. Windowing rides [`@tanstack/virtual-core`](https://tanstack.com/virtual).
 
