@@ -1,23 +1,26 @@
 /*
  * @rozie-ui/data-table — base token reference.
  *
- * This file is the PUBLIC token reference. It declares 19 `--rozie-data-table-*`
+ * This file is the PUBLIC token reference. It declares 18 `--rozie-data-table-*`
  * tokens and wires each onto the short internal `--rdt-*` token the component's
- * scoped `<style>` actually reads. The component reads 83 internal `--rdt-*`
+ * scoped `<style>` actually reads. The component reads 82 internal `--rdt-*`
  * tokens in total, each with an inline `var(--rdt-x, <fallback>)` default, so the
  * table renders ZERO-CONFIG without importing this file.
  *
  * Scope, stated plainly: remapping the public tokens re-skins the table's primary
  * surfaces — type, borders, background, header, row, cell padding, accent, and the
- * max-height. It does NOT reach every cosmetic value. 59 of the 83 internal tokens
+ * max-height. It does NOT reach every cosmetic value. 58 of the 82 internal tokens
  * have no public counterpart today, including the grid active-cell ring, the range
  * highlight, the fill handle, the invalid-cell outline, the group tokens, the filter
- * row, the per-header column ⋯ menu, most of the pagination bar (only its control
- * border, radius, and disabled-opacity are public, via --rozie-data-table-control-*
- * and --rozie-data-table-disabled-opacity — its background, padding, and status-text
- * size are not), and the chrome column widths. Those remain internal and may be
- * renamed; a design system that needs them should set the `--rdt-*` name directly
- * and accept that it is not yet a stable API.
+ * row, the per-header column ⋯ menu, most of the pagination bar (only
+ * --rozie-data-table-control-border-color, --rozie-data-table-radius, and
+ * --rozie-data-table-disabled-opacity are public — its background, padding, and
+ * status-text size are not), and the chrome column widths. Those remain internal
+ * and may be renamed; a design system that needs them should set the `--rdt-*`
+ * name directly and accept that it is not yet a stable API. 17 of the 18 public
+ * tokens are currently ineffective on the Lit leaf, whose shadow root the
+ * class-scoped mapping cannot cross — only `--rozie-data-table-max-height`
+ * inherits through it.
  *
  * NOTE the split: the STRUCTURAL rules — `border-collapse`, the keyed-r-for
  * layout, `position: sticky` for the header + pinned columns, the
