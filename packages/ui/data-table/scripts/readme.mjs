@@ -218,7 +218,7 @@ export function Demo() {
 export function Demo() {
   const rows = ${ROWS};
   // One cell renderer on <DataTable>, dispatched by columnId — it works the same
-  // whether columns are declared as <Column> children or via :columns.
+  // whether columns are declared as <Column> children or via the columns config array.
   return (
     <DataTable
       data={rows}
@@ -612,7 +612,7 @@ const rows = ${MANY_ROWS};
 </script>
 
 <template>
-  <!-- PROP form — bound :maxHeight sizes the scroll container. -->
+  <!-- PROP form — the unbound maxHeight attribute sizes the scroll container (it's a String prop, not a two-way model). -->
   <DataTable :data="rows" :virtual="true" maxHeight="400px">
     <Column field="name" header="Name" />
     <Column field="email" header="Email" />
@@ -818,7 +818,7 @@ const columnFilters = ref<{ id: string; value: unknown }[]>([]);
 </script>
 
 <template>
-  <DataTable v-model:data="rows" v-model:column-filters="columnFilters">
+  <DataTable v-model:data="rows" v-model:columnFilters="columnFilters">
     <Column field="name" header="Name" :filterable="true" />
     <Column field="category" header="Category" :filterable="true" />
     <Column field="price" header="Price" :filterable="true" />
@@ -1284,7 +1284,7 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
   standalone: true,
   imports: [DataTable, Column],
   template: \`
-    <!-- PROP form — bound [maxHeight] sizes the scroll container. -->
+    <!-- PROP form — the unbound maxHeight attribute sizes the scroll container (it's a String prop, not a two-way model). -->
     <DataTable [data]="rows" [virtual]="true" maxHeight="400px">
       <Column field="name" header="Name" />
       <Column field="email" header="Email" />
@@ -2003,15 +2003,18 @@ export function Demo() {
       title: SET_A_TITLE,
       lang: 'ts',
       code: `import '@rozie-ui/data-table-lit';
+import type { DataTable } from '@rozie-ui/data-table-lit';
 
 // <rozie-data-table> is a custom element. Set \`data\`/\`columns\` as properties
 // and listen for the change events (\`sort-change\`, \`filter-change\`, …).
-const el = document.querySelector('rozie-data-table');
-el.data = ${ROWS};
-el.columns = ${COLS};
-el.addEventListener('sort-change', (e) => {
-  console.log('sorting', e.detail);
-});`,
+const el = document.querySelector<DataTable>('rozie-data-table');
+if (el) {
+  el.data = ${ROWS};
+  el.columns = ${COLS};
+  el.addEventListener('sort-change', (e) => {
+    console.log('sorting', e.detail);
+  });
+}`,
     },
     // Lit derives an observed attribute as propertyName.toLowerCase() with NO dash insertion unless the
     // @property declaration passes an explicit `attribute:`. None of these five do, so `interaction-mode`
@@ -2424,14 +2427,18 @@ const cats = handle?.getFacetedUniqueValues('category'); // getFacetedMinMaxValu
     lang: 'ts',
     code: `// The custom element IS the handle — exposed methods are public element
 // methods.
-const el = document.querySelector('rozie-data-table');
-el.toggleAllRows(true);
-const selected = el.getSelectedRows();
-el.editRow(0);                       // full-row edit on row 0
-const range = el.getSelectedRange();  // the active cell-range rectangle
-el.expandAll();                      // collapseAll / toggleRowExpanded / getExpandedRows
-el.applyGrouping(['region']);        // clearGrouping to reset
-const cats = el.getFacetedUniqueValues('category'); // getFacetedMinMaxValues too`,
+import type { DataTable } from '@rozie-ui/data-table-lit';
+
+const el = document.querySelector<DataTable>('rozie-data-table');
+if (el) {
+  el.toggleAllRows(true);
+  const selected = el.getSelectedRows();
+  el.editRow(0);                       // full-row edit on row 0
+  const range = el.getSelectedRange();  // the active cell-range rectangle
+  el.expandAll();                      // collapseAll / toggleRowExpanded / getExpandedRows
+  el.applyGrouping(['region']);        // clearGrouping to reset
+  const cats = el.getFacetedUniqueValues('category'); // getFacetedMinMaxValues too
+}`,
   },
 };
 
@@ -2486,7 +2493,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('## Usage');
   lines.push('');
   lines.push(
-    'Columns may be declared as a `:columns` config array **or** as `<Column>` children ' +
+    'Columns may be declared as a `columns` config array **or** as `<Column>` children ' +
       '(or both — an id-keyed last-write-wins union). Per-cell rendering is one parent ' +
       '`#cell` / `#colHeader` renderer on `<DataTable>`, dispatched by `columnId`, so it ' +
       'works the same with either column form.',
@@ -2511,8 +2518,18 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   );
   lines.push('');
   lines.push('```' + (target === 'lit' ? 'ts' : primaryLang === 'vue' ? 'ts' : primaryLang));
-  lines.push(`import '${pkgName}/themes/base.css';`);
-  lines.push(`import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css`);
+  if (target === 'svelte') {
+    // A bare `import` is not valid top-level Svelte file content — it has to
+    // live inside a <script> block, the way the Vue/Angular equivalents above
+    // are already valid as plain `ts`.
+    lines.push('<script>');
+    lines.push(`  import '${pkgName}/themes/base.css';`);
+    lines.push(`  import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css`);
+    lines.push('</script>');
+  } else {
+    lines.push(`import '${pkgName}/themes/base.css';`);
+    lines.push(`import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css`);
+  }
   lines.push('```');
   lines.push('');
 

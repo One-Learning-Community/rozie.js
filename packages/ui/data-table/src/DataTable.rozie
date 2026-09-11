@@ -136,9 +136,10 @@
     },
   },
 
-  // Row-selection mode chrome seam: 'none' | 'single' | 'multiple'. Reserved here;
-  // the rowSelection state slice is wired in a later wave. Named distinctly from any
-  // future `rowSelection` model prop (no ROZ127 / no slot-name clash).
+  // Row-selection mode chrome seam: 'none' | 'single' | 'multiple'. Drives the
+  // rowSelection state slice below ('multiple' also auto-injects the checkbox
+  // column). Named distinctly from the `rowSelection` model prop itself (no
+  // ROZ127 / no slot-name clash).
   selectionMode: {
     type: String,
     default: 'none',

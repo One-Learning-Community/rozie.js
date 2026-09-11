@@ -9,7 +9,7 @@ A `<Column>` declares one column of the table. It is **renderless** — it draws
 | Attribute | Type | Default | Description |
 | --- | --- | --- | --- |
 | `field` | `String` | `''` | The row field this column reads (table-core `accessorKey`). |
-| `header` | `String` | `''` | The header label (rendered when no `#header` template is supplied). |
+| `header` | `String` | `''` | The header label (rendered when no `#colHeader` template is supplied). |
 | `id` | `String` | `''` | The column id. Defaults to `field` when omitted. |
 | `sortable` | `Boolean` | `false` | Whether this column participates in click-to-sort. |
 | `filterable` | `Boolean` | `false` | Whether this column shows a per-column filter input. |
