@@ -41,7 +41,7 @@ export const eventManifest = {
   'range-change':
     'Fired whenever the rectangular cell-range selection changes — extended by `Shift+Arrow` / `Shift+Click` from the single `extendRange`/`setRangeFocus` call sites (React multi-emit dedup). One-way notification (the range is NOT a `model:true` slice — the model:true count stays at 12, leaving the Angular multi-model-CVA condition untouched); it is a SEPARATE layer from the row-selection slice and the two never corrupt each other. Payload is `getSelectedRange()` → `{ anchor, focus }` where each corner is a `{ rowIndex, colIndex }` index pair over the visible model (integers only — no row data, no DOM node), or `{ anchor: null, focus: null }` when no range is set.',
   'history-change':
-    'Fired when undo/redo AVAILABILITY changes — EDGE-triggered (only when `canUndo`/`canRedo` actually flip, not on every recorded edit) so a toolbar can enable/disable its buttons without polling. Only meaningful when `undoable` is `true`. Payload is `{ canUndo, canRedo }` booleans. No `history` model prop exists, so there is no model-prop==emit-name duplicate-identifier collision.',
+    'Fired when undo/redo AVAILABILITY changes (one unified grid-wide undo/redo stack, not scoped per-cell or per-row) — EDGE-triggered (only when `canUndo`/`canRedo` actually flip, not on every recorded edit) so a toolbar can enable/disable its buttons without polling. Only meaningful when `undoable` is `true`. Payload is `{ canUndo, canRedo }` booleans. No `history` model prop exists, so there is no model-prop==emit-name duplicate-identifier collision.',
 };
 
 export default eventManifest;
