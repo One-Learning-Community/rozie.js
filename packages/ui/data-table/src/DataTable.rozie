@@ -430,14 +430,14 @@
   },
 
   // Interaction mode (D-02): 'table' (default, row-oriented) | 'grid' (full WAI-ARIA
-  // grid cell navigation). Both values are GA — grid cell-nav has been fully
-  // implemented and battery-tested since Phase 63.
+  // grid cell navigation). Both values are GA — grid cell-nav is fully
+  // implemented and battery-tested.
   interactionMode: {
     type: String,
     default: 'table',
     docs: {
       description:
-        "`'table'` (default, row-oriented, byte-behaviorally identical to a plain accessible table) | `'grid'` (GA since Phase 63) — lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)**: `role=\"grid\"`, a roving single tab-stop, 2-D APG arrow-key cell navigation, range selection, and clipboard support.",
+        "`'table'` (default, row-oriented, byte-behaviorally identical to a plain accessible table) | `'grid'` — lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)**: `role=\"grid\"`, a roving single tab-stop, 2-D APG arrow-key cell navigation, range selection, and clipboard support.",
     },
   },
 

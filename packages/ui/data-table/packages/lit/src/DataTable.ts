@@ -577,7 +577,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true }) stickyHeader: boolean = false;
   /**
-   * `'table'` (default, row-oriented, byte-behaviorally identical to a plain accessible table) | `'grid'` (GA since Phase 63) — lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)**: `role="grid"`, a roving single tab-stop, 2-D APG arrow-key cell navigation, range selection, and clipboard support.
+   * `'table'` (default, row-oriented, byte-behaviorally identical to a plain accessible table) | `'grid'` — lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)**: `role="grid"`, a roving single tab-stop, 2-D APG arrow-key cell navigation, range selection, and clipboard support.
    */
   @property({ type: String, reflect: true }) interactionMode: string = 'table';
   /**
