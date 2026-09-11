@@ -22,6 +22,17 @@ A `<Column>` declares one column of the table. It is **renderless** — it draws
 | `editorOptions` | `Array` | `[]` | For `editor="select"`: the `[{ value, label }]` dropdown options. Ignored for the other editor types. |
 | `validate` | `Function` | `null` | A synchronous per-column validator `(value, row) => true \| string`: return `true`/falsy to accept, a string to reject with that message (the editor stays open and the error is announced via aria-live). Defensively wrapped — a thrown error coerces to a generic message. |
 
+::: warning Changed in 0.5.0
+`pinned` is now a real initial pin seed. In 0.4.0 and earlier the field was carried onto the column
+definition and read by nothing, so declaring `pinned="left"` had no effect and this page documented it
+as inert. It now applies once as the table's starting `columnPinning` state — which also **reorders**
+the column, because table-core orders visible cells `[left-pinned, center, right-pinned]`.
+
+If you already declare `pinned` on a column and do not want it pinned, remove the declaration. If you
+bind `r-model:columnPinning` with a non-empty value, or a user has pinned interactively, you own the
+slice and the declaration is ignored — that case is unchanged.
+:::
+
 Because a bare boolean attribute on a child component (`<Column sortable />`) only coerces to `true` on Vue + Lit, **bind it** in the other targets — `:sortable="true"` (React/Solid/Angular/Svelte) — or rely on each consumer framework's own boolean-attribute convention.
 
 ## Two coexisting column-declaration forms

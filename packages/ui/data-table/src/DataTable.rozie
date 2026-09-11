@@ -122,12 +122,17 @@
   // Config-array column fallback (lower precedence than <Column> children). Each:
   // { id?, field, header?, sortable?, filterable?, pinned?, width? }. Columns may be
   // declared via THIS array OR via <Column> children OR both (id-keyed LWW union).
+  // A `pinned` value of 'left' or 'right' is applied once as the table's initial
+  // columnPinning state — identical to <Column pinned> — which also REORDERS that
+  // column, since table-core orders visible cells [left-pinned, center, right-pinned].
+  // A consumer who has already expressed a pin (an initial r-model:columnPinning value
+  // or an interactive pin) owns the slice and this declaration is ignored.
   columns: {
     type: Array,
     default: () => [],
     docs: {
       description:
-        'Config-array column fallback (lower precedence than `<Column>` children). Each entry: `{ id?, field, header?, sortable?, filterable?, pinned?, width? }`. Columns may come from this array, from `<Column>` children, or both (id-keyed last-write-wins union).',
+        'Config-array column fallback (lower precedence than `<Column>` children). Each entry: `{ id?, field, header?, sortable?, filterable?, pinned?, width? }`. Columns may come from this array, from `<Column>` children, or both (id-keyed last-write-wins union). A `pinned` value of `\'left\'` or `\'right\'` is applied once as the table\'s initial `columnPinning` state — identical to `<Column pinned>` — which also REORDERS that column, since table-core orders visible cells `[left-pinned, center, right-pinned]`. A consumer who has already expressed a pin (an initial `r-model:columnPinning` value or an interactive pin) owns the slice and this declaration is ignored.',
     },
   },
 
