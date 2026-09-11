@@ -2,6 +2,14 @@
 
 By default every cell is read-only. Mark a `<Column editable>` (and bind `r-model:data` to receive the writes) to make that column's cells editable — **the component owns the edit state**: the consumer binds the single `data` model and listens for the commit events, with no manual re-sync. A committed edit writes a **fresh** `data` array back (never an in-place mutation).
 
+::: warning Editing requires grid mode
+Every pointer and keyboard edit-entry path — double-click, `singleClickEdit`, a printable keypress,
+`F2`, and `Shift+F2` for full-row edit — is gated on `interactionMode="grid"`. In the default
+`interactionMode="table"` a `<Column editable>` column renders read-only and the only way into an
+editor is the imperative `editCell` / `editRow` handle verbs. Set `interactionMode="grid"` on the
+table whenever you want editing.
+:::
+
 ```rozie
 <DataTable :data="$data.rows" r-model:data="$data.rows" interactionMode="grid"
   @cell-edit-commit="onCommit($event)">
@@ -12,13 +20,13 @@ By default every cell is read-only. Mark a `<Column editable>` (and bind `r-mode
 </DataTable>
 ```
 
-A cell enters edit mode on click, on a printable keypress (which seeds the editor with that character), on `F2`/`Enter` (seeds the current value), or via the [`editCell(rowIndex, colIndex)`](/components/data-table-api#imperative-handle) verb. `Enter` commits; `Escape` cancels.
+A cell enters edit mode on **double-click**, on a printable keypress (which seeds the editor with that character), on `F2` / `Enter` (which seeds the current value), or via the `editCell(rowIndex, colIndex)` verb. Set `singleClickEdit` to open the editor on a single click instead of a double-click. `Enter` commits; `Escape` cancels.
 
 **Built-in editor types** (the `editor` Column prop): `'text'` (default `<input type="text">`), `'number'`, `'select'` (populate `editorOptions` with `[{ value, label }]`), `'checkbox'`, and `'custom'` (no built-in editor — the `#editor` slot drives it).
 
 **Validation.** The `validate` Column prop runs synchronously on commit: return `true`/falsy to accept, or a string to reject — the editor stays open and the message is announced via an aria-live region, and `cell-edit-commit` does **not** fire. Validators are defensively wrapped (a thrown error coerces to a generic message).
 
-**Full-row edit.** `Shift+F2` on a row (or the [`editRow(rowIndex)`](/components/data-table-api#imperative-handle) verb) opens every editable cell in the row at once; `Tab`/`Shift+Tab` move between editors. `Enter` commits the whole row in one `r-model:data` write + one `row-edit-commit` (validated together — one failure blocks the commit); `Escape` reverts the row as a unit.
+**Full-row edit.** `Shift+F2` on a row (or the [`editRow(rowIndex)`](/components/data-table-api#imperative-handle) verb) opens every editable cell in the row at once; `Tab`/`Shift+Tab` move between editors. `Enter` commits the whole row in one `r-model:data` write + one `row-edit-commit` (validated together — one failure blocks the commit); `Escape` reverts the row as a unit. Like every other pointer/keyboard edit-entry path, `Shift+F2` is gated on `interactionMode="grid"`; the imperative `editRow` verb is not.
 
 **The `#editor` scoped slot** (scope `{ columnId, column, row, value, commit, cancel }`) replaces the built-in editor for a column — dispatch by `columnId`. `commit(newValue)` validates + commits (firing `cell-edit-commit`); `cancel()` closes without saving. On React/Solid it is the `renderEditor` / `editorSlot` render prop and on Lit the `.editor` property (the documented divergence).
 

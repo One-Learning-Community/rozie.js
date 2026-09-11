@@ -96,6 +96,7 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
     v-model:column-filters="columnFilters"
     v-model:expanded="expanded"
     sticky-header
+    interactionMode="grid"
   >
     <Column field="name" header="Name" :sortable="true" :filterable="true" :editable="true" editor="custom" />
     <Column field="role" header="Role" :sortable="true" :filterable="true" :editable="true" editor="custom" />

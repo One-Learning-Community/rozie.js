@@ -88,7 +88,7 @@ Alongside the generic `#cell` / `#colHeader` / `#filter` / `#editor` slots (each
 
 **Two gate rules**, applied identically to both the family and the generic tier of the same seam:
 
-- The **editor** family (`editor-<columnId>`, and the generic `#editor`) reaches only columns declaring `editor="custom"`. A column with a built-in editor type (`'text'` / `'number'` / `'select'` / `'checkbox'`) never routes through either editor tier.
+- The **editor** family (`editor-<columnId>`, and the generic `#editor`) reaches only columns with `editable: true` and `editor="custom"` — and, for any pointer or keyboard edit entry (as opposed to the imperative `editCell`/`editRow` handle verbs), the table needs `interactionMode="grid"`. A column with a built-in editor type (`'text'` / `'number'` / `'select'` / `'checkbox'`) never routes through either editor tier.
 - The **filter** family (`filter-<columnId>`, and the generic `#filter`) reaches only columns declaring `filterable`. A non-filterable column never routes through either filter tier.
 
 `cell` and `colHeader` carry no such gate — every column reaches those two seams.

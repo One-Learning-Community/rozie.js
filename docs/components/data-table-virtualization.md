@@ -37,7 +37,7 @@ Windowing is built on the framework-agnostic `@tanstack/virtual-core` wired by h
 
 Turning on column windowing (`virtual='columns'` or `'both'`) applies `table-layout: fixed` to the table. This is a real, documented cost: **columns stop auto-fitting their content** the way an unwindowed table's columns do, because the horizontal spacer math needs every column's width to be predictable up front rather than resolved after layout.
 
-Size columns explicitly via `:columnSizing`, a `<Column size>` attribute, or the built-in resize handle. `table-core`'s column-size oracle (`getSize()`, defaulting to 150px, with explicit sizes on the select/expander chrome columns) is authoritative for the windowed path.
+Size columns explicitly via the two-way `:columnSizing` slice (`{ [columnId]: number }`, in px) or the built-in pointer/keyboard resize handle. `table-core`'s column-size oracle (`getSize()`, defaulting to 150px, with explicit sizes on the select/expander chrome columns) is authoritative for the windowed path.
 
 This consequence applies **only** to the column-windowed path — a table with `virtual={false}`, `virtual={true}`, or `virtual='rows'` keeps its existing auto-fitting layout untouched.
 
