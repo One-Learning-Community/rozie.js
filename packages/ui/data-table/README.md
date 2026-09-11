@@ -89,7 +89,7 @@ pnpm --filter @rozie-ui/data-table build   # codegen.mjs: parse-once → emit-6 
 pnpm --filter @rozie-ui/data-table test    # source unit tests (behavioral coverage lives in the VR matrix)
 ```
 
-The real behavioral gate is the cross-framework **visual-regression matrix** in `tests/visual-regression/specs/data-table-*.spec.ts` (27 spec files, run against all six targets in the pinned CI container).
+The real behavioral gate is the cross-framework **visual-regression matrix** in `tests/visual-regression/specs/data-table*.spec.ts` (28 spec files, run against all six targets in the pinned CI container).
 
 ## License
 
