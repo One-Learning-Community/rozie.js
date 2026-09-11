@@ -20,7 +20,7 @@ table whenever you want editing.
 </DataTable>
 ```
 
-A cell enters edit mode on **double-click**, on a printable keypress (which seeds the editor with that character), on `F2` / `Enter` (which seeds the current value), or via the `editCell(rowIndex, colIndex)` verb. Set `singleClickEdit` to open the editor on a single click instead of a double-click. `Enter` commits; `Escape` cancels.
+A cell enters edit mode on **double-click**, on a printable keypress (which seeds the editor with that character), on `F2` / `Enter` (which seeds the current value), or via the [`editCell(rowIndex, colIndex)`](/components/data-table-api#imperative-handle) verb. Set `singleClickEdit` to open the editor on a single click instead of a double-click. `Enter` commits; `Escape` cancels.
 
 **Built-in editor types** (the `editor` Column prop): `'text'` (default `<input type="text">`), `'number'`, `'select'` (populate `editorOptions` with `[{ value, label }]`), `'checkbox'`, and `'custom'` (no built-in editor — the `#editor` slot drives it).
 
