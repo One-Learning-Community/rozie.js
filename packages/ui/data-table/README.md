@@ -10,12 +10,12 @@ The state engine is [`@tanstack/table-core`](https://tanstack.com/table) — the
 
 | Framework | Package | Peer dependencies |
 | --- | --- | --- |
-| React | [`@rozie-ui/data-table-react`](./packages/react) | `react` · `react-dom` · `@tanstack/table-core` · `@tanstack/virtual-core` · `@floating-ui/dom` |
-| Vue | [`@rozie-ui/data-table-vue`](./packages/vue) | `vue` · `@tanstack/table-core` · `@tanstack/virtual-core` · `@floating-ui/dom` |
-| Svelte | [`@rozie-ui/data-table-svelte`](./packages/svelte) | `svelte` · `@tanstack/table-core` · `@tanstack/virtual-core` · `@floating-ui/dom` |
-| Solid | [`@rozie-ui/data-table-solid`](./packages/solid) | `solid-js` · `@tanstack/table-core` · `@tanstack/virtual-core` · `@floating-ui/dom` |
-| Lit | [`@rozie-ui/data-table-lit`](./packages/lit) | `lit` · `@lit/context` · `@lit-labs/preact-signals` · `@preact/signals-core` · `@tanstack/table-core` · `@tanstack/virtual-core` · `@floating-ui/dom` |
-| Angular | [`@rozie-ui/data-table-angular`](./packages/angular) | `@angular/core` · `@angular/common` · `@angular/forms` · `@tanstack/table-core` · `@tanstack/virtual-core` · `@floating-ui/dom` |
+| React | [`@rozie-ui/data-table-react`](./packages/react) | `react` · `react-dom` · `@tanstack/table-core` · `@tanstack/virtual-core` · `@rozie-ui/popover-react` |
+| Vue | [`@rozie-ui/data-table-vue`](./packages/vue) | `vue` · `@tanstack/table-core` · `@tanstack/virtual-core` · `@rozie-ui/popover-vue` |
+| Svelte | [`@rozie-ui/data-table-svelte`](./packages/svelte) | `svelte` · `@tanstack/table-core` · `@tanstack/virtual-core` · `@rozie-ui/popover-svelte` |
+| Solid | [`@rozie-ui/data-table-solid`](./packages/solid) | `solid-js` · `@tanstack/table-core` · `@tanstack/virtual-core` · `@rozie-ui/popover-solid` |
+| Lit | [`@rozie-ui/data-table-lit`](./packages/lit) | `lit` · `@lit/context` · `@lit-labs/preact-signals` · `@preact/signals-core` · `@tanstack/table-core` · `@tanstack/virtual-core` · `@rozie-ui/popover-lit` |
+| Angular | [`@rozie-ui/data-table-angular`](./packages/angular) | `@angular/core` · `@angular/common` · `@angular/forms` · `@tanstack/table-core` · `@tanstack/virtual-core` · `@rozie-ui/popover-angular` |
 
 ```bash
 npm i @rozie-ui/data-table-react   # + its peers
@@ -54,7 +54,7 @@ const [sorting, setSorting] = useState([]);
 
 ## The surface at a glance
 
-- **28 props**, including twelve independent **two-way `r-model` slices** (`data` + eleven table-state slices) — each an optional two-way binding with an uncontrolled fallback.
+- **29 props**, including twelve independent **two-way `r-model` slices** (`data` + eleven table-state slices) — each an optional two-way binding with an uncontrolled fallback.
 - **15 change events** — every slice fires its change event *regardless* of whether it's bound, so you can observe transitions without two-way binding.
 - **A 34-method imperative handle** (`$expose`) — `sortColumn`, `toggleAllRows`, `expandAll`, `applyGrouping`, `focusCell`, `editRow`, `undo`/`redo`, and more — grabbed via each framework's native ref mechanism.
 - **8 scoped slots** — `cell`, `colHeader`, `selectAll`, `selectCell`, `detail`, `groupBar`, `filter`, `editor`.
@@ -82,14 +82,14 @@ src/
 `.rzts` partials are compile-time script fragments that **dissolve** into each leaf's `<script>` (they are not standalone TS). Two source-only workspace packages compose in the same way — zero runtime dependency:
 
 - [`@rozie-ui/headless-core`](../headless-core) — the shared `windowing.rzts` virtualization math.
-- [`@rozie-ui/popover`](../popover) — vendored at codegen time (Option-B authoring-time vendoring) for the per-column header `⋯` menu; `@floating-ui/dom` is its shipped runtime cost (a peer dep on every leaf).
+- [`@rozie-ui/popover`](../popover) — vendored at codegen time (Option-B authoring-time vendoring) for the per-column header `⋯` menu; each leaf takes the matching `@rozie-ui/popover-<target>` as a direct peer dependency, and `@floating-ui/dom` is in turn *popover's* own peer — so a consumer installs both, but only the popover package is data-table's direct peer.
 
 ```bash
 pnpm --filter @rozie-ui/data-table build   # codegen.mjs: parse-once → emit-6 → vendor themes → render 6 READMEs
 pnpm --filter @rozie-ui/data-table test    # source unit tests (behavioral coverage lives in the VR matrix)
 ```
 
-The real behavioral gate is the cross-framework **visual-regression matrix** in `tests/visual-regression/specs/data-table-*.spec.ts` (22 spec files, run against all six targets in the pinned CI container).
+The real behavioral gate is the cross-framework **visual-regression matrix** in `tests/visual-regression/specs/data-table-*.spec.ts` (27 spec files, run against all six targets in the pinned CI container).
 
 ## License
 
