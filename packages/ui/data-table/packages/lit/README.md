@@ -1,6 +1,6 @@
 # @rozie-ui/data-table-lit
 
-Idiomatic **lit** `DataTable` — a headless, fully-accessible (WAI-ARIA) data table (sorting, global + per-column filtering, pagination, row selection, column visibility / resize / pinning (plus a programmatic `columnOrder` slice, no drag affordance), sticky header) compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. The state engine is `@tanstack/table-core` — the SAME framework-agnostic core behind TanStack Table, wired to this framework's reactivity with NO per-framework adapter. The table's primary surfaces are themed through 19 `--rozie-data-table-*` custom properties, so it re-skins to any design system. This package is generated; do not edit `src/` by hand.
+Idiomatic **lit** `DataTable` — a headless, fully-accessible (WAI-ARIA) data table (sorting, global + per-column filtering, pagination, row selection, column visibility / resize / pinning (plus a programmatic `columnOrder` slice, no drag affordance), sticky header) compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. The state engine is `@tanstack/table-core` — the SAME framework-agnostic core behind TanStack Table, wired to this framework's reactivity with NO per-framework adapter. The table's primary surfaces are themed through 18 `--rozie-data-table-*` custom properties, so it re-skins to any design system. This package is generated; do not edit `src/` by hand.
 
 ## Install
 
@@ -408,7 +408,7 @@ render(html`
 
 ## Theming
 
-The table's primary surfaces are themed through 19 `--rozie-data-table-*` CSS custom properties — override any of them at any ancestor scope (currently ineffective on the Lit leaf, whose shadow root the class-scoped mapping cannot cross — only `--rozie-data-table-max-height` inherits through it). Some internal details (the grid active-cell ring, range highlight, fill handle, the per-header column ⋯ menu, and most of the pagination bar beyond its control border/radius/disabled-opacity) are not yet part of the public token surface. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
+The table's primary surfaces are themed through 18 `--rozie-data-table-*` CSS custom properties — override any of them at any ancestor scope (currently ineffective on the Lit leaf, whose shadow root the class-scoped mapping cannot cross — only `--rozie-data-table-max-height` inherits through it). Some internal details (the grid active-cell ring, range highlight, fill handle, the per-header column ⋯ menu, and most of the pagination bar beyond its control border/radius/disabled-opacity) are not yet part of the public token surface. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
 
 ```ts
 import '@rozie-ui/data-table-lit/themes/base.css';

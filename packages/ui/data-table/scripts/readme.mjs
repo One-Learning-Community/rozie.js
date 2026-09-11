@@ -2473,7 +2473,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       `[Rozie](https://github.com/One-Learning-Community/rozie.js) source. ` +
       `The state engine is \`@tanstack/table-core\` — the SAME framework-agnostic core ` +
       `behind TanStack Table, wired to this framework's reactivity with NO per-framework ` +
-      `adapter. The table's primary surfaces are themed through 19 ` +
+      `adapter. The table's primary surfaces are themed through 18 ` +
       `\`--rozie-data-table-*\` custom properties, so it re-skins to any design ` +
       `system. This package is generated; do not edit \`src/\` by hand.`,
   );
@@ -2520,7 +2520,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('## Theming');
   lines.push('');
   lines.push(
-    'The table\'s primary surfaces are themed through 19 `--rozie-data-table-*` CSS custom ' +
+    'The table\'s primary surfaces are themed through 18 `--rozie-data-table-*` CSS custom ' +
       'properties — override any of them at any ancestor scope' +
       (target === 'lit'
         ? ' (currently ineffective on the Lit leaf, whose shadow root the class-scoped ' +

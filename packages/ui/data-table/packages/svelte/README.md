@@ -1,6 +1,6 @@
 # @rozie-ui/data-table-svelte
 
-Idiomatic **svelte** `DataTable` — a headless, fully-accessible (WAI-ARIA) data table (sorting, global + per-column filtering, pagination, row selection, column visibility / resize / pinning (plus a programmatic `columnOrder` slice, no drag affordance), sticky header) compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. The state engine is `@tanstack/table-core` — the SAME framework-agnostic core behind TanStack Table, wired to this framework's reactivity with NO per-framework adapter. The table's primary surfaces are themed through 19 `--rozie-data-table-*` custom properties, so it re-skins to any design system. This package is generated; do not edit `src/` by hand.
+Idiomatic **svelte** `DataTable` — a headless, fully-accessible (WAI-ARIA) data table (sorting, global + per-column filtering, pagination, row selection, column visibility / resize / pinning (plus a programmatic `columnOrder` slice, no drag affordance), sticky header) compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. The state engine is `@tanstack/table-core` — the SAME framework-agnostic core behind TanStack Table, wired to this framework's reactivity with NO per-framework adapter. The table's primary surfaces are themed through 18 `--rozie-data-table-*` custom properties, so it re-skins to any design system. This package is generated; do not edit `src/` by hand.
 
 ## Install
 
@@ -406,7 +406,7 @@ Columns may be declared as a `columns` config array **or** as `<Column>` childre
 
 ## Theming
 
-The table's primary surfaces are themed through 19 `--rozie-data-table-*` CSS custom properties — override any of them at any ancestor scope. Some internal details (the grid active-cell ring, range highlight, fill handle, the per-header column ⋯ menu, and most of the pagination bar beyond its control border/radius/disabled-opacity) are not yet part of the public token surface. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
+The table's primary surfaces are themed through 18 `--rozie-data-table-*` CSS custom properties — override any of them at any ancestor scope. Some internal details (the grid active-cell ring, range highlight, fill handle, the per-header column ⋯ menu, and most of the pagination bar beyond its control border/radius/disabled-opacity) are not yet part of the public token surface. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
 
 ```svelte
 <script>
