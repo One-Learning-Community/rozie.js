@@ -9,6 +9,8 @@ outline: [2, 3]
 
 The values listed below are exposed as `--rozie-data-table-*` custom properties, each with a built-in fallback, so `DataTable` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
+Scope, stated plainly: remapping the public tokens re-skins the table's primary surfaces — type, borders, background, header, row, cell padding, accent, and the max-height. It does NOT reach every cosmetic value. 59 of the 83 internal tokens have no public counterpart today, including the grid active-cell ring, the range highlight, the fill handle, the invalid-cell outline, the group tokens, the filter row, the per-header column ⋯ menu, most of the pagination bar (only its control border, radius, and disabled-opacity are public, via --rozie-data-table-control-* and --rozie-data-table-disabled-opacity — its background, padding, and status-text size are not), and the chrome column widths. Those remain internal and may be renamed; a design system that needs them should set the `--rdt-*` name directly and accept that it is not yet a stable API.
+
 ```css
 .rozie-data-table-wrap,
 .rozie-data-table {

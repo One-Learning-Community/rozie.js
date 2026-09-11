@@ -1408,7 +1408,10 @@ export function Demo() {
     <DataTable
       data={rows}
       columnFilters={columnFilters()}
-      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      onFilterChange={(...args: unknown[]) => {
+        const p = args[0] as { columnFilters?: { id: string; value: unknown }[] };
+        if (p.columnFilters) setColumnFilters(p.columnFilters);
+      }}
       // The #filter scoped slot is a render prop on Solid (the documented edge).
       filterSlot={({ columnId, uniqueValues, minMax }) =>
         columnId === 'category' ? (
@@ -1961,7 +1964,10 @@ export function Demo() {
     <DataTable
       data={rows}
       columnFilters={columnFilters()}
-      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      onFilterChange={(...args: unknown[]) => {
+        const p = args[0] as { columnFilters?: { id: string; value: unknown }[] };
+        if (p.columnFilters) setColumnFilters(p.columnFilters);
+      }}
       // The #filter scoped slot is a render prop on Solid (the documented edge).
       filterSlot={(scope) => (
         <Switch>
