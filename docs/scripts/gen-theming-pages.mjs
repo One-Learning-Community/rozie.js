@@ -192,7 +192,7 @@ function renderPage(slug, name, prefix, groups, undeclared, overrides, selector,
   parts.push(`# ${name} theming`);
   parts.push('');
   parts.push(
-    `Every cosmetic value \`${name}\` renders is a \`${prefix}*\` custom property with a built-in fallback, so the component works with **zero configuration** and stays fully re-skinnable. The structural rules compile per-leaf and are **not** consumer-overridable — only the values below flow through tokens.`,
+    `The values listed below are exposed as \`${prefix}*\` custom properties, each with a built-in fallback, so \`${name}\` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.`,
   );
   parts.push('');
   parts.push('```css');

@@ -16,12 +16,11 @@
  * remain internal and may be renamed; a design system that needs them should set the
  * `--rdt-*` name directly and accept that it is not yet a stable API.
  *
- * NOTE the split (CONTEXT "Claude's Discretion" + the slider D-08 precedent): the
- * STRUCTURAL rules — `border-collapse`, the keyed-r-for layout, `position: sticky`
- * for the header + pinned columns, the resize-handle positioning, the
- * `<details>` disclosure box — are behavior-critical and live in the component's
- * scoped `<style>` (per-leaf, NOT consumer-overridable). Only the values below
- * flow through tokens.
+ * NOTE the split: the STRUCTURAL rules — `border-collapse`, the keyed-r-for
+ * layout, `position: sticky` for the header + pinned columns, the
+ * resize-handle positioning, the `<details>` disclosure box — are
+ * behavior-critical and live in the component's scoped `<style>` (per-leaf,
+ * NOT consumer-overridable). Only the values below flow through tokens.
  *
  * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
  * `.rozie-data-table` / `.rozie-data-table-wrap` element). See
@@ -30,12 +29,11 @@
  */
 .rozie-data-table-wrap,
 .rozie-data-table {
-  /* NOTE (see file-head comment): most of the tokens below are declared but
-     never read via a CSS var() inside THIS component's own scoped <style> —
-     that is by design. This is the public surface; the "Wire the PUBLIC
-     tokens..." block further down assigns each one onto the short internal
-     --rdt-* custom property the component actually reads. A future audit
-     must not delete these as dead — they are the intended public API. */
+  /* These public tokens aren't read directly by a CSS var() inside this
+     component's own scoped <style> — that is by design. This is the public
+     surface; the "Wire the PUBLIC tokens..." block further down assigns each
+     one onto the short internal --rdt-* custom property the component
+     actually reads. */
 
   /* ── palette (the few values most consumers will set) ───────────────────── */
   --rozie-data-table-fg: inherit;
@@ -58,24 +56,24 @@
   /* ── sort indicator ─────────────────────────────────────────────────────── */
   --rozie-data-table-sort-indicator-opacity: 0.7;
 
-  /* ── resize handle (req-9) ──────────────────────────────────────────────── */
+  /* ── resize handle ──────────────────────────────────────────────────────── */
   --rozie-data-table-resize-grip-color: rgba(0, 0, 0, 0.12);
   --rozie-data-table-resize-grip-active: var(--rozie-data-table-accent);
 
-  /* ── pin controls (req-11) ──────────────────────────────────────────────── */
+  /* ── pin controls ───────────────────────────────────────────────────────── */
   --rozie-data-table-pin-active-bg: rgba(0, 0, 0, 0.1);
 
-  /* ── column-visibility menu (req-8) ─────────────────────────────────────── */
+  /* ── column-visibility menu ─────────────────────────────────────────────── */
   --rozie-data-table-menu-bg: #fff;
   --rozie-data-table-menu-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 
-  /* ── selection checkboxes (req-7) ───────────────────────────────────────── */
+  /* ── selection checkboxes ───────────────────────────────────────────────── */
   --rozie-data-table-select-accent: var(--rozie-data-table-accent);
 
   /* ── disabled pagination controls ──────────────────────────────────────── */
   --rozie-data-table-disabled-opacity: 0.4;
 
-  /* ── virtual scroll (row windowing, req-3/D-06) ─────────────────────────── */
+  /* ── virtual scroll (row windowing) ─────────────────────────────────────── */
   /* Read with NO fallback at its one use site (`max-height: var(--rozie-data-table-max-height);`
      on `.rdt-scroll`) — when unset the property is invalid at computed-value
      time and the rule behaves as if `max-height` were never declared there,
