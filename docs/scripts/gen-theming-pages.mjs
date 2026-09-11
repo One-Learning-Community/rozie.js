@@ -83,10 +83,43 @@ function isLabel(raw) {
 /** Every base.css opens with a `/*\n * @rozie-ui/<family> — base token
  * reference.\n * … *​/` doc block explaining the file itself. It is neither a
  * label nor a note about any group — it documents the FILE — so it is dropped
- * outright. Collapsing such a block leaves its per-line `*` prefixes behind,
- * which is what identifies it. */
+ * outright from the per-group parse. Collapsing such a block leaves its
+ * per-line `*` prefixes behind, which is what identifies it. Its
+ * "Scope, stated plainly" paragraph (when present — see `scopeNoteFrom`) is
+ * surfaced separately, on the page intro, rather than being lost outright. */
 function isDocBlock(raw) {
   return commentText(raw).startsWith('*');
+}
+
+/** Extract the file-head `/* … *​/` doc block's raw text (without the comment
+ * delimiters), or '' if the file has none. */
+function headDocBlock(css) {
+  const m = css.match(/^\s*\/\*([\s\S]*?)\*\//);
+  return m ? m[1] : '';
+}
+
+/** Some families' base.css head comment includes a "Scope, stated plainly:"
+ * paragraph explaining which cosmetic surfaces the public tokens do and do
+ * not reach (data-table is the first — audit 260910, IMPORTANT-3: the
+ * "see Theming" cross-references on data-table's docs pages were dangling
+ * because nothing on the theming page discussed the gap). When present, that
+ * paragraph is consumer-facing content about the token surface itself, so it
+ * belongs on the generated theming page, not just in the CSS source. Returns
+ * null for families with no such paragraph — the intro simply omits it. */
+function scopeNoteFrom(headBlock) {
+  const lines = headBlock.split('\n').map((l) => l.replace(/^[ \t]*\*[ \t]?/, '').trimEnd());
+  const paragraphs = [];
+  let cur = [];
+  for (const line of lines) {
+    if (line.trim() === '') {
+      if (cur.length) paragraphs.push(cur.join(' ').trim());
+      cur = [];
+    } else {
+      cur.push(line.trim());
+    }
+  }
+  if (cur.length) paragraphs.push(cur.join(' ').trim());
+  return paragraphs.find((p) => /^Scope, stated plainly/i.test(p)) ?? null;
 }
 
 /** Parse `base.css` into an ordered list of
@@ -178,7 +211,7 @@ function escapeAngles(text) {
   return String(text).replace(/</g, '&lt;');
 }
 
-function renderPage(slug, name, prefix, groups, undeclared, overrides, selector, bridgeFiles, seeAlso) {
+function renderPage(slug, name, prefix, groups, undeclared, overrides, selector, bridgeFiles, seeAlso, scopeNote) {
   const parts = [];
   parts.push('---');
   parts.push(`title: ${name} theming`);
@@ -195,6 +228,10 @@ function renderPage(slug, name, prefix, groups, undeclared, overrides, selector,
     `The values listed below are exposed as \`${prefix}*\` custom properties, each with a built-in fallback, so \`${name}\` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.`,
   );
   parts.push('');
+  if (scopeNote) {
+    parts.push(escapeAngles(scopeNote));
+    parts.push('');
+  }
   parts.push('```css');
   parts.push(`${selector} {`);
   for (const d of overrides) parts.push(`  ${d.name}: ${d.value};`);
@@ -312,7 +349,8 @@ function main() {
       seeAlso.push(`[${name} — live demo](/components/${slug}-demo) — the real package running in the page.`);
     }
 
-    const page = renderPage(slug, name, prefix, groups, undeclared, overrides, selector, bridgeFiles, seeAlso);
+    const scopeNote = scopeNoteFrom(headDocBlock(css));
+    const page = renderPage(slug, name, prefix, groups, undeclared, overrides, selector, bridgeFiles, seeAlso, scopeNote);
     const out = resolve(COMPONENTS_DIR, `${slug}-theming.md`);
     writeFileSync(out, page);
     written.push(`${slug} → ${name} (${publicDecls.length} tokens)`);

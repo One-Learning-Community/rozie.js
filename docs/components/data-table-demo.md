@@ -114,28 +114,31 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
     </template>
 
     <!-- One #filter slot, dispatched by columnId to the matching filter drop-in -->
-    <template #filter="{ columnId, uniqueValues, minMax, setFilter }">
+    <template #filter="{ columnId, value, uniqueValues, minMax, setFilter }">
       <FilterSelect
         v-if="columnId === 'role'"
         :columnId="columnId"
+        :value="value"
         :setFilter="setFilter"
         :uniqueValues="uniqueValues"
       />
       <FilterNumberRange
         v-else-if="columnId === 'level'"
         :columnId="columnId"
+        :value="value"
         :setFilter="setFilter"
         :minMax="minMax"
       />
       <FilterText
         v-else
         :columnId="columnId"
+        :value="value"
         :setFilter="setFilter"
       />
     </template>
 
     <!-- One #editor slot, dispatched by columnId to the matching editor drop-in -->
-    <template #editor="{ columnId, column, row, value, commit, cancel }">
+    <template #editor="{ columnId, column, row, value, commit, cancel, autofocus }">
       <EditorSelect
         v-if="columnId === 'role'"
         :columnId="columnId"
@@ -144,6 +147,7 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
         :value="value"
         :commit="commit"
         :cancel="cancel"
+        :autofocus="autofocus"
         :options="roleOptions"
       />
       <EditorText
@@ -154,6 +158,7 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
         :value="value"
         :commit="commit"
         :cancel="cancel"
+        :autofocus="autofocus"
       />
     </template>
 
