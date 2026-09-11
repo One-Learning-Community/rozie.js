@@ -41,6 +41,20 @@ For checkbox lists / range sliders built on a column's cross-filtered distinct v
 
 Set `manual` to flip on `manualPagination` / `manualFiltering` / `manualSorting` at once: table-core then trusts the consumer-supplied rows (it does not sort/filter/paginate them itself) and only emits the change events, so you can fetch the matching page/sort/filter slice from a server and feed it back through `:data`.
 
+Under `manual`, `:data` holds only the current page, not the full dataset — table-core can no longer derive a page count from `data.length`. Without a count supplied from elsewhere, `getPageCount()` stays `-1` and `getCanNextPage()` stays permanently `false`, so the consumer can never leave page 0. Supply one of:
+
+- **`rowCount`** — the total server-side row count; table-core derives `⌈rowCount / pageSize⌉`.
+- **`pageCount`** — an explicit total page count; wins over a `rowCount`-derived value when both are set.
+
+```rozie
+<DataTable :data="$data.page" manual :rowCount="$data.totalRows"
+  r-model:pagination="$data.pagination"
+  r-model:sorting="$data.sorting"
+  @page-change="$data.fetchPage($event)">
+  <Column field="name" header="Name" sortable />
+</DataTable>
+```
+
 ## Per-framework code
 
 The idiomatic per-target consumption snippet is on the [usage page](/components/data-table-usage); the [live demo](/components/data-table-demo) binds `sorting`, `globalFilter`, and `pagination` against the real Vue package.

@@ -15,9 +15,13 @@ For the per-column `<Column>` attributes (`field` / `header` / `sortable` / `fil
 
 Each slice is an independent, optional two-way `r-model` with its own uncontrolled fallback and its own change event (which fires **regardless** of whether the slice is bound). All twelve state transitions are funneled through table-core; the table always writes a **fresh** value (never an in-place mutation, which would be silently dropped on React/Solid/Angular/Lit). The first slice is `data` itself — a committed cell or row edit writes a fresh `data` array back; the remaining eleven are the table-state slices.
 
+**Two distinct channels exist per slice, and they are easy to conflate.** Every `r-model:` slice is wired to its target framework's own two-way binding mechanism — that wiring fires a **model-update event** whose name is per-target: Lit dispatches a kebab-case `<slice>-change` custom event (`sorting-change`, `global-filter-change`, `column-filters-change`, `pagination-change`, `expanded-change`, `grouping-change`, `row-selection-change`, `column-visibility-change`, `column-sizing-change`, `column-order-change`, `column-pinning-change`, plus `data-change`), React/Solid take an `onSortingChange` / `onGlobalFilterChange` / … prop, Vue/Svelte/Angular use their native two-way mechanism (`update:sorting`, a bindable, an `[(ngModel)]`-style output). **Separately**, eleven of the twelve slices also fire a hand-authored notification — a plain `$emit` call in the component's write funnel, using one name fixed across all six targets (the `Change event` column below), deliberately stemmed off a distinct word (`sorting` → `sort-change`, not `sorting-change`) so it can't camelCase into the same TS interface member the model-update channel auto-generates. This notification fires **regardless of binding** — it exists so you can observe a transition without binding the slice at all.
+
+`data` is the exception: it has no hand-authored notification — its write funnel never calls `$emit`. The `data-change` name in the table below names only the model-update channel's Lit spelling; on React/Solid it is `onDataChange`, not `data-change`. To observe a committed data change without binding `r-model:data`, listen for `cell-edit-commit` / `row-edit-commit` instead (see the Events table below).
+
 | Model (`r-model:`) | Shape | Change event | Description |
 | --- | --- | --- | --- |
-| `data` | `TData[]` | `data-change` | The row data. Two-way so committed cell/row edits flow back (uncontrolled fallback `dataDefault`). Always written as a fresh array, never mutated in place. |
+| `data` | `TData[]` | *(none — see note above)* | The row data. Two-way so committed cell/row edits flow back (uncontrolled fallback `dataDefault`). Always written as a fresh array, never mutated in place. |
 | `sorting` | `[{ id, desc }]` | `sort-change` | The sort state (header click; shift-click adds a secondary sort). |
 | `globalFilter` | `string` | `filter-change` | The global search string — narrows all columns. |
 | `columnFilters` | `[{ id, value }]` | `filter-change` | Per-column filter values (gated by each column's `filterable`). |
@@ -29,6 +33,8 @@ Each slice is an independent, optional two-way `r-model` with its own uncontroll
 | `columnSizing` | `{ [colId]: number }` | `resize-change` | Per-column widths (live during a resize drag). |
 | `columnOrder` | `string[]` | `reorder-change` | The full column order. |
 | `columnPinning` | `{ left: string[], right: string[] }` | `pin-change` | Per-side pinned-column ids. |
+
+The twelve Lit model-update event names, for reference: `data-change`, `sorting-change`, `global-filter-change`, `column-filters-change`, `pagination-change`, `row-selection-change`, `expanded-change`, `grouping-change`, `column-visibility-change`, `column-sizing-change`, `column-order-change`, `column-pinning-change`.
 
 ## Events
 

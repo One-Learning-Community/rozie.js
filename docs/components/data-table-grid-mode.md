@@ -27,9 +27,36 @@ What flips on:
 
 Drive and observe it imperatively via the [`focusCell`](/components/data-table-api#imperative-handle) / `getActiveCell` / `clearActiveCell` handle verbs and the [`activecell-change`](/components/data-table-api#events) event. The exact behavioral contract is locked by a cross-framework visual-regression matrix proving the same behavior on all six targets.
 
+## Clipboard, fill & clear
+
+Grid mode also ships a spreadsheet-style clipboard, fill, and clear surface, scoped to the current active cell / range selection. Each shortcut below is a no-op — and falls through to the browser's native behavior — while a **header** cell is active, so it never silently mutates a body cell from an unexpected focus position:
+
+- **Copy** — `Ctrl`/`Cmd`+`C` serializes the active range (or the single active cell when no range is set) to the system clipboard as TSV (tab-separated cells, newline-separated rows).
+- **Paste** — `Ctrl`/`Cmd`+`V` reads TSV off the clipboard and tiles it across the current range, anchored at its top-left corner: a clipboard block smaller than the destination range repeats (tiles) to fill the whole range; a clipboard block larger than the range pastes its full block, extending past the original selection (clamped only to the table's own row/column bounds). Each destination cell is written only if its column is `editable` and the value passes that column's validator; everything else is silently skipped. The whole paste is one `r-model:data` write plus one `cell-edit-commit` per cell actually written, and an aria-live region announces how many of the attempted cells were committed.
+- **Cut** — `Ctrl`/`Cmd`+`X` copies the range exactly as above, then clears the source cells through the same write path **Clear** (below) uses. Also reachable imperatively via the [`cut()`](/components/data-table-api#imperative-handle) handle verb.
+- **Fill handle** — dragging the small handle at the active range's bottom-right corner tiles the range's existing values across the cells the drag covers (pure value-copy — there is no series/pattern detection, unlike a spreadsheet's numeric-sequence fill).
+- **Clear** — `Delete` / `Backspace` clears the active cell or range through the same validator-gated write funnel as paste, minus the clipboard copy. Non-editable and validator-rejected cells are left untouched.
+- **Select all cells** — `Ctrl`/`Cmd`+`A` selects the entire body as one rectangular range (always calls `preventDefault`, so the browser never selects the page itself while in grid mode). A no-op — selects nothing — when the active cell is a header.
+
+Every mutation above (paste, fill, cut, clear) is reversible with `Ctrl`+`Z` once `undoable` is set — see [Undo & redo](#undo-redo) below.
+
+## Undo & redo {#undo-redo}
+
+Set `undoable` and every committed data mutation — a cell/row edit, a paste, a fill, a cut, or a clear — becomes one undo step:
+
+- `Ctrl`/`Cmd`+`Z` undoes the most recent mutation; `Ctrl`/`Cmd`+`Y` **or** `Ctrl`/`Cmd`+`Shift`+`Z` redoes it. Both work whether a header or a body cell is active — unlike the clipboard shortcuts above, undo/redo is grid-wide.
+- `undoLimit` (default `100`) bounds how many snapshots are retained; the oldest is evicted once the stack exceeds it.
+- [`history-change`](/components/data-table-api#events) fires `{ canUndo, canRedo }` whenever that availability changes — drive an undo/redo toolbar button's `disabled` state from it.
+- Five handle verbs mirror the keyboard: `undo()`, `redo()`, `canUndo()`, `canRedo()`, `clearHistory()`. See the [API reference](/components/data-table-api#imperative-handle) for their exact contracts. Swapping in a new `data` array from outside the table clears history automatically — a fresh dataset never inherits the previous one's undo stack.
+
+With `undoable` left at its default `false`, nothing is recorded, `Ctrl`+`Z`/`Y` are inert, and the grid is byte-behaviorally identical to a pre-undo build.
+
 ## Accessibility
 
 - Semantic ARIA table roles throughout: `role="table"` / `role="rowgroup"` / `role="row"` / `role="columnheader"` / `role="cell"`, with `aria-sort` (the string-safe `'ascending'` \| `'descending'` \| `'none'`) on sortable headers.
+- **Row counting.** The `<table>` root carries `aria-rowcount` — the full filtered pre-pagination row total (not just the current page) — and every header/body `<tr>` carries a 1-based `aria-rowindex` that already accounts for the header rows ahead of it. These are present in both `table` and `grid` interaction mode, and are unaffected by pagination or row windowing — the index always reflects the row's position in the full model.
+- **Treegrid state (expandable rows and grouping).** When a row can expand — an expandable row or a group-header row — its `<tr>` carries `aria-expanded` (`"true"` / `"false"`). While grouping is active, every row (group header and leaf alike) additionally carries `aria-level` (1-based nesting depth), giving the multi-level grouped-row hierarchy the same treegrid semantics APG expects. Neither attribute appears on a row that can't expand and isn't part of an active grouping.
+- **Column position is not yet advertised.** `aria-colcount` / `aria-colindex` are not emitted anywhere in the component. This means a column-windowed grid (`virtual="columns"` or `"both"`) gives assistive tech no way to tell a windowed leaf column's true position among the full column set — only the row axis currently carries that information.
 - **Every interactive control is a native, focusable element** with an accessible name — the sort buttons, the select-all + per-row checkboxes, the pagination prev/next + page-size `<select>`, the global + per-column filter inputs, the column-visibility `<details>` disclosure, the per-header pin buttons, and the edge resize handles. There is no div-with-click-only control.
 - The keyboard / focus surface is the **table-oriented** default (Tab between the native controls). Opt into `interactionMode="grid"` (above) for the full WAI-ARIA **grid** pattern — `role="grid"`, a roving single tab-stop, and 2-D APG arrow-key cell navigation — on top of the same accessible chrome.
 - Select-all scopes to the filtered rows (the TanStack default) and shows the indeterminate state on a partial selection.

@@ -37,7 +37,7 @@ Because a bare boolean attribute on a child component (`<Column sortable />`) on
 
 ## Two coexisting column-declaration forms
 
-Columns may be declared via `<Column>` children **or** via the `:columns` config-array escape hatch **or both** — they resolve to the same internal column set via an **id-keyed last-write-wins union**: the `:columns` array is applied first (lower precedence), then the `<Column>` children override by id. Each config entry is `{ id?, field, header?, sortable?, filterable?, pinned?, width? }` (`pinned` behaves exactly as described above — an initial pin seed):
+Columns may be declared via `<Column>` children **or** via the `:columns` config-array escape hatch **or both** — they resolve to the same internal column set via an **id-keyed last-write-wins union**: the `:columns` array is applied first (lower precedence), then the `<Column>` children override by id. A leaf config entry accepts the full key set the `<Column>` table above documents — `{ id?, field, header?, sortable?, filterable?, pinned?, width?, groupable?, aggregationFn?, editable?, editor?, editorOptions?, validate? }` (each key's semantics match the identically-named `<Column>` attribute; `pinned` behaves exactly as described above — an initial pin seed) — plus one config-array-only key, `expandable` (reserved per-column metadata flagging participation in the expand affordance; default `false`):
 
 ```rozie
 <DataTable :data="$data.rows" :columns="[
@@ -47,6 +47,22 @@ Columns may be declared via `<Column>` children **or** via the `:columns` config
 ```
 
 See the [config-array usage snippet](/components/data-table-usage#columns-as-a-config-array) and the [declarative `<Column>` children + custom cell snippet](/components/data-table-usage#declarative-column-children-a-custom-cell) for the per-framework form.
+
+## Grouped column headers
+
+A config-array entry may, instead of `field`, carry a nested `columns` array: `{ id?, header, columns: [...] }`. table-core then renders an extra header row — the parent entry's `header` spans its children as a **group header**, and each child resolves as its own leaf column (which may itself nest further). A group entry carries no accessor and can never be sorted, filtered, pinned, or used as a grouping key; only its leaf children can.
+
+```rozie
+<DataTable :data="$data.rows" :columns="[
+  { header: 'Contact', columns: [
+    { field: 'name', header: 'Name', sortable: true },
+    { field: 'email', header: 'Email' },
+  ] },
+  { field: 'status', header: 'Status', filterable: true },
+]" />
+```
+
+If a group entry omits `id`, one is derived deterministically from its children's ids, so it stays addressable (e.g. for `columnVisibility`) without colliding with a same-titled sibling group. **Nesting is available only on the config-array form** — `<Column>` has no nested-column surface; a grouped header cannot be built from `<Column>` children alone.
 
 ## Cell & header rendering — the parent `#cell` / `#colHeader` slot
 
