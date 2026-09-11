@@ -40,17 +40,17 @@ const [sorting, setSorting] = useState([]);
 ## Features
 
 - **Data grid basics** — sorting (single + shift-click multi), global + per-column filtering, client pagination, and a `manual` mode for server-side sort/filter/paginate (with `rowCount` / `pageCount`).
-- **Columns** — declare via a `:columns` config array, `<Column>` children, or both. Per-column visibility, resize, reorder, and left/right pinning (sticky offsets computed for you).
+- **Columns** — declare via a `:columns` config array, `<Column>` children, or both. Per-column visibility, resize, and left/right pinning (sticky offsets computed for you), plus a programmatic `columnOrder` slice (no drag affordance ships).
 - **Selection** — `single` / `multiple` row selection with an auto-injected checkbox column and select-all header.
 - **Expandable + nested rows** — a `#detail` panel under any open row, or depth-indented sub-rows via `getSubRows`. Multi-expand.
 - **Grouping + aggregation** — an ordered, multi-column `grouping` model (nested groups) with per-column `aggregationFn` (built-in name or custom fn) and a **headless** `#groupBar`.
 - **Faceted filtering** — cross-filtered distinct values + numeric min/max exposed to a **headless** `#filter` slot (build any checkbox list / range slider).
 - **Virtualization** — opt-in row and column windowing over the full filtered + sorted model, driven by `@tanstack/virtual-core`.
-- **Editing** — inline cell editing with validation, full-row editing, and five built-in editors (text / number / select / checkbox / date) plus a `custom` editor slot.
+- **Editing** — inline cell editing with validation, full-row editing, and four built-in editor types (`text` / `number` / `select` / `checkbox`) plus `editor="custom"` for a headless `#editor` slot.
 - **Grid interaction mode** (`interactionMode="grid"`) — a WAI-ARIA `role="grid"` with a roving single tab-stop, 2-D APG arrow-key cell navigation, rectangular range selection, TSV clipboard copy / paste / cut, drag-fill, Delete/Backspace clear, and `Ctrl+A` / `Ctrl+Arrow`.
 - **Undo / redo** — opt-in grid-wide history (`undoable`): every committed mutation (edit, paste, fill, cut, clear) is one `Ctrl/Cmd+Z` step, with `history-change` events to drive a toolbar.
 - **Headless by default, batteries optional** — the component ships no built-in group-bar / facet / editor UI; opt-in **drop-in** components (`GroupBar`, `DetailPanel`, five `Editor*`, three `Filter*`) are additive named exports you use as-is or fork as a template.
-- **Accessible + themeable** — WAI-ARIA throughout; every value is a `--rozie-data-table-*` custom property with ready-made `base.css` + `shadcn` / `material` / `bootstrap` bridges.
+- **Accessible + themeable** — WAI-ARIA throughout; the table's primary surfaces are themed through 19 `--rozie-data-table-*` custom properties, each with a built-in fallback, plus ready-made `base.css` + `shadcn` / `material` / `bootstrap` bridges. Some internal details (the grid active-cell ring, range highlight, fill handle, column menu, pagination bar) are not yet part of the public token surface.
 
 ## The surface at a glance
 

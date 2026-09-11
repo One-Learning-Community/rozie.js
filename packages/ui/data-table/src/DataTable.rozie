@@ -387,10 +387,11 @@
     },
   },
 
-  // columnOrder (ColumnOrderState = string[]) — req-10. model:true → two-way. A header
-  // drag writes a FRESH order array (immutable — never an in-place splice → silent on
-  // React/Solid/Angular/Lit). onColumnOrderChange → reorder-change regardless of
-  // binding. Fallback $data.columnOrderDefault.
+  // columnOrder (ColumnOrderState = string[]) — req-10. model:true → two-way. A consumer
+  // write (`applyColumnOrder` or the two-way binding) must write a FRESH order array
+  // (immutable — never an in-place splice → silent on React/Solid/Angular/Lit).
+  // onColumnOrderChange → reorder-change regardless of binding. Fallback
+  // $data.columnOrderDefault.
   columnOrder: {
     type: Array,
     default: () => [],

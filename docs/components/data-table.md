@@ -20,7 +20,7 @@
 
 Under the hood the "engine" is **`@tanstack/table-core`** — the *same* framework-agnostic state machine that powers TanStack Table — wired to each framework's reactivity **with no per-framework adapter**. `table-core` owns no DOM (it is a pure `createTable → setOptions → getRowModel` pull-based state machine), so `DataTable` is the controlled-state half of an engine wrapper with none of the DOM-mutation half: Rozie owns the author-side API (the twelve two-way `r-model` slices, the `<Column>` declarative children, the per-column `#cell` / `#header` reactive templates, and the accessible chrome), table-core owns the row model, and the consumer just binds state.
 
-And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+And because **the table's primary surfaces are themed through 19 `--rozie-data-table-*` CSS custom properties**, each with a built-in fallback, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5. Some internal details (the grid active-cell ring, range highlight, fill handle, column menu, pagination bar) are not yet part of the public token surface; see [Theming](/components/data-table-theming).
 
 ## The `@rozie-ui/data-table` packages
 
@@ -56,7 +56,7 @@ This page is the front door. Each concept below has its own page — start at **
 - [**Expandable rows & master-detail**](/components/data-table-expandable) — the `#detail` panel, nested sub-rows via `getSubRows`, multi-expand, and the imperative expand verbs.
 - [**Grouping & aggregation**](/components/data-table-grouping) — multi-column grouping, the `aggregationFn` per column, collapsible group headers, and the headless `#groupBar`.
 - [**Virtualization**](/components/data-table-virtualization) — opt-in row and column windowing (tested to 100,000 rows) with `virtual` / `estimateRowHeight` / `maxHeight` / `autoMeasure`.
-- [**Editing**](/components/data-table-editing) — editable cells and full-row edit, the five built-in editor types, validation, and the `#editor` slot + drop-in editor components.
+- [**Editing**](/components/data-table-editing) — editable cells and full-row edit, four built-in editor types (`text` / `number` / `select` / `checkbox`) plus `editor="custom"`, validation, and the `#editor` slot + drop-in editor components.
 - [**Grid mode & keyboard**](/components/data-table-grid-mode) — the opt-in WAI-ARIA grid pattern (`role="grid"`, roving tab-stop, 2-D arrow-key navigation, cell range selection) and the accessibility contract.
 - [**API reference**](/components/data-table-api) — the dense Props / Models / Events / Imperative handle / Slots tables.
 - [**Theming**](/components/data-table-theming) — the `--rozie-data-table-*` CSS custom properties and the shadcn / Material 3 / Bootstrap 5 design-system bridges.
@@ -64,7 +64,7 @@ This page is the front door. Each concept below has its own page — start at **
 - [**Per-framework usage code**](/components/data-table-usage) — the idiomatic consumption snippet for each of the six targets.
 - [**Live demo**](/components/data-table-demo) — the real Vue package running in the page, plus the one `.rozie` source and all six generated outputs.
 
-Under the hood the engine is `@tanstack/table-core` (a peer dependency you control), and every visual value is a `--rozie-data-table-*` CSS custom property with a built-in fallback — so the table renders zero-config without any theme import, and a theme swap re-skins it without touching structure. See [Theming](/components/data-table-theming) for the token vocabulary and the design-system bridges.
+Under the hood the engine is `@tanstack/table-core` (a peer dependency you control). The table's primary surfaces are themed through 19 `--rozie-data-table-*` CSS custom properties, each with a built-in fallback, so the table renders zero-config without any theme import, and a theme swap re-skins it without touching structure. Some internal details (the grid active-cell ring, range highlight, fill handle, column menu, pagination bar) are not yet part of the public token surface. See [Theming](/components/data-table-theming) for the token vocabulary and the design-system bridges.
 
 ## See also
 

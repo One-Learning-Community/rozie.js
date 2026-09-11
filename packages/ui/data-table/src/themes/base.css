@@ -1,14 +1,20 @@
 /*
  * @rozie-ui/data-table — base token reference.
  *
- * Every COSMETIC value the table renders flows through a `--rozie-data-table-*`
- * PUBLIC token. The component's scoped `<style>` reads short internal `--rdt-*`
- * tokens with inline `var(--rdt-x, <fallback>)` defaults, so the table renders
- * ZERO-CONFIG without importing this file — it already paints a sensible default.
- * Importing this file simply makes the full public token surface explicit in one
- * place and wires each public `--rozie-data-table-*` token onto the internal
- * `--rdt-*` the component consumes, so a design-system bridge (shadcn / material /
- * bootstrap) can re-skin the whole table by remapping ONLY the public tokens.
+ * This file is the PUBLIC token reference. It declares 19 `--rozie-data-table-*`
+ * tokens and wires each onto the short internal `--rdt-*` token the component's
+ * scoped `<style>` actually reads. The component reads 83 internal `--rdt-*`
+ * tokens in total, each with an inline `var(--rdt-x, <fallback>)` default, so the
+ * table renders ZERO-CONFIG without importing this file.
+ *
+ * Scope, stated plainly: remapping the public tokens re-skins the table's primary
+ * surfaces — type, borders, background, header, row, cell padding, accent, and the
+ * max-height. It does NOT reach every cosmetic value. 56 of the 83 internal tokens
+ * have no public counterpart today, including the grid active-cell ring, the range
+ * highlight, the fill handle, the invalid-cell outline, the group tokens, the filter
+ * row, the column ⋯ menu, the pagination bar, and the chrome column widths. Those
+ * remain internal and may be renamed; a design system that needs them should set the
+ * `--rdt-*` name directly and accept that it is not yet a stable API.
  *
  * NOTE the split (CONTEXT "Claude's Discretion" + the slider D-08 precedent): the
  * STRUCTURAL rules — `border-collapse`, the keyed-r-for layout, `position: sticky`
