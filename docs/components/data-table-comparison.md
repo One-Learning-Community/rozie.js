@@ -50,6 +50,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Faceted filtering | ✅ | ✅ | ✅ | ✅ | ✅ (AG) | ❌ | ✅ headless `#filter` + drop-ins |
 | Inline editing (cell + full-row) | ⚠️ assemble | ⚠️ (PrimeVue ✅) | ⚠️ assemble | ⚠️ assemble | ✅ (AG) | ❌ | ✅ five editors + validation |
 | Cell range selection + clipboard (grid mode) | ❌ | ❌ | ❌ | ❌ | ✅ (AG) | ❌ | ✅ `Shift+Arrow` / `Shift+Click` + `Ctrl+C` / `Ctrl+X` / `Ctrl+V` (range-tiling paste) |
+| CSV / Excel **file** export | ❌ | ⚠️ (PrimeVue `exportCSV` ✅) | ❌ | ❌ | ✅ (AG: CSV community, Excel enterprise) | ❌ | ⚠️ clipboard TSV only — no file download |
 | APG grid keyboard navigation (`role="grid"`) | ❌ | ⚠️ (PrimeVue) | ❌ | ❌ | ✅ (AG) | ❌ | ✅ `interactionMode="grid"` |
 | Declarative `<Column>` surface | ⚠️ defs array | ✅ (PrimeVue) | ⚠️ | ⚠️ | ⚠️ | — | ✅ `<Column>` + `:columns` |
 | Custom cell / header rendering | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ parent `#cell` / `#colHeader`, `columnId`-dispatched, plus an opt-in per-column `cell-<columnId>` / `colHeader-<columnId>` slot family (React/Solid render-prop, Lit property) |
@@ -75,6 +76,19 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 ## What Rozie defers {#what-rozie-defers}
 
 - **AG Grid's enterprise depth.** [AG Grid](https://www.ag-grid.com/) ships tree data, pivoting, integrated charting, and a deep server-side row model. `@rozie-ui/data-table` now covers row grouping + aggregation, expandable rows / master-detail, faceted filtering, inline editing, and cell range selection on top of the common surface (sort / filter / paginate / select / column management) plus a `manual` server-side hook, but not AG's full enterprise feature set.
+- **CSV / Excel file export.** There is no `exportCsv()` verb and no file download. Grid mode
+  copies a selected range to the clipboard as TSV (`Ctrl+C` / `Ctrl+X`), which pastes directly
+  into Excel, Sheets, or Numbers — so the common "get this into a spreadsheet" path is covered
+  without a file. What is genuinely missing is downloading a `.csv` / `.xlsx`, including the
+  whole table rather than a selection, and any control over the exported column set or
+  formatting. [AG Grid](https://www.ag-grid.com/) ships CSV export in its community build and
+  Excel export in enterprise; [PrimeVue](https://primevue.org/datatable/)'s DataTable has a
+  built-in `exportCSV()`. The headless TanStack families leave it to the
+  consumer, as we currently do — but mind the sharp edge: you own the `data` array you passed
+  in, and the handle exposes `getSelectedRows()` and `getColumnDefs()`, so exporting *raw* or
+  *selected* rows is a short function. What the handle does **not** expose is the derived
+  sorted-and-filtered row view, so "export exactly what I am looking at" currently means
+  re-applying your own sort/filter over `data` rather than reading it back off the table.
 - **`@rozie-ui/data-table` is pre-1.0** and younger and less battle-tested than the established libraries. The full prop / slice / event / handle surface is documented in the [API reference](/components/data-table-api).
 
 ## Try it
