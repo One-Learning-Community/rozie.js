@@ -23,7 +23,7 @@ export const handleManifest = {
   toggleRowExpanded:
     "Toggle ONE row's expanded state — `toggleRowExpanded(rowId)` where `rowId` is the consumer's row `id` (the data field) OR the table-core row id (both resolve). Scans the core flat-row set so a collapsed parent is still resolvable. Drives table-core so `expand-change` fires with the fresh `ExpandedState`. Multi-expand: it does not collapse other open rows.",
   expandAll:
-    'Open every expandable row — `expandAll()`. Drives table-core (`toggleAllRowsExpanded(true)`) so `expand-change` fires; the payload may be the `true` expand-all literal (Pitfall 2).',
+    'Open every expandable row — `expandAll()`. Drives table-core (`toggleAllRowsExpanded(true)`) so `expand-change` fires; the payload may be the `true` expand-all literal.',
   collapseAll:
     'Collapse every row — `collapseAll()`. Resets the expanded set to a blank state (`resetExpanded(true)` → `{}`) and fires `expand-change` with `{}`.',
   getExpandedRows:
@@ -37,7 +37,7 @@ export const handleManifest = {
   getFacetedMinMaxValues:
     "Return a numeric column's CROSS-FILTERED `[min, max]` range — `getFacetedMinMaxValues(colId)` → `[number, number] | null`. Resolves the column via `table.getColumn(colId)` and reads table-core's faceted min/max. Cross-filtered (reflects rows passing all OTHER active column filters) and updates when an upstream filter changes. `null` when unavailable. The read twin handed to the `#filter` scoped slot so a consumer builds a numeric range slider purely from exposed values.",
   getColumnDefs:
-    'Return the resolved `ColumnDef[]` (the id-keyed LWW union of the `:columns` config array and the `<Column>` children) — `getColumnDefs()`.',
+    'Return the resolved `ColumnDef[]` (the id-keyed LWW union of the `columns` config array and the `<Column>` children) — `getColumnDefs()`.',
   toggleAllRows:
     'Select or clear all (filtered) rows — `toggleAllRows(value)`. Drives table-core so `selection-change` fires with the fresh `RowSelectionState`.',
   clearSelection: 'Clear the row selection — `clearSelection()`. Fires `selection-change` with `{}`.',

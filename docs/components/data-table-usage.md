@@ -1001,7 +1001,7 @@ export function Demo() {
   // `groupable` enables getGroupedRowModel. The `grouping` model is an ORDERED column-id
   // list (multi-column → nested groups). Per-column `aggregationFn` rolls leaf values up
   // into the group-header row (a built-in name OR a custom fn). #groupBar is HEADLESS —
-  // you build the bar from its props; the component ships NO drag UI (D-02 retired).
+  // you build the bar from its props; the component ships NO drag UI.
   const rows = [
     { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
     { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
