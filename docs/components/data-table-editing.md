@@ -28,7 +28,7 @@ A cell enters edit mode on **double-click**, on a printable keypress (which seed
 
 **Full-row edit.** `Shift+F2` on a row (or the [`editRow(rowIndex)`](/components/data-table-api#imperative-handle) verb) opens every editable cell in the row at once; `Tab`/`Shift+Tab` move between editors. `Enter` commits the whole row in one `r-model:data` write + one `row-edit-commit` (validated together — one failure blocks the commit); `Escape` reverts the row as a unit. Like every other pointer/keyboard edit-entry path, `Shift+F2` is gated on `interactionMode="grid"`; the imperative `editRow` verb is not.
 
-**The `#editor` scoped slot** (scope `{ columnId, column, row, value, commit, cancel }`) replaces the built-in editor for a column — dispatch by `columnId`. `commit(newValue)` validates + commits (firing `cell-edit-commit`); `cancel()` closes without saving. On React/Solid it is the `renderEditor` / `editorSlot` render prop and on Lit the `.editor` property (the documented divergence).
+**The `#editor` scoped slot** (scope `{ columnId, column, row, value, commit, cancel, autofocus }`) replaces the built-in editor for a column — dispatch by `columnId`. `commit(newValue)` validates + commits (firing `cell-edit-commit`); `cancel()` closes without saving; `autofocus` tells the editor whether the host wants it to take initial focus — drive your input's focus from it. On React/Solid it is the `renderEditor` / `editorSlot` render prop and on Lit the `.editor` property (the documented divergence).
 
 **Per-column `editor-<columnId>` slot family.** Instead of dispatching `#editor` by `columnId` yourself, you can fill a single column's editor directly — `#editor-status="{ row, value, commit, cancel }"` — which wins over a generic `#editor` fill for that one column, which in turn wins over the built-in editor. Both the family and the generic `#editor` tier are gated identically: they reach only columns declaring `editor="custom"`. See [Columns — per-column slot families](/components/data-table-columns#per-column-slot-families) for the full precedence and gate rules shared across all four seams.
 
@@ -51,7 +51,7 @@ import { DataTable, Column, EditorText, EditorNumber, EditorSelect, EditorCheckb
 //  Lit: the single side-effect import registers the <rozie-editor-*> custom elements.)
 ```
 
-Each drop-in takes the `#editor` slot scope as its props — `{ columnId, column, row, value, commit, cancel }` — and `EditorSelect` additionally takes `options: [{ value, label }]` (the same shape as `<Column editorOptions>`). Mark the column `editor="custom"` so the slot drives rendering, then dispatch by `columnId` inside `#editor` and forward the scope to the matching drop-in. Use them **as-is**, or fork one as a template for a bespoke editor.
+Each drop-in takes the `#editor` slot scope as its props — `{ columnId, column, row, value, commit, cancel, autofocus }` — and `EditorSelect` additionally takes `options: [{ value, label }]` (the same shape as `<Column editorOptions>`). Mark the column `editor="custom"` so the slot drives rendering, then dispatch by `columnId` inside `#editor` and forward the scope to the matching drop-in. Use them **as-is**, or fork one as a template for a bespoke editor.
 
 | Component | Renders | Extra props |
 | --- | --- | --- |

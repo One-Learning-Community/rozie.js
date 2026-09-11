@@ -417,8 +417,8 @@ export function Demo() {
   // OPT-IN drop-in editors fill the #editor slot — DataTable stays the headless
   // DEFAULT; the editors are additive named exports. Mark each column editor="custom"
   // (the drop-in owns rendering) and dispatch by columnId. Each editor takes the slot
-  // scope as props ({ columnId, column, row, value, commit, cancel }); EditorSelect
-  // also takes \`options\`. Use them as-is, or fork one as a template.
+  // scope as props ({ columnId, column, row, value, commit, cancel, autofocus });
+  // EditorSelect also takes \`options\`. Use them as-is, or fork one as a template.
   const [rows, setRows] = useState(${EDIT_ROWS});
   const statusOptions = ${STATUS_OPTIONS};
   return (
@@ -461,7 +461,7 @@ export function Demo() {
   // OPT-IN drop-in filters fill the #filter slot — DataTable stays the headless
   // DEFAULT; the filters are additive named exports. Mark each column \`filterable\`
   // (the #filter slot only renders for filterable columns) and dispatch by columnId.
-  // Each filter takes the slot scope as props ({ columnId, column, value, setFilter });
+  // Each filter takes the slot scope as props ({ columnId, value, setFilter });
   // FilterSelect also reads \`uniqueValues\`, FilterNumberRange also reads \`minMax\` —
   // both arrive in the slot scope, so spreading it through wires them up.
   const rows = ${FACET_ROWS};
@@ -771,8 +771,8 @@ import DataTable, {
 
 // OPT-IN drop-in editors fill the #editor slot — DataTable stays the headless DEFAULT
 // export; the editors are additive named exports. v-bind the whole slot scope through
-// to each drop-in ({ columnId, column, row, value, commit, cancel }); EditorSelect also
-// takes :options. Use them as-is, or fork one as a template.
+// to each drop-in ({ columnId, column, row, value, commit, cancel, autofocus }); EditorSelect
+// also takes :options. Use them as-is, or fork one as a template.
 const rows = ref(${EDIT_ROWS});
 const statusOptions = ${STATUS_OPTIONS};
 </script>
@@ -812,7 +812,7 @@ import DataTable, {
 // OPT-IN drop-in filters fill the #filter slot — DataTable stays the headless DEFAULT
 // export; the filters are additive named exports. Mark each column :filterable (the
 // #filter slot only renders for filterable columns) and v-bind the whole slot scope
-// through to each drop-in ({ columnId, column, value, setFilter, uniqueValues, minMax }).
+// through to each drop-in ({ columnId, value, uniqueValues, minMax, setFilter }).
 const rows = ref(${FACET_ROWS});
 const columnFilters = ref<{ id: string; value: unknown }[]>([]);
 </script>
@@ -1090,7 +1090,7 @@ const rows = ${FACET_ROWS};
 
   // OPT-IN drop-in editors fill the #editor snippet — DataTable stays the headless
   // DEFAULT export; the editors are additive named exports. Spread the snippet scope
-  // through to each drop-in ({ columnId, column, row, value, commit, cancel });
+  // through to each drop-in ({ columnId, column, row, value, commit, cancel, autofocus });
   // EditorSelect also takes \`options\`. Use them as-is, or fork one as a template.
   let rows = $state(${EDIT_ROWS});
   const statusOptions = ${STATUS_OPTIONS};
@@ -1134,7 +1134,7 @@ const rows = ${FACET_ROWS};
   // OPT-IN drop-in filters fill the #filter snippet — DataTable stays the headless
   // DEFAULT export; the filters are additive named exports. Mark each column filterable
   // (the #filter snippet only renders for filterable columns) and spread the snippet
-  // scope ({ columnId, column, value, setFilter, uniqueValues, minMax }) through.
+  // scope ({ columnId, value, uniqueValues, minMax, setFilter }) through.
   let rows = $state(${FACET_ROWS});
   let columnFilters = $state<{ id: string; value: unknown }[]>([]);
 </script>
@@ -1474,8 +1474,8 @@ import {
   template: \`
     <!-- OPT-IN drop-in editors fill the #editor template — DataTable stays the headless
          default; the editors are additive named exports. Each takes the slot scope as
-         inputs ([columnId] [column] [row] [value] [commit] [cancel]); EditorSelect also
-         takes [options]. Mark each column editor="custom" so the #editor slot drives it. -->
+         inputs ([columnId] [column] [row] [value] [commit] [cancel] [autofocus]); EditorSelect
+         also takes [options]. Mark each column editor="custom" so the #editor slot drives it. -->
     <DataTable
       interactionMode="grid"
       [(data)]="rows"
@@ -1487,22 +1487,22 @@ import {
       <Column field="active" header="Active" [editable]="true" editor="custom" />
       <Column field="score" header="Score" [editable]="true" editor="custom" />
 
-      <ng-template #editor let-columnId="columnId" let-column="column" let-row="row" let-value="value" let-commit="commit" let-cancel="cancel">
+      <ng-template #editor let-columnId="columnId" let-column="column" let-row="row" let-value="value" let-commit="commit" let-cancel="cancel" let-autofocus="autofocus">
         @switch (columnId) {
           @case ('name') {
-            <rozie-editor-text [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+            <rozie-editor-text [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" />
           }
           @case ('qty') {
-            <rozie-editor-number [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+            <rozie-editor-number [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" />
           }
           @case ('status') {
-            <rozie-editor-select [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [options]="statusOptions" />
+            <rozie-editor-select [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" [options]="statusOptions" />
           }
           @case ('active') {
-            <rozie-editor-checkbox [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+            <rozie-editor-checkbox [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" />
           }
           @case ('score') {
-            <rozie-editor-date [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+            <rozie-editor-date [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" />
           }
         }
       </ng-template>
@@ -1531,7 +1531,7 @@ import {
   template: \`
     <!-- OPT-IN drop-in filters fill the #filter template — DataTable stays the headless
          default; the filters are additive named exports. Each takes the slot scope as
-         inputs ([columnId] [column] [value] [setFilter]); FilterSelect also takes
+         inputs ([columnId] [value] [setFilter]); FilterSelect also takes
          [uniqueValues], FilterNumberRange also takes [minMax]. Mark each column
          filterable so the #filter slot renders. -->
     <DataTable [(data)]="rows" [(columnFilters)]="columnFilters">
@@ -1539,16 +1539,16 @@ import {
       <Column field="category" header="Category" [filterable]="true" />
       <Column field="price" header="Price" [filterable]="true" />
 
-      <ng-template #filter let-columnId="columnId" let-column="column" let-value="value" let-setFilter="setFilter" let-uniqueValues="uniqueValues" let-minMax="minMax">
+      <ng-template #filter let-columnId="columnId" let-value="value" let-setFilter="setFilter" let-uniqueValues="uniqueValues" let-minMax="minMax">
         @switch (columnId) {
           @case ('name') {
-            <rozie-filter-text [columnId]="columnId" [column]="column" [value]="value" [setFilter]="setFilter" />
+            <rozie-filter-text [columnId]="columnId" [value]="value" [setFilter]="setFilter" />
           }
           @case ('category') {
-            <rozie-filter-select [columnId]="columnId" [column]="column" [value]="value" [setFilter]="setFilter" [uniqueValues]="uniqueValues" />
+            <rozie-filter-select [columnId]="columnId" [value]="value" [setFilter]="setFilter" [uniqueValues]="uniqueValues" />
           }
           @case ('price') {
-            <rozie-filter-number-range [columnId]="columnId" [column]="column" [value]="value" [setFilter]="setFilter" [minMax]="minMax" />
+            <rozie-filter-number-range [columnId]="columnId" [value]="value" [setFilter]="setFilter" [minMax]="minMax" />
           }
         }
       </ng-template>
@@ -1859,8 +1859,8 @@ import {
 export function Demo() {
   // OPT-IN drop-in editors fill the #editor slot — DataTable stays the headless
   // default; the editors are additive named exports. Spread the slot scope through to
-  // each drop-in ({ columnId, column, row, value, commit, cancel }); EditorSelect also
-  // takes \`options\`. Use them as-is, or fork one as a template.
+  // each drop-in ({ columnId, column, row, value, commit, cancel, autofocus }); EditorSelect
+  // also takes \`options\`. Use them as-is, or fork one as a template.
   const [rows, setRows] = createSignal(${EDIT_ROWS});
   const statusOptions = ${STATUS_OPTIONS};
   return (
@@ -1902,7 +1902,7 @@ export function Demo() {
   // OPT-IN drop-in filters fill the #filter slot — DataTable stays the headless
   // default; the filters are additive named exports. Mark each column filterable (the
   // #filter slot only renders for filterable columns) and spread the slot scope through
-  // to each drop-in ({ columnId, column, value, setFilter, uniqueValues, minMax }).
+  // to each drop-in ({ columnId, value, uniqueValues, minMax, setFilter }).
   const rows = ${FACET_ROWS};
   const [columnFilters, setColumnFilters] = createSignal<{ id: string; value: unknown }[]>([]);
   return (
@@ -2194,21 +2194,21 @@ const statusOptions = ${STATUS_OPTIONS};
 
 // The #editor slot is the \`.editor\` property — a function returning a Lit template,
 // dispatched by columnId. Pass the slot scope ({ columnId, column, row, value, commit,
-// cancel }) as element properties; <rozie-editor-select> also takes \`.options\`.
+// cancel, autofocus }) as element properties; <rozie-editor-select> also takes \`.options\`.
 render(html\`
   <rozie-data-table
     interactionmode="grid"
     .data=\${rows}
     @data-change=\${(e: CustomEvent) => { rows = e.detail; }}
     @cell-edit-commit=\${(e: CustomEvent) => console.log('cell commit', e.detail)}
-    .editor=\${({ columnId, column, row, value, commit, cancel }) => {
-      const p = { columnId, column, row, value, commit, cancel };
+    .editor=\${({ columnId, column, row, value, commit, cancel, autofocus }) => {
+      const p = { columnId, column, row, value, commit, cancel, autofocus };
       switch (columnId) {
-        case 'name':   return html\`<rozie-editor-text .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel}></rozie-editor-text>\`;
-        case 'qty':    return html\`<rozie-editor-number .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel}></rozie-editor-number>\`;
-        case 'status': return html\`<rozie-editor-select .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel} .options=\${statusOptions}></rozie-editor-select>\`;
-        case 'active': return html\`<rozie-editor-checkbox .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel}></rozie-editor-checkbox>\`;
-        case 'score':  return html\`<rozie-editor-date .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel}></rozie-editor-date>\`;
+        case 'name':   return html\`<rozie-editor-text .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel} .autofocus=\${p.autofocus}></rozie-editor-text>\`;
+        case 'qty':    return html\`<rozie-editor-number .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel} .autofocus=\${p.autofocus}></rozie-editor-number>\`;
+        case 'status': return html\`<rozie-editor-select .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel} .autofocus=\${p.autofocus} .options=\${statusOptions}></rozie-editor-select>\`;
+        case 'active': return html\`<rozie-editor-checkbox .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel} .autofocus=\${p.autofocus}></rozie-editor-checkbox>\`;
+        case 'score':  return html\`<rozie-editor-date .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel} .autofocus=\${p.autofocus}></rozie-editor-date>\`;
         default:       return null;
       }
     }}
@@ -2234,19 +2234,19 @@ let rows = ${FACET_ROWS};
 let columnFilters: { id: string; value: unknown }[] = [];
 
 // The #filter slot is the \`.filter\` property — a function returning a Lit template,
-// dispatched by columnId. Pass the slot scope ({ columnId, column, value, setFilter,
-// uniqueValues, minMax }) as element properties.
+// dispatched by columnId. Pass the slot scope ({ columnId, value, uniqueValues, minMax,
+// setFilter }) as element properties.
 render(html\`
   <rozie-data-table
     .data=\${rows}
     .columnFilters=\${columnFilters}
     @filter-change=\${(e: CustomEvent) => { columnFilters = e.detail.columnFilters; }}
-    .filter=\${({ columnId, column, value, setFilter, uniqueValues, minMax }) => {
-      const p = { columnId, column, value, setFilter, uniqueValues, minMax };
+    .filter=\${({ columnId, value, setFilter, uniqueValues, minMax }) => {
+      const p = { columnId, value, setFilter, uniqueValues, minMax };
       switch (columnId) {
-        case 'name':     return html\`<rozie-filter-text .columnId=\${p.columnId} .column=\${p.column} .value=\${p.value} .setFilter=\${p.setFilter}></rozie-filter-text>\`;
-        case 'category': return html\`<rozie-filter-select .columnId=\${p.columnId} .column=\${p.column} .value=\${p.value} .setFilter=\${p.setFilter} .uniqueValues=\${p.uniqueValues}></rozie-filter-select>\`;
-        case 'price':    return html\`<rozie-filter-number-range .columnId=\${p.columnId} .column=\${p.column} .value=\${p.value} .setFilter=\${p.setFilter} .minMax=\${p.minMax}></rozie-filter-number-range>\`;
+        case 'name':     return html\`<rozie-filter-text .columnId=\${p.columnId} .value=\${p.value} .setFilter=\${p.setFilter}></rozie-filter-text>\`;
+        case 'category': return html\`<rozie-filter-select .columnId=\${p.columnId} .value=\${p.value} .setFilter=\${p.setFilter} .uniqueValues=\${p.uniqueValues}></rozie-filter-select>\`;
+        case 'price':    return html\`<rozie-filter-number-range .columnId=\${p.columnId} .value=\${p.value} .setFilter=\${p.setFilter} .minMax=\${p.minMax}></rozie-filter-number-range>\`;
         default:         return null;
       }
     }}
