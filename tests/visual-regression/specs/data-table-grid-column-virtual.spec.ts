@@ -949,9 +949,11 @@ for (const target of TARGETS) {
 //     materializes (DataTable.rozie's afterFirstFrame) — the column-axis equivalent of the
 //     bump the row axis already got for free via remeasureWindow().
 // The forcedColumns()/colPadLeft()/colPadRight() arithmetic these cases exercise was correct
-// throughout, and was verified on every target by direct computation against
-// colVirtualizer.getTotalSize() (padLeft + rendered-cell widths + padRight sums to EXACTLY
-// getTotalSize() on all six).
+// throughout. That claim used to rest on a one-off manual computation recorded here in prose;
+// it is now ENFORCED in code by the F-08 case at the bottom of this file (padLeft + rendered
+// cells + padRight == colCount x column width, on all six, at three scroll offsets). Prose
+// gates nothing — see F-08's own header for why the expected total is derived from the column
+// count rather than from scrollWidth.
 // ═══════════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
   const run = runnerFor(target);
@@ -1325,5 +1327,108 @@ for (const target of TARGETS) {
     await page.waitForTimeout(200);
     const after = await widthOf();
     expect(after).toBeGreaterThan(before + 40);
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// F-08 — the COLUMN-axis spacer-sum invariant, the twin of the enforced ROW-axis one at
+// data-table-edit.spec.ts:588 ("total scroll height must stay invariant").
+//
+//   leading .rdt-col-spacer + Σ(rendered data cells) + trailing .rdt-col-spacer
+//     == colCount × the per-column width
+//
+// This file has asserted that in PROSE since 260908-vcy ("verified on every target by direct
+// computation against colVirtualizer.getTotalSize()") and in CODE nowhere.
+//
+// WHY THE EXPECTED TOTAL IS DERIVED FROM colCount AND NOT FROM THE DOM: under
+// table-layout:fixed a row's cell widths are what DRIVE the container's scrollWidth, so
+// comparing the row sum against scrollWidth is very nearly a tautology — and specifically it
+// would NOT have caught the bug this invariant exists to catch. In the 260908-vcy Svelte
+// collapse the trailing spacer froze at 0px and scrollWidth fell 9000 -> 1350; the row sum
+// fell with it, so both sides of a DOM-vs-DOM comparison would have agreed at 1350 and the
+// case would have stayed green. Deriving the expectation from the COLUMN COUNT instead makes
+// the two sides independent: that same collapse reads 1350 against an expected 9000.
+//
+// Read off the first BODY row: the first row establishes column widths under
+// table-layout:fixed, and a body row carries none of the grouped-header colspan arithmetic
+// that A-03 is about — so a failure here is a spacer/geometry fault, not a header-span fault.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+const F08_COL_COUNT = 60;
+const F08_COL_W = 150; // table-core's default; this demo sets no per-column size (see A-01)
+const F08_EXPECTED_TOTAL = F08_COL_COUNT * F08_COL_W; // 9000
+
+async function columnAxisRowGeometry(
+  page: Page,
+): Promise<{ padSum: number; cellSum: number; dataCells: number; widest: number; scrollWidth: number } | null> {
+  return page.evaluate(() => {
+    // The file's own shadow-piercing walkers (installGridTableHelpers) — a plain
+    // document.querySelector cannot reach into the Lit leaf's shadow root.
+    const findAll = (window as unknown as { __findAllWithinGridTable: (s: string) => Element[] }).__findAllWithinGridTable;
+    const findOne = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
+    const scroller = findOne('.rdt-scroll') as HTMLElement | null;
+    if (!scroller) return null;
+    // Explicitly skip a row-virtualization spacer row rather than trusting :first-child.
+    const rows = findAll('tbody tr');
+    let row: Element | null = null;
+    for (const r of rows) {
+      if (r.querySelector('[data-grid-cell]') || r.querySelector('.rdt-col-spacer')) { row = r; break; }
+    }
+    if (!row) return null;
+    let padSum = 0;
+    let cellSum = 0;
+    let dataCells = 0;
+    let widest = 0;
+    for (const cell of Array.from(row.children)) {
+      const w = (cell as HTMLElement).getBoundingClientRect().width;
+      if (cell.classList.contains('rdt-col-spacer')) {
+        padSum += w;
+      } else {
+        cellSum += w;
+        dataCells++;
+        if (w > widest) widest = w;
+      }
+    }
+    return { padSum, cellSum, dataCells, widest, scrollWidth: scroller.scrollWidth };
+  });
+}
+
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: F-08 colPadLeft + rendered cells + colPadRight == colCount x column width`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await stableScrollWidthOf(page);
+    // Guard the two constants the expectation is built on, so a demo change fails loudly here
+    // rather than silently weakening the invariant below.
+    await expect
+      .poll(async () => readoutText(page, 'col-count'), { timeout: 15_000 })
+      .toBe(String(F08_COL_COUNT));
+    const probe0 = await columnAxisRowGeometry(page);
+    expect(probe0, 'F-08 probe must resolve a body row').not.toBeNull();
+    expect(
+      Math.abs((probe0 as NonNullable<typeof probe0>).widest - F08_COL_W),
+      `F-08 assumes ${F08_COL_W}px data columns; demo now renders ${(probe0 as NonNullable<typeof probe0>).widest}px`,
+    ).toBeLessThanOrEqual(1);
+
+    for (const left of [0, 3000, 6000]) {
+      await scrollGridTo(page, left);
+      await stableScrollWidthOf(page);
+      await expect
+        .poll(
+          async () => {
+            const r = await columnAxisRowGeometry(page);
+            if (!r) return 'probe-returned-null';
+            const total = r.padSum + r.cellSum;
+            // 2px absorbs sub-pixel layout rounding across the ~dozen rendered cells; it is far
+            // below the smallest real fault this guards (the Svelte collapse was 7650px off).
+            return Math.abs(total - F08_EXPECTED_TOTAL) <= 2
+              ? 'exact'
+              : `pad=${Math.round(r.padSum)} cells=${Math.round(r.cellSum)} (${r.dataCells}) total=${Math.round(total)} expected=${F08_EXPECTED_TOTAL} scrollWidth=${r.scrollWidth}`;
+          },
+          { timeout: 15_000 },
+        )
+        .toBe('exact');
+    }
   });
 }
