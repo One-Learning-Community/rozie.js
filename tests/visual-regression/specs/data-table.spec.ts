@@ -380,6 +380,11 @@ for (const target of TARGETS) {
     const resizeTarget = mount.locator('th.rdt-th').first();
     const widthBefore = await resizeTarget.evaluate((el) => el.getBoundingClientRect().width);
     const hb = await resizeHandle.boundingBox();
+    // F-06: without this assertion a null boundingBox silently skips the whole drag and this
+    // case PASSES having asserted nothing — verified 2026-09-11 by forcing hb null, which
+    // went green in 1.8s. That is the exact vacuity the comment above says this case exists
+    // to prevent ("a visible button proves nothing about whether dragging it does anything").
+    expect(hb, 'resize handle must have a layout box — a null box means the drag never ran').not.toBeNull();
     if (hb) {
       // Intermediate moves, not a single jump: table-core seeds startOffset on pointerdown and
       // reads it back on every move, so a one-shot move would not exercise the read-your-own-
