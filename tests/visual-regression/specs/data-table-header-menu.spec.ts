@@ -136,22 +136,20 @@ for (const target of TARGETS) {
     // `<th>`/Popover subtree on any table-state change; that root cause is now
     // FIXED (Solid emits `<Key>`, commit b3c29136). This exclusion is retained
     // ONLY pending a VR run confirming Solid stays open end-to-end.
-    // TODO(solid-key-vr): once the Solid VR cell is green here, drop the
-    // `target !== 'solid'` guard so this guarantee is asserted on all six.
-    if (target !== 'solid') {
-      runner(`the ⋯ menu stays open across a Pin action (does not self-close) [${target}]`, async ({ page }) => {
-        await page.goto(`/?example=DataTableSuper&target=${target}`);
-        await expect(page.getByTestId('dt-super')).toBeVisible({ timeout: 15_000 });
+    // F-04 (2026-09-11): guard DROPPED — the exclusion outlived its cause and was only ever
+    // a placeholder awaiting a VR run that was never performed. Asserted on all six now.
+    runner(`the ⋯ menu stays open across a Pin action (does not self-close) [${target}]`, async ({ page }) => {
+      await page.goto(`/?example=DataTableSuper&target=${target}`);
+      await expect(page.getByTestId('dt-super')).toBeVisible({ timeout: 15_000 });
 
-        await page.getByRole('button', { name: 'Column options for Units', exact: true }).click();
-        const menu = page.locator('[role="menu"].rdt-col-menu:visible');
-        await expect(menu).toBeVisible();
-        await menu.getByRole('menuitem', { name: 'Pin left' }).click();
-        await expect(menu).toBeVisible();
-        await expect(menu.getByRole('menuitem', { name: 'Pin left' })).toHaveAttribute('aria-pressed', 'true');
-        await page.keyboard.press('Escape');
-      });
-    }
+      await page.getByRole('button', { name: 'Column options for Units', exact: true }).click();
+      const menu = page.locator('[role="menu"].rdt-col-menu:visible');
+      await expect(menu).toBeVisible();
+      await menu.getByRole('menuitem', { name: 'Pin left' }).click();
+      await expect(menu).toBeVisible();
+      await expect(menu.getByRole('menuitem', { name: 'Pin left' })).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.press('Escape');
+    });
 
     runner(`Hide column removes Units; the colvis verb re-shows it [${target}]`, async ({ page }) => {
       await page.goto(`/?example=DataTableSuper&target=${target}`);
@@ -249,17 +247,20 @@ for (const target of TARGETS) {
       await page.keyboard.press('Escape');
       await expect(menu).toBeHidden();
       // Popover's Escape/dismiss path restores focus to the click-trigger anchor
-      // (72-06b, deepActiveElement() — resolves through nested shadow roots on
-      // Lit). Excludes Solid: a real Playwright click on the trigger never
-      // gives it native DOM focus there in the first place (document.activeElement
-      // stays <body> immediately after the click, before any Popover logic
-      // runs — confirmed via a monkey-patched HTMLElement.prototype.focus that
-      // never fired) — unlike the other five targets, where the SAME click
-      // sequence naturally focuses the button. Popover's capture/restore logic
-      // is verified correct (it captures/restores whatever `document.activeElement`
-      // actually is); the gap is that Solid's click handling doesn't grant the
-      // trigger focus to begin with — a documented, pre-existing Solid-target
-      // finding (see deferred-items.md), out of this plan's scope.
+      // (72-06b, deepActiveElement() — resolves through nested shadow roots on Lit).
+      //
+      // Excludes Solid, where the trigger does not hold DOM focus after the click. The cause
+      // once filed here — "confirmed via a monkey-patched HTMLElement.prototype.focus that
+      // never fired" — is FALSE, and was retired by the 2026-09-10 audit: native
+      // focus-on-mousedown is a browser DEFAULT ACTION, not a call to that method, so the
+      // patch could never have observed it. That non-probative evidence kept a real defect
+      // filed for weeks as a harness quirk.
+      // Real mechanism: packages/ui/popover/packages/solid/src/Popover.tsx reads open() inside
+      // the JSX insert that invokes the #anchor slot, so Solid replaces that subtree and tears
+      // out the just-focused .rdt-col-menu-trigger (DataTable.rozie:2058).
+      // So the documented "Escape returns focus to the trigger" guarantee is not merely
+      // untested on Solid — it is FALSE there. Owned by Plan 2B (F-03); this guard comes out
+      // when that lands.
       if (target !== 'solid') {
         await expect(trigger).toBeFocused();
       }
