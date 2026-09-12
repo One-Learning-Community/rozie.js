@@ -177,45 +177,93 @@ test('expanding a row reveals its detail panel', async ({ page }) => {
   await expect(page.getByTestId('readout').locator('[data-slice="expanded"]')).not.toContainText('{}');
 });
 
-test('switching theme changes the active data-table stylesheet AND visibly restyles it', async ({ page }) => {
-  await page.goto('/?example=DataTableSuper&target=vue');
-  // An id-only assertion (which `<style id="rdt-theme-*">` is `.disabled`)
-  // is NOT sufficient — it passed even under the original Task 7 landing's
-  // mutually-exclusive swap bug, which disabled base.css's token-wiring the
-  // moment a skin was selected, so shadcn/material/bootstrap's remapped
-  // tokens landed on custom properties nothing reads and the table silently
-  // kept its zero-config look. Assert the REAL computed effect instead: the
-  // header cell's `background-color` (driven by `--rdt-header-bg`, which
-  // base.css wires from the public `--rozie-data-table-header-bg` token —
-  // base.css's value is `rgba(0, 0, 0, 0.03)`, shadcn.css's remapped value
-  // is `hsl(var(--muted, 210 40% 96.1%))` — genuinely different colors)
-  // must actually CHANGE when switching themes. A broken/no-op swap fails
-  // this even if the active stylesheet id still flips.
-  const headerCell = page.locator('thead .rdt-th').first();
-  const headerBg = () => headerCell.evaluate((el) => getComputedStyle(el).backgroundColor);
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// THEME_SWAP_KNOWN_FAILING — two DIFFERENT live defects, both verified red here on
+// 2026-09-11 before being excluded. Neither is a harness quirk; each is owned by a plan and
+// each entry comes OUT as that plan's definition of done. Do not widen this set, and do not
+// promote it to a file-wide KNOWN_FAILING (every data-table spec's file-wide set is empty).
+//
+//   lit   — F-01, Plan 2B. The public tokens are INERT in the Lit leaf's shadow root.
+//           Measured: `--rozie-data-table-header-bg` and `--rdt-header-bg` both resolve to
+//           the EMPTY STRING on a `thead .rdt-th`, before AND after the swap, and the
+//           rendered #f7f7f7 comes from base.css's inline var() FALLBACK, not from a token.
+//           base.css maps tokens under the document-level class selectors
+//           `.rozie-data-table-wrap, .rozie-data-table`, and on Lit both of those elements
+//           live INSIDE the shadow root (verified: th -> tr -> thead -> table.rozie-data-table
+//           -> div.rozie-data-table-wrap -> <rozie-data-table> shadow boundary), while the
+//           four `<style id="rdt-theme-*">` sheets sit in document.head. A head-level class
+//           selector cannot match inside a shadow root, so the swap changes nothing.
+//
+//   react — NEW, not in the 2026-09-10 audit. Found by this conversion. The theme sheet is
+//           never ENABLED: enabledIds stays 'rdt-theme-base'. Tokens resolve FINE on React
+//           (#f7f7f7), so this is not F-01 — the swap itself never runs. Root cause is
+//           REACT CLOSURE STALENESS in emitted code. The demo authors
+//           `r-model="$data.theme"` and `@change="applyTheme($data.theme)"` on one <select>;
+//           the emitter correctly MERGES both into a single onChange (the old duplicate-key
+//           defect is genuinely fixed), but emits:
+//               const [x, ne] = useState("base"); const T = useRef(x); T.current = x;
+//               onChange: a => { ne(a.target.value), V(x) }
+//           so applyTheme receives the PRE-CHANGE render const `x` ("base") rather than the
+//           new value — while a fresh-value ref `T.current` already exists one line above and
+//           goes unused. Same class as 0353d25b1 (React resize, shipping in this wave) and
+//           B-01 (React drag-select stale anchor): the third instance of one emitter defect.
+//           Per the emitter-owns-parity principle this is an EMITTER fix, not a demo edit.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+const THEME_SWAP_KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set(['lit', 'react']);
 
-  // Under the LAYERED swap, `base` is ALWAYS enabled (a "first non-disabled
-  // id" locator would always resolve to `rdt-theme-base` and never change) —
-  // so capture the full SET of enabled sheet ids instead: base-only before,
-  // base+material after.
-  const enabledIds = () => page.evaluate(() =>
-    Array.from(document.querySelectorAll('[id^="rdt-theme-"]'))
-      .filter((s) => !(s as HTMLStyleElement & { disabled?: boolean }).disabled)
-      .map((s) => s.id)
-      .sort()
-      .join(','));
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// F-05a / the six-target THEMING-TOKEN gate. This case asserts a PUBLIC token's computed
+// effect end to end: flip the theme, and `thead .rdt-th`'s background-color — driven by
+// `--rozie-data-table-header-bg` -> `--rdt-header-bg` -> the rule base.css wires — must
+// actually change. Running it on all six is therefore the theming-token coverage the
+// 2026-09-10 audit asks for in §6 Wave D, not a separate case.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || THEME_SWAP_KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`switching theme changes the active data-table stylesheet AND visibly restyles it [${target}]`, async ({ page }) => {
+    await page.goto(`/?example=DataTableSuper&target=${target}`);
+    // An id-only assertion (which `<style id="rdt-theme-*">` is `.disabled`)
+    // is NOT sufficient — it passed even under the original Task 7 landing's
+    // mutually-exclusive swap bug, which disabled base.css's token-wiring the
+    // moment a skin was selected, so shadcn/material/bootstrap's remapped
+    // tokens landed on custom properties nothing reads and the table silently
+    // kept its zero-config look. Assert the REAL computed effect instead: the
+    // header cell's `background-color` (driven by `--rdt-header-bg`, which
+    // base.css wires from the public `--rozie-data-table-header-bg` token —
+    // base.css's value is `#f7f7f7` (made OPAQUE — a translucent header lets the scrolling
+    // body bleed through in sticky mode), shadcn.css's remapped value
+    // is `hsl(var(--muted, 210 40% 96.1%))` — genuinely different colors)
+    // must actually CHANGE when switching themes. A broken/no-op swap fails
+    // this even if the active stylesheet id still flips.
+    const headerCell = page.locator('thead .rdt-th').first();
+    const headerBg = () => headerCell.evaluate((el) => getComputedStyle(el).backgroundColor);
 
-  // $onMount's style-element injection runs after first paint, so poll
-  // rather than asserting synchronously on the very first read.
-  await expect.poll(enabledIds).toBe('rdt-theme-base');
-  const beforeBg = await headerBg();
+    // Under the LAYERED swap, `base` is ALWAYS enabled (a "first non-disabled
+    // id" locator would always resolve to `rdt-theme-base` and never change) —
+    // so capture the full SET of enabled sheet ids instead: base-only before,
+    // base+material after.
+    const enabledIds = () => page.evaluate(() =>
+      Array.from(document.querySelectorAll('[id^="rdt-theme-"]'))
+        .filter((s) => !(s as HTMLStyleElement & { disabled?: boolean }).disabled)
+        .map((s) => s.id)
+        .sort()
+        .join(','));
 
-  await page.getByTestId('ctl-theme').selectOption('material');
+    // $onMount's style-element injection runs after first paint, so poll
+    // rather than asserting synchronously on the very first read.
+    await expect.poll(enabledIds).toBe('rdt-theme-base');
+    const beforeBg = await headerBg();
 
-  await expect.poll(enabledIds).toBe('rdt-theme-base,rdt-theme-material');
-  await expect.poll(headerBg).not.toBe(beforeBg);
-  await expect(page.locator('tbody tr').first()).toBeVisible();
-});
+    await page.getByTestId('ctl-theme').selectOption('material');
+
+    await expect.poll(enabledIds).toBe('rdt-theme-base,rdt-theme-material');
+    await expect.poll(headerBg).not.toBe(beforeBg);
+    await expect(page.locator('tbody tr').first()).toBeVisible();
+  });
+}
 
 test('imperative expandAll populates expanded; applyGrouping writes grouping', async ({ page }) => {
   // Task 6: the isolated imperative-handle panel is gated OFF by default
