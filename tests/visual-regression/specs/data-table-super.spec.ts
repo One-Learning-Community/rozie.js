@@ -265,17 +265,27 @@ for (const target of TARGETS) {
   });
 }
 
-test('imperative expandAll populates expanded; applyGrouping writes grouping', async ({ page }) => {
-  // Task 6: the isolated imperative-handle panel is gated OFF by default
-  // (ctl-handle) — check it to reveal the $refs.tbl.<verb>() button panel,
-  // then drive two side-effecting verbs and assert the effect shows up in
-  // the readout ($data.groupingModel underlies the `grouping` slice —
-  // Task 6's Angular-landmine rename; the `data-slice="grouping"` locator
-  // is unchanged).
-  await page.goto('/?example=DataTableSuper&target=vue');
-  await page.getByTestId('ctl-handle').check();
-  await page.getByTestId('verb-expandAll').click();
-  await expect(page.getByTestId('readout').locator('[data-slice="expanded"]')).not.toContainText('{}');
-  await page.getByTestId('verb-applyGrouping').click();
-  await expect(page.getByTestId('readout').locator('[data-slice="grouping"]')).toContainText('category');
-});
+// F-05b — the imperative-handle case, on all six. Two already-root-caused cross-target
+// emitter defects (Angular inline $refs verb calls, React duplicate onChange keys) were
+// FIXED but ungated; this loop is what gates them. No exclusion set: all six are expected
+// green, so a red here is a live emitter regression to report, not to exclude.
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built ? test.fixme : test;
+  runner(`imperative expandAll populates expanded; applyGrouping writes grouping [${target}]`, async ({ page }) => {
+    // Task 6: the isolated imperative-handle panel is gated OFF by default
+    // (ctl-handle) — check it to reveal the $refs.tbl.<verb>() button panel,
+    // then drive two side-effecting verbs and assert the effect shows up in
+    // the readout ($data.groupingModel underlies the `grouping` slice —
+    // Task 6's Angular-landmine rename; the `data-slice="grouping"` locator
+    // is unchanged).
+    await page.goto(`/?example=DataTableSuper&target=${target}`);
+    await page.getByTestId('ctl-handle').check();
+    await page.getByTestId('verb-expandAll').click();
+    await expect(page.getByTestId('readout').locator('[data-slice="expanded"]')).not.toContainText('{}');
+    await page.getByTestId('verb-applyGrouping').click();
+    await expect(page.getByTestId('readout').locator('[data-slice="grouping"]')).toContainText('category');
+  });
+}
