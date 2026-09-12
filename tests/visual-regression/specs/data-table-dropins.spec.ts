@@ -66,12 +66,26 @@ async function anyEditorOpen(page: Page): Promise<boolean> {
 }
 
 /**
- * Open the #editor custom slot at (row, col) and wait for `selector` to mount. The
- * editor-open-after-commit race (data-table-edit.spec.ts `enterEditAt` lesson) needs two
- * guards: (1) a lingering editor from the prior step must be fully CLOSED before steering
- * focus, and (2) F2 is pressed ONLY when no editor is open — a second F2 on an already-open
- * editor routes to the editor keymap and toggles it shut (the svelte/lit full-suite flake). A
- * small retry budget makes the open deterministic without masking a genuine non-open.
+ * Open the #editor custom slot at (row, col) and wait for `selector` to mount.
+ *
+ * F-07 (2026-09-11): this replaced an 8x retry of the whole close -> focus -> F2 sequence.
+ * The retry was not merely masking a flake — it was GENERATING one. Measured:
+ *   - iteration 0 failed on EVERY run (so the first attempt was reliably too early), and
+ *   - with the 8x budget the EditorDate open failed outright on a ROTATING target
+ *     (vue, react, solid observed on different runs) while the other five passed in <1s,
+ *   - each iteration costs up to 1.5s + a 3s Escape poll, so 8 of them EXCEED the 30s test
+ *     timeout: a genuine non-open surfaced as "Target page closed", not as an assertion,
+ *   - dropping the budget to 2 passed 3/3 runs.
+ * The mechanism is the one the old comment already warned about: a second F2 landing on an
+ * already-open editor routes to the EDITOR keymap and toggles it shut, so every extra retry
+ * is another chance to close the very editor it is waiting for.
+ *
+ * The real defect was a missing precondition, not flakiness. focusBodyCell() calls
+ * cell.focus() and returns immediately, but the grid syncs activeRow/activeColIndex in its
+ * own @focusin handler — so F2 could fire before the grid knew which cell was active. The
+ * deterministic wait is the ROVING TABINDEX: cellTabindex() returns 0 only for the cell the
+ * grid considers active, so polling for tabindex="0" on (row, col) proves the sync landed.
+ * Then F2 is pressed exactly ONCE.
  */
 async function openCustomEditor(
   page: Page,
@@ -80,24 +94,43 @@ async function openCustomEditor(
   col: number,
 ): Promise<void> {
   const target = page.getByTestId('rozie-mount').locator(selector);
-  for (let i = 0; i < 8; i++) {
-    if ((await target.count()) && (await target.first().isVisible())) return;
-    // Close any editor left open at a different cell, then wait for it to fully unmount.
-    if (await anyEditorOpen(page)) {
-      await page.keyboard.press('Escape');
-      await expect.poll(async () => anyEditorOpen(page), { timeout: 3_000 }).toBe(false).catch(() => {});
-    }
-    await focusBodyCell(page, row, col);
-    // Only press F2 when nothing is open (else F2 hits the editor keymap, not the edit-entry).
-    if (!(await anyEditorOpen(page))) await page.keyboard.press('F2');
-    try {
-      await expect(target).toBeVisible({ timeout: 1_500 });
-      return;
-    } catch {
-      // retry the close → focus → F2 sequence.
-    }
+  if ((await target.count()) && (await target.first().isVisible())) return;
+
+  // 1. A lingering editor from the previous step must be fully CLOSED before steering focus.
+  if (await anyEditorOpen(page)) {
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => anyEditorOpen(page), { timeout: 5_000 }).toBe(false);
   }
-  await expect(target).toBeVisible({ timeout: 5_000 });
+
+  // 2. Focus the cell, then WAIT for the grid to register it as active (roving tabindex).
+  await focusBodyCell(page, row, col);
+  await expect
+    .poll(async () => activeCellTabindex(page, row, col), { timeout: 5_000 })
+    .toBe('0');
+
+  // 3. One F2. Never a second — that would route to the editor keymap and toggle it shut.
+  await page.keyboard.press('F2');
+  await expect(target).toBeVisible({ timeout: 10_000 });
+}
+
+/** The `tabindex` of the body cell at (row, col), shadow-pierced. `'0'` means the grid has
+ *  synced its active cell to it (cellTabindex() returns 0 only for the active cell). */
+async function activeCellTabindex(page: Page, row: number, col: number): Promise<string | null> {
+  return page.evaluate(({ r, c }) => {
+    const findGridTable = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('table[role="grid"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) { const inner = findGridTable(sr); if (inner) return inner; }
+      }
+      return null;
+    };
+    const grid = findGridTable(document);
+    if (!grid) return null;
+    const cell = grid.querySelector(`[data-grid-cell][data-row="${r}"][data-col-index="${c}"]`);
+    return cell ? cell.getAttribute('tabindex') : null;
+  }, { r: row, c: col });
 }
 
 /**
