@@ -2523,8 +2523,9 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
     'The table\'s primary surfaces are themed through 18 `--rozie-data-table-*` CSS custom ' +
       'properties — override any of them at any ancestor scope' +
       (target === 'lit'
-        ? ' (currently ineffective on the Lit leaf, whose shadow root the class-scoped ' +
-          'mapping cannot cross — only `--rozie-data-table-max-height` inherits through it)'
+        ? ' (on Lit, set them at or above the `<rozie-data-table>` element — `:root`, a ' +
+          'wrapper, or the element itself — never on the `.rozie-data-table` classes, which ' +
+          'render inside the shadow root where a document stylesheet cannot reach them)'
         : '') +
       '. Some internal details (the grid active-cell ring, range highlight, fill handle, ' +
       'the per-header column ⋯ menu, and most of the pagination bar beyond its control ' +

@@ -17,10 +17,13 @@
  * --rozie-data-table-disabled-opacity are public — its background, padding, and
  * status-text size are not), and the chrome column widths. Those remain internal
  * and may be renamed; a design system that needs them should set the `--rdt-*`
- * name directly and accept that it is not yet a stable API. 17 of the 18 public
- * tokens are currently ineffective on the Lit leaf, whose shadow root the
- * class-scoped mapping cannot cross — only `--rozie-data-table-max-height`
- * inherits through it.
+ * name directly and accept that it is not yet a stable API. One Lit-specific rule: set
+ * the public tokens at or ABOVE the `<rozie-data-table>` element (`:root`, a wrapper, or
+ * the element itself), never on the `.rozie-data-table` / `.rozie-data-table-wrap`
+ * classes — on that target both of those render inside the component's shadow root,
+ * where a document stylesheet cannot reach them. The tokens themselves inherit across
+ * the boundary, and the component carries the mapping internally, so every one of the 18
+ * works there.
  *
  * NOTE the split: the STRUCTURAL rules — `border-collapse`, the keyed-r-for
  * layout, `position: sticky` for the header + pinned columns, the
