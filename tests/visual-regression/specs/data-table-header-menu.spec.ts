@@ -249,21 +249,16 @@ for (const target of TARGETS) {
       // Popover's Escape/dismiss path restores focus to the click-trigger anchor
       // (72-06b, deepActiveElement() — resolves through nested shadow roots on Lit).
       //
-      // Excludes Solid, where the trigger does not hold DOM focus after the click. The cause
-      // once filed here — "confirmed via a monkey-patched HTMLElement.prototype.focus that
-      // never fired" — is FALSE, and was retired by the 2026-09-10 audit: native
-      // focus-on-mousedown is a browser DEFAULT ACTION, not a call to that method, so the
-      // patch could never have observed it. That non-probative evidence kept a real defect
-      // filed for weeks as a harness quirk.
-      // Real mechanism: packages/ui/popover/packages/solid/src/Popover.tsx reads open() inside
-      // the JSX insert that invokes the #anchor slot, so Solid replaces that subtree and tears
-      // out the just-focused .rdt-col-menu-trigger (DataTable.rozie:2058).
-      // So the documented "Escape returns focus to the trigger" guarantee is not merely
-      // untested on Solid — it is FALSE there. Owned by Plan 2B (F-03); this guard comes out
-      // when that lands.
-      if (target !== 'solid') {
-        await expect(trigger).toBeFocused();
-      }
+      // Asserted on ALL SIX since 2026-09-13 (F-03 closed). Solid was excluded for weeks on
+      // the strength of a diagnosis that was never probative — "confirmed via a monkey-patched
+      // HTMLElement.prototype.focus that never fired", when native focus-on-mousedown is a
+      // browser DEFAULT ACTION and not a call to that method. The real cause was in the Solid
+      // EMITTER: slot scope objects were built with eager reads (`{ open: open() }`) inside the
+      // JSX insert that invokes the slot, so every toggle re-ran the insert, re-invoked the
+      // slot and REPLACED the subtree — taking the just-focused trigger with it. The emitter
+      // now passes computed scope values as getters, so the read happens in the consumer's
+      // scope and the insert no longer subscribes.
+      await expect(trigger).toBeFocused();
     });
 
     runner(`click-outside dismisses the menu [${target}]`, async ({ page }) => {

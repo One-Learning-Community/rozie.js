@@ -412,7 +412,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
       <div class={rozieClass(['rozie-sortable-list', local.listClass])} ref={(el) => { listElRef = el as HTMLElement; }} part="list" data-rozie-s-0af24eae="">
         {(_props.headerSlot ?? _props.slots?.['header']?.({}))}
         <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" class={rozieClass(['rozie-sortable-item', itemClassFor(item, index()), { 'rozie-sortable-item-lifted': liftedIndex() === index() }])} style={parseInlineStyle(itemStyleFor(item, index()))} tabIndex={rozieAttr(keyboardEnabled() ? 0 : null)} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
-          {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, index: index() }) : resolved()}
+          {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, get index() { return index(); } }) : resolved()}
         </div>}</For>
         {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}
       </div>

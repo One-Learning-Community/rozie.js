@@ -48,7 +48,10 @@ describe('emitSolid — default-slot scoped-param invocation', () => {
     // function; falls through to the plain children prop otherwise.
     expect(result.code).toContain("typeof local.children === 'function'");
     expect(result.code).toContain('local.children');
-    expect(result.code).toMatch(/\(\{\s*item,\s*index/);
+    // F-03: `item` is an r-for alias (a plain binding) so it stays shorthand, while `index`
+    // is Solid's index ACCESSOR — reading it inside the insert would subscribe the insert
+    // and make it re-render the slot subtree, so it is passed as a getter instead.
+    expect(result.code).toMatch(/\(\{\s*item,\s*get index\(\) \{ return index\(\); \}/);
     // Negative — must NOT emit the bare `{resolved()}` form for this case.
     const slotInvocationRegion = result.code.slice(result.code.indexOf('<li'));
     expect(slotInvocationRegion).not.toContain('{resolved()}');

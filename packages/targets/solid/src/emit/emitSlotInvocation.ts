@@ -61,9 +61,38 @@ function findSlotDecl(name: string, ir: IRComponent): SlotDecl | null {
 
 /**
  * Build the param-object literal text from invocation args.
- *   args = [{name:'open', expression: <ID('open')>}]  → `{ open: open() }`
+ *   args = [{name:'open', expression: <ID('open')>}]  → `{ get open() { return open(); } }`
  * Shorthand collapse: when arg.name === renderedExpression, emit `{ open }` form.
+ *
+ * F-03 — WHY COMPUTED VALUES ARE GETTERS AND NOT PLAIN PROPERTIES.
+ * This object is constructed INSIDE the JSX insert that invokes the slot:
+ *   {(_props.anchorSlot ?? _props.slots?.['anchor'])?.({ … })}
+ * In Solid, a JSX insert subscribes to every signal read while it evaluates. Emitting
+ * `{ open: open() }` therefore made the INSERT itself depend on `open()`, so each toggle
+ * re-ran it, re-invoked the consumer's slot function, and REPLACED the rendered subtree.
+ * Observed consequence: opening the data-table column menu tore the just-focused
+ * `.rdt-col-menu-trigger` out of the DOM, making the documented "Escape returns focus to
+ * the trigger" guarantee FALSE on Solid — while the same guarantee held on the other five.
+ * (This was mis-filed for weeks as a Playwright limitation on the strength of a
+ * monkey-patched `HTMLElement.prototype.focus` that "never fired" — non-probative, since
+ * native focus-on-mousedown is a browser default action, not a call to that method.)
+ *
+ * A getter defers the read to whenever the CONSUMER touches the property, which happens in
+ * the consumer's own reactive scope — so the value stays fully reactive for them while the
+ * insert no longer subscribes. This is Solid's own convention for passing reactive props.
+ *
+ * Bare-identifier shorthand is deliberately left as-is: `{ toggle }` passes a function
+ * reference and reading an identifier is not a signal read, so wrapping it would add noise
+ * without changing behaviour.
  */
+/** Literals that provably cannot read a signal: numbers, quoted strings, and the four
+ *  keyword atoms. Deliberately conservative — anything else gets a getter. */
+const IS_JS_LITERAL = /^(-?\d+(?:\.\d+)?|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\$]|\\.)*`|true|false|null|undefined)$/;
+
+/** Function-valued expressions: creating a closure never reads a signal, so these are safe
+ *  to pass eagerly (and must be, to keep a stable identity across property accesses). */
+const IS_FUNCTION_VALUE = /^(async\s+)?(function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)/;
+
 function buildParamObj(
   args: TemplateSlotInvocationIR['args'],
   ir: IRComponent,
@@ -77,7 +106,14 @@ function buildParamObj(
       loopValueBindings,
     });
     if (code === a.name) return a.name;
-    return `${a.name}: ${code}`;
+    // A literal cannot read a signal, so a getter would be pure noise. Neither can CREATING a
+    // function: an arrow's body is deferred, so `() => toggle(item().id)` reads nothing at
+    // construction — and wrapping it would hand the consumer a NEW function identity on every
+    // property access, which is a behaviour change for no benefit. Keeping both plain holds the
+    // library-wide diff to the shapes that actually needed changing.
+    if (IS_JS_LITERAL.test(code) || IS_FUNCTION_VALUE.test(code)) return `${a.name}: ${code}`;
+    // F-03: lazy, so constructing this object does not subscribe the JSX insert.
+    return `get ${a.name}() { return ${code}; }`;
   });
   return `{ ${parts.join(', ')} }`;
 }

@@ -69,7 +69,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     <>
     <div {...attrs} class={"todo-list" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-52bec3de="">
       <header data-rozie-s-52bec3de="">
-        {(_props.headerSlot ?? _props.slots?.['header'])?.({ remaining: remaining(), total: items().length }) ?? <h3 data-rozie-s-52bec3de="">{local.title} ({rozieDisplay(remaining())} remaining)</h3>}
+        {(_props.headerSlot ?? _props.slots?.['header'])?.({ get remaining() { return remaining(); }, get total() { return items().length; } }) ?? <h3 data-rozie-s-52bec3de="">{local.title} ({rozieDisplay(remaining())} remaining)</h3>}
       </header>
 
       <form onSubmit={($event: Event & { currentTarget: HTMLFormElement; target: Element }) => { $event.preventDefault(); add(); }} data-rozie-s-52bec3de="">
@@ -82,7 +82,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
       </p>}><ul data-rozie-s-52bec3de="">
         <Key each={items() as readonly any[]} by={(item) => item.id}>{(item) => <li class={rozieClass({ done: item().done })} data-rozie-s-52bec3de="">
           
-          {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item: item(), toggle: () => toggle(item().id), remove: () => removeItem(item().id) }) : (resolved() ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item().done} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { toggle(item().id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{rozieDisplay(item().text)}</span></label><button aria-label="Remove" onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { removeItem(item().id); }} data-rozie-s-52bec3de="">×</button></>)}
+          {typeof local.children === 'function' ? (local.children as (s: any) => any)({ get item() { return item(); }, toggle: () => toggle(item().id), remove: () => removeItem(item().id) }) : (resolved() ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item().done} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { toggle(item().id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{rozieDisplay(item().text)}</span></label><button aria-label="Remove" onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { removeItem(item().id); }} data-rozie-s-52bec3de="">×</button></>)}
         </li>}</Key>
       </ul></Show>}</div>
     </>

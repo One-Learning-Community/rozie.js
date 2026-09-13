@@ -19,7 +19,7 @@ export default function SlotConditionalScopedSlotRIf(_props: SlotConditionalScop
   return (
     <>
 
-    <div {...attrs} class={"r" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-896f7201="">{<Show when={local.show}>{typeof local.children === 'function' ? (local.children as (s: any) => any)({ title: local.title }) : resolved()}</Show>}</div>
+    <div {...attrs} class={"r" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-896f7201="">{<Show when={local.show}>{typeof local.children === 'function' ? (local.children as (s: any) => any)({ get title() { return local.title; } }) : resolved()}</Show>}</div>
     </>
   );
 }

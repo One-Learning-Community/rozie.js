@@ -551,7 +551,7 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
           <div class={"rozie-embla__container"} data-rozie-s-4143c216="">
             
             <For each={local.slides}>{(slide, i) => <div class={"rozie-embla__slide"} data-rozie-s-4143c216="">
-              {(_props.slideSlot ?? _props.slots?.['slide'])?.({ slide, index: i() }) ?? rozieDisplay(slide)}
+              {(_props.slideSlot ?? _props.slots?.['slide'])?.({ slide, get index() { return i(); } }) ?? rozieDisplay(slide)}
             </div>}</For>
             
             {resolved()}
@@ -566,7 +566,7 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
         <div class={"rozie-embla__thumbs-viewport"} ref={(el) => { thumbsViewportElRef = el as HTMLElement; }} data-rozie-s-4143c216="">
           <div class={"rozie-embla__thumbs-container"} data-rozie-s-4143c216="">
             <For each={local.slides}>{(item, i) => <div class={"rozie-embla__thumb" + " " + rozieClass({ 'is-selected': i() === selected() })} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { selectThumb(i()); }} data-rozie-s-4143c216="">
-              {(_props.thumbSlot ?? _props.slots?.['thumb'])?.({ slide: item, index: i() }) ?? rozieDisplay(item)}
+              {(_props.thumbSlot ?? _props.slots?.['thumb'])?.({ get slide() { return item; }, get index() { return i(); } }) ?? rozieDisplay(item)}
             </div>}</For>
           </div>
         </div>

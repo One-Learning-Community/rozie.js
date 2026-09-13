@@ -280,17 +280,26 @@ describe('emitSlotInvocation — §slots-merge invocation (Phase 07.3.2 D-02 sta
     expect(code).toContain("(_props.footerSlot ?? _props.slots?.['footer'])");
   });
 
-  it("Dropdown trigger-slot (with-params) invocation merges and invokes: (_props.triggerSlot ?? _props.slots?.['trigger'])?.(... open: open() ...)", () => {
+  it("Dropdown trigger-slot (with-params) invocation merges and invokes with a LAZY scope object (F-03)", () => {
     // With-params variant uses optional-call `?.(...)` form. The merge
-    // expression sits INSIDE the JSX `{...}` braces — see Pitfall 2 test
-    // below — and the paramObj `{ open: open(), toggle }` is passed
-    // unchanged from before Plan 02.
+    // expression sits INSIDE the JSX `{...}` braces — see Pitfall 2 test below.
+    //
+    // F-03: the scope object must pass computed values as GETTERS, not as eager
+    // reads. `{ open: open() }` evaluates the signal while CONSTRUCTING the object,
+    // inside the JSX insert — which makes the whole insert reactive to it, so every
+    // toggle re-invokes the slot and REPLACES the rendered subtree. That tore the
+    // just-focused trigger out of the DOM on Solid and made the documented
+    // "Escape returns focus to the trigger" guarantee false there.
+    // A getter moves the read into the CONSUMER's reactive scope, so the insert
+    // itself no longer subscribes. Bare-identifier shorthand (`toggle`) is left
+    // alone: referencing a function is not a signal read.
     const code = compileSolid('Dropdown');
     expect(code).toContain("(_props.triggerSlot ?? _props.slots?.['trigger'])?.(");
-    // Sanity-check the param object is preserved through the merge:
     expect(code).toMatch(
-      /\(_props\.triggerSlot \?\? _props\.slots\?\.\['trigger'\]\)\?\.\(\{ open: open\(\), toggle \}\)/,
+      /\(_props\.triggerSlot \?\? _props\.slots\?\.\['trigger'\]\)\?\.\(\{ get open\(\) \{ return open\(\); \}, toggle \}\)/,
     );
+    // And the eager form must be gone entirely.
+    expect(code).not.toContain('{ open: open(), toggle }');
   });
 
   it('merge expression stays INSIDE JSX {...} braces — never hoisted to a local const (Pitfall 2 / Assumption A2)', () => {

@@ -1440,7 +1440,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
       </div></Show>}{<Show when={local.editable && (_props.toolbarSlot ?? _props.slots?.['toolbar'])}><div class={"rozie-tiptap-toolbar rozie-tiptap-toolbar--slot"} ref={(el) => { toolbarElRef = el as HTMLElement; }} data-rozie-s-2aeee876="" /></Show>}<div ref={(el) => { editorElRef = el as HTMLElement; }} class={"rozie-tiptap-content"} data-placeholder={local.placeholder} data-rozie-s-2aeee876="" />
       
       {<Show when={local.maxLength != null || (_props.countSlot ?? _props.slots?.['count'])}><div class={"rozie-tiptap-count"} data-rozie-s-2aeee876="">
-        {(_props.countSlot ?? _props.slots?.['count'])?.({ characters: count().characters, words: count().words, maxLength: local.maxLength, over: local.maxLength != null && count().characters > local.maxLength }) ?? <span class={"rozie-tiptap-count-value" + " " + rozieClass({ over: local.maxLength != null && count().characters > local.maxLength })} data-rozie-s-2aeee876="">{rozieDisplay(count().characters)} / {local.maxLength}</span>}
+        {(_props.countSlot ?? _props.slots?.['count'])?.({ get characters() { return count().characters; }, get words() { return count().words; }, get maxLength() { return local.maxLength; }, get over() { return local.maxLength != null && count().characters > local.maxLength; } }) ?? <span class={"rozie-tiptap-count-value" + " " + rozieClass({ over: local.maxLength != null && count().characters > local.maxLength })} data-rozie-s-2aeee876="">{rozieDisplay(count().characters)} / {local.maxLength}</span>}
       </div></Show>}</div>
 
 

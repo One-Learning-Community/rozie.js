@@ -463,7 +463,7 @@ export default function Popover(_props: PopoverProps): JSX.Element {
 
       
       <div aria-haspopup={rozieAttr(hasGestureTrigger() ? 'dialog' : null)} aria-expanded={(hasGestureTrigger() ? !!open() : null) ?? undefined} aria-describedby={rozieAttr(isTooltip() && open() ? 'rozie-popover-floating' : null)} class={"rozie-popover-anchor"} ref={(el) => { anchorElRef = el as HTMLElement; }} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'click' && onAnchorClick(); }} onPointerEnter={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'hover' && onAnchorPointerEnter(); }} onPointerLeave={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'hover' && onAnchorPointerLeave(); }} onFocusIn={($event: FocusEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'focus' && onAnchorFocus(); }} onFocusOut={($event: FocusEvent & { currentTarget: HTMLDivElement; target: Element }) => { local.trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea="">
-        {(_props.anchorSlot ?? _props.slots?.['anchor'])?.({ open: open(), toggle, show, hide })}
+        {(_props.anchorSlot ?? _props.slots?.['anchor'])?.({ get open() { return open(); }, toggle, show, hide })}
       </div>
 
       
