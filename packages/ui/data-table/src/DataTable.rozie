@@ -3014,6 +3014,51 @@ $expose({
 </template>
 
 <style>
+/* ── F-01: the PUBLIC→INTERNAL token wiring, repeated for a SHADOW ROOT ───────────────
+   themes/base.css maps every public `--rozie-data-table-*` token onto the internal
+   `--rdt-*` the rules below read, under `.rozie-data-table-wrap, .rozie-data-table`.
+   On the LIT leaf both of those elements render INSIDE this component's shadow root, and
+   a document-level class selector cannot match inside one — so the wiring never applied
+   there and 17 of the 18 public tokens were inert. (Measured: `--rdt-header-bg` resolved
+   to the EMPTY STRING on a header cell and the colour came from the inline fallback.)
+   The public tokens themselves DO cross the boundary — custom properties inherit — so
+   only the WIRING needs to be inside, which is what `:host` gives us.
+   Inert on the five light-DOM targets: none of them has a shadow host for `:host` to
+   match, and on Angular (whose emulated encapsulation rewrites `:host` to its host
+   attribute) each declaration is either invalid-at-computed-value-time — the public
+   token being unset — or identical to the value base.css already sets on the table
+   element itself, which wins anyway by being set directly rather than inherited.
+   KEPT IN SYNC MECHANICALLY: scripts/codegen.mjs fails the build if this block and
+   base.css's wiring block disagree, so the duplication cannot silently drift. */
+:host {
+  --rdt-font: var(--rozie-data-table-font);
+  --rdt-color: var(--rozie-data-table-fg);
+  --rdt-cell-padding: var(--rozie-data-table-cell-padding);
+  --rdt-border: 1px solid var(--rozie-data-table-border-color);
+  --rdt-header-bg: var(--rozie-data-table-header-bg);
+  --rdt-header-weight: var(--rozie-data-table-header-weight);
+  --rdt-sort-ind-opacity: var(--rozie-data-table-sort-indicator-opacity);
+  --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-filter-radius: var(--rozie-data-table-radius);
+  --rdt-page-btn-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-page-btn-radius: var(--rozie-data-table-radius);
+  --rdt-page-btn-disabled-opacity: var(--rozie-data-table-disabled-opacity);
+  --rdt-page-size-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-page-size-radius: var(--rozie-data-table-radius);
+  --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color);
+  --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active);
+  --rdt-pin-btn-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-pin-btn-radius: var(--rozie-data-table-radius);
+  --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg);
+  --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-colvis-summary-radius: var(--rozie-data-table-radius);
+  --rdt-colvis-menu-border: 1px solid var(--rozie-data-table-border-color);
+  --rdt-colvis-menu-radius: var(--rozie-data-table-radius);
+  --rdt-colvis-menu-bg: var(--rozie-data-table-menu-bg);
+  --rdt-colvis-menu-shadow: var(--rozie-data-table-menu-shadow);
+  --rdt-select-accent: var(--rozie-data-table-select-accent);
+}
+
 .rozie-data-table {
   border-collapse: collapse;
   width: 100%;

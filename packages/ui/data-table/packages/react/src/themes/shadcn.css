@@ -17,7 +17,18 @@
  *
  * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
  * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ *
+ * SCOPE (changed 2026-09-12, F-01). This bridge assigns its tokens at `:root` as well as on
+ * the table's own classes. A design-system bridge is an app-wide skin by nature, and `:root`
+ * is the only scope that reaches the Lit leaf: there, `.rozie-data-table-wrap` and
+ * `.rozie-data-table` both render INSIDE the component's shadow root, where a document-level
+ * class selector can never match — so before this change all four bridges were inert on Lit.
+ * Trade-off, stated rather than buried: two tables on one page can no longer take DIFFERENT
+ * bridges by ancestor class alone. Per-instance overrides still work on the five light-DOM
+ * targets via the class selectors below, and on all six by setting the public tokens on any
+ * ancestor of the table.
  */
+:root,
 .rozie-data-table-wrap,
 .rozie-data-table {
   --rozie-data-table-fg: hsl(var(--foreground, 222.2 47.4% 11.2%));

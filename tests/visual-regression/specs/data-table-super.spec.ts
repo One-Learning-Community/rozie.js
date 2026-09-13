@@ -209,7 +209,7 @@ test('expanding a row reveals its detail panel', async ({ page }) => {
 //           B-01 (React drag-select stale anchor): the third instance of one emitter defect.
 //           Per the emitter-owns-parity principle this is an EMITTER fix, not a demo edit.
 // ═══════════════════════════════════════════════════════════════════════════════════════
-const THEME_SWAP_KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set(['lit', 'react']);
+const THEME_SWAP_KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set(['react']);
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // F-05a / the six-target THEMING-TOKEN gate. This case asserts a PUBLIC token's computed

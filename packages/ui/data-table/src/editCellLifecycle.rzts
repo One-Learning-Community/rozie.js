@@ -294,7 +294,24 @@ const focusCellWhenReady = (row, col) => {
   let attempts = 0
   const tryFocus = () => {
     const el = resolveCellEl(String(row), col)
-    if (el) { el.focus(); return }
+    if (el) {
+      // B-05 / F-07: do NOT stomp focus a later interaction has already placed on a DIFFERENT
+      // grid cell. This poll runs up to 30 frames after commit/cancel, so without this guard a
+      // user (or a test) who moves to the next cell in that window gets yanked BACK to the cell
+      // they just left — and because the steal depends on rAF timing it presents as a flake that
+      // rotates across targets rather than as a reproducible bug. Measured 2026-09-12: the
+      // data-table-dropins editor case failed with the active cell pinned to the PREVIOUS column
+      // (want 0/2, active 0/1; want 0/1, active 0/0) with no editor open.
+      // focusEditorWhenReady already carries the equivalent guard against the same class of
+      // theft; this is its missing twin. Compare the OWNING CELL (not node identity) so a
+      // node-replacing re-render on Solid still resolves a genuinely dropped focus as recoverable.
+      const ae = gridRoot && gridRoot.getRootNode ? gridRoot.getRootNode().activeElement : null
+      if (ae && ae !== el && gridRoot.contains && gridRoot.contains(ae) && ae.closest) {
+        const aeCell = ae.closest('[data-grid-cell]')
+        if (aeCell && aeCell !== el) return
+      }
+      el.focus(); return
+    }
     attempts = attempts + 1
     if (attempts >= 30) return
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)

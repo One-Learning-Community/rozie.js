@@ -35,7 +35,35 @@ import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, m
 // snapshot (the rete stale-closure anti-pattern — a top-level $computed/useCallback
 // freezes the table at the empty-initial state on React).
 
-__rozieInjectStyle('DataTable-d5dcab4c', `.rozie-data-table[data-rozie-s-d5dcab4c] {
+__rozieInjectStyle('DataTable-d5dcab4c', `[data-rozie-s-d5dcab4c]:host {
+  --rdt-font: var(--rozie-data-table-font);
+  --rdt-color: var(--rozie-data-table-fg);
+  --rdt-cell-padding: var(--rozie-data-table-cell-padding);
+  --rdt-border: 1px solid var(--rozie-data-table-border-color);
+  --rdt-header-bg: var(--rozie-data-table-header-bg);
+  --rdt-header-weight: var(--rozie-data-table-header-weight);
+  --rdt-sort-ind-opacity: var(--rozie-data-table-sort-indicator-opacity);
+  --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-filter-radius: var(--rozie-data-table-radius);
+  --rdt-page-btn-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-page-btn-radius: var(--rozie-data-table-radius);
+  --rdt-page-btn-disabled-opacity: var(--rozie-data-table-disabled-opacity);
+  --rdt-page-size-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-page-size-radius: var(--rozie-data-table-radius);
+  --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color);
+  --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active);
+  --rdt-pin-btn-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-pin-btn-radius: var(--rozie-data-table-radius);
+  --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg);
+  --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-colvis-summary-radius: var(--rozie-data-table-radius);
+  --rdt-colvis-menu-border: 1px solid var(--rozie-data-table-border-color);
+  --rdt-colvis-menu-radius: var(--rozie-data-table-radius);
+  --rdt-colvis-menu-bg: var(--rozie-data-table-menu-bg);
+  --rdt-colvis-menu-shadow: var(--rozie-data-table-menu-shadow);
+  --rdt-select-accent: var(--rozie-data-table-select-accent);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] {
   border-collapse: collapse;
   width: 100%;
   font: var(--rdt-font, 14px system-ui, sans-serif);
@@ -6418,6 +6446,21 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     const tryFocus = () => {
       const el = resolveCellEl(String(row), col);
       if (el) {
+        // B-05 / F-07: do NOT stomp focus a later interaction has already placed on a DIFFERENT
+        // grid cell. This poll runs up to 30 frames after commit/cancel, so without this guard a
+        // user (or a test) who moves to the next cell in that window gets yanked BACK to the cell
+        // they just left — and because the steal depends on rAF timing it presents as a flake that
+        // rotates across targets rather than as a reproducible bug. Measured 2026-09-12: the
+        // data-table-dropins editor case failed with the active cell pinned to the PREVIOUS column
+        // (want 0/2, active 0/1; want 0/1, active 0/0) with no editor open.
+        // focusEditorWhenReady already carries the equivalent guard against the same class of
+        // theft; this is its missing twin. Compare the OWNING CELL (not node identity) so a
+        // node-replacing re-render on Solid still resolves a genuinely dropped focus as recoverable.
+        const ae = gridRoot && gridRoot.getRootNode ? gridRoot.getRootNode().activeElement : null;
+        if (ae && ae !== el && gridRoot.contains && gridRoot.contains(ae) && ae.closest) {
+          const aeCell = ae.closest('[data-grid-cell]');
+          if (aeCell && aeCell !== el) return;
+        }
         el.focus();
         return;
       }

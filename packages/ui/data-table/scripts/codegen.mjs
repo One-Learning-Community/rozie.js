@@ -156,6 +156,100 @@ function leafPkg(dir) {
   return JSON.parse(readFileSync(pkgPath, 'utf8'));
 }
 
+/**
+ * F-01 — the public→internal token wiring, re-emitted under `:host` for the LIT leaf only.
+ *
+ * WHY THIS EXISTS. `themes/base.css` maps every public `--rozie-data-table-*` token onto the
+ * short internal `--rdt-*` the component reads, under the selectors
+ * `.rozie-data-table-wrap, .rozie-data-table`. On Lit BOTH of those elements render inside the
+ * component's own shadow root, and a document-level class selector cannot match inside one — so
+ * the wiring never applied there and 17 of the 18 public tokens were inert. Measured before the
+ * fix: `--rozie-data-table-header-bg` and `--rdt-header-bg` both resolved to the EMPTY STRING on
+ * a header cell, and the rendered colour came from the component's inline `var()` fallback.
+ *
+ * The public tokens themselves DO cross the boundary — custom properties inherit through shadow
+ * roots — so only the WIRING needs to move inside. Re-emitting it under `:host` closes the gap:
+ * a consumer setting a token at `:root`, on a wrapper, or on the element gets it applied.
+ *
+ * WHY LIT-ONLY, AND NOT A `:host` RULE IN `DataTable.rozie`'s `<style>`. `:host` is not inert on
+ * the other targets: Angular's emulated ViewEncapsulation REWRITES `:host` into its
+ * host-attribute selector, so a shared rule would silently add a second, host-level wiring there
+ * and move where `--rdt-*` resolves relative to a consumer's documented
+ * `.rozie-data-table`-scoped override. That was tried and rejected once already — see
+ * packages/ui/rete/src/FlowCanvas.rozie:4626-4635, which records the same finding.
+ *
+ * WHY IT IS DERIVED, NOT HARDCODED. base.css wires 26 `--rdt-*` tokens today and that set moves.
+ * A hardcoded copy would drift the moment it does — the exact failure class this remediation
+ * exists to remove. This parses the real block, so the two cannot disagree.
+ *
+ * BEHAVIOUR-NEUTRAL WHEN NO TOKEN IS SET. The wiring passthroughs carry no fallbacks
+ * (`--rdt-font: var(--rozie-data-table-font)`), so with the public token unset the declaration is
+ * invalid-at-computed-value-time and `--rdt-font` stays unset — leaving the component's own
+ * inline `var(--rdt-font, <default>)` to apply, exactly as today. Zero-config Lit is unchanged.
+ */
+function litHostTokenWiring() {
+  const css = readFileSync(resolve(ROOT, 'src/themes/base.css'), 'utf8');
+  const marker = css.indexOf('Wire the PUBLIC tokens');
+  if (marker === -1)
+    throw new Error(
+      'codegen: base.css no longer contains the "Wire the PUBLIC tokens" marker — the F-01 ' +
+        ':host wiring cannot be derived. Fix litHostTokenWiring() rather than dropping it.',
+    );
+  const close = css.indexOf('\n}', marker);
+  if (close === -1) throw new Error('codegen: could not find the end of base.css wiring block');
+  const decls = css
+    .slice(marker, close)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => /^--rdt-[a-z0-9-]+\s*:/.test(l));
+  if (decls.length === 0)
+    throw new Error('codegen: parsed ZERO --rdt-* wiring declarations from base.css');
+  return `:host{\n${decls.map((d) => '  ' + d).join('\n')}\n}`;
+}
+
+/**
+ * F-01 drift guard. `src/DataTable.rozie`'s `<style>` repeats base.css's wiring under `:host`
+ * so it applies inside the Lit shadow root. Two copies of the same 26 declarations can drift,
+ * and a silent drift is exactly the failure class this remediation exists to remove — so the
+ * build FAILS if they stop agreeing. This is why the duplication is acceptable.
+ */
+function assertHostWiringMatchesBaseCss() {
+  const expected = litHostTokenWiring()
+    .replace(/^:host\{\n/, '')
+    .replace(/\n\}$/, '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const rozie = readFileSync(resolve(ROOT, 'src/DataTable.rozie'), 'utf8');
+  const start = rozie.indexOf(':host {');
+  if (start === -1)
+    throw new Error(
+      'codegen: DataTable.rozie no longer contains the F-01 `:host {` wiring block. Public ' +
+        'theming tokens are inert inside the Lit shadow root without it — restore it, do not ' +
+        'delete this check.',
+    );
+  const end = rozie.indexOf('\n}', start);
+  const actual = rozie
+    .slice(start, end)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => /^--rdt-[a-z0-9-]+\s*:/.test(l));
+  const a = actual.join('\n');
+  const e = expected.join('\n');
+  if (a !== e) {
+    const only = (x, y) => x.filter((d) => !y.includes(d));
+    throw new Error(
+      'codegen: the F-01 `:host` wiring in src/DataTable.rozie has DRIFTED from ' +
+        'src/themes/base.css.\n' +
+        `  base.css has ${expected.length} declaration(s), DataTable.rozie has ${actual.length}.\n` +
+        `  only in base.css:        ${JSON.stringify(only(expected, actual))}\n` +
+        `  only in DataTable.rozie: ${JSON.stringify(only(actual, expected))}\n` +
+        '  Re-sync the :host block; the Lit leaf reads it, so a gap makes those tokens inert.',
+    );
+  }
+}
+
+
 /** Copy src/themes/ → leaf src/themes/ (the design-token presets). */
 function copyThemes(leafSrc) {
   const src = resolve(ROOT, 'src/themes');
@@ -242,6 +336,9 @@ function main() {
       );
     }
   }
+
+  // F-01: fail fast if the duplicated :host wiring and base.css disagree.
+  assertHostWiringMatchesBaseCss();
 
   // (3)(4)(5)(6) per-target emit + req-1 check + vendor themes + README + LICENSE.
   for (const [target, cfg] of Object.entries(TARGETS)) {
