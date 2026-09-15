@@ -47,7 +47,7 @@
     "rozie-manifest.json"
   ],
   "dependencies": {
-    "@rozie/runtime-solid": "workspace:*",
+    "@rozie/runtime-solid": "workspace:^",
     "@solid-primitives/keyed": "^1.5.3"
   },
   "peerDependencies": {

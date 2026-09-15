@@ -45,7 +45,7 @@
     "rozie-manifest.json"
   ],
   "dependencies": {
-    "@rozie/runtime-react": "workspace:*"
+    "@rozie/runtime-react": "workspace:^"
   },
   "peerDependencies": {
     "react": "^18.2 || ^19",

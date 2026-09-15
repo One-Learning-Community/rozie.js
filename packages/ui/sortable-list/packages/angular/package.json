@@ -42,7 +42,7 @@
     "src"
   ],
   "dependencies": {
-    "@rozie/runtime-angular": "workspace:*",
+    "@rozie/runtime-angular": "workspace:^",
     "tslib": "^2"
   },
   "peerDependencies": {

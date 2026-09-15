@@ -41,7 +41,7 @@
     "src"
   ],
   "dependencies": {
-    "@rozie/runtime-solid": "workspace:*"
+    "@rozie/runtime-solid": "workspace:^"
   },
   "peerDependencies": {
     "solid-js": "^1.8",

@@ -45,7 +45,7 @@
     "src"
   ],
   "dependencies": {
-    "@rozie/runtime-vue": "workspace:*"
+    "@rozie/runtime-vue": "workspace:^"
   },
   "peerDependencies": {
     "vue": "^3.4"
