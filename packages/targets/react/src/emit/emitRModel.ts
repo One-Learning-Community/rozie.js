@@ -89,6 +89,18 @@ export interface EmitRModelResult {
   /** Replacement attributes (e.g., value=, onChange=) to splice in place of r-model */
   replacementAttributes: AttributeBinding[];
   diagnostics: Diagnostic[];
+  /**
+   * N-01 — the resolved two-way target, when `r-model` addressed a recognised
+   * reactive cell. `local` is the render-scope identifier the bound value reads
+   * from; `setter` is its `useState` setter. Absent when the target was not
+   * recognised (r-model left as-is).
+   *
+   * The same-event merge in `emitTemplateNode` needs BOTH names to shadow the
+   * stale render const inside the merged handler. Re-deriving `local` from
+   * `setter` is not safe — `capitalize()` is not invertible (a state named
+   * `URL` yields setter `setURL`, which de-capitalizes to `uRL`).
+   */
+  modelTarget?: { local: string; setter: string };
 }
 
 /**
@@ -277,6 +289,7 @@ export function emitRModel(element: TemplateElementIR, ir: IRComponent): EmitRMo
         makeBindingAttr(':onValueChange', setterId),
       ],
       diagnostics,
+      modelTarget: target,
     };
   }
 
@@ -300,6 +313,7 @@ export function emitRModel(element: TemplateElementIR, ir: IRComponent): EmitRMo
           makeBindingAttr(':onBlur', handlerArrow),
         ],
         diagnostics,
+        modelTarget: target,
       };
     }
     return {
@@ -308,6 +322,7 @@ export function emitRModel(element: TemplateElementIR, ir: IRComponent): EmitRMo
         makeBindingAttr(':onChange', handlerArrow),
       ],
       diagnostics,
+      modelTarget: target,
     };
   }
 
@@ -338,6 +353,7 @@ export function emitRModel(element: TemplateElementIR, ir: IRComponent): EmitRMo
         makeBindingAttr(':onChange', onChangeArrow),
       ],
       diagnostics,
+      modelTarget: target,
     };
   }
 
@@ -368,6 +384,7 @@ export function emitRModel(element: TemplateElementIR, ir: IRComponent): EmitRMo
         makeBindingAttr(':onChange', onChangeArrow),
       ],
       diagnostics,
+      modelTarget: target,
     };
   }
 
@@ -393,6 +410,7 @@ export function emitRModel(element: TemplateElementIR, ir: IRComponent): EmitRMo
         makeBindingAttr(':onBlur', onChangeArrow),
       ],
       diagnostics,
+      modelTarget: target,
     };
   }
   return {
@@ -401,5 +419,6 @@ export function emitRModel(element: TemplateElementIR, ir: IRComponent): EmitRMo
       makeBindingAttr(':onChange', onChangeArrow),
     ],
     diagnostics,
+    modelTarget: target,
   };
 }

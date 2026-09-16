@@ -79,6 +79,112 @@ const generate: GenerateFn =
     ? (_generate as GenerateFn)
     : (_generate as unknown as { default: GenerateFn }).default;
 
+/**
+ * N-01 — build the fresh-value binding for a merged `r-model` + same-event
+ * handler, or return `null` to leave the merge exactly as it was.
+ *
+ * Recognises ONE shape, the one every `emitRModel` value branch produces:
+ *
+ *     (<param>) => <setter>(<committed>)
+ *
+ * and returns the pieces needed to emit
+ *
+ *     const <local> = <committed'>; <setter>(<local>);
+ *
+ * where `<committed'>` is `<committed>` with `<param>` renamed to `$event` (the
+ * merged arrow's own parameter). `<local>` is the model cell's render-scope
+ * identifier, so the declaration SHADOWS the stale `useState` const for the
+ * remainder of the merged arrow — which is what makes the folded-in explicit
+ * handlers read the new value.
+ *
+ * Deliberately narrow (one seam, one shape):
+ *  - the component-tag `:onValueChange` branch hands over a BARE setter
+ *    identifier rather than an arrow, and its handler receives the new value as
+ *    its argument already — no stale read to fix, and no arrow to destructure;
+ *  - `.lazy` emits `:defaultValue` + `:onBlur`; a colliding `@blur` DOES merge
+ *    and DOES take this path (verified by probe). That is correct — the blur
+ *    handler must see the value being committed, not the last rendered one;
+ *  - a radio's setter takes a LITERAL (`setX('V')`), so hoisting it is harmless
+ *    but also pointless; it still flows through this path correctly.
+ *
+ * Renaming the parameter is safe without scope machinery because a `committed`
+ * expression is a pure expression by construction — `r-model` value transforms
+ * are validated to contain no arrows/statements/returns — so it can hold no
+ * nested binding that could shadow `<param>`.
+ */
+function buildFreshValueBinding(
+  modelHandler: t.Expression,
+  modelTarget: { local: string; setter: string } | undefined,
+): { local: string; setter: string; valueCode: string } | null {
+  if (!modelTarget) return null;
+  if (!t.isArrowFunctionExpression(modelHandler)) return null;
+  if (modelHandler.params.length !== 1) return null;
+  const param = modelHandler.params[0];
+  if (!t.isIdentifier(param)) return null;
+  const body = modelHandler.body;
+  if (!t.isCallExpression(body)) return null;
+  if (!t.isIdentifier(body.callee) || body.callee.name !== modelTarget.setter) return null;
+  if (body.arguments.length !== 1) return null;
+  const arg = body.arguments[0];
+  if (!t.isExpression(arg)) return null;
+
+  // Rename the handler's own parameter to the merged arrow's `$event`.
+  const committed = t.cloneNode(arg, true, false) as t.Expression;
+  const renamed = renameIdentifier(committed, param.name, '$event');
+
+  return {
+    local: modelTarget.local,
+    setter: modelTarget.setter,
+    valueCode: generate(renamed, { concise: true, jsescOption: { minimal: true } }).code,
+  };
+}
+
+/**
+ * Replace every bare `from` Identifier reference in a pure expression with
+ * `to`. Skips non-computed member/object-property KEY positions (`x.from`,
+ * `{ from: 1 }`) — those are names, not references. No scope walk is needed:
+ * see `buildFreshValueBinding`'s purity note.
+ */
+function renameIdentifier(expr: t.Expression, from: string, to: string): t.Expression {
+  const walk = (node: t.Node): void => {
+    for (const key of Object.keys(node) as (keyof typeof node)[]) {
+      const child = (node as unknown as Record<string, unknown>)[key as string];
+      if (Array.isArray(child)) {
+        for (let i = 0; i < child.length; i++) {
+          const el = child[i];
+          if (el && typeof el === 'object' && 'type' in el) {
+            if (t.isIdentifier(el as t.Node) && (el as t.Identifier).name === from) {
+              child[i] = t.identifier(to);
+            } else {
+              walk(el as t.Node);
+            }
+          }
+        }
+        continue;
+      }
+      if (!child || typeof child !== 'object' || !('type' in child)) continue;
+      const childNode = child as t.Node;
+      // `x.from` / `{ from: 1 }` — a key, not a reference.
+      const isMemberKey =
+        (t.isMemberExpression(node) || t.isOptionalMemberExpression(node)) &&
+        node.property === childNode &&
+        !node.computed;
+      const isPropKey =
+        t.isObjectProperty(node) && node.key === childNode && !node.computed && !node.shorthand;
+      if (isMemberKey || isPropKey) continue;
+      if (t.isIdentifier(childNode) && childNode.name === from) {
+        (node as unknown as Record<string, unknown>)[key as string] = t.identifier(to);
+      } else {
+        walk(childNode);
+      }
+    }
+  };
+  if (t.isIdentifier(expr) && expr.name === from) return t.identifier(to);
+  walk(expr);
+  return expr;
+}
+
+
 const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
 
 const VOID_ELEMENTS = new Set([
@@ -565,7 +671,31 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
         const modelHandlerCode = rewriteTemplateExpression(modelEventAttr.expression, ctx.ir);
         // Model write runs FIRST, then each colliding explicit handler, in
         // source order — matching the other 5 targets' "both fire" semantics.
-        const callParts: string[] = [`(${modelHandlerCode})($event);`];
+        //
+        // N-01 — ordering alone is not enough. The explicit handler was
+        // rewritten to read the model cell as its render-scope local (a
+        // `useState` const), and `setState` is ASYNC on React, so running the
+        // write first still hands the handler the PRE-change value. The other
+        // five targets read a signal/ref and see the new one.
+        //
+        // This is emitter-owned, not author-owned: ROZ138 steers authors away
+        // from a write-then-read they WROTE, but here the merge SYNTHESISES
+        // the dominated read — the author's source contains no such sequence
+        // and there is nothing for them to fix.
+        //
+        // Fix: when the model handler has the exact shape
+        // `(<p>) => <setter>(<committed>)`, hoist `<committed>` into a local
+        // NAMED FOR THE MODEL CELL. It shadows the outer render const for the
+        // rest of the merged arrow, so the write and every folded-in handler
+        // agree on one value. Any other handler shape falls through to the
+        // original behaviour untouched.
+        const freshLocal = buildFreshValueBinding(
+          modelEventAttr.expression,
+          rModelResult.modelTarget,
+        );
+        const callParts: string[] = freshLocal
+          ? [`const ${freshLocal.local} = ${freshLocal.valueCode}; ${freshLocal.setter}(${freshLocal.local});`]
+          : [`(${modelHandlerCode})($event);`];
         for (const ev of collidingEvents) {
           const result = emitTemplateEvent(ev, {
             ir: ctx.ir,

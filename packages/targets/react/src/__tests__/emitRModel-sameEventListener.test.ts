@@ -124,6 +124,56 @@ function applyTheme(t) { console.log(t); }
     expect(setThemeIdx).toBeLessThan(applyThemeIdx);
   });
 
+  /**
+   * N-01 (2026-09-15) — the merge was correct about ORDERING but passed the
+   * PRE-CHANGE value to the folded-in explicit handler. `$data.theme` lowers
+   * to a `useState` render const on React, so
+   *
+   *   onChange={($event) => { (e => setTheme(e.target.value))($event);
+   *                           (($event) => { applyTheme(theme); })($event); }}
+   *
+   * hands `applyTheme` the value from BEFORE the write — React's setState is
+   * async, and the closure captured the old const. The other five targets read
+   * a signal/ref and see the new value, so this is a target-asymmetric parity
+   * break that the EMITTER creates: the author never wrote a write-then-read,
+   * so ROZ138 cannot fire and there is no author-side source to fix.
+   *
+   * The fix binds the committed value to a local that SHADOWS the render const
+   * inside the merged arrow, so every folded-in handler reads fresh.
+   */
+  it('N-01: the merged handler passes the FRESH value to the explicit handler, not the pre-change render const', () => {
+    const ir = lowerInline(`
+<rozie name="ThemePickerFresh">
+<data>{ theme: 'base' }</data>
+<script>
+function applyTheme(t) { console.log(t); }
+</script>
+<template>
+<select data-testid="ctl-theme" r-model="$data.theme" @change="applyTheme($data.theme)">
+  <option value="base">base</option>
+  <option value="material">material</option>
+</select>
+</template>
+</rozie>
+`);
+    const { jsx } = emit(ir);
+    const body = extractAttrBody(selectOpeningTag(jsx), 'onChange');
+
+    // A binding for the model local must be introduced INSIDE the handler,
+    // derived from the event — this is what shadows the stale render const.
+    const shadowIdx = body.search(/\bconst theme\s*=/);
+    expect(shadowIdx).toBeGreaterThanOrEqual(0);
+
+    // ...and it must be established BEFORE the explicit handler runs.
+    const applyIdx = body.indexOf('applyTheme');
+    expect(applyIdx).toBeGreaterThanOrEqual(0);
+    expect(shadowIdx).toBeLessThan(applyIdx);
+
+    // The setter must receive that same local, so the write and the handler
+    // can never disagree about which value was selected.
+    expect(body).toMatch(/setTheme\(\s*theme\s*\)/);
+  });
+
   it('non-colliding case stays untouched: r-model alone still emits its own onChange', () => {
     const ir = lowerInline(`
 <rozie name="Plain">
