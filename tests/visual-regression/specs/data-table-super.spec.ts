@@ -178,38 +178,37 @@ test('expanding a row reveals its detail panel', async ({ page }) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
-// THEME_SWAP_KNOWN_FAILING — two DIFFERENT live defects, both verified red here on
-// 2026-09-11 before being excluded. Neither is a harness quirk; each is owned by a plan and
-// each entry comes OUT as that plan's definition of done. Do not widen this set, and do not
-// promote it to a file-wide KNOWN_FAILING (every data-table spec's file-wide set is empty).
+// THEME_SWAP_KNOWN_FAILING — now EMPTY. It held two DIFFERENT live defects, both verified
+// red here on 2026-09-11 and both since fixed at the layer that owned them. Kept as a set
+// rather than deleted because it is what made each fix's definition of done mechanically
+// checkable: a target comes OUT only when its owning plan lands. Do not widen it, and do
+// not promote it to a file-wide KNOWN_FAILING (every data-table spec's file-wide set is empty).
 //
-//   lit   — F-01, Plan 2B. The public tokens are INERT in the Lit leaf's shadow root.
-//           Measured: `--rozie-data-table-header-bg` and `--rdt-header-bg` both resolve to
-//           the EMPTY STRING on a `thead .rdt-th`, before AND after the swap, and the
-//           rendered #f7f7f7 comes from base.css's inline var() FALLBACK, not from a token.
-//           base.css maps tokens under the document-level class selectors
-//           `.rozie-data-table-wrap, .rozie-data-table`, and on Lit both of those elements
-//           live INSIDE the shadow root (verified: th -> tr -> thead -> table.rozie-data-table
-//           -> div.rozie-data-table-wrap -> <rozie-data-table> shadow boundary), while the
-//           four `<style id="rdt-theme-*">` sheets sit in document.head. A head-level class
-//           selector cannot match inside a shadow root, so the swap changes nothing.
+//   lit   — F-01, CLOSED 2026-09-12. The public tokens were inert inside the Lit leaf's
+//           shadow root: base.css mapped public -> `--rdt-*` under the document-level
+//           selectors `.rozie-data-table-wrap, .rozie-data-table`, and on Lit BOTH of those
+//           elements live inside the shadow root while the `<style id="rdt-theme-*">` sheets
+//           sit in document.head. NOT encapsulation — tokens DO inherit across the boundary;
+//           only the wiring was mis-placed. Fixed by repeating the wiring under `:host` in
+//           DataTable.rozie, guarded so codegen fails the build if the two blocks drift.
 //
-//   react — NEW, not in the 2026-09-10 audit. Found by this conversion. The theme sheet is
-//           never ENABLED: enabledIds stays 'rdt-theme-base'. Tokens resolve FINE on React
-//           (#f7f7f7), so this is not F-01 — the swap itself never runs. Root cause is
-//           REACT CLOSURE STALENESS in emitted code. The demo authors
-//           `r-model="$data.theme"` and `@change="applyTheme($data.theme)"` on one <select>;
-//           the emitter correctly MERGES both into a single onChange (the old duplicate-key
-//           defect is genuinely fixed), but emits:
-//               const [x, ne] = useState("base"); const T = useRef(x); T.current = x;
-//               onChange: a => { ne(a.target.value), V(x) }
-//           so applyTheme receives the PRE-CHANGE render const `x` ("base") rather than the
-//           new value — while a fresh-value ref `T.current` already exists one line above and
-//           goes unused. Same class as 0353d25b1 (React resize, shipping in this wave) and
-//           B-01 (React drag-select stale anchor): the third instance of one emitter defect.
-//           Per the emitter-owns-parity principle this is an EMITTER fix, not a demo edit.
+//   react — N-01, CLOSED 2026-09-15 at the EMITTER. The theme sheet never got enabled
+//           because the swap never ran with the new value. Tokens resolve FINE on React
+//           (#f7f7f7), so this was never F-01. The demo authors `r-model="$data.theme"` +
+//           `@change="applyTheme($data.theme)"` on one <select>; the emitter correctly
+//           MERGES them into a single onChange, but emitted
+//               const [x, ne] = useState("base");
+//               onChange: a => { ne(a.target.value), V(x) }   // V got the PRE-change const
+//           `$data.x` is an async `useState` write on React, so the folded-in handler read
+//           the value from before the write while a fresh-value ref sat unused one line
+//           above; the other five targets read a signal/ref and saw the new one.
+//           Emitter-owned, not author-owned: ROZ138 steers authors off a write-then-read
+//           THEY wrote, but here the MERGE synthesised the dominated read — the author's
+//           source contains no such sequence, so ROZ138 cannot fire and there was nothing
+//           for them to fix. The merge now hoists the committed value into a local named for
+//           the model cell, shadowing the stale render const for the rest of the merged arrow.
 // ═══════════════════════════════════════════════════════════════════════════════════════
-const THEME_SWAP_KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set(['react']);
+const THEME_SWAP_KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set([]);
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // F-05a / the six-target THEMING-TOKEN gate. This case asserts a PUBLIC token's computed
