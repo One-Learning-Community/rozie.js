@@ -1,5 +1,11 @@
 # @rozie/runtime-solid
 
+## 0.7.4
+
+### Patch Changes
+
+- @rozie/runtime-keynav-core@0.7.4
+
 ## 0.7.3
 
 ### Patch Changes
