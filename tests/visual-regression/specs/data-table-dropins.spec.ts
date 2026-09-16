@@ -181,7 +181,7 @@ for (const target of TARGETS) {
     await expect.poll(async () => bodyRows.count(), { timeout: 15_000 }).toBe(5);
 
     // ── FilterText (name): type a value matching a single row + Enter → rows narrow to 1.
-    const nameFilter = filterTable.locator('input.rdt-col-filter[aria-label="name"]');
+    const nameFilter = filterTable.locator('input.rdt-col-filter[aria-label="Name"]');
     await expect(nameFilter).toBeVisible({ timeout: 10_000 });
     await nameFilter.fill('Alpha');
     await nameFilter.press('Enter');
@@ -192,7 +192,7 @@ for (const target of TARGETS) {
 
     // ── FilterSelect (category): picking "Hardware" narrows to the 2 Hardware rows
     //    (Alpha, Gamma); the leading "All" option (value="") restores the full set.
-    const categoryFilter = filterTable.locator('select.rdt-col-filter[aria-label="category"]');
+    const categoryFilter = filterTable.locator('select.rdt-col-filter[aria-label="Category"]');
     await expect(categoryFilter).toBeVisible({ timeout: 10_000 });
     await categoryFilter.selectOption('Hardware');
     await expect.poll(async () => bodyRows.count(), { timeout: 10_000 }).toBe(2);
@@ -212,7 +212,7 @@ for (const target of TARGETS) {
     //    environment-flaky, so this is wrapped + non-gating — the text + select assertions
     //    above are the hard gate. (FilterNumberRange compile-correctness is proven ×6.)
     try {
-      const priceMax = filterTable.locator('input.rdt-col-filter[aria-label="price max"]');
+      const priceMax = filterTable.locator('input.rdt-col-filter[aria-label="Price max"]');
       if (await priceMax.count()) {
         await priceMax.fill('50');
         await priceMax.dispatchEvent('change');
@@ -431,25 +431,50 @@ for (const target of TARGETS) {
     const mount = page.getByTestId('rozie-mount');
     await expect(mount.getByTestId('edit-table').locator('table')).toBeVisible({ timeout: 15_000 });
 
-    // Real click + F2 (not a JS .focus()) so the grid's own active-cell path runs.
-    await mount.locator('[data-grid-cell][data-row="0"][data-col-index="0"]').first().click();
-    await page.keyboard.press('F2');
+    // C-02 — every drop-in, not just the first column.
+    //
+    // This case used to open column 0 only. Column 0 is `name`, which dispatches to
+    // EditorText — the ONE drop-in that already implemented the contract. EditorSelect,
+    // EditorNumber, EditorDate and EditorCheckbox never declared the `autofocus` prop at
+    // all, so the host flipped a prop nothing was listening to and they opened unfocused.
+    // The demo forwarded `:autofocus` correctly the whole time; asserting only column 0
+    // could not see it. Each column below dispatches to a DIFFERENT drop-in.
+    for (const { col, header } of [
+      { col: 0, header: 'Name' }, // EditorText
+      { col: 1, header: 'Status' }, // EditorSelect
+      { col: 2, header: 'Ordered' }, // EditorDate
+    ]) {
+      // Real click + F2 (not a JS .focus()) so the grid's own active-cell path runs.
+      await mount.locator(`[data-grid-cell][data-row="0"][data-col-index="${col}"]`).first().click();
+      await page.keyboard.press('F2');
 
-    // Shadow-piercing deep activeElement: on Lit the drop-in's <input> lives inside the
-    // drop-in's OWN shadow root, nested within the grid's — document.activeElement stops at
-    // the outermost host, so a naive check reports the host element and never the input.
-    await expect
-      .poll(
-        async () =>
-          page.evaluate(() => {
-            let ae: Element | null = document.activeElement;
-            while (ae && (ae as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot?.activeElement) {
-              ae = (ae as Element & { shadowRoot: ShadowRoot }).shadowRoot.activeElement;
-            }
-            return !!(ae && ae.hasAttribute && ae.hasAttribute('data-editing-cell'));
-          }),
-        { timeout: 10_000 },
-      )
-      .toBe(true);
+      // Shadow-piercing deep activeElement: on Lit the drop-in's control lives inside the
+      // drop-in's OWN shadow root, nested within the grid's — document.activeElement stops
+      // at the outermost host, so a naive check reports the host and never the control.
+      const deepActive = async () =>
+        page.evaluate(() => {
+          let ae: Element | null = document.activeElement;
+          while (ae && (ae as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot?.activeElement) {
+            ae = (ae as Element & { shadowRoot: ShadowRoot }).shadowRoot.activeElement;
+          }
+          return ae
+            ? {
+                editing: !!(ae.hasAttribute && ae.hasAttribute('data-editing-cell')),
+                label: ae.getAttribute ? ae.getAttribute('aria-label') : null,
+              }
+            : null;
+        });
+
+      await expect.poll(async () => (await deepActive())?.editing, { timeout: 10_000 }).toBe(true);
+
+      // C-11 — the accessible name is the column's HUMAN header, never its internal id.
+      // Before the fix every editor and filter announced the lookup key (`orderedAt`),
+      // which is an implementation detail read aloud to a screen-reader user.
+      expect((await deepActive())?.label).toBe(header);
+
+      // Close before steering to the next cell (openCustomEditor's own precondition).
+      await page.keyboard.press('Escape');
+      await expect.poll(async () => anyEditorOpen(page), { timeout: 10_000 }).toBe(false);
+    }
   });
 }

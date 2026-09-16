@@ -58,8 +58,36 @@ for (const target of TARGETS) {
 
     const declarative = page.getByTestId('declarative-table');
     const config = page.getByTestId('config-table');
+
     await expect(declarative).toBeVisible({ timeout: 15_000 });
     await expect(config).toBeVisible({ timeout: 15_000 });
+
+    // ── A-01: the per-column `width` actually sizes the column. ───────────────────
+    // It was written onto the ColumnDef by BOTH declaration branches and read by
+    // NOTHING — table-core resolves width from `size`, which only the two chrome
+    // columns ever set — so the documented API was completely inert, the exact
+    // sibling of the inert `pinned` that 0.5.0 closed. No demo used `width` at all,
+    // which is why nobody could have noticed.
+    //
+    // Both accepted spellings are exercised: a px STRING on the <Column> branch and
+    // a px NUMBER on the :columns branch. `name` is declared at 220px while the two
+    // untouched columns keep the default, so a pass cannot come from every column
+    // happening to be the same width.
+    for (const table of [declarative, config]) {
+      const firstHeader = table.locator('thead th').first();
+      await expect(firstHeader).toBeVisible({ timeout: 15_000 });
+      const widths = await table.locator('thead th').evaluateAll((els) =>
+        els.map((el) => Math.round(el.getBoundingClientRect().width)),
+      );
+      // Asserted RELATIVELY, not as an exact 220. The demo's container is narrower
+      // than 220 + 2 defaults, so the table compresses every column proportionally
+      // and the declared column lands near 210 — a real application of the width,
+      // just not a pixel-exact one. What cannot happen by accident is the SHAPE:
+      // the declared column is materially wider, and the two undeclared columns
+      // match each other. Before the fix all three were identical.
+      expect(Math.abs(widths[1]! - widths[2]!)).toBeLessThanOrEqual(2); // sub-pixel rounding
+      expect(widths[0]).toBeGreaterThan(widths[1]! + 20);
+    }
 
     // Declarative table: 3 columnheaders + 3 body rows mount.
     await expect

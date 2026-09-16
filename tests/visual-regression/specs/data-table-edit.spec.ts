@@ -210,9 +210,9 @@ async function probeEditorPresent(page: Page): Promise<boolean> {
  * owning cell's [data-col-index]. Null when no editor is open. Walks open shadow roots (Lit).
  */
 // ═══════════════════════════════════════════════════════════════════════════════════════
-// SELECT_SEED_KNOWN_FAILING — C-03 (lit) / C-06 (angular), both MEASURED red here on
-// 2026-09-16, both green on the other four. One defect, one shared cause; each entry comes
-// OUT as the fix's definition of done. Do not widen this set.
+// SELECT_SEED_KNOWN_FAILING — now EMPTY. It held C-03 (lit) and C-06 (angular), both
+// MEASURED red here on 2026-09-16 and green on the other four, and both closed the same
+// day at the emitter. Kept as a set so any recurrence has a documented home; do not widen it.
 //
 // A `<select>` can only hold a value that one of its `<option>` children already carries.
 // Lit and Angular both apply an element's OWN bindings before creating that element's
@@ -234,7 +234,7 @@ async function probeEditorPresent(page: Page): Promise<boolean> {
 // whether the binding worked or was rejected. Any future case here must seed from a row
 // whose value is not option 0.
 // ═══════════════════════════════════════════════════════════════════════════════════════
-const SELECT_SEED_KNOWN_FAILING: ReadonlySet<string> = new Set(['lit', 'angular']);
+const SELECT_SEED_KNOWN_FAILING: ReadonlySet<string> = new Set([]);
 
 /**
  * The open editor's `selectedIndex`, shadow-pierced like `openEditor`. A `<select>` whose
