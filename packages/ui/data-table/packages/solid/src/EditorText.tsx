@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
 import { createEffect, createSignal, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
+import { rozieAttr } from '@rozie/runtime-solid';
 
 interface EditorTextProps {
   /**
@@ -30,11 +31,15 @@ interface EditorTextProps {
    * Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.
    */
   autofocus?: boolean;
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 export default function EditorText(_props: EditorTextProps): JSX.Element {
-  const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null, autofocus: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel', 'autofocus']);
+  const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null, autofocus: false, columnLabel: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel', 'autofocus', 'columnLabel']);
 
   const [draft, setDraft] = createSignal('');
   onMount(() => {
@@ -81,9 +86,20 @@ export default function EditorText(_props: EditorTextProps): JSX.Element {
   // a REACTIVE refocus while already mounted (e.g. a row-mode validation failure that flips
   // autofocus back onto this already-open drop-in).
 
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  function a11yLabel() {
+    if (typeof local.columnLabel === 'string' && local.columnLabel !== '') return local.columnLabel;
+    return local.columnId;
+  }
+
   return (
     <>
-    <input type="text" data-editing-cell="" aria-label={local.columnId} ref={(el) => { inputElRef = el as HTMLElement; }} class={"rdt-cell-editor"} value={draft()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-0d17f43a="" />
+    <input type="text" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} ref={(el) => { inputElRef = el as HTMLElement; }} class={"rdt-cell-editor"} value={draft()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-0d17f43a="" />
     </>
   );
 }

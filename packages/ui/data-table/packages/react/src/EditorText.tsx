@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { rozieAttr } from '@rozie/runtime-react';
 
 interface EditorTextProps {
   /**
@@ -29,10 +30,14 @@ interface EditorTextProps {
    * Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.
    */
   autofocus?: boolean;
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 export default function EditorText(_props: EditorTextProps): JSX.Element {
-  const props: Omit<EditorTextProps, 'columnId' | 'column' | 'row' | 'value' | 'commit' | 'cancel' | 'autofocus'> & { columnId: string; column: (unknown) | null; row: (unknown) | null; value: (unknown) | null; commit: ((...args: any[]) => any) | null; cancel: ((...args: any[]) => any) | null; autofocus: boolean } = {
+  const props: Omit<EditorTextProps, 'columnId' | 'column' | 'row' | 'value' | 'commit' | 'cancel' | 'autofocus' | 'columnLabel'> & { columnId: string; column: (unknown) | null; row: (unknown) | null; value: (unknown) | null; commit: ((...args: any[]) => any) | null; cancel: ((...args: any[]) => any) | null; autofocus: boolean; columnLabel: string } = {
     ..._props,
     columnId: _props.columnId ?? '',
     column: _props.column ?? null,
@@ -41,6 +46,7 @@ export default function EditorText(_props: EditorTextProps): JSX.Element {
     commit: _props.commit ?? null,
     cancel: _props.cancel ?? null,
     autofocus: _props.autofocus ?? false,
+    columnLabel: _props.columnLabel ?? '',
   };
   const _autofocusRef = useRef(props.autofocus);
   _autofocusRef.current = props.autofocus;
@@ -77,6 +83,16 @@ export default function EditorText(_props: EditorTextProps): JSX.Element {
   // (NOT { immediate: true } — an immediate watch fires PRE-mount, null ref on Lit/Solid) covers
   // a REACTIVE refocus while already mounted (e.g. a row-mode validation failure that flips
   // autofocus back onto this already-open drop-in).
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  function a11yLabel() {
+    if (typeof props.columnLabel === 'string' && props.columnLabel !== '') return props.columnLabel;
+    return props.columnId;
+  }
 
   useEffect(() => {
     if (_autofocusRef.current) inputEl.current?.focus();
@@ -89,7 +105,7 @@ export default function EditorText(_props: EditorTextProps): JSX.Element {
 
   return (
     <>
-    <input ref={inputEl} className={"rdt-cell-editor"} type="text" data-editing-cell="" aria-label={props.columnId} value={draft} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-0d17f43a="" />
+    <input ref={inputEl} className={"rdt-cell-editor"} type="text" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} value={draft} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-0d17f43a="" />
     </>
   );
 }

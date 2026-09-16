@@ -543,12 +543,12 @@ A misspelled family key does not fail to compile — the emitted type carries a 
 | groupBar | grouping, groupableColumns, applyGrouping, clearGrouping |
 | selectAll | checked, indeterminate, toggle |
 | colHeader-<id> | columnId, column, label |
-| filter-<id> | columnId, value, uniqueValues, minMax, setFilter |
+| filter-<id> | columnId, value, uniqueValues, minMax, columnLabel, setFilter |
 | selectCell | row, checked, toggle |
 | cell-<id> | columnId, column, row, value |
-| editor-<id> | columnId, column, row, value, commit, cancel, autofocus |
+| editor-<id> | columnId, column, row, value, commit, cancel, columnLabel, autofocus |
 | detail | row |
 | colHeader | columnId, column, label |
-| filter | columnId, value, uniqueValues, minMax, setFilter |
+| filter | columnId, value, uniqueValues, minMax, columnLabel, setFilter |
 | cell | columnId, column, row, value |
-| editor | columnId, column, row, value, commit, cancel, autofocus |
+| editor | columnId, column, row, value, commit, cancel, columnLabel, autofocus |

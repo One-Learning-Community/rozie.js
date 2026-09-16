@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
-import { mergeProps, splitProps } from 'solid-js';
+import { createEffect, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
+import { rozieAttr } from '@rozie/runtime-solid';
 
 interface EditorCheckboxProps {
   /**
@@ -26,11 +27,27 @@ interface EditorCheckboxProps {
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
   cancel?: ((...args: any[]) => any) | null;
+  /**
+   * Focus this editor's primary control when true — the host sets it for the one editor that should hold focus; reactive.
+   */
+  autofocus?: boolean;
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 export default function EditorCheckbox(_props: EditorCheckboxProps): JSX.Element {
-  const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel']);
+  const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null, autofocus: false, columnLabel: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel', 'autofocus', 'columnLabel']);
+
+  onMount(() => {
+    if (local.autofocus) inputElRef?.focus();
+  });
+  createEffect(on(() => (() => local.autofocus)(), (v) => untrack(() => ((v: any) => {
+    if (v) inputElRef?.focus();
+  })(v)), { defer: true }));
+  let inputElRef: HTMLElement | null = null;
 
   // Immediate-commit-on-change: read .checked the global-filter way, coerce to a
   // real boolean, and commit it directly.
@@ -44,9 +61,26 @@ export default function EditorCheckbox(_props: EditorCheckboxProps): JSX.Element
     }
   }
 
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  function a11yLabel() {
+    if (typeof local.columnLabel === 'string' && local.columnLabel !== '') return local.columnLabel;
+    return local.columnId;
+  }
+
+  // C-02 / editor-owns-focus: focus OUR OWN control when the host says we should hold it.
+  // $onMount covers the initial open (autofocus is already true on first render); the LAZY
+  // $watch (NOT { immediate: true } — an immediate watch fires PRE-mount and sees a null
+  // ref on Lit/Solid) covers a REACTIVE refocus while already mounted, e.g. a row-mode
+  // validation failure flipping autofocus back onto this already-open drop-in.
+
   return (
     <>
-    <input type="checkbox" data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} checked={!!local.value} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onChange($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} data-rozie-s-3d792482="" />
+    <input type="checkbox" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} ref={(el) => { inputElRef = el as HTMLElement; }} class={"rdt-cell-editor"} checked={!!local.value} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onChange($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} data-rozie-s-3d792482="" />
     </>
   );
 }

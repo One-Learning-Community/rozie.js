@@ -6,10 +6,10 @@ import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie
   standalone: true,
   template: `
 
-    <select class="rdt-col-filter" part="col-filter" [attr.aria-label]="columnId()" [value]="selectValue()" (change)="onChange($event)">
+    <select class="rdt-col-filter" part="col-filter" [attr.aria-label]="rozieAttr(a11yLabel())" [value]="selectValue()" (change)="onChange($event)">
       <option value="">All</option>
       @for (opt of uniqueValues(); track opt) {
-    <option [attr.value]="rozieAttr(opt)">{{ rozieDisplay(opt) }}</option>
+    <option [attr.value]="rozieAttr(opt)" [selected]="opt === selectValue()">{{ rozieDisplay(opt) }}</option>
     }
     </select>
 
@@ -39,6 +39,10 @@ export class FilterSelect {
    * The faceted distinct keys for this column (cross-filtered, keys only — no occurrence counts) used to build the `<option>` list.
    */
   uniqueValues = input<any[]>((() => [])());
+  /**
+   * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel = input<string>('');
 
   // The <select> value binding coerced to a string. $props.value is typed `unknown`
   // (opaque slot-scope), which the strict bundled-leaf tsc rejects against the native
@@ -56,6 +60,17 @@ export class FilterSelect {
     } else {
       __setFilter && __setFilter(__columnId, v);
     }
+  };
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  a11yLabel = () => {
+    const __columnLabel = this.columnLabel();
+    if (typeof __columnLabel === 'string' && __columnLabel !== '') return __columnLabel;
+    return this.columnId();
   };
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }

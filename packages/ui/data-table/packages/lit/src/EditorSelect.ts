@@ -1,5 +1,5 @@
 import { LitElement, css, html } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, query } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieAttr, rozieDisplay } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
@@ -38,7 +38,17 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
    * The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.
    */
   @property({ type: Array }) options: any[] = [];
+  /**
+   * Focus this editor's primary control when true — the host sets it for the one editor that should hold focus; reactive.
+   */
+  @property({ type: Boolean, reflect: true }) autofocus: boolean = false;
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  @property({ type: String, reflect: true }) columnLabel: string = '';
   private _draft = signal('');
+  @query('[data-rozie-ref="selectEl"]') private _refSelectEl!: HTMLElement;
+private __rozieFirstUpdateDone = false;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -49,6 +59,15 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
     // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
     // to '' so the <select> binds to a string.
     this._draft.value = this.value != null ? String(this.value) : '';
+
+    if (this.autofocus) this._refSelectEl?.focus();
+  }
+
+  updated(changedProperties: Map<string, unknown>): void {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('autofocus'))) { const __watchVal = (() => this.autofocus)(); ((v: any) => {
+      if (v) this._refSelectEl?.focus();
+    })(__watchVal); }
+    this.__rozieFirstUpdateDone = true;
   }
 
   disconnectedCallback(): void {
@@ -63,8 +82,8 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<select class="rdt-cell-editor" data-editing-cell="" aria-label=${this.columnId} .value=${this._draft.value} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onChange($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onBlur(); }} data-rozie-s-117f1a16>
-  ${repeat<any>(this.options, (opt, _idx) => opt.value, (opt, _idx) => html`<option value=${rozieAttr(opt.value)} data-rozie-s-117f1a16>${rozieDisplay(opt.label)}</option>`)}
+<select class="rdt-cell-editor" data-editing-cell="" aria-label=${rozieAttr(this.a11yLabel())} .value=${this._draft.value} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onChange($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onBlur(); }} data-rozie-ref="selectEl" data-rozie-s-117f1a16>
+  ${repeat<any>(this.options, (opt, _idx) => opt.value, (opt, _idx) => html`<option value=${rozieAttr(opt.value)} ?selected=${opt.value === this._draft.value} data-rozie-s-117f1a16>${rozieDisplay(opt.label)}</option>`)}
 </select>
 `;
   }
@@ -95,5 +114,16 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
 
   onBlur = () => {
   this.doCommit();
+};
+
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  a11yLabel = () => {
+  if (typeof this.columnLabel === 'string' && this.columnLabel !== '') return this.columnLabel;
+  return this.columnId;
 };
 }

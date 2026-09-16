@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { rozieAttr } from '@rozie/runtime-react';
 
 interface FilterTextProps {
   /**
@@ -17,15 +18,20 @@ interface FilterTextProps {
    * `(columnId, value) => void` — apply the column filter (Enter / blur applies, Escape clears). Null-guarded at call sites.
    */
   setFilter?: ((...args: any[]) => any) | null;
+  /**
+   * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 export default function FilterText(_props: FilterTextProps): JSX.Element {
-  const props: Omit<FilterTextProps, 'columnId' | 'column' | 'value' | 'setFilter'> & { columnId: string; column: (unknown) | null; value: (unknown) | null; setFilter: ((...args: any[]) => any) | null } = {
+  const props: Omit<FilterTextProps, 'columnId' | 'column' | 'value' | 'setFilter' | 'columnLabel'> & { columnId: string; column: (unknown) | null; value: (unknown) | null; setFilter: ((...args: any[]) => any) | null; columnLabel: string } = {
     ..._props,
     columnId: _props.columnId ?? '',
     column: _props.column ?? null,
     value: _props.value ?? null,
     setFilter: _props.setFilter ?? null,
+    columnLabel: _props.columnLabel ?? '',
   };
   const [draft, setDraft] = useState(() => props.value != null ? String(props.value) : '');
 
@@ -54,10 +60,20 @@ export default function FilterText(_props: FilterTextProps): JSX.Element {
   const onBlur = useCallback(() => {
     applyFilter();
   }, [applyFilter]);
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  function a11yLabel() {
+    if (typeof props.columnLabel === 'string' && props.columnLabel !== '') return props.columnLabel;
+    return props.columnId;
+  }
 
   return (
     <>
-    <input className={"rdt-col-filter"} part="col-filter" type="text" aria-label={props.columnId} value={draft} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-18cbb44e="" />
+    <input className={"rdt-col-filter"} part="col-filter" type="text" aria-label={rozieAttr(a11yLabel())} value={draft} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-18cbb44e="" />
     </>
   );
 }

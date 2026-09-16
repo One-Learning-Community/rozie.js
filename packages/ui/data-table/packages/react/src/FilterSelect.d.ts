@@ -21,6 +21,10 @@ export interface FilterSelectProps {
    * The faceted distinct keys for this column (cross-filtered, keys only — no occurrence counts) used to build the `<option>` list.
    */
   uniqueValues?: unknown[];
+  /**
+   * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 declare function FilterSelect(props: FilterSelectProps): JSX.Element;

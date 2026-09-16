@@ -25,6 +25,14 @@ export interface EditorCheckboxProps {
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
   cancel?: ((...args: any[]) => any) | null;
+  /**
+   * Focus this editor's primary control when true — the host sets it for the one editor that should hold focus; reactive.
+   */
+  autofocus?: boolean;
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 declare function EditorCheckbox(props: EditorCheckboxProps): JSX.Element;

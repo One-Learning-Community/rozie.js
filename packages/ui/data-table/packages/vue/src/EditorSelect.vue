@@ -1,13 +1,13 @@
 <template>
 
-<select class="rdt-cell-editor" data-editing-cell="" :aria-label="props.columnId" :value="draft" @change="onChange($event)" @keydown="onKeydown($event)" @blur="onBlur()">
+<select ref="selectElRef" class="rdt-cell-editor" data-editing-cell="" :aria-label="a11yLabel()" :value="draft" @change="onChange($event)" @keydown="onKeydown($event)" @blur="onBlur()">
   <option v-for="opt in props.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
 </select>
 
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -39,11 +39,21 @@ const props = withDefaults(
      * The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.
      */
     options?: any[];
+    /**
+     * Focus this editor's primary control when true — the host sets it for the one editor that should hold focus; reactive.
+     */
+    autofocus?: boolean;
+    /**
+     * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+     */
+    columnLabel?: string;
   }>(),
-  { columnId: '', column: null, row: null, value: null, commit: null, cancel: null, options: () => [] }
+  { columnId: '', column: null, row: null, value: null, commit: null, cancel: null, options: () => [], autofocus: false, columnLabel: '' }
 );
 
 const draft = ref('');
+
+const selectElRef = ref<HTMLSelectElement>();
 
 // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
 // to '' so the <select> binds to a string.
@@ -71,4 +81,28 @@ const onKeydown = (e: any) => {
 const onBlur = () => {
   doCommit();
 };
+// C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+// `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+// reading an implementation detail aloud. table-core keeps the authored header on
+// `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+// a header rendered by a function has no static text, so fall back to the id rather
+// than invent one.
+const a11yLabel = () => {
+  if (typeof props.columnLabel === 'string' && props.columnLabel !== '') return props.columnLabel;
+  return props.columnId;
+};
+
+// C-02 / editor-owns-focus: focus OUR OWN control when the host says we should hold it.
+// $onMount covers the initial open (autofocus is already true on first render); the LAZY
+// $watch (NOT { immediate: true } — an immediate watch fires PRE-mount and sees a null
+// ref on Lit/Solid) covers a REACTIVE refocus while already mounted, e.g. a row-mode
+// validation failure flipping autofocus back onto this already-open drop-in.
+
+onMounted(() => {
+  if (props.autofocus) selectElRef.value?.focus();
+});
+
+watch(() => props.autofocus, (v: any) => {
+  if (v) selectElRef.value?.focus();
+}, { flush: 'post' });
 </script>

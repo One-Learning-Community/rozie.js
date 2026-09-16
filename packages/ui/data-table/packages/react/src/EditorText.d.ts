@@ -29,6 +29,10 @@ export interface EditorTextProps {
    * Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.
    */
   autofocus?: boolean;
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 declare function EditorText(props: EditorTextProps): JSX.Element;

@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
 import { createSignal, mergeProps, splitProps } from 'solid-js';
+import { rozieAttr } from '@rozie/runtime-solid';
 
 interface FilterTextProps {
   /**
@@ -18,11 +19,15 @@ interface FilterTextProps {
    * `(columnId, value) => void` — apply the column filter (Enter / blur applies, Escape clears). Null-guarded at call sites.
    */
   setFilter?: ((...args: any[]) => any) | null;
+  /**
+   * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 export default function FilterText(_props: FilterTextProps): JSX.Element {
-  const _merged = mergeProps({ columnId: '', column: null, value: null, setFilter: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'value', 'setFilter']);
+  const _merged = mergeProps({ columnId: '', column: null, value: null, setFilter: null, columnLabel: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'value', 'setFilter', 'columnLabel']);
 
   const [draft, setDraft] = createSignal('');
 
@@ -57,9 +62,20 @@ export default function FilterText(_props: FilterTextProps): JSX.Element {
     applyFilter();
   }
 
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  function a11yLabel() {
+    if (typeof local.columnLabel === 'string' && local.columnLabel !== '') return local.columnLabel;
+    return local.columnId;
+  }
+
   return (
     <>
-    <input part="col-filter" type="text" aria-label={local.columnId} class={"rdt-col-filter"} value={draft()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-18cbb44e="" />
+    <input part="col-filter" type="text" aria-label={rozieAttr(a11yLabel())} class={"rdt-col-filter"} value={draft()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-18cbb44e="" />
     </>
   );
 }

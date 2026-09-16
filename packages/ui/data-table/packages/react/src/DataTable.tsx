@@ -45,11 +45,11 @@ interface DetailCtx { row: any; }
 
 interface ColHeaderCtx { columnId: any; column: any; label: any; }
 
-interface FilterCtx { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any; }
+interface FilterCtx { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any; }
 
 interface CellCtx { columnId: any; column: any; row: any; value: any; }
 
-interface EditorCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any; }
+interface EditorCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any; }
 
 interface DataTableProps {
   /**
@@ -218,7 +218,7 @@ interface DataTableProps {
   renderFilter?: (ctx: FilterCtx) => ReactNode;
   renderCell?: (ctx: CellCtx) => ReactNode;
   renderEditor?: (ctx: EditorCtx) => ReactNode;
-  slots?: { [key: `colHeader-${string}`]: ((params: { columnId: any; column: any; label: any }) => import('react').ReactNode) | undefined; [key: `filter-${string}`]: ((params: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => import('react').ReactNode) | undefined; [key: `cell-${string}`]: ((params: { columnId: any; column: any; row: any; value: any }) => import('react').ReactNode) | undefined; [key: `editor-${string}`]: ((params: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }) => import('react').ReactNode) | undefined; [key: string]: ((...args: any[]) => import('react').ReactNode) | undefined; };
+  slots?: { [key: `colHeader-${string}`]: ((params: { columnId: any; column: any; label: any }) => import('react').ReactNode) | undefined; [key: `filter-${string}`]: ((params: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }) => import('react').ReactNode) | undefined; [key: `cell-${string}`]: ((params: { columnId: any; column: any; row: any; value: any }) => import('react').ReactNode) | undefined; [key: `editor-${string}`]: ((params: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }) => import('react').ReactNode) | undefined; [key: string]: ((...args: any[]) => import('react').ReactNode) | undefined; };
 }
 
 export interface DataTableHandle {
@@ -733,6 +733,32 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // ({ id?, header, columns: [...] }) maps to a multi-level header GROUP column
   // whose children are built recursively (B12 — grouped/multi-level column headers).
   // Returns null for an unusable entry (no id/field, unsafe key, empty group).
+  /**
+   * A-01 — translate the public per-column `width` into table-core's `size`.
+   *
+   * `width` was written onto the ColumnDef in both build branches and read by NOTHING:
+   * table-core resolves column width from `size` (a NUMBER of px), which only the two
+   * chrome columns ever set. So the documented API was completely inert — the exact
+   * sibling of the inert `pinned` that 0.5.0 closed.
+   *
+   * `size` is numeric px by construction, so only a number or a px string can map onto
+   * it; any other CSS length (`12rem`, `20%`, `auto`) has no numeric px value at build
+   * time and is deliberately NOT guessed — it returns null and the column keeps
+   * table-core's default. The `width` prop's docs say exactly this.
+   *
+   * Returns null (not undefined) for "no usable width" so callers can test `!= null`
+   * without tripping over a legitimate 0.
+   */
+  function parseWidthToSize(w: any) {
+    if (typeof w === 'number') return Number.isFinite(w) && w > 0 ? w : null;
+    if (typeof w !== 'string') return null;
+    const t = w.trim();
+    if (t === '') return null;
+    const m = /^(\d+(?:\.\d+)?)(px)?$/i.exec(t);
+    if (!m) return null;
+    const n = Number.parseFloat(m[1]);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
   function buildConfigDef(c: any) {
     if (!c) return null;
     // Grouped (multi-level) header column: an entry carrying a `columns` array. table-core's
@@ -788,6 +814,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       aggregationFn: wrapAggregationFn(c.aggregationFn),
       pinned: c.pinned != null ? c.pinned : '',
       width: c.width != null ? c.width : '',
+      // A-01 — `width` alone is inert; table-core sizes from `size`. Spread so an
+      // unusable width leaves `size` ABSENT rather than explicitly undefined, which
+      // would override a consumer's `defaultColumn.size`.
+      ...(parseWidthToSize(c.width) != null ? {
+        size: parseWidthToSize(c.width)
+      } : {}),
       // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
       // metadata carrier the display↔editor branch + runValidator read. Off by default.
       meta: {
@@ -869,6 +901,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         aggregationFn: wrapAggregationFn(spec.aggregationFn),
         pinned: spec.pinned != null ? spec.pinned : '',
         width: spec.width != null ? spec.width : '',
+        // A-01 — see buildConfigDef; same mapping for the <Column> registry branch.
+        ...(parseWidthToSize(spec.width) != null ? {
+          size: parseWidthToSize(spec.width)
+        } : {}),
         // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
         meta: {
           editable: spec.editable === true,
@@ -7364,7 +7400,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
           {!!(colsWindowed()) && <th className={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadLeft() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" />}{windowedHeadersFor(headerGroups[headerGroups.length - 1], headerGroups.length - 1).map((wh) => <th key={wh.header.id} className={"rdt-filter-cell"} role="presentation" data-col={rozieAttr(wh.header.column.id)} style={parseInlineStyle(pinStyle(wh.header.column.id))} data-rozie-s-d5dcab4c="">
             {(isSelectColumn(wh.header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : (isExpanderColumn(wh.header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {!!(columnIsFilterable(wh.header.column.id)) && <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {typeof props.slots?.[`filter-${wh.header.column.id}`] === 'function' ? (props.slots?.[`filter-${wh.header.column.id}`] as Function)({ columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), setFilter: setColumnFilter }) : (props.slots?.[`filter-${wh.header.column.id}`] ?? ((props.renderFilter ?? props.slots?.['filter']) ? ((props.renderFilter ?? props.slots?.['filter']) as Function)({ columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), setFilter: setColumnFilter }) : <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(wh.header.column.id))} value={columnFilterValue(wh.header.column.id)} onInput={($event) => { onColumnFilterInput(wh.header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />))}
+                {typeof props.slots?.[`filter-${wh.header.column.id}`] === 'function' ? (props.slots?.[`filter-${wh.header.column.id}`] as Function)({ columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), columnLabel: headerLabel(wh.header.column.id), setFilter: setColumnFilter }) : (props.slots?.[`filter-${wh.header.column.id}`] ?? ((props.renderFilter ?? props.slots?.['filter']) ? ((props.renderFilter ?? props.slots?.['filter']) as Function)({ columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), columnLabel: headerLabel(wh.header.column.id), setFilter: setColumnFilter }) : <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(wh.header.column.id))} value={columnFilterValue(wh.header.column.id)} onInput={($event) => { onColumnFilterInput(wh.header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />))}
               </span>}</span>}</th>)}
           {!!(colsWindowed()) && <th className={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadRight() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" />}</tr>}</thead>
 
@@ -7392,7 +7428,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
               {(editorTypeOf(cell.column.id) === 'number') ? <input className={"rdt-cell-editor"} type="number" data-editing-cell="" data-builtin-editor="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cell.column.id) === 'select') ? <select className={"rdt-cell-editor"} data-editing-cell="" data-builtin-editor="" value={editorValueFor(cell.column.id)} onChange={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 {editorOptionsOf(cell.column.id).map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>)}
               </select> : (editorTypeOf(cell.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" data-builtin-editor="" checked={editorCheckedFor(cell.column.id)} onChange={($event) => { onCellEditorCheckbox(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cell.column.id) === 'custom') ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {typeof props.slots?.[`editor-${cell.column.id}`] === 'function' ? (props.slots?.[`editor-${cell.column.id}`] as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }) : (props.slots?.[`editor-${cell.column.id}`] ?? ((props.renderEditor ?? props.slots?.['editor']) ? ((props.renderEditor ?? props.slots?.['editor']) as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }) : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" data-builtin-editor="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />))}
+                {typeof props.slots?.[`editor-${cell.column.id}`] === 'function' ? (props.slots?.[`editor-${cell.column.id}`] as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }) : (props.slots?.[`editor-${cell.column.id}`] ?? ((props.renderEditor ?? props.slots?.['editor']) ? ((props.renderEditor ?? props.slots?.['editor']) as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }) : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" data-builtin-editor="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />))}
               </span> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" data-builtin-editor="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : (cellIsPlaceholder(cell)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {typeof props.slots?.[`cell-${cell.column.id}`] === 'function' ? (props.slots?.[`cell-${cell.column.id}`] as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }) : (props.slots?.[`cell-${cell.column.id}`] ?? ((props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }) : (rozieDisplay(cell.getValue()))))}
             </span>}{!!(isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cell))) && <span className={"rdt-fill-handle"} data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" />}</td>)}
@@ -7448,7 +7484,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
           {headerGroups[headerGroups.length - 1].headers.map((header) => <th key={header.id} className={"rdt-filter-cell"} role="presentation" style={parseInlineStyle(pinStyle(header.column.id))} data-rozie-s-d5dcab4c="">
             {(isSelectColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : (isExpanderColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {!!(columnIsFilterable(header.column.id)) && <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {typeof props.slots?.[`filter-${header.column.id}`] === 'function' ? (props.slots?.[`filter-${header.column.id}`] as Function)({ columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }) : (props.slots?.[`filter-${header.column.id}`] ?? ((props.renderFilter ?? props.slots?.['filter']) ? ((props.renderFilter ?? props.slots?.['filter']) as Function)({ columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }) : <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />))}
+                {typeof props.slots?.[`filter-${header.column.id}`] === 'function' ? (props.slots?.[`filter-${header.column.id}`] as Function)({ columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), columnLabel: headerLabel(header.column.id), setFilter: setColumnFilter }) : (props.slots?.[`filter-${header.column.id}`] ?? ((props.renderFilter ?? props.slots?.['filter']) ? ((props.renderFilter ?? props.slots?.['filter']) as Function)({ columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), columnLabel: headerLabel(header.column.id), setFilter: setColumnFilter }) : <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />))}
               </span>}</span>}</th>)}
         </tr>}</thead>
 
@@ -7471,7 +7507,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
               {(editorTypeOf(cell.column.id) === 'number') ? <input className={"rdt-cell-editor"} type="number" data-editing-cell="" data-builtin-editor="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cell.column.id) === 'select') ? <select className={"rdt-cell-editor"} data-editing-cell="" data-builtin-editor="" value={editorValueFor(cell.column.id)} onChange={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 {editorOptionsOf(cell.column.id).map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>)}
               </select> : (editorTypeOf(cell.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" data-builtin-editor="" checked={editorCheckedFor(cell.column.id)} onChange={($event) => { onCellEditorCheckbox(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cell.column.id) === 'custom') ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {typeof props.slots?.[`editor-${cell.column.id}`] === 'function' ? (props.slots?.[`editor-${cell.column.id}`] as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }) : (props.slots?.[`editor-${cell.column.id}`] ?? ((props.renderEditor ?? props.slots?.['editor']) ? ((props.renderEditor ?? props.slots?.['editor']) as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }) : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" data-builtin-editor="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />))}
+                {typeof props.slots?.[`editor-${cell.column.id}`] === 'function' ? (props.slots?.[`editor-${cell.column.id}`] as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }) : (props.slots?.[`editor-${cell.column.id}`] ?? ((props.renderEditor ?? props.slots?.['editor']) ? ((props.renderEditor ?? props.slots?.['editor']) as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }) : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" data-builtin-editor="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />))}
               </span> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" data-builtin-editor="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : (cellIsPlaceholder(cell)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {typeof props.slots?.[`cell-${cell.column.id}`] === 'function' ? (props.slots?.[`cell-${cell.column.id}`] as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }) : (props.slots?.[`cell-${cell.column.id}`] ?? ((props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }) : (rozieDisplay(cell.getValue()))))}
             </span>}{!!(isFillHandleCell(rowIndexOf(row), colIndexOf(row, cell))) && <span className={"rdt-fill-handle"} data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" />}</td>)}

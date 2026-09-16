@@ -64,8 +64,8 @@
       <th v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th><th v-for="wh in windowedHeadersFor(headerGroups[headerGroups.length - 1], headerGroups.length - 1)" :key="wh.header.id" class="rdt-filter-cell" role="presentation" :data-col="wh.header.column.id" :style="pinStyle(wh.header.column.id)">
         <span v-if="isSelectColumn(wh.header.column.id)" style="display:contents"></span><span v-else-if="isExpanderColumn(wh.header.column.id)" style="display:contents"></span><span v-else style="display:contents">
           <span v-if="columnIsFilterable(wh.header.column.id)" style="display:contents">
-            <slot :name="`filter-${wh.header.column.id}`" :columnId="wh.header.column.id" :value="columnFilterValue(wh.header.column.id)" :uniqueValues="getFacetedUniqueValues(wh.header.column.id)" :minMax="getFacetedMinMaxValues(wh.header.column.id)" :setFilter="setColumnFilter">
-              <slot name="filter" :columnId="wh.header.column.id" :value="columnFilterValue(wh.header.column.id)" :uniqueValues="getFacetedUniqueValues(wh.header.column.id)" :minMax="getFacetedMinMaxValues(wh.header.column.id)" :setFilter="setColumnFilter">
+            <slot :name="`filter-${wh.header.column.id}`" :columnId="wh.header.column.id" :value="columnFilterValue(wh.header.column.id)" :uniqueValues="getFacetedUniqueValues(wh.header.column.id)" :minMax="getFacetedMinMaxValues(wh.header.column.id)" :columnLabel="headerLabel(wh.header.column.id)" :setFilter="setColumnFilter">
+              <slot name="filter" :columnId="wh.header.column.id" :value="columnFilterValue(wh.header.column.id)" :uniqueValues="getFacetedUniqueValues(wh.header.column.id)" :minMax="getFacetedMinMaxValues(wh.header.column.id)" :columnLabel="headerLabel(wh.header.column.id)" :setFilter="setColumnFilter">
                 <input class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(wh.header.column.id)" :value="columnFilterValue(wh.header.column.id)" @input="onColumnFilterInput(wh.header.column.id, $event)" @click="stopEvent($event)" />
               </slot>
             </slot>
@@ -100,8 +100,8 @@
           <input v-if="editorTypeOf(cell.column.id) === 'number'" class="rdt-cell-editor" type="number" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><select v-else-if="editorTypeOf(cell.column.id) === 'select'" class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @change="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)">
             <option v-for="opt in editorOptionsOf(cell.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" data-builtin-editor="" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><span v-else-if="editorTypeOf(cell.column.id) === 'custom'" style="display:contents">
-            <slot :name="`editor-${cell.column.id}`" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()" :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)">
-              <slot name="editor" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()" :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)">
+            <slot :name="`editor-${cell.column.id}`" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()" :columnLabel="headerLabel(cell.column.id)" :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)">
+              <slot name="editor" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()" :columnLabel="headerLabel(cell.column.id)" :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)">
                 <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" />
               </slot>
             </slot>
@@ -168,8 +168,8 @@
       <th v-for="header in headerGroups[headerGroups.length - 1].headers" :key="header.id" class="rdt-filter-cell" role="presentation" :style="pinStyle(header.column.id)">
         <span v-if="isSelectColumn(header.column.id)" style="display:contents"></span><span v-else-if="isExpanderColumn(header.column.id)" style="display:contents"></span><span v-else style="display:contents">
           <span v-if="columnIsFilterable(header.column.id)" style="display:contents">
-            <slot :name="`filter-${header.column.id}`" :columnId="header.column.id" :value="columnFilterValue(header.column.id)" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter">
-              <slot name="filter" :columnId="header.column.id" :value="columnFilterValue(header.column.id)" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter">
+            <slot :name="`filter-${header.column.id}`" :columnId="header.column.id" :value="columnFilterValue(header.column.id)" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :columnLabel="headerLabel(header.column.id)" :setFilter="setColumnFilter">
+              <slot name="filter" :columnId="header.column.id" :value="columnFilterValue(header.column.id)" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :columnLabel="headerLabel(header.column.id)" :setFilter="setColumnFilter">
                 <input class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" />
               </slot>
             </slot>
@@ -199,8 +199,8 @@
           <input v-if="editorTypeOf(cell.column.id) === 'number'" class="rdt-cell-editor" type="number" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><select v-else-if="editorTypeOf(cell.column.id) === 'select'" class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @change="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)">
             <option v-for="opt in editorOptionsOf(cell.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" data-builtin-editor="" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><span v-else-if="editorTypeOf(cell.column.id) === 'custom'" style="display:contents">
-            <slot :name="`editor-${cell.column.id}`" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()" :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))">
-              <slot name="editor" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()" :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))">
+            <slot :name="`editor-${cell.column.id}`" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()" :columnLabel="headerLabel(cell.column.id)" :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))">
+              <slot name="editor" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()" :columnLabel="headerLabel(cell.column.id)" :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))">
                 <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" />
               </slot>
             </slot>
@@ -392,18 +392,18 @@ defineSlots<{
   groupBar(props: { grouping: any; groupableColumns: any; applyGrouping: any; clearGrouping: any }): any;
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   [key: `colHeader-${string}`]: ((props: { columnId: any; column: any; label: any }) => any) | undefined;
-  [key: `filter-${string}`]: ((props: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => any) | undefined;
+  [key: `filter-${string}`]: ((props: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }) => any) | undefined;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   [key: `cell-${string}`]: ((props: { columnId: any; column: any; row: any; value: any }) => any) | undefined;
-  [key: `editor-${string}`]: ((props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }) => any) | undefined;
+  [key: `editor-${string}`]: ((props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }) => any) | undefined;
   detail(props: { row: any }): any;
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   detail(props: { row: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
-  filter(props: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }): any;
+  filter(props: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
-  editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }): any;
+  editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }): any;
 }>();
 
 const dataDefault = ref<any[]>([]);
@@ -763,6 +763,32 @@ const currentData = (): any => data.value != null ? data.value : dataDefault.val
 // ({ id?, header, columns: [...] }) maps to a multi-level header GROUP column
 // whose children are built recursively (B12 — grouped/multi-level column headers).
 // Returns null for an unusable entry (no id/field, unsafe key, empty group).
+/**
+ * A-01 — translate the public per-column `width` into table-core's `size`.
+ *
+ * `width` was written onto the ColumnDef in both build branches and read by NOTHING:
+ * table-core resolves column width from `size` (a NUMBER of px), which only the two
+ * chrome columns ever set. So the documented API was completely inert — the exact
+ * sibling of the inert `pinned` that 0.5.0 closed.
+ *
+ * `size` is numeric px by construction, so only a number or a px string can map onto
+ * it; any other CSS length (`12rem`, `20%`, `auto`) has no numeric px value at build
+ * time and is deliberately NOT guessed — it returns null and the column keeps
+ * table-core's default. The `width` prop's docs say exactly this.
+ *
+ * Returns null (not undefined) for "no usable width" so callers can test `!= null`
+ * without tripping over a legitimate 0.
+ */
+const parseWidthToSize = (w: any) => {
+  if (typeof w === 'number') return Number.isFinite(w) && w > 0 ? w : null;
+  if (typeof w !== 'string') return null;
+  const t = w.trim();
+  if (t === '') return null;
+  const m = /^(\d+(?:\.\d+)?)(px)?$/i.exec(t);
+  if (!m) return null;
+  const n = Number.parseFloat(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
 const buildConfigDef = (c: any) => {
   if (!c) return null;
   // Grouped (multi-level) header column: an entry carrying a `columns` array. table-core's
@@ -818,6 +844,12 @@ const buildConfigDef = (c: any) => {
     aggregationFn: wrapAggregationFn(c.aggregationFn),
     pinned: c.pinned != null ? c.pinned : '',
     width: c.width != null ? c.width : '',
+    // A-01 — `width` alone is inert; table-core sizes from `size`. Spread so an
+    // unusable width leaves `size` ABSENT rather than explicitly undefined, which
+    // would override a consumer's `defaultColumn.size`.
+    ...(parseWidthToSize(c.width) != null ? {
+      size: parseWidthToSize(c.width)
+    } : {}),
     // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
     // metadata carrier the display↔editor branch + runValidator read. Off by default.
     meta: {
@@ -902,6 +934,10 @@ const columnDefs = () => {
       aggregationFn: wrapAggregationFn(spec.aggregationFn),
       pinned: spec.pinned != null ? spec.pinned : '',
       width: spec.width != null ? spec.width : '',
+      // A-01 — see buildConfigDef; same mapping for the <Column> registry branch.
+      ...(parseWidthToSize(spec.width) != null ? {
+        size: parseWidthToSize(spec.width)
+      } : {}),
       // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
       meta: {
         editable: spec.editable === true,

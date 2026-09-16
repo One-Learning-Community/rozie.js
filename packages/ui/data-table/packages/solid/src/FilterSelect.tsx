@@ -24,11 +24,15 @@ interface FilterSelectProps {
    * The faceted distinct keys for this column (cross-filtered, keys only — no occurrence counts) used to build the `<option>` list.
    */
   uniqueValues?: any[];
+  /**
+   * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 export default function FilterSelect(_props: FilterSelectProps): JSX.Element {
-  const _merged = mergeProps({ columnId: '', column: null, value: null, setFilter: null, uniqueValues: (() => [])() as any[] }, _props);
-  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'value', 'setFilter', 'uniqueValues']);
+  const _merged = mergeProps({ columnId: '', column: null, value: null, setFilter: null, uniqueValues: (() => [])() as any[], columnLabel: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'value', 'setFilter', 'uniqueValues', 'columnLabel']);
 
   // The <select> value binding coerced to a string. $props.value is typed `unknown`
   // (opaque slot-scope), which the strict bundled-leaf tsc rejects against the native
@@ -49,9 +53,20 @@ export default function FilterSelect(_props: FilterSelectProps): JSX.Element {
     }
   }
 
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  function a11yLabel() {
+    if (typeof local.columnLabel === 'string' && local.columnLabel !== '') return local.columnLabel;
+    return local.columnId;
+  }
+
   return (
     <>
-    <select part="col-filter" aria-label={local.columnId} class={"rdt-col-filter"} value={selectValue()} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onChange($event); }} data-rozie-s-d75b42b2="">
+    <select part="col-filter" aria-label={rozieAttr(a11yLabel())} class={"rdt-col-filter"} value={selectValue()} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onChange($event); }} data-rozie-s-d75b42b2="">
       <option value="" data-rozie-s-d75b42b2="">All</option>
       <Key each={local.uniqueValues as readonly any[]} by={(opt) => opt}>{(opt) => <option value={rozieAttr(opt())} data-rozie-s-d75b42b2="">{rozieDisplay(opt())}</option>}</Key>
     </select>

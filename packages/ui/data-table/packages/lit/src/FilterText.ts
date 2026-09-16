@@ -1,6 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+import { rozieAttr } from '@rozie/runtime-lit';
 
 @customElement('rozie-filter-text')
 export default class FilterText extends SignalWatcher(LitElement) {
@@ -24,6 +25,10 @@ export default class FilterText extends SignalWatcher(LitElement) {
    * `(columnId, value) => void` — apply the column filter (Enter / blur applies, Escape clears). Null-guarded at call sites.
    */
   @property({ type: Function }) setFilter: ((...args: any[]) => any) | null = null;
+  /**
+   * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  @property({ type: String, reflect: true }) columnLabel: string = '';
   private _draft = signal('');
 
   private _disconnectCleanups: Array<() => void> = [];
@@ -49,7 +54,7 @@ export default class FilterText extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<input class="rdt-col-filter" part="col-filter" type="text" aria-label=${this.columnId} .value=${this._draft.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-s-18cbb44e />
+<input class="rdt-col-filter" part="col-filter" type="text" aria-label=${rozieAttr(this.a11yLabel())} .value=${this._draft.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-s-18cbb44e />
 `;
   }
 
@@ -81,5 +86,16 @@ export default class FilterText extends SignalWatcher(LitElement) {
 
   onBlur = () => {
   this.applyFilter();
+};
+
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  a11yLabel = () => {
+  if (typeof this.columnLabel === 'string' && this.columnLabel !== '') return this.columnLabel;
+  return this.columnId;
 };
 }

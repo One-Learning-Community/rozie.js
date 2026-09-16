@@ -1,4 +1,6 @@
 <script lang="ts">
+import { rozieAttr } from '@rozie/runtime-svelte';
+
 interface Props {
   /**
    * The column id (mirrors the `#filter` slot scope) — used as the filter key and the input `aria-label`.
@@ -16,13 +18,18 @@ interface Props {
    * `(columnId, value) => void` — apply the column filter (Enter / blur applies, Escape clears). Null-guarded at call sites.
    */
   setFilter?: ((...args: any[]) => any) | null;
+  /**
+   * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 let {
   columnId = '',
   column = null,
   value = null,
-  setFilter = null
+  setFilter = null,
+  columnLabel = ''
 }: Props = $props();
 
 let draft = $state('');
@@ -55,6 +62,16 @@ const onKeydown = (e: any) => {
 const onBlur = () => {
   applyFilter();
 };
+// C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+// `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+// reading an implementation detail aloud. table-core keeps the authored header on
+// `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+// a header rendered by a function has no static text, so fall back to the id rather
+// than invent one.
+const a11yLabel = () => {
+  if (typeof columnLabel === 'string' && columnLabel !== '') return columnLabel;
+  return columnId;
+};
 </script>
 
-<input class="rdt-col-filter" part="col-filter" type="text" aria-label={columnId} value={draft} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-18cbb44e />
+<input class="rdt-col-filter" part="col-filter" type="text" aria-label={rozieAttr(a11yLabel())} value={draft} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-18cbb44e />

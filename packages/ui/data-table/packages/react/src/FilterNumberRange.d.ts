@@ -21,6 +21,10 @@ export interface FilterNumberRangeProps {
    * The faceted `[min, max]` bounds for this column (`[number, number]` or null) — drives the input placeholders only.
    */
   minMax?: (unknown) | null;
+  /**
+   * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 declare function FilterNumberRange(props: FilterNumberRangeProps): JSX.Element;

@@ -63,6 +63,7 @@ interface RozieDynamicFilterSlotCtx {
   value: any;
   uniqueValues: any;
   minMax: any;
+  columnLabel: any;
   setFilter: any;
 }
 
@@ -86,6 +87,7 @@ interface RozieDynamicEditorSlotCtx {
   value: any;
   commit: any;
   cancel: any;
+  columnLabel: any;
   autofocus: any;
 }
 
@@ -104,6 +106,7 @@ interface RozieFilterSlotCtx {
   value: any;
   uniqueValues: any;
   minMax: any;
+  columnLabel: any;
   setFilter: any;
 }
 
@@ -121,6 +124,7 @@ interface RozieEditorSlotCtx {
   value: any;
   commit: any;
   cancel: any;
+  columnLabel: any;
   autofocus: any;
 }
 
@@ -736,13 +740,13 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   @property({ attribute: false }) colHeader?: (scope: { columnId: any; column: any; label: any }) => unknown;
   @state() private _hasSlotFilter = false;
   @queryAssignedElements({ slot: 'filter', flatten: true }) private _slotFilterElements!: Element[];
-  @property({ attribute: false }) filter?: (scope: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => unknown;
+  @property({ attribute: false }) filter?: (scope: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }) => unknown;
   @state() private _hasSlotCell = false;
   @queryAssignedElements({ slot: 'cell', flatten: true }) private _slotCellElements!: Element[];
   @property({ attribute: false }) cell?: (scope: { columnId: any; column: any; row: any; value: any }) => unknown;
   @state() private _hasSlotEditor = false;
   @queryAssignedElements({ slot: 'editor', flatten: true }) private _slotEditorElements!: Element[];
-  @property({ attribute: false }) editor?: (scope: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }) => unknown;
+  @property({ attribute: false }) editor?: (scope: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }) => unknown;
   // Phase 79 Plan 08 (R4) contract for 79-09: the record intake for
   // record-routed slot fills. 79-09's consumer-side emitSlotFiller
   // accumulates an object literal onto the SAME `.rozieSlots=${{ ... }}`
@@ -752,7 +756,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   // named function-prop / <slot> fallback (AC-9). Attribute
   // deserialization is disabled — this is a function-valued record,
   // never reflected to/from an HTML attribute.
-  @property({ attribute: false }) rozieSlots?: { [key: `colHeader-${string}`]: (scope: { columnId: any; column: any; label: any }) => unknown; [key: `filter-${string}`]: (scope: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => unknown; [key: `cell-${string}`]: (scope: { columnId: any; column: any; row: any; value: any }) => unknown; [key: `editor-${string}`]: (scope: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }) => unknown; } & Record<string, (scope: any) => unknown>;
+  @property({ attribute: false }) rozieSlots?: { [key: `colHeader-${string}`]: (scope: { columnId: any; column: any; label: any }) => unknown; [key: `filter-${string}`]: (scope: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }) => unknown; [key: `cell-${string}`]: (scope: { columnId: any; column: any; row: any; value: any }) => unknown; [key: `editor-${string}`]: (scope: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }) => unknown; } & Record<string, (scope: any) => unknown>;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -1481,8 +1485,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       ${this.colsWindowed() ? html`<th class="rdt-col-spacer" aria-hidden="true" style=${rozieStyle('width:' + this.colPadLeft() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c></th>` : nothing}${repeat<any>(this.windowedHeadersFor(this._headerGroups.value[this._headerGroups.value.length - 1], this._headerGroups.value.length - 1), (wh, _idx) => wh.header.id, (wh, _idx) => html`<th class="rdt-filter-cell" role="presentation" data-col=${rozieAttr(wh.header.column.id)} style=${rozieStyle(this.pinStyle(wh.header.column.id))} data-rozie-s-d5dcab4c>
         ${this.isSelectColumn(wh.header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : this.isExpanderColumn(wh.header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.columnIsFilterable(wh.header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.rozieSlots?.[`filter-${wh.header.column.id}`] !== undefined ? this.rozieSlots?.[`filter-${wh.header.column.id}`]!({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="${`filter-${wh.header.column.id}`}" data-rozie-params=${(() => { try { return JSON.stringify({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id)}); } catch { return '{}'; } })()} @rozie-default-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}>
-              ${this.filter !== undefined ? this.filter({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id)}); } catch { return '{}'; } })()} @rozie-filter-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}>
+            ${this.rozieSlots?.[`filter-${wh.header.column.id}`] !== undefined ? this.rozieSlots?.[`filter-${wh.header.column.id}`]!({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id), columnLabel: this.headerLabel(wh.header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="${`filter-${wh.header.column.id}`}" data-rozie-params=${(() => { try { return JSON.stringify({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id), columnLabel: this.headerLabel(wh.header.column.id)}); } catch { return '{}'; } })()} @rozie-default-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}>
+              ${this.filter !== undefined ? this.filter({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id), columnLabel: this.headerLabel(wh.header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: wh.header.column.id, value: this.columnFilterValue(wh.header.column.id), uniqueValues: this.getFacetedUniqueValues(wh.header.column.id), minMax: this.getFacetedMinMaxValues(wh.header.column.id), columnLabel: this.headerLabel(wh.header.column.id)}); } catch { return '{}'; } })()} @rozie-filter-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}>
                 <input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(wh.header.column.id))} .value=${this.columnFilterValue(wh.header.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onColumnFilterInput(wh.header.column.id, $event); }} @click=${($event: MouseEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />
               </slot>`}
             </slot>`}
@@ -1515,10 +1519,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
           <span class="rdt-group-count" data-rozie-s-d5dcab4c>${rozieDisplay('(' + this.groupSubRowCount(wr.row) + ')')}</span>
         </span>` : this.isEditing(wr.vi.index, this.colIndexOf(wr.row, cell)) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.editorTypeOf(cell.column.id) === 'number' ? html`<input class="rdt-cell-editor" type="number" data-editing-cell="" data-builtin-editor="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : this.editorTypeOf(cell.column.id) === 'select' ? html`<select class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" .value=${this.editorValueFor(cell.column.id)} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c>
-            ${repeat<any>(this.editorOptionsOf(cell.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option value=${rozieAttr(opt.value)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
+            ${repeat<any>(this.editorOptionsOf(cell.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option value=${rozieAttr(opt.value)} ?selected=${opt.value === this.editorValueFor(cell.column.id)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
           </select>` : this.editorTypeOf(cell.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" data-builtin-editor="" ?checked=${this.editorCheckedFor(cell.column.id)} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorCheckbox(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : this.editorTypeOf(cell.column.id) === 'custom' ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.rozieSlots?.[`editor-${cell.column.id}`] !== undefined ? this.rozieSlots?.[`editor-${cell.column.id}`]!({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(wr.row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}) : html`<slot name="${`editor-${cell.column.id}`}" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(wr.row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}); } catch { return '{}'; } })()}>
-              ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(wr.row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(wr.row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}); } catch { return '{}'; } })()}>
+            ${this.rozieSlots?.[`editor-${cell.column.id}`] !== undefined ? this.rozieSlots?.[`editor-${cell.column.id}`]!({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(wr.row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), columnLabel: this.headerLabel(cell.column.id), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}) : html`<slot name="${`editor-${cell.column.id}`}" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(wr.row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), columnLabel: this.headerLabel(cell.column.id), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}); } catch { return '{}'; } })()}>
+              ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(wr.row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), columnLabel: this.headerLabel(cell.column.id), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(wr.row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), columnLabel: this.headerLabel(cell.column.id), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}); } catch { return '{}'; } })()}>
                 <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />
               </slot>`}
             </slot>`}
@@ -1583,8 +1587,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       ${repeat<any>(this._headerGroups.value[this._headerGroups.value.length - 1].headers, (header, _idx) => header.id, (header, _idx) => html`<th class="rdt-filter-cell" role="presentation" style=${rozieStyle(this.pinStyle(header.column.id))} data-rozie-s-d5dcab4c>
         ${this.isSelectColumn(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : this.isExpanderColumn(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.columnIsFilterable(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.rozieSlots?.[`filter-${header.column.id}`] !== undefined ? this.rozieSlots?.[`filter-${header.column.id}`]!({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="${`filter-${header.column.id}`}" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id)}); } catch { return '{}'; } })()} @rozie-default-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}>
-              ${this.filter !== undefined ? this.filter({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id)}); } catch { return '{}'; } })()} @rozie-filter-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}>
+            ${this.rozieSlots?.[`filter-${header.column.id}`] !== undefined ? this.rozieSlots?.[`filter-${header.column.id}`]!({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id), columnLabel: this.headerLabel(header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="${`filter-${header.column.id}`}" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id), columnLabel: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()} @rozie-default-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}>
+              ${this.filter !== undefined ? this.filter({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id), columnLabel: this.headerLabel(header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, value: this.columnFilterValue(header.column.id), uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id), columnLabel: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()} @rozie-filter-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}>
                 <input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: MouseEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />
               </slot>`}
             </slot>`}
@@ -1612,10 +1616,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
           <span class="rdt-group-count" data-rozie-s-d5dcab4c>${rozieDisplay('(' + this.groupSubRowCount(row) + ')')}</span>
         </span>` : this.isEditing(this.rowIndexOf(row), this.colIndexOf(row, cell)) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.editorTypeOf(cell.column.id) === 'number' ? html`<input class="rdt-cell-editor" type="number" data-editing-cell="" data-builtin-editor="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : this.editorTypeOf(cell.column.id) === 'select' ? html`<select class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" .value=${this.editorValueFor(cell.column.id)} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c>
-            ${repeat<any>(this.editorOptionsOf(cell.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option value=${rozieAttr(opt.value)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
+            ${repeat<any>(this.editorOptionsOf(cell.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option value=${rozieAttr(opt.value)} ?selected=${opt.value === this.editorValueFor(cell.column.id)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
           </select>` : this.editorTypeOf(cell.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" data-builtin-editor="" ?checked=${this.editorCheckedFor(cell.column.id)} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorCheckbox(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : this.editorTypeOf(cell.column.id) === 'custom' ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.rozieSlots?.[`editor-${cell.column.id}`] !== undefined ? this.rozieSlots?.[`editor-${cell.column.id}`]!({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}) : html`<slot name="${`editor-${cell.column.id}`}" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}); } catch { return '{}'; } })()}>
-              ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}); } catch { return '{}'; } })()}>
+            ${this.rozieSlots?.[`editor-${cell.column.id}`] !== undefined ? this.rozieSlots?.[`editor-${cell.column.id}`]!({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), columnLabel: this.headerLabel(cell.column.id), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}) : html`<slot name="${`editor-${cell.column.id}`}" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), columnLabel: this.headerLabel(cell.column.id), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}); } catch { return '{}'; } })()}>
+              ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), columnLabel: this.headerLabel(cell.column.id), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: this.cellSlotRow(row), value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), columnLabel: this.headerLabel(cell.column.id), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}); } catch { return '{}'; } })()}>
                 <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />
               </slot>`}
             </slot>`}
@@ -1639,10 +1643,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   </span>
   <button class="rdt-page-btn rdt-page-next" type="button" ?disabled=${!this.canNextPage()} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onNextPage(); }} data-rozie-s-d5dcab4c>Next</button>
   <select class="rdt-page-size" aria-label="Rows per page" .value=${this.pageSize()} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onPageSizeChange($event); }} data-rozie-s-d5dcab4c>
-    <option value=${10} data-rozie-s-d5dcab4c>10</option>
-    <option value=${25} data-rozie-s-d5dcab4c>25</option>
-    <option value=${50} data-rozie-s-d5dcab4c>50</option>
-    <option value=${100} data-rozie-s-d5dcab4c>100</option>
+    <option value=${10} ?selected=${10 === this.pageSize()} data-rozie-s-d5dcab4c>10</option>
+    <option value=${25} ?selected=${25 === this.pageSize()} data-rozie-s-d5dcab4c>25</option>
+    <option value=${50} ?selected=${50 === this.pageSize()} data-rozie-s-d5dcab4c>50</option>
+    <option value=${100} ?selected=${100 === this.pageSize()} data-rozie-s-d5dcab4c>100</option>
   </select>
 </div>` : nothing}</div>
 `;
@@ -1948,6 +1952,33 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // ({ id?, header, columns: [...] }) maps to a multi-level header GROUP column
   // whose children are built recursively (B12 — grouped/multi-level column headers).
   // Returns null for an unusable entry (no id/field, unsafe key, empty group).
+  /**
+   * A-01 — translate the public per-column `width` into table-core's `size`.
+   *
+   * `width` was written onto the ColumnDef in both build branches and read by NOTHING:
+   * table-core resolves column width from `size` (a NUMBER of px), which only the two
+   * chrome columns ever set. So the documented API was completely inert — the exact
+   * sibling of the inert `pinned` that 0.5.0 closed.
+   *
+   * `size` is numeric px by construction, so only a number or a px string can map onto
+   * it; any other CSS length (`12rem`, `20%`, `auto`) has no numeric px value at build
+   * time and is deliberately NOT guessed — it returns null and the column keeps
+   * table-core's default. The `width` prop's docs say exactly this.
+   *
+   * Returns null (not undefined) for "no usable width" so callers can test `!= null`
+   * without tripping over a legitimate 0.
+   */
+  parseWidthToSize = (w: any) => {
+  if (typeof w === 'number') return Number.isFinite(w) && w > 0 ? w : null;
+  if (typeof w !== 'string') return null;
+  const t = w.trim();
+  if (t === '') return null;
+  const m = /^(\d+(?:\.\d+)?)(px)?$/i.exec(t);
+  if (!m) return null;
+  const n = Number.parseFloat(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
   buildConfigDef = (c: any) => {
   if (!c) return null;
   // Grouped (multi-level) header column: an entry carrying a `columns` array. table-core's
@@ -2003,6 +2034,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     aggregationFn: wrapAggregationFn(c.aggregationFn),
     pinned: c.pinned != null ? c.pinned : '',
     width: c.width != null ? c.width : '',
+    // A-01 — `width` alone is inert; table-core sizes from `size`. Spread so an
+    // unusable width leaves `size` ABSENT rather than explicitly undefined, which
+    // would override a consumer's `defaultColumn.size`.
+    ...(this.parseWidthToSize(c.width) != null ? {
+      size: this.parseWidthToSize(c.width)
+    } : {}),
     // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
     // metadata carrier the display↔editor branch + runValidator read. Off by default.
     meta: {
@@ -2092,6 +2129,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       aggregationFn: wrapAggregationFn(spec.aggregationFn),
       pinned: spec.pinned != null ? spec.pinned : '',
       width: spec.width != null ? spec.width : '',
+      // A-01 — see buildConfigDef; same mapping for the <Column> registry branch.
+      ...(this.parseWidthToSize(spec.width) != null ? {
+        size: this.parseWidthToSize(spec.width)
+      } : {}),
       // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
       meta: {
         editable: spec.editable === true,

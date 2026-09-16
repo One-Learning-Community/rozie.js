@@ -22,17 +22,22 @@ interface FilterSelectProps {
    * The faceted distinct keys for this column (cross-filtered, keys only — no occurrence counts) used to build the `<option>` list.
    */
   uniqueValues?: any[];
+  /**
+   * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 export default function FilterSelect(_props: FilterSelectProps): JSX.Element {
   const __defaultUniqueValues = useState(() => (() => [])())[0];
-  const props: Omit<FilterSelectProps, 'columnId' | 'column' | 'value' | 'setFilter' | 'uniqueValues'> & { columnId: string; column: (unknown) | null; value: (unknown) | null; setFilter: ((...args: any[]) => any) | null; uniqueValues: any[] } = {
+  const props: Omit<FilterSelectProps, 'columnId' | 'column' | 'value' | 'setFilter' | 'uniqueValues' | 'columnLabel'> & { columnId: string; column: (unknown) | null; value: (unknown) | null; setFilter: ((...args: any[]) => any) | null; uniqueValues: any[]; columnLabel: string } = {
     ..._props,
     columnId: _props.columnId ?? '',
     column: _props.column ?? null,
     value: _props.value ?? null,
     setFilter: _props.setFilter ?? null,
     uniqueValues: _props.uniqueValues ?? __defaultUniqueValues,
+    columnLabel: _props.columnLabel ?? '',
   };
 
   // The <select> value binding coerced to a string. $props.value is typed `unknown`
@@ -54,10 +59,20 @@ export default function FilterSelect(_props: FilterSelectProps): JSX.Element {
       _rozieProp_setFilter && _rozieProp_setFilter(props.columnId, v);
     }
   }, [_rozieProp_setFilter, props.columnId]);
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  function a11yLabel() {
+    if (typeof props.columnLabel === 'string' && props.columnLabel !== '') return props.columnLabel;
+    return props.columnId;
+  }
 
   return (
     <>
-    <select className={"rdt-col-filter"} part="col-filter" aria-label={props.columnId} value={selectValue()} onChange={($event) => { onChange($event); }} data-rozie-s-d75b42b2="">
+    <select className={"rdt-col-filter"} part="col-filter" aria-label={rozieAttr(a11yLabel())} value={selectValue()} onChange={($event) => { onChange($event); }} data-rozie-s-d75b42b2="">
       <option value="" data-rozie-s-d75b42b2="">All</option>
       {props.uniqueValues.map((opt) => <option key={opt} value={rozieAttr(opt)} data-rozie-s-d75b42b2="">{rozieDisplay(opt)}</option>)}
     </select>

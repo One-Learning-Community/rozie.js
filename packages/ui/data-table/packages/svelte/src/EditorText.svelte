@@ -1,4 +1,6 @@
 <script lang="ts">
+import { rozieAttr } from '@rozie/runtime-svelte';
+
 import { onMount, untrack } from 'svelte';
 
 interface Props {
@@ -30,6 +32,10 @@ interface Props {
    * Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.
    */
   autofocus?: boolean;
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 let {
@@ -39,7 +45,8 @@ let {
   value = null,
   commit = null,
   cancel = null,
-  autofocus = false
+  autofocus = false,
+  columnLabel = ''
 }: Props = $props();
 
 let draft = $state('');
@@ -79,6 +86,16 @@ const onBlur = () => {
 // (NOT { immediate: true } — an immediate watch fires PRE-mount, null ref on Lit/Solid) covers
 // a REACTIVE refocus while already mounted (e.g. a row-mode validation failure that flips
 // autofocus back onto this already-open drop-in).
+// C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+// `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+// reading an implementation detail aloud. table-core keeps the authored header on
+// `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+// a header rendered by a function has no static text, so fall back to the id rather
+// than invent one.
+const a11yLabel = () => {
+  if (typeof columnLabel === 'string' && columnLabel !== '') return columnLabel;
+  return columnId;
+};
 
 onMount(() => {
   if (autofocus) inputEl?.focus();
@@ -90,4 +107,4 @@ $effect(() => { const __watchVal = (() => autofocus)(); untrack(() => { if (__ro
 })(__watchVal); }); });
 </script>
 
-<input bind:this={inputEl} class="rdt-cell-editor" type="text" data-editing-cell="" aria-label={columnId} value={draft} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-0d17f43a />
+<input bind:this={inputEl} class="rdt-cell-editor" type="text" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} value={draft} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-0d17f43a />

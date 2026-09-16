@@ -1,4 +1,5 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { rozieAttr } from '@rozie/runtime-react';
 
 interface EditorCheckboxProps {
   /**
@@ -25,10 +26,18 @@ interface EditorCheckboxProps {
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
   cancel?: ((...args: any[]) => any) | null;
+  /**
+   * Focus this editor's primary control when true — the host sets it for the one editor that should hold focus; reactive.
+   */
+  autofocus?: boolean;
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 export default function EditorCheckbox(_props: EditorCheckboxProps): JSX.Element {
-  const props: Omit<EditorCheckboxProps, 'columnId' | 'column' | 'row' | 'value' | 'commit' | 'cancel'> & { columnId: string; column: (unknown) | null; row: (unknown) | null; value: (unknown) | null; commit: ((...args: any[]) => any) | null; cancel: ((...args: any[]) => any) | null } = {
+  const props: Omit<EditorCheckboxProps, 'columnId' | 'column' | 'row' | 'value' | 'commit' | 'cancel' | 'autofocus' | 'columnLabel'> & { columnId: string; column: (unknown) | null; row: (unknown) | null; value: (unknown) | null; commit: ((...args: any[]) => any) | null; cancel: ((...args: any[]) => any) | null; autofocus: boolean; columnLabel: string } = {
     ..._props,
     columnId: _props.columnId ?? '',
     column: _props.column ?? null,
@@ -36,7 +45,13 @@ export default function EditorCheckbox(_props: EditorCheckboxProps): JSX.Element
     value: _props.value ?? null,
     commit: _props.commit ?? null,
     cancel: _props.cancel ?? null,
+    autofocus: _props.autofocus ?? false,
+    columnLabel: _props.columnLabel ?? '',
   };
+  const _autofocusRef = useRef(props.autofocus);
+  _autofocusRef.current = props.autofocus;
+  const inputEl = useRef<HTMLInputElement | null>(null);
+  const _watch0First = useRef(true);
 
   // Immediate-commit-on-change: read .checked the global-filter way, coerce to a
   // real boolean, and commit it directly.
@@ -51,10 +66,35 @@ export default function EditorCheckbox(_props: EditorCheckboxProps): JSX.Element
       _rozieProp_cancel && _rozieProp_cancel();
     }
   }, [_rozieProp_cancel]);
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  function a11yLabel() {
+    if (typeof props.columnLabel === 'string' && props.columnLabel !== '') return props.columnLabel;
+    return props.columnId;
+  }
+
+  // C-02 / editor-owns-focus: focus OUR OWN control when the host says we should hold it.
+  // $onMount covers the initial open (autofocus is already true on first render); the LAZY
+  // $watch (NOT { immediate: true } — an immediate watch fires PRE-mount and sees a null
+  // ref on Lit/Solid) covers a REACTIVE refocus while already mounted, e.g. a row-mode
+  // validation failure flipping autofocus back onto this already-open drop-in.
+
+  useEffect(() => {
+    if (_autofocusRef.current) inputEl.current?.focus();
+  }, []);
+  useEffect(() => {
+    if (_watch0First.current) { _watch0First.current = false; return; }
+    const v = props.autofocus;
+    if (v) inputEl.current?.focus();
+  }, [props.autofocus]);
 
   return (
     <>
-    <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" aria-label={props.columnId} checked={!!props.value} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-3d792482="" />
+    <input ref={inputEl} className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} checked={!!props.value} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-3d792482="" />
     </>
   );
 }

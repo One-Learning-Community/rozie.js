@@ -1,11 +1,12 @@
-import { Component, ViewEncapsulation, input, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, ViewEncapsulation, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-editor-date',
   standalone: true,
   template: `
 
-    <input class="rdt-cell-editor" type="date" data-editing-cell="" [attr.aria-label]="columnId()" [value]="draft()" (input)="onInput($event)" (change)="onChange($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
+    <input #inputEl class="rdt-cell-editor" type="date" data-editing-cell="" [attr.aria-label]="rozieAttr(a11yLabel())" [value]="draft()" (input)="onInput($event)" (change)="onChange($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
 
   `,
   styles: [`
@@ -37,12 +38,29 @@ export class EditorDate {
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
   cancel = input<((...args: any[]) => any) | null>(null);
+  /**
+   * Focus this editor's primary control when true — the host sets it for the one editor that should hold focus; reactive.
+   */
+  autofocus = input<boolean>(false);
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel = input<string>('');
   draft = signal('');
+  inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
+  private __rozieWatchInitial_0 = true;
 
   constructor() {
     // Seed the draft once from the incoming value (setup-once). A native date input
     // only accepts `YYYY-MM-DD`; normalize null/undefined to ''.
     this.draft.set(this.value() != null ? String(this.value()) : '');
+    effect(() => { const __watchVal = (() => this.autofocus())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
+      if (v) this.inputEl()?.nativeElement?.focus();
+    })(__watchVal); }); });
+  }
+
+  ngAfterViewInit() {
+    if (this.autofocus()) this.inputEl()?.nativeElement?.focus();
   }
 
   onInput = (e: any) => {
@@ -72,6 +90,21 @@ export class EditorDate {
   onBlur = () => {
     this.doCommit();
   };
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  a11yLabel = () => {
+    const __columnLabel = this.columnLabel();
+    if (typeof __columnLabel === 'string' && __columnLabel !== '') return __columnLabel;
+    return this.columnId();
+  };
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default EditorDate;

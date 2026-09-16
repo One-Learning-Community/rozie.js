@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, input, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, ViewEncapsulation, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
 
 @Component({
@@ -6,9 +6,9 @@ import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie
   standalone: true,
   template: `
 
-    <select class="rdt-cell-editor" data-editing-cell="" [attr.aria-label]="columnId()" [value]="draft()" (change)="onChange($event)" (keydown)="onKeydown($event)" (blur)="onBlur()">
+    <select #selectEl class="rdt-cell-editor" data-editing-cell="" [attr.aria-label]="rozieAttr(a11yLabel())" [value]="draft()" (change)="onChange($event)" (keydown)="onKeydown($event)" (blur)="onBlur()">
       @for (opt of options(); track opt.value) {
-    <option [attr.value]="rozieAttr(opt.value)">{{ rozieDisplay(opt.label) }}</option>
+    <option [attr.value]="rozieAttr(opt.value)" [selected]="opt.value === draft()">{{ rozieDisplay(opt.label) }}</option>
     }
     </select>
 
@@ -46,12 +46,29 @@ export class EditorSelect {
    * The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.
    */
   options = input<any[]>((() => [])());
+  /**
+   * Focus this editor's primary control when true — the host sets it for the one editor that should hold focus; reactive.
+   */
+  autofocus = input<boolean>(false);
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel = input<string>('');
   draft = signal('');
+  selectEl = viewChild<ElementRef<HTMLSelectElement>>('selectEl');
+  private __rozieWatchInitial_0 = true;
 
   constructor() {
     // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
     // to '' so the <select> binds to a string.
     this.draft.set(this.value() != null ? String(this.value()) : '');
+    effect(() => { const __watchVal = (() => this.autofocus())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
+      if (v) this.selectEl()?.nativeElement?.focus();
+    })(__watchVal); }); });
+  }
+
+  ngAfterViewInit() {
+    if (this.autofocus()) this.selectEl()?.nativeElement?.focus();
   }
 
   // Picking/arrow-cycling an option updates the draft only — no commit.
@@ -78,6 +95,17 @@ export class EditorSelect {
   };
   onBlur = () => {
     this.doCommit();
+  };
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  a11yLabel = () => {
+    const __columnLabel = this.columnLabel();
+    if (typeof __columnLabel === 'string' && __columnLabel !== '') return __columnLabel;
+    return this.columnId();
   };
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }

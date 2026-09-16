@@ -1,11 +1,12 @@
 import { Component, DestroyRef, ElementRef, ViewEncapsulation, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-editor-text',
   standalone: true,
   template: `
 
-    <input #inputEl class="rdt-cell-editor" type="text" data-editing-cell="" [attr.aria-label]="columnId()" [value]="draft()" (input)="onInput($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
+    <input #inputEl class="rdt-cell-editor" type="text" data-editing-cell="" [attr.aria-label]="rozieAttr(a11yLabel())" [value]="draft()" (input)="onInput($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
 
   `,
   styles: [`
@@ -41,6 +42,10 @@ export class EditorText {
    * Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.
    */
   autofocus = input<boolean>(false);
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel = input<string>('');
   draft = signal('');
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   private __rozieWatchInitial_0 = true;
@@ -84,6 +89,26 @@ export class EditorText {
   onBlur = () => {
     this.doCommit();
   };
+  // Editor-owns-focus contract: focus OUR OWN input when the host says we should hold focus.
+  // $onMount covers the initial open (autofocus already true on first render); the LAZY $watch
+  // (NOT { immediate: true } — an immediate watch fires PRE-mount, null ref on Lit/Solid) covers
+  // a REACTIVE refocus while already mounted (e.g. a row-mode validation failure that flips
+  // autofocus back onto this already-open drop-in).
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  a11yLabel = () => {
+    const __columnLabel = this.columnLabel();
+    if (typeof __columnLabel === 'string' && __columnLabel !== '') return __columnLabel;
+    return this.columnId();
+  };
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default EditorText;

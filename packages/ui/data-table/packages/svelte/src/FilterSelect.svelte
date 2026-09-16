@@ -22,6 +22,10 @@ interface Props {
    * The faceted distinct keys for this column (cross-filtered, keys only — no occurrence counts) used to build the `<option>` list.
    */
   uniqueValues?: any[];
+  /**
+   * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 let __defaultUniqueValues = (() => [])();
@@ -31,7 +35,8 @@ let {
   column = null,
   value = null,
   setFilter = null,
-  uniqueValues = __defaultUniqueValues
+  uniqueValues = __defaultUniqueValues,
+  columnLabel = ''
 }: Props = $props();
 
 // The <select> value binding coerced to a string. $props.value is typed `unknown`
@@ -49,6 +54,16 @@ const onChange = (e: any) => {
     setFilter && setFilter(columnId, v);
   }
 };
+// C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+// `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+// reading an implementation detail aloud. table-core keeps the authored header on
+// `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+// a header rendered by a function has no static text, so fall back to the id rather
+// than invent one.
+const a11yLabel = () => {
+  if (typeof columnLabel === 'string' && columnLabel !== '') return columnLabel;
+  return columnId;
+};
 </script>
 
-<select class="rdt-col-filter" part="col-filter" aria-label={columnId} value={rozieAttr(selectValue())} onchange={($event) => { onChange($event); }} data-rozie-s-d75b42b2><option value="" data-rozie-s-d75b42b2>All</option>{#each uniqueValues as opt (opt)}<option value={rozieAttr(opt)} data-rozie-s-d75b42b2>{rozieDisplay(opt)}</option>{/each}</select>
+<select class="rdt-col-filter" part="col-filter" aria-label={rozieAttr(a11yLabel())} value={rozieAttr(selectValue())} onchange={($event) => { onChange($event); }} data-rozie-s-d75b42b2><option value="" data-rozie-s-d75b42b2>All</option>{#each uniqueValues as opt (opt)}<option value={rozieAttr(opt)} data-rozie-s-d75b42b2>{rozieDisplay(opt)}</option>{/each}</select>

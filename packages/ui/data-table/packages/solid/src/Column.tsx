@@ -30,7 +30,7 @@ interface ColumnProps {
    */
   pinned?: string;
   /**
-   * Optional fixed/initial column width — a CSS length string or a px number.
+   * Optional fixed/initial column width, applied as the column's starting size — a px number (`120`) or a px string (`'120px'`). Column sizing is numeric px, so other CSS lengths (`'12rem'`, `'20%'`, `'auto'`) have no px value to apply and are ignored; the column keeps the default width. An interactive resize overrides this.
    */
   width?: string | number;
   /**

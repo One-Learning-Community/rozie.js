@@ -1,6 +1,6 @@
 <template>
 
-<input ref="inputElRef" class="rdt-cell-editor" type="text" data-editing-cell="" :aria-label="props.columnId" :value="draft" @input="onInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
+<input ref="inputElRef" class="rdt-cell-editor" type="text" data-editing-cell="" :aria-label="a11yLabel()" :value="draft" @input="onInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
 
 </template>
 
@@ -37,8 +37,12 @@ const props = withDefaults(
      * Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.
      */
     autofocus?: boolean;
+    /**
+     * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+     */
+    columnLabel?: string;
   }>(),
-  { columnId: '', column: null, row: null, value: null, commit: null, cancel: null, autofocus: false }
+  { columnId: '', column: null, row: null, value: null, commit: null, cancel: null, autofocus: false, columnLabel: '' }
 );
 
 const draft = ref('');
@@ -78,6 +82,16 @@ const onBlur = () => {
 // (NOT { immediate: true } — an immediate watch fires PRE-mount, null ref on Lit/Solid) covers
 // a REACTIVE refocus while already mounted (e.g. a row-mode validation failure that flips
 // autofocus back onto this already-open drop-in).
+// C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+// `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+// reading an implementation detail aloud. table-core keeps the authored header on
+// `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+// a header rendered by a function has no static text, so fall back to the id rather
+// than invent one.
+const a11yLabel = () => {
+  if (typeof props.columnLabel === 'string' && props.columnLabel !== '') return props.columnLabel;
+  return props.columnId;
+};
 
 onMounted(() => {
   if (props.autofocus) inputElRef.value?.focus();

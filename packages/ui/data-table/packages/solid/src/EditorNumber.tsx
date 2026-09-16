@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
-import { createSignal, mergeProps, splitProps } from 'solid-js';
+import { createEffect, createSignal, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
+import { rozieAttr } from '@rozie/runtime-solid';
 
 interface EditorNumberProps {
   /**
@@ -26,13 +27,28 @@ interface EditorNumberProps {
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
   cancel?: ((...args: any[]) => any) | null;
+  /**
+   * Focus this editor's primary control when true — the host sets it for the one editor that should hold focus; reactive.
+   */
+  autofocus?: boolean;
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 export default function EditorNumber(_props: EditorNumberProps): JSX.Element {
-  const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel']);
+  const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null, autofocus: false, columnLabel: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel', 'autofocus', 'columnLabel']);
 
   const [draft, setDraft] = createSignal('');
+  onMount(() => {
+    if (local.autofocus) inputElRef?.focus();
+  });
+  createEffect(on(() => (() => local.autofocus)(), (v) => untrack(() => ((v: any) => {
+    if (v) inputElRef?.focus();
+  })(v)), { defer: true }));
+  let inputElRef: HTMLElement | null = null;
 
   // Seed the draft string once from the incoming value (setup-once).
   setDraft(local.value != null ? String(local.value) : '');
@@ -69,9 +85,26 @@ export default function EditorNumber(_props: EditorNumberProps): JSX.Element {
     doCommit();
   }
 
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  function a11yLabel() {
+    if (typeof local.columnLabel === 'string' && local.columnLabel !== '') return local.columnLabel;
+    return local.columnId;
+  }
+
+  // C-02 / editor-owns-focus: focus OUR OWN control when the host says we should hold it.
+  // $onMount covers the initial open (autofocus is already true on first render); the LAZY
+  // $watch (NOT { immediate: true } — an immediate watch fires PRE-mount and sees a null
+  // ref on Lit/Solid) covers a REACTIVE refocus while already mounted, e.g. a row-mode
+  // validation failure flipping autofocus back onto this already-open drop-in.
+
   return (
     <>
-    <input type="number" data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={draft()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-b2792b32="" />
+    <input type="number" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} ref={(el) => { inputElRef = el as HTMLElement; }} class={"rdt-cell-editor"} value={draft()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-b2792b32="" />
     </>
   );
 }

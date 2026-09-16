@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { createSignal, mergeProps, splitProps } from 'solid-js';
+import { createEffect, createSignal, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
 import { rozieAttr, rozieDisplay } from '@rozie/runtime-solid';
 
@@ -32,13 +32,28 @@ interface EditorSelectProps {
    * The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.
    */
   options?: any[];
+  /**
+   * Focus this editor's primary control when true — the host sets it for the one editor that should hold focus; reactive.
+   */
+  autofocus?: boolean;
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel?: string;
 }
 
 export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
-  const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null, options: (() => [])() as any[] }, _props);
-  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel', 'options']);
+  const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null, options: (() => [])() as any[], autofocus: false, columnLabel: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel', 'options', 'autofocus', 'columnLabel']);
 
   const [draft, setDraft] = createSignal('');
+  onMount(() => {
+    if (local.autofocus) selectElRef?.focus();
+  });
+  createEffect(on(() => (() => local.autofocus)(), (v) => untrack(() => ((v: any) => {
+    if (v) selectElRef?.focus();
+  })(v)), { defer: true }));
+  let selectElRef: HTMLElement | null = null;
 
   // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
   // to '' so the <select> binds to a string.
@@ -69,9 +84,26 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
     doCommit();
   }
 
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  function a11yLabel() {
+    if (typeof local.columnLabel === 'string' && local.columnLabel !== '') return local.columnLabel;
+    return local.columnId;
+  }
+
+  // C-02 / editor-owns-focus: focus OUR OWN control when the host says we should hold it.
+  // $onMount covers the initial open (autofocus is already true on first render); the LAZY
+  // $watch (NOT { immediate: true } — an immediate watch fires PRE-mount and sees a null
+  // ref on Lit/Solid) covers a REACTIVE refocus while already mounted, e.g. a row-mode
+  // validation failure flipping autofocus back onto this already-open drop-in.
+
   return (
     <>
-    <select data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={draft()} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onChange($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onBlur(); }} data-rozie-s-117f1a16="">
+    <select data-editing-cell="" aria-label={rozieAttr(a11yLabel())} ref={(el) => { selectElRef = el as HTMLElement; }} class={"rdt-cell-editor"} value={draft()} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onChange($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onBlur(); }} data-rozie-s-117f1a16="">
       <Key each={local.options as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-117f1a16="">{rozieDisplay(opt().label)}</option>}</Key>
     </select>
     </>

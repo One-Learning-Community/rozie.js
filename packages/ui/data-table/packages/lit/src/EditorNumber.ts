@@ -1,6 +1,7 @@
 import { LitElement, css, html } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, query } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+import { rozieAttr } from '@rozie/runtime-lit';
 
 @customElement('rozie-editor-number')
 export default class EditorNumber extends SignalWatcher(LitElement) {
@@ -32,7 +33,17 @@ export default class EditorNumber extends SignalWatcher(LitElement) {
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
   @property({ type: Function }) cancel: ((...args: any[]) => any) | null = null;
+  /**
+   * Focus this editor's primary control when true — the host sets it for the one editor that should hold focus; reactive.
+   */
+  @property({ type: Boolean, reflect: true }) autofocus: boolean = false;
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  @property({ type: String, reflect: true }) columnLabel: string = '';
   private _draft = signal('');
+  @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
+private __rozieFirstUpdateDone = false;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -42,6 +53,15 @@ export default class EditorNumber extends SignalWatcher(LitElement) {
   firstUpdated(): void {
     // Seed the draft string once from the incoming value (setup-once).
     this._draft.value = this.value != null ? String(this.value) : '';
+
+    if (this.autofocus) this._refInputEl?.focus();
+  }
+
+  updated(changedProperties: Map<string, unknown>): void {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('autofocus'))) { const __watchVal = (() => this.autofocus)(); ((v: any) => {
+      if (v) this._refInputEl?.focus();
+    })(__watchVal); }
+    this.__rozieFirstUpdateDone = true;
   }
 
   disconnectedCallback(): void {
@@ -56,7 +76,7 @@ export default class EditorNumber extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<input class="rdt-cell-editor" type="number" data-editing-cell="" aria-label=${this.columnId} .value=${this._draft.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-s-b2792b32 />
+<input class="rdt-cell-editor" type="number" data-editing-cell="" aria-label=${rozieAttr(this.a11yLabel())} .value=${this._draft.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-ref="inputEl" data-rozie-s-b2792b32 />
 `;
   }
 
@@ -94,5 +114,16 @@ export default class EditorNumber extends SignalWatcher(LitElement) {
 
   onBlur = () => {
   this.doCommit();
+};
+
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  a11yLabel = () => {
+  if (typeof this.columnLabel === 'string' && this.columnLabel !== '') return this.columnLabel;
+  return this.columnId;
 };
 }

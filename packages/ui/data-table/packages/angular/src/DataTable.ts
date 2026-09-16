@@ -73,11 +73,12 @@ interface ColHeaderCtx {
 }
 
 interface FilterCtx {
-  $implicit: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any };
+  $implicit: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any };
   columnId: any;
   value: any;
   uniqueValues: any;
   minMax: any;
+  columnLabel: any;
   setFilter: any;
 }
 
@@ -90,13 +91,14 @@ interface CellCtx {
 }
 
 interface EditorCtx {
-  $implicit: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any };
+  $implicit: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any };
   columnId: any;
   column: any;
   row: any;
   value: any;
   commit: any;
   cancel: any;
+  columnLabel: any;
   autofocus: any;
 }
 
@@ -108,11 +110,12 @@ interface ColHeaderCtx {
 }
 
 interface FilterCtx {
-  $implicit: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any };
+  $implicit: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any };
   columnId: any;
   value: any;
   uniqueValues: any;
   minMax: any;
+  columnLabel: any;
   setFilter: any;
 }
 
@@ -125,13 +128,14 @@ interface CellCtx {
 }
 
 interface EditorCtx {
-  $implicit: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any };
+  $implicit: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any };
   columnId: any;
   column: any;
   row: any;
   value: any;
   commit: any;
   cancel: any;
+  columnLabel: any;
   autofocus: any;
 }
 
@@ -275,11 +279,11 @@ interface EditorCtx {
               @if (columnIsFilterable(wh.header.column.id)) {
     <span style="display:contents">
                 @if ((__rozieFillMap()[\`filter-\${wh.header.column.id}\`] ?? templates()?.[\`filter-\${wh.header.column.id}\`])) {
-    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`filter-\${wh.header.column.id}\`] ?? templates()?.[\`filter-\${wh.header.column.id}\`]); context: { $implicit: { columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), setFilter: setColumnFilter }, columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), setFilter: setColumnFilter }" />
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`filter-\${wh.header.column.id}\`] ?? templates()?.[\`filter-\${wh.header.column.id}\`]); context: { $implicit: { columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), columnLabel: headerLabel(wh.header.column.id), setFilter: setColumnFilter }, columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), columnLabel: headerLabel(wh.header.column.id), setFilter: setColumnFilter }" />
     } @else {
 
                   @if ((filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter'])) {
-    <ng-container *ngTemplateOutlet="(filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter']); context: { $implicit: { columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), setFilter: setColumnFilter }, columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), setFilter: setColumnFilter }" />
+    <ng-container *ngTemplateOutlet="(filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter']); context: { $implicit: { columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), columnLabel: headerLabel(wh.header.column.id), setFilter: setColumnFilter }, columnId: wh.header.column.id, value: columnFilterValue(wh.header.column.id), uniqueValues: getFacetedUniqueValues(wh.header.column.id), minMax: getFacetedMinMaxValues(wh.header.column.id), columnLabel: headerLabel(wh.header.column.id), setFilter: setColumnFilter }" />
     } @else {
 
                     <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(wh.header.column.id))" [value]="columnFilterValue(wh.header.column.id)" (input)="onColumnFilterInput(wh.header.column.id, $event)" (click)="stopEvent($event)" />
@@ -351,7 +355,7 @@ interface EditorCtx {
     } @else if (editorTypeOf(cell.column.id) === 'select') {
     <select class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (change)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)">
                 @for (opt of editorOptionsOf(cell.column.id); track opt.value) {
-    <option [attr.value]="rozieAttr(opt.value)">{{ rozieDisplay(opt.label) }}</option>
+    <option [attr.value]="rozieAttr(opt.value)" [selected]="opt.value === editorValueFor(cell.column.id)">{{ rozieDisplay(opt.label) }}</option>
     }
               </select>
     } @else if (editorTypeOf(cell.column.id) === 'checkbox') {
@@ -359,11 +363,11 @@ interface EditorCtx {
     } @else if (editorTypeOf(cell.column.id) === 'custom') {
     <span style="display:contents">
                 @if ((__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`])) {
-    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
     } @else {
 
                   @if ((editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor'])) {
-    <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
+    <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
     } @else {
 
                     <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
@@ -505,11 +509,11 @@ interface EditorCtx {
               @if (columnIsFilterable(header.column.id)) {
     <span style="display:contents">
                 @if ((__rozieFillMap()[\`filter-\${header.column.id}\`] ?? templates()?.[\`filter-\${header.column.id}\`])) {
-    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`filter-\${header.column.id}\`] ?? templates()?.[\`filter-\${header.column.id}\`]); context: { $implicit: { columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }" />
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`filter-\${header.column.id}\`] ?? templates()?.[\`filter-\${header.column.id}\`]); context: { $implicit: { columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), columnLabel: headerLabel(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), columnLabel: headerLabel(header.column.id), setFilter: setColumnFilter }" />
     } @else {
 
                   @if ((filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter'])) {
-    <ng-container *ngTemplateOutlet="(filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }" />
+    <ng-container *ngTemplateOutlet="(filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), columnLabel: headerLabel(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), columnLabel: headerLabel(header.column.id), setFilter: setColumnFilter }" />
     } @else {
 
                     <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="stopEvent($event)" />
@@ -572,7 +576,7 @@ interface EditorCtx {
     } @else if (editorTypeOf(cell.column.id) === 'select') {
     <select class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (change)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)">
                 @for (opt of editorOptionsOf(cell.column.id); track opt.value) {
-    <option [attr.value]="rozieAttr(opt.value)">{{ rozieDisplay(opt.label) }}</option>
+    <option [attr.value]="rozieAttr(opt.value)" [selected]="opt.value === editorValueFor(cell.column.id)">{{ rozieDisplay(opt.label) }}</option>
     }
               </select>
     } @else if (editorTypeOf(cell.column.id) === 'checkbox') {
@@ -580,11 +584,11 @@ interface EditorCtx {
     } @else if (editorTypeOf(cell.column.id) === 'custom') {
     <span style="display:contents">
                 @if ((__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`])) {
-    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
     } @else {
 
                   @if ((editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor'])) {
-    <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
+    <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
     } @else {
 
                     <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
@@ -636,10 +640,10 @@ interface EditorCtx {
       </span>
       <button type="button" class="rdt-page-btn rdt-page-next" [disabled]="!canNextPage()" (click)="onNextPage()">Next</button>
       <select class="rdt-page-size" aria-label="Rows per page" [value]="pageSize()" (change)="onPageSizeChange($event)">
-        <option [value]="10">10</option>
-        <option [value]="25">25</option>
-        <option [value]="50">50</option>
-        <option [value]="100">100</option>
+        <option [value]="10" [selected]="10 === pageSize()">10</option>
+        <option [value]="25" [selected]="25 === pageSize()">25</option>
+        <option [value]="50" [selected]="50 === pageSize()">50</option>
+        <option [value]="100" [selected]="100 === pageSize()">100</option>
       </select>
     </div>
     }</div>
@@ -1979,6 +1983,32 @@ export class DataTable {
   // ({ id?, header, columns: [...] }) maps to a multi-level header GROUP column
   // whose children are built recursively (B12 — grouped/multi-level column headers).
   // Returns null for an unusable entry (no id/field, unsafe key, empty group).
+  /**
+   * A-01 — translate the public per-column `width` into table-core's `size`.
+   *
+   * `width` was written onto the ColumnDef in both build branches and read by NOTHING:
+   * table-core resolves column width from `size` (a NUMBER of px), which only the two
+   * chrome columns ever set. So the documented API was completely inert — the exact
+   * sibling of the inert `pinned` that 0.5.0 closed.
+   *
+   * `size` is numeric px by construction, so only a number or a px string can map onto
+   * it; any other CSS length (`12rem`, `20%`, `auto`) has no numeric px value at build
+   * time and is deliberately NOT guessed — it returns null and the column keeps
+   * table-core's default. The `width` prop's docs say exactly this.
+   *
+   * Returns null (not undefined) for "no usable width" so callers can test `!= null`
+   * without tripping over a legitimate 0.
+   */
+  parseWidthToSize = (w: any) => {
+    if (typeof w === 'number') return Number.isFinite(w) && w > 0 ? w : null;
+    if (typeof w !== 'string') return null;
+    const t = w.trim();
+    if (t === '') return null;
+    const m = /^(\d+(?:\.\d+)?)(px)?$/i.exec(t);
+    if (!m) return null;
+    const n = Number.parseFloat(m[1]);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
   buildConfigDef = (c: any) => {
     if (!c) return null;
     // Grouped (multi-level) header column: an entry carrying a `columns` array. table-core's
@@ -2034,6 +2064,12 @@ export class DataTable {
       aggregationFn: wrapAggregationFn(c.aggregationFn),
       pinned: c.pinned != null ? c.pinned : '',
       width: c.width != null ? c.width : '',
+      // A-01 — `width` alone is inert; table-core sizes from `size`. Spread so an
+      // unusable width leaves `size` ABSENT rather than explicitly undefined, which
+      // would override a consumer's `defaultColumn.size`.
+      ...(this.parseWidthToSize(c.width) != null ? {
+        size: this.parseWidthToSize(c.width)
+      } : {}),
       // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
       // metadata carrier the display↔editor branch + runValidator read. Off by default.
       meta: {
@@ -2120,6 +2156,10 @@ export class DataTable {
         aggregationFn: wrapAggregationFn(spec.aggregationFn),
         pinned: spec.pinned != null ? spec.pinned : '',
         width: spec.width != null ? spec.width : '',
+        // A-01 — see buildConfigDef; same mapping for the <Column> registry branch.
+        ...(this.parseWidthToSize(spec.width) != null ? {
+          size: this.parseWidthToSize(spec.width)
+        } : {}),
         // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
         meta: {
           editable: spec.editable === true,

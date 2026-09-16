@@ -1,6 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+import { rozieAttr } from '@rozie/runtime-lit';
 
 @customElement('rozie-editor-text')
 export default class EditorText extends SignalWatcher(LitElement) {
@@ -36,6 +37,10 @@ export default class EditorText extends SignalWatcher(LitElement) {
    * Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.
    */
   @property({ type: Boolean, reflect: true }) autofocus: boolean = false;
+  /**
+   * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  @property({ type: String, reflect: true }) columnLabel: string = '';
   private _draft = signal('');
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
 private __rozieFirstUpdateDone = false;
@@ -72,7 +77,7 @@ private __rozieFirstUpdateDone = false;
 
   render() {
     return html`
-<input class="rdt-cell-editor" type="text" data-editing-cell="" aria-label=${this.columnId} .value=${this._draft.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-ref="inputEl" data-rozie-s-0d17f43a />
+<input class="rdt-cell-editor" type="text" data-editing-cell="" aria-label=${rozieAttr(this.a11yLabel())} .value=${this._draft.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-ref="inputEl" data-rozie-s-0d17f43a />
 `;
   }
 
@@ -103,5 +108,21 @@ private __rozieFirstUpdateDone = false;
 
   onBlur = () => {
   this.doCommit();
+};
+
+  // Editor-owns-focus contract: focus OUR OWN input when the host says we should hold focus.
+  // $onMount covers the initial open (autofocus already true on first render); the LAZY $watch
+  // (NOT { immediate: true } — an immediate watch fires PRE-mount, null ref on Lit/Solid) covers
+  // a REACTIVE refocus while already mounted (e.g. a row-mode validation failure that flips
+  // autofocus back onto this already-open drop-in).
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  a11yLabel = () => {
+  if (typeof this.columnLabel === 'string' && this.columnLabel !== '') return this.columnLabel;
+  return this.columnId;
 };
 }

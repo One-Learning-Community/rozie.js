@@ -7,9 +7,9 @@ import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie
   template: `
 
     <span style="display:flex; align-items: center">
-      <input class="rdt-col-filter" part="col-filter" type="number" [attr.aria-label]="rozieAttr(columnId() + ' min')" [attr.placeholder]="rozieAttr(minPlaceholder())" [value]="minDraft()" (input)="onMinInput($event)" (change)="applyRange()" />
+      <input class="rdt-col-filter" part="col-filter" type="number" [attr.aria-label]="rozieAttr(a11yLabel() + ' min')" [attr.placeholder]="rozieAttr(minPlaceholder())" [value]="minDraft()" (input)="onMinInput($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
       <span> - </span>
-      <input class="rdt-col-filter" part="col-filter" type="number" [attr.aria-label]="rozieAttr(columnId() + ' max')" [attr.placeholder]="rozieAttr(maxPlaceholder())" [value]="maxDraft()" (input)="onMaxInput($event)" (change)="applyRange()" />
+      <input class="rdt-col-filter" part="col-filter" type="number" [attr.aria-label]="rozieAttr(a11yLabel() + ' max')" [attr.placeholder]="rozieAttr(maxPlaceholder())" [value]="maxDraft()" (input)="onMaxInput($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
     </span>
 
   `,
@@ -38,6 +38,10 @@ export class FilterNumberRange {
    * The faceted `[min, max]` bounds for this column (`[number, number]` or null) — drives the input placeholders only.
    */
   minMax = input<(unknown) | null>(null);
+  /**
+   * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
+   */
+  columnLabel = input<string>('');
   minDraft = signal('');
   maxDraft = signal('');
 
@@ -48,11 +52,32 @@ export class FilterNumberRange {
   }
 
   // Untyped handler params neutralize to `any` (the global-filter idiom).
+  // C-01 — the range used to commit from `@change`, which is NOT the same event across
+  // targets for a text/number input: React maps `onChange` onto the native `input`
+  // event, so on React it fired on EVERY keystroke, in the same tick as the `@input`
+  // handler's `$data` write. `$data` is an async `useState` write there, so the commit
+  // re-read the PREVIOUS keystroke's draft and the filter ran one keystroke behind (the
+  // first keystroke cleared it). The other five use the real `change` event — blur or
+  // Enter — and were already correct.
+  //
+  // Fixed by committing on the events that mean the same thing everywhere, Enter and
+  // blur, which is also the contract FilterText already uses; and by making applyRange
+  // take both drafts as arguments so it can never re-read a value written in its own
+  // tick. That combination is target-independent rather than a React special case.
   onMinInput = (e: any) => {
     this.minDraft.set(e && e.target ? e.target.value : '');
   };
   onMaxInput = (e: any) => {
     this.maxDraft.set(e && e.target ? e.target.value : '');
+  };
+  // Commit the range on Enter or blur — the same commit-on-commit contract FilterText
+  // uses, NOT per keystroke. Both read the drafts in a tick where nothing has just
+  // written them, so every target reads the settled value.
+  onKeydown = (e: any) => {
+    if (e && e.key === 'Enter') this.applyRange(this.minDraft(), this.maxDraft());
+  };
+  onBlur = () => {
+    this.applyRange(this.minDraft(), this.maxDraft());
   };
   // Plain string-coercion functions for the placeholders (NOT $computed — the
   // EditorSelect/listbox lesson; opaque slot-scope props rejected by strict leaf tsc).
@@ -60,18 +85,30 @@ export class FilterNumberRange {
   maxPlaceholder = () => Array.isArray(this.minMax()) && this.minMax()[1] != null ? String(this.minMax()[1]) : '';
   // Convert a draft to a Number or undefined (empty string → undefined so a
   // one-sided range works). Both undefined → clear the filter.
-  applyRange = () => {
-    const __minDraft = this.minDraft();
-    const __maxDraft = this.maxDraft();
+  // Takes both drafts as ARGUMENTS — never re-reads $data — so it is correct on all six
+  // targets regardless of when in the tick it runs. Callers that have just written a
+  // draft pass the value they wrote.
+  applyRange = (minDraft: any, maxDraft: any) => {
     const __setFilter = this.setFilter();
     const __columnId = this.columnId();
-    const minNum = __minDraft === '' ? undefined : Number(__minDraft);
-    const maxNum = __maxDraft === '' ? undefined : Number(__maxDraft);
+    const minNum = minDraft === '' ? undefined : Number(minDraft);
+    const maxNum = maxDraft === '' ? undefined : Number(maxDraft);
     if (minNum === undefined && maxNum === undefined) {
       __setFilter && __setFilter(__columnId, '');
     } else {
       __setFilter && __setFilter(__columnId, [minNum, maxNum]);
     }
+  };
+  // C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+  // `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+  // reading an implementation detail aloud. table-core keeps the authored header on
+  // `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+  // a header rendered by a function has no static text, so fall back to the id rather
+  // than invent one.
+  a11yLabel = () => {
+    const __columnLabel = this.columnLabel();
+    if (typeof __columnLabel === 'string' && __columnLabel !== '') return __columnLabel;
+    return this.columnId();
   };
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }

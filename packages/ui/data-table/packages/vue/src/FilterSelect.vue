@@ -1,6 +1,6 @@
 <template>
 
-<select class="rdt-col-filter" part="col-filter" :aria-label="props.columnId" :value="selectValue()" @change="onChange($event)">
+<select class="rdt-col-filter" part="col-filter" :aria-label="a11yLabel()" :value="selectValue()" @change="onChange($event)">
   <option value="">All</option>
   <option v-for="opt in props.uniqueValues" :key="opt" :value="opt">{{ opt }}</option>
 </select>
@@ -30,8 +30,12 @@ const props = withDefaults(
      * The faceted distinct keys for this column (cross-filtered, keys only — no occurrence counts) used to build the `<option>` list.
      */
     uniqueValues?: any[];
+    /**
+     * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
+     */
+    columnLabel?: string;
   }>(),
-  { columnId: '', column: null, value: null, setFilter: null, uniqueValues: () => [] }
+  { columnId: '', column: null, value: null, setFilter: null, uniqueValues: () => [], columnLabel: '' }
 );
 
 // The <select> value binding coerced to a string. $props.value is typed `unknown`
@@ -48,5 +52,15 @@ const onChange = (e: any) => {
   } else {
     props.setFilter && props.setFilter(props.columnId, v);
   }
+};
+// C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+// `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+// reading an implementation detail aloud. table-core keeps the authored header on
+// `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+// a header rendered by a function has no static text, so fall back to the id rather
+// than invent one.
+const a11yLabel = () => {
+  if (typeof props.columnLabel === 'string' && props.columnLabel !== '') return props.columnLabel;
+  return props.columnId;
 };
 </script>
