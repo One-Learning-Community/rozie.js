@@ -91,13 +91,13 @@
         "Initial pin side: `''` (unpinned) | `'left'` | `'right'`. Applied once as the table's starting `columnPinning` state, so `getIsPinned()` reports it and the column joins the matching sticky rail — which also reorders it, since visible cells are ordered `[left-pinned, center, right-pinned]`. Ignored if the consumer has already pinned something; an interactive unpin is never re-applied.",
     },
   },
-  // Optional fixed/initial column width (CSS length or px number).
+  // Optional fixed/initial column width, applied as table-core's numeric `size`.
   width:      {
     type: [String, Number],
     default: '',
     docs: {
       description:
-        'Optional fixed/initial column width — a CSS length string or a px number.',
+        "Optional fixed/initial column width, applied as the column's starting size — a px number (`120`) or a px string (`'120px'`). Column sizing is numeric px, so other CSS lengths (`'12rem'`, `'20%'`, `'auto'`) have no px value to apply and are ignored; the column keeps the default width. An interactive resize overrides this.",
     },
   },
 

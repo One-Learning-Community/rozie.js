@@ -104,6 +104,18 @@
         "Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.",
     },
   },
+  // C-11 — the column's human header, forwarded by the host's slot scope. `column` is an
+  // OPAQUE passthrough (`type: null`), so reaching into `column.columnDef.header` is
+  // unsound under the leaves' strict tsc — the host owns `headerLabel()` and hands the
+  // resolved string down instead of making every drop-in introspect table-core.
+  columnLabel: {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        "The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.",
+    },
+  },
 }
 </props>
 
@@ -158,6 +170,17 @@ $onMount(() => {
 $watch(() => $props.autofocus, (v) => {
   if (v) $refs.inputEl?.focus()
 })
+
+// C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+// `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+// reading an implementation detail aloud. table-core keeps the authored header on
+// `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+// a header rendered by a function has no static text, so fall back to the id rather
+// than invent one.
+const a11yLabel = () => {
+  if (typeof $props.columnLabel === 'string' && $props.columnLabel !== '') return $props.columnLabel
+  return $props.columnId
+}
 </script>
 
 <template>
@@ -166,7 +189,7 @@ $watch(() => $props.autofocus, (v) => {
   class="rdt-cell-editor"
   type="text"
   data-editing-cell
-  :aria-label="$props.columnId"
+  :aria-label="a11yLabel()"
   :value="$data.draft"
   @input="onInput($event)"
   @keydown="onKeydown($event)"

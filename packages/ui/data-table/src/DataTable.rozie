@@ -2160,6 +2160,7 @@ $expose({
               :value="columnFilterValue(wh.header.column.id)"
               :uniqueValues="getFacetedUniqueValues(wh.header.column.id)"
               :minMax="getFacetedMinMaxValues(wh.header.column.id)"
+              :columnLabel="headerLabel(wh.header.column.id)"
               :setFilter="setColumnFilter"
             >
               <slot
@@ -2168,6 +2169,7 @@ $expose({
                 :value="columnFilterValue(wh.header.column.id)"
                 :uniqueValues="getFacetedUniqueValues(wh.header.column.id)"
                 :minMax="getFacetedMinMaxValues(wh.header.column.id)"
+                :columnLabel="headerLabel(wh.header.column.id)"
                 :setFilter="setColumnFilter"
               >
                 <input
@@ -2374,6 +2376,7 @@ $expose({
               :value="editorValueFor(cell.column.id)"
               :commit="editorCommitFor(cell.column.id)"
               :cancel="editorCancelFor()"
+              :columnLabel="headerLabel(cell.column.id)"
               :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)"
             >
               <slot
@@ -2384,7 +2387,8 @@ $expose({
                 :value="editorValueFor(cell.column.id)"
                 :commit="editorCommitFor(cell.column.id)"
                 :cancel="editorCancelFor()"
-                :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)"
+                :columnLabel="headerLabel(cell.column.id)"
+              :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)"
               >
                 <input
                   class="rdt-cell-editor"
@@ -2694,6 +2698,7 @@ $expose({
               :value="columnFilterValue(header.column.id)"
               :uniqueValues="getFacetedUniqueValues(header.column.id)"
               :minMax="getFacetedMinMaxValues(header.column.id)"
+              :columnLabel="headerLabel(header.column.id)"
               :setFilter="setColumnFilter"
             >
               <slot
@@ -2702,6 +2707,7 @@ $expose({
                 :value="columnFilterValue(header.column.id)"
                 :uniqueValues="getFacetedUniqueValues(header.column.id)"
                 :minMax="getFacetedMinMaxValues(header.column.id)"
+                :columnLabel="headerLabel(header.column.id)"
                 :setFilter="setColumnFilter"
               >
                 <input
@@ -2882,6 +2888,7 @@ $expose({
               :value="editorValueFor(cell.column.id)"
               :commit="editorCommitFor(cell.column.id)"
               :cancel="editorCancelFor()"
+              :columnLabel="headerLabel(cell.column.id)"
               :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))"
             >
               <slot
@@ -2892,7 +2899,8 @@ $expose({
                 :value="editorValueFor(cell.column.id)"
                 :commit="editorCommitFor(cell.column.id)"
                 :cancel="editorCancelFor()"
-                :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))"
+                :columnLabel="headerLabel(cell.column.id)"
+              :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))"
               >
                 <input
                   class="rdt-cell-editor"

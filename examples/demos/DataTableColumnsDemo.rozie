@@ -42,7 +42,8 @@
   // The config-array form (lower precedence; here it stands alone in its own
   // table). Same three columns, no templates → plain values.
   configColumns: [
-    { field: 'name',   header: 'Name'   },
+    // A-01 — `width` as a px NUMBER on the :columns config branch.
+    { field: 'name',   header: 'Name', width: 220 },
     { field: 'status', header: 'Status' },
     { field: 'amount', header: 'Amount' },
   ],
@@ -64,7 +65,8 @@ const currency = (v) => '$' + (Number(v) || 0).toLocaleString('en-US')
     <h4>&lt;Column&gt; children</h4>
     <DataTable :data="$data.rows">
       <!-- <Column> = metadata only (id/field/header/sortable/...). -->
-      <Column field="name" header="Name" />
+      <!-- A-01 — `width` as a px STRING on the <Column> declarative branch. -->
+      <Column field="name" header="Name" width="220px" />
       <Column field="status" header="Status" />
       <Column field="amount" header="Amount" />
       <!-- ONE #cell scoped slot, dispatched by columnId (the 3 distinct render paths):

@@ -6,7 +6,8 @@
   no draft — @change commits the boolean checked state; Escape cancels.
 
   The `checked` binding is `!!$props.value` so any truthy/falsy incoming value maps
-  to a real boolean (never author a bare `<input checked>` — bind :checked).
+  to a real boolean (never author a bare `<input
+ checked>` — bind :checked).
 
   PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. See
   EditorText.rozie for slot-wiring + styling rationale. NO <style> block.
@@ -63,6 +64,30 @@
         '`() => void` — revert the edit (Escape). Null-guarded at call sites.',
     },
   },
+  // C-02 / editor-owns-focus contract (quick 260711-i5m): the HOST sets this reactively
+  // for the ONE editor that should currently hold focus — the drop-in focuses its OWN
+  // control in response (mount-time via $onMount, post-mount via a lazy $watch). No
+  // shadow-piercing, no host DOM reach-in.
+  autofocus: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        "Focus this editor's primary control when true — the host sets it for the one editor that should hold focus; reactive.",
+    },
+  },
+  // C-11 — the column's human header, forwarded by the host's slot scope. `column` is an
+  // OPAQUE passthrough (`type: null`), so reaching into `column.columnDef.header` is
+  // unsound under the leaves' strict tsc — the host owns `headerLabel()` and hands the
+  // resolved string down instead of making every drop-in introspect table-core.
+  columnLabel: {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        "The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.",
+    },
+  },
 }
 </props>
 
@@ -79,14 +104,38 @@ const onKeydown = (e) => {
     $props.cancel && $props.cancel()
   }
 }
+
+// C-11 — the accessible name must be the column's HUMAN header, not its internal id.
+// `columnId` is a lookup key (`unit_price`, `col_3`); a screen reader announcing it is
+// reading an implementation detail aloud. table-core keeps the authored header on
+// `column.columnDef.header`, which is a string for every declarative `<Column header>`;
+// a header rendered by a function has no static text, so fall back to the id rather
+// than invent one.
+const a11yLabel = () => {
+  if (typeof $props.columnLabel === 'string' && $props.columnLabel !== '') return $props.columnLabel
+  return $props.columnId
+}
+
+// C-02 / editor-owns-focus: focus OUR OWN control when the host says we should hold it.
+// $onMount covers the initial open (autofocus is already true on first render); the LAZY
+// $watch (NOT { immediate: true } — an immediate watch fires PRE-mount and sees a null
+// ref on Lit/Solid) covers a REACTIVE refocus while already mounted, e.g. a row-mode
+// validation failure flipping autofocus back onto this already-open drop-in.
+$onMount(() => {
+  if ($props.autofocus) $refs.inputEl?.focus()
+})
+$watch(() => $props.autofocus, (v) => {
+  if (v) $refs.inputEl?.focus()
+})
 </script>
 
 <template>
 <input
+  ref="inputEl"
   class="rdt-cell-editor"
   type="checkbox"
   data-editing-cell
-  :aria-label="$props.columnId"
+  :aria-label="a11yLabel()"
   :checked="!!$props.value"
   @change="onChange($event)"
   @keydown="onKeydown($event)"
