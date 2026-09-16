@@ -77,6 +77,13 @@ import { resolveLitSetterText } from './resolveLitSetterText.js';
 import { renderRecordKey } from './slotRecordKey.js';
 
 export interface EmitTemplateOpts {
+  /**
+   * C-03 — while emitting the children of a `<select>` whose value is bound,
+   * this carries that value expression so each descendant `<option>` can bind
+   * its own `.selected`. See `withSelectedBinding`.
+   */
+  selectValueExpr?: bt.Expression | undefined;
+
   lit: LitImportCollector;
   decorators: LitDecoratorImportCollector;
   runtime: RuntimeLitImportCollector;
@@ -1788,12 +1795,75 @@ function emitElement(
   return markup;
 }
 
+
+/**
+ * C-03 — a `<select>` cannot hold a value that none of its `<option>` children
+ * carries yet.
+ *
+ * lit-html builds a template's parts in traversal order, so a `<select>`'s own
+ * property part (`.value=${…}`) commits BEFORE the child part that populates its
+ * options via `repeat()`. The value therefore lands on an empty `<select>`, the
+ * browser rejects it, and `selectedIndex` falls back to 0 — the user sees the
+ * wrong option and, accepting what is shown, commits a value they never chose.
+ * Angular has the same parent-before-children ordering and the same bug;
+ * React/Vue/Svelte/Solid do not, which is why this reads as a target-asymmetric
+ * defect rather than a component one.
+ *
+ * Rather than re-applying the value after render (which needs a post-render hook
+ * and raises a "don't stomp an in-flight user selection" problem), we express the
+ * selection where the DOM actually stores it: on the options. An
+ * `<option .selected=${optValue === selectValue}>` is correct at the moment each
+ * option is created, needs no ordering guarantee, and stays correct on re-render
+ * because both sides remain bound.
+ *
+ * Only `<option>` elements carrying their OWN value binding participate — a
+ * static `<option value="a">` already exists before the select's binding applies
+ * and is matched correctly, and an option with no value has nothing to compare.
+ */
+function selectValueBindingOf(node: TemplateElementIR): bt.Expression | null {
+  if (node.tagName.toLowerCase() !== 'select') return null;
+  for (const a of node.attributes) {
+    if (a.kind === 'binding' && (a.name === 'value' || a.name === 'r-model')) return a.expression;
+  }
+  return null;
+}
+
+/** See `selectValueBindingOf`. An explicit author `:selected` always wins. */
+function withSelectedBinding(
+  node: TemplateElementIR,
+  selectValue: bt.Expression,
+): TemplateElementIR {
+  if (node.tagName.toLowerCase() !== 'option') return node;
+  let optValue: bt.Expression | null = null;
+  for (const a of node.attributes) {
+    if (a.kind === 'binding' && a.name === 'selected') return node;
+    if (a.kind === 'binding' && a.name === 'value') optValue = a.expression;
+  }
+  if (!optValue) return node;
+  return {
+    ...node,
+    attributes: [
+      ...node.attributes,
+      {
+        kind: 'binding',
+        name: 'selected',
+        expression: bt.binaryExpression('===', optValue, selectValue),
+        deps: [],
+        sourceLoc: node.sourceLoc ?? { start: 0, end: 0 },
+      } as (typeof node.attributes)[number],
+    ],
+  };
+}
+
 function emitElementInner(
   origNode: TemplateElementIR,
   ir: IRComponent,
   hostListenerWiring: string[],
   opts: EmitTemplateOpts,
 ): string {
+  // C-03 — an <option> inside a value-bound <select> binds its own `.selected`.
+  if (opts.selectValueExpr) origNode = withSelectedBinding(origNode, opts.selectValueExpr);
+
   // Phase 71 (r-keynav), extended Phase 77 (@keynav-page) — strip the
   // synthetic `@keynav-commit`/`@keynav-page` listeners BEFORE any listener
   // emission runs; both are routed into `KeynavController`'s
@@ -1940,7 +2010,13 @@ function emitElementInner(
     return `${openWithProps}${fillerChildren.join('')}</${tagName}>`;
   }
 
+  // C-03 — scope the select's bound value over its children ONLY. `opts` is a
+  // shared object carrying mutable sinks, so save/restore rather than clone.
+  const prevSelectValue = opts.selectValueExpr;
+  const ownSelectValue = selectValueBindingOf(node);
+  if (ownSelectValue) opts.selectValueExpr = ownSelectValue;
   const children = node.children.map((c) => emitNode(c, ir, hostListenerWiring, opts)).join('');
+  opts.selectValueExpr = prevSelectValue;
   // `r-external` engine-wrapper marker — wrap the marked element's children
   // in `keyed(this._rozieReconcileSeq ?? 0, html\`…\`)` so that the runtime
   // helper `__rozieReconcileAfterDomMutation` can dispose orphan DOM and

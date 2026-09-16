@@ -34,6 +34,7 @@ import type {
   TemplateSlotInvocationIR,
   TemplateStaticTextIR,
 } from '@rozie/core';
+import * as bt from '@babel/types';
 import { RozieErrorCode } from '@rozie/core';
 // Phase 79 Plan 05 (R12/D-03) — a non-identifier, non-default slot name (e.g.
 // `#cell-status`) is routed through the SAME `emitDynamicSlotFiller` /
@@ -141,6 +142,12 @@ export interface EmitNodeCtx {
    * Set semantics).
    */
   hasListenerSpread?: { value: boolean };
+  /**
+   * C-06 — while emitting the children of a `<select>` whose value is bound,
+   * this carries that value expression so each descendant `<option>` can bind
+   * its own `selected`. See `selectedBindingForOption`.
+   */
+  selectValueExpr?: bt.Expression | undefined;
   /**
    * Plan 15-05 — when the dynamic-listener-spread effect() body emits the
    * one-time `__rozieDestroyRef.onDestroy(...)` registration, set to
@@ -607,6 +614,72 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
 /**
  * Emit a TemplateElement's markup. Walks attributes, events; renders children.
  */
+
+/**
+ * C-06 — a `<select>` cannot hold a value that none of its `<option>` children
+ * carries yet.
+ *
+ * Angular applies an element's own bindings before creating that element's
+ * dynamic children, so `[value]="draft()"` on a `<select>` whose options come
+ * from an `@for` lands on an EMPTY select. The browser rejects the value and
+ * falls back to `selectedIndex` 0, so the user sees the wrong option and, if
+ * they accept what is shown, commits a value they never chose. Lit has the same
+ * parent-before-children ordering and the same bug; React/Vue/Svelte/Solid do
+ * not, which is why this reads as a target-asymmetric defect rather than a
+ * component one.
+ *
+ * Rather than re-applying the value after render (which needs a post-render hook
+ * per target and raises a "don't stomp an in-flight user selection" problem), we
+ * express the selection where the DOM actually stores it: on the options. An
+ * `<option [selected]="optValue === selectValue">` is correct at the moment each
+ * option is created, needs no ordering guarantee at all, and keeps working on
+ * re-render because both sides stay bound.
+ *
+ * Only `<option>` elements carrying their OWN value binding participate — a
+ * static `<option value="a">` is already matched correctly by the select's value
+ * binding (its children exist before the binding applies), and an option with no
+ * value at all has nothing to compare.
+ */
+function selectValueBindingOf(node: TemplateElementIR): bt.Expression | null {
+  if (node.tagName.toLowerCase() !== 'select') return null;
+  for (const a of node.attributes) {
+    if (a.kind === 'binding' && (a.name === 'value' || a.name === 'r-model')) return a.expression;
+  }
+  return null;
+}
+
+/**
+ * Given an `<option>` inside a value-bound `<select>`, return the node with a
+ * synthesized `selected` binding appended. Returns the node unchanged when it
+ * already binds `selected` (an explicit author binding always wins) or has no
+ * value binding of its own.
+ */
+function withSelectedBinding(
+  node: TemplateElementIR,
+  selectValue: bt.Expression,
+): TemplateElementIR {
+  if (node.tagName.toLowerCase() !== 'option') return node;
+  let optValue: bt.Expression | null = null;
+  for (const a of node.attributes) {
+    if (a.kind === 'binding' && a.name === 'selected') return node;
+    if (a.kind === 'binding' && a.name === 'value') optValue = a.expression;
+  }
+  if (!optValue) return node;
+  return {
+    ...node,
+    attributes: [
+      ...node.attributes,
+      {
+        kind: 'binding',
+        name: 'selected',
+        expression: bt.binaryExpression('===', optValue, selectValue),
+        deps: [],
+        sourceLoc: node.sourceLoc ?? { start: 0, end: 0 },
+      } as (typeof node.attributes)[number],
+    ],
+  };
+}
+
 function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
   // Phase 71 (r-keynav), extended Phase 77 (@keynav-page) — strip the
   // synthetic `@keynav-commit`/`@keynav-page` listeners BEFORE any listener
@@ -616,6 +689,9 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   // `stripKeynavSyntheticEvents` doc comment). No-op (returns the SAME node)
   // for every element that isn't a keynav root.
   let node = stripKeynavSyntheticEvents(origNode);
+
+  // C-06 — an <option> inside a value-bound <select> binds its own `selected`.
+  if (ctx.selectValueExpr) node = withSelectedBinding(node, ctx.selectValueExpr);
 
   // Keyed-remount codegen Task 6 — when this element carries a
   // `remountKeyExpression` (a component-level `:key`, not an r-for loop key),
@@ -932,7 +1008,14 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
     return `<${tagOut}${head}>${innerFills}</${tagOut}>`;
   }
 
+  // C-06 — scope the select's bound value over its children ONLY, then restore.
+  // Save/restore rather than a fresh ctx object: the ctx carries mutable sinks
+  // (scriptInjections, injectionCounter, the has* refs) that must stay shared.
+  const prevSelectValue = ctx.selectValueExpr;
+  const ownSelectValue = selectValueBindingOf(node);
+  if (ownSelectValue) ctx.selectValueExpr = ownSelectValue;
   const inner = node.children.map((c) => emitNode(c, ctx)).join('');
+  ctx.selectValueExpr = prevSelectValue;
 
   // D-LIT-ANG-DEFAULT-SLOT: when consuming a Rozie-component (tagKind:
   // 'component' or 'self'), Angular's content-projection model requires the
