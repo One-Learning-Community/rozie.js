@@ -209,6 +209,58 @@ async function probeEditorPresent(page: Page): Promise<boolean> {
  * The open editor element ([data-editing-cell]) descriptor — its tag, type, value, and the
  * owning cell's [data-col-index]. Null when no editor is open. Walks open shadow roots (Lit).
  */
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SELECT_SEED_KNOWN_FAILING — C-03 (lit) / C-06 (angular), both MEASURED red here on
+// 2026-09-16, both green on the other four. One defect, one shared cause; each entry comes
+// OUT as the fix's definition of done. Do not widen this set.
+//
+// A `<select>` can only hold a value that one of its `<option>` children already carries.
+// Lit and Angular both apply an element's OWN bindings before creating that element's
+// dynamic children, so `.value` / `[value]` lands on an empty `<select>`, the browser
+// rejects it, and `selectedIndex` falls back to 0. The user sees the wrong option and, if
+// they accept what is shown, commits a value they never chose.
+//
+//   lit     — `html\`<select .value=${draft}>${repeat(options, …)}</select>\`` — lit-html
+//             builds parts in template-traversal order, so the select's property part
+//             commits before its child part populates the options.
+//   angular — `<select [value]="draft()">@for (opt of options(); …)` — same parent-before
+//             -children ordering within one change-detection pass.
+//
+// Measured: expected "archived" (statusOptions[1]), received "active" (index 0).
+//
+// NOTE the coverage trap this replaced. The row-0 seed asserted a few lines above is
+// VACUOUS for this defect: row 0's status is 'active', which is ALSO statusOptions[0], so
+// the fallback value and the correct value are the same string and the assertion passes
+// whether the binding worked or was rejected. Any future case here must seed from a row
+// whose value is not option 0.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+const SELECT_SEED_KNOWN_FAILING: ReadonlySet<string> = new Set(['lit', 'angular']);
+
+/**
+ * The open editor's `selectedIndex`, shadow-pierced like `openEditor`. A `<select>` whose
+ * value binding was applied before its options existed reports index 0 with no option
+ * genuinely chosen, so index is the assertion that cannot pass by coincidence.
+ */
+async function selectedOptionIndex(page: Page): Promise<number | null> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('[data-editing-cell]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const el = find(document) as HTMLSelectElement | null;
+    if (!el || el.tagName.toLowerCase() !== 'select') return null;
+    return el.selectedIndex;
+  });
+}
+
 async function openEditor(
   page: Page,
 ): Promise<{ tag: string; type: string | null; value: string; checked: boolean; col: string | null } | null> {
@@ -752,6 +804,26 @@ for (const target of TARGETS) {
     await expect.poll(async () => (await openEditor(page))?.tag, { timeout: 10_000 }).toBe('select');
     expect((await openEditor(page))?.value).toBe('active'); // row 0 status seed.
     // Press Escape ON the editor locator (focuses it first → the editor keymap receives it).
+    await mount.locator('[data-editing-cell]').press('Escape');
+    await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
+
+    // ── C-03/C-06: the seed above is VACUOUS for the defect it looks like it covers.
+    //    Row 0's status is 'active', which is also statusOptions[0]. A <select> handed a
+    //    value it cannot match (because its <option> children have not been created yet)
+    //    falls back to selectedIndex 0 — which reads back as exactly 'active'. So that
+    //    assertion passes identically whether the binding worked or was rejected.
+    //
+    //    Re-seed from a row whose value is NOT option 0. Row 1 (Beta) is 'archived',
+    //    statusOptions[1]. On a target that applies the element's own value binding before
+    //    committing its dynamic <option> children, this reads 'active' (index 0), not
+    //    'archived'. selectedIndex is asserted too, because a target could in principle
+    //    report the right .value with nothing visibly selected. ─────────────────────────
+    await enterEditAt(page, 1, 2); // row 1 (Beta, status='archived'), col 2
+    await expect.poll(async () => (await openEditor(page))?.tag, { timeout: 10_000 }).toBe('select');
+    if (!SELECT_SEED_KNOWN_FAILING.has(target)) {
+      expect((await openEditor(page))?.value).toBe('archived');
+      expect(await selectedOptionIndex(page)).toBe(1);
+    }
     await mount.locator('[data-editing-cell]').press('Escape');
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
 
