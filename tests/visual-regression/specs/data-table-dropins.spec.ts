@@ -478,3 +478,96 @@ for (const target of TARGETS) {
     }
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// C-07 — EditorDate must show a date the model holds in ANY ordinary shape.
+//
+// The seed was `String($props.value)` while the component's own `docs:` string — which ships
+// as JSDoc in every leaf `.d.ts` — promised "String-coerced to an ISO `YYYY-MM-DD` string".
+// A native `<input type="date">` accepts only `YYYY-MM-DD` and renders BLANK for anything
+// else, silently, so a `Date`, an ISO datetime string, an epoch number or a localised string
+// all opened an empty editor over a cell that plainly showed a date.
+//
+// Every row of the fixture used to hold an already-ISO string, i.e. the one shape needing no
+// coercion, so the existing EditorDate coverage could not have caught this. Two rows now hold
+// other shapes. Row 3's is the OFF-BY-ONE case on purpose: midnight UTC, which renders as the
+// previous day if the date is re-derived from local parts instead of read as written.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-dropins editor [${target}]: C-07 EditorDate seeds from a non-ISO model value`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableEditorDropins&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount.getByTestId('edit-table').locator('table')).toBeVisible({ timeout: 15_000 });
+
+    // Row 2 holds a localised string ('March 1, 2026').
+    await openCustomEditor(page, 'input.rdt-cell-editor[type="date"]', 2, 2);
+    await expect
+      .poll(async () => mount.locator('input.rdt-cell-editor[type="date"]').first().inputValue(), { timeout: 10_000 })
+      .toBe('2026-03-01');
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => anyEditorOpen(page), { timeout: 5_000 }).toBe(false);
+
+    // Row 3 holds an ISO DATETIME at midnight UTC — the off-by-one shape. The date part is
+    // taken as WRITTEN, so this is 04-01 regardless of the runner's timezone.
+    await openCustomEditor(page, 'input.rdt-cell-editor[type="date"]', 3, 2);
+    await expect
+      .poll(async () => mount.locator('input.rdt-cell-editor[type="date"]').first().inputValue(), { timeout: 10_000 })
+      .toBe('2026-04-01');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// C-08 — FilterText / FilterNumberRange must re-sync when the filter changes from OUTSIDE.
+//
+// Both hold a local draft seeded ONCE at setup, and neither is remounted when the filter
+// changes, so a programmatic reset — a "Clear filters" button, another control calling
+// `setFilter`, a consumer writing `columnFilters` directly — moved the real filter while the
+// input went on displaying the old text. The UI stated a filter that was no longer applied.
+// `FilterSelect` was never affected: it reads `$props.value` live.
+//
+// The demo's buttons write `columnFilters` DIRECTLY, never through the drop-ins' own
+// `setFilter`, so what is being tested is genuinely an outside-in sync.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-dropins filter [${target}]: C-08 the text and range inputs re-sync from an external columnFilters write`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableFilterDropins&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const mount = page.getByTestId('rozie-mount');
+    const filterTable = mount.getByTestId('filter-table');
+    await expect(filterTable.locator('table')).toBeVisible({ timeout: 15_000 });
+    const bodyRows = filterTable.locator('tbody tr');
+    await expect.poll(async () => bodyRows.count(), { timeout: 15_000 }).toBe(5);
+
+    const nameFilter = filterTable.locator('input.rdt-col-filter[aria-label="Name"]');
+    const priceInputs = filterTable.locator('input.rdt-col-filter[aria-label^="Price"]');
+
+    // ── FilterText: apply through the input, then CLEAR from outside.
+    await nameFilter.fill('Alpha');
+    await nameFilter.press('Enter');
+    await expect.poll(async () => bodyRows.count(), { timeout: 10_000 }).toBe(1);
+    await page.getByTestId('clear-filters').click();
+    await expect.poll(async () => bodyRows.count(), { timeout: 10_000 }).toBe(5);
+    // The input must not keep advertising a filter that is gone.
+    await expect.poll(async () => nameFilter.inputValue(), { timeout: 10_000 }).toBe('');
+
+    // ── FilterText: SET from outside — the input must pick the new value up.
+    await page.getByTestId('set-name-filter').click();
+    await expect.poll(async () => bodyRows.count(), { timeout: 10_000 }).toBe(1);
+    await expect.poll(async () => nameFilter.inputValue(), { timeout: 10_000 }).toBe('Gam');
+
+    // ── FilterNumberRange: both inputs follow an external [min, max] write, then a clear.
+    await page.getByTestId('set-price-filter').click();
+    await expect
+      .poll(async () => `${await priceInputs.nth(0).inputValue()}..${await priceInputs.nth(1).inputValue()}`, { timeout: 10_000 })
+      .toBe('20..60');
+    await page.getByTestId('clear-filters').click();
+    await expect
+      .poll(async () => `${await priceInputs.nth(0).inputValue()}..${await priceInputs.nth(1).inputValue()}`, { timeout: 10_000 })
+      .toBe('..');
+  });
+}

@@ -30,16 +30,19 @@ export default class FilterText extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) columnLabel: string = '';
   private _draft = signal('');
+  private _touched = signal(false);
+private __rozieFirstUpdateDone = false;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
   // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
   private _rozieTornDown = false;
 
-  firstUpdated(): void {
-    // Seed the draft once at setup from the incoming value (setup-once, NOT in the
-    // template). Normalize null/undefined to '' so the input value binds to a string.
-    this._draft.value = this.value != null ? String(this.value) : '';
+  updated(changedProperties: Map<string, unknown>): void {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('value'))) { const __watchVal = (() => this.value)(); (() => {
+      this._touched.value = false;
+    })(); }
+    this.__rozieFirstUpdateDone = true;
   }
 
   disconnectedCallback(): void {
@@ -54,23 +57,45 @@ export default class FilterText extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<input class="rdt-col-filter" part="col-filter" type="text" aria-label=${rozieAttr(this.a11yLabel())} .value=${this._draft.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-s-18cbb44e />
+<input class="rdt-col-filter" part="col-filter" type="text" aria-label=${rozieAttr(this.a11yLabel())} .value=${this.draftValue()} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-s-18cbb44e />
 `;
   }
+
+  // ── C-08 + N-04: the draft is DERIVED from `$props.value`, with a `touched` latch ────────
+  //
+  // C-08 — this component mounts once per rendered filter row and is NOT remounted when the
+  // filter changes, and its draft was seeded setup-once. So a programmatic reset (a "Clear
+  // filters" button, `setFilter(id, '')` from another control, a consumer writing
+  // `columnFilters` directly) moved the real filter while this input went on displaying the old
+  // text: the UI stated a filter that was no longer applied. `FilterSelect` was never affected —
+  // it reads `$props.value` live through `selectValue()`, which is the pattern adopted here.
+  //
+  // N-04 — the setup-once seed was ALSO wrong on Angular from the start: the emitter places
+  // setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+  // DEFAULT, because Angular sets inputs after construction. Measured on the sibling EditorDate,
+  // which opened empty on angular for every row while vue and lit seeded correctly. A derived
+  // read is correct on all six by construction, with no flash and no per-target branch.
+  //
+  // `touched` is what stops the live read from overwriting the user mid-type; the watch clears
+  // it, so an OUTSIDE change always wins and the input follows it. `@input` never moves
+  // `$props.value` (nothing is applied until Enter/blur), so the two can never fight.
+  draftValue = () => this._touched.value ? this._draft.value : this.value != null ? String(this.value) : '';
 
   // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
   // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
   onInput = (e: any) => {
   this._draft.value = e && e.target ? e.target.value : '';
+  this._touched.value = true;
 };
 
   // setFilter is a Function prop (default null) — guard before calling.
   applyFilter = () => {
-  this.setFilter && this.setFilter(this.columnId, this._draft.value);
+  this.setFilter && this.setFilter(this.columnId, this.draftValue());
 };
 
   clearFilter = () => {
   this._draft.value = '';
+  this._touched.value = false;
   this.setFilter && this.setFilter(this.columnId, '');
 };
 

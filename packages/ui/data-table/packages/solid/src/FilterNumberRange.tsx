@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { createSignal, mergeProps, splitProps } from 'solid-js';
+import { createEffect, createSignal, mergeProps, on, splitProps, untrack } from 'solid-js';
 import { rozieAttr } from '@rozie/runtime-solid';
 
 interface FilterNumberRangeProps {
@@ -35,11 +35,36 @@ export default function FilterNumberRange(_props: FilterNumberRangeProps): JSX.E
 
   const [minDraft, setMinDraft] = createSignal('');
   const [maxDraft, setMaxDraft] = createSignal('');
+  const [touched, setTouched] = createSignal(false);
+  createEffect(on(() => (() => Array.isArray(local.value) ? String(local.value[0]) + '\u0000' + String(local.value[1]) : '')(), (v) => untrack(() => (() => {
+    setTouched(false);
+  })()), { defer: true }));
 
-  // Seed both drafts once at setup from the incoming [min,max] tuple (setup-once).
-  setMinDraft(Array.isArray(local.value) && local.value[0] != null ? String(local.value[0]) : '');
-  setMaxDraft(Array.isArray(local.value) && local.value[1] != null ? String(local.value[1]) : '');
-
+  // ── C-08 + N-04: both drafts are DERIVED from `$props.value`, with a `touched` latch ─────
+  //
+  // C-08 — this component mounts once per rendered filter row and is NOT remounted when the
+  // filter changes, and both drafts were seeded setup-once. A programmatic reset or an external
+  // `columnFilters` write moved the real filter while these two inputs went on displaying the
+  // old numbers. See FilterText for the full reasoning; `FilterSelect` was never affected
+  // because it reads `$props.value` live, which is the pattern adopted here.
+  //
+  // N-04 — the setup-once seed was ALSO wrong on Angular from the start: the emitter places
+  // setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+  // DEFAULT. Measured on the sibling EditorDate.
+  //
+  // The watch clears `touched` rather than writing the drafts, so the derived readers pick the
+  // new value up on their own. It is keyed on the TUPLE ELEMENTS, not the array identity: the
+  // funnel writes a fresh `[min, max]` array for every apply, so an identity key would fire on
+  // every apply, and a consumer mutating a tuple in place would be missed by it anyway. The key
+  // is a joined STRING rather than an array — an array-returning watch getter is compared by
+  // identity on Lit, so a fresh array every read means it can never report "unchanged" (measured:
+  // the range half of the C-08 case stayed red on lit alone with an array key).
+  function minDraftValue() {
+    return touched() ? minDraft() : Array.isArray(local.value) && local.value[0] != null ? String(local.value[0]) : '';
+  }
+  function maxDraftValue() {
+    return touched() ? maxDraft() : Array.isArray(local.value) && local.value[1] != null ? String(local.value[1]) : '';
+  }
   // Untyped handler params neutralize to `any` (the global-filter idiom).
   // C-01 — the range used to commit from `@change`, which is NOT the same event across
   // targets for a text/number input: React maps `onChange` onto the native `input`
@@ -55,19 +80,21 @@ export default function FilterNumberRange(_props: FilterNumberRangeProps): JSX.E
   // tick. That combination is target-independent rather than a React special case.
   function onMinInput(e: any) {
     setMinDraft(e && e.target ? e.target.value : '');
+    setTouched(true);
   }
   function onMaxInput(e: any) {
     setMaxDraft(e && e.target ? e.target.value : '');
+    setTouched(true);
   }
 
   // Commit the range on Enter or blur — the same commit-on-commit contract FilterText
   // uses, NOT per keystroke. Both read the drafts in a tick where nothing has just
   // written them, so every target reads the settled value.
   function onKeydown(e: any) {
-    if (e && e.key === 'Enter') applyRange(minDraft(), maxDraft());
+    if (e && e.key === 'Enter') applyRange(minDraftValue(), maxDraftValue());
   }
   function onBlur() {
-    applyRange(minDraft(), maxDraft());
+    applyRange(minDraftValue(), maxDraftValue());
   }
 
   // Plain string-coercion functions for the placeholders (NOT $computed — the
@@ -108,9 +135,9 @@ export default function FilterNumberRange(_props: FilterNumberRangeProps): JSX.E
   return (
     <>
     <span style={{ display: "flex", "align-items": "center" }} data-rozie-s-97b2c090="">
-      <input part="col-filter" type="number" aria-label={rozieAttr(a11yLabel() + ' min')} class={"rdt-col-filter"} placeholder={rozieAttr(minPlaceholder())} value={minDraft()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onMinInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-97b2c090="" />
+      <input part="col-filter" type="number" aria-label={rozieAttr(a11yLabel() + ' min')} class={"rdt-col-filter"} placeholder={rozieAttr(minPlaceholder())} value={minDraftValue()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onMinInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-97b2c090="" />
       <span data-rozie-s-97b2c090=""> - </span>
-      <input part="col-filter" type="number" aria-label={rozieAttr(a11yLabel() + ' max')} class={"rdt-col-filter"} placeholder={rozieAttr(maxPlaceholder())} value={maxDraft()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onMaxInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-97b2c090="" />
+      <input part="col-filter" type="number" aria-label={rozieAttr(a11yLabel() + ' max')} class={"rdt-col-filter"} placeholder={rozieAttr(maxPlaceholder())} value={maxDraftValue()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onMaxInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-97b2c090="" />
     </span>
     </>
   );

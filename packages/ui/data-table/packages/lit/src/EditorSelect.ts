@@ -47,6 +47,7 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) columnLabel: string = '';
   private _draft = signal('');
+  private _touched = signal(false);
   @query('[data-rozie-ref="selectEl"]') private _refSelectEl!: HTMLElement;
 private __rozieFirstUpdateDone = false;
 
@@ -56,10 +57,6 @@ private __rozieFirstUpdateDone = false;
   private _rozieTornDown = false;
 
   firstUpdated(): void {
-    // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
-    // to '' so the <select> binds to a string.
-    this._draft.value = this.value != null ? String(this.value) : '';
-
     if (this.autofocus) this._refSelectEl?.focus();
   }
 
@@ -82,20 +79,34 @@ private __rozieFirstUpdateDone = false;
 
   render() {
     return html`
-<select class="rdt-cell-editor" data-editing-cell="" aria-label=${rozieAttr(this.a11yLabel())} .value=${this._draft.value} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onChange($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onBlur(); }} data-rozie-ref="selectEl" data-rozie-s-117f1a16>
-  ${repeat<any>(this.options, (opt, _idx) => opt.value, (opt, _idx) => html`<option value=${rozieAttr(opt.value)} ?selected=${opt.value === this._draft.value} data-rozie-s-117f1a16>${rozieDisplay(opt.label)}</option>`)}
+<select class="rdt-cell-editor" data-editing-cell="" aria-label=${rozieAttr(this.a11yLabel())} .value=${this.draftValue()} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onChange($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onBlur(); }} data-rozie-ref="selectEl" data-rozie-s-117f1a16>
+  ${repeat<any>(this.options, (opt, _idx) => opt.value, (opt, _idx) => html`<option value=${rozieAttr(opt.value)} ?selected=${opt.value === this.draftValue()} data-rozie-s-117f1a16>${rozieDisplay(opt.label)}</option>`)}
 </select>
 `;
   }
 
+  // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
+  // to '' so the <select> binds to a string.
+  // ── N-04: the draft is DERIVED, not seeded setup-once ───────────────────────────────────
+  // A top-level `$data.draft = <read of $props.x>` is setup-once, and on ANGULAR the emitter
+  // places setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+  // DEFAULT — Angular sets inputs after construction. Measured on the sibling EditorDate: it
+  // opened EMPTY on angular for every row while vue and lit seeded correctly. Reading the prop
+  // through a derived function is correct on all six by construction, with no flash of an empty
+  // control on the fine-grained targets and no per-target branch — the pattern `FilterSelect`
+  // already uses (`selectValue()`), which is why FilterSelect was the one drop-in unaffected.
+  // `touched` keeps the live prop read from overwriting the user once they start typing.
+  draftValue = () => this._touched.value ? this._draft.value : this.value != null ? String(this.value) : '';
+
   // Picking/arrow-cycling an option updates the draft only — no commit.
   onChange = (e: any) => {
   this._draft.value = e && e.target ? e.target.value : '';
+  this._touched.value = true;
 };
 
   // commit/cancel are Function props (default null) — guard before calling.
   doCommit = () => {
-  this.commit && this.commit(this._draft.value);
+  this.commit && this.commit(this.draftValue());
 };
 
   doCancel = () => {

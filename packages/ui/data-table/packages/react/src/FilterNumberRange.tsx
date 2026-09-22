@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { rozieAttr } from '@rozie/runtime-react';
 
 interface FilterNumberRangeProps {
@@ -38,9 +38,36 @@ export default function FilterNumberRange(_props: FilterNumberRangeProps): JSX.E
     minMax: _props.minMax ?? null,
     columnLabel: _props.columnLabel ?? '',
   };
-  const [minDraft, setMinDraft] = useState(() => Array.isArray(props.value) && props.value[0] != null ? String(props.value[0]) : '');
-  const [maxDraft, setMaxDraft] = useState(() => Array.isArray(props.value) && props.value[1] != null ? String(props.value[1]) : '');
+  const [minDraft, setMinDraft] = useState('');
+  const [maxDraft, setMaxDraft] = useState('');
+  const [touched, setTouched] = useState(false);
+  const _watch0First = useRef(true);
 
+  // ── C-08 + N-04: both drafts are DERIVED from `$props.value`, with a `touched` latch ─────
+  //
+  // C-08 — this component mounts once per rendered filter row and is NOT remounted when the
+  // filter changes, and both drafts were seeded setup-once. A programmatic reset or an external
+  // `columnFilters` write moved the real filter while these two inputs went on displaying the
+  // old numbers. See FilterText for the full reasoning; `FilterSelect` was never affected
+  // because it reads `$props.value` live, which is the pattern adopted here.
+  //
+  // N-04 — the setup-once seed was ALSO wrong on Angular from the start: the emitter places
+  // setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+  // DEFAULT. Measured on the sibling EditorDate.
+  //
+  // The watch clears `touched` rather than writing the drafts, so the derived readers pick the
+  // new value up on their own. It is keyed on the TUPLE ELEMENTS, not the array identity: the
+  // funnel writes a fresh `[min, max]` array for every apply, so an identity key would fire on
+  // every apply, and a consumer mutating a tuple in place would be missed by it anyway. The key
+  // is a joined STRING rather than an array — an array-returning watch getter is compared by
+  // identity on Lit, so a fresh array every read means it can never report "unchanged" (measured:
+  // the range half of the C-08 case stayed red on lit alone with an array key).
+  function minDraftValue() {
+    return touched ? minDraft : Array.isArray(props.value) && props.value[0] != null ? String(props.value[0]) : '';
+  }
+  function maxDraftValue() {
+    return touched ? maxDraft : Array.isArray(props.value) && props.value[1] != null ? String(props.value[1]) : '';
+  }
   // Untyped handler params neutralize to `any` (the global-filter idiom).
   // C-01 — the range used to commit from `@change`, which is NOT the same event across
   // targets for a text/number input: React maps `onChange` onto the native `input`
@@ -56,19 +83,21 @@ export default function FilterNumberRange(_props: FilterNumberRangeProps): JSX.E
   // tick. That combination is target-independent rather than a React special case.
   const onMinInput = useCallback((e: any) => {
     setMinDraft(e && e.target ? e.target.value : '');
+    setTouched(true);
   }, []);
   const onMaxInput = useCallback((e: any) => {
     setMaxDraft(e && e.target ? e.target.value : '');
+    setTouched(true);
   }, []);
   // Commit the range on Enter or blur — the same commit-on-commit contract FilterText
   // uses, NOT per keystroke. Both read the drafts in a tick where nothing has just
   // written them, so every target reads the settled value.
   const onKeydown = useCallback((e: any) => {
-    if (e && e.key === 'Enter') applyRange(minDraft, maxDraft);
-  }, [applyRange, maxDraft, minDraft]);
+    if (e && e.key === 'Enter') applyRange(minDraftValue(), maxDraftValue());
+  }, [applyRange, maxDraftValue, minDraftValue]);
   const onBlur = useCallback(() => {
-    applyRange(minDraft, maxDraft);
-  }, [applyRange, maxDraft, minDraft]);
+    applyRange(minDraftValue(), maxDraftValue());
+  }, [applyRange, maxDraftValue, minDraftValue]);
   // Plain string-coercion functions for the placeholders (NOT $computed — the
   // EditorSelect/listbox lesson; opaque slot-scope props rejected by strict leaf tsc).
   function minPlaceholder() {
@@ -104,12 +133,17 @@ export default function FilterNumberRange(_props: FilterNumberRangeProps): JSX.E
     return props.columnId;
   }
 
+  useEffect(() => {
+    if (_watch0First.current) { _watch0First.current = false; return; }
+    setTouched(false);
+  }, [Array, String, props.value]);
+
   return (
     <>
     <span style={{ display: "flex", alignItems: "center" }} data-rozie-s-97b2c090="">
-      <input className={"rdt-col-filter"} part="col-filter" type="number" aria-label={rozieAttr(a11yLabel() + ' min')} placeholder={rozieAttr(minPlaceholder())} value={minDraft} onInput={($event) => { onMinInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-97b2c090="" />
+      <input className={"rdt-col-filter"} part="col-filter" type="number" aria-label={rozieAttr(a11yLabel() + ' min')} placeholder={rozieAttr(minPlaceholder())} value={minDraftValue()} onInput={($event) => { onMinInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-97b2c090="" />
       <span data-rozie-s-97b2c090=""> - </span>
-      <input className={"rdt-col-filter"} part="col-filter" type="number" aria-label={rozieAttr(a11yLabel() + ' max')} placeholder={rozieAttr(maxPlaceholder())} value={maxDraft} onInput={($event) => { onMaxInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-97b2c090="" />
+      <input className={"rdt-col-filter"} part="col-filter" type="number" aria-label={rozieAttr(a11yLabel() + ' max')} placeholder={rozieAttr(maxPlaceholder())} value={maxDraftValue()} onInput={($event) => { onMaxInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-97b2c090="" />
     </span>
     </>
   );

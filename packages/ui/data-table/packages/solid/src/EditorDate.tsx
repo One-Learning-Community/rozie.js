@@ -1,6 +1,27 @@
 import type { JSX } from 'solid-js';
 import { createEffect, createSignal, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
 import { rozieAttr } from '@rozie/runtime-solid';
+// C-07: the native `<input type="date">` accepts ONLY `YYYY-MM-DD` and renders BLANK for
+// anything else, silently. The seed used to be `String($props.value)`, which is not the ISO
+// coercion this component's own docs: string promises — so a `Date`, an ISO datetime string,
+// an epoch number or a localised string all produced an empty editor. `toIsoDateString`
+// (helpers/dateValue.ts) is the real coercion, pure and unit-tested.
+import { toIsoDateString } from './helpers/dateValue';
+
+// ── N-04: the draft is DERIVED, not seeded setup-once ───────────────────────────────────
+// A top-level `$data.draft = <read of $props.x>` is setup-once, and on ANGULAR the emitter
+// places setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+// DEFAULT — Angular sets inputs after construction. Measured directly: this editor opened
+// EMPTY on angular for every row, including one whose value was already `YYYY-MM-DD`, while
+// vue and lit seeded correctly. That is why the shape of the incoming value (C-07) could not
+// be the whole story, and why the existing EditorDate coverage never saw either problem: it
+// fills the input before asserting anything.
+//
+// Reading the prop through a derived function instead is correct on all six by construction,
+// with no flash of an empty control on the fine-grained targets and no per-target branch. It
+// is the pattern `FilterSelect` in this same package already uses (`selectValue()`), which is
+// exactly why FilterSelect was the one drop-in unaffected. `touched` is what keeps the user's
+// typing from being overwritten by the live prop read once they have started editing.
 
 interface EditorDateProps {
   /**
@@ -42,6 +63,7 @@ export default function EditorDate(_props: EditorDateProps): JSX.Element {
   const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel', 'autofocus', 'columnLabel']);
 
   const [draft, setDraft] = createSignal('');
+  const [touched, setTouched] = createSignal(false);
   onMount(() => {
     if (local.autofocus) inputElRef?.focus();
   });
@@ -50,21 +72,37 @@ export default function EditorDate(_props: EditorDateProps): JSX.Element {
   })(v)), { defer: true }));
   let inputElRef: HTMLElement | null = null;
 
-  // Seed the draft once from the incoming value (setup-once). A native date input
-  // only accepts `YYYY-MM-DD`; normalize null/undefined to ''.
-  setDraft(local.value != null ? String(local.value) : '');
+  // ── N-04: the draft is DERIVED, not seeded setup-once ───────────────────────────────────
+  // A top-level `$data.draft = <read of $props.x>` is setup-once, and on ANGULAR the emitter
+  // places setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+  // DEFAULT — Angular sets inputs after construction. Measured directly: this editor opened
+  // EMPTY on angular for every row, including one whose value was already `YYYY-MM-DD`, while
+  // vue and lit seeded correctly. That is why the shape of the incoming value (C-07) could not
+  // be the whole story, and why the existing EditorDate coverage never saw either problem: it
+  // fills the input before asserting anything.
+  //
+  // Reading the prop through a derived function instead is correct on all six by construction,
+  // with no flash of an empty control on the fine-grained targets and no per-target branch. It
+  // is the pattern `FilterSelect` in this same package already uses (`selectValue()`), which is
+  // exactly why FilterSelect was the one drop-in unaffected. `touched` is what keeps the user's
+  // typing from being overwritten by the live prop read once they have started editing.
+  function draftValue() {
+    return touched() ? draft() : toIsoDateString(local.value);
+  }
   function onInput(e: any) {
     setDraft(e && e.target ? e.target.value : '');
+    setTouched(true);
   }
   function doCommit() {
     // commit the ISO date string the native control already produced.
-    local.commit && local.commit(draft());
+    local.commit && local.commit(draftValue());
   }
   function doCancel() {
     local.cancel && local.cancel();
   }
   function onChange(e: any) {
     setDraft(e && e.target ? e.target.value : '');
+    setTouched(true);
   }
   function onKeydown(e: any) {
     if (e && e.key === 'Enter') {
@@ -98,7 +136,7 @@ export default function EditorDate(_props: EditorDateProps): JSX.Element {
 
   return (
     <>
-    <input type="date" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} ref={(el) => { inputElRef = el as HTMLElement; }} class={"rdt-cell-editor"} value={draft()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onChange($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-7abe1a56="" />
+    <input type="date" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} ref={(el) => { inputElRef = el as HTMLElement; }} class={"rdt-cell-editor"} value={draftValue()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onChange($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-7abe1a56="" />
     </>
   );
 }

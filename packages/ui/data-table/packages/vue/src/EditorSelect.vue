@@ -1,6 +1,6 @@
 <template>
 
-<select ref="selectElRef" class="rdt-cell-editor" data-editing-cell="" :aria-label="a11yLabel()" :value="draft" @change="onChange($event)" @keydown="onKeydown($event)" @blur="onBlur()">
+<select ref="selectElRef" class="rdt-cell-editor" data-editing-cell="" :aria-label="a11yLabel()" :value="draftValue()" @change="onChange($event)" @keydown="onKeydown($event)" @blur="onBlur()">
   <option v-for="opt in props.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
 </select>
 
@@ -52,19 +52,30 @@ const props = withDefaults(
 );
 
 const draft = ref('');
+const touched = ref(false);
 
 const selectElRef = ref<HTMLSelectElement>();
 
 // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
 // to '' so the <select> binds to a string.
-draft.value = props.value != null ? String(props.value) : '';
+// ── N-04: the draft is DERIVED, not seeded setup-once ───────────────────────────────────
+// A top-level `$data.draft = <read of $props.x>` is setup-once, and on ANGULAR the emitter
+// places setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+// DEFAULT — Angular sets inputs after construction. Measured on the sibling EditorDate: it
+// opened EMPTY on angular for every row while vue and lit seeded correctly. Reading the prop
+// through a derived function is correct on all six by construction, with no flash of an empty
+// control on the fine-grained targets and no per-target branch — the pattern `FilterSelect`
+// already uses (`selectValue()`), which is why FilterSelect was the one drop-in unaffected.
+// `touched` keeps the live prop read from overwriting the user once they start typing.
+const draftValue = () => touched.value ? draft.value : props.value != null ? String(props.value) : '';
 // Picking/arrow-cycling an option updates the draft only — no commit.
 const onChange = (e: any) => {
   draft.value = e && e.target ? e.target.value : '';
+  touched.value = true;
 };
 // commit/cancel are Function props (default null) — guard before calling.
 const doCommit = () => {
-  props.commit && props.commit(draft.value);
+  props.commit && props.commit(draftValue());
 };
 const doCancel = () => {
   props.cancel && props.cancel();

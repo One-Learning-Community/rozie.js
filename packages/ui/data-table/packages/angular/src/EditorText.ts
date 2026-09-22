@@ -6,7 +6,7 @@ import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie
   standalone: true,
   template: `
 
-    <input #inputEl class="rdt-cell-editor" type="text" data-editing-cell="" [attr.aria-label]="rozieAttr(a11yLabel())" [value]="draft()" (input)="onInput($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
+    <input #inputEl class="rdt-cell-editor" type="text" data-editing-cell="" [attr.aria-label]="rozieAttr(a11yLabel())" [value]="draftValue()" (input)="onInput($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
 
   `,
   styles: [`
@@ -47,13 +47,11 @@ export class EditorText {
    */
   columnLabel = input<string>('');
   draft = signal('');
+  touched = signal(false);
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   private __rozieWatchInitial_0 = true;
 
   constructor() {
-    // Seed the draft once at setup from the incoming value (setup-once, NOT in the
-    // template). Normalize null/undefined to '' so the input value binds to a string.
-    this.draft.set(this.value() != null ? String(this.value()) : '');
     effect(() => { const __watchVal = (() => this.autofocus())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
       if (v) this.inputEl()?.nativeElement?.focus();
     })(__watchVal); }); });
@@ -63,15 +61,28 @@ export class EditorText {
     if (this.autofocus()) this.inputEl()?.nativeElement?.focus();
   }
 
+  // Seed the draft once at setup from the incoming value (setup-once, NOT in the
+  // template). Normalize null/undefined to '' so the input value binds to a string.
+  // ── N-04: the draft is DERIVED, not seeded setup-once ───────────────────────────────────
+  // A top-level `$data.draft = <read of $props.x>` is setup-once, and on ANGULAR the emitter
+  // places setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+  // DEFAULT — Angular sets inputs after construction. Measured on the sibling EditorDate: it
+  // opened EMPTY on angular for every row while vue and lit seeded correctly. Reading the prop
+  // through a derived function is correct on all six by construction, with no flash of an empty
+  // control on the fine-grained targets and no per-target branch — the pattern `FilterSelect`
+  // already uses (`selectValue()`), which is why FilterSelect was the one drop-in unaffected.
+  // `touched` keeps the live prop read from overwriting the user once they start typing.
+  draftValue = () => this.touched() ? this.draft() : this.value() != null ? String(this.value()) : '';
   // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
   // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
   onInput = (e: any) => {
     this.draft.set(e && e.target ? e.target.value : '');
+    this.touched.set(true);
   };
   // commit/cancel are Function props (default null) — guard before calling.
   doCommit = () => {
     const __commit = this.commit();
-    __commit && __commit(this.draft());
+    __commit && __commit(this.draftValue());
   };
   doCancel = () => {
     const __cancel = this.cancel();

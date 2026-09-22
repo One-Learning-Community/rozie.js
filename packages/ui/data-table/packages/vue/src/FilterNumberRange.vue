@@ -1,15 +1,15 @@
 <template>
 
 <span style="display:flex; align-items: center">
-  <input class="rdt-col-filter" part="col-filter" type="number" :aria-label="a11yLabel() + ' min'" :placeholder="minPlaceholder()" :value="minDraft" @input="onMinInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
+  <input class="rdt-col-filter" part="col-filter" type="number" :aria-label="a11yLabel() + ' min'" :placeholder="minPlaceholder()" :value="minDraftValue()" @input="onMinInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
   <span> - </span>
-  <input class="rdt-col-filter" part="col-filter" type="number" :aria-label="a11yLabel() + ' max'" :placeholder="maxPlaceholder()" :value="maxDraft" @input="onMaxInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
+  <input class="rdt-col-filter" part="col-filter" type="number" :aria-label="a11yLabel() + ' max'" :placeholder="maxPlaceholder()" :value="maxDraftValue()" @input="onMaxInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
 </span>
 
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -43,10 +43,29 @@ const props = withDefaults(
 
 const minDraft = ref('');
 const maxDraft = ref('');
+const touched = ref(false);
 
-// Seed both drafts once at setup from the incoming [min,max] tuple (setup-once).
-minDraft.value = Array.isArray(props.value) && props.value[0] != null ? String(props.value[0]) : '';
-maxDraft.value = Array.isArray(props.value) && props.value[1] != null ? String(props.value[1]) : '';
+// ── C-08 + N-04: both drafts are DERIVED from `$props.value`, with a `touched` latch ─────
+//
+// C-08 — this component mounts once per rendered filter row and is NOT remounted when the
+// filter changes, and both drafts were seeded setup-once. A programmatic reset or an external
+// `columnFilters` write moved the real filter while these two inputs went on displaying the
+// old numbers. See FilterText for the full reasoning; `FilterSelect` was never affected
+// because it reads `$props.value` live, which is the pattern adopted here.
+//
+// N-04 — the setup-once seed was ALSO wrong on Angular from the start: the emitter places
+// setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+// DEFAULT. Measured on the sibling EditorDate.
+//
+// The watch clears `touched` rather than writing the drafts, so the derived readers pick the
+// new value up on their own. It is keyed on the TUPLE ELEMENTS, not the array identity: the
+// funnel writes a fresh `[min, max]` array for every apply, so an identity key would fire on
+// every apply, and a consumer mutating a tuple in place would be missed by it anyway. The key
+// is a joined STRING rather than an array — an array-returning watch getter is compared by
+// identity on Lit, so a fresh array every read means it can never report "unchanged" (measured:
+// the range half of the C-08 case stayed red on lit alone with an array key).
+const minDraftValue = () => touched.value ? minDraft.value : Array.isArray(props.value) && props.value[0] != null ? String(props.value[0]) : '';
+const maxDraftValue = () => touched.value ? maxDraft.value : Array.isArray(props.value) && props.value[1] != null ? String(props.value[1]) : '';
 // Untyped handler params neutralize to `any` (the global-filter idiom).
 // C-01 — the range used to commit from `@change`, which is NOT the same event across
 // targets for a text/number input: React maps `onChange` onto the native `input`
@@ -62,18 +81,20 @@ maxDraft.value = Array.isArray(props.value) && props.value[1] != null ? String(p
 // tick. That combination is target-independent rather than a React special case.
 const onMinInput = (e: any) => {
   minDraft.value = e && e.target ? e.target.value : '';
+  touched.value = true;
 };
 const onMaxInput = (e: any) => {
   maxDraft.value = e && e.target ? e.target.value : '';
+  touched.value = true;
 };
 // Commit the range on Enter or blur — the same commit-on-commit contract FilterText
 // uses, NOT per keystroke. Both read the drafts in a tick where nothing has just
 // written them, so every target reads the settled value.
 const onKeydown = (e: any) => {
-  if (e && e.key === 'Enter') applyRange(minDraft.value, maxDraft.value);
+  if (e && e.key === 'Enter') applyRange(minDraftValue(), maxDraftValue());
 };
 const onBlur = () => {
-  applyRange(minDraft.value, maxDraft.value);
+  applyRange(minDraftValue(), maxDraftValue());
 };
 // Plain string-coercion functions for the placeholders (NOT $computed — the
 // EditorSelect/listbox lesson; opaque slot-scope props rejected by strict leaf tsc).
@@ -103,4 +124,8 @@ const a11yLabel = () => {
   if (typeof props.columnLabel === 'string' && props.columnLabel !== '') return props.columnLabel;
   return props.columnId;
 };
+
+watch(() => Array.isArray(props.value) ? String(props.value[0]) + '\u0000' + String(props.value[1]) : '', () => {
+  touched.value = false;
+}, { flush: 'post' });
 </script>

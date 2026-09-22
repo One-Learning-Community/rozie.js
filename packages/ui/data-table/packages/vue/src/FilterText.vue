@@ -1,11 +1,11 @@
 <template>
 
-<input class="rdt-col-filter" part="col-filter" type="text" :aria-label="a11yLabel()" :value="draft" @input="onInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
+<input class="rdt-col-filter" part="col-filter" type="text" :aria-label="a11yLabel()" :value="draftValue()" @input="onInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
 
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -34,21 +34,40 @@ const props = withDefaults(
 );
 
 const draft = ref('');
+const touched = ref(false);
 
-// Seed the draft once at setup from the incoming value (setup-once, NOT in the
-// template). Normalize null/undefined to '' so the input value binds to a string.
-draft.value = props.value != null ? String(props.value) : '';
+// ── C-08 + N-04: the draft is DERIVED from `$props.value`, with a `touched` latch ────────
+//
+// C-08 — this component mounts once per rendered filter row and is NOT remounted when the
+// filter changes, and its draft was seeded setup-once. So a programmatic reset (a "Clear
+// filters" button, `setFilter(id, '')` from another control, a consumer writing
+// `columnFilters` directly) moved the real filter while this input went on displaying the old
+// text: the UI stated a filter that was no longer applied. `FilterSelect` was never affected —
+// it reads `$props.value` live through `selectValue()`, which is the pattern adopted here.
+//
+// N-04 — the setup-once seed was ALSO wrong on Angular from the start: the emitter places
+// setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+// DEFAULT, because Angular sets inputs after construction. Measured on the sibling EditorDate,
+// which opened empty on angular for every row while vue and lit seeded correctly. A derived
+// read is correct on all six by construction, with no flash and no per-target branch.
+//
+// `touched` is what stops the live read from overwriting the user mid-type; the watch clears
+// it, so an OUTSIDE change always wins and the input follows it. `@input` never moves
+// `$props.value` (nothing is applied until Enter/blur), so the two can never fight.
+const draftValue = () => touched.value ? draft.value : props.value != null ? String(props.value) : '';
 // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
 // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
 const onInput = (e: any) => {
   draft.value = e && e.target ? e.target.value : '';
+  touched.value = true;
 };
 // setFilter is a Function prop (default null) — guard before calling.
 const applyFilter = () => {
-  props.setFilter && props.setFilter(props.columnId, draft.value);
+  props.setFilter && props.setFilter(props.columnId, draftValue());
 };
 const clearFilter = () => {
   draft.value = '';
+  touched.value = false;
   props.setFilter && props.setFilter(props.columnId, '');
 };
 const onKeydown = (e: any) => {
@@ -73,4 +92,8 @@ const a11yLabel = () => {
   if (typeof props.columnLabel === 'string' && props.columnLabel !== '') return props.columnLabel;
   return props.columnId;
 };
+
+watch(() => props.value, () => {
+  touched.value = false;
+}, { flush: 'post' });
 </script>

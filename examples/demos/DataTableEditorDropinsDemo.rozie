@@ -31,11 +31,18 @@
 {
   // A static dataset with an editable text field (name) + a categorical field (status).
   // VR-deterministic. Row 0 = Alpha / active.
+  //
+  // C-07 (260921-tsu): rows 2 and 3 deliberately hold dates in shapes that are NOT already
+  // `YYYY-MM-DD`. Every row used to, which is the one shape a native `<input type="date">`
+  // accepts — so the EditorDate coverage could not have caught the seed being a bare
+  // `String($props.value)`: the assertion was only ever exercising the case needing no
+  // coercion. Row 3 is the OFF-BY-ONE shape specifically (midnight UTC), which renders as the
+  // previous day if the date is re-derived from local parts instead of read as written.
   rows: [
     { id: 1, name: 'Alpha', status: 'active',   orderedAt: '2026-01-01' },
     { id: 2, name: 'Beta',  status: 'archived', orderedAt: '2026-02-01' },
-    { id: 3, name: 'Gamma', status: 'active',   orderedAt: '2026-03-01' },
-    { id: 4, name: 'Delta', status: 'pending',  orderedAt: '2026-04-01' },
+    { id: 3, name: 'Gamma', status: 'active',   orderedAt: 'March 1, 2026' },
+    { id: 4, name: 'Delta', status: 'pending',  orderedAt: '2026-04-01T00:00:00.000Z' },
   ],
   // Select-editor options for the `status` column.
   statusOptions: [

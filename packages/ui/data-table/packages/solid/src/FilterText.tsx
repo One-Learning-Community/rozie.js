@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { createSignal, mergeProps, splitProps } from 'solid-js';
+import { createEffect, createSignal, mergeProps, on, splitProps, untrack } from 'solid-js';
 import { rozieAttr } from '@rozie/runtime-solid';
 
 interface FilterTextProps {
@@ -30,23 +30,46 @@ export default function FilterText(_props: FilterTextProps): JSX.Element {
   const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'value', 'setFilter', 'columnLabel']);
 
   const [draft, setDraft] = createSignal('');
+  const [touched, setTouched] = createSignal(false);
+  createEffect(on(() => (() => local.value)(), (v) => untrack(() => (() => {
+    setTouched(false);
+  })()), { defer: true }));
 
-  // Seed the draft once at setup from the incoming value (setup-once, NOT in the
-  // template). Normalize null/undefined to '' so the input value binds to a string.
-  setDraft(local.value != null ? String(local.value) : '');
-
+  // ── C-08 + N-04: the draft is DERIVED from `$props.value`, with a `touched` latch ────────
+  //
+  // C-08 — this component mounts once per rendered filter row and is NOT remounted when the
+  // filter changes, and its draft was seeded setup-once. So a programmatic reset (a "Clear
+  // filters" button, `setFilter(id, '')` from another control, a consumer writing
+  // `columnFilters` directly) moved the real filter while this input went on displaying the old
+  // text: the UI stated a filter that was no longer applied. `FilterSelect` was never affected —
+  // it reads `$props.value` live through `selectValue()`, which is the pattern adopted here.
+  //
+  // N-04 — the setup-once seed was ALSO wrong on Angular from the start: the emitter places
+  // setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+  // DEFAULT, because Angular sets inputs after construction. Measured on the sibling EditorDate,
+  // which opened empty on angular for every row while vue and lit seeded correctly. A derived
+  // read is correct on all six by construction, with no flash and no per-target branch.
+  //
+  // `touched` is what stops the live read from overwriting the user mid-type; the watch clears
+  // it, so an OUTSIDE change always wins and the input follows it. `@input` never moves
+  // `$props.value` (nothing is applied until Enter/blur), so the two can never fight.
+  function draftValue() {
+    return touched() ? draft() : local.value != null ? String(local.value) : '';
+  }
   // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
   // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
   function onInput(e: any) {
     setDraft(e && e.target ? e.target.value : '');
+    setTouched(true);
   }
 
   // setFilter is a Function prop (default null) — guard before calling.
   function applyFilter() {
-    local.setFilter && local.setFilter(local.columnId, draft());
+    local.setFilter && local.setFilter(local.columnId, draftValue());
   }
   function clearFilter() {
     setDraft('');
+    setTouched(false);
     local.setFilter && local.setFilter(local.columnId, '');
   }
   function onKeydown(e: any) {
@@ -75,7 +98,7 @@ export default function FilterText(_props: FilterTextProps): JSX.Element {
 
   return (
     <>
-    <input part="col-filter" type="text" aria-label={rozieAttr(a11yLabel())} class={"rdt-col-filter"} value={draft()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-18cbb44e="" />
+    <input part="col-filter" type="text" aria-label={rozieAttr(a11yLabel())} class={"rdt-col-filter"} value={draftValue()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-18cbb44e="" />
     </>
   );
 }

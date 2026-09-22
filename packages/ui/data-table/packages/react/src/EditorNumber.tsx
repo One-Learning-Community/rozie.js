@@ -50,19 +50,34 @@ export default function EditorNumber(_props: EditorNumberProps): JSX.Element {
   };
   const _autofocusRef = useRef(props.autofocus);
   _autofocusRef.current = props.autofocus;
-  const [draft, setDraft] = useState(() => props.value != null ? String(props.value) : '');
+  const [draft, setDraft] = useState('');
+  const [touched, setTouched] = useState(false);
   const inputEl = useRef<HTMLInputElement | null>(null);
   const _watch0First = useRef(true);
 
+  // Seed the draft string once from the incoming value (setup-once).
+  // ── N-04: the draft is DERIVED, not seeded setup-once ───────────────────────────────────
+  // A top-level `$data.draft = <read of $props.x>` is setup-once, and on ANGULAR the emitter
+  // places setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+  // DEFAULT — Angular sets inputs after construction. Measured on the sibling EditorDate: it
+  // opened EMPTY on angular for every row while vue and lit seeded correctly. Reading the prop
+  // through a derived function is correct on all six by construction, with no flash of an empty
+  // control on the fine-grained targets and no per-target branch — the pattern `FilterSelect`
+  // already uses (`selectValue()`), which is why FilterSelect was the one drop-in unaffected.
+  // `touched` keeps the live prop read from overwriting the user once they start typing.
+  function draftValue() {
+    return touched ? draft : props.value != null ? String(props.value) : '';
+  }
   const onInput = useCallback((e: any) => {
     setDraft(e && e.target ? e.target.value : '');
+    setTouched(true);
   }, []);
   // Coerce to a Number at commit time. Defensive guard: an empty/whitespace draft
   // commits null rather than NaN (Number('') === 0 is a silent footgun); a
   // non-numeric draft also commits null. Otherwise commit the coerced number.
   function doCommit() {
     if (!props.commit) return;
-    const raw = draft;
+    const raw = draftValue();
     if (raw == null || String(raw).trim() === '') {
       props.commit(null);
       return;
@@ -113,7 +128,7 @@ export default function EditorNumber(_props: EditorNumberProps): JSX.Element {
 
   return (
     <>
-    <input ref={inputEl} className={"rdt-cell-editor"} type="number" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} value={draft} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-b2792b32="" />
+    <input ref={inputEl} className={"rdt-cell-editor"} type="number" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} value={draftValue()} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-b2792b32="" />
     </>
   );
 }

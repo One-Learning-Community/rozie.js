@@ -1,6 +1,8 @@
 <script lang="ts">
 import { rozieAttr } from '@rozie/runtime-svelte';
 
+import { untrack } from 'svelte';
+
 interface Props {
   /**
    * The column id (mirrors the `#filter` slot scope) — used as the filter key and the input `aria-label` base.
@@ -39,10 +41,29 @@ let {
 
 let minDraft = $state('');
 let maxDraft = $state('');
+let touched = $state(false);
 
-// Seed both drafts once at setup from the incoming [min,max] tuple (setup-once).
-minDraft = Array.isArray(value) && value[0] != null ? String(value[0]) : '';
-maxDraft = Array.isArray(value) && value[1] != null ? String(value[1]) : '';
+// ── C-08 + N-04: both drafts are DERIVED from `$props.value`, with a `touched` latch ─────
+//
+// C-08 — this component mounts once per rendered filter row and is NOT remounted when the
+// filter changes, and both drafts were seeded setup-once. A programmatic reset or an external
+// `columnFilters` write moved the real filter while these two inputs went on displaying the
+// old numbers. See FilterText for the full reasoning; `FilterSelect` was never affected
+// because it reads `$props.value` live, which is the pattern adopted here.
+//
+// N-04 — the setup-once seed was ALSO wrong on Angular from the start: the emitter places
+// setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+// DEFAULT. Measured on the sibling EditorDate.
+//
+// The watch clears `touched` rather than writing the drafts, so the derived readers pick the
+// new value up on their own. It is keyed on the TUPLE ELEMENTS, not the array identity: the
+// funnel writes a fresh `[min, max]` array for every apply, so an identity key would fire on
+// every apply, and a consumer mutating a tuple in place would be missed by it anyway. The key
+// is a joined STRING rather than an array — an array-returning watch getter is compared by
+// identity on Lit, so a fresh array every read means it can never report "unchanged" (measured:
+// the range half of the C-08 case stayed red on lit alone with an array key).
+const minDraftValue = () => touched ? minDraft : Array.isArray(value) && value[0] != null ? String(value[0]) : '';
+const maxDraftValue = () => touched ? maxDraft : Array.isArray(value) && value[1] != null ? String(value[1]) : '';
 // Untyped handler params neutralize to `any` (the global-filter idiom).
 // C-01 — the range used to commit from `@change`, which is NOT the same event across
 // targets for a text/number input: React maps `onChange` onto the native `input`
@@ -58,18 +79,20 @@ maxDraft = Array.isArray(value) && value[1] != null ? String(value[1]) : '';
 // tick. That combination is target-independent rather than a React special case.
 const onMinInput = (e: any) => {
   minDraft = e && e.target ? e.target.value : '';
+  touched = true;
 };
 const onMaxInput = (e: any) => {
   maxDraft = e && e.target ? e.target.value : '';
+  touched = true;
 };
 // Commit the range on Enter or blur — the same commit-on-commit contract FilterText
 // uses, NOT per keystroke. Both read the drafts in a tick where nothing has just
 // written them, so every target reads the settled value.
 const onKeydown = (e: any) => {
-  if (e && e.key === 'Enter') applyRange(minDraft, maxDraft);
+  if (e && e.key === 'Enter') applyRange(minDraftValue(), maxDraftValue());
 };
 const onBlur = () => {
-  applyRange(minDraft, maxDraft);
+  applyRange(minDraftValue(), maxDraftValue());
 };
 // Plain string-coercion functions for the placeholders (NOT $computed — the
 // EditorSelect/listbox lesson; opaque slot-scope props rejected by strict leaf tsc).
@@ -99,6 +122,11 @@ const a11yLabel = () => {
   if (typeof columnLabel === 'string' && columnLabel !== '') return columnLabel;
   return columnId;
 };
+
+let __rozieWatchInitial_0 = true;
+$effect(() => { (() => Array.isArray(value) ? String(value[0]) + '\u0000' + String(value[1]) : '')(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
+  touched = false;
+})(); }); });
 </script>
 
-<span style="display:flex; align-items: center" data-rozie-s-97b2c090><input class="rdt-col-filter" part="col-filter" type="number" aria-label={rozieAttr(a11yLabel() + ' min')} placeholder={rozieAttr(minPlaceholder())} value={minDraft} oninput={($event) => { onMinInput($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-97b2c090 /><span data-rozie-s-97b2c090> - </span><input class="rdt-col-filter" part="col-filter" type="number" aria-label={rozieAttr(a11yLabel() + ' max')} placeholder={rozieAttr(maxPlaceholder())} value={maxDraft} oninput={($event) => { onMaxInput($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-97b2c090 /></span>
+<span style="display:flex; align-items: center" data-rozie-s-97b2c090><input class="rdt-col-filter" part="col-filter" type="number" aria-label={rozieAttr(a11yLabel() + ' min')} placeholder={rozieAttr(minPlaceholder())} value={minDraftValue()} oninput={($event) => { onMinInput($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-97b2c090 /><span data-rozie-s-97b2c090> - </span><input class="rdt-col-filter" part="col-filter" type="number" aria-label={rozieAttr(a11yLabel() + ' max')} placeholder={rozieAttr(maxPlaceholder())} value={maxDraftValue()} oninput={($event) => { onMaxInput($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-97b2c090 /></span>

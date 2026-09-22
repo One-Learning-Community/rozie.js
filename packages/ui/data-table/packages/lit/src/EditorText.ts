@@ -42,6 +42,7 @@ export default class EditorText extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) columnLabel: string = '';
   private _draft = signal('');
+  private _touched = signal(false);
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
 private __rozieFirstUpdateDone = false;
 
@@ -51,10 +52,6 @@ private __rozieFirstUpdateDone = false;
   private _rozieTornDown = false;
 
   firstUpdated(): void {
-    // Seed the draft once at setup from the incoming value (setup-once, NOT in the
-    // template). Normalize null/undefined to '' so the input value binds to a string.
-    this._draft.value = this.value != null ? String(this.value) : '';
-
     if (this.autofocus) this._refInputEl?.focus();
   }
 
@@ -77,19 +74,33 @@ private __rozieFirstUpdateDone = false;
 
   render() {
     return html`
-<input class="rdt-cell-editor" type="text" data-editing-cell="" aria-label=${rozieAttr(this.a11yLabel())} .value=${this._draft.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-ref="inputEl" data-rozie-s-0d17f43a />
+<input class="rdt-cell-editor" type="text" data-editing-cell="" aria-label=${rozieAttr(this.a11yLabel())} .value=${this.draftValue()} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-ref="inputEl" data-rozie-s-0d17f43a />
 `;
   }
+
+  // Seed the draft once at setup from the incoming value (setup-once, NOT in the
+  // template). Normalize null/undefined to '' so the input value binds to a string.
+  // ── N-04: the draft is DERIVED, not seeded setup-once ───────────────────────────────────
+  // A top-level `$data.draft = <read of $props.x>` is setup-once, and on ANGULAR the emitter
+  // places setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+  // DEFAULT — Angular sets inputs after construction. Measured on the sibling EditorDate: it
+  // opened EMPTY on angular for every row while vue and lit seeded correctly. Reading the prop
+  // through a derived function is correct on all six by construction, with no flash of an empty
+  // control on the fine-grained targets and no per-target branch — the pattern `FilterSelect`
+  // already uses (`selectValue()`), which is why FilterSelect was the one drop-in unaffected.
+  // `touched` keeps the live prop read from overwriting the user once they start typing.
+  draftValue = () => this._touched.value ? this._draft.value : this.value != null ? String(this.value) : '';
 
   // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
   // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
   onInput = (e: any) => {
   this._draft.value = e && e.target ? e.target.value : '';
+  this._touched.value = true;
 };
 
   // commit/cancel are Function props (default null) — guard before calling.
   doCommit = () => {
-  this.commit && this.commit(this._draft.value);
+  this.commit && this.commit(this.draftValue());
 };
 
   doCancel = () => {

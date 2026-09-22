@@ -2,6 +2,27 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieAttr } from '@rozie/runtime-lit';
+// C-07: the native `<input type="date">` accepts ONLY `YYYY-MM-DD` and renders BLANK for
+// anything else, silently. The seed used to be `String($props.value)`, which is not the ISO
+// coercion this component's own docs: string promises — so a `Date`, an ISO datetime string,
+// an epoch number or a localised string all produced an empty editor. `toIsoDateString`
+// (helpers/dateValue.ts) is the real coercion, pure and unit-tested.
+import { toIsoDateString } from './helpers/dateValue';
+
+// ── N-04: the draft is DERIVED, not seeded setup-once ───────────────────────────────────
+// A top-level `$data.draft = <read of $props.x>` is setup-once, and on ANGULAR the emitter
+// places setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+// DEFAULT — Angular sets inputs after construction. Measured directly: this editor opened
+// EMPTY on angular for every row, including one whose value was already `YYYY-MM-DD`, while
+// vue and lit seeded correctly. That is why the shape of the incoming value (C-07) could not
+// be the whole story, and why the existing EditorDate coverage never saw either problem: it
+// fills the input before asserting anything.
+//
+// Reading the prop through a derived function instead is correct on all six by construction,
+// with no flash of an empty control on the fine-grained targets and no per-target branch. It
+// is the pattern `FilterSelect` in this same package already uses (`selectValue()`), which is
+// exactly why FilterSelect was the one drop-in unaffected. `touched` is what keeps the user's
+// typing from being overwritten by the live prop read once they have started editing.
 
 @customElement('rozie-editor-date')
 export default class EditorDate extends SignalWatcher(LitElement) {
@@ -42,6 +63,7 @@ export default class EditorDate extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) columnLabel: string = '';
   private _draft = signal('');
+  private _touched = signal(false);
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
 private __rozieFirstUpdateDone = false;
 
@@ -51,10 +73,6 @@ private __rozieFirstUpdateDone = false;
   private _rozieTornDown = false;
 
   firstUpdated(): void {
-    // Seed the draft once from the incoming value (setup-once). A native date input
-    // only accepts `YYYY-MM-DD`; normalize null/undefined to ''.
-    this._draft.value = this.value != null ? String(this.value) : '';
-
     if (this.autofocus) this._refInputEl?.focus();
   }
 
@@ -77,17 +95,20 @@ private __rozieFirstUpdateDone = false;
 
   render() {
     return html`
-<input class="rdt-cell-editor" type="date" data-editing-cell="" aria-label=${rozieAttr(this.a11yLabel())} .value=${this._draft.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onChange($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-ref="inputEl" data-rozie-s-7abe1a56 />
+<input class="rdt-cell-editor" type="date" data-editing-cell="" aria-label=${rozieAttr(this.a11yLabel())} .value=${this.draftValue()} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onChange($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-ref="inputEl" data-rozie-s-7abe1a56 />
 `;
   }
 
+  draftValue = () => this._touched.value ? this._draft.value : toIsoDateString(this.value);
+
   onInput = (e: any) => {
   this._draft.value = e && e.target ? e.target.value : '';
+  this._touched.value = true;
 };
 
   doCommit = () => {
   // commit the ISO date string the native control already produced.
-  this.commit && this.commit(this._draft.value);
+  this.commit && this.commit(this.draftValue());
 };
 
   doCancel = () => {
@@ -96,6 +117,7 @@ private __rozieFirstUpdateDone = false;
 
   onChange = (e: any) => {
   this._draft.value = e && e.target ? e.target.value : '';
+  this._touched.value = true;
 };
 
   onKeydown = (e: any) => {

@@ -6,7 +6,7 @@ import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie
   standalone: true,
   template: `
 
-    <input #inputEl class="rdt-cell-editor" type="number" data-editing-cell="" [attr.aria-label]="rozieAttr(a11yLabel())" [value]="draft()" (input)="onInput($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
+    <input #inputEl class="rdt-cell-editor" type="number" data-editing-cell="" [attr.aria-label]="rozieAttr(a11yLabel())" [value]="draftValue()" (input)="onInput($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
 
   `,
   styles: [`
@@ -47,12 +47,11 @@ export class EditorNumber {
    */
   columnLabel = input<string>('');
   draft = signal('');
+  touched = signal(false);
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   private __rozieWatchInitial_0 = true;
 
   constructor() {
-    // Seed the draft string once from the incoming value (setup-once).
-    this.draft.set(this.value() != null ? String(this.value()) : '');
     effect(() => { const __watchVal = (() => this.autofocus())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
       if (v) this.inputEl()?.nativeElement?.focus();
     })(__watchVal); }); });
@@ -62,8 +61,20 @@ export class EditorNumber {
     if (this.autofocus()) this.inputEl()?.nativeElement?.focus();
   }
 
+  // Seed the draft string once from the incoming value (setup-once).
+  // ── N-04: the draft is DERIVED, not seeded setup-once ───────────────────────────────────
+  // A top-level `$data.draft = <read of $props.x>` is setup-once, and on ANGULAR the emitter
+  // places setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+  // DEFAULT — Angular sets inputs after construction. Measured on the sibling EditorDate: it
+  // opened EMPTY on angular for every row while vue and lit seeded correctly. Reading the prop
+  // through a derived function is correct on all six by construction, with no flash of an empty
+  // control on the fine-grained targets and no per-target branch — the pattern `FilterSelect`
+  // already uses (`selectValue()`), which is why FilterSelect was the one drop-in unaffected.
+  // `touched` keeps the live prop read from overwriting the user once they start typing.
+  draftValue = () => this.touched() ? this.draft() : this.value() != null ? String(this.value()) : '';
   onInput = (e: any) => {
     this.draft.set(e && e.target ? e.target.value : '');
+    this.touched.set(true);
   };
   // Coerce to a Number at commit time. Defensive guard: an empty/whitespace draft
   // commits null rather than NaN (Number('') === 0 is a silent footgun); a
@@ -71,7 +82,7 @@ export class EditorNumber {
   doCommit = () => {
     const __commit = this.commit();
     if (!__commit) return;
-    const raw = this.draft();
+    const raw = this.draftValue();
     if (raw == null || String(raw).trim() === '') {
       __commit(null);
       return;

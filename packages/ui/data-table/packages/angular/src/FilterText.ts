@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, input, signal } from '@angular/core';
+import { Component, ViewEncapsulation, effect, input, signal, untracked } from '@angular/core';
 import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
 
 @Component({
@@ -6,7 +6,7 @@ import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie
   standalone: true,
   template: `
 
-    <input class="rdt-col-filter" part="col-filter" type="text" [attr.aria-label]="rozieAttr(a11yLabel())" [value]="draft()" (input)="onInput($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
+    <input class="rdt-col-filter" part="col-filter" type="text" [attr.aria-label]="rozieAttr(a11yLabel())" [value]="draftValue()" (input)="onInput($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
 
   `,
   styles: [`
@@ -35,26 +35,49 @@ export class FilterText {
    */
   columnLabel = input<string>('');
   draft = signal('');
+  touched = signal(false);
+  private __rozieWatchInitial_0 = true;
 
   constructor() {
-    // Seed the draft once at setup from the incoming value (setup-once, NOT in the
-    // template). Normalize null/undefined to '' so the input value binds to a string.
-    this.draft.set(this.value() != null ? String(this.value()) : '');
+    effect(() => { const __watchVal = (() => this.value())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+      this.touched.set(false);
+    })(); }); });
   }
 
+  // ── C-08 + N-04: the draft is DERIVED from `$props.value`, with a `touched` latch ────────
+  //
+  // C-08 — this component mounts once per rendered filter row and is NOT remounted when the
+  // filter changes, and its draft was seeded setup-once. So a programmatic reset (a "Clear
+  // filters" button, `setFilter(id, '')` from another control, a consumer writing
+  // `columnFilters` directly) moved the real filter while this input went on displaying the old
+  // text: the UI stated a filter that was no longer applied. `FilterSelect` was never affected —
+  // it reads `$props.value` live through `selectValue()`, which is the pattern adopted here.
+  //
+  // N-04 — the setup-once seed was ALSO wrong on Angular from the start: the emitter places
+  // setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+  // DEFAULT, because Angular sets inputs after construction. Measured on the sibling EditorDate,
+  // which opened empty on angular for every row while vue and lit seeded correctly. A derived
+  // read is correct on all six by construction, with no flash and no per-target branch.
+  //
+  // `touched` is what stops the live read from overwriting the user mid-type; the watch clears
+  // it, so an OUTSIDE change always wins and the input follows it. `@input` never moves
+  // `$props.value` (nothing is applied until Enter/blur), so the two can never fight.
+  draftValue = () => this.touched() ? this.draft() : this.value() != null ? String(this.value()) : '';
   // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
   // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
   onInput = (e: any) => {
     this.draft.set(e && e.target ? e.target.value : '');
+    this.touched.set(true);
   };
   // setFilter is a Function prop (default null) — guard before calling.
   applyFilter = () => {
     const __setFilter = this.setFilter();
-    __setFilter && __setFilter(this.columnId(), this.draft());
+    __setFilter && __setFilter(this.columnId(), this.draftValue());
   };
   clearFilter = () => {
     const __setFilter = this.setFilter();
     this.draft.set('');
+    this.touched.set(false);
     __setFilter && __setFilter(this.columnId(), '');
   };
   onKeydown = (e: any) => {

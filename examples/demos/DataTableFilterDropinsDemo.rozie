@@ -45,9 +45,35 @@
 }
 </data>
 
+<script lang="ts">
+// C-08: write the columnFilters model DIRECTLY — never through the drop-ins' own setFilter —
+// so the re-sync being tested is genuinely an outside-in one.
+const setNameFilter = (): void => {
+  $data.columnFilters = [{ id: 'name', value: 'Gam' }]
+}
+const setPriceFilter = (): void => {
+  $data.columnFilters = [{ id: 'price', value: [20, 60] }]
+}
+const clearFilters = (): void => {
+  $data.columnFilters = []
+}
+</script>
+
 <template>
 <div class="dt-filter-demo">
   <h3>DataTable — #filter slot drop-ins</h3>
+
+  <!-- C-08 vehicle: change the column filters from OUTSIDE the drop-in inputs, the way a
+       "Clear filters" button or any other control in a real app does. The drop-ins hold a
+       local draft seeded once at setup, so without a re-sync watch they keep displaying the
+       old text while the table filters by something else. -->
+  <div class="controls">
+    <button type="button" data-testid="set-name-filter" @click="setNameFilter">set name filter = Gam</button>
+    <button type="button" data-testid="set-price-filter" @click="setPriceFilter">set price filter = 20..60</button>
+    <button type="button" data-testid="clear-filters" @click="clearFilters">clear all filters</button>
+    <span class="label">filters:</span>
+    <span class="readout" data-testid="filters-readout">{{ JSON.stringify($data.columnFilters) }}</span>
+  </div>
 
   <div data-testid="filter-table">
     <DataTable
@@ -63,15 +89,22 @@
         <span data-testid="cell-display">{{ value }}</span>
       </template>
 
-      <!-- The #filter scoped slot, dispatched by columnId to the real drop-ins. The
-           PRODUCER declares only { columnId, uniqueValues, minMax, setFilter } (NO
-           column/value — those are optional drop-in props that default to null), so we
-           forward exactly the declared scope. The drop-ins call setFilter(columnId, value). -->
+      <!-- The #filter scoped slot, dispatched by columnId to the real drop-ins. The producer
+           declares { columnId, value, uniqueValues, minMax, setFilter, columnLabel }; the
+           drop-ins call setFilter(columnId, value) to apply.
+
+           C-08 (260921-tsu): `:value` is forwarded to EVERY drop-in, not just FilterSelect.
+           It used to go only to FilterSelect — a stale comment here still claimed the producer
+           did not declare `value` at all — so FilterText and FilterNumberRange received null
+           forever. They could not seed from an existing filter and could not re-sync when one
+           changed from outside, and no fixture could have caught either, because nothing was
+           ever passed for them to sync FROM. -->
       <template #filter="{ columnId, value, uniqueValues, minMax, setFilter, columnLabel }">
         <FilterText
           r-if="columnId === 'name'"
           :columnId="columnId"
           :columnLabel="columnLabel"
+          :value="value"
           :setFilter="setFilter"
         />
         <FilterSelect
@@ -86,6 +119,7 @@
           r-else-if="columnId === 'price'"
           :columnId="columnId"
           :columnLabel="columnLabel"
+          :value="value"
           :setFilter="setFilter"
           :minMax="minMax"
         />

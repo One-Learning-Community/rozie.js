@@ -47,6 +47,7 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
   const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel', 'options', 'autofocus', 'columnLabel']);
 
   const [draft, setDraft] = createSignal('');
+  const [touched, setTouched] = createSignal(false);
   onMount(() => {
     if (local.autofocus) selectElRef?.focus();
   });
@@ -57,16 +58,28 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
 
   // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
   // to '' so the <select> binds to a string.
-  setDraft(local.value != null ? String(local.value) : '');
+  // ── N-04: the draft is DERIVED, not seeded setup-once ───────────────────────────────────
+  // A top-level `$data.draft = <read of $props.x>` is setup-once, and on ANGULAR the emitter
+  // places setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+  // DEFAULT — Angular sets inputs after construction. Measured on the sibling EditorDate: it
+  // opened EMPTY on angular for every row while vue and lit seeded correctly. Reading the prop
+  // through a derived function is correct on all six by construction, with no flash of an empty
+  // control on the fine-grained targets and no per-target branch — the pattern `FilterSelect`
+  // already uses (`selectValue()`), which is why FilterSelect was the one drop-in unaffected.
+  // `touched` keeps the live prop read from overwriting the user once they start typing.
+  function draftValue() {
+    return touched() ? draft() : local.value != null ? String(local.value) : '';
+  }
 
   // Picking/arrow-cycling an option updates the draft only — no commit.
   function onChange(e: any) {
     setDraft(e && e.target ? e.target.value : '');
+    setTouched(true);
   }
 
   // commit/cancel are Function props (default null) — guard before calling.
   function doCommit() {
-    local.commit && local.commit(draft());
+    local.commit && local.commit(draftValue());
   }
   function doCancel() {
     local.cancel && local.cancel();
@@ -103,7 +116,7 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
 
   return (
     <>
-    <select data-editing-cell="" aria-label={rozieAttr(a11yLabel())} ref={(el) => { selectElRef = el as HTMLElement; }} class={"rdt-cell-editor"} value={draft()} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onChange($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onBlur(); }} data-rozie-s-117f1a16="">
+    <select data-editing-cell="" aria-label={rozieAttr(a11yLabel())} ref={(el) => { selectElRef = el as HTMLElement; }} class={"rdt-cell-editor"} value={draftValue()} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onChange($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onBlur(); }} data-rozie-s-117f1a16="">
       <Key each={local.options as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-117f1a16="">{rozieDisplay(opt().label)}</option>}</Key>
     </select>
     </>

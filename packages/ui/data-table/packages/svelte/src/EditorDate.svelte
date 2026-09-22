@@ -50,24 +50,45 @@ let {
 }: Props = $props();
 
 let draft = $state('');
+let touched = $state(false);
 
 let inputEl = $state<HTMLInputElement | undefined>(undefined);
 
-// Seed the draft once from the incoming value (setup-once). A native date input
-// only accepts `YYYY-MM-DD`; normalize null/undefined to ''.
-draft = value != null ? String(value) : '';
+// C-07: the native `<input type="date">` accepts ONLY `YYYY-MM-DD` and renders BLANK for
+// anything else, silently. The seed used to be `String($props.value)`, which is not the ISO
+// coercion this component's own docs: string promises — so a `Date`, an ISO datetime string,
+// an epoch number or a localised string all produced an empty editor. `toIsoDateString`
+// (helpers/dateValue.ts) is the real coercion, pure and unit-tested.
+import { toIsoDateString } from './helpers/dateValue';
+// ── N-04: the draft is DERIVED, not seeded setup-once ───────────────────────────────────
+// A top-level `$data.draft = <read of $props.x>` is setup-once, and on ANGULAR the emitter
+// places setup-once statements in the CONSTRUCTOR, where an `input()` signal still returns its
+// DEFAULT — Angular sets inputs after construction. Measured directly: this editor opened
+// EMPTY on angular for every row, including one whose value was already `YYYY-MM-DD`, while
+// vue and lit seeded correctly. That is why the shape of the incoming value (C-07) could not
+// be the whole story, and why the existing EditorDate coverage never saw either problem: it
+// fills the input before asserting anything.
+//
+// Reading the prop through a derived function instead is correct on all six by construction,
+// with no flash of an empty control on the fine-grained targets and no per-target branch. It
+// is the pattern `FilterSelect` in this same package already uses (`selectValue()`), which is
+// exactly why FilterSelect was the one drop-in unaffected. `touched` is what keeps the user's
+// typing from being overwritten by the live prop read once they have started editing.
+const draftValue = () => touched ? draft : toIsoDateString(value);
 const onInput = (e: any) => {
   draft = e && e.target ? e.target.value : '';
+  touched = true;
 };
 const doCommit = () => {
   // commit the ISO date string the native control already produced.
-  commit && commit(draft);
+  commit && commit(draftValue());
 };
 const doCancel = () => {
   cancel && cancel();
 };
 const onChange = (e: any) => {
   draft = e && e.target ? e.target.value : '';
+  touched = true;
 };
 const onKeydown = (e: any) => {
   if (e && e.key === 'Enter') {
@@ -108,4 +129,4 @@ $effect(() => { const __watchVal = (() => autofocus)(); untrack(() => { if (__ro
 })(__watchVal); }); });
 </script>
 
-<input bind:this={inputEl} class="rdt-cell-editor" type="date" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} value={draft} oninput={($event) => { onInput($event); }} onchange={($event) => { onChange($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-7abe1a56 />
+<input bind:this={inputEl} class="rdt-cell-editor" type="date" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} value={draftValue()} oninput={($event) => { onInput($event); }} onchange={($event) => { onChange($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-7abe1a56 />
