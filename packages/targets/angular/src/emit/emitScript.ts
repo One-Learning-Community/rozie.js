@@ -166,7 +166,14 @@ function initializerHasLeakingSigil(node: t.Node): boolean {
   t.traverseFast(node, (n) => {
     if (found) return;
     if (t.isMemberExpression(n) && t.isIdentifier(n.object)) {
-      if (n.object.name === '$props' || n.object.name === '$data') found = true;
+      // quick 260922-hk4: `$model` too — the rewriter normalizes it to `$props`,
+      // but without it here a `$model.X` initializer skipped the rewrite and leaked.
+      if (
+        n.object.name === '$props' ||
+        n.object.name === '$data' ||
+        n.object.name === '$model'
+      )
+        found = true;
     }
   });
   return found;
@@ -1139,8 +1146,18 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
     // derived-state footgun, uniform across all six targets) — an $onMount
     // seed remains the honest REACTIVE form; this only makes the snapshot
     // form work.
+    // Quick 260922-hk4 (Task 2b) — the initializer lands in a CLASS-FIELD
+    // position (`x = signal(<init>)`), which is real TS in class scope, not an
+    // Angular template: `prefixThis` qualifies reads as `this.value()` /
+    // `this.a()` (template context emitted a bare `value()` — TS2304 + runtime
+    // ReferenceError), and `scriptContext` keeps TS cast syntax valid instead
+    // of lowering it to the template-only `$any()`. Inputs/models are declared
+    // before data fields, so class-field order makes the read well-defined.
     const initText = initializerHasLeakingSigil(s.initializer)
-      ? rewriteTemplateExpression(stripInitializerComments(s.initializer), ir)
+      ? rewriteTemplateExpression(stripInitializerComments(s.initializer), ir, {
+          prefixThis: true,
+          scriptContext: true,
+        })
       : genCode(s.initializer);
     // Quick task 260520-w18 bug class 2/6(iii) — an empty-array `<data>`
     // initializer (`files: []`) types as `signal<never[]>`, so

@@ -145,7 +145,14 @@ function initializerHasLeakingSigil(node: t.Node): boolean {
   t.traverseFast(node, (n) => {
     if (found) return;
     if (t.isMemberExpression(n) && t.isIdentifier(n.object)) {
-      if (n.object.name === '$props' || n.object.name === '$data') found = true;
+      // quick 260922-hk4: `$model` too — the rewriter normalizes it to `$props`,
+      // but without it here a `$model.X` initializer skipped the rewrite and leaked.
+      if (
+        n.object.name === '$props' ||
+        n.object.name === '$data' ||
+        n.object.name === '$model'
+      )
+        found = true;
     }
   });
   return found;

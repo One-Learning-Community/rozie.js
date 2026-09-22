@@ -73,6 +73,44 @@ describe('data-init sigil lowering (Spike-012 R9 make-it-work — $props/$data)'
     }
   });
 
+  // Quick 260922-hk4 (Task 2b) — `$model` in a `<data>` initializer. Every
+  // target's data-initializer gate only recognised `$props`/`$data`, so a
+  // `$model.X` read skipped the sigil rewrite and leaked verbatim on all six.
+  describe('$model member access — { fromModel: $model.open }', () => {
+    const modelSource = rozie('{ fromModel: $model.open }').replace(
+      '{ initial: { type: Number, default: 0 } }',
+      '{ initial: { type: Number, default: 0 }, open: { type: Boolean, default: false, model: true } }',
+    );
+
+    for (const target of ALL_TARGETS) {
+      it(`${target}: does not leak a raw $model sigil into emit`, () => {
+        const code = compileCode(modelSource, target);
+        expect(code).not.toContain('$model');
+      });
+    }
+  });
+
+  // Quick 260922-hk4 (Task 2b) — Vue's `<data>` initializer sits in
+  // `<script setup>`, where refs are NOT auto-unwrapped. The template-context
+  // rewrite emitted `ref(a)` / `ref(open)`, and Vue's `ref(existingRef)`
+  // RETURNS THAT SAME REF — the new field silently aliased its source. The
+  // script-context form reads the value.
+  describe('Vue script-context reads in <data> initializers', () => {
+    it('vue: $data self-reference reads the ref value, not the ref', () => {
+      const code = compileCode(rozie('{ a: 1, b: $data.a }'), 'vue');
+      expect(code).toContain('const b = ref(a.value);');
+    });
+
+    it('vue: a model-prop read reads the defineModel ref value', () => {
+      const src = rozie('{ fromModel: $props.open }').replace(
+        '{ initial: { type: Number, default: 0 } }',
+        '{ initial: { type: Number, default: 0 }, open: { type: Boolean, default: false, model: true } }',
+      );
+      const code = compileCode(src, 'vue');
+      expect(code).toContain('const fromModel = ref(open.value);');
+    });
+  });
+
   describe('$data self-reference — { a: 1, b: $data.a }', () => {
     const dataBody = '{ a: 1, b: $data.a }';
 

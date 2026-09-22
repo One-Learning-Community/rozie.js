@@ -139,7 +139,14 @@ function initializerHasLeakingSigil(node: t.Node): boolean {
   t.traverseFast(node, (n) => {
     if (found) return;
     if (t.isMemberExpression(n) && t.isIdentifier(n.object)) {
-      if (n.object.name === '$props' || n.object.name === '$data') found = true;
+      // quick 260922-hk4: `$model` too — the rewriter normalizes it to `$props`,
+      // but without it here a `$model.X` initializer skipped the rewrite and leaked.
+      if (
+        n.object.name === '$props' ||
+        n.object.name === '$data' ||
+        n.object.name === '$model'
+      )
+        found = true;
     }
   });
   return found;
@@ -808,8 +815,13 @@ function emitDataRefs(ir: IRComponent, imports: VueImportCollector): string[] {
     // derived-state footgun, uniform across all six targets) — an `$onMount`
     // seed remains the honest REACTIVE form; this only makes the snapshot
     // form work.
+    // Quick 260922-hk4 (Task 2b) — the initializer is `<script setup>` code,
+    // where refs are NOT auto-unwrapped: render in SCRIPT context so `$data.a`
+    // / a model `$props.x` read `.value`. Template context emitted `ref(a)`,
+    // and Vue's `ref(existingRef)` returns that SAME ref — the new field
+    // silently aliased its source.
     const initText = initializerHasLeakingSigil(s.initializer)
-      ? rewriteTemplateExpression(stripInitializerComments(s.initializer), ir)
+      ? rewriteTemplateExpression(stripInitializerComments(s.initializer), ir, true)
       : genCode(s.initializer);
     lines.push(`const ${s.name} = ref${refTypeArg}(${initText});`);
   }

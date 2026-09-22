@@ -146,6 +146,50 @@ ${PROPS}
   });
 });
 
+// ── <data> initializers + IIFE (quick 260922-hk4 Task 2b) ───────────────────
+
+describe('setupOncePropReadValidator — <data> initializers and IIFEs', () => {
+  const dataWrap = (data: string, script = `const x = 1`) =>
+    wrap(script, `<div>{{ $data.draft }}</div>`, `<data>\n${data}\n</data>`);
+
+  it('`{ fromData: $props.value }` → 1 warning naming the <data> initializer, Angular and Lit', () => {
+    const src = dataWrap(`{ draft: '', fromData: $props.value }`);
+    const hits = roz150(src);
+    expect(hits.length).toBe(1);
+    expect(hits[0]!.severity).toBe('warning');
+    expect(hits[0]!.message).toContain('<data>');
+    expect(hits[0]!.message).toContain('Angular');
+    expect(hits[0]!.message).toContain('Lit');
+    expect(hits[0]!.message).toContain('() => $props.value');
+    expect(src.slice(hits[0]!.loc.start, hits[0]!.loc.end)).toBe('$props.value');
+  });
+
+  it('`{ fromModel: $model.open }` → 1', () => {
+    expect(roz150(dataWrap(`{ draft: '', fromModel: $model.open }`)).length).toBe(1);
+  });
+
+  it('`{ fromData: () => $props.value }` → 0 (deferred)', () => {
+    expect(roz150(dataWrap(`{ draft: '', fromData: () => $props.value }`))).toEqual([]);
+  });
+
+  it('a factory reading props only inside a nested function → 0', () => {
+    const data = `{ draft: '', handlers: { get: () => $props.value, run() { return $props.a } } }`;
+    expect(roz150(dataWrap(data))).toEqual([]);
+  });
+
+  it('an IIFE in a <data> initializer does not defer → 1', () => {
+    expect(roz150(dataWrap(`{ draft: '', fromData: (() => $props.value)() }`)).length).toBe(1);
+  });
+
+  it('a top-level <script> IIFE does not defer → 1', () => {
+    expect(roz150(wrap(`;(() => { $data.draft = $props.value })()`)).length).toBe(1);
+  });
+
+  it('a callback passed to a call (not an IIFE) still defers → 0', () => {
+    expect(roz150(wrap(`$onMount(() => { $data.draft = $props.value })`))).toEqual([]);
+  });
+});
+
 // ── compile() — the warning never blocks ────────────────────────────────────
 
 describe('setupOncePropReadValidator — warning never blocks compile', () => {

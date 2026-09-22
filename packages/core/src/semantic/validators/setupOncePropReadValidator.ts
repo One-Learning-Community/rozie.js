@@ -32,14 +32,22 @@
  *   - a non-computed `$props.<x>` / `$model.<x>` READ in `<script>` with NO
  *     enclosing function (Program top level, including inside a top-level
  *     `if` / `for` / block, and inside a top-level declaration initializer).
- *   Deduplicated per (top-level statement, sigil.member); reported at the
- *   first read.
+ *   - a non-computed `$props.<x>` / `$model.<x>` READ inside a `<data>`
+ *     initializer, outside any nested function (quick 260922-hk4 Task 2b). The
+ *     data field is a class field on Angular (`x = signal(this.value())`) and
+ *     Lit (`_x = signal(this.value)`), initialized before consumer-bound
+ *     inputs arrive — the same default-read.
+ *   - an immediately-invoked function (IIFE) does NOT defer: its body runs
+ *     at the same point as the code around it.
+ *   Deduplicated per (top-level statement / `<data>` field, sigil.member);
+ *   reported at the first read.
  *
  * ── DO-NOT-FLAG ──────────────────────────────────────────────────────────────
- *   - any read inside a function: arrow, function expression/declaration,
- *     object or class method, and therefore every `$onMount` / `$onUnmount` /
- *     `$onUpdate` / `$watch` / `$computed` callback — `path.getFunctionParent()
- *     !== null` covers all of them (same discriminator as ROZ149);
+ *   - any read inside a function that is not immediately invoked: arrow,
+ *     function expression/declaration, object or class method, and therefore
+ *     every `$onMount` / `$onUnmount` / `$onUpdate` / `$watch` / `$computed`
+ *     callback (the ROZ149 `getFunctionParent()` discriminator, refined to
+ *     skip IIFE callees);
  *   - reads inside a class body (a class-field initializer is not setup code);
  *   - the TARGET of a write (`$props.x = …`, `$props.x++`) — write validators
  *     (ROZ200 / ROZ203) own writes;
@@ -74,6 +82,25 @@ function propMember(node: t.MemberExpression): { sigil: string; member: string }
   if (!t.isIdentifier(node.object) || !PROP_SIGILS.has(node.object.name)) return null;
   if (!t.isIdentifier(node.property)) return null;
   return { sigil: node.object.name, member: node.property.name };
+}
+
+/**
+ * True when some enclosing function DEFERS the read — i.e. a function that is
+ * not the callee of an immediate call. An IIFE (`(() => …)()`) runs where it
+ * stands, so it is looked through.
+ */
+function isDeferred(path: NodePath): boolean {
+  let fn = path.getFunctionParent();
+  while (fn !== null) {
+    const parent = fn.parentPath;
+    const isIife =
+      parent !== null &&
+      (parent.isCallExpression() || parent.isOptionalCallExpression()) &&
+      parent.node.callee === fn.node;
+    if (!isIife) return true;
+    fn = fn.parentPath?.getFunctionParent() ?? null;
+  }
+  return false;
 }
 
 /** True when `path` is the target of a write (`= / op=` LHS, or `++`/`--` operand). */
@@ -116,6 +143,14 @@ function buildMessage(sigil: string, member: string, lit: boolean): string {
   );
 }
 
+function buildDataMessage(sigil: string, member: string): string {
+  const read = `${sigil}.${member}`;
+  return (
+    `A <data> initializer reads \`${read}\`. On Angular and Lit the data field is a class field, initialized before consumer-bound inputs arrive, so it sees the input's default — the value the consumer bound is not available yet.` +
+    ` Read the prop through a derived function in <script> instead (\`const ${member}Value = () => ${read}\`), which is correct on all six targets with no flash on the fine-grained ones.`
+  );
+}
+
 const HINT =
   "Reference implementation: FilterSelect.rozie's `selectValue()` in @rozie-ui/data-table. When the value is also locally editable, keep a local draft plus a `touched` latch so the live read does not overwrite the user mid-edit (the data-table editor drop-ins' `draftValue()` shape). Code only ever compiled for Vue/React/Svelte/Solid may ignore this warning.";
 
@@ -125,36 +160,70 @@ const HINT =
  */
 export function runSetupOncePropReadValidator(ast: RozieAST, diagnostics: Diagnostic[]): void {
   try {
-    if (!ast.script) return;
+    validateDataInitializers(ast, diagnostics);
+    validateScript(ast, diagnostics);
+  } catch {
+    // D-08: collected-not-thrown — a validator crash must never fail a compile.
+  }
+}
+
+/** `<data>` initializers — one dedupe scope per top-level data field. */
+function validateDataInitializers(ast: RozieAST, diagnostics: Diagnostic[]): void {
+  if (!ast.data) return;
+  for (const prop of ast.data.expression.properties) {
+    if (!t.isObjectProperty(prop) || !t.isExpression(prop.value)) continue;
     const seen = new Set<string>();
-    const stmtIds = new Map<t.Node, number>();
-    traverse(ast.script.program, {
+    const wrapped = t.file(t.program([t.expressionStatement(prop.value)]));
+    traverse(wrapped, {
       MemberExpression(path: NodePath<t.MemberExpression>) {
         const hit = propMember(path.node);
         if (hit === null) return;
-        if (path.getFunctionParent() !== null) return; // deferred by an enclosing function.
-        if (path.findParent((p) => p.isClassBody()) !== null) return; // class-field initializer.
-        if (isWriteTarget(path)) return; // writes are ROZ200/ROZ203's concern.
-        const stmt = topLevelStatement(path);
-        if (stmt === null) return;
-        let id = stmtIds.get(stmt);
-        if (id === undefined) {
-          id = stmtIds.size;
-          stmtIds.set(stmt, id);
-        }
-        const key = `${id}:${hit.sigil}.${hit.member}`;
+        if (isDeferred(path)) return;
+        if (isWriteTarget(path)) return;
+        const key = `${hit.sigil}.${hit.member}`;
         if (seen.has(key)) return;
         seen.add(key);
         diagnostics.push({
           code: RozieErrorCode.SETUP_ONCE_PROP_READ,
           severity: 'warning',
-          message: buildMessage(hit.sigil, hit.member, inTopLevelDeclarationInit(path)),
+          message: buildDataMessage(hit.sigil, hit.member),
           loc: { start: path.node.start ?? 0, end: path.node.end ?? 0 },
           hint: HINT,
         });
       },
     });
-  } catch {
-    // D-08: collected-not-thrown — a validator crash must never fail a compile.
   }
+}
+
+/** `<script>` Program — setup-once code outside any deferring function. */
+function validateScript(ast: RozieAST, diagnostics: Diagnostic[]): void {
+  if (!ast.script) return;
+  const seen = new Set<string>();
+  const stmtIds = new Map<t.Node, number>();
+  traverse(ast.script.program, {
+    MemberExpression(path: NodePath<t.MemberExpression>) {
+      const hit = propMember(path.node);
+      if (hit === null) return;
+      if (isDeferred(path)) return; // deferred by an enclosing (non-IIFE) function.
+      if (path.findParent((p) => p.isClassBody()) !== null) return; // class-field initializer.
+      if (isWriteTarget(path)) return; // writes are ROZ200/ROZ203's concern.
+      const stmt = topLevelStatement(path);
+      if (stmt === null) return;
+      let id = stmtIds.get(stmt);
+      if (id === undefined) {
+        id = stmtIds.size;
+        stmtIds.set(stmt, id);
+      }
+      const key = `${id}:${hit.sigil}.${hit.member}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      diagnostics.push({
+        code: RozieErrorCode.SETUP_ONCE_PROP_READ,
+        severity: 'warning',
+        message: buildMessage(hit.sigil, hit.member, inTopLevelDeclarationInit(path)),
+        loc: { start: path.node.start ?? 0, end: path.node.end ?? 0 },
+        hint: HINT,
+      });
+    },
+  });
 }
