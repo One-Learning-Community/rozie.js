@@ -40,6 +40,7 @@ import { runContextValidator } from './validators/contextValidator.js';
 import { runEmitNameValidator } from './validators/emitNameValidator.js';
 import { runRefsPreMountValidator } from './validators/refsPreMountValidator.js';
 import { runPortalsPreMountValidator } from './validators/portalsPreMountValidator.js';
+import { runSetupOncePropReadValidator } from './validators/setupOncePropReadValidator.js';
 import { runStructuredCloneReactiveValidator } from './validators/structuredCloneReactiveValidator.js';
 import { runExposeReservedMemberValidator } from './validators/exposeReservedMemberValidator.js';
 import { runReservedNameCollisionValidator } from './validators/reservedNameCollisionValidator.js';
@@ -90,6 +91,12 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   // dependency. Registered immediately adjacent to ROZ123's runner so the
   // two pre-mount validators read together.
   runPortalsPreMountValidator(ast, diagnostics);
+  // Quick 260922-hk4 — ROZ150 (warning): a setup-once <script> read of
+  // $props.<x>/$model.<x> (no enclosing function) sees the input DEFAULT on
+  // Angular (constructor / class field) and, for a top-level declaration
+  // initializer, on Lit. Cross-target parity advisory, never blocks a build.
+  // No bindings dependency.
+  runSetupOncePropReadValidator(ast, diagnostics);
   // Phase 45 (D-02) — ROZ135 (warning): structuredClone($data.x/$props.x/$model.x)
   // throws on Vue reactive()/Svelte $state proxies — steer authors to $clone(x).
   // No binding dependency.

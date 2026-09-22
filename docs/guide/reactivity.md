@@ -112,6 +112,30 @@ Read a `$computed` bare (template, interpolation, simple expression) and the acc
 
 Reading `$refs` inside a `$computed` body is a compile error (`ROZ123`) for the same reason it is in a `$watch` getter — the computed evaluates eagerly, before the ref is populated. See [`$refs`](#refs-derived-from-ref) below.
 
+## Reading props in setup-once code (ROZ150)
+
+Top-level `<script>` statements run **once**, at setup. On Vue, React, Svelte, and Solid the consumer's bound props are already there at that point. On **Angular** that code runs in the constructor, or as a class-field initializer, which is before Angular sets inputs. On **Lit** a top-level declaration initializer (`const snap = $props.value`) is also a class field. In both of those places a setup-once read of `$props` or `$model` sees the prop's **default**, not the value the consumer bound:
+
+```rozie
+<script>
+// ⚠️ ROZ150 — on Angular this seeds from the default, not the bound value
+$data.draft = $props.value
+</script>
+```
+
+Read the prop through a derived function instead. A function reads live on every call, so it is correct on all six targets, with no flash on the fine-grained ones. `FilterSelect.rozie`'s `selectValue()` in `@rozie-ui/data-table` is the reference shape:
+
+```rozie
+<script>
+// ✅ A derived read — correct on all six
+const selectValue = () => ($props.value != null ? String($props.value) : '')
+</script>
+```
+
+When the value is also locally editable, keep a local draft plus a `touched` latch, so the live read does not overwrite the user mid-edit. This is the `draftValue()` shape the data-table editor drop-ins use: `const draftValue = () => ($data.touched ? $data.draft : $props.value)`.
+
+Reads inside any function body (`$onMount`, `$watch`, `$computed`, helpers) and in the template are live and never flagged. `ROZ150` is a **warning** and never blocks a build: it is about cross-target parity, so a component compiled only for Vue, React, Svelte, or Solid may ignore it.
+
 ## `$memo(fn, keyFn)` — a memoized plain function, uniform on all six
 
 The plain-function escape hatch above (`## $computed` § "When you need to alias and index") trades memoization for a single, target-uniform access form — fine for a cheap filter, wasteful for an O(N) re-map called on every keystroke or scroll tick. `$memo(fn, keyFn)` gives you both: a plain function you call with `()` everywhere (uniform on all six, safe to alias/index/iterate), memoized against a **reference-keyed** cache so it only re-runs `fn` when `keyFn`'s inputs actually change identity:

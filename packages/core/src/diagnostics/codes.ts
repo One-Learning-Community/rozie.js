@@ -630,6 +630,26 @@ export const RozieErrorCode = {
   // re-teach the tax that fix removes.
   PORTAL_CALL_BEFORE_MOUNT: 'ROZ149', // error — $portals.<name> evaluated during setup/render (script Program top level, a $computed body, a $watch GETTER, or a template binding/directive/r-for-iterable/interpolation) — the portal anchor does not exist yet, so the call can only ever return an inert { update(){}, dispose(){} } handle. Move the call into $onMount, $onUpdate, a $watch CALLBACK, or an ordinary function body invoked post-mount.
 
+  // Quick 260922-hk4 — ROZ150 is the next free code after ROZ149 in the 100
+  // semantic-binding cluster (N-04, HANDOFF-EMITTER.md; owner decision
+  // "DIAGNOSTIC ONLY"). A top-level `<script>` statement is setup-once code.
+  // On Angular it runs in the constructor (statements) or as a class-field
+  // initializer (declarations) — both BEFORE Angular sets inputs, so a
+  // `$props.<x>` / `$model.<x>` read there returns the input's DEFAULT. On Lit
+  // a top-level declaration initializer is likewise a class field (measured);
+  // Lit's statements run in firstUpdated() and are fine. Vue, React, Svelte and
+  // Solid are correct. Real instance: EditorDate opened EMPTY on Angular for
+  // every row (data-table, fixed at source in 52d279314 — the corpus now has
+  // zero such reads). Scope fence: reads inside ANY function body ($onMount,
+  // $watch, $computed, helpers, methods) are live and never flagged; template
+  // and <listeners> reads are never walked; writes are ROZ200/ROZ203's.
+  // Severity: warning, because this is about cross-target PARITY, not
+  // validity — a Vue-only author has done nothing wrong. It is not a codegen
+  // change because moving setup-once statements to ngOnInit would change WHEN
+  // every setup-once statement runs on Angular, library-wide, for a pattern
+  // the shipped corpus does not use. See setupOncePropReadValidator.ts.
+  SETUP_ONCE_PROP_READ: 'ROZ150', // warning (suppressible) — setup-once <script> code (no enclosing function) reads $props.<x>/$model.<x>; on Angular (and Lit, for a top-level declaration initializer) that runs before consumer-bound inputs arrive, so it sees the default. Read it through a derived function (`const xValue = () => $props.x`) instead.
+
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // error — SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
   WRITE_TO_REF: 'ROZ201', // error — $refs.foo = … (refs are read-only DOM-element wrappers)
