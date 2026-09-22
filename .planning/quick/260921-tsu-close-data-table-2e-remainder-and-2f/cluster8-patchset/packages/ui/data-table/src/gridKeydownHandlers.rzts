@@ -1,0 +1,660 @@
+// THE single delegated keydown handler (RESEARCH "Single delegated keydown handler"). Wired
+// as ONE keydown listener on the <table> root — NOT per-cell, NOT with .stop/.prevent modifiers (the
+// Angular .stop-in-@for hoist bug, F5/ROZ723). e.preventDefault() is called IMPERATIVELY for
+// handled keys. Each nav helper writes $data and RETURNS the fresh post-write locals; those
+// SAME locals feed BOTH focusActiveCell AND the activecell-change emit (no $data re-read).
+const onGridKeyDown = (e) => {
+  if (!isGrid() || !e) return
+  const key = e.key
+  // Editing mode (phase 51, Pitfall 5): an OPEN editor owns Tab/Enter/Escape (+ caret keys)
+  // via its local onEditorKeyDown handler. This top check (BEFORE activeInControl) returns
+  // early so the grid nav keymap never hijacks an arrow/Tab/Enter while editing — the three
+  // modes (editing / in-control / navigation) stay mutually exclusive and ordered.
+  if ($data.editingRow >= 0) return
+  // Full-row edit (phase 51 req-6): an OPEN row editor owns Enter/Escape/Tab via the cell
+  // editors' local onEditorKeyDown. Return early (before activeInControl) so the grid nav
+  // keymap never hijacks while a row is in edit — the three modes stay mutually exclusive.
+  if ($data.editingRowIndex != null) return
+  // Interaction mode (D-08): Tab cycles within the cell, Escape exits. Focus containment.
+  if ($data.activeInControl) {
+    if (key === 'Escape') {
+      e.preventDefault()
+      $data.activeInControl = false
+      // Return focus to the OWNING cell (no move happened) — pass the current indices
+      // explicitly (the React-emitted seam types both params as required; a zero-arg call
+      // is TS2554). Reading $data here is safe: no write to activeRow/activeColIndex precedes it.
+      focusActiveCell($data.activeRow, $data.activeColIndex)
+    } else if (key === 'Tab') {
+      e.preventDefault()
+      cycleWithinCell(currentCellEl(), !e.shiftKey)
+    }
+    return
+  }
+  // WR-05: in navigation mode, only hijack arrow/Home/End/Page keys when focus is ON a
+  // grid cell. An inner control reached WITHOUT Enter (e.g. a header filter <input> the
+  // user clicked into directly, or a per-cell control tabbed/clicked to) must keep its
+  // NATIVE key behavior — caret movement, option cycling, etc. e.target is the deepest
+  // focused node; if it is not itself a [data-grid-cell], let the event pass through.
+  const tgt = e.target
+  if (!tgt || !tgt.hasAttribute || !tgt.hasAttribute('data-grid-cell')) return
+  // Navigation mode — compute fresh locals, write $data inside the helper, thread them out.
+  // nextIsHeader is threaded alongside nextRow/nextCol so the focus seam never re-reads the
+  // async-stale $data.activeIsHeader after a header crossing (React ROZ138 / Angular signal —
+  // plan-01 Pitfall 2). moveRow returns the fresh { row, isHeader }; every other branch lands
+  // in the body (isHeader = false). WR-06: snapshot the PRE-move indices so the emit below
+  // fires ONLY on a real move (a clamped no-op edge move leaves them identical).
+  const prevRow = $data.activeRow
+  const prevCol = $data.activeColIndex
+  const prevIsHeader = $data.activeIsHeader
+  const prevLevel = $data.activeHeaderLevel
+  let nextRow = prevRow
+  let nextCol = prevCol
+  let nextIsHeader = prevIsHeader
+  // B12: the fresh post-write header LEVEL (the grouped-header analog of nextIsHeader) is
+  // threaded into the focus seam so a leaf↔parent header move lands focus at the correct
+  // level. moveRow returns it; the non-vertical branches keep the pre-move level.
+  let nextLevel = prevLevel
+  // ── Cell-range extend (phase 51 req-7 / D-07) — Shift+Arrow extends the rectangle from
+  // the active cell's leading edge. Tested BEFORE the plain arrows (a Shift+Arrow must NOT
+  // fall through to a plain navigation move). Body cells only (no range from a header). The
+  // extendRange call owns focus + the range-change emit, so return immediately. ──────────
+  // ── §8 (260709-3qt) Ctrl/Cmd+Arrow — jump the active cell to the data-region edge (plain
+  // Ctrl) or EXTEND the range to that edge (Ctrl+Shift). Body cells only (a header-active
+  // Ctrl+Arrow falls through to the plain-arrow branches unchanged). Tested BEFORE the
+  // Shift+Arrow / plain-arrow cascade so the modifier combo is matched first. preventDefault
+  // suppresses the browser's native Ctrl+Arrow scroll/word-jump. The Ctrl+Shift branch owns
+  // extendRange's focus + range-change emit (returns); the plain-Ctrl branch sets the fresh
+  // nextRow/nextCol locals and FALLS THROUGH to the shared focus seam (like Ctrl+Home/End). ──
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && !$data.activeIsHeader && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
+    e.preventDefault()
+    // B-04: measured from the range's FOCUS corner, which is what extendRange moves — not
+    // from the active cell, which a drag-select or Ctrl+A leaves somewhere else entirely.
+    if (key === 'ArrowUp') extendRange(-rangeFocusRow(), 0)
+    else if (key === 'ArrowDown') extendRange((bodyRowCount() - 1) - rangeFocusRow(), 0)
+    else if (key === 'ArrowLeft') extendRange(0, -rangeFocusCol())
+    else extendRange(0, (visibleColCount() - 1) - rangeFocusCol())
+    return
+  }
+  else if ((e.ctrlKey || e.metaKey) && !$data.activeIsHeader && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
+    e.preventDefault()
+    clearRange()
+    if (key === 'ArrowUp') { nextRow = gotoRowEdge(false); nextIsHeader = false }
+    else if (key === 'ArrowDown') { nextRow = gotoRowEdge(true); nextIsHeader = false }
+    else if (key === 'ArrowLeft') { nextCol = gotoColEdge(false) }
+    else { nextCol = gotoColEdge(true) }
+  }
+  else if (key === 'ArrowRight' && e.shiftKey && !$data.activeIsHeader) { e.preventDefault(); extendRange(0, 1); return }
+  else if (key === 'ArrowLeft' && e.shiftKey && !$data.activeIsHeader) { e.preventDefault(); extendRange(0, -1); return }
+  else if (key === 'ArrowDown' && e.shiftKey && !$data.activeIsHeader) { e.preventDefault(); extendRange(1, 0); return }
+  else if (key === 'ArrowUp' && e.shiftKey && !$data.activeIsHeader) { e.preventDefault(); extendRange(-1, 0); return }
+  else if (key === 'ArrowRight') { e.preventDefault(); clearRange(); nextCol = moveCol(1) }
+  else if (key === 'ArrowLeft') { e.preventDefault(); clearRange(); nextCol = moveCol(-1) }
+  else if (key === 'ArrowDown') { e.preventDefault(); clearRange(); const m = moveRow(1); nextRow = m.row; nextCol = m.col; nextIsHeader = m.isHeader; nextLevel = m.level }
+  else if (key === 'ArrowUp') { e.preventDefault(); clearRange(); const m = moveRow(-1); nextRow = m.row; nextCol = m.col; nextIsHeader = m.isHeader; nextLevel = m.level }
+  else if (key === 'PageDown') { e.preventDefault(); const m = moveRow(GRID_PAGE_STEP); nextRow = m.row; nextCol = m.col; nextIsHeader = m.isHeader; nextLevel = m.level }
+  else if (key === 'PageUp') { e.preventDefault(); const m = moveRow(-GRID_PAGE_STEP); nextRow = m.row; nextCol = m.col; nextIsHeader = m.isHeader; nextLevel = m.level }
+  else if (key === 'Home') {
+    e.preventDefault()
+    if (e.ctrlKey || e.metaKey) { const s = gotoStart(); nextRow = s.row; nextCol = s.col; nextIsHeader = false }
+    else { nextCol = gotoColEdge(false) }
+  }
+  else if (key === 'End') {
+    e.preventDefault()
+    if (e.ctrlKey || e.metaKey) { const en = gotoEnd(); nextRow = en.row; nextCol = en.col; nextIsHeader = false }
+    else { nextCol = gotoColEdge(true) }
+  }
+  // ── Clipboard (phase 51 req-8 / D-03) — Ctrl/Cmd+C copies the range as TSV; Ctrl/Cmd+V
+  // pastes TSV into the range under the D-03 skip rule. Placed BEFORE the printable-key
+  // edit-entry branch (which excludes ctrl/meta) so the shortcuts are never swallowed as a
+  // type-to-edit char. Copy/paste act on the whole range (or the single active cell). B11:
+  // gated by clipboardActiveAllowed() (== !activeIsHeader) so a header-active Ctrl+C/Ctrl+V
+  // falls through to NATIVE behavior — never preventDefault'd, never a silent body mutation
+  // (copyRange/pasteRange also self-guard; the verb guard is what plan 63-09's Cut reuses). ──
+  // B-07: `clipboardWriteAvailable()` / `clipboardReadAvailable()` are part of the BRANCH
+  // CONDITION, not a guard inside the verb. preventDefault ran first and copyRange/pasteRange
+  // then returned early when `navigator.clipboard` was absent — an insecure `http://` origin, a
+  // permissions policy, an older embedded webview — so the browser's own copy/paste was
+  // suppressed and nothing replaced it: Ctrl+C did nothing whatsoever. Falling through leaves
+  // the native default in charge, which is the only correct behaviour when we cannot act.
+  else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed() && clipboardWriteAvailable()) {
+    e.preventDefault(); copyRange(); return
+  }
+  else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed() && clipboardReadAvailable()) {
+    e.preventDefault(); pasteRange(); return
+  }
+  // ── C3 (phase 63 wave-9) — Ctrl/Cmd+X CUTS the range: copy the range as TSV then clear the
+  // source cells through the SAME write-funnel as paste (one writeData). Same B11 gate as
+  // Ctrl+C/Ctrl+V (clipboardActiveAllowed) so a header-active Ctrl+X falls through to NATIVE cut
+  // and never silently clears a body cell (cutRange also self-guards). Placed beside the C/V
+  // shortcuts, BEFORE the printable-key edit-entry branch (which excludes ctrl/meta). ──
+  // B-07 applies to Cut too, and gating it on WRITE availability is deliberate: a cut that
+  // cannot copy is data destruction with nothing on the clipboard to paste back.
+  else if ((key === 'x' || key === 'X') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed() && clipboardWriteAvailable()) {
+    e.preventDefault(); cutRange(); return
+  }
+  // ── 260709-8ct (grid-wide undo/redo) — Ctrl/Cmd+Z undoes; Ctrl/Cmd+Y OR Ctrl/Cmd+Shift+Z
+  // redoes. Undoable-gated (`$props.undoable`) — when off, neither preventDefault nor
+  // undo()/redo() runs, so a shipped grid with undoable unset is byte-behaviorally unchanged
+  // (the browser's own native undo/redo, if any, still fires). NOT clipboardActiveAllowed-
+  // gated (unlike Ctrl+C/V/X/Delete above): undo/redo is GRID-WIDE and must work regardless of
+  // whether a header or body cell is active. Tested the Ctrl+Shift+Z (redo) combo BEFORE the
+  // plain Ctrl+Z (undo) branch so a Shift+Z never falls into undo.
+  else if ((key === 'z' || key === 'Z') && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+    if ($props.undoable) { e.preventDefault(); redo(); return }
+  }
+  else if ((key === 'y' || key === 'Y') && (e.ctrlKey || e.metaKey)) {
+    if ($props.undoable) { e.preventDefault(); redo(); return }
+  }
+  else if ((key === 'z' || key === 'Z') && (e.ctrlKey || e.metaKey)) {
+    if ($props.undoable) { e.preventDefault(); undo(); return }
+  }
+  // ── §7 (260709-3qt) — Delete/Backspace CLEARS the active cell / range through the SAME
+  // write-funnel as Cut (applyGridToRange of an empty grid), MINUS the clipboard copy. B11-gated
+  // by clipboardActiveAllowed so a header-active Delete/Backspace falls through to NATIVE behavior
+  // (never a silent body mutation). The top-of-handler editing early-returns + the line-39
+  // data-grid-cell guard keep this to navigation mode; applyGridToRange skips read-only/non-editable
+  // cells. Reversible via Ctrl+Z when `undoable` is on (260709-8ct) — clearActiveRange funnels
+  // through the SAME writeData seam undo/redo replay through, so no separate inverse machinery
+  // is needed here.
+  else if ((key === 'Delete' || key === 'Backspace') && clipboardActiveAllowed()) {
+    e.preventDefault(); clearActiveRange(); return
+  }
+  // ── §8 (260709-3qt) — Ctrl/Cmd+A selects the WHOLE BODY range (drives the same range corners
+  // shift+arrow uses). preventDefault ALWAYS so the page is never selected in grid mode; only a
+  // body-active Ctrl+A builds the range (a header-active Ctrl+A is a no-op — selects nothing). ──
+  else if ((key === 'a' || key === 'A') && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault(); if (!$data.activeIsHeader) selectAllBody(); return
+  }
+  // ── B-15: the APG grid pattern's row/column selection keys, and Escape in NAVIGATION mode.
+  // All three were simply absent. They are placed HERE, before every `key === ' '` branch
+  // below, because the boolean in-place toggle matches a bare `' '` without excluding
+  // modifiers — so a Shift+Space on a checkbox cell would have toggled the checkbox instead
+  // of selecting the row, and Ctrl+Space likewise.
+  //
+  // Shift+Space selects the ROW (table-core's own rowSelection slice, through the row's
+  // toggleSelected — the same funnel the per-row checkbox uses, so the change event and the
+  // two-way model behave identically). A no-op when selectionMode is 'none', which is the
+  // honest behaviour: there is no row selection to make.
+  //
+  // Ctrl+Space selects the COLUMN as a full-height CELL RANGE rather than inventing a third
+  // selection concept — the same corners Ctrl+A and shift+arrow drive, so Ctrl+C / Ctrl+X /
+  // Delete / the fill handle all act on it unchanged.
+  //
+  // Escape in navigation mode collapses the range. In-control mode already consumed Escape at
+  // the top of this handler; in navigation mode it did nothing at all, leaving a user who had
+  // shift-arrowed out a rectangle with no keyboard way to drop it short of an arrow key, which
+  // also MOVES. Only preventDefault'd when there is a range to clear, so a consumer's own
+  // Escape handling on a table with no selection is untouched.
+  else if (key === ' ' && e.shiftKey && !e.ctrlKey && !e.metaKey && !$data.activeIsHeader) {
+    e.preventDefault()
+    if ($props.selectionMode !== 'none') {
+      const selRow = ($data.rows || [])[$data.activeRow]
+      if (selRow && selRow.toggleSelected) selRow.toggleSelected(!rowIsSelected(selRow))
+    }
+    return
+  }
+  else if (key === ' ' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !$data.activeIsHeader) {
+    e.preventDefault(); selectActiveColumn(); return
+  }
+  else if (key === 'Escape') {
+    if (rangeActive || $data.rangeAnchor != null) { e.preventDefault(); clearRange() }
+    return
+  }
+  // ── Full-row edit entry (phase 51 req-6 / D-06) — Shift+F2 on an editable active cell puts
+  // EVERY editable cell in the active row into edit at once. Tested BEFORE the plain F2 branch
+  // (a Shift+F2 must NOT fall through to single-cell F2). Shift+F2 was chosen for the lowest
+  // collision risk against the Phase-49 keymap. Gated by isActiveCellEditable() (the row has
+  // at least the active editable column); a non-editable active cell falls through unchanged.
+  else if (key === 'F2' && e.shiftKey && isActiveCellEditable()) {
+    e.preventDefault(); beginRowEdit(($data.rows || [])[$data.activeRow]); return
+  }
+  // ── Boolean in-place toggle (design doc 2026-07-05, Change 1) — a built-in
+  // editor:'checkbox' cell toggles + commits INSTANTLY on Space/Enter/F2, no editor opens
+  // (the spreadsheet-standard shape for a two-state value). Tested BEFORE the generic
+  // Enter/F2 edit-entry branch below (a checkbox cell must never fall into the open-an-
+  // editor ceremony) and gated the SAME way (isActiveCellEditable) plus editorTypeOf ===
+  // 'checkbox'. Full-row edit mode is unaffected — the editingRowIndex early return at the
+  // top of onGridKeyDown already excludes it.
+  else if ((key === 'Enter' || key === 'F2' || key === ' ') && isActiveCellEditable() && editorTypeOf(activeCellColumnId()) === 'checkbox') {
+    e.preventDefault(); toggleActiveBooleanCell(); return
+  }
+  // ── Edit-entry (phase 51 req-1/3, D-05) — BEFORE the reserved enterControl branch.
+  // Gated by isActiveCellEditable(): a non-editable active cell falls through to
+  // enterControl (the Phase-49 behavior is unchanged). F2/Enter seed the EXISTING value
+  // (in-place edit); a single printable char (no Ctrl/Meta/Alt) REPLACES the value.
+  else if ((key === 'Enter' || key === 'F2') && isActiveCellEditable()) {
+    e.preventDefault(); beginEdit($data.activeRow, $data.activeColIndex, null); return
+  }
+  else if (isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && editorTypeOf(activeCellColumnId()) !== 'checkbox') {
+    // B24: a printable key only SEEDS a draft on a free-text editor (text/number). A
+    // checkbox/select/date editor must NOT take the typed char as its value (it would
+    // force-check the checkbox, seed a garbage select option, or corrupt the date) — open
+    // those with the EXISTING value (seed=null), identical to the F2/Enter in-place entry.
+    // Checkbox is excluded entirely (type-to-edit disabled — the branch above already
+    // handles Space/Enter/F2; any OTHER printable key on a checkbox cell is a no-op).
+    e.preventDefault()
+    const editType = editorTypeOf(activeCellColumnId())
+    const seed = (editType === 'text' || editType === 'number') ? key : null
+    beginEdit($data.activeRow, $data.activeColIndex, seed); return
+  }
+  // ── C2 (phase 63 wave-8): Enter on a GROUP-HEADER cell toggles that group's collapse/
+  // expand (APG treegrid). C1 (quick 260906-cvo) CORRECTION: the comment here used to claim
+  // "a group cell is non-editable" as "the verified invariant" — that was FALSE AS WRITTEN.
+  // It held only for the grouping column's OWN cell (cellIsGrouped's branch renders before
+  // the editor branch); a non-grouping EDITABLE column's cell on a group row fell straight
+  // through the branch chain to isEditing(...) and opened an editor (the C1 defect this
+  // quick task closed). What is now TRUE, and WHY: isActiveCellEditable() carries an
+  // explicit rowIndexIsGrouped(...) row guard (filterPaginationRowChrome.rzts), so EVERY
+  // editable column's cell on a group row is non-editable — that is what makes the four
+  // edit-entry branches above fall through to this one, not an incidental property of the
+  // grouping column alone. Route it to the SAME onToggleExpand path the chevron uses (group
+  // rows ride the expand model) so one Enter toggles the group. Body cells only (a
+  // header-active Enter is unchanged);
+  // ($data.rows || [])[$data.activeRow] is the active flattened row (page-relative non-virtual /
+  // full-model virtual — both index $data.rows). Placed BEFORE the reserved enterControl branch.
+  else if (key === 'Enter' && !$data.activeIsHeader && rowIsGrouped(($data.rows || [])[$data.activeRow])) {
+    e.preventDefault()
+    // C2 (phase 63 wave-11) — re-seat focus after the group collapse/expand re-render so the
+    // active cell never drops focus OUT of the grid. onToggleExpand flips the expand model →
+    // the tbody re-renders (the group's leaf rows appear/disappear). The active GROUP-HEADER
+    // row index is UNCHANGED (a group header is never hidden by its OWN collapse), but on the
+    // fine-grained-reactive targets (Solid especially) that re-render REPLACES the active cell's
+    // DOM node, dropping keyboard focus into <body> — the active STATE stays on the group header
+    // while DOM focus is lost (the treegrid collapsed-coherence gap; the 63-07 Solid grouping-
+    // settling fragility class). Capture the active coords BEFORE the toggle (React-stale-safe —
+    // onToggleExpand's expand-model write is an async setState on React) and re-seat focus via the
+    // SAME deferred rAF-poll recovery B25 uses (resolveCellEl retries across the async re-render
+    // until the group-header cell re-commits). The 5 sync targets resolve on attempt 1 (focus is
+    // already there → a harmless no-op re-focus); Solid retries until its grouping graph settles.
+    const grpRow = $data.activeRow
+    const grpCol = $data.activeColIndex
+    onToggleExpand(($data.rows || [])[$data.activeRow], e)
+    // guardMoved=true: the group header row is UNCHANGED by its own collapse, so a stale late
+    // rAF poll must not steal focus back after the user has already ArrowDown'd to another row.
+    recoverGridFocus(String(grpRow), grpCol, null, true)
+    return
+  }
+  else if (key === 'Enter' || key === 'F2') { e.preventDefault(); enterControl(); return }
+  else return
+  // THE seam — built from the SAME fresh post-write locals (Pitfall 2). Always re-assert
+  // focus on the resolved cell (harmless on a no-op clamp; corrects any drift otherwise).
+  focusActiveCell(nextRow, nextCol, nextIsHeader, nextLevel)
+  // WR-06: the D-02 activecell-change event fires ONLY when the resolved cell actually
+  // changed. A clamped no-op edge move (ArrowLeft at col 0, ArrowDown at the page-last
+  // row, …) leaves the indices identical → no spurious emit (a no-op is not a navigation).
+  // B12: a header-LEVEL move (leaf↔parent, same colIndex) is a real navigation too.
+  // C1 (phase 63 wave-6): the emitted rowIndex is the ABSOLUTE display-order index (toAbsRow) —
+  // keyboard nav never crosses a page (D-06), so nextRow is in the current page slice and
+  // toAbsRow adds the live page offset (0 in virtual mode where activeRow is already absolute).
+  // The change-detection comparison stays in the PAGE-RELATIVE space (nextRow vs prevRow).
+  if (nextRow !== prevRow || nextCol !== prevCol || nextIsHeader !== prevIsHeader || nextLevel !== prevLevel) {
+    // Mirror getActiveCell's shape (this payload + getActiveCell are documented to speak the
+    // SAME language): a header cell has no body-row index, so emit rowIndex:null + isHeader:true
+    // rather than a bogus toAbsRow(nextRow) — which would compute a real body-row absolute index
+    // for a HEADER move, misleading a consumer into thinking that body row is the active cell.
+    $emit('activecell-change', nextIsHeader
+      ? { rowIndex: null, colIndex: nextCol, isHeader: true }
+      : { rowIndex: toAbsRow(nextRow), colIndex: nextCol, isHeader: false })
+  }
+}
+
+// WR-03: integrate mouse-click + programmatic focus with the roving model. A click on a
+// tabindex="-1" cell (or focus arriving any way other than the keyboard nav path) moves
+// DOM focus there but does NOT run onGridKeyDown — so activeRow/activeColIndex would stay
+// on the OLD cell and the NEXT arrow key would jump from the stale active cell. Wired as
+// ONE @focusin on the <table> root (focusin bubbles): resolve the focused element's owning
+// [data-grid-cell], parse its data-row/data-col-index, and write them into the active-cell
+// state (mirroring the keyboard path). Clears activeInControl ONLY when the cell ITSELF
+// (not an inner control) received focus — focusing a control via Enter keeps the in-control
+// flag. NEVER emits activecell-change (a focus sync is not a keyboard navigation event).
+const syncActiveFromEvent = (e) => {
+  if (!isGrid() || !e) return
+  const tgt = e.target
+  if (!tgt || !tgt.closest) return
+  const cellEl = tgt.closest('[data-grid-cell]')
+  if (!cellEl) return
+  const rowAttr = cellEl.getAttribute('data-row')
+  const colAttr = cellEl.getAttribute('data-col-index')
+  if (rowAttr == null || colAttr == null) return
+  const col = parseInt(colAttr, 10)
+  if (!Number.isFinite(col)) return
+  // #9: snapshot the PRE-write active position so we can bump the focus-intent epoch ONLY when
+  // this focusin genuinely MOVES the active cell (a click landing on a NEW cell). A no-op focusin
+  // — focus arriving on the ALREADY-active cell, e.g. a scroll/page-switch poll's own el.focus()
+  // or focusActiveCell's synchronous re-seat — must NOT bump, or it would abort a legitimate
+  // in-flight recovery on its own settling frames (the poll would see a changed epoch and quit).
+  const prevIsHeader = $data.activeIsHeader
+  const prevRow = $data.activeRow
+  const prevCol = $data.activeColIndex
+  const prevLevel = $data.activeHeaderLevel
+  const isHeader = rowAttr === '__header'
+  $data.activeIsHeader = isHeader
+  let movedRow = prevRow
+  let movedLevel = prevLevel
+  if (isHeader) {
+    // B12: a click/focus onto a grouped header cell must capture its header LEVEL too, so the
+    // roving model + a subsequent ArrowUp/ArrowDown resolve from the correct level (not a stale
+    // one). data-header-level is an integer marker on the <th>; fall back to the leaf level.
+    const lvlAttr = cellEl.getAttribute('data-header-level')
+    const lvl = lvlAttr != null ? parseInt(lvlAttr, 10) : headerLeafLevel()
+    movedLevel = Number.isFinite(lvl) ? lvl : headerLeafLevel()
+    $data.activeHeaderLevel = movedLevel
+  } else {
+    const row = parseInt(rowAttr, 10)
+    if (Number.isFinite(row)) { movedRow = row; $data.activeRow = row }
+  }
+  $data.activeColIndex = col
+  // #9: a genuine active-cell MOVE is a fresh focus intent — supersede any pending async focus
+  // poll (scroll-to / page-switch). Compare against the PRE-write snapshot: bump only when the
+  // header-flag, column, or (per mode) the header LEVEL / body ROW actually changed.
+  if (isHeader !== prevIsHeader || col !== prevCol || (isHeader ? movedLevel !== prevLevel : movedRow !== prevRow)) {
+    focusIntentEpoch = focusIntentEpoch + 1
+  }
+  // A plain focus collapses any range back to the single active cell — EXCEPT (a) the
+  // programmatic settle of an in-flight extendRange (rangeTransition): that focus move lands
+  // ON the new range-focus corner and must NOT wipe the range we just set; and (b) the
+  // focusin that follows a Shift+Click (rangeClickPending): @mousedown already set the range
+  // BEFORE this focusin fires, and a focusin carries no reliable shiftKey, so the @mousedown
+  // path owns the shift case and flags it here so the collapse is skipped.
+  // B-11: `rangeClickPending` carries the CELL the Shift+Click landed on, not a bare boolean.
+  // A boolean leaks: Shift+Click on the cell that ALREADY holds focus fires no focusin at all,
+  // so nothing consumed the flag, and the next ordinary navigation click (or Tab) hit this
+  // branch instead and skipped its collapse — leaving a stale rectangle painted while the
+  // active cell moved away. Matching on the coordinates makes a leak self-healing: a focusin on
+  // any OTHER cell falls through to clearRange() and clears the flag on the way past.
+  if (rangeTransition) {
+    rangeTransition = false
+  } else if (
+    rangeClickPending &&
+    rangeClickPending.isHeader === isHeader &&
+    rangeClickPending.r === movedRow &&
+    rangeClickPending.c === col
+  ) {
+    rangeClickPending = null
+  } else {
+    rangeClickPending = null
+    clearRange()
+  }
+  // The cell box (not an inner control) receiving focus = navigation mode.
+  if (tgt === cellEl) $data.activeInControl = false
+}
+
+// onGridMouseDown: the pointer range seam (phase 51 req-7 / D-07 Shift+Click; §6 260709-3qt
+// plain drag-to-select). A focusin event carries no reliable `shiftKey`, so the modifier MUST
+// be read off the pointer event — @mousedown fires BEFORE the cell's focusin and DOES carry
+// shiftKey. A shift-held mousedown on a BODY cell sets the range's moving corner to that cell
+// (keeping the anchor), then flags rangeClickPending so the follow-up focusin does not collapse
+// the range. A PLAIN (non-shift) mousedown BEGINS a drag-select anchored at that cell (§6): the
+// document pointermove/up listeners paint the range as the pointer moves. The fill handle owns
+// its own @pointerdown drag (it stops propagation), so a plain mousedown originating inside it is
+// skipped. Do NOT preventDefault — native focus must still land (focusin sync + roving tabindex).
+const onGridMouseDown = (e) => {
+  if (!isGrid() || !e) return
+  const tgt = e.target
+  if (!tgt || !tgt.closest) return
+  // §6: a plain mousedown inside the fill handle is owned by the handle's own pointerdown drag —
+  // never begin a range paint from it (the shift path never lands on the 8px handle).
+  if (!e.shiftKey && tgt.closest('[data-fill-handle]')) return
+  const cellEl = tgt.closest('[data-grid-cell]')
+  if (!cellEl) return
+  const rowAttr = cellEl.getAttribute('data-row')
+  const colAttr = cellEl.getAttribute('data-col-index')
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return
+  const row = parseInt(rowAttr, 10)
+  const col = parseInt(colAttr, 10)
+  if (!Number.isFinite(row) || !Number.isFinite(col)) return
+  if (e.shiftKey) {
+    // Shift+Click: set the moving corner (keeping the anchor) and flag rangeClickPending so the
+    // follow-up focusin does not collapse the range (a focusin carries no reliable shiftKey).
+    setRangeFocus(row, col)
+    $data.activeIsHeader = false
+    $data.activeRow = row
+    $data.activeColIndex = col
+    // B-11: arm the skip for THIS cell only (see syncActiveFromEvent). Body cell → isHeader
+    // false; the header path never reaches here (rowAttr === '__header' returned above).
+    rangeClickPending = { isHeader: false, r: row, c: col }
+    return
+  }
+  // B-16: a mousedown INSIDE the cell that is currently in edit belongs to the editor — it is
+  // the user placing a caret or drag-selecting TEXT. Starting a cell drag-select from it paints
+  // a grid range over the very cell being typed into, and (with `undoable`) a drag that leaves
+  // the cell then lets Delete/Ctrl+X act on a rectangle the user was never selecting. The
+  // editor owns the gesture; return before any document listener is attached.
+  if (isEditing(row, col)) return
+  // §6 plain mousedown → begin a document-level drag-select anchored at this cell. The anchor is
+  // passed EXPLICITLY into setRangeFocus by beginRangeDrag (B-01) rather than seeded from the
+  // active cell, which is still the PRE-mousedown one at this point (native focus is a default
+  // action that runs after this handler). A mousedown with no move collapses to a single active
+  // cell (no range).
+  beginRangeDrag(row, col)
+}
+
+// onGridDblClick: the double-click-into-edit seam (grid pointer §3+§5, 260708-ni6). Wired as
+// ONE @dblclick on the <table> root (mirroring the already-delegated @mousedown/@focusin). A
+// double-click on a BODY cell either toggles a group (group-header cell) or opens the editor
+// (editable cell); a non-editable body cell is a no-op (the cell stays active — its focusin
+// already set the active state + the §1 ring). Header cells return early so they keep their
+// native sort/menu/resize semantics. Reuses the SAME closest/parse/finite guards as
+// syncActiveFromEvent and the SAME beginEdit / onToggleExpand funnels the keyboard path uses —
+// no new edit or expand machinery. isGrid()-gated so 'table' mode never runs it.
+const onGridDblClick = (e) => {
+  if (!isGrid() || !e) return
+  const tgt = e.target
+  if (!tgt || !tgt.closest) return
+  const cellEl = tgt.closest('[data-grid-cell]')
+  if (!cellEl) return
+  const rowAttr = cellEl.getAttribute('data-row')
+  const colAttr = cellEl.getAttribute('data-col-index')
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return
+  const row = parseInt(rowAttr, 10)
+  const col = parseInt(colAttr, 10)
+  if (!Number.isFinite(row) || !Number.isFinite(col)) return
+  // NB the local is `rowObj` (NOT `activeRow`): $data.activeRow lowers to the bare React state
+  // binding `activeRow`, so a `const activeRow = …` local self-shadows it (TS2448 TDZ — the
+  // visibleColCount `rowList` self-shadow class). ($data.rows || [])[row] is the active flattened
+  // row (page-relative non-virtual / full-model virtual — both index $data.rows, matching the C2
+  // Enter-on-group path + syncActiveFromEvent's row parse).
+  const rowObj = ($data.rows || [])[row]
+  if (rowIsGrouped(rowObj)) {
+    // Group-header cell → toggle its collapse/expand through the SAME onToggleExpand funnel the
+    // chevron uses (mirrors the C2 Enter-on-group path verbatim), then re-seat focus after the
+    // re-render (guardMoved=true — the group-header row is unchanged by its own collapse, so a
+    // stale late rAF must not steal focus back after a subsequent nav).
+    e.preventDefault()
+    onToggleExpand(rowObj, e)
+    recoverGridFocus(String(row), col, null, true)
+    return
+  }
+  // Editable body cell → open its editor (seed=null → seed the EXISTING value, the in-place F2/
+  // Enter entry). A non-editable body cell is a no-op: the cell stays active (focusin already set
+  // it + the §1 ring), matching the spreadsheet display-vs-edit convention.
+  const colId = columnIdAt(row, col)
+  if (colId != null && columnEditable(colId)) {
+    e.preventDefault()
+    beginEdit(row, col, null)
+  }
+}
+
+// onGridClick: the opt-in single-click-to-edit seam (grid pointer §4, 260708-ni6). Only active
+// when the `singleClickEdit` prop is true (default false, negative-opt-out). Wired as ONE @click
+// on the <table> root — @click fires on a genuine mouseup-no-drag click (NOT @mousedown), which
+// honors the deferred §6 drag guard (a mousedown that begins a drag-select must not open an
+// editor). A plain click on an EDITABLE body cell opens its editor via the SAME beginEdit funnel;
+// shift+click (range extend) and non-editable cells are unaffected. Same closest/parse/header-skip
+// /finite guards as onGridDblClick. isGrid()-gated so 'table' mode never runs it.
+const onGridClick = (e) => {
+  if (!isGrid() || !e) return
+  if (!$props.singleClickEdit) return
+  if (e.shiftKey) return
+  // §6 (260709-3qt): a drag-select that MOVED must never open the editor — the editor opens only
+  // on a genuine mouseup-no-drag click. beginRangeDrag resets rangeDragMoved=false per gesture, so
+  // the flag is always fresh; consume it here so a subsequent plain click still edits.
+  if (rangeDragMoved) { rangeDragMoved = false; return }
+  const tgt = e.target
+  if (!tgt || !tgt.closest) return
+  const cellEl = tgt.closest('[data-grid-cell]')
+  if (!cellEl) return
+  const rowAttr = cellEl.getAttribute('data-row')
+  const colAttr = cellEl.getAttribute('data-col-index')
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return
+  const row = parseInt(rowAttr, 10)
+  const col = parseInt(colAttr, 10)
+  if (!Number.isFinite(row) || !Number.isFinite(col)) return
+  // Already editing THIS exact cell → no-op (a click inside an open editor must not re-open it).
+  if ($data.editingRow === row && $data.editingCol === col) return
+  const colId = columnIdAt(row, col)
+  if (colId != null && columnEditable(colId)) beginEdit(row, col, null)
+}
+
+// WR-02: reset the interaction-mode flag when focus leaves the active cell's subtree.
+// Without this, activeInControl could stick `true` — a mouse click OUTSIDE the cell, or
+// the focused inner control being removed from the DOM — leaving onGridKeyDown wedged in
+// the in-cell-trap branch so arrow nav is dead until Escape. Wired as ONE @focusout on
+// the <table> root (focusout bubbles, unlike blur). relatedTarget is the element RECEIVING
+// focus (null when focus leaves the document / is retargeted across a shadow boundary). If
+// focus is NOT moving to a descendant of the active cell, drop the flag. A Tab-cycle WITHIN
+// the cell (interaction mode) keeps relatedTarget inside cellEl → no reset.
+const onGridFocusOut = (e) => {
+  if (!isGrid() || !$data.activeInControl) return
+  const next = e ? e.relatedTarget : null
+  const cellEl = currentCellEl()
+  if (!cellEl || !next || !cellEl.contains(next)) $data.activeInControl = false
+}
+
+// B25: re-focus a resolved valid cell AFTER a programmatic shrink re-renders. The clamp
+// runs synchronously BEFORE the framework commits the new tbody, so a deferred rAF-poll
+// resolves the [data-row][data-col-index] cell off gridRoot once it has rendered (the fast
+// targets land on attempt 1; React/Solid retry across the async commit). Mirrors
+// focusCellWhenReady (B23) — DOM-only (reads gridRoot), so it is React-stale-safe.
+// guardMoved (default false): when true, the poll does NOT stomp focus that a later nav has
+// already moved to a DIFFERENT, STILL-VALID row — used only by the group-collapse re-seat (the
+// target group-header row is unchanged, so a stale late rAF must not steal focus back after the
+// user ArrowDown'd away → the non-deterministic treegrid collapsed-nav focus-theft). It is left
+// OFF for the B25 shrink-recovery site, whose target is a CLAMPED index of a now-REMOVED cell:
+// there focus legitimately sits on the doomed old cell (a different row) mid-async-render on
+// React and MUST be recovered onto the clamped survivor, not preserved. Compare data-row (NOT
+// node identity) so a stale SAME-row cell on Solid's node-replacing re-render still resolves as
+// the target — a genuinely dropped focus is always recovered on both sites.
+const recoverGridFocus = (rowKey, col, level, guardMoved = false) => {
+  if (!gridRoot) return
+  let attempts = 0
+  const tryFocus = () => {
+    if (guardMoved) {
+      const ae = gridRoot && gridRoot.getRootNode ? gridRoot.getRootNode().activeElement : null
+      const aeCell = ae && ae.closest ? ae.closest('[data-grid-cell]') : null
+      if (aeCell && gridRoot.contains(aeCell)) {
+        const aeRow = aeCell.getAttribute('data-row')
+        if (aeRow != null && aeRow !== rowKey) return
+      }
+    }
+    const el = resolveCellEl(rowKey, col, level)
+    if (el) { el.focus(); return }
+    attempts = attempts + 1
+    if (attempts >= 30) return
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
+    else setTimeout(tryFocus, 16)
+  }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
+  else setTimeout(tryFocus, 0)
+}
+
+// D-05: clamp the active cell to bounds on every underlying-data change (re-sort, filter,
+// pagination, page-size). KEEP the same indices; clamp ONLY when the grid shrank — NO
+// row-id following, NO bounce-to-top on a filter keystroke. Gated by isGrid() so 'table'
+// mode is entirely untouched. Invoked at the rowModelVer bump path (refreshRowModel).
+const clampActiveCell = (rowCount, colCount) => {
+  if (!isGrid()) return
+  // B8/B23 React-stale guard: the bounds come from the FRESH model the caller (refreshRowModel)
+  // just derived and passes in — NEVER re-read $data.rows here. `$data.rows = nextRows` is an
+  // async useState on React, so bodyRowCount()/visibleColCount() would see the PRE-change model
+  // and SKIP a legitimate shrink-clamp (a filter-to-fewer left the active cell / range corners
+  // out of bounds on React only). Falls back to the live helpers when called without bounds.
+  const colN = colCount != null ? colCount : visibleColCount()
+  const rowN = rowCount != null ? rowCount : bodyRowCount()
+  // B25: BEFORE re-indexing, detect whether DOM focus currently rests on a BODY cell that the
+  // shrink will REMOVE (its row index exceeds the new bounds). We run synchronously BEFORE the
+  // framework commits the new tbody (refreshRowModel calls us right after `$data.rows = nextRows`
+  // — true on all six, incl React's async setState), so the doomed cell + its focus are still
+  // observable in the OLD DOM. Only then do we arm a focus RECOVERY (after the re-render), so a
+  // programmatic shrink (collapseAll/pageSize/data swap) never drops keyboard focus to <body>.
+  // Focus elsewhere — a header sort button, an external control, an unfocused grid — is NOT a
+  // doomed body cell, so recovery never STEALS focus on a routine re-sort/filter.
+  // The recovery TARGET is derived from the doomed cell's OWN DOM coords (doomedRow/doomedCol),
+  // NOT $data.activeRow/activeColIndex — those are React-stale (ROZ138) when a focusCell + the
+  // shrink run inside one synchronous handler (focusCell's setActiveRow has not committed). The
+  // DOM coords are always fresh.
+  let recoverFocus = false
+  let doomedRow = -1
+  let doomedCol = 0
+  if (gridRoot) {
+    const rootNode = gridRoot.getRootNode ? gridRoot.getRootNode() : null
+    const focusedEl = rootNode ? rootNode.activeElement : null
+    const focusedCell = focusedEl && focusedEl.closest ? focusedEl.closest('[data-grid-cell]') : null
+    if (focusedCell && gridRoot.contains(focusedCell)) {
+      const fRowAttr = focusedCell.getAttribute('data-row')
+      const fColAttr = focusedCell.getAttribute('data-col-index')
+      if (fRowAttr != null && fRowAttr !== '__header') {
+        const fr = parseInt(fRowAttr, 10)
+        const fc = parseInt(fColAttr, 10)
+        if (Number.isFinite(fr) && fr > rowN - 1) {
+          recoverFocus = true
+          doomedRow = fr
+          doomedCol = Number.isFinite(fc) ? fc : 0
+        }
+      }
+    }
+  }
+  const maxCol = colN - 1
+  const col = clamp($data.activeColIndex, 0, (maxCol < 0 ? 0 : maxCol))
+  if (col !== $data.activeColIndex) $data.activeColIndex = col
+  // B6: an empty / all-filtered grid has NO body cell to hold the active cell. Park the active
+  // cell on the leaf-header fallback (col 0) so the roving tab-stop stays on a REAL cell (never
+  // an absent body cell → focus lost into <body>), and flag it so the next non-empty refresh
+  // re-seats a body cell. The cellTabindex empty-fallback keeps exactly one header tab-stop.
+  if (rowN <= 0) {
+    $data.activeIsHeader = true
+    $data.activeHeaderLevel = headerLeafLevel()
+    $data.activeColIndex = 0
+    // B6 — `gridEmptyFallback` is a plain component-scope `let` (NOT $data): clampActiveCell is
+    // reached through the mount-time refreshRowModel closure, so a `$data` READ here binds the
+    // async-stale mount-time value on React (setState is async — the rangeActive / B23-nextRows
+    // class). A synchronously-written plain `let` is read FRESH on all six so the empty→non-empty
+    // recovery branch below actually runs on React too.
+    gridEmptyFallback = true
+    clampRange(rowN - 1, colN - 1)
+    // B25 does NOT actively focus in the EMPTY-grid case: B6 already keeps the grid keyboard-
+    // reachable via the roving tab-stop on the header fallback (a tabindex=0, not a focus grab).
+    // Moving DOM focus here would steal focus AND — on React — the fallback's @focusin
+    // (setActiveIsHeader true) races the next clear-filter re-seat, leaving the tab-stop stuck on
+    // the header. Focus recovery is for a shrink that leaves a VALID BODY cell to land on (below).
+    return
+  }
+  // B6 recovery: the body model returned. If we were parked on the empty-grid header fallback,
+  // re-seat a valid BODY active cell (row 0) so the roving tab-stop lands back on a real body
+  // cell. A user-driven header position (not the empty fallback) is left untouched.
+  if (gridEmptyFallback) {
+    gridEmptyFallback = false
+    $data.activeIsHeader = false
+    $data.activeRow = 0
+  }
+  if (!$data.activeIsHeader) {
+    const lastRow = rowN - 1
+    const maxRow = lastRow < 0 ? 0 : lastRow
+    const row = clamp($data.activeRow, 0, maxRow)
+    if (row !== $data.activeRow) $data.activeRow = row
+  }
+  // B8: clamp the range-selection corners to the same FRESH bounds (a sort/filter/paginate that
+  // shrank the model would otherwise leave a stale rectangle → phantom copy rows + an
+  // out-of-bounds getSelectedRange). Reconcile-only (no range-change emit here, B18/B19).
+  clampRange(rowN - 1, colN - 1)
+  // B25: recover DOM focus onto the re-indexed valid cell (deferred until the new model renders)
+  // when the shrink removed the focused cell. The target is the DOOMED cell's own coords clamped
+  // into the fresh bounds (React-stale-safe — see the doomedRow/doomedCol note above).
+  if (recoverFocus) {
+    const recRow = clamp(doomedRow, 0, rowN - 1)
+    const recCol = clamp(doomedCol, 0, (maxCol < 0 ? 0 : maxCol))
+    recoverGridFocus(String(recRow), recCol, null)
+  }
+}
+
+export { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell }

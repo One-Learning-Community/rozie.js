@@ -1,0 +1,562 @@
+// ══ Grid interaction mode (phase 49) — STATE + STRUCTURE only ═══════════════════════════
+// This plan (02) establishes the gated ARIA roles, the roving single-tab-stop tabindex,
+// the active-cell index-pair state, the data-* cell markers, and the SINGLE
+// focusActiveCell() seam. Plan 03 adds the keydown navigation math, the $expose verbs
+// (focusCell/getActiveCell/clearActiveCell), and the activecell-change event ON TOP.
+
+// D-22 (Phase 87 plan 87-01): clamp/focusables moved to the colocated plain-TS module
+// below — pure, sigil-free, no cross-partial host-symbol calls. Re-exported unchanged
+// from this partial's trailing export list. (This partial is edited again in
+// 87-06-PLAN.md — keep this diff to the two moved declarations plus this import line.)
+import { clamp, focusables } from './helpers/indexMath'
+
+// interactionMode gate. 'grid' lights up roving nav; 'table' (default) is byte-behaviorally
+// identical to phase 48 (roles fall back to the literals, tabindex drops).
+const isGrid = () => $props.interactionMode === 'grid'
+
+// Role computeds (RESEARCH Pattern 4). The 'table' branch returns the EXACT phase-48
+// literal so 'table'-mode DOM is unchanged. Header cells keep 'columnheader' and rows keep
+// 'row'/'rowgroup' in BOTH modes (APG grid) — those stay static literals in the template.
+const tableRole = () => (isGrid() ? 'grid' : 'table')
+const cellRole = () => (isGrid() ? 'gridcell' : 'cell')
+
+// ── Cell addressing helpers (plain fns — no $computed alias trap; safe in template) ────
+// rowIndexOf: a body row's index over the visible model ($data.rows). tick() puts the read
+// in the fine-grained reactive scope (Solid/Lit) so the data-row marker re-derives on a
+// re-pull (reorder/filter) — matching visibleCellsFor's discipline.
+const rowIndexOf = (row) => (tick() >= 0 ? ($data.rows || []).indexOf(row) : -1)
+// colIndexOf: a body cell's position in its row's visible cell list.
+const colIndexOf = (row, cellCtx) => (tick() >= 0 ? visibleCellsFor(row).indexOf(cellCtx) : -1)
+// headerColIndexOf: a header cell's position in its header group's leaf headers.
+const headerColIndexOf = (hg, header) => ((hg && hg.headers ? hg.headers : []).indexOf(header))
+
+// E-05 — a header's ABSOLUTE LEAF-column start index, which is NOT the same as its position
+// in the group's header array: a grouped header occupies ONE array slot but spans colSpan leaf
+// columns, so positions and leaf indices diverge the moment a header group exists. Walk the
+// group accumulating colSpan to the target. Window-independent by construction (a header's
+// leaf start is a full-model property), so both the windowed grid header and the plain
+// non-grid header can share it.
+const headerLeafStart = (hg, header) => {
+  const list = (hg && hg.headers) ? hg.headers : []
+  let leaf = 0
+  for (let i = 0; i < list.length; i++) {
+    if (list[i] === header) return leaf
+    const h = list[i]
+    leaf = leaf + (h && h.colSpan > 1 ? h.colSpan : 1)
+  }
+  return -1
+}
+
+// ── C1 (phase 63 wave-6) absolute-index bridge ─────────────────────────────────────────
+// The PUBLIC active-cell rowIndex (focusCell/getActiveCell/activecell-change) is the ABSOLUTE
+// display-order position in getPrePaginationRowModel().rows (filter+sort+expand applied, BEFORE
+// pagination/windowing), in BOTH paginated and virtual modes — reversing the old page-relative
+// paginated meaning. INTERNALLY $data.activeRow stays PAGE-RELATIVE in the non-virtual paginated
+// body (the data-row markers + the nav math index the page slice) and FULL-MODEL in virtual mode
+// (the wr.vi.index space). pageRowOffset() bridges the two so the API speaks one absolute language.
+//   - virtual mode: activeRow is already the full pre-pagination index → offset 0.
+//   - non-virtual:  activeRow is page-relative → offset = pageIndex * pageSize.
+// isGrid()-gated (the active-cell API is grid-only); pageIndex()/pageSize() read live table-core
+// state through the reactive tick (filterPaginationRowChrome), so this re-derives on a page change.
+const pageRowOffset = () => {
+  if (!isGrid() || rowsWindowed()) return 0
+  return pageIndex() * pageSize()
+}
+// page-relative active row → absolute (display-order) index.
+const toAbsRow = (localRow) => localRow + pageRowOffset()
+// A body row's ABSOLUTE display-order index = its page-relative index + the page offset. Drives
+// aria-rowindex on the non-virtual paginated body (B27); the virtual path uses wr.vi.index
+// directly (already absolute). Reactive via rowIndexOf's tick().
+const absRowIndexOf = (row) => rowIndexOf(row) + pageRowOffset()
+// Total filtered+sorted PRE-pagination row count — the clamp bound for an absolute focusCell.
+// In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
+// non-virtual paginated body $data.rows is only the page slice, so read the live model.
+const prePaginationRowCount = () => {
+  if (!table || rowsWindowed()) return bodyRowCount()
+  const pm = table.getPrePaginationRowModel()
+  return pm && pm.rows ? pm.rows.length : bodyRowCount()
+}
+
+// Roving tabindex (RESEARCH Code Examples). Reads ONLY reactive $data (ROZ123-safe,
+// fine-grained-reactive). Returns null in 'table' mode → the bound numeric attribute
+// DROPS entirely (IN-01: on React via the `cellTabindex(...) ?? undefined` numeric-attr
+// emitter path landed in 4bec3b8e — NOT rozieAttr, which would string-widen tabIndex and
+// TS2322; the other five targets drop it via their own nullish-attr handling), keeping
+// 'table'-mode DOM clean. rowKey is the literal
+// '__header' for header cells or the String(bodyRowIndex) for body cells, so the active
+// header state (activeIsHeader) is addressable through the same computed.
+const cellTabindex = (rowKey, colIndex, level = null) => {
+  if (!isGrid()) return null
+  // B6: an empty / all-filtered grid (no body rows) must STILL be keyboard-reachable. Fall
+  // the single roving tab-stop back to the FIRST leaf-header cell so the grid never has ZERO
+  // tab-stops (a keyboard trap). Only the leaf-level header col 0 carries the tab-stop.
+  if (bodyRowCount() === 0) {
+    return (rowKey === '__header' && colIndex === 0 && level === headerLeafLevel()) ? 0 : -1
+  }
+  // B12: when a header cell is active, address it by BOTH its level AND its colIndex so a
+  // grouped multi-level header carries exactly ONE tab-stop. The pre-fix level-blind compare
+  // lit BOTH the parent (level 0) and the leaf (level 1) at the same colIndex → multiple
+  // tab-stops (the roving invariant broke under grouped headers).
+  if ($data.activeIsHeader) {
+    if (rowKey !== '__header') return -1
+    return (colIndex === $data.activeColIndex && level === $data.activeHeaderLevel) ? 0 : -1
+  }
+  const isActive = rowKey === String($data.activeRow) && colIndex === $data.activeColIndex
+  return isActive ? 0 : -1
+}
+
+// ── Active-cell ring predicate (grid pointer §1, 260708-ni6) ───────────────────────────
+// isActiveCell mirrors cellTabindex's ACTIVE branch (the same (rowKey, colIndex, level)
+// address tuples the roving tabindex uses) but returns a BOOLEAN for the `.rdt-cell-active`
+// :class binding, and is STATE-DRIVEN — so the ring shows identically on click AND keyboard
+// (independent of :focus-visible, which browsers gate off for a mouse-focused non-text <td>).
+// It DELIBERATELY omits cellTabindex's B6 empty-grid / header-fallback branch: the ring must
+// NOT light on an empty grid's synthetic tab-stop (there is no real active cell there). Reads
+// ONLY reactive $data (ROZ123-safe, fine-grained). Returns false in 'table' mode so table-mode
+// markup is byte-behaviorally unchanged. Header cells are active only while activeIsHeader is
+// true (addressed by BOTH colIndex and level — a grouped multi-level header carries exactly one
+// ring); body cells only while activeIsHeader is false.
+const isActiveCell = (rowKey, colIndex, level = null) => {
+  if (!isGrid()) return false
+  if ($data.activeIsHeader) {
+    if (rowKey !== '__header') return false
+    return colIndex === $data.activeColIndex && level === $data.activeHeaderLevel
+  }
+  if (rowKey === '__header') return false
+  return rowKey === String($data.activeRow) && colIndex === $data.activeColIndex
+}
+
+// ── The focus SEAM (RESEARCH Pattern 1 + 3, req-6) ─────────────────────────────────────
+// resolveCellEl: index pair → DOM element, via a data-* attribute query off the stable
+// post-mount root. Uniform on all six, shadow-safe (the query runs from inside the
+// component's own scope). rowKey is the literal '__header' or a String(integer index) and
+// colIndex is an integer — NO consumer string is interpolated into the selector (T-49-01).
+const resolveCellEl = (rowKey, colIndex, level = null) => {
+  if (!gridRoot) return null
+  // B12: a grouped multi-level header has MULTIPLE cells sharing data-row="__header" at the
+  // same data-col-index across levels (parent vs leaf). Disambiguate header lookups by the
+  // integer data-header-level so resolveCellEl('__header', 0) no longer returns the FIRST DOM
+  // match (the parent) when the leaf is meant. level is an integer (NO consumer string is
+  // interpolated — T-49-01 stays safe); body lookups pass level=null → the selector is
+  // byte-unchanged.
+  let sel = '[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]'
+  if (rowKey === '__header' && level != null) sel = sel + '[data-header-level="' + level + '"]'
+  return gridRoot.querySelector(sel)
+}
+
+// focusActiveCell: THE single DOM-focus-resolution path (req-6). Every focus change —
+// the D-04 entry cell here, and (plan 03) arrow nav / focusCell() / the data-change clamp —
+// routes through this one function, so a verifier can point to it and phase 53 windowing
+// hooks it without a rewrite. Accepts OPTIONAL explicit (nextRow,nextCol) so callers can
+// pass FRESH post-write locals (React ROZ138 / Angular signal async — pinned by plan 01);
+// falls back to $data when none passed. NEVER stores a DOM node (index-only state).
+// 260618-ao9 — params carry explicit `= null` defaults so the cross-target
+// emitters type them OPTIONAL (untyped params lower to REQUIRED `any`, making the
+// 2-arg `focusActiveCell(r, c)` call sites a TS2554 on React/Solid/Lit — a
+// pre-existing regression from the d7166c5e header-crossing `nextIsHeader` add).
+// The `= null` default reproduces the documented "falls back to $data when
+// omitted" contract: an omitted arg arrives as `null`, and the body's `== null`
+// checks already route those to the live `$data` value — behavior-identical.
+const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, nextLevel = null) => {
+  if (!isGrid() || !gridRoot) return
+  // #9 focus-intent epoch: focusActiveCell is THE single seam every keyboard nav re-asserts
+  // focus through, so it establishes a fresh "where focus should be" on every call — bump the
+  // epoch here (BEFORE arming the virtual-scroll focusWhenReady poll below). A SUBSEQUENT
+  // focusActiveCell (the next user nav) bumps again → any pending focusWhenReady captured the
+  // OLD value → aborts instead of yanking focus back. The poll captures the POST-bump value so
+  // a lone scroll-to-focus with no later nav still lands (epoch stable across its own frames).
+  focusIntentEpoch = focusIntentEpoch + 1
+  const r = nextRow == null ? $data.activeRow : nextRow
+  const c = nextCol == null ? $data.activeColIndex : nextCol
+  // B12: thread the FRESH post-write header level (the grouped-header analog of the
+  // nextIsHeader threading) so a leaf↔parent header move resolves the cell at the correct
+  // level, never the async-stale $data.activeHeaderLevel re-read (React ROZ138 / Angular signal).
+  const lvl = nextLevel == null ? $data.activeHeaderLevel : nextLevel
+  // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
+  // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
+  // Angular's signal write are async within one handler — re-reading $data.activeIsHeader
+  // here returns the PRE-write value, resolving focus to the BODY cell instead of the
+  // header. Callers pass the fresh isHeader local; falls back to $data when omitted.
+  const header = nextIsHeader == null ? $data.activeIsHeader : nextIsHeader
+  // ── phase 53 scroll-then-focus (D-12): when windowing AND the target body row and/or column
+  // is OUTSIDE the rendered window, scroll it in first, then defer focus to AFTER the new
+  // window commits (the double-rAF — a single rAF can fire before React's async commit, Pitfall
+  // 4). Header cells and fully in-window cells keep the synchronous path below (table-mode /
+  // non-windowed stay byte-stable). The guard reads the resolved `header` (NOT the raw
+  // `nextIsHeader`) so an omitted-arg call while a header cell is active falls back to
+  // $data.activeIsHeader and skips the scroll path.
+  // Phase 87 87-06 (D-12): widened to the SECOND axis — colIsOutsideWindow(c)/colsWindowed()
+  // mirror rowIsOutsideWindow(r)/rowsWindowed() exactly (both landed in windowing.rzts in
+  // 87-04). Either axis being out triggers the scroll+poll; both scrollToIndex calls fire when
+  // both are out, and the ONE existing poll below is reused unchanged — it already resolves the
+  // target cell by BOTH (row, col) via resolveCellEl(String(r), c), so a cell that becomes
+  // reachable via the column axis needs no new poll logic (per the plan's own key_links note).
+  // B-03: the COLUMN axis applies to HEADER cells too. This guard used to be `!header &&
+  // (rowOut || colOut)`, so a header-active move to an off-window column never scrolled it in:
+  // `resolveCellEl` returned null, focus froze on the old `<th>` while the state and the ring
+  // ran away to a column with no DOM node, and `cellTabindex` then reported 0 for an unrendered
+  // cell — leaving the grid with ZERO `tabindex="0"` cells and no way back in with Tab. Header
+  // rows genuinely have no ROW-axis window (headers are not row-virtualized), so the row half
+  // stays body-only; only the column half widens.
+  const rowOut = rowsWindowed() && virtualizer && rowIsOutsideWindow(r)
+  const colOut = colsWindowed() && colVirtualizer && colIsOutsideWindow(c)
+  const rowScroll = !header && rowOut
+  if (rowScroll || colOut) {
+    if (rowScroll) virtualizer.scrollToIndex(r, { align: 'center' })
+    if (colOut) colVirtualizer.scrollToIndex(c, { align: 'center' })
+    // Bounded rAF-poll-until-cell-present (D-12): scrollToIndex → virtual-core onChange → windowVer
+    // bump → the framework commits the scrolled-in row/column. On React that commit is async
+    // (setState → reconcile) and for a far scroll (e.g. row 4000, or col 55 on a 60-col table)
+    // spans several frames — a one-shot double-rAF fires BEFORE resolveCellEl can find the cell,
+    // so focus is silently lost (the deterministic React off-window-focus failure). Poll
+    // resolveCellEl for up to ~30 frames: the five fast-committing targets resolve on the first
+    // attempt (behavior unchanged), React retries across the few frames its async commit needs.
+    // The poll ONLY focuses (never measures), so it cannot re-introduce the remeasure-vs-scroll
+    // fight. Inside the rowOut||colOut guard only.
+    let focusAttempts = 0
+    // #9: capture the epoch AFTER this call's own bump (above) so the poll never aborts itself
+    // (its captured value equals the current epoch). A LATER focusActiveCell / focusCell /
+    // active-cell-moving focusin bumps the epoch → the check below aborts this stale poll.
+    const myEpoch = focusIntentEpoch
+    const focusWhenReady = () => {
+      // A newer focus intent superseded this poll — abort WITHOUT focusing (the user has since
+      // navigated / clicked elsewhere; re-focusing this off-window target would yank focus back).
+      if (focusIntentEpoch !== myEpoch) return
+      // B-03: resolve with the SAME key the synchronous path below uses, so the poll can
+      // find a header cell. `String(r)` alone addresses body rows only.
+      const el = resolveCellEl(header ? '__header' : String(r), c, header ? lvl : null)
+      if (el) { el.focus(); return }
+      focusAttempts = focusAttempts + 1
+      if (focusAttempts >= 30) return
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusWhenReady)
+      else setTimeout(focusWhenReady, 16)
+    }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusWhenReady)
+    else setTimeout(focusWhenReady, 0)
+    return
+  }
+  const rowKey = header ? '__header' : String(r)
+  const el = resolveCellEl(rowKey, c, header ? lvl : null)
+  if (el) el.focus()
+}
+
+// ══ Grid keyboard navigation (phase 49 plan 03 — RESEARCH Pattern 5 + the delegated handler) ═══
+// The nav model is plain ARRAY-INDEX MATH over the VISIBLE model. table-core has already
+// done the hard part: $data.rows (body) and $data.headerGroups (header) hold the visible,
+// reordered, pinned cell set (row.getVisibleCells() / getHeaderGroups()) — hidden columns
+// are ALREADY ABSENT, reorder/pinning is ALREADY REFLECTED (REQ-7). There is NO separate
+// "compute visible order" step. Every index is clamped to [0,max] so an out-of-range key
+// never throws or builds an injection-shaped selector (Security V5 / T-49-03).
+
+// IN-01: aria-rowcount for the NON-VIRTUAL table. The virtual table binds $data.rows.length
+// (the full pre-pagination model). For the non-virtual path $data.rows is the PAGINATED slice,
+// so report the FILTERED (pre-pagination) total instead — the count AT users need to know "row N
+// of TOTAL". Falls back to $data.rows.length pre-mount (table is null until $onMount).
+// NB the helper is named `totalRowCount`, NOT `ariaRowCount`: `ariaRowCount` is an inherited
+// HTMLElement ARIA-reflected property (`Element.ariaRowCount: string`), so a same-named method
+// becomes a class field that shadows it on Lit → TS2416 cascades to EVERY @property decorator
+// (the `valueOf`/`nodeType` inherited-DOM-member collision class, authoring playbook §6).
+// A-04: under `manual` the filtered row model is NOT the total — table-core holds only the
+// page the consumer handed it, so getFilteredRowModel().rows.length is the PAGE SIZE. The
+// server-side total lives in the props the consumer passes for exactly this purpose
+// (`rowCount`, else `pageCount`), which is also table-core's own precedence for getPageCount()
+// (explicit pageCount wins, else ⌈rowCount / pageSize⌉). Taking them here keeps aria-rowcount
+// consistent with bodyAriaRowIndex, which already offsets by pageIndex * pageSize and would
+// otherwise hand a screen reader an index LARGER than the advertised count on any page past
+// the first. `pageCount * pageSize` is an upper bound (the last page is usually partial) —
+// an over-count is the safe direction: an aria-rowindex can never exceed it.
+// With `manual` and NEITHER count set, table-core pins getCanNextPage() to false, so pageIndex
+// stays 0, the offset is 0 and page-slice-as-total is self-consistent; we leave it alone.
+const totalRowCount = () => {
+  if (!table) return ($data.rows || []).length
+  if ($props.manual === true) {
+    if ($props.rowCount != null) return $props.rowCount
+    if ($props.pageCount != null) return $props.pageCount * pageSize()
+  }
+  const fm = table.getFilteredRowModel()
+  return fm && fm.rows ? fm.rows.length : ($data.rows || []).length
+}
+
+// ── A11y row bookkeeping (#13): consistent aria-rowindex / aria-rowcount ──────────────
+// WAI-ARIA: when aria-rowcount is set on the grid/table, EVERY row (header rows + body rows)
+// must carry an aria-rowindex, and aria-rowcount must equal the total number of rows INCLUDING
+// the header rows. Before this fix aria-rowcount was set unconditionally to totalRowCount() but
+// aria-rowindex was grid-only — so a paginated 'table'-mode grid advertised e.g. rowcount=100
+// while its 10 visible rows carried NO index (SR announced "row 1..10 of 100" on the LAST page).
+//   headerRowCount = the columnheader rows ($data.headerGroups — a grouped/multi-level header is
+//     >1; the role="presentation" filter row is NOT a row and is excluded).
+//   gridAriaRowCount = header rows + the FILTERED pre-pagination data total → equals the largest
+//     aria-rowindex any body row carries, so count and indices are always mutually consistent.
+// NB the helpers are gridAriaRowCount / bodyAriaRowIndex, NOT ariaRowCount / ariaRowIndex: the
+// latter collide with the inherited HTMLElement.ariaRowCount / .ariaRowIndex reflected properties
+// on Lit (TS2416 — the same inherited-DOM-member collision class as totalRowCount's rename note).
+const headerRowCount = () => ($data.headerGroups || []).length
+const gridAriaRowCount = () => headerRowCount() + totalRowCount()
+// Page offset that is MODE-INDEPENDENT (works in BOTH 'table' and 'grid' mode), unlike
+// pageRowOffset() which is isGrid()-gated for the active-cell API. In the non-virtual body
+// $data.rows is only the page slice, so a data row's ABSOLUTE index = its page-relative
+// rowIndexOf + this offset. Virtual mode never reaches here (that body uses wr.vi.index).
+const ariaPageOffset = () => (table ? pageIndex() * pageSize() : 0)
+// A non-virtual body row's 1-based aria-rowindex: the header rows come first (headerRowCount),
+// then the absolute (page-aware) 0-based data index, +1 to 1-base it. Present in BOTH modes so
+// it is always consistent with gridAriaRowCount. The virtual body binds
+// `headerRowCount() + wr.vi.index + 1` inline (wr.vi.index is already the absolute full-model index).
+const bodyAriaRowIndex = (row) => headerRowCount() + rowIndexOf(row) + ariaPageOffset() + 1
+
+// ── E-05: the COLUMN-axis twin of gridAriaRowCount / bodyAriaRowIndex ────────────────
+// WAI-ARIA: when aria-colcount is set, every cell must carry an aria-colindex and the count
+// must equal the largest index any cell declares. The row axis has had this since #13; the
+// column axis had NOTHING repo-wide (0 occurrences of aria-colcount/aria-colindex), which
+// matters most under column windowing — the rendered <td>s are a WINDOW, so without an
+// explicit index a screen reader counts the window and announces "column 3 of 6" while the
+// user sits in absolute column 41.
+//
+// The index space is `visibleCellsFor(row)` / the header group's leaf headers — the same one
+// `colIndexOf` and `data-col-index` already use, INCLUDING the auto-injected select/expander
+// chrome columns (they are real columns in that list). `visibleColCount()` counts the same
+// list, so count and indices are mutually consistent by construction.
+//
+// NB named gridAriaColCount, NOT ariaColCount: `Element.ariaColCount` / `.ariaColIndex` are
+// inherited ARIA-reflected properties, so a same-named method becomes a Lit class field that
+// shadows them → TS2416 cascading to every @property decorator. Exactly the rename discipline
+// totalRowCount / gridAriaRowCount / bodyAriaRowIndex already document above.
+const gridAriaColCount = () => visibleColCount()
+
+// Column count = the visible cell list length (uniform header+body in a flat grid). Reads
+// $data.rows (reactive) so it is fine-grained-correct on Solid/Lit; falls back to the
+// header leaf count when there are no body rows.
+const visibleColCount = () => {
+  // NB: local is `rowList` (NOT `rows`) — the React emitter lowers `$data.rows` to the bare
+  // state binding `rows`, so a `const rows = $data.rows` self-shadows it (TS2448 TDZ). Same
+  // self-shadow class as the deconflictPropShadows finding; avoid the $data-key name as a local.
+  const rowList = $data.rows || []
+  if (rowList.length) return rowList[0].getVisibleCells().length
+  const hg = $data.headerGroups || []
+  return hg.length ? ((hg[hg.length - 1].headers || []).length) : 0
+}
+const bodyRowCount = () => ($data.rows || []).length
+
+// ── Multi-level (grouped) header addressing (B12) ──────────────────────────────────────
+// $data.headerGroups is ordered top→bottom; the LEAF header row (the one adjacent to the
+// body) is the LAST group. The roving active-header state carries activeHeaderLevel (the
+// group index) alongside activeColIndex (the index within THAT level's headers) so the
+// single-tab-stop invariant + ArrowUp parent-resolution span every header level — a flat
+// grid has one level (leafLevel 0), so the table-mode/flat path is unchanged.
+const headerLeafLevel = () => {
+  const hg = $data.headerGroups || []
+  return hg.length ? hg.length - 1 : 0
+}
+// #10: the number of header cells AT a given level. A grouped PARENT level may have FEWER
+// headers than there are leaf columns (one parent spans several leaves), so horizontal nav on a
+// non-leaf header must clamp against THIS count — not visibleColCount() (the leaf-column count),
+// which would let ArrowRight/End overrun into a phantom (null) cell → focus dropped to <body>.
+// Degenerate cases (no headerGroups, level out of range) fall back to visibleColCount() so the
+// clamp is never negative or NaN. The LEAF level's count equals visibleColCount() (one header per
+// visible leaf column), so leaf-header + body horizontal nav is byte-behaviorally unchanged.
+const headerCountAtLevel = (level) => {
+  const hg = $data.headerGroups || []
+  if (!hg.length) return visibleColCount()
+  const grp = (level >= 0 && level < hg.length) ? hg[level] : null
+  if (!grp || !grp.headers) return visibleColCount()
+  return grp.headers.length
+}
+const headerAt = (level, colIndex) => {
+  const hg = $data.headerGroups || []
+  const grp = hg[level]
+  if (!grp || !grp.headers) return null
+  return grp.headers[colIndex] || null
+}
+// ArrowUp from a (level, colIndex) leaf/child header → the index of its PARENT header in the
+// level above (the parent column that spans it, via table-core header.column.parent). -1 when
+// there is no real parent (already at the top, or a placeholder with no group) → the caller
+// keeps the active header where it is.
+const parentHeaderColIndex = (level, colIndex) => {
+  if (level <= 0) return -1
+  const h = headerAt(level, colIndex)
+  if (!h || !h.column || !h.column.parent) return -1
+  const parentId = h.column.parent.id
+  const hg = $data.headerGroups || []
+  const pg = hg[level - 1]
+  if (!pg || !pg.headers) return -1
+  for (let i = 0; i < pg.headers.length; i++) {
+    const ph = pg.headers[i]
+    if (ph && ph.column && ph.column.id === parentId) return i
+  }
+  return -1
+}
+// ArrowDown from a (level, colIndex) GROUP header → the index of its FIRST child header in the
+// level below (via table-core column.columns). -1 when the header has no child columns (a leaf)
+// → the caller drops into the body instead.
+const firstChildHeaderColIndex = (level, colIndex) => {
+  const h = headerAt(level, colIndex)
+  if (!h || !h.column) return -1
+  const kids = h.column.columns || []
+  if (!kids.length) return -1
+  const childId = kids[0].id
+  const hg = $data.headerGroups || []
+  const cg = hg[level + 1]
+  if (!cg || !cg.headers) return -1
+  for (let i = 0; i < cg.headers.length; i++) {
+    const ch = cg.headers[i]
+    if (ch && ch.column && ch.column.id === childId) return i
+  }
+  return -1
+}
+
+// ── Nav helpers: compute the NEXT indices into LOCAL consts, write $data from them, and
+// RETURN the fresh locals so the caller threads the SAME values into BOTH focusActiveCell
+// AND the activecell-change emit. NEVER re-read $data.activeRow/activeColIndex after the
+// write (React setState is async — ROZ138 — the re-read binds the PRE-write value; Angular
+// signal writes are async too — both proven live by plan 01's probe). ──────────────────────
+
+// ArrowRight/Left — clamp colIndex over [0, visibleColCount()-1] (no wrap; hidden cols
+// already excluded from the visible list per REQ-7).
+const moveCol = (delta) => {
+  // #10: when a grouped PARENT header is active, clamp against the header count AT THE ACTIVE
+  // LEVEL (which may be fewer than the leaf-column count) so ArrowRight never overruns onto a
+  // phantom cell past that level's headers. Body cells + the leaf header level keep visibleColCount().
+  const count = $data.activeIsHeader ? headerCountAtLevel($data.activeHeaderLevel) : visibleColCount()
+  const max = count - 1
+  const nextCol = clamp($data.activeColIndex + delta, 0, (max < 0 ? 0 : max))
+  $data.activeColIndex = nextCol
+  return nextCol
+}
+
+// ArrowUp/Down + PageUp/Down — cross the header boundary and clamp at body edges (no
+// page-cross per D-06/REQ-7). Returns { row, isHeader } fresh locals.
+//  - From the header, ArrowDown (delta>0) drops into body row 0 (activeIsHeader=false).
+//  - From body row 0, ArrowUp (delta<0) crosses into the header (activeIsHeader=true).
+//  - PageUp/Down jump by ±GRID_PAGE_STEP, clamped to the current page bounds (no cross).
+const moveRow = (delta) => {
+  const lastRow = bodyRowCount() - 1
+  const maxRow = lastRow < 0 ? 0 : lastRow
+  const leafLevel = headerLeafLevel()
+  if ($data.activeIsHeader) {
+    if (delta > 0) {
+      // B12 — Down: from a PARENT header level, descend to its FIRST child leaf header (one
+      // level down); from the LEAF header level, drop into the body (row 0). A header-level
+      // move re-targets activeColIndex (parent↔child column indices differ), so the fresh
+      // col is RETURNED for the caller to thread into the focus seam (NOT re-read from $data).
+      if ($data.activeHeaderLevel < leafLevel) {
+        const childCol = firstChildHeaderColIndex($data.activeHeaderLevel, $data.activeColIndex)
+        if (childCol >= 0) {
+          const nextLevel = $data.activeHeaderLevel + 1
+          $data.activeHeaderLevel = nextLevel
+          $data.activeColIndex = childCol
+          return { row: $data.activeRow, col: childCol, isHeader: true, level: nextLevel }
+        }
+      }
+      // At the leaf header: an empty grid has no body to drop into → stay put.
+      if (bodyRowCount() === 0) return { row: $data.activeRow, col: $data.activeColIndex, isHeader: true, level: $data.activeHeaderLevel }
+      // B17: crossing from the leaf header INTO the body consumes ONE step; the REMAINING
+      // (delta-1) continues the descent, so PageDown (delta=GRID_PAGE_STEP) lands a real
+      // page-down body row, NOT row 0 (== ArrowDown). ArrowDown (delta=1) still lands row 0
+      // (delta-1 = 0); clamped to the page-last body row.
+      const landRow = clamp(delta - 1, 0, maxRow)
+      $data.activeIsHeader = false
+      $data.activeRow = landRow
+      return { row: landRow, col: $data.activeColIndex, isHeader: false, level: 0 }
+    }
+    // B12 — Up: from the leaf (or any non-top) header level, ascend to the PARENT header that
+    // spans the active column; at the top level (or no real parent) stay put. The parent col
+    // index differs from the leaf's, so the fresh col is RETURNED (threaded into focus).
+    const parentCol = parentHeaderColIndex($data.activeHeaderLevel, $data.activeColIndex)
+    if (parentCol >= 0) {
+      const nextLevel = $data.activeHeaderLevel - 1
+      $data.activeHeaderLevel = nextLevel
+      $data.activeColIndex = parentCol
+      return { row: $data.activeRow, col: parentCol, isHeader: true, level: nextLevel }
+    }
+    return { row: $data.activeRow, col: $data.activeColIndex, isHeader: true, level: $data.activeHeaderLevel }
+  }
+  // In the body: an upward move from row 0 crosses into the LEAF header level (the header row
+  // adjacent to the body). The body col index aligns 1:1 with the leaf header col index, so
+  // activeColIndex carries over unchanged.
+  if (delta < 0 && $data.activeRow === 0) {
+    $data.activeIsHeader = true
+    $data.activeHeaderLevel = leafLevel
+    return { row: $data.activeRow, col: $data.activeColIndex, isHeader: true, level: leafLevel }
+  }
+  const nextRow = clamp($data.activeRow + delta, 0, maxRow)
+  $data.activeRow = nextRow
+  $data.activeIsHeader = false
+  return { row: nextRow, col: $data.activeColIndex, isHeader: false, level: 0 }
+}
+
+// Home/End within the current row → col 0 / max. Returns the fresh colIndex.
+const gotoColEdge = (toEnd) => {
+  // #10: End on a grouped PARENT header lands on that level's LAST header (headerCountAtLevel-1),
+  // not the leaf-column max — otherwise the ring strands on a phantom cell past the level's
+  // headers. Home is index 0 either way. Body cells + the leaf header level keep visibleColCount().
+  const count = $data.activeIsHeader ? headerCountAtLevel($data.activeHeaderLevel) : visibleColCount()
+  const max = count - 1
+  const nextCol = toEnd ? (max < 0 ? 0 : max) : 0
+  $data.activeColIndex = nextCol
+  return nextCol
+}
+
+// gotoRowEdge(toEnd): the §8 (260709-3qt) Ctrl+ArrowUp/Down vertical region-edge jump — move the
+// active cell to the data-region row edge (row 0 / last body row) in the CURRENT column, mirroring
+// gotoColEdge's horizontal edge jump. Body cells only (the caller gates on !activeIsHeader); always
+// lands in the body (activeIsHeader=false). Returns the fresh row index for the shared focus seam.
+const gotoRowEdge = (toEnd) => {
+  const lastRow = bodyRowCount() - 1
+  const nextRow = toEnd ? (lastRow < 0 ? 0 : lastRow) : 0
+  $data.activeRow = nextRow
+  $data.activeIsHeader = false
+  return nextRow
+}
+
+// Ctrl+Home → first body cell (0,0); Ctrl+End → last body cell (lastRow,max). Returns the
+// fresh { row, col } locals. Both land in the body (activeIsHeader=false).
+const gotoStart = () => {
+  $data.activeIsHeader = false
+  $data.activeRow = 0
+  $data.activeColIndex = 0
+  return { row: 0, col: 0 }
+}
+const gotoEnd = () => {
+  const lastRow = bodyRowCount() - 1
+  const maxRow = lastRow < 0 ? 0 : lastRow
+  const max = visibleColCount() - 1
+  const maxCol = max < 0 ? 0 : max
+  $data.activeIsHeader = false
+  $data.activeRow = maxRow
+  $data.activeColIndex = maxCol
+  return { row: maxRow, col: maxCol }
+}
+
+// Resolve the active cell element (for the in-cell trap) — uses the same data-* query as
+// the focus seam. rowKey is the literal '__header' or String(integer) — no consumer string.
+const currentCellEl = () => {
+  const rowKey = $data.activeIsHeader ? '__header' : String($data.activeRow)
+  return resolveCellEl(rowKey, $data.activeColIndex, $data.activeIsHeader ? $data.activeHeaderLevel : null)
+}
+
+// Enter/F2 → enter interaction mode: focus the active cell's FIRST interactive control
+// (D-07 — uniform for header sort buttons and body controls; Enter does NOT sort directly).
+// No-op (stay in navigation mode) if the cell has no focusable control.
+const enterControl = () => {
+  const cellEl = currentCellEl()
+  const list = focusables(cellEl)
+  if (!list.length) return
+  $data.activeInControl = true
+  list[0].focus()
+}
+
+// Cycle focus among the controls WITHIN the active cell (D-08 focus containment) — Tab
+// forward / Shift+Tab backward, wrapping at the ends. Uses the plan-01-PROVEN per-target
+// activeElement read: gridRoot.getRootNode().activeElement is the UNIFORM correct read on
+// ALL SIX (document in light DOM; the shadow root on Lit). Reuse verbatim — do NOT re-derive.
+const cycleWithinCell = (cellEl, forward) => {
+  const list = focusables(cellEl)
+  if (!list.length) return
+  const active = gridRoot ? gridRoot.getRootNode().activeElement : null
+  const cur = list.indexOf(active)
+  let i = cur < 0 ? 0 : (forward ? cur + 1 : cur - 1)
+  if (i >= list.length) i = 0
+  if (i < 0) i = list.length - 1
+  list[i].focus()
+}
+
+export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, headerLeafStart, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, ariaPageOffset, bodyAriaRowIndex, visibleColCount, gridAriaColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }

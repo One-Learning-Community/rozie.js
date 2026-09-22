@@ -1,0 +1,301 @@
+// ══ Full-row edit lifecycle (phase 51 plan 03 / req-6 / D-06, RESEARCH Pattern 6) ════════
+// Shift+F2 (and the editRow $expose verb) put EVERY editable cell in the active row into
+// edit at once; one save commits the whole row in ONE writeData (a single fresh-array row
+// replace) + ONE row-edit-commit event; Escape reverts the whole row as a unit. Per-column
+// validation still runs on each edited cell at commit (D-01 keep-open if ANY fails). The
+// editor template branch (isEditing's row arm) is re-used verbatim — no per-mode fork.
+
+// D-22 (Phase 87 plan 87-01): replaceRowValues moved to the colocated plain-TS module below —
+// pure, sigil-free, no cross-partial host-symbol calls. Re-exported unchanged from this
+// partial's trailing export list.
+import { replaceRowValues } from './helpers/rowValueUtils'
+
+// The editable [columnId, field] pairs for a body row at the given visible-model index,
+// in visible-cell order. field is the column's accessorKey (the row-object key to write).
+const editableColumnsForRow = (rowIndex) => {
+  const rowList = $data.rows || []
+  const row = rowList[rowIndex]
+  if (!row) return []
+  const cells = visibleCellsFor(row)
+  const out = []
+  for (let c = 0; c < cells.length; c++) {
+    const cell = cells[c]
+    const colId = cell && cell.column ? cell.column.id : null
+    if (colId == null || !columnEditable(colId)) continue
+    const d = defFor(colId)
+    const field = d ? (d.accessorKey != null ? d.accessorKey : colId) : colId
+    // colIndex = the VISIBLE-cell index (the data-col-index the editor cell renders under).
+    // Carried so the row-mode Tab containment (B21) + the validation-failure focus (B22)
+    // can address a SPECIFIC editor by column, not just the first [data-editing-cell].
+    out.push({ colId, field, colIndex: c })
+  }
+  return out
+}
+
+// B21/B22: focus the row-mode editor at a given VISIBLE col index. In full-row edit every
+// editable cell is already mounted as an editor, so this resolves the cell off gridRoot and
+// focuses its [data-editing-cell][data-builtin-editor] control. Bounded rAF-poll (mirrors
+// focusEditorWhenReady) so a React re-render that recreates the input across the focus call
+// still lands it. select-all on text/number editors (a no-op try/catch on select/checkbox).
+// D-01/D-02 (88-07): the old columnIdAt + presence-check early-return gate is DELETED — the
+// host-owned data-builtin-editor marker replaces it. If the resolved cell already holds an
+// editor carrying ONLY the base data-editing-cell marker (no builtin marker), that's a
+// consumer drop-in — bail immediately, it owns its own focus (EditorText's own $onMount +
+// reactive `autofocus`, which the caller already flips via $data.editFocusColId). This
+// two-step resolve (resolveCellEl THEN a scoped query within that one cell) was ALREADY
+// column-scoped and correct — it is the shape focusEditorWhenReady's D-02 rework adopts.
+const focusRowEditorAt = (rowIndex, colIndex) => {
+  if (!gridRoot) return
+  let attempts = 0
+  const tryFocus = () => {
+    const cellEl = resolveCellEl(String(rowIndex), colIndex)
+    const ed = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell][data-builtin-editor]') : null
+    if (ed) { ed.focus(); if (ed.select) { try { ed.select() } catch (e) {} } return }
+    // No marked built-in editor yet in this cell: a drop-in mounted there owns its own
+    // focus — bail immediately (D-02) rather than burning the retry ceiling on DOM the
+    // host does not own. No editor at all yet just means "keep polling."
+    const any = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null
+    if (any) return
+    attempts = attempts + 1
+    if (attempts >= 30) return
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
+    else setTimeout(tryFocus, 16)
+  }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
+  else setTimeout(tryFocus, 0)
+}
+
+// beginRowEdit(row): enter full-row edit on a body row (req-6). Seeds rowDraft from each
+// editable column's CURRENT value (so an immediate save is a no-op), clears any single-cell
+// edit (mutual exclusivity), and focuses the first editable cell's editor (the bounded
+// rAF-poll resolves the first [data-editing-cell] off gridRoot — same mechanism as
+// focusEditorWhenReady). Accepts the row OBJECT (the template/Shift+F2 path) — index-resolved
+// internally via rowIndexOf so it stays in the editingRow/activeRow index space.
+const beginRowEdit = (row) => {
+  const rowIndex = rowIndexOf(row)
+  if (rowIndex < 0) return
+  // C1 (quick 260906-cvo) — Layer 5: a second, independent editing-state funnel that takes a
+  // row OBJECT from its caller. Reachable today only via Shift+F2 (Layer 1), so also
+  // redundant at HEAD; kept for the same reason as Layer 4 — it is a mutation entry point,
+  // and the natural call site for a future #rowActions "Edit" drop-in button.
+  if (rowIndexIsGrouped(rowIndex)) return
+  const editable = editableColumnsForRow(rowIndex)
+  if (editable.length === 0) return
+  // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
+  committedThisSession = false
+  // Clear any single-cell editor first (mutual exclusivity).
+  $data.editingRow = -1
+  $data.editingCol = -1
+  $data.draftValue = null
+  setInvalid('')
+  // Seed each editable cell's draft from its current value.
+  const draft = {}
+  const rowList = $data.rows || []
+  const r = rowList[rowIndex]
+  const orig = r ? r.original : null
+  for (let i = 0; i < editable.length; i++) {
+    const ec = editable[i]
+    draft[ec.colId] = orig ? orig[ec.field] : null
+  }
+  $data.rowDraft = draft
+  $data.editingRowIndex = rowIndex
+  $data.activeInControl = true
+  $data.editVer = $data.editVer + 1
+  // Editor-owns-focus contract (quick 260711-i5m): the row's FIRST editable column is the
+  // initial focus target — editorAutofocusFor derives the reactive `autofocus` #editor scope
+  // prop from it (a built-in column is also host-focused below via focusEditorWhenReady; a
+  // drop-in column self-focuses via its own $onMount, gated off the host reach-in via D-01's
+  // marker). editable[0].colIndex is THIS call's own already-resolved value (D-02) — passed
+  // through directly, never re-read off $data.editFocusColId inside the poll.
+  $data.editFocusColId = editable[0].colId
+  focusEditorWhenReady(rowIndex, editable[0].colIndex)
+}
+
+// commitRow(): validate EVERY edited column (D-01 — keep the row open if ANY fails: set
+// invalid + announce, NEVER write the model); on all-valid build ONE fresh array replacing
+// the single row object with all rowDraft values applied at once, call writeData ONCE, then
+// emit ONE row-edit-commit from THIS single call site, clear the row state, return focus.
+// Returns true on a written commit, false when a validation failure kept the row open.
+const commitRow = () => {
+  if ($data.editingRowIndex == null) return false
+  // ── B-13 ────────────────────────────────────────────────────────────────────────────
+  // The guard above is the ROW twin of `commitEdit`'s `$data.editingRow < 0`, and it has the
+  // same weakness: on React `$data.editingRowIndex` is an async `useState` read, so a SECOND
+  // commitRow within the same tick still sees the pre-write value and re-runs the whole
+  // commit — a duplicate `row-edit-commit`, a duplicate `writeData`, and a duplicate undo
+  // snapshot. The single-cell path has carried `committedThisSession` against exactly this
+  // since the drop-in double-commit fix; the row path never got it, which the 260910 audit
+  // filed as a latch ASYMMETRY it could not reproduce.
+  //
+  // It is reproducible now, and C-05 is why: a drop-in's Enter commits the row through the
+  // host's new wrapper handler, and the focus change that follows fires `onEditorBlur`, whose
+  // row branch commits again whenever `relatedTarget` is not a cell of the editing row. On the
+  // five synchronous targets `inRowEdit()` has already gone false by then; on React it has
+  // not. Reset by `beginRowEdit` (and by `beginEdit`/`editCell`, since the two modes are
+  // mutually exclusive), so a genuinely new session always commits.
+  if (committedThisSession) return false
+  const rowIndex = $data.editingRowIndex
+  const editable = editableColumnsForRow(rowIndex)
+  if (editable.length === 0) { endRowEdit(); return false }
+  const rowList = $data.rows || []
+  const r = rowList[rowIndex]
+  const rowOriginal = r ? r.original : null
+  const rowId = r ? r.id : null
+  const draft = $data.rowDraft || {}
+  // Validate every edited column FIRST (D-01: a single failure blocks the whole row commit).
+  // B3 (Rule 1): coerce each draft by the column's editor type BEFORE validation + write — a
+  // 'number' editor must commit a real Number/null, never the raw editor STRING (the single-cell
+  // commitEdit already coerces via coerceCellValue; the row path silently committed strings →
+  // a number column ended up holding '99'). Coerce once here so the validator and the model both
+  // see the typed value, identical to the single-cell funnel.
+  for (let i = 0; i < editable.length; i++) {
+    const ec = editable[i]
+    const err = runValidator(ec.colId, coerceCellValue(ec.colId, draft[ec.colId]), rowOriginal)
+    if (err !== true) {
+      setInvalid(err)
+      // Editor-owns-focus contract (quick 260711-i5m): the OFFENDING column becomes the new
+      // reactive focus target BEFORE the host-focus call below — a #editor drop-in already
+      // mounted (full-row edit opens every editable cell at once) picks this up via its own
+      // lazy $watch on the `autofocus` scope prop flipping false→true. Bump editVer so the
+      // coarse-render targets (React/Vue/Angular/Svelte) re-derive the slot binding (Solid's
+      // fine-grained accessor re-runs without the bump, but the bump keeps all 6 in lockstep).
+      $data.editFocusColId = ec.colId
+      $data.editVer = $data.editVer + 1
+      // B22: focus the OFFENDING column's editor (the one whose validator rejected), NOT
+      // unconditionally the first editor (focusEditorWhenReady resolves the first
+      // [data-editing-cell] in DOM order). ec.colIndex is the offending cell's visible col.
+      // Gated (Task 3) so a #editor drop-in self-focuses instead of a host DOM reach-in.
+      focusRowEditorAt(rowIndex, ec.colIndex)
+      return false
+    }
+  }
+  setInvalid('')
+  // Build the changes payload (only the columns whose value actually changed) + the field→
+  // value map for the single row-object replace.
+  const changes = []
+  const fieldValues = {}
+  for (let i = 0; i < editable.length; i++) {
+    const ec = editable[i]
+    // B3 (Rule 1): commit the TYPE-COERCED value (number editor → Number/null), not the raw draft
+    // string — matches the single-cell commitEdit funnel so a row column never holds a stray string.
+    const newValue = coerceCellValue(ec.colId, draft[ec.colId])
+    const oldValue = rowOriginal ? rowOriginal[ec.field] : null
+    fieldValues[ec.field] = newValue
+    if (oldValue !== newValue) changes.push({ columnId: ec.colId, oldValue, newValue })
+  }
+  // Snapshot the active cell to return focus to (the whole row is in edit, so the active-cell
+  // row/column is the roving focus target), BEFORE endRowEdit clears editing state.
+  const focusRow = $data.activeRow
+  const focusCol = $data.activeColIndex
+  // #5: a no-op row commit (NO column's value actually changed — a bare Enter/save/outside-click
+  // that edited nothing) must do NO model write, NO history record, NO row-edit-commit event:
+  // writeData → recordSnapshot UNCONDITIONALLY clears the redo stack and mints a fresh row
+  // identity, so an unconditional write on a no-op destroys redo + spuriously re-renders + emits
+  // a no-op row-edit-commit. Gate the write/emit on `changes.length`; ALWAYS close the editor.
+  const changed = changes.length > 0
+  // B-13: latch BEFORE the write, so a re-entrant call arriving during `writeData`'s own
+  // re-render (the unmount-blur path) is already no-op'd. Set unconditionally, including on a
+  // no-op commit: the session IS over either way, and a second call must not re-open it.
+  committedThisSession = true
+  editTransition = true
+  if (changed) {
+    // ONE fresh-array replace of the SINGLE row object with all field values applied at once.
+    const srcIndex = sourceIndexOfRow(rowIndex)
+    const next = replaceRowValues(currentData(), srcIndex, fieldValues)
+    writeData(next)
+    // EXACTLY ONE emit per row commit, from THIS single call site (React multi-emit dedup, D-07).
+    $emit('row-edit-commit', { rowId, changes })
+  }
+  endRowEdit()
+  editTransition = false
+  if (changed) {
+    // WR-01/B23 (review): a FULL-ROW commit can RELOCATE its row under an active sort/filter, exactly
+    // like the single-cell commitEdit. Do NOT focus the FIXED old index — focusCellWhenReady(rowIndex,
+    // col) would land on whatever DIFFERENT row now occupies the old index (or drop to <body>) AND leave
+    // $data.activeRow stale, so the @focusin sync writes the WRONG activeRow (IN-02 — roving model +
+    // DOM focus incoherent on the next keystroke). Instead record a pending follow-request the
+    // refreshRowModel pass consumes AFTER the row model re-derives: it resolves the committed row's NEW
+    // display index by IDENTITY (rowId FIRST — stable across a re-sort; rowOriginal as fallback, since
+    // the fresh-spread replace changes the row object) and re-seats focus on THAT cell via the DOM-only
+    // poll (React-stale-safe). With no sort/filter the row keeps its index → byte-behaviorally identical.
+    pendingEditFollow = { rowOriginal, rowId, col: focusCol }
+  } else {
+    // #5 no-op path: nothing was written, so refreshRowModel never runs and would never consume a
+    // pendingEditFollow — focus would drop to <body>. Return focus DIRECTLY. The row does NOT
+    // relocate (no write), so the B23 relocation hazard does not apply: (focusRow, focusCol) is safe.
+    focusCellWhenReady(focusRow, focusCol)
+  }
+  return true
+}
+
+// cancelRow(): revert the whole row as a unit (D-06 — drop every draft, NO model write) and
+// return focus to the active cell.
+const cancelRow = () => {
+  if ($data.editingRowIndex == null) return
+  // B-13 deliberately does NOT latch here, matching its single-cell sibling `cancelEdit`,
+  // which does not either. A re-entrant cancel is harmless: `endRowEdit()` is idempotent and
+  // the path writes nothing and emits nothing. Latching it would be a deviation from the
+  // proven pattern for no gain, and would leave the latch set on a path that never committed.
+  const focusRow = $data.activeRow
+  const focusCol = $data.activeColIndex
+  editTransition = true
+  endRowEdit()
+  editTransition = false
+  focusCellWhenReady(focusRow, focusCol)
+}
+
+// Compute the next editable cell for Tab-advance (req-3, RESEARCH Open-Q3 deterministic
+// rule): skip non-editable columns within the row; wrap to the NEXT row's first editable
+// cell at the row's end; stop (return null) at grid end. Pure index math over the visible
+// model. Returns { row, col } or null.
+const nextEditableCell = (fromRow, fromCol) => {
+  const rowList = $data.rows || []
+  const rowCount = rowList.length
+  if (rowCount === 0) return null
+  let r = fromRow
+  let c = fromCol + 1
+  while (r < rowCount) {
+    const row = rowList[r]
+    const cells = row ? visibleCellsFor(row) : []
+    while (c < cells.length) {
+      const cell = cells[c]
+      const cid = cell && cell.column ? cell.column.id : null
+      if (cid != null && columnEditable(cid)) return { row: r, col: c }
+      c = c + 1
+    }
+    r = r + 1
+    c = 0
+  }
+  return null
+}
+
+// B4: the mirror of nextEditableCell — the PREVIOUS editable cell for a Shift+Tab
+// backward move. Skips non-editable columns leftward within the row; wraps to the END
+// of the prior row; stops (returns null) at grid start. Pure index math over the visible
+// model. Returns { row, col } or null.
+const prevEditableCell = (fromRow, fromCol) => {
+  const rowList = $data.rows || []
+  const rowCount = rowList.length
+  if (rowCount === 0) return null
+  let r = fromRow
+  let c = fromCol - 1
+  while (r >= 0) {
+    const row = rowList[r]
+    const cells = row ? visibleCellsFor(row) : []
+    while (c >= 0) {
+      const cell = cells[c]
+      const cid = cell && cell.column ? cell.column.id : null
+      if (cid != null && columnEditable(cid)) return { row: r, col: c }
+      c = c - 1
+    }
+    r = r - 1
+    if (r >= 0) {
+      const prow = rowList[r]
+      const pcells = prow ? visibleCellsFor(prow) : []
+      c = pcells.length - 1
+    }
+  }
+  return null
+}
+
+export { editableColumnsForRow, focusRowEditorAt, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell, prevEditableCell }

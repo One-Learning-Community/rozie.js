@@ -1,0 +1,310 @@
+// ══ Vertical row windowing (phase 53, req-1/2/3/6/9/10) — the virtual-core bridge ════════
+// virtual-core is a pure state machine EXACTLY like table-core: constructed once in $onMount
+// (ONLY when $props.virtual), its imperative onChange push converted to per-target reactivity
+// via the SEPARATE $data.windowVer tick, re-fed via setOptions()+_willUpdate() in the
+// refreshRowModel path (NEVER a render helper — Pitfall 1). Every runtime reference is guarded
+// so the virtual=false emitted path is dead (req-1).
+//
+// Phase 64 (D-04): the PURE windowing math (windowedRows / padTop / padBottom / pmIndexInWindow /
+// rowIsOutsideWindow / virtualizerOptions / virtualItemKey) now lives in the shared, target-agnostic
+// `@rozie-ui/headless-core/windowing.rzts` partial and is re-exported below — this file is now the
+// thin DATA-TABLE HOST SHELL holding only the impure, per-consumer pieces (the table-bound row
+// source + the DOM/refs/virtualizer-instance machinery + the D-05 edit-pinning hook). The math
+// dissolves in via inlineScriptPartials() byte-identically; behavior is unchanged (the B13 specs +
+// dist-parity are the net). The host satisfies the windowing.rzts contract by convention:
+// windowSource() (the row source), pinnedEditIndex()/pinnedMeasurement() (the D-05 pin hook),
+// scheduleRemeasure(), and the gridScrollEl/virtualizer/virtual-core-fn references.
+
+// ══ D-05 predicate layer (Phase 87 87-02) — resolves the windowing prop into an axis state,
+// replacing every bare truthiness read of $props.virtual (which is unsafe once the prop widens
+// to a string grammar in 87-03: 'columns' is truthy but does NOT mean "windows rows"). Modeled on
+// resolveAppendTo() in CommandPalette.rozie (the D-01 value-grammar precedent): branch on
+// typeof === 'string', switch on the known string values, fall back to the boolean cases. THIS
+// plan still declares `virtual: Boolean` (87-03 widens the declaration to [Boolean, String]), so
+// resolveVirtual() can currently only return 'off' or 'rows' and colsWindowed() is constantly
+// false — inert until 87-03/87-04 land the column axis.
+//
+// Declared BEFORE windowSource() (below): windowSource() calls rowsWindowed(), and the React
+// emitter lowers each of these to a useCallback whose dependency array is evaluated eagerly at
+// the declaration site — a forward reference here is a genuine TDZ (TS2448), not just a style
+// preference (found running the strict react typecheck gate this task, Rule 1).
+const resolveVirtual = () => {
+  const v = $props.virtual
+  if (typeof v === 'string') {
+    if (v === 'rows') return 'rows'
+    if (v === 'columns') return 'columns'
+    if (v === 'both') return 'both'
+    return 'off'
+  }
+  return v === true ? 'rows' : 'off'
+}
+// rowsWindowed(): the windowing.rzts host-contract symbol (D-05). Byte-behaviorally identical to
+// today's `$props.virtual` truthiness — this plan changes NO user-visible behavior.
+const rowsWindowed = () => {
+  const s = resolveVirtual()
+  return s === 'rows' || s === 'both'
+}
+const colsWindowed = () => {
+  const s = resolveVirtual()
+  return s === 'columns' || s === 'both'
+}
+const isWindowed = () => rowsWindowed() || colsWindowed()
+
+// autoMeasureOn() (Phase 87 87-07, D-18): the windowing.rzts host-contract gate for the
+// running-mean row-size estimator. Real body here: $props.autoMeasure === true. listbox/
+// combobox define this as a permanent `() => false` one-liner (D-20) so estimateRowSize()'s
+// accumulator branch is dead code for them.
+const autoMeasureOn = () => $props.autoMeasure === true
+
+// D-10 column-axis host-contract symbols. columnCount()/columnSize() got REAL bodies in
+// 87-04 (the tracer); forcedColumns() stays an empty-array stub until 87-05 gives it the
+// pinned + active-cell + editing-column union. Explicit return-type annotations (columnSize /
+// forcedColumns) copy the pinMeasurement() trick (windowing.rzts) so the strict bundled-leaf
+// tsc does not flow-narrow a no-op host's return to `never`.
+//
+// columnCount(): the leaf-column count the column virtualizer windows over — visibleColCount()
+// (gridFocusNav.rzts), the SAME index space colIndexOf()/data-col-index already address (D-08).
+const columnCount = (): number => visibleColCount()
+// columnSize(i): the authoritative width of absolute leaf column i (D-06). Reads table-core's
+// OWN getVisibleLeafColumns() directly — NOT the host's allLeafColumns() wrapper
+// (columnChrome.rzts), which returns plain `{ id, label, visible }` POJOs with no getSize()
+// and also EXCLUDES the auto-injected chrome columns (select/expander), breaking the index
+// alignment with columnCount()/colIndexOf(). getVisibleLeafColumns() is the array
+// row.getVisibleCells() itself is built from, so its index space matches exactly. Falls back
+// to table-core's own default column width (150) when the index is out of range.
+const columnSize = (i: number): number => {
+  if (!table || !table.getVisibleLeafColumns) return 150
+  const cols = table.getVisibleLeafColumns()
+  const c = cols[i]
+  return c && typeof c.getSize === 'function' ? c.getSize() : 150
+}
+// forcedColumns() (Phase 87 87-05, D-10): the column-axis mirror of pinnedEditIndex()/
+// pinnedMeasurement() (the row axis's D-05 pin-extension hook) — unions pinned + active-cell +
+// editing column indices into the window slice so none of them ever recycle out from under the
+// user. Reads table.getVisibleLeafColumns() DIRECTLY (the SAME array columnCount()/columnSize()
+// index against, and the array row.getVisibleCells() is itself built from) — NOT
+// allLeafColumns() (columnChrome.rzts), which excludes the auto-injected chrome columns and
+// returns plain POJOs with no getSize(), breaking the index alignment (the exact columnSize()
+// Rule-1 fix from 87-04, mirrored here rather than repeated).
+//
+// The fill-handle corner is DELIBERATELY not forced (D-10 explicit) — no call to
+// isFillHandleCell here. The whole selected RANGE is not forced either: a range's moving
+// corner tracks into $data.activeColIndex (extendRange/setRangeFocus), so even a 200-column
+// range forces at most the ONE active-cell column via the branch below, never the full span —
+// forcing the whole range would defeat the feature precisely where it is most wanted (D-10).
+const forcedColumns = (): number[] => {
+  if (!colsWindowed()) return []
+  const out = []
+  if (table && table.getVisibleLeafColumns) {
+    const cols = table.getVisibleLeafColumns()
+    for (let i = 0; i < cols.length; i++) {
+      const c = cols[i]
+      if (c && c.getIsPinned && c.getIsPinned()) out.push(i)
+    }
+  }
+  // Active cell's column (D-10): required or focusActiveCell()'s [data-col-index="N"]
+  // querySelector cannot resolve for an off-window active cell.
+  //
+  // B-03: this used to be body-cells-only, on the stated grounds that "a header-active cell
+  // has no column-axis rendering dependency here (headers window separately)". That is false —
+  // `windowedHeadersFor()` slices the header row from `windowedColIndices()`, the very set this
+  // function feeds, so a header cell has EXACTLY the same dependency a body cell does. With the
+  // active header column unforced, focusing a leaf header in a 60-column windowed grid and
+  // pressing End left `resolveCellEl` with nothing to find: focus froze on the old `<th>` while
+  // the roving model moved on, and `cellTabindex` handed `tabindex="0"` to a cell that does not
+  // exist — so the grid had no tab stop at all. The gate is gone; the column is forced for
+  // whichever axis the active cell is on.
+  if ($data.activeColIndex >= 0 && out.indexOf($data.activeColIndex) === -1) {
+    out.push($data.activeColIndex)
+  }
+  // Editing column (D-10): required or an open editor unmounts mid-keystroke when a
+  // horizontal scroll recycles it — the exact failure D-02 was built to fix on the row axis
+  // (T-87-05-01, the phase's one HIGH-severity threat). Single-cell edit mode only
+  // ($data.editingRow/editingCol, mirroring editingColumnId()'s own index pair) — full-row
+  // edit mode (editingRowIndex) has no single "the editing column" to force.
+  if ($data.editingRow >= 0 && $data.editingCol >= 0 && out.indexOf($data.editingCol) === -1) {
+    out.push($data.editingCol)
+  }
+  return out
+}
+
+// windowedCells(row) (D-09): the TEMPLATE-ONLY windowed slice of a row's visible cells — wraps
+// visibleCellsFor(row) (columnChrome.rzts) WITHOUT modifying it. Degrades to the full,
+// unsliced set when columns are not windowed (byte-identical to today). visibleCellsFor()
+// itself must never be sliced: colIndexOf/visibleColCount/columnIdAt/cellValueAt/beginEdit all
+// index into its FULL result (the A2 invariant, 87-02), and slicing it would silently break
+// all five with no compile error.
+const windowedCells = (row) => {
+  // subscribe-first (the windowedRows() discipline) so the fine-grained targets' body <td>
+  // r-for re-derives when the column window moves.
+  void $data.windowVer
+  const cells = visibleCellsFor(row)
+  if (!colsWindowed()) return cells
+  const idx = windowedColIndices()
+  const out = []
+  for (let i = 0; i < idx.length; i++) {
+    // WR-01 shrink-window guard, one axis over: drop any index that outruns the row's
+    // current cell list (a brief stale-count window analogous to windowedRows()'s WR-01).
+    const cell = cells[idx[i]]
+    if (cell) out.push(cell)
+  }
+  return out
+}
+
+// remeasureColumnWindow() (Phase 87 87-04) is declared in DataTable.rozie's OWN script, NOT
+// here — even though it is conceptually this file's D-10 host-shell twin of remeasureWindow()
+// above. Reason (Rule 1, found via the react typecheck gate): remeasureColumnWindow() must call
+// columnVirtualizerOptions() (headless-core windowing.rzts). inlineScriptPartials() groups a
+// RELATIVE partial import (this file) BEFORE a bare-package-specifier partial import
+// (@rozie-ui/headless-core/windowing.rzts) in the merged per-target output, regardless of which
+// import statement appears first in DataTable.rozie's own script (verified: columnVirtualizerOptions
+// emits as a `useCallback` LATER in the react output than every symbol this file exports). A
+// function declared HERE calling INTO windowing.rzts is therefore a forward reference — the
+// exact TS2448 TDZ class the 87-02 predicate-layer reordering already fixed once. DataTable.rozie's
+// OWN top-level script code lands AFTER both partial groups, so remeasureColumnWindow() is safe
+// declared there instead (see the comment beside windowedHeaderRow()/windowedColSpan()).
+
+// windowSource(): the rows fed to the virtualizer AND held in $data.rows — the windowing.rzts
+// host-contract source. When virtual, the FULL filtered+sorted PRE-PAGINATION model
+// (A2-verified table.getPrePaginationRowModel()) so windowing REPLACES client pagination (req-9);
+// else the normal (paginated) row model — the non-virtual path is byte-unchanged.
+const windowSource = () => {
+  if (!table) return []
+  if (rowsWindowed()) return table.getPrePaginationRowModel().rows
+  return table.getRowModel().rows
+}
+
+// Defer remeasureWindow() until AFTER the framework commits the recycled window (onChange fires
+// BEFORE React/Solid commit), falling back to a microtask/timeout where rAF is unavailable (SSR /
+// test envs). DEDUPED via remeasurePending so a scroll burst queues at most one in-flight sweep
+// (piled-up rAF sweeps broke the Solid scroll-then-focus seam — and the focus seam itself now
+// polls for its target cell, so it no longer depends on remeasure timing).
+//
+// TWO deferred passes (microtask THEN rAF), both behind the single in-flight flag:
+//   - Solid's <For> / Svelte's {#each} commit the recycled <tr> set SYNCHRONOUSLY in the reactive
+//     tick that the windowVer bump triggers, so the recycled nodes already exist by the next
+//     microtask — measuring there observes them while they are still connected, BEFORE the next
+//     fast-scroll step recycles them away. A single rAF (a full frame later) was too late on the
+//     fine-grained targets under a 40ms-per-step scroll: many rows mounted-and-recycled within one
+//     frame, so the once-per-frame rAF sweep observed only a fraction of them and the measured
+//     total under-converged (the Solid ~23.5k-vs-≥24k residual). The microtask catches them.
+//   - React's setState→reconcile→commit is async (a microtask is too early — the new window is not
+//     committed yet), so the rAF pass is what observes React's recycled rows.
+// Each pass only OBSERVES + measures the live window; measureElement is idempotent on an
+// already-observed node, so running both is cheap and loop-free.
+const scheduleRemeasure = () => {
+  // 87-13: never arm a new sweep after teardown — an onChange can still fire from a
+  // virtualizer whose own ResizeObserver cleanup has run but whose queued tick was already
+  // in flight.
+  if (remeasureDisposed) return
+  if (remeasurePending) return
+  remeasurePending = true
+  let ranMicro = false
+  const microPass = () => { remeasureWindow() }
+  const rafPass = () => { remeasureRaf = null; remeasurePending = false; remeasureWindow() }
+  if (typeof queueMicrotask !== 'undefined') { ranMicro = true; queueMicrotask(microPass) }
+  // 87-13: retain the handle so teardownRemeasure() can cancel a pass that is still pending
+  // at unmount. Without this the callback survives teardown and writes $data.windowVer.
+  if (typeof requestAnimationFrame === 'function') remeasureRaf = requestAnimationFrame(rafPass)
+  else if (ranMicro) remeasurePending = false
+  else remeasureRaf = setTimeout(rafPass, 0)
+}
+
+// 87-13 (CR-01): idempotent teardown for the deferred sweep — the same discipline
+// teardownFillDrag()/teardownRangeDrag() already follow. Cancels a pending pass and latches
+// `remeasureDisposed` so the microtask twin (which carries no cancellable handle) and any
+// in-flight onChange both bail instead of writing to a torn-down instance.
+const teardownRemeasure = () => {
+  remeasureDisposed = true
+  if (remeasureRaf != null) {
+    // Discriminate on requestAnimationFrame — the SAME predicate scheduleRemeasure() branched
+    // on when it produced this handle. Testing cancelAnimationFrame instead would hand a
+    // setTimeout id to cancelAnimationFrame in any env where the two disagree.
+    if (typeof requestAnimationFrame === 'function') cancelAnimationFrame(remeasureRaf)
+    else clearTimeout(remeasureRaf)
+    remeasureRaf = null
+  }
+  remeasurePending = false
+}
+
+// pinnedEditIndex(): the FULL-MODEL row index of the row currently in edit (D-02 pin-row),
+// or -1 when no editor is open. Under virtualization `$data.rows` is the FULL pre-pagination
+// model, so editingRow (single-cell) / editingRowIndex (full-row) — both in that index space —
+// ARE the full-model index. The pinned row must never recycle while editing (req-9): it is
+// unioned into the windowed slice when it scrolls off-window and its height is subtracted from
+// the appropriate spacer so the total stays exactly getTotalSize() (the 51-01-proven mechanism).
+// This is the data-table half of the D-05 windowing.rzts pin-extension hook (listbox provides none).
+//
+// B-06 widens this from "the editing row" to "the row that must not recycle out of the
+// window", which now includes the ACTIVE row in grid mode. The active cell is the grid's ONLY
+// `tabindex="0"` — `cellTabindex()` returns 0 for it and -1 for every other cell — so once a
+// wheel-scroll carried it out of the window the grid had NO tab stop at all: Tab could not
+// re-enter it, and the roving model still pointed at a cell with no DOM node, so
+// `resolveCellEl` returned null and a subsequent arrow key moved state with nothing to focus.
+// The column axis has forced the active-cell COLUMN since D-10 (`forcedColumns`); this is the
+// row-axis twin of that decision, and it costs at most one extra rendered row, in flow, with
+// its height subtracted from the spacer by the same 51-01 mechanism the editing pin uses.
+//
+// `$props.interactionMode` is read directly rather than through `isGrid()` (gridFocusNav.rzts):
+// that partial is imported AFTER this one, and this file's header documents the
+// forward-cross-partial-reference TDZ on React that the 87-02 lesson established. A prop read
+// has no such hazard.
+const pinnedEditIndex = () => {
+  if ($data.editingRow >= 0) return $data.editingRow
+  if ($data.editingRowIndex != null) return $data.editingRowIndex
+  if ($props.interactionMode === 'grid' && !$data.activeIsHeader && $data.activeRow >= 0) return $data.activeRow
+  return -1
+}
+// pinnedMeasurement(pin): the virtual-core measurement { index, start, size, end, key } for the
+// pinned full-model index — its measured (or estimated) height + offset, used to (a) decide
+// whether it sits above/below the rendered window and (b) subtract its height from the right
+// spacer. Null when out of range / not virtual.
+const pinnedMeasurement = (pin) => {
+  if (!virtualizer || pin < 0) return null
+  const ms = virtualizer.getMeasurements()
+  return ms && ms[pin] ? ms[pin] : null
+}
+
+// measureElement sweep (D-10 / CR-01): refine estimated heights to MEASURED ones. The off-root
+// querySelector idiom (chartjs/cropper/embla precedent — no per-row callback ref). Each rendered
+// <tr> MUST be handed to virtualizer.measureElement on every window commit for it to be observed:
+// virtual-core does NOT auto-register rendered rows — measureElement is the SOLE caller of its
+// internal ResizeObserver's observe() (virtual-core@3.17.1 dist/esm/index.js:794-817), keyed by
+// getItemKey. So this sweep must run not just once at mount but on every onChange tick (via
+// scheduleRemeasure), or recycled rows keep the estimateRowHeight seed forever. measureElement is
+// idempotent on an already-observed node (the `prevNode !== node` guard), so re-sweeping the
+// visible window each commit is cheap and loop-free.
+const remeasureWindow = () => {
+  // 87-13 (CR-01): the disposed latch, checked BEFORE the ref guard below. That guard cannot
+  // cover unmount — virtualizer/gridRoot are assigned in $onMount and never nulled — so this
+  // is the only thing standing between a pass queued pre-unmount and refineRowEstimate()'s
+  // setOptions/scrollTop/$data.windowVer writes against a torn-down instance.
+  if (remeasureDisposed) return
+  if (!virtualizer || !gridRoot) return
+  // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
+  // exclusively during scrollToIndex / scrollToOffset (the D-12 scroll-then-focus seam) and
+  // null for ordinary user/scrollTop-driven scrolling (verified virtual-core@3.17.1: set in
+  // scrollToIndex L992, cleared to null on reconcile L378). Measuring mid-scrollToIndex lets
+  // resizeItem nudge the offset and starve the scroll target (the Solid off-window focus
+  // regression); the next settled onChange re-measures the stable window. Manual-scroll
+  // recycling (the CR-01 case) has scrollState === null, so it measures normally.
+  if (virtualizer.scrollState) return
+  const trs = gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]')
+  for (const tr of trs) virtualizer.measureElement(tr)
+  // D-15 (Phase 87 87-07): trigger the shared engine's post-measurement fold + hysteresis
+  // re-feed via the afterRowRemeasure mutable-let hook (DataTable.rozie's own script,
+  // assigned to windowing.rzts's refineRowEstimate()) — NEVER a direct call from this file
+  // into windowing.rzts (see windowing.rzts's HOST CONTRACT comment for the forward-
+  // reference TDZ this indirection avoids, the same class remeasureColumnWindow()'s comment
+  // documents for columnVirtualizerOptions()). Inert (no-op) until the host assigns it; the
+  // off/pre-mount path never reaches this line since virtualizer is null there.
+  if (afterRowRemeasure) afterRowRemeasure()
+}
+
+// D-04: this shell exports ONLY the impure, data-table-specific host pieces. The pure windowing
+// math (windowedRows / padTop / padBottom / pmIndexInWindow / rowIsOutsideWindow / virtualizerOptions
+// / virtualItemKey) is imported DIRECTLY by the host (DataTable.rozie) from
+// `@rozie-ui/headless-core/windowing.rzts` via bare specifier — the P0-proven cross-package inline
+// path that DISSOLVES the partial into the leaf (a re-export-from THROUGH this shell would survive as
+// a runtime import, not inline — verified). The math closes over these host symbols by convention.
+export { windowSource, scheduleRemeasure, teardownRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn }

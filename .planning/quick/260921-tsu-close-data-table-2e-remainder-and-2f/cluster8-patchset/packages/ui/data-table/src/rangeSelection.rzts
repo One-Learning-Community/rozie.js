@@ -1,0 +1,258 @@
+const inRange = (rIdx, cIdx) => {
+  const a = $data.rangeAnchor
+  const f = $data.rangeFocus
+  if (!a || !f) return false
+  const r0 = a.rowIndex < f.rowIndex ? a.rowIndex : f.rowIndex
+  const r1 = a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex
+  const c0 = a.colIndex < f.colIndex ? a.colIndex : f.colIndex
+  const c1 = a.colIndex > f.colIndex ? a.colIndex : f.colIndex
+  return rIdx >= r0 && rIdx <= r1 && cIdx >= c0 && cIdx <= c1
+}
+
+// getSelectedRange(): the current range as plain integers — { anchor, focus } each a
+// { rowIndex, colIndex } pair (or null when no range). T-49-02: positions only, no row
+// data, no DOM node. Used by the getSelectedRange $expose verb AND every range-change emit
+// (the single payload source) AND copyRange/fillRange (the rectangle they operate over).
+const getSelectedRange = () => {
+  // B8: clamp the corners to the CURRENT bounds ON READ so the verb (and the range-change emit
+  // payload) never reports a corner past a shrunken model — React-stale-safe (the eager
+  // refreshRowModel clamp is async-defeated on React; this read-time clamp is the guarantee).
+  const a = $data.rangeAnchor
+  const f = $data.rangeFocus
+  if (!a && !f) return { anchor: null, focus: null }
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return { anchor: null, focus: null }
+  const clampCorner = (c) => (c == null ? null : { rowIndex: clamp(c.rowIndex, 0, maxRow), colIndex: clamp(c.colIndex, 0, maxCol) })
+  return { anchor: clampCorner(a), focus: clampCorner(f) }
+}
+
+// isFillHandleCell(rIdx, cIdx): is this cell the BOTTOM-RIGHT corner of the current range?
+// That corner hosts the fill-handle affordance (req-8 / D-04). False without a range — the
+// byte-identical-off guard for the handle markup (no range → no handle).
+const isFillHandleCell = (rIdx, cIdx) => {
+  const a = $data.rangeAnchor
+  const f = $data.rangeFocus
+  if (!a || !f) return false
+  const r1 = a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex
+  const c1 = a.colIndex > f.colIndex ? a.colIndex : f.colIndex
+  return rIdx === r1 && cIdx === c1
+}
+
+// emitRangeChange(anchor, focus): fire range-change with the FRESH range corners passed by
+// the caller — NOT a re-read of $data.rangeAnchor/rangeFocus. The range corners are <data>
+// (useState on React), so re-reading right after the same-tick setState returns the STALE
+// pre-write value (ROZ138). extendRange/setRangeFocus thread the just-computed locals through
+// here so the emitted payload matches the write. The single call site keeps the count
+// predictable (React multi-emit dedup, D-07). One-way notification.
+// B-10 — announce the selection alongside the emit. This is the SINGLE site every range
+// mutation funnels through (shift+arrow via extendRange, shift+click and drag-select and
+// fill-drag via setRangeFocus, Ctrl+A via selectAllBody), so one announce here covers all of
+// them; guarding the callers individually would be five chances to miss one.
+//
+// Writes $data.rangeAnnounce directly rather than importing clipboardFill's announce(): that
+// helper drives pasteAnnounce, and a range move must not overwrite a paste/validation message
+// the user has not heard yet (hence the separate key + region). `polite` + `aria-atomic` means
+// a fast drag replaces the pending text instead of queueing every intermediate rectangle.
+const rangeSummary = (anchor, focus) => {
+  if (!anchor || !focus) return ''
+  const rows = Math.abs(focus.rowIndex - anchor.rowIndex) + 1
+  const cols = Math.abs(focus.colIndex - anchor.colIndex) + 1
+  if (rows === 1 && cols === 1) return '1 cell selected'
+  const rowPart = rows + (rows === 1 ? ' row' : ' rows')
+  const colPart = cols + (cols === 1 ? ' column' : ' columns')
+  return rowPart + ' by ' + colPart + ' selected, ' + (rows * cols) + ' cells'
+}
+const emitRangeChange = (anchor, focus) => {
+  $data.rangeAnnounce = rangeSummary(anchor, focus)
+  $emit('range-change', { anchor, focus })
+}
+
+// extendRange(dRow, dCol): move rangeFocus by the (row,col) delta, clamped to the grid
+// bounds, seeding rangeAnchor from the active cell when no range exists yet (Shift+Arrow
+// from a bare active cell starts a 1×N / N×1 rectangle anchored at that cell). Body cells
+// only (header rows are not range-selectable). Emits range-change from this single site.
+const extendRange = (dRow, dCol) => {
+  if ($data.activeIsHeader) return
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return
+  // Seed the anchor + focus from the active cell on the FIRST extend (no range yet).
+  let anchor = $data.rangeAnchor
+  let focus = $data.rangeFocus
+  const hadRange = !!(anchor && focus)
+  if (!anchor || !focus) {
+    anchor = { rowIndex: $data.activeRow, colIndex: $data.activeColIndex }
+    focus = { rowIndex: $data.activeRow, colIndex: $data.activeColIndex }
+  }
+  const nextRow = clamp(focus.rowIndex + dRow, 0, maxRow)
+  const nextCol = clamp(focus.colIndex + dCol, 0, maxCol)
+  const nextFocus = { rowIndex: nextRow, colIndex: nextCol }
+  $data.rangeAnchor = anchor
+  $data.rangeFocus = nextFocus
+  rangeActive = true
+  // Keep the active cell tracking the moving focus corner (so a follow-up F2 / arrow acts
+  // from the range's leading edge, the spreadsheet convention).
+  $data.activeRow = nextRow
+  $data.activeColIndex = nextCol
+  // Suppress the focus-move's @focusin clearRange (no shiftKey on a programmatic focus): the
+  // settle on the new focus corner is part of THIS range extension, not a fresh navigation.
+  rangeTransition = true
+  focusActiveCell(nextRow, nextCol, false)
+  // B18: emit range-change ONLY on an actual change. A clamped no-op (a range already exists
+  // and the focus corner did not move — Shift+Arrow into the grid boundary) is not a selection
+  // change → no emit. Seeding a brand-new range (no prior range) is always a change (the
+  // rectangle came into existence) even if its first corner is a degenerate 1×1.
+  if (!hadRange || nextRow !== focus.rowIndex || nextCol !== focus.colIndex) {
+    emitRangeChange(anchor, nextFocus)
+  }
+}
+
+// setRangeFocus(rIdx, cIdx, anchorR, anchorC): set the moving corner to an explicit cell
+// (Shift+Click, or a drag-select's pointermove), seeding the anchor when no range exists yet.
+// Clamped to bounds. Emits range-change from this single site.
+//
+// B-01: the anchor seed is EXPLICIT when the caller knows it. Seeding it from
+// `$data.activeRow`/`$data.activeColIndex` is only correct if that state is live at the moment
+// the seed happens — and inside a drag-select it is not on React, where the document
+// pointermove closure captures the render-scoped consts from the render that ran BEFORE the
+// mousedown. Native focus moves as mousedown's DEFAULT ACTION, after handlers return, so at
+// `beginRangeDrag` time the active cell is still the PRE-mousedown one and React can never
+// show that closure a newer value. Dragging (5,2)→(7,3) on a fresh grid anchored at (0,0) and
+// selected the whole rectangle from there — which Ctrl+X and Delete then destroy.
+// The other five targets read `$data.activeRow` LIVE inside `move` (by then focusin has synced
+// it), so they were accidentally correct; taking the anchor from the caller removes the read
+// entirely and makes all six correct for the same reason. Falls back to the active cell when no
+// explicit anchor is passed — Shift+Click, where "the anchor is where you already were" IS the
+// active cell and the read happens synchronously in the same handler.
+const setRangeFocus = (rIdx, cIdx, anchorR, anchorC) => {
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return
+  let anchor = $data.rangeAnchor
+  if (!anchor && anchorR != null && anchorC != null) {
+    anchor = { rowIndex: clamp(Math.trunc(Number(anchorR)) || 0, 0, maxRow), colIndex: clamp(Math.trunc(Number(anchorC)) || 0, 0, maxCol) }
+  }
+  if (!anchor) anchor = { rowIndex: $data.activeRow, colIndex: $data.activeColIndex }
+  const r = clamp(Math.trunc(Number(rIdx)) || 0, 0, maxRow)
+  const c = clamp(Math.trunc(Number(cIdx)) || 0, 0, maxCol)
+  const nextFocus = { rowIndex: r, colIndex: c }
+  $data.rangeAnchor = anchor
+  $data.rangeFocus = nextFocus
+  rangeActive = true
+  emitRangeChange(anchor, nextFocus)
+}
+
+// selectAllBody(): the §8 (260709-3qt) Ctrl+A whole-body select — set the range to span EVERY
+// body cell (anchor at the first body cell (0,0), moving corner at the last (maxRow, maxCol)),
+// driving the SAME range corners shift+arrow / setRangeFocus use. Emits range-change from a single
+// site (the emitRangeChange contract — pass the FRESH corners, never a $data re-read). No-op on an
+// empty grid. Body cells only — a header-active Ctrl+A is gated OUT by the caller (never builds a
+// range from a header). rangeActive is set synchronously so a follow-up clearRange collapses it.
+const selectAllBody = () => {
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return
+  const anchor = { rowIndex: 0, colIndex: 0 }
+  const focus = { rowIndex: maxRow, colIndex: maxCol }
+  $data.rangeAnchor = anchor
+  $data.rangeFocus = focus
+  rangeActive = true
+  emitRangeChange(anchor, focus)
+}
+
+// ── B-04: where does a range EXTENSION measure its delta from? ──────────────────────────
+// `extendRange(dRow, dCol)` applies its delta to the range's FOCUS corner, not to the active
+// cell. For shift+arrow the two always agree (extendRange writes the active cell to the new
+// focus on every step), but two paths deliberately move the focus corner WITHOUT syncing the
+// active cell: a drag-select (`setRangeFocus`, which leaves the active cell on the mousedown
+// anchor) and Ctrl+A (`selectAllBody`, which sets both corners outright). After either,
+// Ctrl/Cmd+Shift+Arrow computed "distance from the active cell to the edge" and then added it
+// to a DIFFERENT cell. Drag (5,2)->(7,3) then Ctrl+Shift+ArrowUp extended to row 2 instead of
+// row 0; Ctrl+Shift+ArrowLeft to column 1 instead of column 0 — an extend-to-edge that stops
+// short of the edge by exactly the gap between the two.
+//
+// These report the corner extendRange will actually move, so the delta and its target are the
+// same cell by construction. No range yet -> the active cell IS the focus corner.
+const rangeFocusRow = () => {
+  const f = $data.rangeFocus
+  return f && f.rowIndex != null ? f.rowIndex : $data.activeRow
+}
+const rangeFocusCol = () => {
+  const f = $data.rangeFocus
+  return f && f.colIndex != null ? f.colIndex : $data.activeColIndex
+}
+
+// B-15: the APG grid pattern's Ctrl+Space — select the COLUMN containing the focused cell.
+// Expressed as a full-height rectangle over the SAME range corners shift+arrow and Ctrl+A
+// drive, so Ctrl+C / Ctrl+X / Delete / the fill handle all act on it with no new machinery
+// and no second selection concept for a consumer to reason about. Emits through the single
+// emitRangeChange funnel (fresh corners, never a $data re-read). No-op on an empty grid, and
+// header-active is gated OUT by the caller, exactly as selectAllBody is.
+const selectActiveColumn = () => {
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return
+  const c = clamp(Math.trunc(Number($data.activeColIndex)) || 0, 0, maxCol)
+  const anchor = { rowIndex: 0, colIndex: c }
+  const focus = { rowIndex: maxRow, colIndex: c }
+  $data.rangeAnchor = anchor
+  $data.rangeFocus = focus
+  rangeActive = true
+  emitRangeChange(anchor, focus)
+}
+
+// clearRange(): drop the rectangle (a non-shift navigation / edit-entry collapses any
+// range back to a single active cell). Cheap no-op when no range is set (the guard keeps a
+// plain navigation with no active range from emitting). B19: when a range DID exist, emit
+// range-change with null corners so a consumer mirroring the selection through the event sees
+// the drop — without this they hold a STALE rectangle after every non-shift navigation /
+// edit-entry collapse (getSelectedRange already reports null, but the event never fired).
+const clearRange = () => {
+  // B19: gate on the SYNCHRONOUS rangeActive mirror, NOT a $data re-read. clearRange runs twice
+  // in one plain-arrow keydown (explicit collapse + the focusin after the programmatic focus
+  // move); on React `$data.rangeAnchor = null` is async, so a `$data.rangeAnchor == null` guard
+  // would let the SECOND call through and emit a duplicate range-change. rangeActive flips
+  // synchronously → the second call returns here.
+  if (!rangeActive) return
+  rangeActive = false
+  $data.rangeAnchor = null
+  $data.rangeFocus = null
+  emitRangeChange(null, null)
+}
+
+// B8: clamp the range corners to the current grid bounds after an underlying-data change
+// (sort/filter/paginate/page-size all re-derive the row model). A range whose rows now exceed
+// the shrunken model would otherwise leave STALE/phantom corners → a copy serializes empty
+// rows past the model's end (and getSelectedRange reports out-of-bounds corners). We CLAMP each
+// corner into [0,maxRow]×[0,maxCol] (preserving a valid rectangle — a corner that clamps onto
+// another keeps the range non-empty); when no selectable body cell remains the rectangle is
+// dropped. Does NOT emit range-change here — the clamp is a reconcile, not a user selection
+// move (the emit-on-change work, B18/B19, lands in plan 63-05). Called from clampActiveCell.
+const clampRange = (maxRowArg, maxColArg) => {
+  const a = $data.rangeAnchor
+  const f = $data.rangeFocus
+  if (!a && !f) return
+  // Bounds passed from the FRESH model (clampActiveCell → refreshRowModel's nextRows) so the
+  // shrink-clamp is React-stale-safe; fall back to the live helpers for a direct call.
+  const maxRow = maxRowArg != null ? maxRowArg : (bodyRowCount() - 1)
+  const maxCol = maxColArg != null ? maxColArg : (visibleColCount() - 1)
+  if (maxRow < 0 || maxCol < 0) {
+    $data.rangeAnchor = null
+    $data.rangeFocus = null
+    rangeActive = false
+    return
+  }
+  if (a) {
+    const ar = clamp(a.rowIndex, 0, maxRow)
+    const ac = clamp(a.colIndex, 0, maxCol)
+    if (ar !== a.rowIndex || ac !== a.colIndex) $data.rangeAnchor = { rowIndex: ar, colIndex: ac }
+  }
+  if (f) {
+    const fr = clamp(f.rowIndex, 0, maxRow)
+    const fc = clamp(f.colIndex, 0, maxCol)
+    if (fr !== f.rowIndex || fc !== f.colIndex) $data.rangeFocus = { rowIndex: fr, colIndex: fc }
+  }
+}
+
+export { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, selectAllBody, selectActiveColumn, rangeFocusRow, rangeFocusCol, clearRange, clampRange }

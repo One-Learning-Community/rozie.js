@@ -1,0 +1,402 @@
+<!--
+  GroupBar.rozie — presentational #groupBar slot DROP-IN for @rozie-ui/data-table.
+
+  A ready-made drag-to-group bar filling the headless `#groupBar` slot. Consumers
+  forward the slot scope and get a working bar with ZERO extra deps (native HTML5
+  drag-and-drop):
+
+    <DataTable … groupable>
+      <template #groupBar="{ grouping, groupableColumns, applyGrouping, clearGrouping }">
+        <GroupBar :grouping="grouping" :groupableColumns="groupableColumns"
+                  :applyGrouping="applyGrouping" :clearGrouping="clearGrouping" />
+      </template>
+    </DataTable>
+
+  CONTRACT: the grouping order is the parent's source of truth. This drop-in NEVER
+  keeps its own copy of the grouping order — it ALWAYS reads `$props.grouping` and
+  writes ONLY through `$props.applyGrouping` / `$props.clearGrouping`. The only local
+  state is ephemeral drag bookkeeping (`$data.draggingId` / `dragKind` / `dropKey` /
+  `isOver`).
+
+  Drag a column chip into the drop zone to add it to the grouping; drag an active
+  token onto another to REORDER it (it lands before the anchor token, or at the end
+  when dropped on empty zone space); click a token's × to remove it; "Clear" resets.
+  A chip drag (dragKind 'chip') APPENDS; a token drag (dragKind 'token') MOVES — the
+  onDrop branch keys off dragKind. Native DnD requires preventDefault on dragover or
+  @drop never fires — onDragOver / onTokenDragOver handle that across all 6 targets.
+
+  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. Styling split:
+  the SHARED `.rdt-group-token` pill + `.rdt-group-bar-host` are descendant selectors
+  defined in DataTable.rozie's <style> (a slotted <GroupBar> renders inside that subtree
+  so the DOM nesting reaches them, and Lit crosses the shadow via ::part(group-token)).
+  The drop-zone chrome (`.rdt-group-drop-zone`, its empty-state hint, the drag-over
+  highlight) is LOCAL to this drop-in — it exists nowhere else, so it lives in the
+  <style> block below rather than paying the cross-shadow :deep()/::part() tax. Its
+  `--rdt-group-drop-zone-*` tokens still inherit through the Lit shadow, so consumer
+  retheming works the same as the shared pills.
+-->
+<rozie name="GroupBar" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  // The ORDERED active grouping key array (READ-ONLY source of truth).
+  grouping:         {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'The ordered active grouping key array (read-only source of truth from the `#groupBar` slot scope). This drop-in never keeps its own copy — it always reads this and writes through `applyGrouping` / `clearGrouping`.',
+    },
+  },
+  // The columns offered as grouping targets — `[{ id, label }]`.
+  groupableColumns: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'The columns offered as grouping targets — `[{ id, label }]` — rendered as draggable chips.',
+    },
+  },
+  // (cols: string[]) => void — the ONLY add/reorder writer. Null-guarded at call sites.
+  applyGrouping:    {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        '`(cols: string[]) => void` — the only add/reorder writer for the grouping order. Null-guarded at call sites.',
+    },
+  },
+  // () => void — the ONLY clear writer. Null-guarded at call sites.
+  clearGrouping:    {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        '`() => void` — the only clear writer; resets grouping to empty. Null-guarded at call sites.',
+    },
+  },
+}
+</props>
+
+<data>
+{
+  // Ephemeral drag bookkeeping ONLY — which column id is mid-drag. NEVER a copy of
+  // the grouping order (that lives in $props.grouping).
+  draggingId: '',
+  // Ephemeral drop-target highlight — true while a chip is dragged over the zone.
+  // Presentational only; drives the .is-over class (light DOM) + `group-drop-zone-over`
+  // ::part token (Lit shadow). Reset on drop / real leave.
+  isOver: false,
+  // Ephemeral: which kind of drag is in flight — 'chip' (add a NEW column from the
+  // palette) vs 'token' (REORDER an existing grouping key). Selects the onDrop branch.
+  dragKind: '',
+  // Ephemeral: the active-token key currently under the pointer during a reorder drag
+  // — we drop BEFORE it. '' → the drop lands at the end (move-to-last). Also drives the
+  // .is-drop-target insertion marker.
+  dropKey: '',
+}
+</data>
+
+<script lang="ts">
+// Untyped handler params neutralize to `any` so the native drag-event shapes
+// (dataTransfer / preventDefault) typecheck across all six strict leaves — the
+// global-filter idiom (see FilterText.rozie). NEVER annotate these params.
+
+// A palette CHIP started dragging → this is an ADD-a-new-column drag.
+const onChipDragStart = (e, id) => {
+  $data.draggingId = id
+  $data.dragKind = 'chip'
+  if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', id)
+}
+
+// An active TOKEN started dragging → this is a REORDER drag.
+const onTokenDragStart = (e, gk) => {
+  $data.draggingId = gk
+  $data.dragKind = 'token'
+  if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', gk)
+}
+
+// MUST preventDefault — native HTML5 DnD never fires @drop on a zone that does not
+// cancel the dragover default. Also raises the drop-target highlight.
+const onDragOver = (e) => {
+  if (e) e.preventDefault()
+  $data.isOver = true
+}
+
+// While reordering, record the token under the pointer as the insertion anchor
+// (we drop BEFORE it). preventDefault so the zone still accepts the drop. Ignored
+// for chip drags — those just append at the end.
+const onTokenDragOver = (e, gk) => {
+  if (e) e.preventDefault()
+  if ($data.dragKind === 'token') $data.dropKey = gk
+}
+
+// Clear the highlight only on a REAL leave: dragleave ALSO fires when the pointer
+// crosses onto a child token, so ignore leaves whose relatedTarget is still inside
+// the zone (prevents flicker as you hover over existing grouping tokens).
+const onDragLeave = (e) => {
+  if (e && e.currentTarget && e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return
+  $data.isOver = false
+  $data.dropKey = ''
+}
+
+// Single reset for all ephemeral drag bookkeeping — called on drop AND on dragend
+// (so an aborted drag, dropped outside the zone, still clears the marker/highlight).
+const resetDrag = () => {
+  $data.draggingId = ''
+  $data.dragKind = ''
+  $data.dropKey = ''
+  $data.isOver = false
+}
+
+const onDragEnd = () => {
+  resetDrag()
+}
+
+const onDrop = (e) => {
+  if (e) e.preventDefault()
+  const kind = $data.dragKind
+  const anchor = $data.dropKey
+  const id = (e && e.dataTransfer && e.dataTransfer.getData('text/plain')) || $data.draggingId
+  resetDrag()
+  if (!id) return
+  if (kind === 'token') {
+    // REORDER: pull the dragged key out, then splice it back in BEFORE the anchor
+    // token (or at the end when dropped on empty zone space). Shift-safe because we
+    // resolve the anchor by KEY inside the already-filtered array, not by raw index.
+    if ($props.grouping.indexOf(id) === -1) return
+    const without = $props.grouping.filter((k) => k !== id)
+    let to = without.length
+    if (anchor && anchor !== id) {
+      const j = without.indexOf(anchor)
+      if (j !== -1) to = j
+    }
+    const next = without.slice(0, to).concat([id]).concat(without.slice(to))
+    $props.applyGrouping && $props.applyGrouping(next)
+    return
+  }
+  // APPEND (chip): add the dragged column IF not already grouped — read the order
+  // from $props.grouping, write the NEW order through applyGrouping.
+  if ($props.grouping.indexOf(id) !== -1) return
+  const next = $props.grouping.concat([id])
+  $props.applyGrouping && $props.applyGrouping(next)
+}
+
+// ── C-04: the keyboard half of the group bar ────────────────────────────────────────────
+// Native HTML5 drag-and-drop was the SOLE input path for both adding and reordering, on
+// elements with no tabindex, no role and no click/keydown handler. Remove and Clear were real
+// `<button>`s, so a keyboard user could UNGROUP but could never group or reorder — the bar was
+// a one-way door. HTML5 DnD has no keyboard equivalent by construction, so a parallel,
+// explicitly-keyboard path is the only fix; both halves write through the SAME
+// `applyGrouping` funnel the drop handler uses, so there is one ordering rule, not two.
+//
+// The palette chips become real `<button>`s (Enter/Space for free, focusable for free) rather
+// than spans with `tabindex` + a hand-rolled key handler — the same reasoning that already
+// made Remove and Clear buttons. A `<button draggable="true">` keeps the existing pointer
+// path working unchanged.
+//
+// Reorder is Alt+Arrow on a grouping token, not plain Arrow: the tokens sit in a toolbar that
+// a user also arrows THROUGH, and stealing bare arrows would trap them. Alt is the modifier
+// Windows/macOS list reordering conventionally uses.
+const toggleKey = (id) => {
+  if (!id) return
+  if ($props.grouping.indexOf(id) !== -1) {
+    removeKey(id)
+    return
+  }
+  $props.applyGrouping && $props.applyGrouping($props.grouping.concat([id]))
+}
+
+// Move a grouping key one position left/right. No-op at the ends (never wraps: a wrap would
+// make a held key cycle forever with no signal that the end was reached).
+const moveKey = (key, delta) => {
+  const cur = $props.grouping
+  const from = cur.indexOf(key)
+  if (from === -1) return
+  const to = from + delta
+  if (to < 0 || to >= cur.length) return
+  const next = cur.slice()
+  next.splice(from, 1)
+  next.splice(to, 0, key)
+  $props.applyGrouping && $props.applyGrouping(next)
+}
+
+const onTokenKeydown = (e, gk) => {
+  if (!e) return
+  const key = e.key
+  if (key === 'Delete' || key === 'Backspace') { e.preventDefault(); removeKey(gk); return }
+  if (!e.altKey) return
+  if (key === 'ArrowLeft') { e.preventDefault(); moveKey(gk, -1) }
+  else if (key === 'ArrowRight') { e.preventDefault(); moveKey(gk, 1) }
+}
+
+const removeKey = (key) => {
+  $props.applyGrouping && $props.applyGrouping($props.grouping.filter((k) => k !== key))
+}
+
+const clearAll = () => {
+  $props.clearGrouping && $props.clearGrouping()
+}
+
+// Resolve a grouping key to its column's friendly label (falls back to the raw
+// key). Used for both the token text and the remove button's aria-label so the
+// bar reads in human terms, not internal column ids. Untyped like the handlers.
+const labelFor = (key) => {
+  const col = $props.groupableColumns.find((c) => c.id === key)
+  return (col && col.label) || key
+}
+</script>
+
+<template>
+<div class="rdt-group-bar">
+  <!-- (a) draggable column chips (the palette — ADD a new grouping key) -->
+  <button
+    type="button"
+    class="rdt-group-token rdt-group-token-add"
+    part="group-token"
+    r-for="col in $props.groupableColumns"
+    :key="col.id"
+    draggable="true"
+    :aria-pressed="$props.grouping.indexOf(col.id) !== -1 ? 'true' : 'false'"
+    :aria-label="'Group by ' + col.label"
+    @dragstart="onChipDragStart($event, col.id)"
+    @dragend="onDragEnd()"
+    @click="toggleKey(col.id)"
+  >{{ col.label }}</button>
+
+  <!-- (b) drop zone listing the ACTIVE grouping as removable tokens -->
+  <span
+    class="rdt-group-drop-zone"
+    :class="{ 'is-over': $data.isOver }"
+    data-group-drop-zone
+    role="list"
+    aria-label="Active grouping"
+    @dragover="onDragOver($event)"
+    @dragleave="onDragLeave($event)"
+    @drop="onDrop($event)"
+  >
+    <!-- empty-state affordance: only shown when nothing is grouped yet -->
+    <span class="rdt-group-drop-hint" r-if="!$props.grouping.length">Drag columns here to group</span>
+    <!-- active grouping tokens — draggable to REORDER; the anchor token gets .is-drop-target -->
+    <span
+      class="rdt-group-token"
+      part="group-token"
+      data-group-token
+      r-for="gk in $props.grouping"
+      :key="gk"
+      :class="{ 'is-drop-target': $data.dragKind === 'token' && $data.dropKey === gk && $data.draggingId !== gk }"
+      draggable="true"
+      role="listitem"
+      tabindex="0"
+      :aria-label="labelFor(gk) + ' grouping, position ' + ($props.grouping.indexOf(gk) + 1) + ' of ' + $props.grouping.length + '. Alt+Arrow to reorder, Delete to remove.'"
+      @dragstart="onTokenDragStart($event, gk)"
+      @dragover="onTokenDragOver($event, gk)"
+      @dragend="onDragEnd()"
+      @keydown="onTokenKeydown($event, gk)"
+    >
+      {{ labelFor(gk) }}
+      <button type="button" class="rdt-group-token-remove" :aria-label="'Remove ' + labelFor(gk) + ' grouping'" @click="removeKey(gk)">×</button>
+    </span>
+  </span>
+
+  <!-- (c) clear affordance, shown only when grouping is non-empty -->
+  <button type="button" class="rdt-group-clear" r-if="$props.grouping.length" @click="clearAll()">Clear</button>
+</div>
+</template>
+
+<style>
+/* Drop-zone chrome is LOCAL to this drop-in (unlike the shared `.rdt-group-token` pill,
+   which DataTable owns). Keeping it here means the selectors sit in our OWN subtree — no
+   cross-shadow `:deep()`/`::part()` needed. Token-driven so consumers can retheme; the
+   `--rdt-*` custom props inherit through the Lit shadow boundary just fine. */
+.rdt-group-drop-zone {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rdt-group-bar-gap, 0.375rem);
+  min-width: var(--rdt-group-drop-zone-min, 8rem);
+  min-height: 1.75rem;
+  padding: var(--rdt-group-drop-zone-pad, 0.1875rem 0.5rem);
+  border: 1px dashed var(--rdt-group-drop-zone-border, rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-group-drop-zone-radius, 0.375rem);
+  background: var(--rdt-group-drop-zone-bg, transparent);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+/* Drag-over highlight — driven by the ephemeral $data.isOver flag. */
+.rdt-group-drop-zone.is-over {
+  border-color: var(--rdt-group-drop-zone-border-over, rgba(37, 99, 235, 0.7));
+  background: var(--rdt-group-drop-zone-bg-over, rgba(37, 99, 235, 0.08));
+}
+/* C-04: the palette chips are real `<button>`s now, so they need the UA button reset that
+   makes them read as the same pill the grouping tokens are. `font: inherit` and the
+   background/border reset are the whole of it — the shared `.rdt-group-token` rule (owned by
+   DataTable) supplies the actual pill chrome, and a button inherits none of the UA defaults
+   a span never had. */
+.rdt-group-token-add {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  padding: inherit;
+  cursor: pointer;
+}
+/* C-04: a visible focus ring on BOTH keyboard affordances. The grouping tokens carry
+   `tabindex="0"` for Alt+Arrow reordering and the palette chips are focusable by being
+   buttons; without a ring, a keyboard user driving the bar has no idea where they are. Uses
+   the same `--rdt-focus-ring` token the rest of the family's keyboard chrome reads. */
+.rdt-group-token-add:focus-visible,
+.rdt-group-drop-zone [data-group-token]:focus-visible {
+  outline: var(--rdt-focus-ring, 2px solid #2563eb);
+  outline-offset: 1px;
+}
+/* Empty-state hint — pointer-events off so it never eats the drag/drop events. */
+.rdt-group-drop-hint {
+  opacity: 0.55;
+  font-size: 0.8125em;
+  user-select: none;
+  pointer-events: none;
+}
+/* Lay the drop-in's own root out in a row; wrap so it can't overflow the (already
+   wrapping) .rdt-group-bar-host wrapper DataTable provides. */
+.rdt-group-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rdt-group-bar-gap, 0.375rem);
+}
+/* Minimal reset for the in-token × and the Clear action — both shipped as bare UA
+   buttons. NOTE: outline:none WITHOUT a replacement drops the keyboard focus ring,
+   so the accessible :focus-visible outline below is load-bearing, not decorative. */
+.rdt-group-token-remove {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 0.125rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.rdt-group-token-remove:hover {
+  opacity: 1;
+}
+.rdt-group-clear {
+  cursor: pointer;
+}
+.rdt-group-token-remove:focus-visible,
+.rdt-group-clear:focus-visible {
+  outline: var(--rdt-focus-ring, 2px solid rgba(37, 99, 235, 0.7));
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+/* Reorder insertion marker — a left rule on the token the dragged token will land
+   BEFORE. Driven by the ephemeral $data.dropKey (see the .is-drop-target binding). */
+.rdt-group-token.is-drop-target {
+  box-shadow: inset 3px 0 0 0 var(--rdt-group-drop-marker, rgba(37, 99, 235, 0.9));
+}
+</style>
+
+</rozie>

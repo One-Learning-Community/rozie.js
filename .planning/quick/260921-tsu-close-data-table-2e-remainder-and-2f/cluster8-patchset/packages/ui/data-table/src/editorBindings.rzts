@@ -1,0 +1,340 @@
+const inRowEdit = () => $data.editingRowIndex != null
+const editorValueFor = (colId) => (inRowEdit() ? ($data.rowDraft ? $data.rowDraft[colId] : null) : $data.draftValue)
+const editorCheckedFor = (colId) => !!(inRowEdit() ? ($data.rowDraft ? $data.rowDraft[colId] : null) : $data.draftValue)
+
+// #editor custom-slot callbacks (req-2/6): the consumer's slot calls commit(value)/cancel().
+// In SINGLE-CELL mode commit(v) commits that cell (commitEdit override); in ROW mode commit(v)
+// only WRITES this column's draft (the row commits as a unit later — never per cell). cancel()
+// reverts the cell (single) or the whole row (row mode). Factory-bound per columnId so the
+// row-mode commit targets the right draft key.
+const editorCommitFor = (colId) => (value) => {
+  if (inRowEdit()) { setRowDraft(colId, value); return }
+  commitEdit(value)
+}
+const editorCancelFor = () => () => {
+  if (inRowEdit()) { cancelRow(); return }
+  cancelEdit()
+}
+
+// Editor input handlers (the global-filter `evt.target.value` idiom — an untyped param
+// neutralizes to `any`, so reading .value/.checked typechecks ×6; an inline
+// `$data.x = $event.target.value` binding does NOT neutralize and breaks Lit/React JSX).
+// Column-aware: in row mode they write rowDraft[colId] (a FRESH object so Solid/Svelte/React
+// re-derive); single-cell they write the shared draftValue.
+const onCellEditorInput = (colId, evt) => {
+  const v = evt && evt.target ? evt.target.value : ''
+  if (inRowEdit()) { setRowDraft(colId, v); return }
+  $data.draftValue = v
+}
+const onCellEditorCheckbox = (colId, evt) => {
+  const v = !!(evt && evt.target && evt.target.checked)
+  if (inRowEdit()) { setRowDraft(colId, v); return }
+  $data.draftValue = v
+}
+// setRowDraft: write ONE key into a FRESH rowDraft object (whole-object replace — an
+// in-place mutation is silently dropped on React/Solid; the family immutable rule).
+const setRowDraft = (colId, value) => {
+  const src = $data.rowDraft || {}
+  const next = {}
+  for (const k in src) next[k] = src[k]
+  next[colId] = value
+  $data.rowDraft = next
+}
+
+// B21: contain a Tab WITHIN the editing row (editMode='row'). Resolve the editable cells'
+// visible col indices for the editing row, find the current editor's col (off the blurring
+// editor's owning [data-grid-cell]), then move to the next/prev editable col WITH WRAP so
+// focus never leaves the row. A no-op when no row is editing / the row has no editable cells.
+const rowEditTab = (target, backward) => {
+  const rowIndex = $data.editingRowIndex
+  if (rowIndex == null) return
+  const editable = editableColumnsForRow(rowIndex)
+  if (editable.length === 0) return
+  const cols = editable.map((ec) => ec.colIndex)
+  const cell = target && target.closest ? target.closest('[data-grid-cell]') : null
+  const curAttr = cell ? cell.getAttribute('data-col-index') : null
+  const cur = curAttr != null ? parseInt(curAttr, 10) : -1
+  let pos = cols.indexOf(cur)
+  if (pos < 0) pos = 0
+  const len = cols.length
+  const nextPos = backward ? (pos - 1 + len) % len : (pos + 1) % len
+  // Editor-owns-focus contract (quick 260711-i5m): the Tab target becomes the new reactive
+  // focus target BEFORE the host-focus call below, so Tab onto an already-mounted #editor
+  // drop-in (row mode) also refocuses it via its own lazy $watch.
+  $data.editFocusColId = editable[nextPos].colId
+  $data.editVer = $data.editVer + 1
+  focusRowEditorAt(rowIndex, cols[nextPos])
+}
+
+// onEditorKeyDown: the editor-LOCAL keymap (req-3). Enter → commit + stay (focus returns
+// to the cell); Tab → commit + advance to the next editable cell; Escape → cancel +
+// revert. preventDefault on handled keys so the grid keymap / native Tab don't double-act.
+const onEditorKeyDown = (e) => {
+  if (!e) return
+  const key = e.key
+  // Full-row mode (req-6): Enter from ANY cell editor commits the WHOLE row at once (ONE
+  // model write + ONE row-edit-commit); Escape reverts the whole row. Tab moves between the
+  // row's editors NATIVELY (no commit-per-cell) — let the browser advance focus, so we don't
+  // preventDefault it here.
+  if (inRowEdit()) {
+    if (key === 'Enter') { e.preventDefault(); commitRow() }
+    else if (key === 'Escape') { e.preventDefault(); cancelRow() }
+    // B21: CONTAIN Tab within the editing row. Native Tab escapes the row at its first/last
+    // editor (leaving editingRowIndex set so onGridKeyDown stays frozen → keyboard trap). Take
+    // Tab over entirely and cycle between the row's editors WITH WRAP (forward off the last →
+    // first; Shift+Tab off the first → last). Cross-target-safe (no reliance on the native DOM
+    // tab order across a Lit shadow boundary).
+    else if (key === 'Tab') { e.preventDefault(); rowEditTab(e.target, e.shiftKey) }
+    return
+  }
+  if (key === 'Enter') {
+    e.preventDefault()
+    commitEdit(undefined)
+  } else if (key === 'Tab') {
+    e.preventDefault()
+    // Resolve the advance target from the EDITING pair (the cell that is open), not the
+    // active cell (they match here, but the editing pair is authoritative). B4: Shift+Tab
+    // moves BACKWARD (prevEditableCell), a plain Tab FORWARD (nextEditableCell). Snapshot
+    // the editing pair BEFORE commit (commitEdit resets it to -1).
+    const fromRow = $data.editingRow
+    const fromCol = $data.editingCol
+    const target = e.shiftKey
+      ? prevEditableCell(fromRow, fromCol)
+      : nextEditableCell(fromRow, fromCol)
+    // skipFocusReturn=true: don't bounce focus back to the committed cell — we advance
+    // straight into the next editable cell's editor below. Use the RETURN value (not a
+    // re-read of $data.editingRow — async-stale on React) to gate the advance: a validation
+    // failure returns false and keeps the editor open (the user must fix the value first).
+    const committed = commitEdit(undefined, true)
+    if (committed && target) {
+      $data.activeRow = target.row
+      $data.activeColIndex = target.col
+      beginEdit(target.row, target.col, null)
+    } else if (committed) {
+      // B5: no editable cell in the Tab direction (grid start/end) — keep focus INSIDE the
+      // grid by returning it to the just-committed cell instead of letting it drop to <body>.
+      focusCellWhenReady(fromRow, fromCol)
+    }
+  } else if (key === 'Escape') {
+    e.preventDefault()
+    cancelEdit()
+  }
+}
+
+// DECLARED AFTER onEditorKeyDown ON PURPOSE. It delegates to it, and the React emitter lowers
+// both to `useCallback`s whose DEPENDENCY ARRAY is evaluated EAGERLY at declaration time — so
+// with this one first, its deps array referenced `onEditorKeyDown` before the const existed and
+// every React cell in the family died with `ReferenceError: Cannot access 'ze' before
+// initialization` at mount. That is the 87-02 useCallback-deps-array ordering lesson, and it is
+// invisible on the other five targets. Keep this block below.
+// ── C-10 + C-05: the grid keymap for a CUSTOM #editor drop-in ───────────────────────────
+// The built-in editors bind `onEditorKeyDown` directly, so Tab commits-and-advances and, in
+// row mode, Enter commits the row. A drop-in binds nothing of ours: it is consumer markup
+// inside the `#editor` slot. Its own keydown handler covers Enter and Escape (the drop-in
+// contract) and stops there, and the keydown then bubbles to the table root where
+// `onGridKeyDown` early-returns because an editor is open. Result:
+//   C-10 — Tab in a drop-in did not commit and advance. It fell through to NATIVE tab order
+//          and walked focus out of the grid, leaving the editor open behind it.
+//   C-05 — in FULL-ROW mode a drop-in's `commit(v)` is draft-only BY DESIGN (committing per
+//          cell would split the row into N writes and N events), and the row commits only
+//          through handlers bound on the built-in inputs — which a row of drop-ins does not
+//          have. So Shift+F2, documented as "Enter commits the whole row in one
+//          `r-model:data` write", wrote a draft and nothing else, `editingRowIndex` stayed
+//          set, and `onGridKeyDown`'s early-return left arrow nav dead. The only exits were
+//          Escape (reverting the whole row) and the imperative verb.
+//
+// Bound on the `display: contents` span that wraps the slot, so it sees the bubbled event
+// from whatever the consumer rendered — including a bespoke editor that never heard of this
+// component. The host owning the GRID keymap while the drop-in owns its own CONTROL is the
+// same division the built-in path already has.
+//
+// Row mode ignores `defaultPrevented` for Enter/Escape on purpose: a drop-in preventDefaults
+// Enter to mean "do not insert a newline", not "the row is handled". Its own handler has
+// already run (target phase before bubble), so the draft is staged by the time we commit.
+// Single-cell mode honours `defaultPrevented` for Tab, so a drop-in that genuinely implements
+// its own Tab (a multi-field editor) keeps it.
+const onEditorDropinKeyDown = (e) => {
+  if (!e) return
+  const key = e.key
+  if (inRowEdit()) {
+    if (key === 'Enter') { e.preventDefault(); commitRow(); return }
+    if (key === 'Escape') { e.preventDefault(); cancelRow(); return }
+    if (key === 'Tab') { e.preventDefault(); rowEditTab(e.target, e.shiftKey); return }
+    return
+  }
+  if (key === 'Tab' && !e.defaultPrevented) onEditorKeyDown(e)
+}
+
+// onEditorBlur: commit on a genuine click/focus-away (D-01 — an invalid value keeps the
+// editor open via commitEdit's reject path). SKIP when:
+//  - editTransition is set (a synchronous commit/cancel teardown is unmounting the editor), or
+//  - the blur is part of a controlled keyboard transition: focus is moving to a grid cell
+//    or another editor inside our gridRoot (Tab-advance, Enter/Escape focus-return). On the
+//    async-render targets the unmount-blur can fire AFTER the synchronous flag cleared, so
+//    the relatedTarget/containment check is the load-bearing guard, not the flag alone.
+const onEditorBlur = (e) => {
+  // Full-row mode (req-6): a blur that stays WITHIN the row editor — Tab/click between the
+  // row's OWN fields — is a normal focus move and must NOT commit (a per-cell blur-commit
+  // would split the row into N writes + N events, violating the one-write/one-event contract).
+  // But an OUTSIDE-click blur (#7) MUST commit the row: otherwise the model is never written
+  // AND editingRowIndex stays set, freezing onGridKeyDown's editingRowIndex early-return so
+  // arrow-nav is dead the moment the user clicks back into the grid. Mirror the single-cell
+  // branch's relatedTarget shape to tell an in-row focus move from a genuine click-away.
+  if (inRowEdit()) {
+    // Guard the teardown blur: commitRow's writeData/endRowEdit re-render unmounts the row's
+    // editors → a same-tick re-render blur must NOT re-enter commitRow (double row-edit-commit).
+    // commitRow sets editTransition synchronously BEFORE writeData, so it is set here during the
+    // teardown window (the async unmount-blur that fires after endRowEdit finds editingRowIndex
+    // already null → inRowEdit() false → the single-cell tail's editingRow<0 guard returns).
+    if (editTransition) return
+    const rowNext = e ? e.relatedTarget : null
+    const rowNextCell = rowNext && rowNext.closest ? rowNext.closest('[data-grid-cell]') : null
+    const rowNextRow = rowNextCell ? rowNextCell.getAttribute('data-row') : null
+    // Focus landing on a cell of the SAME editing row (Tab/click between the row's own fields) →
+    // controlled in-row move, do NOT commit. Anything else — a null relatedTarget, another row,
+    // a toolbar/widget, or outside the grid entirely — is an outside-click → commit the row as a
+    // unit. commitRow clears editingRowIndex, releasing onGridKeyDown's early-return so nav
+    // resumes; a no-op row (nothing changed) takes commitRow's clean #5 no-write/no-emit path.
+    if (rowNextRow != null && rowNextRow === String($data.editingRowIndex)) return
+    commitRow()
+    return
+  }
+  if ($data.editingRow < 0 || editTransition) return
+  const next = e ? e.relatedTarget : null
+  const fromCell = e && e.target && e.target.closest ? e.target.closest('[data-grid-cell]') : null
+  // ── B-02 ────────────────────────────────────────────────────────────────────────────
+  // A null relatedTarget used to return unconditionally. That is correct for the WR-04 case
+  // the comment cited — a Tab-advance fires the OLD editor's blur with a TRANSIENT null
+  // relatedTarget while it unmounts, and committing there double-counts — but it is NOT the
+  // only shape. Clicking any non-focusable region of the page (the body, a heading, whitespace)
+  // also blurs the editor with a null relatedTarget, and that returned WITHOUT committing and
+  // WITHOUT endEdit(): the typed value was silently discarded, the editor stayed open, and
+  // `$data.editingRow` stayed >= 0 — which gridKeydownHandlers' `if ($data.editingRow >= 0)
+  // return` reads as "an editor owns the keyboard", so arrows/Enter/F2/Home/Ctrl+C were all
+  // dead until the user double-clicked somewhere else. There is no document-level click-away
+  // listener anywhere in the family to catch it afterwards.
+  //
+  // The two shapes ARE separable, with the discriminator the branch below already uses: on a
+  // Tab-advance the keyboard path has already moved the editing pair to the NEXT cell, so the
+  // blurring editor's own cell no longer matches ($data.editingRow/editingCol), while a
+  // click-away leaves the pair still sitting on it. The row-edit branch twenty lines above
+  // reaches the same conclusion by the same reasoning and commits on null; this is that branch's
+  // single-cell twin.
+  if (next == null) {
+    // Not a click-away unless a pointerdown OUTSIDE the grid just said so. `outsidePointerDown`
+    // is the discriminator, and nothing weaker works: an editor recycled out of the virtual
+    // window (or replaced by Solid's keyed-row reconcile) blurs with a null relatedTarget too,
+    // and `closest()` still resolves an owning `<td>` inside a DETACHED subtree, so every
+    // synchronous DOM test reads it as a click-away — measured, it closed the pinned editor in
+    // data-table-edit's "open editor + index-based range survive virtualization recycle" case on
+    // solid. Deferring a frame does not help either: by then the node is reattached, focus sits
+    // on <body>, and the state is indistinguishable from a real click-away.
+    //
+    // The flag is a plain module-let set by the document pointerdown listener in DataTable.rozie
+    // (NOT a $data field, and NOT a closure over one): a document listener is attached once, so
+    // on React any `$data` it closes over is frozen at attach time, and a commit driven from
+    // that closure would write the draft as of editor-OPEN and lose everything typed. Routing
+    // the decision back through THIS handler — template-bound, so React re-binds it every
+    // render — keeps the commit on the always-fresh path. Consume it here so an unmount blur
+    // arriving later can never inherit it.
+    if (!outsidePointerDown) return
+    outsidePointerDown = false
+    if (!fromCell) return
+    if (
+      fromCell.getAttribute('data-row') !== String($data.editingRow) ||
+      fromCell.getAttribute('data-col-index') !== String($data.editingCol)
+    )
+      return
+    // Genuine click-away onto a non-focusable region outside the grid → commit + close (D-01's
+    // reject path keeps the editor open on an invalid value, exactly as for a click onto another
+    // cell). skipFocusReturn: the user deliberately put focus elsewhere; do not yank it back.
+    commitEdit(undefined, true)
+    return
+  }
+  // Focus moving OUTSIDE the grid (a click into another widget) → commit (D-01 reject keeps
+  // the editor open on an invalid value).
+  if (!(gridRoot && gridRoot.contains && gridRoot.contains(next))) { commitEdit(undefined); return }
+  // Focus stays INSIDE the grid. B1: distinguish a controlled keyboard transition (the
+  // keyboard handler already committed) from a genuine click-away to ANOTHER grid cell
+  // (which must commit + close so the grid is not wedged with an open editor).
+  const nextCell = next.closest ? next.closest('[data-grid-cell]') : null
+  // Same cell (an inner control / the editing cell itself on an Enter focus-return) → a
+  // controlled move; skip. Also skip when either cell can't be resolved (an unmounting
+  // editor has no owning cell — the Tab-advance remount-blur path, never a click-away).
+  if (!nextCell || !fromCell || nextCell === fromCell) return
+  // A Tab-advance already committed the old editor and opened the next one, so the live
+  // editing pair has MOVED off the blurring editor's cell; only a click-away leaves the
+  // editing pair still ON fromCell. Skip when they differ (the keyboard path owns it — no
+  // double commit, WR-04).
+  const fromRow = fromCell.getAttribute('data-row')
+  const fromCol = fromCell.getAttribute('data-col-index')
+  if (fromRow !== String($data.editingRow) || fromCol !== String($data.editingCol)) return
+  // Genuine click-away to another grid cell → commit + close. skipFocusReturn=true so the
+  // commit does NOT bounce focus back to the just-committed editing cell (which would fight
+  // the click destination). The commit's writeData re-renders the table and can DROP DOM
+  // focus on the fine-grained targets (Solid keyed-row replace). Re-seat focus on the CLICK
+  // DESTINATION cell ONLY IF the re-render actually dropped it — a single deferred check
+  // (not a 30-frame poll) so a target whose click-focus SURVIVED (Lit) is never re-focused
+  // late, which would steal focus back from a subsequent navigation.
+  const destRow = nextCell.getAttribute('data-row')
+  const destCol = nextCell.getAttribute('data-col-index')
+  commitEdit(undefined, true)
+  const reseatDestFocus = () => {
+    if (!gridRoot || destRow == null || destCol == null || destRow === '__header') return
+    const root = gridRoot.getRootNode ? gridRoot.getRootNode() : null
+    const act = root && root.activeElement ? root.activeElement : null
+    // Focus already landed inside the grid (the click-focus survived the re-render) — leave it.
+    if (act && gridRoot.contains && gridRoot.contains(act)) return
+    const el = resolveCellEl(destRow, parseInt(destCol, 10))
+    if (el) el.focus()
+  }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(reseatDestFocus)
+  else setTimeout(reseatDestFocus, 0)
+}
+
+// editCell(rowIndex, colIndex) — programmatic edit-entry ($expose, req-3). Coerces +
+// clamps indices, moves the active cell, and opens the editor (no-op on a non-editable
+// cell). Collision-clean (RESEARCH name-check): not a verb/event/prop/ROZ137 member.
+const editCell = (rowIndex, colIndex) => {
+  const lastRow = bodyRowCount() - 1
+  const maxRow = lastRow < 0 ? 0 : lastRow
+  const maxCol = visibleColCount() - 1
+  const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow)
+  const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, (maxCol < 0 ? 0 : maxCol))
+  // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
+  committedThisSession = false
+  $data.activeIsHeader = false
+  $data.activeRow = r
+  $data.activeColIndex = c
+  beginEdit(r, c, null)
+}
+
+// commitEditing() — programmatic commit of the open editor ($expose, req-3). No-op when
+// nothing is editing. Collision-clean (not `commit`). Handles BOTH edit modes: a full-row
+// edit (editRow()/Shift+F2) drives editingRowIndex and leaves editingRow at -1, so the
+// single-cell commitEdit guard (editingRow >= 0) is false during a row edit — route to
+// commitRow() first so a programmatic commit of a row editor is not a silent no-op.
+const commitEditing = () => {
+  if (inRowEdit()) { commitRow(); return }
+  if ($data.editingRow >= 0) commitEdit(undefined)
+}
+
+// editRow(rowIndex) — programmatically enter full-row edit on a body row ($expose, req-6 /
+// D-06), the API twin of the Shift+F2 shortcut. Addressed BY INDEX over the visible model
+// (coerced + clamped); no-op on a row with no editable columns. Collision-clean (RESEARCH
+// name-check): `editRow` is not in the 15 existing verbs, not a prop, not a *-change/commit
+// event, not a Lit ROZ137-reserved host member. Moves the active cell to the row first so the
+// commit/cancel focus-return lands in the right row.
+const editRow = (rowIndex) => {
+  const lastRow = bodyRowCount() - 1
+  const maxRow = lastRow < 0 ? 0 : lastRow
+  const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow)
+  const rowList = $data.rows || []
+  const row = rowList[r]
+  if (!row) return
+  $data.activeIsHeader = false
+  $data.activeRow = r
+  beginRowEdit(row)
+}
+
+export { inRowEdit, editorValueFor, editorCheckedFor, editorCommitFor, editorCancelFor, onCellEditorInput, onCellEditorCheckbox, setRowDraft, rowEditTab, onEditorKeyDown, onEditorDropinKeyDown, onEditorBlur, editCell, commitEditing, editRow }

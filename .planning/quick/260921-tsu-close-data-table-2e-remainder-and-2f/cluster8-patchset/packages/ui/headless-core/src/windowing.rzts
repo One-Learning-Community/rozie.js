@@ -1,0 +1,675 @@
+// ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
+// Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
+// holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
+// in the host (ROZ123). It is a compile-time `.rzts` script-partial: it dissolves into each consumer's
+// compiled leaf via inlineScriptPartials() before IR lowering — leaving zero runtime dependency.
+//
+// HOST CONTRACT (symbols the consuming host MUST define before importing — the same implicit
+// by-convention mixin contract the DataTable host's other partials already use for `$data.windowVer`):
+//   - windowSource(): T[]   — the full list to window (the KEY generalization; the DataTable host
+//                             returns its pre-pagination row model, listbox/combobox return the
+//                             filtered options). This partial MUST NOT reach into the host data engine
+//                             directly — rows arrive ONLY through windowSource().
+//   - $props.estimateRowHeight — per-item size estimate (kept aliased for DataTable back-compat).
+//   - $data.windowVer / $data.editVer — window/edit-version reactivity bumps.
+//   - gridScrollEl              — the scroll-container element handle.
+//   - virtualizer               — the host virtual-core instance (built in $onMount from the ref).
+//   - observeElementRect / observeElementOffset / elementScroll / measureElement — virtual-core fns.
+//   - scheduleRemeasure()       — the host's rAF/microtask remeasure defer.
+//   - pinnedEditIndex() / pinnedMeasurement(pin) — the D-05 OPTIONAL pin-extension hook (host-provided,
+//                             defaulting to no-op): the DataTable host passes its edit-pinning hooks;
+//                             listbox passes nothing. Routing pinning through this host hook (NOT
+//                             inlining it) keeps DataTable's B13 edit-pinning behavior byte-identical.
+//   - rowsWindowed(): boolean  — is the ROW axis windowed. REQUIRED, no default — replaces every bare
+//                             truthiness read of the host's windowing prop (D-05); `windowedRows()` /
+//                             `padTop()` / `padBottom()` / `rowIsOutsideWindow()` below call it by
+//                             convention exactly as they already call `pinnedEditIndex()`.
+//   - colsWindowed(): boolean  — is the COLUMN axis windowed. REQUIRED, no default. `false` for every
+//                             host until it defines the real column-axis mechanism (87-04+).
+//   - columnCount(): number    — the leaf-column count the column virtualizer windows over. REQUIRED,
+//                             no default.
+//   - columnSize(i: number): number — the authoritative width of absolute leaf column `i`, sourced
+//                             from table-core's `getSize()` under D-06. REQUIRED, no default.
+//   - forcedColumns(): number[] — the D-10 OPTIONAL column-axis mirror of `pinnedEditIndex()`: the
+//                             DataTable host unions pinned + active-cell + editing column indices into
+//                             the column-window slice; listbox/combobox pass an empty array (host-
+//                             provided, defaulting to `[]`).
+//   - colVirtualizer           — the host's SECOND virtual-core instance, windowing the COLUMN axis
+//                             (see the AXIS MECHANISM note below). Host-provided, defaulting to `null`.
+//   - autoMeasureOn(): boolean — the D-18 REQUIRED content-driven-estimate gate (Phase 87 87-07):
+//                             data-table's real body reads `$props.autoMeasure === true`; listbox/
+//                             combobox/command-palette return `false` so the accumulator branch
+//                             estimateRowSize() gates on is dead code for them (D-20).
+//   - afterRowRemeasure        — OPTIONAL host-owned mutable `let` (defaults to a no-op / undefined),
+//                             assigned to refineRowEstimate() (below) by the host. The DataTable
+//                             host's remeasureWindow() (virtualization.rzts) calls it AFTER its
+//                             measureElement sweep so the fold + hysteresis re-feed run on every
+//                             window commit. Routed through a mutable `let` rather than a direct
+//                             call FROM virtualization.rzts INTO this file: a relative-partial CONST
+//                             calling a bare-specifier-partial CONST is the exact forward-reference
+//                             TDZ class remeasureColumnWindow()'s own DataTable.rozie comment
+//                             documents for columnVirtualizerOptions() (inlineScriptPartials()
+//                             groups the relative partial BEFORE the bare-specifier partial in the
+//                             merged per-target output, regardless of source import order). A
+//                             mutable `let` hoists to `useRef` on React and is excluded from a
+//                             useCallback's dependency array, sidestepping the hazard entirely — the
+//                             SAME mechanism `refreshRowModel` already relies on.
+//
+// AXIS MECHANISM (OQ1 / Assumption A1 — resolved from the installed source in 87-02;
+// LANDED in 87-04: `columnVirtualizerOptions()` below IS the second, horizontal instance this
+// note originally only documented). `horizontal` is a PER-INSTANCE field of `VirtualizerOptions`
+// (`node_modules/@tanstack/virtual-core/dist/esm/index.d.ts:67`, installed version 3.17.1 per
+// `package.json`), and every axis-sensitive internal read consults `instance.options.horizontal` —
+// `measureElement`'s inlineSize/blockSize + offsetWidth/offsetHeight branch
+// (`dist/esm/index.js:137,150`), `observeElementOffset`'s scrollLeft/scrollTop branch
+// (`dist/esm/index.js:118-121`), `getMaxScrollOffset`'s scrollWidth/scrollHeight branch
+// (`dist/esm/index.js:907-915`), and `scrollWithAdjustments`'s left/top branch
+// (`dist/esm/index.js:152-161`). So ONE `Virtualizer` instance windows exactly ONE axis: the column
+// axis needs its own SECOND, independent `Virtualizer` instance constructed with `horizontal: true`,
+// sharing the SAME `getScrollElement()` (the `rdt-scroll` wrapper) the row instance already uses.
+// Two options the row axis does not set that the column instance will need: `isRtl?: boolean`
+// (data-table ships an RTL grid path) and `overscan?: number` (D-07 gives the column axis its own
+// hardcoded constant, separate from the row axis's `overscan: 8` below).
+//
+// isRtl WIRING (gap-closure 87-09, LANDED — see `ensureColRtlWatch()`/`isColRtl()` below,
+// immediately ahead of `columnVirtualizerOptions()`): data-table has no construction-time RTL
+// signal (no `dir`/`rtl` prop), and `dir` can be set on `gridScrollEl` at ANY point relative to
+// mount. `isRtl` is therefore computed LIVE via `getComputedStyle`, not baked in once.
+
+// getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
+// React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
+// id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).
+const virtualItemKey = (i) => {
+  const src = windowSource()
+  return src && src[i] ? src[i].id : undefined
+}
+
+// COL_OVERSCAN (D-07): the column axis's own hardcoded overscan constant, separate from the
+// row axis's `overscan: 8` below. Columns are far wider than rows are tall, so one number
+// cannot serve both axes; no prop is exposed because no consumer has asked to tune the row
+// overscan across the four phases it has shipped. Unused until 87-04 constructs the second,
+// horizontal Virtualizer instance (see the AXIS MECHANISM note above).
+const COL_OVERSCAN = 3
+
+// columnVirtualizerOptions() (Phase 87 87-04): the SECOND, horizontal Virtualizer instance's
+// full options set — the AXIS MECHANISM note's second instance, landed. Mirrors
+// virtualizerOptions() exactly except: count/estimateSize read the COLUMN host symbols,
+// horizontal:true selects the axis, overscan is the column axis's OWN constant (D-07), and
+// there is NO getItemKey — columns have no stable per-column id in the virtual-core sense, so
+// they key by index (virtual-core's default). onChange bumps the SAME $data.windowVer counter
+// the row axis uses (87-02 checkpoint decision (b): no separate $data.colWindowVer) but does
+// NOT call scheduleRemeasure(): under D-06 column widths come from table-core's getSize()
+// oracle and are NEVER measured from the DOM, so a horizontal scroll has nothing new to
+// observe (unlike the row axis's CR-01 recycled-row remeasure sweep).
+// ══ Gap-closure 87-09 (dir="rtl" column windowing) ═══════════════════════════════════════
+// virtual-core reads `instance.options.isRtl` FRESH on every native 'scroll' event — the
+// negation lives inside `observeElementOffset`'s internal per-event closure
+// (`dist/esm/index.js:119-120`: `el.scrollLeft * (isRtl && -1 || 1)`), called anew each time
+// the browser fires 'scroll'. But `instance.options` itself is only a plain VALUE snapshot
+// taken by the LAST `setOptions()` call (`dist/esm/index.js:277-280`:
+// `for (const key in opts2) merged[key] = opts2[key]` copies the boolean, not a live binding
+// or getter) — so a static `isRtl` computed ONCE at `colVirtualizer` construction would only
+// ever reflect direction AT THAT INSTANT. `dir` can be set on `gridScrollEl` at any point
+// relative to mount (data-table has no construction-time RTL prop), so a MutationObserver on
+// `gridScrollEl`'s own `dir` attribute re-feeds `colVirtualizer`'s options — a cheap
+// object-merge via `setOptions()`, deliberately NOT a forced `_willUpdate()` recompute, since
+// nothing needs to repaint until the next real scroll — the moment direction flips. By the
+// time the NEXT native 'scroll' event's own offset read runs, `instance.options.isRtl`
+// already reflects the correction. Ordering is spec-guaranteed, not a race: MutationObserver
+// callbacks run on the microtask queue, which the HTML event loop always drains before the
+// next task — and a native 'scroll' event dispatched after a programmatic `scrollLeft` write
+// is itself a subsequent task, not a microtask racing the same tick.
+//
+// F6 STALE-CLOSURE HAZARD (found + fixed this task, React only): calling
+// columnVirtualizerOptions() FRESH from inside the MutationObserver's callback would
+// re-derive `count`/`estimateSize` via columnCount() (virtualization.rzts's
+// visibleColCount(), which reads `$data.rows`). The MutationObserver is attached ONCE,
+// inside ensureColRtlWatch() at colVirtualizer CONSTRUCTION time ($onMount) — a closure
+// FROZEN to that render's scope on React, where `$data.rows` is a useState value.
+// $onMount's row-model seed (refreshRowModel()) resolves via an ASYNC setState, so AT THE
+// EXACT INSTANT colVirtualizer is constructed, `rows` may still be `[]` in THAT render's
+// closure — and unlike a `let`-hoisted ref (virtualizer, table, gridScrollEl — always read
+// via `.current`, always live no matter which render's closure holds the reference),
+// `$data.rows` is genuine React state: a plain local binding recreated fresh EVERY render,
+// so a function captured from an OLDER render reads that OLDER render's snapshot FOREVER,
+// no matter how many later renders populate it. Confirmed empirically: calling
+// columnVirtualizerOptions() from the frozen callback read `count` back as 0 (not 60),
+// collapsing getVirtualItems() to []. This is the exact class of bug `virtualItemKey`'s own
+// header comment already documents ("never a frozen mount-render $data.rows closure") — and
+// a MUTABLE-LET INDIRECTION (the `afterRowRemeasure` shape, 87-07) does NOT fix it here,
+// because the hazard lives INSIDE columnVirtualizerOptions()'s own dependency chain
+// ($data.rows), not in "which function identity gets called" — wrapping a stale call in
+// another layer of ref does not make an inner React-state read fresh.
+//
+// FIX: never call columnVirtualizerOptions() again from this callback at all. Read
+// `colVirtualizer.options` — virtual-core's OWN internal state, mutated in place on every
+// setOptions() call regardless of which render's closure triggered it (a REAL object
+// reference the SAME way `virtualizer`/`table` are, not React state) — and merge in ONLY
+// the corrected `isRtl`. `count`/`estimateSize`/etc. keep whatever value the LAST correct
+// setOptions() call gave them (from construction, or from remeasureColumnWindow()'s own
+// FRESH-per-render re-feed via the $watch-driven refreshRowModel cycle) — untouched,
+// because this dir-flip has nothing to do with row/column count. isColRtl() itself reads
+// only `gridScrollEl` (also a ref) and does a live DOM getComputedStyle read — no React
+// state involved, so it is never stale regardless of which render's closure calls it.
+let colRtlObserver: any = null
+let colRtlObserverEl: any = null
+
+// isColRtl(): getComputedStyle (not a raw `.getAttribute('dir')` read) so an ANCESTOR's `dir`
+// or a CSS `direction: rtl` rule is honored the same way the browser's own bidi layout honors
+// it, not merely a literal attribute on gridScrollEl itself.
+const isColRtl = (): boolean => {
+  if (!gridScrollEl || typeof getComputedStyle !== 'function') return false
+  return getComputedStyle(gridScrollEl).direction === 'rtl'
+}
+
+// ensureColRtlWatch(): idempotent — a no-op once already attached to the CURRENT gridScrollEl
+// (a stable ref for the component's lifetime once mounted). Self-attaching from inside
+// columnVirtualizerOptions() means no new host-contract symbol is needed: listbox/combobox/
+// command-palette never call columnVirtualizerOptions() at all (colsWindowed() is permanently
+// false for them, D-20), so this code path — and the observer it creates — never exists there.
+const ensureColRtlWatch = (): void => {
+  if (!gridScrollEl || colRtlObserverEl === gridScrollEl || typeof MutationObserver !== 'function') return
+  if (colRtlObserver) colRtlObserver.disconnect()
+  colRtlObserver = new MutationObserver(() => {
+    if (colVirtualizer) colVirtualizer.setOptions({ ...colVirtualizer.options, isRtl: isColRtl() })
+  })
+  colRtlObserver.observe(gridScrollEl, { attributes: true, attributeFilter: ['dir'] })
+  colRtlObserverEl = gridScrollEl
+}
+
+// teardownColRtlWatch(): exported so the DataTable host disconnects the observer alongside
+// colVirtualizerCleanup() in $onUnmount — mirrors virtual-core's own _didMount()/teardown
+// discipline for the ResizeObserver it manages internally. No-op if never attached.
+const teardownColRtlWatch = (): void => {
+  if (colRtlObserver) colRtlObserver.disconnect()
+  colRtlObserver = null
+  colRtlObserverEl = null
+}
+
+const columnVirtualizerOptions = (): any => {
+  ensureColRtlWatch()
+  return {
+    count: columnCount(),
+    getScrollElement: () => gridScrollEl,
+    estimateSize: (i) => columnSize(i),
+    horizontal: true,
+    isRtl: isColRtl(),
+    observeElementRect,
+    observeElementOffset,
+    scrollToFn: elementScroll,
+    measureElement,
+    overscan: COL_OVERSCAN,
+    onChange: () => {
+      $data.windowVer = $data.windowVer + 1
+    },
+  }
+}
+
+// ══ Phase 87 87-07 (D-15/D-18) — content-driven auto-measure: the shared engine's FIRST
+// mutable top-level state. Hoisted to `useRef` PER-INSTANCE by the React emitter's
+// hoistModuleLet — the SAME mechanism already load-bearing for `table`, `virtualizer`,
+// `remeasurePending`, and `gridScrollEl` in the DataTable host (Task 1's confirmed
+// precedent), so two DataTable instances on one page never share an accumulator
+// (T-87-07-04). measuredRowTotal/measuredRowCount together give the running MEAN of every
+// row folded in so far; lastFedRowEstimate is the estimate value most recently pushed into
+// virtual-core (the hysteresis comparison baseline). ══
+let measuredRowTotal = 0
+let measuredRowCount = 0
+let lastFedRowEstimate = 0
+// foldedRowHeights: dedupe map (full-model row index -> its last-folded height) so a row
+// measured TWICE (e.g. scrolled back into view) UPDATES the running mean rather than being
+// added a second time (T-87-07-03) — a skewed mean produces a lying scrollbar, the exact
+// defect this feature exists to remove.
+let foldedRowHeights: Record<number, number> = {}
+
+// ══ Gap-closure 87-10 — windowVerBumpPending / bumpWindowVer(): coalesce EVERY $data.windowVer
+// write behind a SINGLE microtask-deferred increment, regardless of how many callers request
+// one within the same synchronous JS task. ══
+//
+// ROOT CAUSE (framework-agnostic; the Solid-specific symptom this closes only EXPOSES it) —
+// confirmed by instrumenting the installed @tanstack/virtual-core@3.17.1 source directly
+// (dist/esm/index.js), not by reasoning abstractly: virtual-core's resizeItem() calls
+// `this.notify(false)` — synchronously invoking `virtualizerOptions().onChange` below — EVERY
+// TIME a measured row's real size differs from its cached one (`delta !== 0`), independent of
+// framework (dist/esm/index.js:836-874). remeasureWindow()'s CR-01 sweep
+// (packages/ui/data-table/src/virtualization.rzts) measures EVERY currently-rendered `<tr>` in
+// ONE for-loop BEFORE calling afterRowRemeasure() (refineRowEstimate() below) — so a single
+// synchronous JS task (e.g. the very first measurement pass, which transitions N never-before-
+// measured rows from the flat seed to their real heights) can fire onChange, and therefore an
+// UNCOALESCED `$data.windowVer = $data.windowVer + 1`, MANY times in a row — well BEFORE
+// refineRowEstimate()'s own fold-then-re-feed (which runs only AFTER that loop finishes) has
+// folded those same measurements into the running mean or re-fed the converged estimate into
+// virtual-core via setOptions(). A live trace of this exact sequence (instrumented resizeItem/
+// getMeasurements calls, DataTableColumnVirtualDemo, autoMeasure on) showed Vue batching 3
+// resizeItem calls before its ONE downstream re-render reads getMeasurements() — already
+// reflecting the fully-folded, re-fed state — versus Solid re-running its padTop()/padBottom()
+// effects SYNCHRONOUSLY and IMMEDIATELY on EVERY individual windowVer write (11 interleaved
+// resize-then-immediate-recompute pairs, each recompute happening mid-sweep, before
+// refineRowEstimate() had run even once). React/Vue/Svelte/Angular/Lit all batch their own
+// reactivity to at least a microtask boundary, so their downstream reads land AFTER the whole
+// synchronous burst (measurement sweep + fold + re-feed) completes — accidentally correct, not
+// correct by construction. Solid does not auto-batch a signal write made from outside a
+// Solid-owned event/effect context, so it is the one target where the mid-burst TORN read is
+// externally observable. Because `setOptions()` + `_willUpdate()` alone do NOT invalidate
+// virtual-core's own `getMeasurements()` memo (keyed on itemSizeCacheVersion /
+// getMeasurementOptions() — never on the estimateSize FUNCTION reference itself; confirmed from
+// the same installed source, dist/esm/index.js:585-587,624), Solid's LAST such mid-sweep
+// recompute is also the LAST time getMeasurements() is ever invoked for that sweep once no
+// further row happens to differ from its cache — so the DOM stays frozen on that stale,
+// pre-fold/pre-re-feed snapshot indefinitely, even though the accumulator itself has already
+// converged correctly (T-87-07's own confirmed finding).
+//
+// FIX: coalesce every requester of a windowVer bump — virtual-core's own onChange AND
+// refineRowEstimate()'s explicit re-feed bump — behind ONE microtask-deferred write, the SAME
+// idiom scheduleRemeasure() already uses in virtualization.rzts. This makes the render happen
+// EXACTLY ONCE, strictly AFTER the entire synchronous burst (including refineRowEstimate()'s
+// fold + re-feed) on EVERY target, by construction rather than by incidental host-framework
+// batching. Scoped to the ROW axis only: colVirtualizer never calls resizeItem() at all (D-06 —
+// column widths come from table-core's getSize() oracle, never measured from the DOM), so
+// columnVirtualizerOptions()'s onChange cannot hit this burst class and is left untouched.
+let windowVerBumpPending = false
+const bumpWindowVer = (): void => {
+  if (windowVerBumpPending) return
+  windowVerBumpPending = true
+  const flush = () => {
+    windowVerBumpPending = false
+    $data.windowVer = $data.windowVer + 1
+  }
+  // Mirrors scheduleRemeasure()'s own defensive queueMicrotask-with-setTimeout-fallback
+  // (virtualization.rzts) for environments where queueMicrotask is unavailable.
+  if (typeof queueMicrotask !== 'undefined') queueMicrotask(flush)
+  else setTimeout(flush, 0)
+}
+
+// ESTIMATE_REFEED_DELTA_PX (D-15): the hysteresis threshold gating a re-feed into
+// virtual-core. Without it, a mean nudging by a fraction of a pixel on every fold would
+// re-feed on every window commit — the T-87-07-01 DoS control, paired with virtual-core's
+// own measureElement/resizeItem idempotence (see refineRowEstimate() below).
+const ESTIMATE_REFEED_DELTA_PX = 4
+
+// estimateRowSize(i) (D-15/D-17): the estimateSize() resolver. MUST check !autoMeasureOn()
+// FIRST so the off path touches zero accumulator state and returns $props.estimateRowHeight
+// verbatim (D-17's byte-behavioral no-op). The zero-measurements case (first paint,
+// regardless of autoMeasure) still returns the seed — the very first render has nothing
+// measured yet either way (D-15).
+const estimateRowSize = (i: number): number => {
+  if (!autoMeasureOn()) return $props.estimateRowHeight
+  if (measuredRowCount === 0) return $props.estimateRowHeight
+  return Math.round(measuredRowTotal / measuredRowCount)
+}
+
+// foldMeasuredRow(index, height): fold ONE measured row's height into the running-mean
+// accumulator, UPDATING (not double-adding) an already-folded index (T-87-07-03).
+const foldMeasuredRow = (index: number, height: number): void => {
+  const prev = foldedRowHeights[index]
+  if (prev === height) return
+  if (prev == null) {
+    measuredRowTotal = measuredRowTotal + height
+    measuredRowCount = measuredRowCount + 1
+  } else {
+    measuredRowTotal = measuredRowTotal - prev + height
+  }
+  foldedRowHeights[index] = height
+}
+
+// refineRowEstimate() (D-15/D-16, Phase 87 87-07): the shared engine's post-measurement
+// orchestration, called via the host's afterRowRemeasure hook (see the HOST CONTRACT note
+// above for why this is never called directly FROM virtualization.rzts). Folds every
+// CURRENTLY RENDERED row's REAL measurement (from virtual-core's own getMeasurements() —
+// never a DOM read), then hysteresis-gates a re-feed into virtual-core, reusing the EXACT
+// `virtualizer.scrollState` bail remeasureWindow() already applies (T-87-07-02) rather than
+// inventing a second gating mechanism, and finally (Task 3, D-16) anchor-corrects scrollTop
+// around the re-feed so the row under the user's eye does not visibly lurch. Entirely a
+// no-op when !autoMeasureOn() — the off path never folds a measurement, touches
+// lastFedRowEstimate, or adjusts scrollTop (D-17).
+const refineRowEstimate = (): void => {
+  if (!autoMeasureOn() || !virtualizer) return
+  const items = virtualizer.getVirtualItems()
+  const measurements = virtualizer.getMeasurements()
+  for (let i = 0; i < items.length; i++) {
+    const idx = items[i].index
+    const m = measurements && measurements[idx]
+    if (m) foldMeasuredRow(idx, m.size)
+  }
+  // T-87-07-02: never re-feed while a PROGRAMMATIC scroll is in flight — the exact bail
+  // remeasureWindow() already applies (virtualizer.scrollState is non-null only during
+  // scrollToIndex/scrollToOffset).
+  if (virtualizer.scrollState) return
+  const est = estimateRowSize(0)
+  if (Math.abs(est - lastFedRowEstimate) < ESTIMATE_REFEED_DELTA_PX) return
+  // D-16 anchor capture: the topmost rendered row's full-model index + its CURRENT offset,
+  // taken from virtual-core's own measurements (never a getBoundingClientRect() layout read
+  // — slower, and inconsistent with the measurements the spacer math already uses) — taken
+  // BEFORE the re-feed so the correction below can compute exactly the delta the re-feed
+  // itself introduces. Not restricted to scroll offset 0 (D-16 explicit): a table restored
+  // mid-scroll, or whose content changes height after scrolling, must refine too.
+  const anchorIndex = items.length ? items[0].index : -1
+  const anchorStart = items.length ? items[0].start : 0
+  virtualizer.setOptions(virtualizerOptions())
+  virtualizer._willUpdate()
+  lastFedRowEstimate = est
+  // D-16 anchor correction: read the SAME index's fresh measurement post-re-feed and adjust
+  // scrollTop by the delta so the row under the user's eye stays visually put. Guarded by
+  // the SAME path the re-feed itself is gated on (autoMeasureOn() && scrollState === null,
+  // both already checked above), so it can never fight a programmatic scroll (T-87-07-02).
+  if (anchorIndex >= 0 && gridScrollEl) {
+    // ── A-05 ────────────────────────────────────────────────────────────────────────────
+    // `setOptions()` alone does NOT make `getMeasurements()` return anything new, so without
+    // this bump `fresh.start` was `anchorStart` and the delta was structurally 0 — the
+    // correction below never ran. virtual-core memoizes `getMeasurements` on
+    // `[getMeasurementOptions(), itemSizeCacheVersion]`, and `getMeasurementOptions` keys on
+    // count / paddingStart / scrollMargin / getItemKey / enabled / lanes /
+    // laneAssignmentMode — `estimateSize`, the ONLY thing this re-feed changes, is not among
+    // them. (The same omission is A-02 on the column axis.)
+    //
+    // It was not 0 on React alone, and only by accident: `getItemKey` is in the memo key and
+    // React hands virtual-core a fresh `virtualItemKey` identity every render, so the memo
+    // happened to miss there. One target got the correction, five did not, and nothing said so.
+    //
+    // The version is bumped DIRECTLY rather than by calling `measure()`, which is what the
+    // column axis uses: `measure()` also CLEARS `itemSizeCache`, and on this axis that cache
+    // holds every measured row height the fold sweep just put there — discarding it is the
+    // opposite of what this function exists to do. Bumping the version alone recomputes the
+    // measurements from the live cache plus the new estimate, which is exactly the delta we
+    // want. Feature-detected, so a virtual-core that renames the field degrades to today's
+    // no-op rather than throwing.
+    if (typeof virtualizer.itemSizeCacheVersion === 'number') {
+      virtualizer.itemSizeCacheVersion = virtualizer.itemSizeCacheVersion + 1
+    }
+    const freshMeasurements = virtualizer.getMeasurements()
+    const fresh = freshMeasurements && freshMeasurements[anchorIndex]
+    if (fresh) {
+      const delta = fresh.start - anchorStart
+      if (delta !== 0) gridScrollEl.scrollTop = gridScrollEl.scrollTop + delta
+    }
+  }
+  // Explicit windowVer bump (87-07, Rule 1): virtual-core's own setOptions()+_willUpdate()
+  // re-feed above does NOT itself invoke notify()/onChange (confirmed from the installed
+  // source: _willUpdate() is a no-op once `scrollElement` is already set, dist/esm/
+  // index.js:389-393), so a re-feed needs its own explicit trigger to make the spacer
+  // re-derivation happen at all. Routed through bumpWindowVer() (87-10, see its own comment
+  // above) rather than a raw `$data.windowVer = $data.windowVer + 1` — coalescing this bump
+  // with any onChange-triggered ones already pending from the SAME synchronous sweep is what
+  // makes the eventual render land strictly AFTER this fold + re-feed has fully landed, on
+  // every target (the 87-10 fix for the confirmed Solid-specific rendering gap).
+  bumpWindowVer()
+}
+
+// The FULL virtualizer options. virtual-core's setOptions REPLACES options with
+// `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
+// source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
+// Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
+// on virtual-core's generic option inference. onChange's windowVer write is routed through
+// bumpWindowVer() (87-10) rather than a raw `$data.x = $data.x + 1` — resizeItem() can call
+// this onChange MANY times in a single synchronous sweep (once per row whose real measured
+// size differs from its cache, e.g. every never-before-measured row in the FIRST window),
+// and coalescing those into one microtask-deferred write is what keeps every target's render
+// landing strictly AFTER the whole sweep (see bumpWindowVer()'s own comment for the confirmed
+// Solid-specific rendering gap this closes). The React emitter still lowers the underlying
+// `$data.windowVer = $data.windowVer + 1` to functional setState — correct even deferred to a
+// microtask, exactly as it was correct from a mount closure before.
+const virtualizerOptions = (): any => ({
+  count: windowSource().length,
+  getScrollElement: () => gridScrollEl,
+  estimateSize: (i) => estimateRowSize(i),
+  observeElementRect,
+  observeElementOffset,
+  scrollToFn: elementScroll,
+  measureElement,
+  overscan: 8,
+  getItemKey: virtualItemKey,
+  onChange: () => {
+    bumpWindowVer()
+    // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
+    // virtual-core only observe()s a node you explicitly hand to measureElement (it does
+    // NOT auto-discover rendered rows — measureElement is the SOLE caller of
+    // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
+    // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
+    // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
+    // so the new <tr> set is in the DOM before we measure. Safe from an infinite
+    // measure→onChange→measure loop: measureElement is idempotent on an already-observed
+    // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
+    // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
+    // re-measure is a no-op.
+    scheduleRemeasure()
+  },
+})
+
+// pinMeasurement(pin): the D-05 pin-hook read, RE-TYPED at the windowing layer so the
+// shared math is strict-clean across every host. The host-provided pinnedMeasurement() has
+// two shapes: the DataTable host returns a real virtual-core measurement; the listbox/combobox
+// no-op host returns bare `null` (inferred `(pin) => null`). Calling it directly makes
+// `const pm = pinnedMeasurement(pin)` flow-narrow to `null`, so the downstream `pm && pm.start`
+// guard collapses the object branch to `never` (TS2339, Class 3). Reading the hook through this
+// thin wrapper with an EXPLICIT return type (a return-type annotation is NOT flow-narrowed)
+// gives the measurement a real object-or-null shape, so `pm && pm.start` keeps the object branch.
+// Typing-only: the runtime value (a measurement or null) is unchanged.
+const pinMeasurement = (pin: number): { start: number; size: number; index: number; end: number } | null => pinnedMeasurement(pin)
+
+// windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
+// { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
+// $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
+// full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
+// `rows` binding → TS2448 self-shadow, line ~1149 lesson).
+const windowedRows = () => {
+  // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
+  // early return — so Solid's <For>/Svelte's {#each} accessor subscribes to it on its FIRST eval,
+  // which happens at initial render while `virtualizer` is still null (it is built in $onMount,
+  // after the first render). `virtualizer` is a non-reactive `let`, so if the windowVer read sat
+  // BELOW the `!virtualizer` guard the accessor would early-return [] without ever reading the
+  // signal → it would NEVER re-run when onChange later bumps windowVer, and the window would stay
+  // blank forever (the Solid/Svelte fine-grained bug). Coarse targets re-render wholesale so the
+  // placement is a no-op for them. The post-construction windowVer bump in $onMount fires the
+  // first re-run that picks up the now-non-null virtualizer.
+  // ALSO subscribe to editVer here so the slice re-derives when an editor opens/closes (the
+  // pin/unpin transition), mirroring the probe's windowVer bump on pin (Solid/Svelte fine-grained).
+  void $data.windowVer
+  void $data.editVer
+  if (!virtualizer) {
+    // Rows OFF (Phase 87 D-04: this now includes the colsWindowed()-only path, since the
+    // wrapper template is entered whenever isWindowed(), not just rowsWindowed() — the row
+    // virtualizer is never constructed when only the column axis is windowed, D-04) → the FULL
+    // set, with a SYNTHETIC `vi.index` set to each row's array position (matching rowIndexOf's
+    // own `$data.rows.indexOf(row)` semantics exactly, since $data.rows IS windowSource()'s
+    // output here). Every windowed body binding reads wr.vi.index (data-row, aria-rowindex,
+    // colIndexOf, isEditing, the fill handle) — a bare `null` there is a hard crash the moment
+    // this branch is reached with the wrapper mounted, which colsWindowed()-only now does.
+    // Row-virtual ON but the virtualizer is not yet constructed (pre-$onMount first paint) →
+    // render NOTHING so the template never dereferences a not-yet-real `vi`; the rows appear on
+    // the first onChange after _didMount.
+    if (!rowsWindowed()) {
+      const rowList = $data.rows || []
+      return rowList.map((r, i) => ({ vi: { index: i }, row: r }))
+    }
+    return []
+  }
+  const items = virtualizer.getVirtualItems()
+  const rowList = $data.rows || []
+  // WR-01: drop any virtual item whose index outruns the current full-model rows (a brief
+  // shrink window where the virtualizer count is stale relative to $data.rows on the async
+  // onChange→windowVer path). The template keys on wr.row.id, so a row:undefined entry would
+  // throw "Cannot read properties of undefined"; filter it here so the template never sees it.
+  const out = items.map((vi) => ({ vi, row: rowList[vi.index] })).filter((wr) => wr.row)
+  // ── D-02 pin-row union (req-9): if an editor is open on a row that is NOT in the current
+  // window, UNION it into the slice (keyed on row.id so Lit repeat / Solid For never recycle it
+  // into another full-model row), LEADING the slice when it sits above the window and TRAILING
+  // it when below — so DOM order matches visual/aria order. The spacer subtraction (padTop/
+  // padBottom) keeps the total exactly getTotalSize(). This is the 51-01-proven mechanism wired
+  // into the real windowing.
+  const pin = pinnedEditIndex()
+  if (pin >= 0 && rowList[pin]) {
+    let inWindow = false
+    for (let i = 0; i < items.length; i++) { if (items[i].index === pin) { inWindow = true; break } }
+    if (!inWindow) {
+      const pm = pinMeasurement(pin)
+      const firstStart = items.length ? items[0].start : 0
+      const above = pm ? pm.start < firstStart : pin < (items.length ? items[0].index : pin)
+      const pinnedEntry = { vi: pm != null ? pm : { index: pin }, row: rowList[pin], pinned: true }
+      if (above) out.unshift(pinnedEntry)
+      else out.push(pinnedEntry)
+    }
+  }
+  return out
+}
+
+// Spacer-<tr> heights (D-03): the leading spacer occupies items[0].start; the trailing spacer
+// the gap between the last rendered item's end and getTotalSize(). Both windowVer-gated reads
+// (the `$data.windowVer` touch re-derives them as the window/measurements change). 0 when off.
+const padTop = () => {
+  // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer + editVer at the TOP so the
+  // spacer-<td> :style binding subscribes on the fine-grained targets before the early return,
+  // and re-derives on the pin/unpin transition (the D-02 spacer subtraction below).
+  void $data.windowVer
+  void $data.editVer
+  if (!rowsWindowed() || !virtualizer) return 0
+  const items = virtualizer.getVirtualItems()
+  let pad = items.length ? items[0].start : 0
+  // D-02 spacer subtraction: when the pinned editing row sits ABOVE the window it is rendered
+  // in-flow as the slice's LEADING <tr> (its measured height is now a real <tr>), so subtract
+  // that height from the leading spacer to keep padTop + Σ rendered <tr> + padBottom = total.
+  const pin = pinnedEditIndex()
+  if (pin >= 0) {
+    const pm = pinMeasurement(pin)
+    const inWindow = pmIndexInWindow(items, pin)
+    if (pm && !inWindow && pm.start < pad) pad = pad - pm.size
+  }
+  return pad < 0 ? 0 : pad
+}
+const padBottom = () => {
+  // subscribe-first, see windowedRows() (IN-04): touch windowVer + editVer before the early
+  // return so the fine-grained spacer :style binding subscribes on its first eval + re-derives
+  // on pin/unpin.
+  void $data.windowVer
+  void $data.editVer
+  if (!rowsWindowed() || !virtualizer) return 0
+  const items = virtualizer.getVirtualItems()
+  if (!items.length) return 0
+  let pad = virtualizer.getTotalSize() - items[items.length - 1].end
+  // D-02 spacer subtraction: when the pinned editing row sits BELOW the window it is rendered
+  // in-flow as the slice's TRAILING <tr>, so subtract its height from the trailing spacer.
+  const pin = pinnedEditIndex()
+  if (pin >= 0) {
+    const pm = pinMeasurement(pin)
+    const inWindow = pmIndexInWindow(items, pin)
+    // WR-01: decide "below the window" by INDEX, not by start-OFFSET. On variable-height rows
+    // measurement drift can leave pm.start at-or-past items[0].start while the pinned row's
+    // index is actually ABOVE the window, mis-subtracting its height from the trailing spacer.
+    // The pinned full-model index vs the last rendered item's index is drift-proof. Fall back to
+    // the offset comparison only if the measurement lacks an index (defensive).
+    const lastItemIdx = items[items.length - 1].index
+    const below = pm && pm.index != null ? (pm.index > lastItemIdx) : (pm && pm.start >= items[0].start)
+    if (pm && !inWindow && below) {
+      // below the window → it trailed the slice; subtract its height from the trailing spacer.
+      if (pm.end > items[items.length - 1].end) pad = pad - pm.size
+    }
+  }
+  return pad < 0 ? 0 : pad
+}
+// pmIndexInWindow: is full-model index `idx` present in the rendered virtual window?
+const pmIndexInWindow = (items, idx) => {
+  for (let i = 0; i < items.length; i++) if (items[i].index === idx) return true
+  return false
+}
+// rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
+// window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
+const rowIsOutsideWindow = (r) => {
+  if (!rowsWindowed() || !virtualizer) return false
+  const items = virtualizer.getVirtualItems()
+  for (const it of items) if (it.index === r) return false
+  return true
+}
+
+// ══ Phase 87 87-04 — the column-axis analogs of windowedRows()/padTop()/padBottom()/
+// rowIsOutsideWindow() above. The column axis has no "row-shaped" identity to carry alongside
+// a VirtualItem (a column is not a full-model object the way a row is), so windowedColIndices()
+// returns bare ABSOLUTE leaf-column indices; the template resolves each index back to a header/
+// cell through the host's own header-group / visibleCellsFor lookups (D-08/D-09). ══
+
+// windowedColIndices(): the ordered array of ABSOLUTE leaf-column indices to render.
+const windowedColIndices = () => {
+  // SUBSCRIBE FIRST (the windowedRows() discipline): colVirtualizer is a non-reactive `let`,
+  // null at first render, so a $data.windowVer read placed BELOW the guards below would mean
+  // Solid's <For> / Svelte's {#each} accessors never subscribe — the column window would stay
+  // blank forever on exactly those two targets. Also subscribe to editVer (mirrors the row
+  // axis's pin/unpin re-derive — the D-10 forced-column union lands on top of this in 87-05).
+  void $data.windowVer
+  void $data.editVer
+  if (!colsWindowed()) {
+    // Columns OFF (or rows-only windowed) → every absolute index, the degrade-to-full-set
+    // path that keeps the caller (windowedCells / the header loop) axis-agnostic.
+    const n = columnCount()
+    const out = []
+    for (let i = 0; i < n; i++) out.push(i)
+    return out
+  }
+  // Columns windowed but the column virtualizer is not yet constructed (pre-$onMount first
+  // paint) → render NOTHING, matching windowedRows()'s pre-mount behavior.
+  if (!colVirtualizer) return []
+  const items = colVirtualizer.getVirtualItems()
+  const idx = items.map((it) => it.index)
+  // D-10 forced-column union (host hook — empty array until 87-05 gives it a real body):
+  // dedupe-then-append any forced index not already in the virtualized window.
+  const forced = forcedColumns()
+  for (let i = 0; i < forced.length; i++) {
+    if (idx.indexOf(forced[i]) === -1) idx.push(forced[i])
+  }
+  // Sorted ascending: the body <td> sequence and the header <th> sequence both follow visual
+  // left-to-right order, and the virtual items + forced union are not guaranteed sorted.
+  idx.sort((a, b) => a - b)
+  return idx
+}
+
+// colPadLeft() / colPadRight() (D-06): the horizontal spacer <td>/<th> widths — the leading
+// spacer occupies items[0].start, the trailing spacer the gap between the last rendered
+// item's end and getTotalSize(). Mirrors padTop()/padBottom() exactly, INCLUDING the D-02-style
+// pin subtraction (87-05): forcedColumns() can return MULTIPLE forced indices (pinned + active +
+// editing, not just one pin), so each forced index outside the virtual window is checked
+// individually. A forced column rendered outside the window contributes its OWN real width to
+// the row (via its <th>/<td>'s own inline width under table-layout:fixed), so that width must
+// come OUT of the spacer or the row's total overshoots getTotalSize() and the horizontal
+// scrollbar lengthens on every such scroll. WR-01: decide before/after the window by comparing
+// the forced INDEX against the window's first/last item INDEX, never by start-OFFSET —
+// measurement drift makes the offset comparison wrong for the variable-width case (mirrors
+// padBottom()'s existing WR-01 discipline). A forced column's width is columnSize(i) (the
+// table-core size oracle, D-06's authoritative source), never a DOM measurement.
+const colPadLeft = () => {
+  void $data.windowVer
+  void $data.editVer
+  if (!colsWindowed() || !colVirtualizer) return 0
+  const items = colVirtualizer.getVirtualItems()
+  let pad = items.length ? items[0].start : 0
+  if (items.length) {
+    const firstIdx = items[0].index
+    const forced = forcedColumns()
+    for (let i = 0; i < forced.length; i++) {
+      if (forced[i] < firstIdx) pad = pad - columnSize(forced[i])
+    }
+  }
+  return pad < 0 ? 0 : pad
+}
+const colPadRight = () => {
+  void $data.windowVer
+  void $data.editVer
+  if (!colsWindowed() || !colVirtualizer) return 0
+  const items = colVirtualizer.getVirtualItems()
+  if (!items.length) return 0
+  let pad = colVirtualizer.getTotalSize() - items[items.length - 1].end
+  const lastIdx = items[items.length - 1].index
+  const forced = forcedColumns()
+  for (let i = 0; i < forced.length; i++) {
+    if (forced[i] > lastIdx) pad = pad - columnSize(forced[i])
+  }
+  return pad < 0 ? 0 : pad
+}
+// colIsOutsideWindow(c): is the absolute leaf-column index c absent from the currently
+// rendered column window? The column-axis analog of rowIsOutsideWindow(r) (D-12's
+// scroll-then-focus seam, wired starting 87-06). Gated on colsWindowed() (never a bare prop
+// truthiness read — the 87-02 prohibition gate).
+const colIsOutsideWindow = (c) => {
+  if (!colsWindowed() || !colVirtualizer) return false
+  const items = colVirtualizer.getVirtualItems()
+  for (const it of items) if (it.index === c) return false
+  return true
+}
+
+export { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow, COL_OVERSCAN, columnVirtualizerOptions, windowedColIndices, colPadLeft, colPadRight, bumpWindowVer, colIsOutsideWindow, ESTIMATE_REFEED_DELTA_PX, estimateRowSize, foldMeasuredRow, refineRowEstimate, teardownColRtlWatch }
