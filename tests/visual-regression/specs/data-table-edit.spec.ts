@@ -1050,6 +1050,55 @@ for (const target of TARGETS) {
     await expect.poll(async () => readoutText(page, 'range-count'), { timeout: 10_000 }).toBe('2');
     expect(await readoutText(page, 'range-readout')).toBe('1,1:2,2');
 
+    // ── B-10 + E-05: the range's ACCESSIBLE surface. Before this, range selection had none:
+    //    zero aria-selected on any cell (the only two occurrences were ROW selection on the
+    //    <tr>), and rangeSelection.rzts contained zero announce calls — so a screen-reader
+    //    user extending a rectangle got silence, then invoked Cut/Delete over a selection
+    //    they could not perceive. E-05 is the column-axis half: aria-colcount/aria-colindex
+    //    were absent repo-wide (0 occurrences) while the row-axis twin had been complete
+    //    since #13, which matters most under column windowing, where the rendered <td>s are
+    //    a WINDOW and an AT counting them announces the wrong column number. ──────────────
+    {
+      const aria = await page.evaluate(() => {
+        const findGrid = (root: Document | ShadowRoot): Element | null => {
+          const d = root.querySelector('table.rozie-data-table');
+          if (d) return d;
+          for (const el of Array.from(root.querySelectorAll('*'))) {
+            const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+            if (sr) { const i = findGrid(sr); if (i) return i; }
+          }
+          return null;
+        };
+        const t = findGrid(document);
+        if (!t) return null;
+        const sel = Array.from(t.querySelectorAll('[data-grid-cell][aria-selected="true"]'))
+          .map((el) => `${el.getAttribute('data-row')}:${el.getAttribute('data-col-index')}`)
+          .sort();
+        const firstBody = t.querySelector('tbody [data-grid-cell]');
+        const firstHead = t.querySelector('thead [data-grid-cell]');
+        return {
+          colcount: t.getAttribute('aria-colcount'),
+          rowcount: t.getAttribute('aria-rowcount'),
+          bodyColIndex: firstBody ? firstBody.getAttribute('aria-colindex') : null,
+          headColIndex: firstHead ? firstHead.getAttribute('aria-colindex') : null,
+          selected: sel,
+        };
+      });
+      expect(aria).not.toBeNull();
+      // aria-colcount must be present and consistent with the indices the cells declare.
+      expect(Number(aria!.colcount)).toBeGreaterThan(0);
+      // 1-BASED, per ARIA — an off-by-one here is the whole point of asserting it.
+      expect(aria!.bodyColIndex).toBe('1');
+      expect(aria!.headColIndex).toBe('1');
+      // Every cell in the rectangle carries aria-selected, and ONLY those cells do.
+      expect(aria!.selected).toEqual(['1:1', '1:2', '2:1', '2:2']);
+    }
+    // The range is announced in its own polite live region (separate from the paste region so
+    // a selection move cannot clobber an unheard paste/validation message).
+    await expect
+      .poll(async () => mount.getByTestId('range-announce').textContent(), { timeout: 10_000 })
+      .toBe('2 rows by 2 columns selected, 4 cells');
+
     // getSelectedRange() returns the integer index pairs (no DOM node, no row data).
     await mount.getByTestId('call-getrange').click();
     await expect

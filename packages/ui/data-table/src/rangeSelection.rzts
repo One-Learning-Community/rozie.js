@@ -45,7 +45,28 @@ const isFillHandleCell = (rIdx, cIdx) => {
 // pre-write value (ROZ138). extendRange/setRangeFocus thread the just-computed locals through
 // here so the emitted payload matches the write. The single call site keeps the count
 // predictable (React multi-emit dedup, D-07). One-way notification.
-const emitRangeChange = (anchor, focus) => { $emit('range-change', { anchor, focus }) }
+// B-10 — announce the selection alongside the emit. This is the SINGLE site every range
+// mutation funnels through (shift+arrow via extendRange, shift+click and drag-select and
+// fill-drag via setRangeFocus, Ctrl+A via selectAllBody), so one announce here covers all of
+// them; guarding the callers individually would be five chances to miss one.
+//
+// Writes $data.rangeAnnounce directly rather than importing clipboardFill's announce(): that
+// helper drives pasteAnnounce, and a range move must not overwrite a paste/validation message
+// the user has not heard yet (hence the separate key + region). `polite` + `aria-atomic` means
+// a fast drag replaces the pending text instead of queueing every intermediate rectangle.
+const rangeSummary = (anchor, focus) => {
+  if (!anchor || !focus) return ''
+  const rows = Math.abs(focus.rowIndex - anchor.rowIndex) + 1
+  const cols = Math.abs(focus.colIndex - anchor.colIndex) + 1
+  if (rows === 1 && cols === 1) return '1 cell selected'
+  const rowPart = rows + (rows === 1 ? ' row' : ' rows')
+  const colPart = cols + (cols === 1 ? ' column' : ' columns')
+  return rowPart + ' by ' + colPart + ' selected, ' + (rows * cols) + ' cells'
+}
+const emitRangeChange = (anchor, focus) => {
+  $data.rangeAnnounce = rangeSummary(anchor, focus)
+  $emit('range-change', { anchor, focus })
+}
 
 // extendRange(dRow, dCol): move rangeFocus by the (row,col) delta, clamped to the grid
 // bounds, seeding rangeAnchor from the active cell when no range exists yet (Shift+Arrow

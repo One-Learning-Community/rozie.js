@@ -30,6 +30,23 @@ const colIndexOf = (row, cellCtx) => (tick() >= 0 ? visibleCellsFor(row).indexOf
 // headerColIndexOf: a header cell's position in its header group's leaf headers.
 const headerColIndexOf = (hg, header) => ((hg && hg.headers ? hg.headers : []).indexOf(header))
 
+// E-05 — a header's ABSOLUTE LEAF-column start index, which is NOT the same as its position
+// in the group's header array: a grouped header occupies ONE array slot but spans colSpan leaf
+// columns, so positions and leaf indices diverge the moment a header group exists. Walk the
+// group accumulating colSpan to the target. Window-independent by construction (a header's
+// leaf start is a full-model property), so both the windowed grid header and the plain
+// non-grid header can share it.
+const headerLeafStart = (hg, header) => {
+  const list = (hg && hg.headers) ? hg.headers : []
+  let leaf = 0
+  for (let i = 0; i < list.length; i++) {
+    if (list[i] === header) return leaf
+    const h = list[i]
+    leaf = leaf + (h && h.colSpan > 1 ? h.colSpan : 1)
+  }
+  return -1
+}
+
 // ── C1 (phase 63 wave-6) absolute-index bridge ─────────────────────────────────────────
 // The PUBLIC active-cell rowIndex (focusCell/getActiveCell/activecell-change) is the ABSOLUTE
 // display-order position in getPrePaginationRowModel().rows (filter+sort+expand applied, BEFORE
@@ -260,6 +277,25 @@ const ariaPageOffset = () => (table ? pageIndex() * pageSize() : 0)
 // it is always consistent with gridAriaRowCount. The virtual body binds
 // `headerRowCount() + wr.vi.index + 1` inline (wr.vi.index is already the absolute full-model index).
 const bodyAriaRowIndex = (row) => headerRowCount() + rowIndexOf(row) + ariaPageOffset() + 1
+
+// ── E-05: the COLUMN-axis twin of gridAriaRowCount / bodyAriaRowIndex ────────────────
+// WAI-ARIA: when aria-colcount is set, every cell must carry an aria-colindex and the count
+// must equal the largest index any cell declares. The row axis has had this since #13; the
+// column axis had NOTHING repo-wide (0 occurrences of aria-colcount/aria-colindex), which
+// matters most under column windowing — the rendered <td>s are a WINDOW, so without an
+// explicit index a screen reader counts the window and announces "column 3 of 6" while the
+// user sits in absolute column 41.
+//
+// The index space is `visibleCellsFor(row)` / the header group's leaf headers — the same one
+// `colIndexOf` and `data-col-index` already use, INCLUDING the auto-injected select/expander
+// chrome columns (they are real columns in that list). `visibleColCount()` counts the same
+// list, so count and indices are mutually consistent by construction.
+//
+// NB named gridAriaColCount, NOT ariaColCount: `Element.ariaColCount` / `.ariaColIndex` are
+// inherited ARIA-reflected properties, so a same-named method becomes a Lit class field that
+// shadows them → TS2416 cascading to every @property decorator. Exactly the rename discipline
+// totalRowCount / gridAriaRowCount / bodyAriaRowIndex already document above.
+const gridAriaColCount = () => visibleColCount()
 
 // Column count = the visible cell list length (uniform header+body in a flat grid). Reads
 // $data.rows (reactive) so it is fine-grained-correct on Solid/Lit; falls back to the
@@ -498,4 +534,4 @@ const cycleWithinCell = (cellEl, forward) => {
   list[i].focus()
 }
 
-export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, ariaPageOffset, bodyAriaRowIndex, visibleColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }
+export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, headerLeafStart, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, ariaPageOffset, bodyAriaRowIndex, visibleColCount, gridAriaColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }

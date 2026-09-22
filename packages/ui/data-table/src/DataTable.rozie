@@ -702,6 +702,11 @@
   // (D-03). SEPARATE from the validation invalidMsg region (different semantics). '' when no
   // paste has happened (the byte-identical-off baseline: the announce region r-if is false).
   pasteAnnounce: '',
+  // B-10 — the polite aria-live summary of the CURRENT cell-range selection. Kept SEPARATE
+  // from pasteAnnounce (clipboard) and invalidMsg (validation) so a range move cannot clobber
+  // a paste/validation message a screen-reader user has not heard yet. '' = no range, and the
+  // region is r-if'd on it, so a table that never range-selects emits nothing.
+  rangeAnnounce: '',
 
   // ── Sort/filter live announcement (#14) ─────────────────────────────────────────────
   // The polite aria-live message announced when the consumer changes sorting OR filtering
@@ -1573,7 +1578,7 @@ $provide('data-table:columns', {
 
 import { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage, cut } from './exposeStateVerbs.rzts'
 
-import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, bodyAriaRowIndex, visibleColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
+import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, headerLeafStart, pageRowOffset, toAbsRow, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, bodyAriaRowIndex, visibleColCount, gridAriaColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
 
 import { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell } from './gridKeydownHandlers.rzts'
 
@@ -1840,6 +1845,11 @@ $expose({
      SEPARATE node from the validation region (different semantics + lifetime). Gated
      `r-if="!!$data.pasteAnnounce"` so a table that never pasted emits nothing (byte-identical-off). -->
 <div class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true" r-if="!!$data.pasteAnnounce">{{ $data.pasteAnnounce }}</div>
+<!-- B-10: cell-range selection aria-live region. Range selection previously had NO accessible
+     surface at all — no aria-selected on the cells and no announcement — so a screen-reader
+     user extending a rectangle with Shift+Arrow got silence and could not tell what was
+     selected before invoking a destructive Cut/Delete over it. -->
+<div class="rdt-sr-live rdt-sr-range" data-testid="range-announce" role="status" aria-live="polite" aria-atomic="true" r-if="!!$data.rangeAnnounce">{{ $data.rangeAnnounce }}</div>
 <!-- Sort/filter aria-live region (#14): a visually-hidden polite status region announcing
      sort + filter changes (silent reorders/removals are otherwise invisible to a screen
      reader). SEPARATE node from the validation + paste regions (different semantics). Gated
@@ -1928,6 +1938,7 @@ $expose({
   :class="{ 'rdt-sticky': $props.stickyHeader, 'rdt-col-windowed': colsWindowed() }"
   :role="tableRole()"
   :aria-rowcount="gridAriaRowCount()"
+  :aria-colcount="gridAriaColCount()"
   @keydown="onGridKeyDown($event)"
   @focusin="syncActiveFromEvent($event)"
   @focusout="onGridFocusOut($event)"
@@ -1965,6 +1976,7 @@ $expose({
         :data-header-level="hgLevel"
         :colspan="wh.span > 1 ? wh.span : null"
         :data-col-index="headerColIndexOf(hg, wh.header)"
+        :aria-colindex="headerLeafStart(hg, wh.header) + 1"
         :tabindex="cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel)"
         :class="{ 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }"
         :aria-sort="ariaSortFor(wh.header.column.id)"
@@ -2252,6 +2264,8 @@ $expose({
         :class="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }"
         :style="bodyCellStyle(wr.row, cell.column.id)"
         :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell))"
+        :aria-colindex="colIndexOf(wr.row, cell) + 1"
+        :aria-selected="inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null"
         :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null"
         :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : null"
       >
@@ -2329,6 +2343,7 @@ $expose({
             type="number"
             data-editing-cell
             data-builtin-editor
+            :aria-invalid="$data.invalidMsg ? 'true' : null"
             :value="editorValueFor(cell.column.id)"
             @input="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2339,6 +2354,7 @@ $expose({
             class="rdt-cell-editor"
             data-editing-cell
             data-builtin-editor
+            :aria-invalid="$data.invalidMsg ? 'true' : null"
             :value="editorValueFor(cell.column.id)"
             @change="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2352,6 +2368,7 @@ $expose({
             type="checkbox"
             data-editing-cell
             data-builtin-editor
+            :aria-invalid="$data.invalidMsg ? 'true' : null"
             :checked="editorCheckedFor(cell.column.id)"
             @change="onCellEditorCheckbox(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2395,6 +2412,7 @@ $expose({
                   type="text"
                   data-editing-cell
                   data-builtin-editor
+            :aria-invalid="$data.invalidMsg ? 'true' : null"
                   :value="editorValueFor(cell.column.id)"
                   @input="onCellEditorInput(cell.column.id, $event)"
                   @keydown="onEditorKeyDown($event)"
@@ -2409,6 +2427,7 @@ $expose({
             type="text"
             data-editing-cell
             data-builtin-editor
+            :aria-invalid="$data.invalidMsg ? 'true' : null"
             :value="editorValueFor(cell.column.id)"
             @input="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2491,6 +2510,7 @@ $expose({
   :class="{ 'rdt-sticky': $props.stickyHeader }"
   :role="tableRole()"
   :aria-rowcount="gridAriaRowCount()"
+  :aria-colcount="gridAriaColCount()"
   @keydown="onGridKeyDown($event)"
   @focusin="syncActiveFromEvent($event)"
   @focusout="onGridFocusOut($event)"
@@ -2517,6 +2537,7 @@ $expose({
         :data-header-level="hgLevel"
         :colspan="header.colSpan > 1 ? header.colSpan : null"
         :data-col-index="headerColIndexOf(hg, header)"
+        :aria-colindex="headerLeafStart(hg, header) + 1"
         :tabindex="cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)"
         :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }"
         :aria-sort="ariaSortFor(header.column.id)"
@@ -2757,6 +2778,8 @@ $expose({
         :class="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row)), colIndexOf(row, cell)) }"
         :style="bodyCellStyle(row, cell.column.id)"
         :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell))"
+        :aria-colindex="colIndexOf(row, cell) + 1"
+        :aria-selected="inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : null"
         :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : null"
         :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : null"
       >
@@ -2848,6 +2871,7 @@ $expose({
             type="number"
             data-editing-cell
             data-builtin-editor
+            :aria-invalid="$data.invalidMsg ? 'true' : null"
             :value="editorValueFor(cell.column.id)"
             @input="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2858,6 +2882,7 @@ $expose({
             class="rdt-cell-editor"
             data-editing-cell
             data-builtin-editor
+            :aria-invalid="$data.invalidMsg ? 'true' : null"
             :value="editorValueFor(cell.column.id)"
             @change="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2871,6 +2896,7 @@ $expose({
             type="checkbox"
             data-editing-cell
             data-builtin-editor
+            :aria-invalid="$data.invalidMsg ? 'true' : null"
             :checked="editorCheckedFor(cell.column.id)"
             @change="onCellEditorCheckbox(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
@@ -2907,6 +2933,7 @@ $expose({
                   type="text"
                   data-editing-cell
                   data-builtin-editor
+            :aria-invalid="$data.invalidMsg ? 'true' : null"
                   :value="editorValueFor(cell.column.id)"
                   @input="onCellEditorInput(cell.column.id, $event)"
                   @keydown="onEditorKeyDown($event)"
@@ -2921,6 +2948,7 @@ $expose({
             type="text"
             data-editing-cell
             data-builtin-editor
+            :aria-invalid="$data.invalidMsg ? 'true' : null"
             :value="editorValueFor(cell.column.id)"
             @input="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"

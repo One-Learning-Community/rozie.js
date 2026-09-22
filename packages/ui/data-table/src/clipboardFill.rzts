@@ -104,7 +104,13 @@ const copyRange = () => {
 // running fresh array (replaceRowValue) and record the committed cell. After the walk: ONE
 // writeData (the single r-model:data write), ONE cell-edit-commit per COMMITTED cell, and the
 // N-of-M aria-live announce. Returns { wrote, total }.
-const applyGridToRange = (grid, originRow, originCol) => {
+// B-09 — `verb` names the OPERATION in the aria-live summary. This funnel serves paste, cut,
+// range-delete AND fill, so hardcoding "pasted" made a Cut announce "3 of 3 cells pasted" and a
+// Delete announce the same — actively wrong for a screen-reader user, who has no other signal
+// that the destructive operation they invoked actually happened. Defaults to 'pasted' so the
+// paste path's wording is unchanged.
+const applyGridToRange = (grid, originRow, originCol, verb) => {
+  const opVerb = typeof verb === 'string' && verb !== '' ? verb : 'pasted'
   const maxRow = bodyRowCount() - 1
   const maxCol = visibleColCount() - 1
   if (maxRow < 0 || maxCol < 0) return { wrote: 0, total: 0 }
@@ -160,8 +166,8 @@ const applyGridToRange = (grid, originRow, originCol) => {
   // WR-02: announce the N-of-M summary only when at least one cell was written. When the paste
   // targeted real cells but every one was skipped (validation-failed / non-editable), announce a
   // distinct validation-failed message instead of a misleading "0 of M cells pasted".
-  if (wrote > 0) announce(wrote + ' of ' + total + ' cells pasted')
-  else if (total > 0) announce('No cells pasted — ' + total + ' cells were invalid or read-only')
+  if (wrote > 0) announce(wrote + ' of ' + total + ' cells ' + opVerb)
+  else if (total > 0) announce('No cells ' + opVerb + ' — ' + total + ' cells were invalid or read-only')
   return { wrote, total }
 }
 
@@ -204,7 +210,7 @@ const pasteRange = () => {
     // C3: tile the clipboard block to fill the destination range (single→range fill,
     // smaller-tiles-into-larger); a clipboard larger than the box pastes its full block.
     const tiled = tileGridToBox(grid, destBox)
-    applyGridToRange(tiled, anchorRow, anchorCol)
+    applyGridToRange(tiled, anchorRow, anchorCol, 'pasted')
   }).catch(() => {})
 }
 
@@ -239,7 +245,7 @@ const cutRange = () => {
     for (let c = c0; c <= c1; c++) cols.push('')
     grid.push(cols)
   }
-  applyGridToRange(grid, r0, c0)
+  applyGridToRange(grid, r0, c0, 'cut')
 }
 
 // clearActiveRange(): the §7 (260709-3qt) Delete/Backspace clear — cutRange() MINUS the clipboard
@@ -265,7 +271,7 @@ const clearActiveRange = () => {
     for (let c = c0; c <= c1; c++) cols.push('')
     grid.push(cols)
   }
-  applyGridToRange(grid, r0, c0)
+  applyGridToRange(grid, r0, c0, 'cleared')
 }
 
 // fillRange(sourceBox): drag-fill (D-04 — VALUE-COPY ONLY, no series detection). B7: the fill
@@ -312,7 +318,7 @@ const fillRange = (sourceBox, endCell) => {
     }
     grid.push(cols)
   }
-  applyGridToRange(grid, box.r0, box.c0)
+  applyGridToRange(grid, box.r0, box.c0, 'filled')
 }
 
 export { announce, clipboardActiveAllowed, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, tileGridToBox, pasteRange, cutRange, clearActiveRange, tileIndex, fillRange }
