@@ -1,0 +1,11 @@
+
+> @rozie-ui/data-table-vue@0.5.0 build /Users/serpentblade/work/olc/rozie/packages/ui/data-table/packages/vue
+> vite build && vue-tsc --declaration --emitDeclarationOnly
+
+vite v8.1.0 building client environment for production...
+[2Ktransforming...✓ 39 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.mjs  182.54 kB │ gzip: 42.86 kB
+
+✓ built in 160ms

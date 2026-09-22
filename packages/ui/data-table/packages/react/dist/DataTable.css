@@ -1,0 +1,384 @@
+[data-rozie-s-d5dcab4c]:host {
+  --rdt-font: var(--rozie-data-table-font);
+  --rdt-color: var(--rozie-data-table-fg);
+  --rdt-cell-padding: var(--rozie-data-table-cell-padding);
+  --rdt-border: 1px solid var(--rozie-data-table-border-color);
+  --rdt-header-bg: var(--rozie-data-table-header-bg);
+  --rdt-header-weight: var(--rozie-data-table-header-weight);
+  --rdt-sort-ind-opacity: var(--rozie-data-table-sort-indicator-opacity);
+  --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-filter-radius: var(--rozie-data-table-radius);
+  --rdt-page-btn-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-page-btn-radius: var(--rozie-data-table-radius);
+  --rdt-page-btn-disabled-opacity: var(--rozie-data-table-disabled-opacity);
+  --rdt-page-size-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-page-size-radius: var(--rozie-data-table-radius);
+  --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color);
+  --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active);
+  --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg);
+  --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-colvis-summary-radius: var(--rozie-data-table-radius);
+  --rdt-colvis-menu-border: 1px solid var(--rozie-data-table-border-color);
+  --rdt-colvis-menu-radius: var(--rozie-data-table-radius);
+  --rdt-colvis-menu-bg: var(--rozie-data-table-menu-bg);
+  --rdt-colvis-menu-shadow: var(--rozie-data-table-menu-shadow);
+  --rdt-select-accent: var(--rozie-data-table-select-accent);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] {
+  border-collapse: collapse;
+  width: 100%;
+  font: var(--rdt-font, 14px system-ui, sans-serif);
+  color: var(--rdt-color, inherit);
+}
+.rozie-data-table.rdt-col-windowed[data-rozie-s-d5dcab4c] {
+  table-layout: fixed;
+}
+.rozie-data-table.rdt-col-windowed[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
+.rozie-data-table.rdt-col-windowed[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
+  box-sizing: border-box;
+}
+.rdt-sr-live[data-rozie-s-d5dcab4c] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-cell-editor[data-rozie-s-d5dcab4c] {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[aria-invalid="true"][data-rozie-s-d5dcab4c] {
+  outline: var(--rdt-invalid-outline, 2px solid #d33);
+  outline-offset: -2px;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-in-range[data-rozie-s-d5dcab4c] {
+  background: var(--rdt-range-bg, rgba(37, 99, 235, 0.12));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-cell-active[data-rozie-s-d5dcab4c],
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-th.rdt-cell-active[data-rozie-s-d5dcab4c] {
+  outline: var(--rdt-active-cell-outline, 2px solid #2563eb);
+  outline-offset: -2px;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
+  position: relative;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-fill-handle[data-rozie-s-d5dcab4c] {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 8px;
+  height: 8px;
+  background: var(--rdt-fill-handle-bg, #2563eb);
+  border: 1px solid #fff;
+  cursor: crosshair;
+  z-index: 1;
+  touch-action: none;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
+  padding: var(--rdt-cell-padding, 0.5rem 0.75rem);
+  text-align: left;
+  border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-thead[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c] {
+  font-weight: var(--rdt-header-weight, 600);
+  /* OPAQUE default (was rgba(0,0,0,0.03)): a translucent header lets the scrolling body
+     bleed through in sticky mode. #f7f7f7 is the visual equivalent of the old 3%-black
+     tint over white, but solid. The three design-system themes already ship opaque
+     header backgrounds; this makes the zero-config default consistent with them. */
+  background: var(--rdt-header-bg, #f7f7f7);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-sort-btn[data-rozie-s-d5dcab4c] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rdt-sort-gap, 0.35em);
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-sort-ind[data-rozie-s-d5dcab4c] {
+  font-size: 0.8em;
+  opacity: var(--rdt-sort-ind-opacity, 0.7);
+}
+.rozie-data-table.rdt-sticky[data-rozie-s-d5dcab4c] .rdt-thead[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c] {
+  position: sticky;
+  top: var(--rdt-sticky-top, 0);
+  z-index: var(--rdt-sticky-z, 2);
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-scroll[data-rozie-s-d5dcab4c] {
+  max-height: var(--rozie-data-table-max-height);
+  overflow: auto;
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-group-bar-host[data-rozie-s-d5dcab4c] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rdt-group-bar-gap, 0.375rem);
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-group-token {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--rdt-group-token-pad, 0.125rem 0.5rem);
+  border-radius: var(--rdt-group-token-radius, 999px);
+  background: var(--rdt-group-token-bg, rgba(0, 0, 0, 0.06));
+  font-size: var(--rdt-group-token-size, 0.8125em);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-group-header[data-rozie-s-d5dcab4c] {
+  background: var(--rdt-group-header-bg, rgba(0, 0, 0, 0.025));
+  font-weight: var(--rdt-group-header-weight, 600);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-group-toggle[data-rozie-s-d5dcab4c] {
+  margin-right: var(--rdt-group-toggle-gap, 0.375rem);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-group-count[data-rozie-s-d5dcab4c] {
+  margin-left: var(--rdt-group-count-gap, 0.375rem);
+  opacity: var(--rdt-group-count-opacity, 0.65);
+  font-weight: 400;
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rdt-chrome-gap, 0.5rem);
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-toolbar[data-rozie-s-d5dcab4c] {
+  display: flex;
+  gap: var(--rdt-toolbar-gap, 0.5rem);
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-global-filter[data-rozie-s-d5dcab4c],
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-col-filter {
+  font: inherit;
+  /* border-box so the padding + border count INSIDE the declared width — without it
+     the col-filter's `width: 100%` + padding overflows its (constrained) header cell. */
+  box-sizing: border-box;
+  padding: var(--rdt-filter-padding, 0.25rem 0.5rem);
+  border: var(--rdt-filter-border, 1px solid rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-filter-radius, 4px);
+  background: var(--rdt-filter-bg, transparent);
+  color: inherit;
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-col-filter {
+  display: block;
+  margin-top: var(--rdt-col-filter-gap, 0.25rem);
+  width: 100%;
+  font-weight: normal;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-filter-row[data-rozie-s-d5dcab4c] {
+  background: var(--rdt-filter-row-bg, rgba(0, 0, 0, 0.015));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-filter-cell[data-rozie-s-d5dcab4c] {
+  padding: var(--rdt-filter-cell-padding, 0.35rem 0.75rem);
+  border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-filter-row[data-rozie-s-d5dcab4c] .rdt-col-filter {
+  font-size: var(--rdt-filter-row-input-size, 0.9em);
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-pagination[data-rozie-s-d5dcab4c] {
+  display: flex;
+  align-items: center;
+  gap: var(--rdt-pagination-gap, 0.5rem);
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-page-btn[data-rozie-s-d5dcab4c] {
+  font: inherit;
+  cursor: pointer;
+  padding: var(--rdt-page-btn-padding, 0.25rem 0.6rem);
+  border: var(--rdt-page-btn-border, 1px solid rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-page-btn-radius, 4px);
+  background: var(--rdt-page-btn-bg, transparent);
+  color: inherit;
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-page-btn[data-rozie-s-d5dcab4c]:disabled {
+  opacity: var(--rdt-page-btn-disabled-opacity, 0.4);
+  cursor: default;
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-page-status[data-rozie-s-d5dcab4c] {
+  font-size: var(--rdt-page-status-size, 0.9em);
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-page-size[data-rozie-s-d5dcab4c] {
+  font: inherit;
+  padding: var(--rdt-page-size-padding, 0.2rem 0.4rem);
+  border: var(--rdt-page-size-border, 1px solid rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-page-size-radius, 4px);
+  background: var(--rdt-page-size-bg, transparent);
+  color: inherit;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c] {
+  position: relative;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-resize-handle[data-rozie-s-d5dcab4c] {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: var(--rdt-resize-handle-width, 6px);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-resize-grip[data-rozie-s-d5dcab4c] {
+  display: block;
+  width: var(--rdt-resize-grip-width, 2px);
+  height: 100%;
+  margin: 0 auto;
+  background: var(--rdt-resize-grip-color, rgba(0, 0, 0, 0.12));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-resize-handle[data-rozie-s-d5dcab4c]:hover .rdt-resize-grip[data-rozie-s-d5dcab4c],
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-th-resizing[data-rozie-s-d5dcab4c] .rdt-resize-grip[data-rozie-s-d5dcab4c] {
+  background: var(--rdt-resize-grip-active, rgba(0, 0, 0, 0.4));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-col-menu-trigger[data-rozie-s-d5dcab4c] {
+  font: inherit;
+  font-size: var(--rdt-col-menu-trigger-size, 0.9em);
+  line-height: 1;
+  cursor: pointer;
+  margin-left: var(--rdt-col-menu-trigger-margin, 0.35em);
+  padding: var(--rdt-col-menu-trigger-padding, 0.15em 0.4em);
+  border: var(--rdt-col-menu-trigger-border, 1px solid rgba(0, 0, 0, 0.15));
+  border-radius: var(--rdt-col-menu-trigger-radius, 3px);
+  background: var(--rdt-col-menu-trigger-bg, transparent);
+  color: inherit;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-col-menu-trigger[data-rozie-s-d5dcab4c]:hover {
+  background: var(--rdt-col-menu-trigger-hover-bg, rgba(0, 0, 0, 0.06));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-col-menu-trigger[data-rozie-s-d5dcab4c]:focus-visible {
+  outline: var(--rdt-col-menu-trigger-focus-outline, 2px solid #2563eb);
+  outline-offset: 1px;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-col-menu[data-rozie-s-d5dcab4c] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rdt-col-menu-item-gap, 0.15rem);
+  min-width: var(--rdt-col-menu-min-width, 9rem);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-col-menu-item[data-rozie-s-d5dcab4c] {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  padding: var(--rdt-col-menu-item-padding, 0.35em 0.6em);
+  border: none;
+  border-radius: var(--rdt-col-menu-item-radius, 3px);
+  background: none;
+  color: inherit;
+  white-space: nowrap;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-col-menu-item[data-rozie-s-d5dcab4c]:hover {
+  background: var(--rdt-col-menu-item-hover-bg, rgba(0, 0, 0, 0.06));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-col-menu-item[aria-pressed='true'][data-rozie-s-d5dcab4c] {
+  background: var(--rdt-pin-btn-active-bg, rgba(0, 0, 0, 0.1));
+  font-weight: 700;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-col-menu-sep[data-rozie-s-d5dcab4c] {
+  margin: var(--rdt-col-menu-sep-margin, 0.25rem 0);
+  border: none;
+  border-top: var(--rdt-col-menu-sep-border, 1px solid rgba(0, 0, 0, 0.1));
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-colvis[data-rozie-s-d5dcab4c] {
+  position: relative;
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-colvis-summary[data-rozie-s-d5dcab4c] {
+  cursor: pointer;
+  font: inherit;
+  padding: var(--rdt-colvis-summary-padding, 0.25rem 0.6rem);
+  border: var(--rdt-colvis-summary-border, 1px solid rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-colvis-summary-radius, 4px);
+  list-style: none;
+  user-select: none;
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-colvis-menu[data-rozie-s-d5dcab4c] {
+  position: absolute;
+  z-index: var(--rdt-colvis-menu-z, 5);
+  margin-top: var(--rdt-colvis-menu-gap, 0.25rem);
+  padding: var(--rdt-colvis-menu-padding, 0.4rem 0.6rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--rdt-colvis-item-gap, 0.25rem);
+  border: var(--rdt-colvis-menu-border, 1px solid rgba(0, 0, 0, 0.15));
+  border-radius: var(--rdt-colvis-menu-radius, 4px);
+  background: var(--rdt-colvis-menu-bg, #fff);
+  box-shadow: var(--rdt-colvis-menu-shadow, 0 2px 8px rgba(0, 0, 0, 0.12));
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-colvis-item[data-rozie-s-d5dcab4c] {
+  display: flex;
+  align-items: center;
+  gap: var(--rdt-colvis-label-gap, 0.4em);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-select-th[data-rozie-s-d5dcab4c],
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-select-td[data-rozie-s-d5dcab4c] {
+  width: var(--rdt-select-col-width, 44px);
+  text-align: var(--rdt-select-col-align, center);
+  white-space: nowrap;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-expander-th[data-rozie-s-d5dcab4c],
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-expander-td[data-rozie-s-d5dcab4c] {
+  width: var(--rdt-expander-col-width, 40px);
+  text-align: var(--rdt-expander-col-align, center);
+  white-space: nowrap;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="1"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before,
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="2"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before,
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="3"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before,
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="4"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before,
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="5"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before,
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="6"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before,
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="7"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before,
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="8"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before {
+  content: '';
+  display: inline-block;
+  vertical-align: middle;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="1"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before {
+  width: calc(1 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="2"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before {
+  width: calc(2 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="3"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before {
+  width: calc(3 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="4"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before {
+  width: calc(4 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="5"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before {
+  width: calc(5 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="6"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before {
+  width: calc(6 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="7"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before {
+  width: calc(7 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="8"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before {
+  width: calc(8 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table[role="grid"][data-rozie-s-d5dcab4c] {
+  user-select: none;
+}
+.rozie-data-table[role="grid"][data-rozie-s-d5dcab4c] input[data-rozie-s-d5dcab4c],
+.rozie-data-table[role="grid"][data-rozie-s-d5dcab4c] textarea[data-rozie-s-d5dcab4c],
+.rozie-data-table[role="grid"][data-rozie-s-d5dcab4c] select[data-rozie-s-d5dcab4c],
+.rozie-data-table[role="grid"][data-rozie-s-d5dcab4c] [contenteditable="true"][data-rozie-s-d5dcab4c] {
+  user-select: text;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-select-all[data-rozie-s-d5dcab4c],
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-select-row[data-rozie-s-d5dcab4c] {
+  cursor: pointer;
+  accent-color: var(--rdt-select-accent, currentColor);
+}

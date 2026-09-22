@@ -1,0 +1,1 @@
+{"version":3,"file":"DetailPanel.d.ts","sourceRoot":"","sources":["../src/DetailPanel.ts"],"names":[],"mappings":";AAGA,qBAoBa,WAAW;IACtB;;OAEG;IACH,GAAG,+CAAiC;IAKpC,OAAO;;;QAOL;IAEF,YAAY,CAAC,CAAC,EAAE,OAAO,GAAG,MAAM;IAEhC,SAAS,CAAC,CAAC,EAAE,OAAO,GAAG,MAAM,GAAG,IAAI;yCApBzB,WAAW;2CAAX,WAAW;CAqBvB;AAED,eAAe,WAAW,CAAC"}

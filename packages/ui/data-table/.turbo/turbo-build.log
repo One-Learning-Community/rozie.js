@@ -1,0 +1,13 @@
+
+> @rozie-ui/data-table@0.1.0 build /Users/serpentblade/work/olc/rozie/packages/ui/data-table
+> node scripts/codegen.mjs
+
+codegen: react    → react/src/{DataTable.tsx, Column.tsx, EditorText.tsx, EditorNumber.tsx, EditorSelect.tsx, EditorCheckbox.tsx, EditorDate.tsx, FilterText.tsx, FilterNumberRange.tsx, FilterSelect.tsx, GroupBar.tsx, DetailPanel.tsx} (+ .css/.global.css/.d.ts)  ✓ (+ themes/, helpers/)
+codegen: vue      → vue/src/{DataTable.vue, Column.vue, EditorText.vue, EditorNumber.vue, EditorSelect.vue, EditorCheckbox.vue, EditorDate.vue, FilterText.vue, FilterNumberRange.vue, FilterSelect.vue, GroupBar.vue, DetailPanel.vue}  ✓ (+ themes/, helpers/)
+codegen: svelte   → svelte/src/{DataTable.svelte, Column.svelte, EditorText.svelte, EditorNumber.svelte, EditorSelect.svelte, EditorCheckbox.svelte, EditorDate.svelte, FilterText.svelte, FilterNumberRange.svelte, FilterSelect.svelte, GroupBar.svelte, DetailPanel.svelte}  ✓ (+ themes/, helpers/)
+codegen: angular  → angular/src/{DataTable.ts, Column.ts, EditorText.ts, EditorNumber.ts, EditorSelect.ts, EditorCheckbox.ts, EditorDate.ts, FilterText.ts, FilterNumberRange.ts, FilterSelect.ts, GroupBar.ts, DetailPanel.ts}  ✓ (+ themes/, helpers/)
+codegen: solid    → solid/src/{DataTable.tsx, Column.tsx, EditorText.tsx, EditorNumber.tsx, EditorSelect.tsx, EditorCheckbox.tsx, EditorDate.tsx, FilterText.tsx, FilterNumberRange.tsx, FilterSelect.tsx, GroupBar.tsx, DetailPanel.tsx}  ✓ (+ themes/, helpers/)
+codegen: lit      → lit/src/{DataTable.ts, Column.ts, EditorText.ts, EditorNumber.ts, EditorSelect.ts, EditorCheckbox.ts, EditorDate.ts, FilterText.ts, FilterNumberRange.ts, FilterSelect.ts, GroupBar.ts, DetailPanel.ts}  ✓ (+ themes/, helpers/)
+codegen: docs props-table validation PASS — 0 rows match ir.props (ENFORCING)
+codegen: docs surface validation PASS — 49 emit/handle names present in 2 docs page(s) (ENFORCING; throws on drift)
+codegen: done — 12 components × 6 targets emitted (DataTable, Column, EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate, FilterText, FilterNumberRange, FilterSelect, GroupBar, DetailPanel), themes vendored, 6 READMEs rendered, 6 LICENSEs vendored.

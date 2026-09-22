@@ -1,0 +1,4 @@
+
+> @rozie-ui/data-table-lit@0.5.0 typecheck /Users/serpentblade/work/olc/rozie/packages/ui/data-table/packages/lit
+> tsc --noEmit
+

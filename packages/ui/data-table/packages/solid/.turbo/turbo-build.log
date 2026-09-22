@@ -1,0 +1,22 @@
+
+> @rozie-ui/data-table-solid@0.5.0 build /Users/serpentblade/work/olc/rozie/packages/ui/data-table/packages/solid
+> tsdown
+
+ℹ tsdown v0.21.10 powered by rolldown v1.0.0-rc.17
+ℹ config file: /Users/serpentblade/work/olc/rozie/packages/ui/data-table/packages/solid/tsdown.config.ts 
+ℹ entry: src/index.ts
+ℹ tsconfig: tsconfig.json
+
+ WARN  `external` is deprecated. Use `deps.neverBundle` instead.
+
+ℹ Build start
+ℹ Cleaning 4 files
+ℹ [CJS] dist/index.cjs  224.58 kB │ gzip: 40.32 kB
+ℹ [CJS] 1 files, total: 224.58 kB
+ℹ [CJS] dist/index.d.cts  30.59 kB │ gzip: 7.63 kB
+ℹ [CJS] 1 files, total: 30.59 kB
+✔ Build complete in 511ms
+ℹ [ESM] dist/index.mjs    214.93 kB │ gzip: 39.67 kB
+ℹ [ESM] dist/index.d.mts   30.59 kB │ gzip:  7.63 kB
+ℹ [ESM] 2 files, total: 245.51 kB
+✔ Build complete in 516ms

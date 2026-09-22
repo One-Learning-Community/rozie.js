@@ -157,3 +157,37 @@ ONE gate sweep, ONE Docker VR union run at the end.
 
 - No changeset / version / push — owner-reserved.
 - D-14 (angular leaf READMEs) stays out — Plan 3, repo-wide.
+
+## GATES — run at the end of the session, and what they caught
+
+Two of the three turbo gates FAILED on the committed tree, and the local VR sweep had been
+1170/1170 green with the break in it — VR runs compiled JS and never looks at the leaf `.d.ts`
+surface, so the gates are the only thing that sees it.
+
+**FIXED (committed):** `setRangeFocus` (B-01) and `thStyle` (A-03) each gained a parameter, and
+the emitted per-target signature types EVERY declared param as REQUIRED. The two-argument
+Shift+Click call and the one-argument non-windowed header call therefore failed the strict leaf
+typecheck with TS2554 on react and solid, and broke the angular and vue leaf BUILDS. Both now
+carry an explicit `= null` default, which is what makes the emitted param optional — the same
+rule `gridKeydownHandlers`' `focusActiveCell` comment already records.
+
+  build 243/243 · typecheck 324/324 (was 241/243 and 319/324)
+
+**STILL RED — two recorded-baseline gates, NOT yet investigated (test 147/149):**
+
+1. `@rozie/regressions` → `roz138-corpus-precision.test.ts`. Still exactly **3** ROZ138 warnings,
+   but the deep-equal on their SITES fails: this session's edits moved line numbers inside
+   `gridKeydownHandlers.rzts`. Almost certainly pure location drift, and ROZ138 in this corpus is
+   author-owned by decision (`.planning/notes/roz138-triage.md`) — but CONFIRM the three sites are
+   the same three before re-recording them.
+2. `@rozie/vue-typecheck` → `family-children.test.ts`, "data-table: SFC-body errors match the
+   recorded baseline (28 known, do-not-fix-here)". The baseline moved. Read the actual +/- delta
+   before touching it: an ADDED error is a regression to fix, not to bless. The sibling listbox
+   and sortable-list cases still pass, so the drift is data-table-local.
+
+Do not re-bless either without reading the delta — blessing can cement a regression
+(`feedback_canonical_wins_dedup_verify_behavior`).
+
+**NOT RUN:** the Docker VR union (`bash tools/ci-repro/vr.sh`, no `-g`). Still owed on this
+session's commits AND on `ba9b73f20`, which has never had one.
+

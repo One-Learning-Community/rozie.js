@@ -1,0 +1,37 @@
+interface Props {
+    /**
+     * The column id (mirrors the `#editor` slot scope). Used as the input `aria-label` fallback.
+     */
+    columnId?: string;
+    /**
+     * The table-core column object (opaque passthrough from the `#editor` slot scope).
+     */
+    column?: (unknown) | null;
+    /**
+     * The consumer's row data object (opaque passthrough from the `#editor` slot scope).
+     */
+    row?: (unknown) | null;
+    /**
+     * The current cell value the editor seeds its local draft from (setup-once).
+     */
+    value?: (unknown) | null;
+    /**
+     * `(value) => void` — commit the edited cell value (from the `#editor` slot scope). Null-guarded at call sites.
+     */
+    commit?: ((...args: any[]) => any) | null;
+    /**
+     * `() => void` — revert the edit and close the editor (from the `#editor` slot scope). Null-guarded at call sites.
+     */
+    cancel?: ((...args: any[]) => any) | null;
+    /**
+     * Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.
+     */
+    autofocus?: boolean;
+    /**
+     * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
+     */
+    columnLabel?: string;
+}
+declare const EditorText: import("svelte").Component<Props, {}, "">;
+type EditorText = ReturnType<typeof EditorText>;
+export default EditorText;

@@ -1,0 +1,5 @@
+
+> @rozie-ui/data-table@0.1.0 typecheck /Users/serpentblade/work/olc/rozie/packages/ui/data-table
+> echo 'no local TS to check (pure-Rozie source); the emitted leaves typecheck individually'
+
+no local TS to check (pure-Rozie source); the emitted leaves typecheck individually

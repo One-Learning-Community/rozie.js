@@ -1,0 +1,22 @@
+
+> @rozie-ui/data-table-react@0.5.0 build /Users/serpentblade/work/olc/rozie/packages/ui/data-table/packages/react
+> tsdown
+
+ℹ tsdown v0.21.10 powered by rolldown v1.0.0-rc.17
+ℹ config file: /Users/serpentblade/work/olc/rozie/packages/ui/data-table/packages/react/tsdown.config.ts 
+ℹ entry: src/index.ts
+
+ℹ tsconfig: tsconfig.json
+ WARN  `external` is deprecated. Use `deps.neverBundle` instead.
+
+ℹ Build start
+ℹ Cleaning 5 files
+ℹ [CJS] dist/index.d.cts  30.67 kB │ gzip: 7.57 kB
+ℹ [CJS] 1 files, total: 30.67 kB
+ℹ [CJS] dist/index.cjs  245.88 kB │ gzip: 41.41 kB
+ℹ [CJS] 1 files, total: 245.88 kB
+✔ Build complete in 533ms
+ℹ [ESM] dist/index.mjs    232.58 kB │ gzip: 40.75 kB
+ℹ [ESM] dist/index.d.mts   30.55 kB │ gzip:  7.66 kB
+ℹ [ESM] 2 files, total: 263.13 kB
+✔ Build complete in 544ms

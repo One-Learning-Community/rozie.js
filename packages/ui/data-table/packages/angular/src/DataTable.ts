@@ -4150,7 +4150,10 @@ export class DataTable {
   // Header.getSize() — every descendant leaf, in-window or not — and so over-declares a straddling
   // group by exactly the leaves the colspan already excluded. Null on the unwindowed path and from
   // the non-windowed header body, which both keep headerWidth() verbatim.
-  thStyle = (header: any, widthPx: any) => {
+  // `widthPx` carries an EXPLICIT `= null` default for the same reason setRangeFocus's anchor
+  // params do: the emitted signature types a declared param as required, and the non-windowed
+  // header body calls `thStyle(header)` with one argument — TS2554 on the strict leaf typecheck.
+  thStyle = (header: any, widthPx: any = null) => {
     let s = '';
     const w = widthPx != null && widthPx > 0 ? widthPx + 'px' : this.headerWidth(header);
     if (w) s += 'width:' + w + ';';
@@ -6168,7 +6171,12 @@ export class DataTable {
   // entirely and makes all six correct for the same reason. Falls back to the active cell when no
   // explicit anchor is passed — Shift+Click, where "the anchor is where you already were" IS the
   // active cell and the read happens synchronously in the same handler.
-  setRangeFocus = (rIdx: any, cIdx: any, anchorR: any, anchorC: any) => {
+  // The two anchor params carry EXPLICIT `= null` defaults, and that is load-bearing, not style:
+  // the emitted per-target signature types every declared param as REQUIRED, so the Shift+Click
+  // call site's two-argument `setRangeFocus(row, col)` fails the strict leaf typecheck with
+  // TS2554 "Expected 4 arguments, but got 2" on react and solid. Same rule the `focusActiveCell`
+  // comment in gridKeydownHandlers records for its own optional params.
+  setRangeFocus = (rIdx: any, cIdx: any, anchorR: any = null, anchorC: any = null) => {
     const maxRow = this.bodyRowCount() - 1;
     const maxCol = this.visibleColCount() - 1;
     if (maxRow < 0 || maxCol < 0) return;

@@ -125,7 +125,12 @@ const extendRange = (dRow, dCol) => {
 // entirely and makes all six correct for the same reason. Falls back to the active cell when no
 // explicit anchor is passed — Shift+Click, where "the anchor is where you already were" IS the
 // active cell and the read happens synchronously in the same handler.
-const setRangeFocus = (rIdx, cIdx, anchorR, anchorC) => {
+// The two anchor params carry EXPLICIT `= null` defaults, and that is load-bearing, not style:
+// the emitted per-target signature types every declared param as REQUIRED, so the Shift+Click
+// call site's two-argument `setRangeFocus(row, col)` fails the strict leaf typecheck with
+// TS2554 "Expected 4 arguments, but got 2" on react and solid. Same rule the `focusActiveCell`
+// comment in gridKeydownHandlers records for its own optional params.
+const setRangeFocus = (rIdx, cIdx, anchorR = null, anchorC = null) => {
   const maxRow = bodyRowCount() - 1
   const maxCol = visibleColCount() - 1
   if (maxRow < 0 || maxCol < 0) return

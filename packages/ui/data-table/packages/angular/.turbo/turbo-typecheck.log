@@ -1,0 +1,5 @@
+
+> @rozie-ui/data-table-angular@0.5.0 typecheck /Users/serpentblade/work/olc/rozie/packages/ui/data-table/packages/angular
+> echo 'source+dist; ng-packagr declaration emit at build'
+
+source+dist; ng-packagr declaration emit at build
