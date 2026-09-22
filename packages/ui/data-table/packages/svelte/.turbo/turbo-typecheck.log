@@ -1,5 +1,0 @@
-
-> @rozie-ui/data-table-svelte@0.5.0 typecheck /Users/serpentblade/work/olc/rozie/packages/ui/data-table/packages/svelte
-> echo 'source+dist; svelte-check at repo level'
-
-source+dist; svelte-check at repo level
