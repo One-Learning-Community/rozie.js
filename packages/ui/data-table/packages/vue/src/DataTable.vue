@@ -5,7 +5,7 @@
 
 <div class="rdt-column-defs" style="display:none" aria-hidden="true"><slot></slot></div>
 
-<div v-if="!!invalidMsg" class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true">{{ invalidMsg }}</div><div v-if="!!pasteAnnounce" class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true">{{ pasteAnnounce }}</div><div v-if="!!liveAnnounce" class="rdt-sr-live rdt-sr-sortfilter" data-testid="sortfilter-announce" role="status" aria-live="polite" aria-atomic="true">{{ liveAnnounce }}</div><div class="rdt-toolbar">
+<div v-if="!!invalidMsg" class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true">{{ invalidMsg }}</div><div v-if="!!pasteAnnounce" class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true">{{ pasteAnnounce }}</div><div v-if="!!rangeAnnounce" class="rdt-sr-live rdt-sr-range" data-testid="range-announce" role="status" aria-live="polite" aria-atomic="true">{{ rangeAnnounce }}</div><div v-if="!!liveAnnounce" class="rdt-sr-live rdt-sr-sortfilter" data-testid="sortfilter-announce" role="status" aria-live="polite" aria-atomic="true">{{ liveAnnounce }}</div><div class="rdt-toolbar">
   <input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" :value="globalFilterValue()" @input="onGlobalFilterInput($event)" />
   
   <details v-if="allLeafColumns().length" class="rdt-colvis">
@@ -24,11 +24,11 @@
     <span v-for="gk in groupingKeys()" :key="gk" class="rdt-group-token" data-group-token="">{{ gk }}</span>
   </slot>
 </div><div v-if="isWindowed()" class="rdt-scroll" :style="rowsWindowed() && props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto'">
-<table :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader, 'rdt-col-windowed': colsWindowed() }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
+<table :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader, 'rdt-col-windowed': colsWindowed() }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" :aria-colcount="(gridAriaColCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
   <thead class="rdt-thead" role="rowgroup">
     <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row" :aria-rowindex="hgLevel + 1">
       
-      <th v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th><th v-for="wh in windowedHeadersFor(hg, hgLevel)" :key="wh.header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }]" role="columnheader" :data-col="wh.header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(wh.span > 1 ? wh.span : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, wh.header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(wh.header.column.id)" :style="thStyle(wh.header)">
+      <th v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th><th v-for="wh in windowedHeadersFor(hg, hgLevel)" :key="wh.header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }]" role="columnheader" :data-col="wh.header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(wh.span > 1 ? wh.span : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, wh.header)" :aria-colindex="headerLeafStart(hg, wh.header) + 1" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(wh.header.column.id)" :style="thStyle(wh.header)">
         <span v-if="isSelectColumn(wh.header.column.id)" style="display:contents">
           <slot name="selectAll" :checked="isAllRowsSelected()" :indeterminate="isSomeRowsSelected()" :toggle="onToggleAllRows">
             <input v-if="props.selectionMode === 'multiple'" class="rdt-select-all" type="checkbox" aria-label="Select all rows" :checked="isAllRowsSelected()" @change="onToggleAllRows($event)" /></slot>
@@ -81,7 +81,7 @@
     <template v-for="wr in windowedRows()" :key="wr.row.id">
     <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }]" role="row" :data-row="wr.vi.index" :aria-rowindex="headerRowCount() + wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined" :data-depth="wr.row.depth" :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined" :aria-expanded="(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined" :aria-selected="(props.selectionMode !== 'none' ? !!rowIsSelected(wr.row) : undefined) ?? undefined" :aria-level="(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined">
       
-      <td v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"></td><td v-for="cell in windowedCells(wr.row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cell)" :tabindex="(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell))) ?? undefined" :style="bodyCellStyle(wr.row, cell.column.id)" :aria-invalid="(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell))) ?? undefined" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
+      <td v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"></td><td v-for="cell in windowedCells(wr.row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cell)" :tabindex="(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell))) ?? undefined" :style="bodyCellStyle(wr.row, cell.column.id)" :aria-invalid="(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell))) ?? undefined" :aria-colindex="colIndexOf(wr.row, cell) + 1" :aria-selected="(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined) ?? undefined" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
         
         <span v-if="isExpanderColumn(cell.column.id)" style="display:contents">
           <button v-if="rowCanExpand(wr.row)" type="button" class="rdt-expander" data-expander="" :aria-expanded="!!rowIsExpanded(wr.row)" :aria-label="rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row'" @click="onToggleExpand(wr.row, $event)">{{ rowIsExpanded(wr.row) ? '▾' : '▸' }}</button></span><span v-else-if="isSelectColumn(cell.column.id)" style="display:contents">
@@ -97,15 +97,15 @@
           </span>
           <span class="rdt-group-count">{{ '(' + groupSubRowCount(wr.row) + ')' }}</span>
         </span><span v-else-if="isEditing(wr.vi.index, colIndexOf(wr.row, cell))" style="display:contents">
-          <input v-if="editorTypeOf(cell.column.id) === 'number'" class="rdt-cell-editor" type="number" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><select v-else-if="editorTypeOf(cell.column.id) === 'select'" class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @change="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)">
+          <input v-if="editorTypeOf(cell.column.id) === 'number'" class="rdt-cell-editor" type="number" data-editing-cell="" data-builtin-editor="" :aria-invalid="(invalidMsg ? 'true' : undefined) ?? undefined" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><select v-else-if="editorTypeOf(cell.column.id) === 'select'" class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" :aria-invalid="(invalidMsg ? 'true' : undefined) ?? undefined" :value="editorValueFor(cell.column.id)" @change="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)">
             <option v-for="opt in editorOptionsOf(cell.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" data-builtin-editor="" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><span v-else-if="editorTypeOf(cell.column.id) === 'custom'" style="display:contents">
+          </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" data-builtin-editor="" :aria-invalid="(invalidMsg ? 'true' : undefined) ?? undefined" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><span v-else-if="editorTypeOf(cell.column.id) === 'custom'" style="display:contents">
             <slot :name="`editor-${cell.column.id}`" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()" :columnLabel="headerLabel(cell.column.id)" :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)">
               <slot name="editor" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()" :columnLabel="headerLabel(cell.column.id)" :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)">
-                <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" />
+                <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" :aria-invalid="(invalidMsg ? 'true' : undefined) ?? undefined" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" />
               </slot>
             </slot>
-          </span><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else-if="cellIsPlaceholder(cell)" style="display:contents"></span><span v-else class="rdt-cell-value">
+          </span><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" :aria-invalid="(invalidMsg ? 'true' : undefined) ?? undefined" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else-if="cellIsPlaceholder(cell)" style="display:contents"></span><span v-else class="rdt-cell-value">
           <slot :name="`cell-${cell.column.id}`" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="cell.getValue()">
             <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(wr.row)" :value="cell.getValue()">{{ cell.getValue() }}</slot>
           </slot>
@@ -124,10 +124,10 @@
     </tr>
   </tbody>
 </table>
-</div><table v-else :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
+</div><table v-else :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" :aria-colcount="(gridAriaColCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
   <thead class="rdt-thead" role="rowgroup">
     <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row" :aria-rowindex="hgLevel + 1">
-      <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header)">
+      <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :aria-colindex="headerLeafStart(hg, header) + 1" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header)">
         
         
         <span v-if="isSelectColumn(header.column.id)" style="display:contents">
@@ -180,7 +180,7 @@
     
     <template v-for="row in rows" :key="row.id">
     <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(row) }]" role="row" :data-depth="row.depth" :aria-rowindex="(bodyAriaRowIndex(row)) ?? undefined" :data-group-header="rowIsGrouped(row) ? row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(row) ? row.id : undefined" :aria-expanded="(rowIsGrouped(row) ? !!rowIsExpanded(row) : undefined) ?? undefined" :aria-selected="(props.selectionMode !== 'none' ? !!rowIsSelected(row) : undefined) ?? undefined" :aria-level="(groupingActive() ? row.depth + 1 : undefined) ?? undefined">
-      <td v-for="cell in visibleCellsFor(row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row)), colIndexOf(row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="rowIndexOf(row)" :data-col-index="colIndexOf(row, cell)" :tabindex="(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell))) ?? undefined" :style="bodyCellStyle(row, cell.column.id)" :aria-invalid="(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell))) ?? undefined" :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
+      <td v-for="cell in visibleCellsFor(row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row)), colIndexOf(row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="rowIndexOf(row)" :data-col-index="colIndexOf(row, cell)" :tabindex="(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell))) ?? undefined" :style="bodyCellStyle(row, cell.column.id)" :aria-invalid="(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell))) ?? undefined" :aria-colindex="colIndexOf(row, cell) + 1" :aria-selected="(inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : undefined) ?? undefined" :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
         
         <span v-if="isExpanderColumn(cell.column.id)" style="display:contents">
           <button v-if="rowCanExpand(row)" type="button" class="rdt-expander" data-expander="" :aria-expanded="!!rowIsExpanded(row)" :aria-label="rowIsExpanded(row) ? 'Collapse row' : 'Expand row'" @click="onToggleExpand(row, $event)">{{ rowIsExpanded(row) ? '▾' : '▸' }}</button></span><span v-else-if="isSelectColumn(cell.column.id)" style="display:contents">
@@ -196,15 +196,15 @@
           </span>
           <span class="rdt-group-count">{{ '(' + groupSubRowCount(row) + ')' }}</span>
         </span><span v-else-if="isEditing(rowIndexOf(row), colIndexOf(row, cell))" style="display:contents">
-          <input v-if="editorTypeOf(cell.column.id) === 'number'" class="rdt-cell-editor" type="number" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><select v-else-if="editorTypeOf(cell.column.id) === 'select'" class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @change="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)">
+          <input v-if="editorTypeOf(cell.column.id) === 'number'" class="rdt-cell-editor" type="number" data-editing-cell="" data-builtin-editor="" :aria-invalid="(invalidMsg ? 'true' : undefined) ?? undefined" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><select v-else-if="editorTypeOf(cell.column.id) === 'select'" class="rdt-cell-editor" data-editing-cell="" data-builtin-editor="" :aria-invalid="(invalidMsg ? 'true' : undefined) ?? undefined" :value="editorValueFor(cell.column.id)" @change="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)">
             <option v-for="opt in editorOptionsOf(cell.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" data-builtin-editor="" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><span v-else-if="editorTypeOf(cell.column.id) === 'custom'" style="display:contents">
+          </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" data-builtin-editor="" :aria-invalid="(invalidMsg ? 'true' : undefined) ?? undefined" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><span v-else-if="editorTypeOf(cell.column.id) === 'custom'" style="display:contents">
             <slot :name="`editor-${cell.column.id}`" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()" :columnLabel="headerLabel(cell.column.id)" :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))">
               <slot name="editor" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()" :columnLabel="headerLabel(cell.column.id)" :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))">
-                <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" />
+                <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" :aria-invalid="(invalidMsg ? 'true' : undefined) ?? undefined" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" />
               </slot>
             </slot>
-          </span><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else-if="cellIsPlaceholder(cell)" style="display:contents"></span><span v-else class="rdt-cell-value">
+          </span><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" :aria-invalid="(invalidMsg ? 'true' : undefined) ?? undefined" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else-if="cellIsPlaceholder(cell)" style="display:contents"></span><span v-else class="rdt-cell-value">
           <slot :name="`cell-${cell.column.id}`" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="cell.getValue()">
             <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="cellSlotRow(row)" :value="cell.getValue()">{{ cell.getValue() }}</slot>
           </slot>
@@ -453,6 +453,7 @@ const rowDraft = ref({});
 const rangeAnchor = ref<any>(null);
 const rangeFocus = ref<any>(null);
 const pasteAnnounce = ref('');
+const rangeAnnounce = ref('');
 const liveAnnounce = ref('');
 
 const __rozieRootRef = ref<HTMLElement>();
@@ -3234,6 +3235,22 @@ const rowIndexOf = (row: any) => tick() >= 0 ? (rows.value || []).indexOf(row) :
 const colIndexOf = (row: any, cellCtx: any) => tick() >= 0 ? visibleCellsFor(row).indexOf(cellCtx) : -1;
 // headerColIndexOf: a header cell's position in its header group's leaf headers.
 const headerColIndexOf = (hg: any, header: any) => (hg && hg.headers ? hg.headers : []).indexOf(header);
+// E-05 — a header's ABSOLUTE LEAF-column start index, which is NOT the same as its position
+// in the group's header array: a grouped header occupies ONE array slot but spans colSpan leaf
+// columns, so positions and leaf indices diverge the moment a header group exists. Walk the
+// group accumulating colSpan to the target. Window-independent by construction (a header's
+// leaf start is a full-model property), so both the windowed grid header and the plain
+// non-grid header can share it.
+const headerLeafStart = (hg: any, header: any) => {
+  const list = hg && hg.headers ? hg.headers : [];
+  let leaf = 0;
+  for (let i = 0; i < list.length; i++) {
+    if (list[i] === header) return leaf;
+    const h = list[i];
+    leaf = leaf + (h && h.colSpan > 1 ? h.colSpan : 1);
+  }
+  return -1;
+};
 // ── C1 (phase 63 wave-6) absolute-index bridge ─────────────────────────────────────────
 // The PUBLIC active-cell rowIndex (focusCell/getActiveCell/activecell-change) is the ABSOLUTE
 // display-order position in getPrePaginationRowModel().rows (filter+sort+expand applied, BEFORE
@@ -3462,6 +3479,24 @@ const ariaPageOffset = () => table ? pageIndex() * pageSize() : 0;
 // it is always consistent with gridAriaRowCount. The virtual body binds
 // `headerRowCount() + wr.vi.index + 1` inline (wr.vi.index is already the absolute full-model index).
 const bodyAriaRowIndex = (row: any) => headerRowCount() + rowIndexOf(row) + ariaPageOffset() + 1;
+// ── E-05: the COLUMN-axis twin of gridAriaRowCount / bodyAriaRowIndex ────────────────
+// WAI-ARIA: when aria-colcount is set, every cell must carry an aria-colindex and the count
+// must equal the largest index any cell declares. The row axis has had this since #13; the
+// column axis had NOTHING repo-wide (0 occurrences of aria-colcount/aria-colindex), which
+// matters most under column windowing — the rendered <td>s are a WINDOW, so without an
+// explicit index a screen reader counts the window and announces "column 3 of 6" while the
+// user sits in absolute column 41.
+//
+// The index space is `visibleCellsFor(row)` / the header group's leaf headers — the same one
+// `colIndexOf` and `data-col-index` already use, INCLUDING the auto-injected select/expander
+// chrome columns (they are real columns in that list). `visibleColCount()` counts the same
+// list, so count and indices are mutually consistent by construction.
+//
+// NB named gridAriaColCount, NOT ariaColCount: `Element.ariaColCount` / `.ariaColIndex` are
+// inherited ARIA-reflected properties, so a same-named method becomes a Lit class field that
+// shadows them → TS2416 cascading to every @property decorator. Exactly the rename discipline
+// totalRowCount / gridAriaRowCount / bodyAriaRowIndex already document above.
+const gridAriaColCount = () => visibleColCount();
 // Column count = the visible cell list length (uniform header+body in a flat grid). Reads
 // $data.rows (reactive) so it is fine-grained-correct on Solid/Lit; falls back to the
 // header leaf count when there are no body rows.
@@ -4577,7 +4612,26 @@ const isFillHandleCell = (rIdx: any, cIdx: any) => {
 // pre-write value (ROZ138). extendRange/setRangeFocus thread the just-computed locals through
 // here so the emitted payload matches the write. The single call site keeps the count
 // predictable (React multi-emit dedup, D-07). One-way notification.
+// B-10 — announce the selection alongside the emit. This is the SINGLE site every range
+// mutation funnels through (shift+arrow via extendRange, shift+click and drag-select and
+// fill-drag via setRangeFocus, Ctrl+A via selectAllBody), so one announce here covers all of
+// them; guarding the callers individually would be five chances to miss one.
+//
+// Writes $data.rangeAnnounce directly rather than importing clipboardFill's announce(): that
+// helper drives pasteAnnounce, and a range move must not overwrite a paste/validation message
+// the user has not heard yet (hence the separate key + region). `polite` + `aria-atomic` means
+// a fast drag replaces the pending text instead of queueing every intermediate rectangle.
+const rangeSummary = (anchor: any, focus: any) => {
+  if (!anchor || !focus) return '';
+  const rows = Math.abs(focus.rowIndex - anchor.rowIndex) + 1;
+  const cols = Math.abs(focus.colIndex - anchor.colIndex) + 1;
+  if (rows === 1 && cols === 1) return '1 cell selected';
+  const rowPart = rows + (rows === 1 ? ' row' : ' rows');
+  const colPart = cols + (cols === 1 ? ' column' : ' columns');
+  return rowPart + ' by ' + colPart + ' selected, ' + rows * cols + ' cells';
+};
 const emitRangeChange = (anchor: any, focus: any) => {
+  rangeAnnounce.value = rangeSummary(anchor, focus);
   emit('range-change', {
     anchor,
     focus
@@ -4821,7 +4875,13 @@ const copyRange = () => {
 // running fresh array (replaceRowValue) and record the committed cell. After the walk: ONE
 // writeData (the single r-model:data write), ONE cell-edit-commit per COMMITTED cell, and the
 // N-of-M aria-live announce. Returns { wrote, total }.
-const applyGridToRange = (grid: any, originRow: any, originCol: any) => {
+// B-09 — `verb` names the OPERATION in the aria-live summary. This funnel serves paste, cut,
+// range-delete AND fill, so hardcoding "pasted" made a Cut announce "3 of 3 cells pasted" and a
+// Delete announce the same — actively wrong for a screen-reader user, who has no other signal
+// that the destructive operation they invoked actually happened. Defaults to 'pasted' so the
+// paste path's wording is unchanged.
+const applyGridToRange = (grid: any, originRow: any, originCol: any, verb: any) => {
+  const opVerb = typeof verb === 'string' && verb !== '' ? verb : 'pasted';
   const maxRow = bodyRowCount() - 1;
   const maxCol = visibleColCount() - 1;
   if (maxRow < 0 || maxCol < 0) return {
@@ -4885,7 +4945,7 @@ const applyGridToRange = (grid: any, originRow: any, originCol: any) => {
   // WR-02: announce the N-of-M summary only when at least one cell was written. When the paste
   // targeted real cells but every one was skipped (validation-failed / non-editable), announce a
   // distinct validation-failed message instead of a misleading "0 of M cells pasted".
-  if (wrote > 0) announce(wrote + ' of ' + total + ' cells pasted');else if (total > 0) announce('No cells pasted — ' + total + ' cells were invalid or read-only');
+  if (wrote > 0) announce(wrote + ' of ' + total + ' cells ' + opVerb);else if (total > 0) announce('No cells ' + opVerb + ' — ' + total + ' cells were invalid or read-only');
   return {
     wrote,
     total
@@ -4938,7 +4998,7 @@ const pasteRange = () => {
     // C3: tile the clipboard block to fill the destination range (single→range fill,
     // smaller-tiles-into-larger); a clipboard larger than the box pastes its full block.
     const tiled = tileGridToBox(grid, destBox);
-    applyGridToRange(tiled, anchorRow, anchorCol);
+    applyGridToRange(tiled, anchorRow, anchorCol, 'pasted');
   }).catch(() => {});
 };
 // cutRange(): C3 Cut — copy the current range to the clipboard (rangeToTsv — the SAME escaped
@@ -4972,7 +5032,7 @@ const cutRange = () => {
     for (let c = c0; c <= c1; c++) cols.push('');
     grid.push(cols);
   }
-  applyGridToRange(grid, r0, c0);
+  applyGridToRange(grid, r0, c0, 'cut');
 };
 // clearActiveRange(): the §7 (260709-3qt) Delete/Backspace clear — cutRange() MINUS the clipboard
 // copy. Clears the active cell / selected range through the SAME write-funnel as Cut/paste/fill:
@@ -4997,7 +5057,7 @@ const clearActiveRange = () => {
     for (let c = c0; c <= c1; c++) cols.push('');
     grid.push(cols);
   }
-  applyGridToRange(grid, r0, c0);
+  applyGridToRange(grid, r0, c0, 'cleared');
 };
 // fillRange(sourceBox): drag-fill (D-04 — VALUE-COPY ONLY, no series detection). B7: the fill
 // SOURCE is the PRE-DRAG rectangle (`sourceBox`, captured at pointerdown before the drag grew
@@ -5051,7 +5111,7 @@ const fillRange = (sourceBox: any, endCell: any) => {
     }
     grid.push(cols);
   }
-  applyGridToRange(grid, box.r0, box.c0);
+  applyGridToRange(grid, box.r0, box.c0, 'filled');
 };
 // onFillHandlePointerDown: begin a fill-handle drag (req-8 / D-04). The handle sits on the
 // range's bottom-right cell; a pointer drag extends the range (reusing setRangeFocus off the
