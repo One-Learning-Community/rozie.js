@@ -471,6 +471,10 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     componentImportsBlock,
     hasSelfReference,
     componentName: ir.name,
+    // quick 260922-hk4 (N-03): buildScriptPrelude folds the both-false
+    // opt-out into the single defineOptions({ ... }) macro.
+    inheritAttrs: ir.inheritAttrs,
+    inheritListeners: ir.inheritListeners,
   });
 
   const code = ms.toString();

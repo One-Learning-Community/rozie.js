@@ -4,6 +4,11 @@
  * Produces the body of `<script setup lang="ts">` for a Vue 3.4+ SFC. Output
  * order (per RESEARCH.md Pattern 3 + plan §<action>):
  *
+ *   0. script prelude — component imports + a single merged
+ *      `defineOptions({ name?, inheritAttrs? })` — precedes item 1 and is
+ *      emitted by shell.ts `buildScriptPrelude`, NOT here (quick 260922-hk4,
+ *      N-03: Vue rejects a duplicate `defineOptions()` call, so the
+ *      `inheritAttrs: false` opt-out is merged into the one `name` macro).
  *   1. import { ... } from 'vue'        (auto-collected)
  *   2. withDefaults(defineProps<...>(), { ... })  (non-model props only — D-31)
  *   3. const X = defineModel<T>('X', { ... })     (per model prop — D-31, Pitfall 3)

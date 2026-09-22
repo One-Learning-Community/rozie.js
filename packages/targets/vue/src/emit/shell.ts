@@ -98,6 +98,18 @@ export interface ShellParts {
    * `defineOptions({ name })` macro when `hasSelfReference` is true.
    */
   componentName?: string;
+  /**
+   * quick 260922-hk4 (N-03): the IR's `inherit-attrs` flag. Absent = `true`
+   * (preserves callers that predate the field). Only consulted together with
+   * `inheritListeners` — see `buildScriptPrelude`.
+   */
+  inheritAttrs?: boolean;
+  /**
+   * quick 260922-hk4 (N-03): the IR's `inherit-listeners` flag. Absent =
+   * `true`. `defineOptions({ inheritAttrs: false })` is emitted only when
+   * BOTH this and `inheritAttrs` are exactly `false`.
+   */
+  inheritListeners?: boolean;
 }
 
 /**
@@ -139,9 +151,15 @@ export interface BuildShellResult {
  * never relied on the old `MagicString('')` + .append() composition either.
  */
 /**
- * Phase 06.2 P2: build the script-prelude block (component imports +
- * optional defineOptions) for `<script setup>`. Returns '' when neither
- * is present so non-composing examples stay byte-stable.
+ * Phase 06.2 P2 + quick 260922-hk4 (N-03): build the script-prelude block for
+ * `<script setup>` — component imports first, then AT MOST ONE merged
+ * `defineOptions({ name?, inheritAttrs? })` macro carrying:
+ *   - `name: '<componentName>'` when the template references its own tag
+ *     (self-reference; don't rely on filename auto-name), and
+ *   - `inheritAttrs: false` when BOTH `inherit-attrs` and `inherit-listeners`
+ *     are `false` on the `<rozie>` block.
+ * Returns '' when nothing is present so non-composing examples stay
+ * byte-stable.
  */
 function buildScriptPrelude(parts: ShellParts): string {
   const lines: string[] = [];
@@ -149,8 +167,33 @@ function buildScriptPrelude(parts: ShellParts): string {
     // componentImportsBlock is already newline-terminated.
     lines.push(parts.componentImportsBlock.replace(/\n$/, ''));
   }
+  const options: string[] = [];
   if (parts.hasSelfReference === true && parts.componentName) {
-    lines.push(`defineOptions({ name: '${parts.componentName}' });`);
+    options.push(`name: '${parts.componentName}'`);
+  }
+  // quick 260922-hk4 (N-03) — the Vue side of Rozie's fallthrough opt-out.
+  //
+  // Vue has ONE switch (`inheritAttrs`) where Rozie has two
+  // (`inherit-attrs` / `inherit-listeners`), and Vue's `$attrs` CARRIES
+  // listeners. So `inheritAttrs: false` is exact only when BOTH flags are
+  // `false`. Each mixed setting is not expressible on Vue:
+  //   - attrs-only `false`: `inheritAttrs: false` would also drop listeners;
+  //   - listeners-only `false`: Vue cannot drop listeners while keeping attrs.
+  // A mixed setting therefore deliberately keeps the prior output — no macro,
+  // Vue's default fallthrough on the root — rather than silently
+  // over-suppressing. This is intentional, not an oversight (N-03; the owner
+  // declined a split-flag diagnostic). Omitting the root `v-bind="$attrs"`
+  // spread alone is NOT an opt-out on Vue: the implicit fallthrough still
+  // applies everything.
+  //
+  // The macro lives HERE, merged with `name`, and not in emitScript.ts:
+  // Vue's compiler-sfc hard-errors on a duplicate `defineOptions()` call,
+  // and this function already owns the `name` macro for self-reference.
+  if (parts.inheritAttrs === false && parts.inheritListeners === false) {
+    options.push('inheritAttrs: false');
+  }
+  if (options.length > 0) {
+    lines.push(`defineOptions({ ${options.join(', ')} });`);
   }
   if (lines.length === 0) return '';
   return lines.join('\n') + '\n\n';
