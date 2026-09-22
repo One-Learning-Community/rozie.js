@@ -1383,6 +1383,13 @@ export const EXAMPLES = [
   // it, and that the seed is one-shot (an unpin is not re-seeded). Drives
   // data-table-pinned-seed.spec.ts. DOM assertions only.
   'DataTablePinnedSeed',
+  // Quick task 260921-tsu (A-04) — the `manual` server-side pagination contract:
+  // `manual` + `rowCount` / `pageCount`, the surface the 260910 audit recorded as having
+  // no demo and no test anywhere in the repo. Two tables, one per count source, each fed a
+  // locally sliced page out of a 137-row master (what a server-paginated consumer does).
+  // Loader falls through to the sibling examples/demos/ file, no canonical top-level flat
+  // file. Drives data-table-manual-page.spec.ts. DOM assertions only.
+  'DataTableManualPage',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -1829,6 +1836,8 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableSlotFamily: 'rozie-data-table-slot-family',
   // Quick task 260908-vcy — the lit entry appends '-demo' to this tag.
   DataTablePinnedSeed: 'rozie-data-table-pinned-seed',
+  // Quick task 260921-tsu — the lit entry appends '-demo' to this tag.
+  DataTableManualPage: 'rozie-data-table-manual-page',
 };
 
 export interface HostQuery {
@@ -2336,6 +2345,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Quick task 260908-vcy — self-contained (rows/columns/pinning seeded in <data>); no
   // parent-supplied props. This entry exists only to satisfy the Record<Example> type.
   DataTablePinnedSeed: {},
+  // Quick task 260921-tsu — self-contained (the 137-row master is built in $onMount); no
+  // parent-supplied props. This entry exists only to satisfy the Record<Example> type.
+  DataTableManualPage: {},
 };
 
 /**

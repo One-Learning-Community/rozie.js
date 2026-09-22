@@ -1,0 +1,160 @@
+<!--
+  DataTableManualPageDemo.rozie — the `manual` server-side pagination contract
+  (`manual` + `rowCount` / `pageCount`) RED-first fixture.
+
+  Covers, via data-table-manual-page.spec.ts on all six targets:
+    A-04 — under `manual`, table-core holds ONLY the page the consumer handed it, so
+           `aria-rowcount` derived from getFilteredRowModel() reports the PAGE SIZE.
+           It must report the server-side total the consumer passes instead, and stay
+           consistent with the aria-rowindex values the body rows already carry
+           (which are offset by pageIndex * pageSize and so run well past the page).
+    coverage — `rowCount` / `pageCount` / the whole `manual` contract had NO demo and NO
+           test anywhere in the repo (audit 260910 §5 names it), which is why A-04 could
+           sit in shipped code. Both count sources are exercised here, and `Next` being
+           enabled at all is the proof `rowCount` reaches table-core's getPageCount()
+           (without a count `getCanNextPage()` is permanently false and page 0 is a
+           dead end).
+
+  Two tables, one per count source:
+    #manual-rowcount  — :manual + :rowCount="137"  (137 rows @ pageSize 10 = 14 pages)
+    #manual-pagecount — :manual + :pageCount="14"  (no rowCount; the derived upper bound)
+
+  Both are fed a LOCALLY sliced page out of a 137-row master array — that is exactly what
+  a server-paginated consumer does, and it is what makes table-core see a 10-row dataset.
+  The master array is built from a pure index function (no clock, no random) for VR
+  determinism.
+
+  No loop var / slot named row/cell/header (the Svelte mount-throw discipline).
+-->
+
+<rozie name="DataTableManualPageDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // The "server" dataset. 137 rows at pageSize 10 = 14 pages, the last one partial (7) —
+  // deliberately NOT a multiple of the page size, so `pageCount * pageSize` is a strict
+  // over-count and the two tables cannot accidentally agree.
+  master: [],
+  // The consumer-held page slices (what a real server hands back).
+  rowsA: [],
+  rowsB: [],
+  // Two-way pagination per table so a chrome Next round-trips on React.
+  pageA: { pageIndex: 0, pageSize: 10 },
+  pageB: { pageIndex: 0, pageSize: 10 },
+  // page-change readouts (the event a manual consumer actually fetches on).
+  lastPageA: '0',
+  lastPageB: '0',
+}
+</data>
+
+<script lang="ts">
+const TOTAL = 137
+const PAGE = 10
+
+// Pure index -> record. No clock/random: the VR run must be byte-deterministic.
+const buildMaster = (): Array<{ id: number; name: string; qty: number }> => {
+  const out: Array<{ id: number; name: string; qty: number }> = []
+  for (let i = 0; i < TOTAL; i++) out.push({ id: i + 1, name: 'Row ' + (i + 1), qty: (i * 7) % 90 })
+  return out
+}
+
+// The "server fetch": hand back only the requested page OUT OF AN EXPLICIT SOURCE ARRAY.
+// The source is a parameter, never a `$data` read, so the $onMount seeding below cannot
+// hit the React read-after-write staleness class (ROZ138): inside one flush `$data.master`
+// is still the pre-write value, so `sliceFrom` must not look it up itself.
+const sliceFrom = (
+  src: Array<{ id: number; name: string; qty: number }>,
+  pageIndex: number,
+): Array<{ id: number; name: string; qty: number }> => {
+  const start = pageIndex * PAGE
+  return src.slice(start, start + PAGE)
+}
+
+$onMount(() => {
+  const built = buildMaster()
+  $data.master = built
+  $data.rowsA = sliceFrom(built, 0)
+  $data.rowsB = sliceFrom(built, 0)
+})
+
+// A manual consumer refetches on page-change; both tables do exactly that.
+const onPageA = (payload: { pageIndex: number }): void => {
+  const pi = payload && payload.pageIndex != null ? payload.pageIndex : 0
+  $data.lastPageA = String(pi)
+  $data.rowsA = sliceFrom($data.master, pi)
+}
+const onPageB = (payload: { pageIndex: number }): void => {
+  const pi = payload && payload.pageIndex != null ? payload.pageIndex : 0
+  $data.lastPageB = String(pi)
+  $data.rowsB = sliceFrom($data.master, pi)
+}
+</script>
+
+<template>
+<div class="dt-manual-demo">
+  <h3>DataTable — manual (server-side) pagination</h3>
+
+  <div class="controls">
+    <span class="label">pageA:</span>
+    <span class="readout" data-testid="page-a-readout">{{ $data.lastPageA }}</span>
+    <span class="label">pageB:</span>
+    <span class="readout" data-testid="page-b-readout">{{ $data.lastPageB }}</span>
+  </div>
+
+  <div data-testid="manual-rowcount">
+    <h4>rowCount = 137</h4>
+    <DataTable
+      :data="$data.rowsA"
+      :manual="true"
+      :rowCount="137"
+      r-model:pagination="$data.pageA"
+      @page-change="onPageA($event)"
+    >
+      <Column field="name" header="Name" />
+      <Column field="qty" header="Qty" />
+    </DataTable>
+  </div>
+
+  <div data-testid="manual-pagecount">
+    <h4>pageCount = 14 (no rowCount)</h4>
+    <DataTable
+      :data="$data.rowsB"
+      :manual="true"
+      :pageCount="14"
+      r-model:pagination="$data.pageB"
+      @page-change="onPageB($event)"
+    >
+      <Column field="name" header="Name" />
+      <Column field="qty" header="Qty" />
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-manual-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 620px;
+}
+.dt-manual-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.dt-manual-demo h4 { margin: 0.75rem 0 0.25rem; font-size: 0.8125rem; font-weight: 600; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+</style>

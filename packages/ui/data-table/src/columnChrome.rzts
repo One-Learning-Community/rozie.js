@@ -222,9 +222,14 @@ const pinStyle = (colId, zIndex = 1) => {
 // read header.getSize() — the group-aware size (see headerWidth's own comment). pinStyle still
 // keys off the plain column id (pinning is a leaf-column-only concern; a grouped header never
 // pins as a unit in this codebase's model).
-const thStyle = (header) => {
+// A-03: `widthPx` is the in-window leaf-width sum windowedHeadersFor() computed alongside the
+// clamped colspan. When it is present it WINS over headerWidth(), which reports
+// Header.getSize() — every descendant leaf, in-window or not — and so over-declares a straddling
+// group by exactly the leaves the colspan already excluded. Null on the unwindowed path and from
+// the non-windowed header body, which both keep headerWidth() verbatim.
+const thStyle = (header, widthPx) => {
   let s = ''
-  const w = headerWidth(header)
+  const w = widthPx != null && widthPx > 0 ? widthPx + 'px' : headerWidth(header)
   if (w) s += 'width:' + w + ';'
   s += pinStyle(header && header.column ? header.column.id : null, 2)
   return s

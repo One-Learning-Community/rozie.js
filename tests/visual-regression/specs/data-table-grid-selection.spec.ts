@@ -351,6 +351,72 @@ for (const target of TARGETS) {
   });
 
   // ════════════════════════════════════════════════════════════════════════════════
+  // B-01 — a drag that does NOT start at (0,0) anchors at the cell the user pressed on.
+  //   The pre-existing §6 case above drags (0,0)→(1,1), and (0,0) is exactly where the stale
+  //   read happens to be correct, so it cemented the bug instead of catching it. Here the
+  //   active cell is parked at (0,0) FIRST and the drag starts at (2,1) — the two disagree, so
+  //   a wrong anchor is visible as a wrong rectangle SIZE rather than only a wrong corner.
+  //   Pre-fix on React: `setRangeFocus` seeded the anchor from `$data.activeRow/activeColIndex`
+  //   read inside the document-pointermove closure, which is frozen at the render BEFORE the
+  //   mousedown (native focus is a default action that runs after handlers), so the range
+  //   spanned (0,0)→(3,2) = 12 cells — and Ctrl+X / Delete destroy every one of them. The other
+  //   five read that state live inside `move` (focusin has run by then) and were accidentally
+  //   correct; the anchor is now passed explicitly, so no target reads it at all.
+  // ════════════════════════════════════════════════════════════════════════════════
+  runnerFor(target)(`data-table-grid-selection [${target}]: B-01 a drag anchors at the mousedown cell, not the previously-active one`, async ({ page }) => {
+    await gotoGrid(page, target);
+    // Park the active cell at (0,0) — the value the stale read would pick up.
+    await clickBodyCell(page, 0, 0);
+    await expect
+      .poll(async () => { const a = await activeCellCoords(page); return a ? `${a.row},${a.col}` : null; }, { timeout: 10_000 })
+      .toBe('0,0');
+
+    await dragSelect(page, 2, 1, 3, 2);
+
+    // (2,1)→(3,2) is a 2x2 rectangle = 4 cells. A stale (0,0) anchor gives 4 rows x 3 cols = 12.
+    await expect
+      .poll(async () => countInRange(page, 'grid-table'), { timeout: 10_000 })
+      .toBe(4);
+    // Stated the other way round too, so a future change that merely alters the COUNT cannot
+    // pass while still selecting the wrong corner.
+    expect(await cellHasClass(page, 'grid-table', 0, 0, 'rdt-in-range')).toBe(false);
+    expect(await cellHasClass(page, 'grid-table', 2, 1, 'rdt-in-range')).toBe(true);
+    expect(await cellHasClass(page, 'grid-table', 3, 2, 'rdt-in-range')).toBe(true);
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // B-11 — the Shift+Click focusin-skip flag must not leak onto the NEXT click.
+  //   Shift+Click sets the range from the pointer event (a focusin carries no shiftKey) and
+  //   arms a flag so the follow-up focusin does not collapse what it just set. But Shift+Click
+  //   on the cell that ALREADY holds focus fires no focusin at all, so a bare boolean stayed
+  //   armed and the next ordinary navigation click consumed it and skipped ITS collapse —
+  //   leaving a rectangle painted around a cell the user had navigated away from. The flag now
+  //   carries the cell it was armed for, so a focusin anywhere else falls through to
+  //   clearRange().
+  // ════════════════════════════════════════════════════════════════════════════════
+  runnerFor(target)(`data-table-grid-selection [${target}]: B-11 a Shift+Click on the focused cell does not strand the next click's range`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await clickBodyCell(page, 1, 1);
+    await expect
+      .poll(async () => { const a = await activeCellCoords(page); return a ? `${a.row},${a.col}` : null; }, { timeout: 10_000 })
+      .toBe('1,1');
+    // Shift+Click the SAME, already-focused cell: a 1x1 range, and no focusin to consume the
+    // flag (the cell cannot receive focus it already has).
+    await clickBodyCell(page, 1, 1, true);
+    await expect
+      .poll(async () => countInRange(page, 'grid-table'), { timeout: 10_000 })
+      .toBe(1);
+    // An ordinary navigation click elsewhere must collapse it.
+    await clickBodyCell(page, 3, 0);
+    await expect
+      .poll(async () => { const a = await activeCellCoords(page); return a ? `${a.row},${a.col}` : null; }, { timeout: 10_000 })
+      .toBe('3,0');
+    await expect
+      .poll(async () => countInRange(page, 'grid-table'), { timeout: 10_000 })
+      .toBe(0);
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
   // §6 — mousedown WITHOUT a move collapses to a single active cell (no range). Pre-fix: a
   //   plain mousedown was a no-op anyway; this pins the "no paint on a bare click" contract.
   // ════════════════════════════════════════════════════════════════════════════════

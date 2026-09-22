@@ -246,8 +246,23 @@ const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, ne
 // HTMLElement ARIA-reflected property (`Element.ariaRowCount: string`), so a same-named method
 // becomes a class field that shadows it on Lit → TS2416 cascades to EVERY @property decorator
 // (the `valueOf`/`nodeType` inherited-DOM-member collision class, authoring playbook §6).
+// A-04: under `manual` the filtered row model is NOT the total — table-core holds only the
+// page the consumer handed it, so getFilteredRowModel().rows.length is the PAGE SIZE. The
+// server-side total lives in the props the consumer passes for exactly this purpose
+// (`rowCount`, else `pageCount`), which is also table-core's own precedence for getPageCount()
+// (explicit pageCount wins, else ⌈rowCount / pageSize⌉). Taking them here keeps aria-rowcount
+// consistent with bodyAriaRowIndex, which already offsets by pageIndex * pageSize and would
+// otherwise hand a screen reader an index LARGER than the advertised count on any page past
+// the first. `pageCount * pageSize` is an upper bound (the last page is usually partial) —
+// an over-count is the safe direction: an aria-rowindex can never exceed it.
+// With `manual` and NEITHER count set, table-core pins getCanNextPage() to false, so pageIndex
+// stays 0, the offset is 0 and page-slice-as-total is self-consistent; we leave it alone.
 const totalRowCount = () => {
   if (!table) return ($data.rows || []).length
+  if ($props.manual === true) {
+    if ($props.rowCount != null) return $props.rowCount
+    if ($props.pageCount != null) return $props.pageCount * pageSize()
+  }
   const fm = table.getFilteredRowModel()
   return fm && fm.rows ? fm.rows.length : ($data.rows || []).length
 }

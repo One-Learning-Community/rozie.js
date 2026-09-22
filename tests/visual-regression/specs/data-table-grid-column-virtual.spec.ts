@@ -787,9 +787,17 @@ for (const target of TARGETS) {
     // attempt (not just the readback) — under concurrent-worker load a target's re-render
     // after the scroll-reset above can lag past a single focus attempt, and a one-shot
     // `.focus()` on a not-yet-rendered cell silently no-ops with nothing to retry it.
+    // 260921-tsu: the SCROLL RESET is inside the poll, not only above it. Re-focusing alone
+    // cannot recover the failure this retry exists for: if the window has not settled back over
+    // col2, `.focus()` on an unrendered cell silently no-ops and nothing re-drives the window,
+    // so the loop re-tries a call that can never succeed and burns the full timeout. That is the
+    // exact shape observed twice now under parallel load (2026-09-14 Docker union, 2026-09-21
+    // local sweep) — 15s of retries, then a 1-2s pass in isolation. Re-issuing the scroll each
+    // attempt makes the retry actually retry the thing that was lagging.
     await expect
       .poll(
         async () => {
+          await scrollGridTo(page, 0);
           await focusScopedCell(page, 'grid-table', 5, 2);
           return activeCellColIndex(page);
         },

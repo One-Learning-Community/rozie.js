@@ -157,11 +157,56 @@ const onEditorBlur = (e) => {
   }
   if ($data.editingRow < 0 || editTransition) return
   const next = e ? e.relatedTarget : null
-  // A null relatedTarget is an unmount-blur (the editor left the DOM) or a focus drop the
-  // keyboard path owns; committing here would double-count (WR-04: the OLD editor's blur on
-  // a Tab-advance fires with a TRANSIENT null relatedTarget while it unmounts). Keep the
-  // conservative null=skip behavior.
-  if (next == null) return
+  const fromCell = e && e.target && e.target.closest ? e.target.closest('[data-grid-cell]') : null
+  // ── B-02 ────────────────────────────────────────────────────────────────────────────
+  // A null relatedTarget used to return unconditionally. That is correct for the WR-04 case
+  // the comment cited — a Tab-advance fires the OLD editor's blur with a TRANSIENT null
+  // relatedTarget while it unmounts, and committing there double-counts — but it is NOT the
+  // only shape. Clicking any non-focusable region of the page (the body, a heading, whitespace)
+  // also blurs the editor with a null relatedTarget, and that returned WITHOUT committing and
+  // WITHOUT endEdit(): the typed value was silently discarded, the editor stayed open, and
+  // `$data.editingRow` stayed >= 0 — which gridKeydownHandlers' `if ($data.editingRow >= 0)
+  // return` reads as "an editor owns the keyboard", so arrows/Enter/F2/Home/Ctrl+C were all
+  // dead until the user double-clicked somewhere else. There is no document-level click-away
+  // listener anywhere in the family to catch it afterwards.
+  //
+  // The two shapes ARE separable, with the discriminator the branch below already uses: on a
+  // Tab-advance the keyboard path has already moved the editing pair to the NEXT cell, so the
+  // blurring editor's own cell no longer matches ($data.editingRow/editingCol), while a
+  // click-away leaves the pair still sitting on it. The row-edit branch twenty lines above
+  // reaches the same conclusion by the same reasoning and commits on null; this is that branch's
+  // single-cell twin.
+  if (next == null) {
+    // Not a click-away unless a pointerdown OUTSIDE the grid just said so. `outsidePointerDown`
+    // is the discriminator, and nothing weaker works: an editor recycled out of the virtual
+    // window (or replaced by Solid's keyed-row reconcile) blurs with a null relatedTarget too,
+    // and `closest()` still resolves an owning `<td>` inside a DETACHED subtree, so every
+    // synchronous DOM test reads it as a click-away — measured, it closed the pinned editor in
+    // data-table-edit's "open editor + index-based range survive virtualization recycle" case on
+    // solid. Deferring a frame does not help either: by then the node is reattached, focus sits
+    // on <body>, and the state is indistinguishable from a real click-away.
+    //
+    // The flag is a plain module-let set by the document pointerdown listener in DataTable.rozie
+    // (NOT a $data field, and NOT a closure over one): a document listener is attached once, so
+    // on React any `$data` it closes over is frozen at attach time, and a commit driven from
+    // that closure would write the draft as of editor-OPEN and lose everything typed. Routing
+    // the decision back through THIS handler — template-bound, so React re-binds it every
+    // render — keeps the commit on the always-fresh path. Consume it here so an unmount blur
+    // arriving later can never inherit it.
+    if (!outsidePointerDown) return
+    outsidePointerDown = false
+    if (!fromCell) return
+    if (
+      fromCell.getAttribute('data-row') !== String($data.editingRow) ||
+      fromCell.getAttribute('data-col-index') !== String($data.editingCol)
+    )
+      return
+    // Genuine click-away onto a non-focusable region outside the grid → commit + close (D-01's
+    // reject path keeps the editor open on an invalid value, exactly as for a click onto another
+    // cell). skipFocusReturn: the user deliberately put focus elsewhere; do not yank it back.
+    commitEdit(undefined, true)
+    return
+  }
   // Focus moving OUTSIDE the grid (a click into another widget) → commit (D-01 reject keeps
   // the editor open on an invalid value).
   if (!(gridRoot && gridRoot.contains && gridRoot.contains(next))) { commitEdit(undefined); return }
@@ -169,7 +214,6 @@ const onEditorBlur = (e) => {
   // keyboard handler already committed) from a genuine click-away to ANOTHER grid cell
   // (which must commit + close so the grid is not wedged with an open editor).
   const nextCell = next.closest ? next.closest('[data-grid-cell]') : null
-  const fromCell = e && e.target && e.target.closest ? e.target.closest('[data-grid-cell]') : null
   // Same cell (an inner control / the editing cell itself on an Enter focus-return) → a
   // controlled move; skip. Also skip when either cell can't be resolved (an unmounting
   // editor has no owning cell — the Tab-advance remount-blur path, never a click-away).

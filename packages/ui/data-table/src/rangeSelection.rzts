@@ -108,14 +108,31 @@ const extendRange = (dRow, dCol) => {
   }
 }
 
-// setRangeFocus(rIdx, cIdx): set the moving corner to an explicit cell (Shift+Click),
-// seeding the anchor from the active cell when no range exists yet. Clamped to bounds.
-// Emits range-change from this single site.
-const setRangeFocus = (rIdx, cIdx) => {
+// setRangeFocus(rIdx, cIdx, anchorR, anchorC): set the moving corner to an explicit cell
+// (Shift+Click, or a drag-select's pointermove), seeding the anchor when no range exists yet.
+// Clamped to bounds. Emits range-change from this single site.
+//
+// B-01: the anchor seed is EXPLICIT when the caller knows it. Seeding it from
+// `$data.activeRow`/`$data.activeColIndex` is only correct if that state is live at the moment
+// the seed happens — and inside a drag-select it is not on React, where the document
+// pointermove closure captures the render-scoped consts from the render that ran BEFORE the
+// mousedown. Native focus moves as mousedown's DEFAULT ACTION, after handlers return, so at
+// `beginRangeDrag` time the active cell is still the PRE-mousedown one and React can never
+// show that closure a newer value. Dragging (5,2)→(7,3) on a fresh grid anchored at (0,0) and
+// selected the whole rectangle from there — which Ctrl+X and Delete then destroy.
+// The other five targets read `$data.activeRow` LIVE inside `move` (by then focusin has synced
+// it), so they were accidentally correct; taking the anchor from the caller removes the read
+// entirely and makes all six correct for the same reason. Falls back to the active cell when no
+// explicit anchor is passed — Shift+Click, where "the anchor is where you already were" IS the
+// active cell and the read happens synchronously in the same handler.
+const setRangeFocus = (rIdx, cIdx, anchorR, anchorC) => {
   const maxRow = bodyRowCount() - 1
   const maxCol = visibleColCount() - 1
   if (maxRow < 0 || maxCol < 0) return
   let anchor = $data.rangeAnchor
+  if (!anchor && anchorR != null && anchorC != null) {
+    anchor = { rowIndex: clamp(Math.trunc(Number(anchorR)) || 0, 0, maxRow), colIndex: clamp(Math.trunc(Number(anchorC)) || 0, 0, maxCol) }
+  }
   if (!anchor) anchor = { rowIndex: $data.activeRow, colIndex: $data.activeColIndex }
   const r = clamp(Math.trunc(Number(rIdx)) || 0, 0, maxRow)
   const c = clamp(Math.trunc(Number(cIdx)) || 0, 0, maxCol)

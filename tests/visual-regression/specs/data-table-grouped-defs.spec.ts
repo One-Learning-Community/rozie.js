@@ -489,9 +489,13 @@ for (const target of TARGETS) {
         ':1|:2|:3|Fig:4|Date:5|Lime:6',
         { timeout: 5_000 },
       );
+      // B-09 (260921-tsu): the verb is 'cleared', not 'pasted'. `applyGridToRange` is the single
+      // write funnel for paste, cut, range-delete AND fill and used to hardcode "pasted", so a
+      // Delete announced itself as a paste to a screen-reader user. It now takes the verb from
+      // its caller. This assertion predates that fix and was asserting the bug.
       await expect
         .poll(async () => readoutText(page, 'paste-announce'), { timeout: 5_000 })
-        .toBe('3 of 4 cells pasted');
+        .toBe('3 of 4 cells cleared');
     }
 
     // (c) Control: the IDENTICAL Delete-clear operation anchored ENTIRELY on leaf rows
@@ -506,9 +510,10 @@ for (const target of TARGETS) {
         ':1|:2|:3|Fig:4|Date:5|Lime:6',
         { timeout: 5_000 },
       );
+      // B-09 — same Delete-clear verb correction as case (b) above.
       await expect
         .poll(async () => readoutText(page, 'paste-announce'), { timeout: 5_000 })
-        .toBe('3 of 3 cells pasted');
+        .toBe('3 of 3 cells cleared');
     }
 
     // (d) Fill-drag: a true 1x1 SOURCE at Plum's 'product' cell (row 3) dragged DOWN across

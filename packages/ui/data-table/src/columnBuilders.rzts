@@ -34,6 +34,35 @@ const parseWidthToSize = (w) => {
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
+// ── E-03: the `editor` union is FOUR built-ins plus the 'custom' gate ────────────────────
+// `editorTypeOf` falls through to the plain text `<input>` for ANY unrecognised value, so a
+// consumer writing `editor="date"` — a value the comparison page and the root README both
+// advertised as a fifth built-in until the 260910 audit corrected them — got a text box with
+// no error, no warning, and no hint that `EditorDate` is a DROP-IN reached through
+// `editor="custom"` + an `#editor` fill. Same for any typo. The silent degradation is the
+// defect; the docs half is already corrected.
+//
+// Warned at column-BUILD time, not in `editorTypeOf`, which is called per cell per render
+// (D-23) — and latched per `id:value` so a rebuild (the memo misses whenever the column set
+// changes identity) cannot turn one misconfiguration into a console flood. Unguarded
+// console.warn, matching the D-07/D-08 virtual-misconfig warns in DataTable.rozie: a
+// process.env guard is not bundler-portable across six targets, and always-warn-on-misconfig
+// is the established call in this component.
+const EDITOR_KINDS = ['text', 'number', 'select', 'checkbox', 'custom']
+const editorWarned = Object.create(null)
+const checkEditorKind = (id, editor) => {
+  if (editor == null || EDITOR_KINDS.indexOf(editor) !== -1) return editor
+  const key = id + '\u0000' + String(editor)
+  if (editorWarned[key]) return editor
+  editorWarned[key] = true
+  console.warn(
+    '[rozie-data-table] column "' + id + '": editor="' + String(editor) + '" is not a built-in editor. ' +
+      'The built-ins are text | number | select | checkbox; anything else needs editor="custom" plus an ' +
+      '#editor slot fill (that is how <EditorDate> is used). Falling back to the text input.',
+  )
+  return editor
+}
+
 const buildConfigDef = (c) => {
   if (!c) return null
   // Grouped (multi-level) header column: an entry carrying a `columns` array. table-core's
@@ -93,7 +122,7 @@ const buildConfigDef = (c) => {
     // metadata carrier the display↔editor branch + runValidator read. Off by default.
     meta: {
       editable: c.editable === true,
-      editor: c.editor != null ? c.editor : 'text',
+      editor: c.editor != null ? checkEditorKind(id, c.editor) : 'text',
       editorOptions: c.editorOptions != null ? c.editorOptions : [],
       validate: typeof c.validate === 'function' ? c.validate : null,
     },
@@ -178,7 +207,7 @@ const columnDefs = () => {
       // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
       meta: {
         editable: spec.editable === true,
-        editor: spec.editor != null ? spec.editor : 'text',
+        editor: spec.editor != null ? checkEditorKind(id, spec.editor) : 'text',
         editorOptions: spec.editorOptions != null ? spec.editorOptions : [],
         validate: typeof spec.validate === 'function' ? spec.validate : null,
       },

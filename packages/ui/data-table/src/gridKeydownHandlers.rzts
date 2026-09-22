@@ -311,11 +311,23 @@ const syncActiveFromEvent = (e) => {
   // focusin that follows a Shift+Click (rangeClickPending): @mousedown already set the range
   // BEFORE this focusin fires, and a focusin carries no reliable shiftKey, so the @mousedown
   // path owns the shift case and flags it here so the collapse is skipped.
+  // B-11: `rangeClickPending` carries the CELL the Shift+Click landed on, not a bare boolean.
+  // A boolean leaks: Shift+Click on the cell that ALREADY holds focus fires no focusin at all,
+  // so nothing consumed the flag, and the next ordinary navigation click (or Tab) hit this
+  // branch instead and skipped its collapse — leaving a stale rectangle painted while the
+  // active cell moved away. Matching on the coordinates makes a leak self-healing: a focusin on
+  // any OTHER cell falls through to clearRange() and clears the flag on the way past.
   if (rangeTransition) {
     rangeTransition = false
-  } else if (rangeClickPending) {
-    rangeClickPending = false
+  } else if (
+    rangeClickPending &&
+    rangeClickPending.isHeader === isHeader &&
+    rangeClickPending.r === movedRow &&
+    rangeClickPending.c === col
+  ) {
+    rangeClickPending = null
   } else {
+    rangeClickPending = null
     clearRange()
   }
   // The cell box (not an inner control) receiving focus = navigation mode.
@@ -353,13 +365,22 @@ const onGridMouseDown = (e) => {
     $data.activeIsHeader = false
     $data.activeRow = row
     $data.activeColIndex = col
-    rangeClickPending = true
+    // B-11: arm the skip for THIS cell only (see syncActiveFromEvent). Body cell → isHeader
+    // false; the header path never reaches here (rowAttr === '__header' returned above).
+    rangeClickPending = { isHeader: false, r: row, c: col }
     return
   }
-  // §6 plain mousedown → begin a document-level drag-select anchored at this cell. The mousedown's
-  // native focusin commits the ACTIVE cell to (row,col); beginRangeDrag's first cross-cell
-  // pointermove paints the range via setRangeFocus (anchored at the active cell). A mousedown with
-  // no move collapses to a single active cell (no range).
+  // B-16: a mousedown INSIDE the cell that is currently in edit belongs to the editor — it is
+  // the user placing a caret or drag-selecting TEXT. Starting a cell drag-select from it paints
+  // a grid range over the very cell being typed into, and (with `undoable`) a drag that leaves
+  // the cell then lets Delete/Ctrl+X act on a rectangle the user was never selecting. The
+  // editor owns the gesture; return before any document listener is attached.
+  if (isEditing(row, col)) return
+  // §6 plain mousedown → begin a document-level drag-select anchored at this cell. The anchor is
+  // passed EXPLICITLY into setRangeFocus by beginRangeDrag (B-01) rather than seeded from the
+  // active cell, which is still the PRE-mousedown one at this point (native focus is a default
+  // action that runs after this handler). A mousedown with no move collapses to a single active
+  // cell (no range).
   beginRangeDrag(row, col)
 }
 

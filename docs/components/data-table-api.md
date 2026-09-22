@@ -11,6 +11,45 @@ The full prop surface. The twelve `model: true` slices (the **Two-way** column �
 
 For the per-column `<Column>` attributes (`field` / `header` / `sortable` / `filterable` / `pinned` / `width` / `groupable` / `aggregationFn` / `editable` / `editor` / `editorOptions` / `validate`), see the [Columns reference](/components/data-table-columns).
 
+### Attribute and listener fallthrough is OFF
+
+Every component this package ships — `DataTable`, `Column`, `DetailPanel`, the four
+`Editor*` drop-ins, the three `Filter*` drop-ins and `GroupBar` — declares
+`inherit-attrs="false" inherit-listeners="false"`, and none of them re-applies `$attrs` /
+`$listeners` anywhere in its template. **An attribute or a native listener that is not a
+declared prop is dropped, not forwarded to the root element.**
+
+It is easy to trip over, because it is the opposite of the library-wide default
+(auto-fallthrough is [on unless a component opts out](/guide/composition)),
+and nothing warns you:
+
+```html
+<!-- dropped — `class`, `data-*` and the listener never reach the DOM -->
+<DataTable class="my-table" data-analytics="orders" @click="onAnyClick" :data="rows" />
+```
+
+Wrap the component when you need a hook of your own:
+
+```html
+<div class="my-table" data-analytics="orders" @click="onAnyClick">
+  <DataTable :data="rows" />
+</div>
+```
+
+The same rule governs the drop-in editors and filters, and it is why a prop a drop-in does
+not declare cannot be passed through to it — `autofocus` on `<EditorSelect>` reaches the
+component only because `EditorSelect` declares an `autofocus` prop, not by fallthrough.
+Style the table through the [public tokens](/components/data-table-theming) or the stable
+`.rozie-data-table*` / `.rdt-*` class names rather than an injected `class`.
+
+::: warning Vue does not honour this yet
+On the **Vue** leaf only, the opt-out is currently inert: the compiler emits no
+`inheritAttrs: false`, so Vue's own default fallthrough still applies undeclared
+attributes and listeners to the wrapper `<div class="rozie-data-table-wrap">`. Treat the
+behaviour above as the contract on all six targets and do not rely on the Vue fallthrough —
+it will stop working when the compiler closes the gap.
+:::
+
 ## Models (the twelve two-way slices)
 
 Each slice is an independent, optional two-way `r-model` with its own uncontrolled fallback and its own change event (which fires **regardless** of whether the slice is bound). All twelve state transitions are funneled through table-core; the table always writes a **fresh** value (never an in-place mutation, which would be silently dropped on React/Solid/Angular/Lit). The first slice is `data` itself — a committed cell or row edit writes a fresh `data` array back; the remaining eleven are the table-state slices.

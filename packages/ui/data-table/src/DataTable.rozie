@@ -811,6 +811,18 @@ const GRID_PAGE_STEP = 10
 // querySelector-off-root precedent, proven ×6 by plan 01's probe). NEVER read in a
 // computed/template binding (ROZ123).
 let gridRoot = null
+// ── B-02: "did the user just click OUTSIDE the grid?" ──────────────────────────────────
+// Set by the document-level pointerdown listener registered in $onMount, consumed by
+// onEditorBlur's null-relatedTarget branch (editorBindings.rzts), which explains in full why
+// the decision has to come from here and be routed back there. In short: a null relatedTarget
+// on its own cannot tell a click onto a non-focusable page region (the edit must commit) from
+// an editor being recycled out of the virtual window (it must NOT), and a document listener
+// cannot commit for itself on React because it closes over the render that attached it — the
+// draft it would write is the one from editor-open. A plain module-let is hoisted to a
+// per-instance `useRef` there, so it is read FRESH from the template-bound blur handler.
+// Capture phase, so a stopPropagation anywhere in the page cannot hide the click from us.
+let outsidePointerDown = false
+let docPointerDown = null
 
 // Echo-guard: while WE are writing a slice back, the re-feed watcher must not re-enter
 // the funnel. A counter (not a boolean) so nested writes are safe.
@@ -1173,6 +1185,20 @@ $onMount(() => {
   // cell selectors hang off (the exact idiom proven ×6 by plan 01's probe). Captured here
   // (post-mount) so it is non-null and ROZ123-clean.
   gridRoot = $el ? $el.querySelector('.rozie-data-table') : null
+  // B-02: the click-away detector. `composedPath()` rather than `ev.target` because on Lit the
+  // grid lives in a shadow root and a document-level listener sees the retargeted HOST element,
+  // which is never `gridRoot.contains(...)` — every in-grid click would read as "outside".
+  if (typeof document !== 'undefined') {
+    docPointerDown = (ev) => {
+      if (!gridRoot) { outsidePointerDown = false; return }
+      const path = ev && typeof ev.composedPath === 'function' ? ev.composedPath() : null
+      const inside = path
+        ? path.indexOf(gridRoot) !== -1
+        : !!(ev && ev.target && gridRoot.contains && gridRoot.contains(ev.target))
+      outsidePointerDown = !inside
+    }
+    document.addEventListener('pointerdown', docPointerDown, true)
+  }
   // WR-04: NO on-mount auto-focus of the entry cell. Auto-focusing here stole focus on
   // page load AND was non-deterministic on React/Solid (the entry cell may not be
   // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
@@ -1306,6 +1332,12 @@ $onMount(() => {
 // Tear down the virtualizer's scroll-element ResizeObserver on unmount (the embla destroy
 // precedent). No-op when virtual was off (cleanup stays null).
 $onUnmount(() => {
+  // B-02: drop the document click-away listener (it is attached for the instance's lifetime,
+  // not per edit session — attaching it per session would freeze a stale closure on React).
+  if (docPointerDown && typeof document !== 'undefined') {
+    document.removeEventListener('pointerdown', docPointerDown, true)
+    docPointerDown = null
+  }
   if (virtualizerCleanup) virtualizerCleanup()
   // Phase 87 87-04: tear down the column virtualizer's scroll-element ResizeObserver too.
   // No-op when column windowing was off (cleanup stays null).
@@ -1504,6 +1536,12 @@ let lastData = null
 let lastDataLen = -1
 $onUpdate(() => {
   maybeClearHistoryOnExternalSwap()
+  // A-02: the post-render hook is the one place that observes EVERY column-width change on all
+  // six targets — an interactive resize writes `columnSizing` through table-core under
+  // `columnResizeMode: 'onChange'` and never reaches the coarse re-feed watch (which keys on
+  // `$props.columnSizing`, undefined on the uncontrolled path). Self-guarded on the width
+  // signature, so a tick that changed no width costs one loop over the leaf columns.
+  remeasureColumnSizes()
   if (!table) return
   // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
   // $data.dataDefault) so a committed edit re-feeds on Lit whether or not the two-way
@@ -1599,10 +1637,23 @@ import { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, on
 // UNCHANGED (span = the header's own colSpan, or 1) when columns are not windowed — the
 // off-path the template's `:colspan="wh.span > 1 ? wh.span : null"` binding preserves
 // byte-identically (a bare colspan="1" would change the emitted markup on the unwindowed path).
+//
+// A-03: the emitted entry also carries the WIDTH of the in-window leaves, because the colspan
+// clamp above is only half the job. `thStyle` declared `Header.getSize()` — the sum of ALL
+// descendant leaves — against a colspan clamped to the leaves actually rendered. Under
+// `table-layout: fixed` a first-row spanning cell's declared width is divided across the
+// columns it spans, and only the first row establishes widths, so a group straddling the window
+// edge inflated every column it still rendered: measured on "Group A" (cols 10-14 @150px,
+// getSize() 750), each rendered group column went 150 -> 187.5 -> 250 -> 375 -> 750px as the
+// group scrolled out, and scrollWidth with it, 9000 -> 9600. Identical on all five light-DOM
+// targets. This is the SAME getSize()-vs-colspan mismatch the earlier Column.getSize() ->
+// Header.getSize() fix cured for the fully-in-window case, inverted: that one was a 5x
+// COLLAPSE, this is a 5x EXPANSION for the partial case. Summing the same leaves the clamp
+// counted keeps the declared width and the colspan describing the same set by construction.
 const windowedHeadersFor = (hg, hgLevel) => {
   const headers = (hg && hg.headers) || []
   if (!colsWindowed()) {
-    return headers.map((h) => ({ header: h, span: h && h.colSpan > 1 ? h.colSpan : 1 }))
+    return headers.map((h) => ({ header: h, span: h && h.colSpan > 1 ? h.colSpan : 1, width: null }))
   }
   const idx = windowedColIndices()
   const idxSet = {}
@@ -1616,8 +1667,9 @@ const windowedHeadersFor = (hg, hgLevel) => {
     const end = cursor + leafCount
     cursor = end
     let span = 0
-    for (let c = start; c < end; c++) if (idxSet[c]) span = span + 1
-    if (span > 0) out.push({ header: h, span })
+    let width = 0
+    for (let c = start; c < end; c++) if (idxSet[c]) { span = span + 1; width = width + columnSize(c) }
+    if (span > 0) out.push({ header: h, span, width })
   }
   return out
 }
@@ -1627,6 +1679,36 @@ const windowedHeadersFor = (hg, hgLevel) => {
 // D-11's alignment obligation under table-layout:fixed). Off → visibleColCount() unchanged
 // (byte-identical).
 const windowedColSpan = () => (colsWindowed() ? windowedColIndices().length + 2 : visibleColCount())
+// ── A-02: a column RESIZE must invalidate the column virtualizer's measurement cache ──────
+// `setOptions` is not enough, and this is a property of virtual-core, not of how we call it.
+// `getMeasurements()` is memoized on `[getMeasurementOptions(), itemSizeCacheVersion]`, and
+// `getMeasurementOptions()` is itself memoized on count / paddingStart / scrollMargin /
+// getItemKey / enabled / lanes / laneAssignmentMode — `estimateSize` is NOT among them. The
+// column axis feeds its widths ENTIRELY through `estimateSize: (i) => columnSize(i)` (it never
+// calls `measureElement`), so after a resize the memo returns the array built from the OLD
+// widths: measured on a 60x150px grid, dragging one column +1200px left `scrollWidth`
+// oscillating 9000 <-> 10200 as that column entered and left the window, and at scrollLeft 6000
+// the window started at index 37 where fresh geometry predicts 29. `measure()` is the only API
+// that bumps `itemSizeCacheVersion`, and it appeared ZERO times in this package or in
+// headless-core. Same defect for `resetColumnSizing()` and any programmatic `columnSizing` write.
+//
+// Guarded on a SIGNATURE rather than called unconditionally. `columnResizeMode` is 'onChange',
+// so `writeColumnSizing` fires on every pointermove of a drag; `measure()` clears the size cache
+// and calls `notify(false)`, which bumps `$data.windowVer` and therefore re-renders. Hashing the
+// widths (order-sensitive, so a pure A<->B swap that preserves the sum still trips it) makes the
+// steady state a ~N-integer-op no-op and guarantees the notify cannot feed itself: the second
+// pass sees an unchanged signature and returns.
+let lastColSizeSig = 0
+const remeasureColumnSizes = () => {
+  if (!colsWindowed() || !colVirtualizer || !colVirtualizer.measure) return
+  const n = columnCount()
+  let sig = n
+  for (let i = 0; i < n; i++) sig = (Math.imul(sig, 31) + columnSize(i)) | 0
+  if (sig === lastColSizeSig) return
+  lastColSizeSig = sig
+  colVirtualizer.measure()
+}
+
 // remeasureColumnWindow() (Phase 87 87-04): push a fresh column count/size into the SECOND
 // (horizontal) virtualizer on every row-model refresh — mirrors the row axis's
 // virtualizer.setOptions(virtualizerOptions()) + _willUpdate() re-feed in refreshRowModel, so a
@@ -1640,6 +1722,7 @@ const windowedColSpan = () => (colsWindowed() ? windowedColIndices().length + 2 
 const remeasureColumnWindow = () => {
   if (!colsWindowed() || !colVirtualizer) return
   colVirtualizer.setOptions(columnVirtualizerOptions())
+  remeasureColumnSizes()
   colVirtualizer._willUpdate()
 }
 
@@ -1676,8 +1759,13 @@ let gridEmptyFallback = false
 let rangeTransition = false
 // rangeClickPending: set by onGridMouseDown on a Shift+Click (the range is set off the
 // pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
-// to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
-let rangeClickPending = false
+// to SKIP the range-collapse (a focusin carries no reliable shiftKey).
+// B-11: it holds the CELL `{ isHeader, r, c }` the Shift+Click landed on, not a boolean, and
+// is null when idle. Shift+Click on the already-focused cell fires no focusin, so a boolean
+// was left armed and the NEXT ordinary click/Tab consumed it and skipped its own collapse,
+// stranding a painted rectangle. Coordinate-matched, that leak is self-healing: a focusin on
+// any other cell clears it and collapses normally. Cleared on BOTH branches of the consume.
+let rangeClickPending = null
 // B19: a SYNCHRONOUS mirror of "a range currently exists" — extendRange/setRangeFocus set it
 // true, clearRange/clampRange-to-empty set it false. clearRange is invoked TWICE in one plain-
 // arrow keydown (the explicit collapse + the focusin that follows the programmatic focus move);
@@ -1980,7 +2068,7 @@ $expose({
         :tabindex="cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel)"
         :class="{ 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }"
         :aria-sort="ariaSortFor(wh.header.column.id)"
-        :style="thStyle(wh.header)"
+        :style="thStyle(wh.header, wh.width)"
       >
         <span style="display:contents" r-if="isSelectColumn(wh.header.column.id)">
           <slot
@@ -3083,8 +3171,6 @@ $expose({
   --rdt-page-size-radius: var(--rozie-data-table-radius);
   --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color);
   --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active);
-  --rdt-pin-btn-border: 1px solid var(--rozie-data-table-control-border-color);
-  --rdt-pin-btn-radius: var(--rozie-data-table-radius);
   --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg);
   --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color);
   --rdt-colvis-summary-radius: var(--rozie-data-table-radius);
@@ -3503,12 +3589,76 @@ $expose({
    def's `size` (40 — columnBuilders.rzts) for the same left-pinned-rail reason as the select
    column above (a fixed narrow width now replaces the old `width:1%` shrink trick, which only
    fixed the VISUAL width and left table-core's 150px size model — hence the sticky offset —
-   wrong once pinned). Deep tree indentation is applied as padding-left WITHIN the cell. */
+   wrong once pinned). Tree DEPTH indentation is NOT applied here — see the [data-depth]
+   block below; the expander column is a fixed-width chrome rail and indenting inside it
+   would push the chevron out of its own box. */
 .rozie-data-table .rdt-expander-th,
 .rozie-data-table .rdt-expander-td {
   width: var(--rdt-expander-col-width, 40px);
   text-align: var(--rdt-expander-col-align, center);
   white-space: nowrap;
+}
+/* ── E-06: tree-row depth indentation ─────────────────────────────────────────────────
+   `getSubRows` flattens a hierarchy into depth-tagged rows and the `<tr>` has carried
+   `data-depth` since phase 50 — but NOTHING selected on it. There was no `[data-depth]`
+   rule in this <style>, in any themes/*.css, or in any compiled leaf, so "depth-indented
+   child rows" (promised on the expandable page, eight places in the usage page, and in the
+   `getSubRows` docs: string that ships as JSDoc in all six leaf .d.ts files) rendered dead
+   flat: a parent and its grandchildren were visually indistinguishable.
+
+   WHICH CELL. Not the expander `<td>`: it is a fixed-width chrome rail (40px above), and
+   under `.rdt-col-windowed`'s `box-sizing: border-box` a padding indent there eats the
+   chevron. The indent belongs on the first DATA cell, which is addressable without a
+   template change because the chrome columns are auto-injected FIRST and tree mode always
+   injects the expander: `.rdt-expander-td + .rdt-td` is that cell, on both body paths and
+   under column windowing (the leading spacer `<td>` precedes the whole chrome rail).
+
+   HOW. A `::before` inline-block spacer rather than `padding-left`, so the cell keeps
+   whatever `--rdt-cell-padding` the consumer set — CSS cannot add to a shorthand, and
+   re-stating the padding here would silently override a themed value. The spacer also
+   leads in the INLINE direction, so it indents correctly under `dir="rtl"`.
+
+   DEPTH CAP. Eight explicit levels; depth 9+ keeps the level-8 indent. table-core's
+   `row.depth` is unbounded, so this is a real (documented) cap — a variable indent would
+   need `--rdt-row-depth` bound per row from the template, which is two more `:style`
+   bindings on the hottest element in the component for a case nobody has asked for.
+   `--rdt-tree-indent` is the per-level step; depth 0 (top-level rows) is untouched, so a
+   non-tree table is byte-identical. */
+.rozie-data-table tbody tr[data-depth="1"] > .rdt-expander-td + .rdt-td::before,
+.rozie-data-table tbody tr[data-depth="2"] > .rdt-expander-td + .rdt-td::before,
+.rozie-data-table tbody tr[data-depth="3"] > .rdt-expander-td + .rdt-td::before,
+.rozie-data-table tbody tr[data-depth="4"] > .rdt-expander-td + .rdt-td::before,
+.rozie-data-table tbody tr[data-depth="5"] > .rdt-expander-td + .rdt-td::before,
+.rozie-data-table tbody tr[data-depth="6"] > .rdt-expander-td + .rdt-td::before,
+.rozie-data-table tbody tr[data-depth="7"] > .rdt-expander-td + .rdt-td::before,
+.rozie-data-table tbody tr[data-depth="8"] > .rdt-expander-td + .rdt-td::before {
+  content: '';
+  display: inline-block;
+  vertical-align: middle;
+}
+.rozie-data-table tbody tr[data-depth="1"] > .rdt-expander-td + .rdt-td::before {
+  width: calc(1 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table tbody tr[data-depth="2"] > .rdt-expander-td + .rdt-td::before {
+  width: calc(2 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table tbody tr[data-depth="3"] > .rdt-expander-td + .rdt-td::before {
+  width: calc(3 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table tbody tr[data-depth="4"] > .rdt-expander-td + .rdt-td::before {
+  width: calc(4 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table tbody tr[data-depth="5"] > .rdt-expander-td + .rdt-td::before {
+  width: calc(5 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table tbody tr[data-depth="6"] > .rdt-expander-td + .rdt-td::before {
+  width: calc(6 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table tbody tr[data-depth="7"] > .rdt-expander-td + .rdt-td::before {
+  width: calc(7 * var(--rdt-tree-indent, 1.25rem));
+}
+.rozie-data-table tbody tr[data-depth="8"] > .rdt-expander-td + .rdt-td::before {
+  width: calc(8 * var(--rdt-tree-indent, 1.25rem));
 }
 .rozie-data-table .rdt-select-all,
 .rozie-data-table .rdt-select-row {

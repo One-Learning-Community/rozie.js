@@ -20,10 +20,14 @@ const teardownRangeDrag = () => {
   rangeDragging = false
 }
 
-// beginRangeDrag(anchorR, anchorC): start a drag-select anchored at the mousedown cell. The
-// mousedown's native focus/focusin already committed the ACTIVE cell to (anchorR, anchorC), so
-// setRangeFocus (which seeds the anchor from the ACTIVE cell) spans mousedown-cell→pointer-cell —
-// we NEVER write $data.rangeAnchor directly (it is React-stale, ROZ138). rangeDragMoved starts
+// beginRangeDrag(anchorR, anchorC): start a drag-select anchored at the mousedown cell.
+// B-01: the anchor is handed to setRangeFocus EXPLICITLY, never left to be seeded from the
+// active cell. The mousedown's native focus is a DEFAULT ACTION that runs after this handler
+// returns, so at this point $data.activeRow/activeColIndex still hold the PRE-mousedown cell;
+// on React the pointermove closure below is frozen at that render and can never observe the
+// post-focusin value, so the whole gesture anchored at wherever the user happened to be
+// (a fresh grid: (0,0)). We still never WRITE $data.rangeAnchor directly (React-stale,
+// ROZ138) — setRangeFocus owns that write. rangeDragMoved starts
 // false and flips true only once the pointer reaches a DIFFERENT cell, so a mousedown-with-no-move
 // leaves a single active cell + no range (a normal click). lastCell dedups the many pointermove
 // events per cell (setRangeFocus emits range-change — only extend on a NEW cell, mirroring fillDrag's
@@ -45,7 +49,7 @@ const beginRangeDrag = (anchorR, anchorC) => {
     if (cell && (cell.r !== lastCell.r || cell.c !== lastCell.c)) {
       lastCell = cell
       rangeDragMoved = true
-      setRangeFocus(cell.r, cell.c)
+      setRangeFocus(cell.r, cell.c, anchorR, anchorC)
     }
   }
   const up = () => {
