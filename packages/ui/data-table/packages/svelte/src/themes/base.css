@@ -17,7 +17,10 @@
  * --rozie-data-table-disabled-opacity are public — its background, padding, and
  * status-text size are not), and the chrome column widths. Those remain internal
  * and may be renamed; a design system that needs them should set the `--rdt-*`
- * name directly and accept that it is not yet a stable API. One Lit-specific rule: set
+ * name directly and accept that it is not yet a stable API. Those two counts are
+ * `<DataTable>`'s own; the sibling `<GroupBar>` reads 9 further internal tokens
+ * (`--rdt-group-drop-zone-*`, `--rdt-group-drop-marker`, `--rdt-focus-ring`), none of
+ * them public and all of them likewise inline-defaulted. One Lit-specific rule: set
  * the public tokens at or ABOVE the `<rozie-data-table>` element (`:root`, a wrapper, or
  * the element itself), never on the `.rozie-data-table` / `.rozie-data-table-wrap`
  * classes — on that target both of those render inside the component's shadow root,
@@ -115,8 +118,6 @@
   --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color);
   --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active);
 
-  --rdt-pin-btn-border: 1px solid var(--rozie-data-table-control-border-color);
-  --rdt-pin-btn-radius: var(--rozie-data-table-radius);
   --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg);
 
   --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color);

@@ -198,7 +198,7 @@ interface EditorCtx {
           @if (colsWindowed()) {
     <th class="rdt-col-spacer" aria-hidden="true" [attr.style]="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th>
     }@for (wh of windowedHeadersFor(hg, hgLevel); track wh.header.id) {
-    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(wh.header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(wh.span > 1 ? wh.span : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, wh.header))" [attr.aria-colindex]="rozieAttr(headerLeafStart(hg, wh.header) + 1)" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(wh.header.column.id))" [style]="thStyle(wh.header)">
+    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(wh.header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(wh.span > 1 ? wh.span : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, wh.header))" [attr.aria-colindex]="rozieAttr(headerLeafStart(hg, wh.header) + 1)" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(wh.header.column.id))" [style]="thStyle(wh.header, wh.width)">
             @if (isSelectColumn(wh.header.column.id)) {
     <span style="display:contents">
               @if ((selectAllTpl ?? __rozieFillMap()['selectAll'] ?? templates()?.['selectAll'])) {
@@ -670,8 +670,6 @@ interface EditorCtx {
       --rdt-page-size-radius: var(--rozie-data-table-radius);
       --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color);
       --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active);
-      --rdt-pin-btn-border: 1px solid var(--rozie-data-table-control-border-color);
-      --rdt-pin-btn-radius: var(--rozie-data-table-radius);
       --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg);
       --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color);
       --rdt-colvis-summary-radius: var(--rozie-data-table-radius);
@@ -989,6 +987,42 @@ interface EditorCtx {
       text-align: var(--rdt-expander-col-align, center);
       white-space: nowrap;
     }
+    .rozie-data-table tbody tr[data-depth="1"] > .rdt-expander-td + .rdt-td::before,
+    .rozie-data-table tbody tr[data-depth="2"] > .rdt-expander-td + .rdt-td::before,
+    .rozie-data-table tbody tr[data-depth="3"] > .rdt-expander-td + .rdt-td::before,
+    .rozie-data-table tbody tr[data-depth="4"] > .rdt-expander-td + .rdt-td::before,
+    .rozie-data-table tbody tr[data-depth="5"] > .rdt-expander-td + .rdt-td::before,
+    .rozie-data-table tbody tr[data-depth="6"] > .rdt-expander-td + .rdt-td::before,
+    .rozie-data-table tbody tr[data-depth="7"] > .rdt-expander-td + .rdt-td::before,
+    .rozie-data-table tbody tr[data-depth="8"] > .rdt-expander-td + .rdt-td::before {
+      content: '';
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .rozie-data-table tbody tr[data-depth="1"] > .rdt-expander-td + .rdt-td::before {
+      width: calc(1 * var(--rdt-tree-indent, 1.25rem));
+    }
+    .rozie-data-table tbody tr[data-depth="2"] > .rdt-expander-td + .rdt-td::before {
+      width: calc(2 * var(--rdt-tree-indent, 1.25rem));
+    }
+    .rozie-data-table tbody tr[data-depth="3"] > .rdt-expander-td + .rdt-td::before {
+      width: calc(3 * var(--rdt-tree-indent, 1.25rem));
+    }
+    .rozie-data-table tbody tr[data-depth="4"] > .rdt-expander-td + .rdt-td::before {
+      width: calc(4 * var(--rdt-tree-indent, 1.25rem));
+    }
+    .rozie-data-table tbody tr[data-depth="5"] > .rdt-expander-td + .rdt-td::before {
+      width: calc(5 * var(--rdt-tree-indent, 1.25rem));
+    }
+    .rozie-data-table tbody tr[data-depth="6"] > .rdt-expander-td + .rdt-td::before {
+      width: calc(6 * var(--rdt-tree-indent, 1.25rem));
+    }
+    .rozie-data-table tbody tr[data-depth="7"] > .rdt-expander-td + .rdt-td::before {
+      width: calc(7 * var(--rdt-tree-indent, 1.25rem));
+    }
+    .rozie-data-table tbody tr[data-depth="8"] > .rdt-expander-td + .rdt-td::before {
+      width: calc(8 * var(--rdt-tree-indent, 1.25rem));
+    }
     .rozie-data-table .rdt-select-all,
     .rozie-data-table .rdt-select-row {
       cursor: pointer;
@@ -1238,6 +1272,12 @@ export class DataTable {
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
+      // B-02: drop the document click-away listener (it is attached for the instance's lifetime,
+      // not per edit session — attaching it per session would freeze a stale closure on React).
+      if (this.docPointerDown && typeof document !== 'undefined') {
+        document.removeEventListener('pointerdown', this.docPointerDown, true);
+        this.docPointerDown = null;
+      }
       if (this.virtualizerCleanup) this.virtualizerCleanup();
       // Phase 87 87-04: tear down the column virtualizer's scroll-element ResizeObserver too.
       // No-op when column windowing was off (cleanup stays null).
@@ -1257,6 +1297,12 @@ export class DataTable {
     });
     effect(() => () => {
       this.maybeClearHistoryOnExternalSwap();
+      // A-02: the post-render hook is the one place that observes EVERY column-width change on all
+      // six targets — an interactive resize writes `columnSizing` through table-core under
+      // `columnResizeMode: 'onChange'` and never reaches the coarse re-feed watch (which keys on
+      // `$props.columnSizing`, undefined on the uncontrolled path). Self-guarded on the width
+      // signature, so a tick that changed no width costs one loop over the leaf columns.
+      this.remeasureColumnSizes();
       if (!this.table) return;
       // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
       // $data.dataDefault) so a committed edit re-feeds on Lit whether or not the two-way
@@ -1536,6 +1582,24 @@ export class DataTable {
     // cell selectors hang off (the exact idiom proven ×6 by plan 01's probe). Captured here
     // (post-mount) so it is non-null and ROZ123-clean.
     this.gridRoot = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-data-table') : null;
+    // B-02: the click-away detector. `composedPath()` rather than `ev.target` because on Lit the
+    // grid lives in a shadow root and a document-level listener sees the retargeted HOST element,
+    // which is never `gridRoot.contains(...)` — every in-grid click would read as "outside".
+    // B-02: the click-away detector. `composedPath()` rather than `ev.target` because on Lit the
+    // grid lives in a shadow root and a document-level listener sees the retargeted HOST element,
+    // which is never `gridRoot.contains(...)` — every in-grid click would read as "outside".
+    if (typeof document !== 'undefined') {
+      this.docPointerDown = (ev: any) => {
+        if (!this.gridRoot) {
+          this.outsidePointerDown = false;
+          return;
+        }
+        const path = ev && typeof ev.composedPath === 'function' ? ev.composedPath() : null;
+        const inside = path ? path.indexOf(this.gridRoot) !== -1 : !!(ev && ev.target && this.gridRoot.contains && this.gridRoot.contains(ev.target));
+        this.outsidePointerDown = !inside;
+      };
+      document.addEventListener('pointerdown', this.docPointerDown, true);
+    }
     // WR-04: NO on-mount auto-focus of the entry cell. Auto-focusing here stole focus on
     // page load AND was non-deterministic on React/Solid (the entry cell may not be
     // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
@@ -1757,6 +1821,18 @@ export class DataTable {
   // querySelector-off-root precedent, proven ×6 by plan 01's probe). NEVER read in a
   // computed/template binding (ROZ123).
   gridRoot: any = null;
+  // ── B-02: "did the user just click OUTSIDE the grid?" ──────────────────────────────────
+  // Set by the document-level pointerdown listener registered in $onMount, consumed by
+  // onEditorBlur's null-relatedTarget branch (editorBindings.rzts), which explains in full why
+  // the decision has to come from here and be routed back there. In short: a null relatedTarget
+  // on its own cannot tell a click onto a non-focusable page region (the edit must commit) from
+  // an editor being recycled out of the virtual window (it must NOT), and a document listener
+  // cannot commit for itself on React because it closes over the render that attached it — the
+  // draft it would write is the one from editor-open. A plain module-let is hoisted to a
+  // per-instance `useRef` there, so it is read FRESH from the template-bound blur handler.
+  // Capture phase, so a stopPropagation anywhere in the page cannot hide the click from us.
+  outsidePointerDown = false;
+  docPointerDown: any = null;
   // Echo-guard: while WE are writing a slice back, the re-feed watcher must not re-enter
   // the funnel. A counter (not a boolean) so nested writes are safe.
   programmatic = 0;
@@ -2012,6 +2088,30 @@ export class DataTable {
     const n = Number.parseFloat(m[1]);
     return Number.isFinite(n) && n > 0 ? n : null;
   };
+  // ── E-03: the `editor` union is FOUR built-ins plus the 'custom' gate ────────────────────
+  // `editorTypeOf` falls through to the plain text `<input>` for ANY unrecognised value, so a
+  // consumer writing `editor="date"` — a value the comparison page and the root README both
+  // advertised as a fifth built-in until the 260910 audit corrected them — got a text box with
+  // no error, no warning, and no hint that `EditorDate` is a DROP-IN reached through
+  // `editor="custom"` + an `#editor` fill. Same for any typo. The silent degradation is the
+  // defect; the docs half is already corrected.
+  //
+  // Warned at column-BUILD time, not in `editorTypeOf`, which is called per cell per render
+  // (D-23) — and latched per `id:value` so a rebuild (the memo misses whenever the column set
+  // changes identity) cannot turn one misconfiguration into a console flood. Unguarded
+  // console.warn, matching the D-07/D-08 virtual-misconfig warns in DataTable.rozie: a
+  // process.env guard is not bundler-portable across six targets, and always-warn-on-misconfig
+  // is the established call in this component.
+  EDITOR_KINDS = ['text', 'number', 'select', 'checkbox', 'custom'];
+  editorWarned = Object.create(null);
+  checkEditorKind = (id: any, editor: any) => {
+    if (editor == null || this.EDITOR_KINDS.indexOf(editor) !== -1) return editor;
+    const key = id + '\u0000' + String(editor);
+    if (this.editorWarned[key]) return editor;
+    this.editorWarned[key] = true;
+    console.warn('[rozie-data-table] column "' + id + '": editor="' + String(editor) + '" is not a built-in editor. ' + 'The built-ins are text | number | select | checkbox; anything else needs editor="custom" plus an ' + '#editor slot fill (that is how <EditorDate> is used). Falling back to the text input.');
+    return editor;
+  };
   buildConfigDef = (c: any) => {
     if (!c) return null;
     // Grouped (multi-level) header column: an entry carrying a `columns` array. table-core's
@@ -2077,7 +2177,7 @@ export class DataTable {
       // metadata carrier the display↔editor branch + runValidator read. Off by default.
       meta: {
         editable: c.editable === true,
-        editor: c.editor != null ? c.editor : 'text',
+        editor: c.editor != null ? this.checkEditorKind(id, c.editor) : 'text',
         editorOptions: c.editorOptions != null ? c.editorOptions : [],
         validate: typeof c.validate === 'function' ? c.validate : null
       }
@@ -2166,7 +2266,7 @@ export class DataTable {
         // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
         meta: {
           editable: spec.editable === true,
-          editor: spec.editor != null ? spec.editor : 'text',
+          editor: spec.editor != null ? this.checkEditorKind(id, spec.editor) : 'text',
           editorOptions: spec.editorOptions != null ? spec.editorOptions : [],
           validate: typeof spec.validate === 'function' ? spec.validate : null
         }
@@ -4020,9 +4120,14 @@ export class DataTable {
   // read header.getSize() — the group-aware size (see headerWidth's own comment). pinStyle still
   // keys off the plain column id (pinning is a leaf-column-only concern; a grouped header never
   // pins as a unit in this codebase's model).
-  thStyle = (header: any) => {
+  // A-03: `widthPx` is the in-window leaf-width sum windowedHeadersFor() computed alongside the
+  // clamped colspan. When it is present it WINS over headerWidth(), which reports
+  // Header.getSize() — every descendant leaf, in-window or not — and so over-declares a straddling
+  // group by exactly the leaves the colspan already excluded. Null on the unwindowed path and from
+  // the non-windowed header body, which both keep headerWidth() verbatim.
+  thStyle = (header: any, widthPx: any) => {
     let s = '';
-    const w = this.headerWidth(header);
+    const w = widthPx != null && widthPx > 0 ? widthPx + 'px' : this.headerWidth(header);
     if (w) s += 'width:' + w + ';';
     s += this.pinStyle(header && header.column ? header.column.id : null, 2);
     return s;
@@ -4681,9 +4786,26 @@ export class DataTable {
   // HTMLElement ARIA-reflected property (`Element.ariaRowCount: string`), so a same-named method
   // becomes a class field that shadows it on Lit → TS2416 cascades to EVERY @property decorator
   // (the `valueOf`/`nodeType` inherited-DOM-member collision class, authoring playbook §6).
+  // A-04: under `manual` the filtered row model is NOT the total — table-core holds only the
+  // page the consumer handed it, so getFilteredRowModel().rows.length is the PAGE SIZE. The
+  // server-side total lives in the props the consumer passes for exactly this purpose
+  // (`rowCount`, else `pageCount`), which is also table-core's own precedence for getPageCount()
+  // (explicit pageCount wins, else ⌈rowCount / pageSize⌉). Taking them here keeps aria-rowcount
+  // consistent with bodyAriaRowIndex, which already offsets by pageIndex * pageSize and would
+  // otherwise hand a screen reader an index LARGER than the advertised count on any page past
+  // the first. `pageCount * pageSize` is an upper bound (the last page is usually partial) —
+  // an over-count is the safe direction: an aria-rowindex can never exceed it.
+  // With `manual` and NEITHER count set, table-core pins getCanNextPage() to false, so pageIndex
+  // stays 0, the offset is 0 and page-slice-as-total is self-consistent; we leave it alone.
   totalRowCount = () => {
     const __rows = this.rows();
+    const __rowCount = this.rowCount();
+    const __pageCount = this.pageCount();
     if (!this.table) return (__rows || []).length;
+    if (this.manual() === true) {
+      if (__rowCount != null) return __rowCount;
+      if (__pageCount != null) return __pageCount * this.pageSize();
+    }
     const fm = this.table.getFilteredRowModel();
     return fm && fm.rows ? fm.rows.length : (__rows || []).length;
   };
@@ -5408,11 +5530,18 @@ export class DataTable {
     // focusin that follows a Shift+Click (rangeClickPending): @mousedown already set the range
     // BEFORE this focusin fires, and a focusin carries no reliable shiftKey, so the @mousedown
     // path owns the shift case and flags it here so the collapse is skipped.
+    // B-11: `rangeClickPending` carries the CELL the Shift+Click landed on, not a bare boolean.
+    // A boolean leaks: Shift+Click on the cell that ALREADY holds focus fires no focusin at all,
+    // so nothing consumed the flag, and the next ordinary navigation click (or Tab) hit this
+    // branch instead and skipped its collapse — leaving a stale rectangle painted while the
+    // active cell moved away. Matching on the coordinates makes a leak self-healing: a focusin on
+    // any OTHER cell falls through to clearRange() and clears the flag on the way past.
     if (this.rangeTransition) {
       this.rangeTransition = false;
-    } else if (this.rangeClickPending) {
-      this.rangeClickPending = false;
+    } else if (this.rangeClickPending && this.rangeClickPending.isHeader === isHeader && this.rangeClickPending.r === movedRow && this.rangeClickPending.c === col) {
+      this.rangeClickPending = null;
     } else {
+      this.rangeClickPending = null;
       this.clearRange();
     }
     // The cell box (not an inner control) receiving focus = navigation mode.
@@ -5449,13 +5578,26 @@ export class DataTable {
       this.activeIsHeader.set(false);
       this.activeRow.set(row);
       this.activeColIndex.set(col);
-      this.rangeClickPending = true;
+      // B-11: arm the skip for THIS cell only (see syncActiveFromEvent). Body cell → isHeader
+      // false; the header path never reaches here (rowAttr === '__header' returned above).
+      this.rangeClickPending = {
+        isHeader: false,
+        r: row,
+        c: col
+      };
       return;
     }
-    // §6 plain mousedown → begin a document-level drag-select anchored at this cell. The mousedown's
-    // native focusin commits the ACTIVE cell to (row,col); beginRangeDrag's first cross-cell
-    // pointermove paints the range via setRangeFocus (anchored at the active cell). A mousedown with
-    // no move collapses to a single active cell (no range).
+    // B-16: a mousedown INSIDE the cell that is currently in edit belongs to the editor — it is
+    // the user placing a caret or drag-selecting TEXT. Starting a cell drag-select from it paints
+    // a grid range over the very cell being typed into, and (with `undoable`) a drag that leaves
+    // the cell then lets Delete/Ctrl+X act on a rectangle the user was never selecting. The
+    // editor owns the gesture; return before any document listener is attached.
+    if (this.isEditing(row, col)) return;
+    // §6 plain mousedown → begin a document-level drag-select anchored at this cell. The anchor is
+    // passed EXPLICITLY into setRangeFocus by beginRangeDrag (B-01) rather than seeded from the
+    // active cell, which is still the PRE-mousedown one at this point (native focus is a default
+    // action that runs after this handler). A mousedown with no move collapses to a single active
+    // cell (no range).
     this.beginRangeDrag(row, col);
   };
   // onGridDblClick: the double-click-into-edit seam (grid pointer §3+§5, 260708-ni6). Wired as
@@ -5702,12 +5844,26 @@ export class DataTable {
   // UNCHANGED (span = the header's own colSpan, or 1) when columns are not windowed — the
   // off-path the template's `:colspan="wh.span > 1 ? wh.span : null"` binding preserves
   // byte-identically (a bare colspan="1" would change the emitted markup on the unwindowed path).
+  //
+  // A-03: the emitted entry also carries the WIDTH of the in-window leaves, because the colspan
+  // clamp above is only half the job. `thStyle` declared `Header.getSize()` — the sum of ALL
+  // descendant leaves — against a colspan clamped to the leaves actually rendered. Under
+  // `table-layout: fixed` a first-row spanning cell's declared width is divided across the
+  // columns it spans, and only the first row establishes widths, so a group straddling the window
+  // edge inflated every column it still rendered: measured on "Group A" (cols 10-14 @150px,
+  // getSize() 750), each rendered group column went 150 -> 187.5 -> 250 -> 375 -> 750px as the
+  // group scrolled out, and scrollWidth with it, 9000 -> 9600. Identical on all five light-DOM
+  // targets. This is the SAME getSize()-vs-colspan mismatch the earlier Column.getSize() ->
+  // Header.getSize() fix cured for the fully-in-window case, inverted: that one was a 5x
+  // COLLAPSE, this is a 5x EXPANSION for the partial case. Summing the same leaves the clamp
+  // counted keeps the declared width and the colspan describing the same set by construction.
   windowedHeadersFor = (hg: any, hgLevel: any) => {
     const headers = hg && hg.headers || [];
     if (!this.colsWindowed()) {
       return headers.map((h: any) => ({
         header: h,
-        span: h && h.colSpan > 1 ? h.colSpan : 1
+        span: h && h.colSpan > 1 ? h.colSpan : 1,
+        width: null
       }));
     }
     const idx = this.windowedColIndices();
@@ -5722,10 +5878,15 @@ export class DataTable {
       const end = cursor + leafCount;
       cursor = end;
       let span = 0;
-      for (let c = start; c < end; c++) if (idxSet[c]) span = span + 1;
+      let width = 0;
+      for (let c = start; c < end; c++) if (idxSet[c]) {
+        span = span + 1;
+        width = width + this.columnSize(c);
+      }
       if (span > 0) out.push({
         header: h,
-        span
+        span,
+        width
       });
     }
     return out;
@@ -5736,6 +5897,35 @@ export class DataTable {
   // D-11's alignment obligation under table-layout:fixed). Off → visibleColCount() unchanged
   // (byte-identical).
   windowedColSpan = () => this.colsWindowed() ? this.windowedColIndices().length + 2 : this.visibleColCount();
+  // ── A-02: a column RESIZE must invalidate the column virtualizer's measurement cache ──────
+  // `setOptions` is not enough, and this is a property of virtual-core, not of how we call it.
+  // `getMeasurements()` is memoized on `[getMeasurementOptions(), itemSizeCacheVersion]`, and
+  // `getMeasurementOptions()` is itself memoized on count / paddingStart / scrollMargin /
+  // getItemKey / enabled / lanes / laneAssignmentMode — `estimateSize` is NOT among them. The
+  // column axis feeds its widths ENTIRELY through `estimateSize: (i) => columnSize(i)` (it never
+  // calls `measureElement`), so after a resize the memo returns the array built from the OLD
+  // widths: measured on a 60x150px grid, dragging one column +1200px left `scrollWidth`
+  // oscillating 9000 <-> 10200 as that column entered and left the window, and at scrollLeft 6000
+  // the window started at index 37 where fresh geometry predicts 29. `measure()` is the only API
+  // that bumps `itemSizeCacheVersion`, and it appeared ZERO times in this package or in
+  // headless-core. Same defect for `resetColumnSizing()` and any programmatic `columnSizing` write.
+  //
+  // Guarded on a SIGNATURE rather than called unconditionally. `columnResizeMode` is 'onChange',
+  // so `writeColumnSizing` fires on every pointermove of a drag; `measure()` clears the size cache
+  // and calls `notify(false)`, which bumps `$data.windowVer` and therefore re-renders. Hashing the
+  // widths (order-sensitive, so a pure A<->B swap that preserves the sum still trips it) makes the
+  // steady state a ~N-integer-op no-op and guarantees the notify cannot feed itself: the second
+  // pass sees an unchanged signature and returns.
+  lastColSizeSig = 0;
+  remeasureColumnSizes = () => {
+    if (!this.colsWindowed() || !this.colVirtualizer || !this.colVirtualizer.measure) return;
+    const n = this.columnCount();
+    let sig = n;
+    for (let i = 0; i < n; i++) sig = Math.imul(sig, 31) + this.columnSize(i) | 0;
+    if (sig === this.lastColSizeSig) return;
+    this.lastColSizeSig = sig;
+    this.colVirtualizer.measure();
+  };
   // remeasureColumnWindow() (Phase 87 87-04): push a fresh column count/size into the SECOND
   // (horizontal) virtualizer on every row-model refresh — mirrors the row axis's
   // virtualizer.setOptions(virtualizerOptions()) + _willUpdate() re-feed in refreshRowModel, so a
@@ -5749,6 +5939,7 @@ export class DataTable {
   remeasureColumnWindow = () => {
     if (!this.colsWindowed() || !this.colVirtualizer) return;
     this.colVirtualizer.setOptions(this.columnVirtualizerOptions());
+    this.remeasureColumnSizes();
     this.colVirtualizer._willUpdate();
   };
   // B6 (phase 63 wave-11) — "the active cell is parked on the empty-grid header fallback" control
@@ -5782,8 +5973,13 @@ export class DataTable {
   rangeTransition = false;
   // rangeClickPending: set by onGridMouseDown on a Shift+Click (the range is set off the
   // pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
-  // to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
-  rangeClickPending = false;
+  // to SKIP the range-collapse (a focusin carries no reliable shiftKey).
+  // B-11: it holds the CELL `{ isHeader, r, c }` the Shift+Click landed on, not a boolean, and
+  // is null when idle. Shift+Click on the already-focused cell fires no focusin, so a boolean
+  // was left armed and the NEXT ordinary click/Tab consumed it and skipped its own collapse,
+  // stranding a painted rectangle. Coordinate-matched, that leak is self-healing: a focusin on
+  // any other cell clears it and collapses normally. Cleared on BOTH branches of the consume.
+  rangeClickPending: any = null;
   // B19: a SYNCHRONOUS mirror of "a range currently exists" — extendRange/setRangeFocus set it
   // true, clearRange/clampRange-to-empty set it false. clearRange is invoked TWICE in one plain-
   // arrow keydown (the explicit collapse + the focusin that follows the programmatic focus move);
@@ -5922,14 +6118,34 @@ export class DataTable {
       this.emitRangeChange(anchor, nextFocus);
     }
   };
-  // setRangeFocus(rIdx, cIdx): set the moving corner to an explicit cell (Shift+Click),
-  // seeding the anchor from the active cell when no range exists yet. Clamped to bounds.
-  // Emits range-change from this single site.
-  setRangeFocus = (rIdx: any, cIdx: any) => {
+  // setRangeFocus(rIdx, cIdx, anchorR, anchorC): set the moving corner to an explicit cell
+  // (Shift+Click, or a drag-select's pointermove), seeding the anchor when no range exists yet.
+  // Clamped to bounds. Emits range-change from this single site.
+  //
+  // B-01: the anchor seed is EXPLICIT when the caller knows it. Seeding it from
+  // `$data.activeRow`/`$data.activeColIndex` is only correct if that state is live at the moment
+  // the seed happens — and inside a drag-select it is not on React, where the document
+  // pointermove closure captures the render-scoped consts from the render that ran BEFORE the
+  // mousedown. Native focus moves as mousedown's DEFAULT ACTION, after handlers return, so at
+  // `beginRangeDrag` time the active cell is still the PRE-mousedown one and React can never
+  // show that closure a newer value. Dragging (5,2)→(7,3) on a fresh grid anchored at (0,0) and
+  // selected the whole rectangle from there — which Ctrl+X and Delete then destroy.
+  // The other five targets read `$data.activeRow` LIVE inside `move` (by then focusin has synced
+  // it), so they were accidentally correct; taking the anchor from the caller removes the read
+  // entirely and makes all six correct for the same reason. Falls back to the active cell when no
+  // explicit anchor is passed — Shift+Click, where "the anchor is where you already were" IS the
+  // active cell and the read happens synchronously in the same handler.
+  setRangeFocus = (rIdx: any, cIdx: any, anchorR: any, anchorC: any) => {
     const maxRow = this.bodyRowCount() - 1;
     const maxCol = this.visibleColCount() - 1;
     if (maxRow < 0 || maxCol < 0) return;
     let anchor = this.rangeAnchor();
+    if (!anchor && anchorR != null && anchorC != null) {
+      anchor = {
+        rowIndex: clamp(Math.trunc(Number(anchorR)) || 0, 0, maxRow),
+        colIndex: clamp(Math.trunc(Number(anchorC)) || 0, 0, maxCol)
+      };
+    }
     if (!anchor) anchor = {
       rowIndex: this.activeRow(),
       colIndex: this.activeColIndex()
@@ -6623,10 +6839,14 @@ export class DataTable {
     this.rangeDragUp = null;
     this.rangeDragging = false;
   };
-  // beginRangeDrag(anchorR, anchorC): start a drag-select anchored at the mousedown cell. The
-  // mousedown's native focus/focusin already committed the ACTIVE cell to (anchorR, anchorC), so
-  // setRangeFocus (which seeds the anchor from the ACTIVE cell) spans mousedown-cell→pointer-cell —
-  // we NEVER write $data.rangeAnchor directly (it is React-stale, ROZ138). rangeDragMoved starts
+  // beginRangeDrag(anchorR, anchorC): start a drag-select anchored at the mousedown cell.
+  // B-01: the anchor is handed to setRangeFocus EXPLICITLY, never left to be seeded from the
+  // active cell. The mousedown's native focus is a DEFAULT ACTION that runs after this handler
+  // returns, so at this point $data.activeRow/activeColIndex still hold the PRE-mousedown cell;
+  // on React the pointermove closure below is frozen at that render and can never observe the
+  // post-focusin value, so the whole gesture anchored at wherever the user happened to be
+  // (a fresh grid: (0,0)). We still never WRITE $data.rangeAnchor directly (React-stale,
+  // ROZ138) — setRangeFocus owns that write. rangeDragMoved starts
   // false and flips true only once the pointer reaches a DIFFERENT cell, so a mousedown-with-no-move
   // leaves a single active cell + no range (a normal click). lastCell dedups the many pointermove
   // events per cell (setRangeFocus emits range-change — only extend on a NEW cell, mirroring fillDrag's
@@ -6651,7 +6871,7 @@ export class DataTable {
       if (cell && (cell.r !== lastCell.r || cell.c !== lastCell.c)) {
         lastCell = cell;
         this.rangeDragMoved = true;
-        this.setRangeFocus(cell.r, cell.c);
+        this.setRangeFocus(cell.r, cell.c, anchorR, anchorC);
       }
     };
     const up = () => {
@@ -7656,6 +7876,7 @@ export class DataTable {
   //    the relatedTarget/containment check is the load-bearing guard, not the flag alone.
   onEditorBlur = (e: any) => {
     const __editingRow = this.editingRow();
+    const __editingCol = this.editingCol();
     // Full-row mode (req-6): a blur that stays WITHIN the row editor — Tab/click between the
     // row's OWN fields — is a normal focus move and must NOT commit (a per-cell blur-commit
     // would split the row into N writes + N events, violating the one-write/one-event contract).
@@ -7684,11 +7905,52 @@ export class DataTable {
     }
     if (__editingRow < 0 || this.editTransition) return;
     const next = e ? e.relatedTarget : null;
-    // A null relatedTarget is an unmount-blur (the editor left the DOM) or a focus drop the
-    // keyboard path owns; committing here would double-count (WR-04: the OLD editor's blur on
-    // a Tab-advance fires with a TRANSIENT null relatedTarget while it unmounts). Keep the
-    // conservative null=skip behavior.
-    if (next == null) return;
+    const fromCell = e && e.target && e.target.closest ? e.target.closest('[data-grid-cell]') : null;
+    // ── B-02 ────────────────────────────────────────────────────────────────────────────
+    // A null relatedTarget used to return unconditionally. That is correct for the WR-04 case
+    // the comment cited — a Tab-advance fires the OLD editor's blur with a TRANSIENT null
+    // relatedTarget while it unmounts, and committing there double-counts — but it is NOT the
+    // only shape. Clicking any non-focusable region of the page (the body, a heading, whitespace)
+    // also blurs the editor with a null relatedTarget, and that returned WITHOUT committing and
+    // WITHOUT endEdit(): the typed value was silently discarded, the editor stayed open, and
+    // `$data.editingRow` stayed >= 0 — which gridKeydownHandlers' `if ($data.editingRow >= 0)
+    // return` reads as "an editor owns the keyboard", so arrows/Enter/F2/Home/Ctrl+C were all
+    // dead until the user double-clicked somewhere else. There is no document-level click-away
+    // listener anywhere in the family to catch it afterwards.
+    //
+    // The two shapes ARE separable, with the discriminator the branch below already uses: on a
+    // Tab-advance the keyboard path has already moved the editing pair to the NEXT cell, so the
+    // blurring editor's own cell no longer matches ($data.editingRow/editingCol), while a
+    // click-away leaves the pair still sitting on it. The row-edit branch twenty lines above
+    // reaches the same conclusion by the same reasoning and commits on null; this is that branch's
+    // single-cell twin.
+    if (next == null) {
+      // Not a click-away unless a pointerdown OUTSIDE the grid just said so. `outsidePointerDown`
+      // is the discriminator, and nothing weaker works: an editor recycled out of the virtual
+      // window (or replaced by Solid's keyed-row reconcile) blurs with a null relatedTarget too,
+      // and `closest()` still resolves an owning `<td>` inside a DETACHED subtree, so every
+      // synchronous DOM test reads it as a click-away — measured, it closed the pinned editor in
+      // data-table-edit's "open editor + index-based range survive virtualization recycle" case on
+      // solid. Deferring a frame does not help either: by then the node is reattached, focus sits
+      // on <body>, and the state is indistinguishable from a real click-away.
+      //
+      // The flag is a plain module-let set by the document pointerdown listener in DataTable.rozie
+      // (NOT a $data field, and NOT a closure over one): a document listener is attached once, so
+      // on React any `$data` it closes over is frozen at attach time, and a commit driven from
+      // that closure would write the draft as of editor-OPEN and lose everything typed. Routing
+      // the decision back through THIS handler — template-bound, so React re-binds it every
+      // render — keeps the commit on the always-fresh path. Consume it here so an unmount blur
+      // arriving later can never inherit it.
+      if (!this.outsidePointerDown) return;
+      this.outsidePointerDown = false;
+      if (!fromCell) return;
+      if (fromCell.getAttribute('data-row') !== String(__editingRow) || fromCell.getAttribute('data-col-index') !== String(__editingCol)) return;
+      // Genuine click-away onto a non-focusable region outside the grid → commit + close (D-01's
+      // reject path keeps the editor open on an invalid value, exactly as for a click onto another
+      // cell). skipFocusReturn: the user deliberately put focus elsewhere; do not yank it back.
+      this.commitEdit(undefined, true);
+      return;
+    }
     // Focus moving OUTSIDE the grid (a click into another widget) → commit (D-01 reject keeps
     // the editor open on an invalid value).
     if (!(this.gridRoot && this.gridRoot.contains && this.gridRoot.contains(next))) {
@@ -7699,7 +7961,6 @@ export class DataTable {
     // keyboard handler already committed) from a genuine click-away to ANOTHER grid cell
     // (which must commit + close so the grid is not wedged with an open editor).
     const nextCell = next.closest ? next.closest('[data-grid-cell]') : null;
-    const fromCell = e && e.target && e.target.closest ? e.target.closest('[data-grid-cell]') : null;
     // Same cell (an inner control / the editing cell itself on an Enter focus-return) → a
     // controlled move; skip. Also skip when either cell can't be resolved (an unmounting
     // editor has no owning cell — the Tab-advance remount-blur path, never a click-away).
@@ -7710,7 +7971,7 @@ export class DataTable {
     // double commit, WR-04).
     const fromRow = fromCell.getAttribute('data-row');
     const fromCol = fromCell.getAttribute('data-col-index');
-    if (fromRow !== String(__editingRow) || fromCol !== String(this.editingCol())) return;
+    if (fromRow !== String(__editingRow) || fromCol !== String(__editingCol)) return;
     // Genuine click-away to another grid cell → commit + close. skipFocusReturn=true so the
     // commit does NOT bounce focus back to the just-committed editing cell (which would fight
     // the click destination). The commit's writeData re-renders the table and can DROP DOM
