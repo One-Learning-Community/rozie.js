@@ -772,10 +772,13 @@ for (const target of TARGETS) {
     await page.evaluate(() => navigator.clipboard.writeText('true'));
     await focusBodyCellStable(page, 0, 3);
     await page.keyboard.press('Control+v');
+    // Poll the VALUE, then check the type. Row 0's `active` is SEEDED `false` — already a
+    // boolean — so a `typeof` poll here passed before the paste landed and the `toBe(true)`
+    // that followed raced the write (flaked on angular in the 260922 Docker union).
     await expect
-      .poll(async () => typeof (await modelRows(page))[0]?.active, { timeout: 10_000 })
-      .toBe('boolean');
-    expect((await modelRows(page))[0]?.active).toBe(true);
+      .poll(async () => (await modelRows(page))[0]?.active, { timeout: 10_000 })
+      .toBe(true);
+    expect(typeof (await modelRows(page))[0]?.active).toBe('boolean');
 
     // ...and the text 'false', which is a TRUTHY string — the case a truthiness check misses.
     await page.evaluate(() => navigator.clipboard.writeText('false'));
