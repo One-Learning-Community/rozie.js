@@ -131,4 +131,53 @@ const editorKindWarning = (id: any, editor: any): string | null => {
   )
 }
 
-export { isSafeKey, wrapAggregationFn, collectNestedDefs, indexDefsById, collectGroupableLeafDefs, EDITOR_KINDS, editorKindWarning }
+
+// ── C-09: is this column spec EQUIVALENT to the one already registered? ──────────────────
+// `<Column>`'s re-register `$watch` keys on `$props.editorOptions`, `$props.aggregationFn` and
+// `$props.validate` — all reference types. The documented wiring for them is an INLINE literal
+// (`:editorOptions="[{ value: 'a' }, …]"`, `:validate="(v) => v !== ''"`), and an inline
+// literal is a NEW identity on every consumer render. So the watch fired every render,
+// `registerColumn` whole-object-replaced `$data.colReg`, the parent's re-feed watch keys on
+// `$data.colReg`, the re-feed re-rendered the parent, and the next render produced a new
+// identity again: not a slow path, a feedback loop.
+//
+// Equality is by VALUE, with functions compared on identity first and `toString()` second.
+// Source-text comparison is the point rather than a shortcut: an inline arrow re-created each
+// render has a different identity and identical source, which is exactly the case that has to
+// stop churning, while a genuinely different validator has different source and still
+// re-registers. Depth-bounded so a consumer object graph with a cycle cannot hang the compare.
+const columnSpecsEquivalent = (a: any, b: any, depth?: number): boolean => {
+  const d = typeof depth === 'number' ? depth : 0
+  if (a === b) return true
+  if (d > 4) return false
+  const ta = typeof a
+  const tb = typeof b
+  if (ta !== tb) return false
+  if (ta === 'function') {
+    try {
+      return String(a) === String(b)
+    } catch (err) {
+      return false
+    }
+  }
+  if (ta === 'number') return a !== a && b !== b   // NaN === NaN, for this purpose
+  if (a === null || b === null || ta !== 'object') return false
+  const aArr = Array.isArray(a)
+  if (aArr !== Array.isArray(b)) return false
+  if (aArr) {
+    if (a.length !== b.length) return false
+    for (let i = 0; i < a.length; i++) if (!columnSpecsEquivalent(a[i], b[i], d + 1)) return false
+    return true
+  }
+  const ka = Object.keys(a)
+  const kb = Object.keys(b)
+  if (ka.length !== kb.length) return false
+  for (let i = 0; i < ka.length; i++) {
+    const k = ka[i]
+    if (!Object.prototype.hasOwnProperty.call(b, k)) return false
+    if (!columnSpecsEquivalent(a[k], b[k], d + 1)) return false
+  }
+  return true
+}
+
+export { isSafeKey, wrapAggregationFn, collectNestedDefs, indexDefsById, collectGroupableLeafDefs, EDITOR_KINDS, editorKindWarning, columnSpecsEquivalent }

@@ -35,6 +35,15 @@ import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, m
 // snapshot (the rete stale-closure anti-pattern — a top-level $computed/useCallback
 // freezes the table at the empty-initial state on React).
 
+// C-09's value-equality guard. Imported HERE, in DataTable.rozie's OWN script, because that
+// is where it is USED: a `.rzts` partial's import of a symbol the partial itself never
+// references is dropped as unused, and the host script then reaches a free identifier. That
+// failed at RUNTIME, not at compile time — `ReferenceError: columnSpecsEquivalent is not
+// defined` on the first paste — which is the only way this class of mistake shows up.
+import { columnSpecsEquivalent } from './helpers/columnDefUtils';
+
+// The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
+
 interface GroupBarCtx { grouping: any; groupableColumns: any; applyGrouping: any; clearGrouping: any; }
 
 interface SelectAllCtx { checked: any; indeterminate: any; toggle: any; }
@@ -3229,7 +3238,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     selectAllBox.current = __rozieRoot.current!.querySelector('.rdt-select-all');
     if (selectAllBox.current) selectAllBox.current.indeterminate = isSomeRowsSelected() && !isAllRowsSelected();
   }, [isAllRowsSelected, isSomeRowsSelected]);
-  // The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
+  // C-09's value-equality guard. Imported HERE, in DataTable.rozie's OWN script, because that
+  // is where it is USED: a `.rzts` partial's import of a symbol the partial itself never
+  // references is dropped as unused, and the host script then reaches a free identifier. That
+  // failed at RUNTIME, not at compile time — `ReferenceError: columnSpecsEquivalent is not
+  // defined` on the first paste — which is the only way this class of mistake shows up.
   // Imperative handle (consumer-callable). Each verb is a PRE-DECLARED top-level
   // `const` (the canonical $expose contract — `$expose({ name })` references a
   // binding ALREADY in scope; an INLINE-defined verb `$expose({ name: () => {} })`
@@ -6124,7 +6137,28 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // other editor type commits the value verbatim. Idempotent for the #editor drop-in path
   // (an already-numeric override passes through; an explicit null stays null).
   function coerceCellValue(colId: any, raw: any) {
-    if (editorTypeOf(colId) !== 'number') return raw;
+    const kind = editorTypeOf(colId);
+    // ── C-13 ────────────────────────────────────────────────────────────────────────────
+    // This funnel exists so "no mixed/garbage types ever reach the model" (B9, T-63-03-01), and
+    // it covered ONE of the four built-in editor types. Every path that writes without opening
+    // the built-in control — paste, Cut, Delete/Backspace over a range, a fill-drag — arrives
+    // here with a plain TSV STRING, so a `checkbox` column took `''` from a Delete and the
+    // literal text `'true'` from a paste, straight into a field the consumer declared boolean.
+    // `select` is deliberately NOT coerced: its model type IS the option string, so a string is
+    // already correct there, and an out-of-range option is a validation question (C-03's class),
+    // not a type one.
+    //
+    // Recognised spellings both ways; ANYTHING else — including '' and unrecognised text —
+    // becomes `false`. That is lossy by construction and deterministic by design: the
+    // alternative is letting a non-boolean reach a boolean field, which is the defect. It is
+    // documented in the editing page's emptied-cell table.
+    if (kind === 'checkbox') {
+      if (typeof raw === 'boolean') return raw;
+      if (raw == null) return false;
+      if (typeof raw === 'number') return raw !== 0;
+      return /^\s*(true|1|yes|y|on)\s*$/i.test(String(raw));
+    }
+    if (kind !== 'number') return raw;
     if (raw == null) return null;
     if (typeof raw === 'number') return Number.isNaN(raw) ? null : raw;
     const s = String(raw).trim();
@@ -7676,6 +7710,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (id == null) return;
     const key = String(id);
     if (key === '__proto__' || key === 'constructor' || key === 'prototype') return;
+    // C-09: skip the state write when the incoming spec is EQUIVALENT to the stored one.
+    // `<Column>`'s re-register watch keys on reference-typed props whose documented wiring is
+    // an inline literal — a fresh identity every consumer render — so without this guard every
+    // render whole-object-replaced `$data.colReg`, which the parent's re-feed watch keys on,
+    // which re-rendered the parent, which produced a new identity: a feedback loop, not a slow
+    // path. Guarded HERE rather than in the watch because this is the single seam every
+    // registration passes through, and because value-equality is the correct test for the
+    // registry's own purpose (has anything the table renders from actually changed?).
+    const prev = colReg ? colReg[key] : undefined;
+    if (prev !== undefined && columnSpecsEquivalent(prev, spec)) return;
     setColReg(prev => ({
       ...prev,
       [key]: spec

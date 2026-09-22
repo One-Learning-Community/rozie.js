@@ -368,6 +368,15 @@
 .rozie-data-table[data-rozie-s-d5dcab4c] tbody[data-rozie-s-d5dcab4c] tr[data-depth="8"][data-rozie-s-d5dcab4c] > .rdt-expander-td[data-rozie-s-d5dcab4c] + .rdt-td[data-rozie-s-d5dcab4c]::before {
   width: calc(8 * var(--rdt-tree-indent, 1.25rem));
 }
+.rozie-data-table[role="grid"][data-rozie-s-d5dcab4c] {
+  user-select: none;
+}
+.rozie-data-table[role="grid"][data-rozie-s-d5dcab4c] input[data-rozie-s-d5dcab4c],
+.rozie-data-table[role="grid"][data-rozie-s-d5dcab4c] textarea[data-rozie-s-d5dcab4c],
+.rozie-data-table[role="grid"][data-rozie-s-d5dcab4c] select[data-rozie-s-d5dcab4c],
+.rozie-data-table[role="grid"][data-rozie-s-d5dcab4c] [contenteditable="true"][data-rozie-s-d5dcab4c] {
+  user-select: text;
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-select-all[data-rozie-s-d5dcab4c],
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-select-row[data-rozie-s-d5dcab4c] {
   cursor: pointer;

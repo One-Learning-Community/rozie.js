@@ -42,6 +42,33 @@ The commit events are `cell-edit-commit` (payload `{ rowId, columnId, oldValue, 
 Before 0.3.2 an editable non-grouping column would open an editor on a group-header row, and committing wrote to the group's **first member record** — silently modifying a row the user was not editing. Paste and fill-drag wrote through the same path. If your app allowed editing while grouped, audit for records changed this way.
 :::
 
+## What an emptied cell commits
+
+Clearing a cell — deleting its text and committing, `Delete`/`Backspace` over a range, a `Cut`,
+or pasting an empty TSV field — does **not** commit the same value for every column. The
+commit funnel coerces by the column's `editor` type:
+
+| `editor` | An emptied cell commits |
+| --- | --- |
+| `number` | `null` — there is no empty number, and `Number('')` is `0`, which would silently write a real zero |
+| `text` (and the `r-else` fallback) | `''` |
+| `select` | `''` — a select's model type *is* the option string, so a string is already correct; an out-of-range option is a validation question, not a coercion one, and nothing is coerced here |
+| `checkbox` | `false` |
+| `custom` | whatever your `#editor` fill passes to `commit(...)`; nothing is coerced |
+
+A `checkbox` column coerces on the way in as well, because every path that writes without
+opening the built-in control — paste, `Cut`, `Delete` over a range, a fill-drag — arrives as a
+plain TSV **string**. `true` / `1` / `yes` / `y` / `on` (any case, any surrounding whitespace)
+and a non-zero number commit `true`; everything else, including `''` and unrecognised text,
+commits `false`. That is lossy on purpose: the alternative is letting the literal text
+`"maybe"` land in a field your model declares boolean.
+
+That is type-correct per column but it is **not uniform across columns**, which matters the
+moment one operation spans several: `Delete` over a range covering a text column and a number
+column writes `''` into one and `null` into the other in the same `r-model:data` update. An
+"is this cell empty?" check on the consumer side has to accept both. The rule is stable and
+will not change silently — it is asserted per editor type in the grid-edit battery.
+
 ## Drop-in editor components
 
 The `#editor` slot is fully headless — you can render any control. For the common cases the package also ships **opt-in drop-in editor components** so you don't have to hand-roll the input wiring: `EditorText`, `EditorNumber`, `EditorSelect`, `EditorCheckbox`, and `EditorDate`. They are **additive named exports** alongside `DataTable` (which stays the headless **default** export — importing the editors is byte-identical-off if you never use them):

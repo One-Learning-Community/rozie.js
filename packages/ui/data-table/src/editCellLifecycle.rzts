@@ -368,7 +368,28 @@ const editorAutofocusFor = (colId, rowIndex) => {
 // other editor type commits the value verbatim. Idempotent for the #editor drop-in path
 // (an already-numeric override passes through; an explicit null stays null).
 const coerceCellValue = (colId, raw) => {
-  if (editorTypeOf(colId) !== 'number') return raw
+  const kind = editorTypeOf(colId)
+  // ── C-13 ────────────────────────────────────────────────────────────────────────────
+  // This funnel exists so "no mixed/garbage types ever reach the model" (B9, T-63-03-01), and
+  // it covered ONE of the four built-in editor types. Every path that writes without opening
+  // the built-in control — paste, Cut, Delete/Backspace over a range, a fill-drag — arrives
+  // here with a plain TSV STRING, so a `checkbox` column took `''` from a Delete and the
+  // literal text `'true'` from a paste, straight into a field the consumer declared boolean.
+  // `select` is deliberately NOT coerced: its model type IS the option string, so a string is
+  // already correct there, and an out-of-range option is a validation question (C-03's class),
+  // not a type one.
+  //
+  // Recognised spellings both ways; ANYTHING else — including '' and unrecognised text —
+  // becomes `false`. That is lossy by construction and deterministic by design: the
+  // alternative is letting a non-boolean reach a boolean field, which is the defect. It is
+  // documented in the editing page's emptied-cell table.
+  if (kind === 'checkbox') {
+    if (typeof raw === 'boolean') return raw
+    if (raw == null) return false
+    if (typeof raw === 'number') return raw !== 0
+    return /^\s*(true|1|yes|y|on)\s*$/i.test(String(raw))
+  }
+  if (kind !== 'number') return raw
   if (raw == null) return null
   if (typeof raw === 'number') return Number.isNaN(raw) ? null : raw
   const s = String(raw).trim()

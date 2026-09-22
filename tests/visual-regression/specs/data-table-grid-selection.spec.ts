@@ -510,3 +510,53 @@ for (const target of TARGETS) {
     expect(await cellHasClass(page, 'grid-table', 3, 0, 'rdt-in-range')).toBe(true);
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// B-14 — a drag-select must not also paint a NATIVE text selection.
+//
+// A drag-select is a mousedown followed by pointer movement across text, which is also exactly
+// the gesture for selecting text. With nothing suppressing it the browser painted its own
+// selection highlight straight through the cell range the component was painting, so the user
+// saw two overlapping, disagreeing selections and Ctrl+C was ambiguous between them.
+//
+// Asserted on the COMPUTED style of the grid root and of an editor control, because that is
+// the whole mechanism — and the control exemption is the half that is easy to lose: without
+// it, caret placement and text selection inside an open editor stop working, which would be a
+// worse bug than the one being fixed. `table` mode is deliberately untouched (no drag-select
+// exists there, and a read-only table is something users legitimately select text out of).
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-selection [${target}]: B-14 grid mode suppresses native text selection but not inside its controls`, async ({ page }) => {
+    await gotoGrid(page, target);
+
+    const userSelectOf = async (selector: string): Promise<string> =>
+      page.evaluate((sel) => {
+        const deepFirst = (root: Document | ShadowRoot, s: string): Element | null => {
+          const direct = root.querySelector(s);
+          if (direct) return direct;
+          for (const el of Array.from(root.querySelectorAll('*'))) {
+            const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+            if (sr) { const inner = deepFirst(sr, s); if (inner) return inner; }
+          }
+          return null;
+        };
+        const el = deepFirst(document, sel);
+        if (!el) return 'NO-ELEMENT';
+        const cs = getComputedStyle(el as Element);
+        return cs.userSelect || (cs as unknown as { webkitUserSelect: string }).webkitUserSelect;
+      }, selector);
+
+    expect(await userSelectOf('table[role="grid"]')).toBe('none');
+    // A cell inherits it...
+    expect(await userSelectOf('table[role="grid"] [data-grid-cell]')).toBe('none');
+
+    // ...and an OPEN EDITOR's control does not. This is the half that is easy to lose: the
+    // grid-wide rule would otherwise inherit into the editor and kill caret placement and
+    // text selection inside it, which is a worse bug than the one being fixed.
+    await focusBodyCellStable(page, 0, 0);
+    await page.keyboard.press('F2');
+    await expect
+      .poll(async () => userSelectOf('table[role="grid"] [data-editing-cell]'), { timeout: 10_000 })
+      .toBe('text');
+  });
+}

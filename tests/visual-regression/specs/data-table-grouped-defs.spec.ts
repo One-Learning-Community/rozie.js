@@ -517,18 +517,28 @@ for (const target of TARGETS) {
     }
 
     // (d) Fill-drag: a true 1x1 SOURCE at Plum's 'product' cell (row 3) dragged DOWN across
-    // the South group-header row (row 4) writes ONLY the source cell itself (a self-write,
-    // same value) — the group row is SKIPPED. commit-count is the unambiguous discriminator
-    // here: a fill-drag across a group row happens to write the group row's leaked record
-    // with the SAME value the source cell already holds, so model-readout alone cannot tell
-    // the two apart.
+    // the South group-header row (row 4) writes ONLY the source cell itself — the group row is
+    // SKIPPED. Both candidate outcomes write the SAME VALUE (the fill source's), so
+    // model-readout cannot tell them apart and the discriminator has to be a count.
+    //
+    // B-08 (260921-tsu) moved which count that is. `commit-count` used to work because an
+    // unchanged cell still emitted `cell-edit-commit`, so the self-write showed up as 1 —
+    // i.e. this assertion was reading an event that should never have fired. Now an unchanged
+    // cell emits nothing, so commit-count is 0 whether the group row was written or not, and
+    // the case would silently stop discriminating. The aria-live summary is the count that
+    // still separates them: it reports APPLIED of TOTAL TARGETS, and a skipped group row is
+    // counted as a target. Group row skipped -> "1 of 2"; group row written -> "2 of 2".
     {
       const { mount } = await gotoGroupEditGuard(page, target);
       await focusBodyCellStable(page, 3, PRODUCT_COL);
       await extendRangeBy(page, 'Down', 1, 4, PRODUCT_COL);
       await extendRangeBy(page, 'Up', 1, 3, PRODUCT_COL); // back to a true 1x1 range at row 3
       await fillDragTo(page, 4, PRODUCT_COL); // drag DOWN across the South group-header row
-      await expect(mount.getByTestId('commit-count')).toHaveText('1', { timeout: 5_000 });
+      await expect
+        .poll(async () => readoutText(page, 'paste-announce'), { timeout: 5_000 })
+        .toBe('1 of 2 cells filled');
+      // ...and nothing was committed, because the one cell it DID target already held the value.
+      await expect(mount.getByTestId('commit-count')).toHaveText('0', { timeout: 5_000 });
     }
   });
 }

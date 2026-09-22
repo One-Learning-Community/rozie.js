@@ -1598,12 +1598,29 @@ const syncIndeterminate = () => {
   if (selectAllBox) selectAllBox.indeterminate = isSomeRowsSelected() && !isAllRowsSelected()
 }
 
+// C-09's value-equality guard. Imported HERE, in DataTable.rozie's OWN script, because that
+// is where it is USED: a `.rzts` partial's import of a symbol the partial itself never
+// references is dropped as unused, and the host script then reaches a free identifier. That
+// failed at RUNTIME, not at compile time — `ReferenceError: columnSpecsEquivalent is not
+// defined` on the first paste — which is the only way this class of mistake shows up.
+import { columnSpecsEquivalent } from './helpers/columnDefUtils'
+
 // The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
 $provide('data-table:columns', {
   registerColumn: (id, spec) => {
     if (id == null) return
     const key = String(id)
     if (key === '__proto__' || key === 'constructor' || key === 'prototype') return
+    // C-09: skip the state write when the incoming spec is EQUIVALENT to the stored one.
+    // `<Column>`'s re-register watch keys on reference-typed props whose documented wiring is
+    // an inline literal — a fresh identity every consumer render — so without this guard every
+    // render whole-object-replaced `$data.colReg`, which the parent's re-feed watch keys on,
+    // which re-rendered the parent, which produced a new identity: a feedback loop, not a slow
+    // path. Guarded HERE rather than in the watch because this is the single seam every
+    // registration passes through, and because value-equality is the correct test for the
+    // registry's own purpose (has anything the table renders from actually changed?).
+    const prev = $data.colReg ? $data.colReg[key] : undefined
+    if (prev !== undefined && columnSpecsEquivalent(prev, spec)) return
     $data.colReg = { ...$data.colReg, [key]: spec }
   },
   unregisterColumn: (id) => {
@@ -3659,6 +3676,30 @@ $expose({
 }
 .rozie-data-table tbody tr[data-depth="8"] > .rdt-expander-td + .rdt-td::before {
   width: calc(8 * var(--rdt-tree-indent, 1.25rem));
+}
+/* ── B-14: no native TEXT selection inside a grid-mode table ─────────────────────────────
+   A drag-select is a mousedown followed by pointer movement across text, which is also
+   exactly the gesture for selecting text. With nothing suppressing it the browser painted a
+   native selection highlight straight through the cell range the component was painting,
+   so the user saw two overlapping, disagreeing selections and a Ctrl+C ambiguous between
+   them. Every spreadsheet suppresses it.
+
+   Scoped to `[role="grid"]`, i.e. `interactionMode="grid"` only: in the default `table` mode
+   there is no drag-select and no cell range, and a read-only table is something users
+   legitimately select text out of. Byte-identical-off for every non-grid table.
+
+   The exemptions are what keep it usable: an open editor's own control must still support
+   caret placement and text selection (B-16 stops the drag-select from starting there, but the
+   control has to be selectable in the first place), and so must the filter/search inputs and
+   the page-size select rendered inside the table. */
+.rozie-data-table[role="grid"] {
+  user-select: none;
+}
+.rozie-data-table[role="grid"] input,
+.rozie-data-table[role="grid"] textarea,
+.rozie-data-table[role="grid"] select,
+.rozie-data-table[role="grid"] [contenteditable="true"] {
+  user-select: text;
 }
 .rozie-data-table .rdt-select-all,
 .rozie-data-table .rdt-select-row {

@@ -750,3 +750,49 @@ for (const target of TARGETS) {
     expect((await openEditor(page))?.col).toBe('0');
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// C-13 — a checkbox column's value stays a BOOLEAN through the range-write funnel.
+//
+// `coerceCellValue` exists so "no mixed/garbage types ever reach the model" (B9/T-63-03-01),
+// and it covered exactly one of the four built-in editor types. Every path that writes without
+// opening the built-in control — paste, Cut, Delete/Backspace over a range, a fill-drag —
+// arrives with a plain TSV STRING, so a `checkbox` column took `''` from a Delete and the
+// literal text `'true'` from a paste, straight into a field the consumer declared boolean.
+//
+// Asserted on `typeof`, not on truthiness: `'false'` is a truthy STRING, so a truthiness
+// assertion would pass against exactly the value that is wrong.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-edit [${target}]: C-13 a paste and a Delete over a checkbox column commit booleans`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    // Paste the TEXT 'true' onto a checkbox cell.
+    await page.evaluate(() => navigator.clipboard.writeText('true'));
+    await focusBodyCellStable(page, 0, 3);
+    await page.keyboard.press('Control+v');
+    await expect
+      .poll(async () => typeof (await modelRows(page))[0]?.active, { timeout: 10_000 })
+      .toBe('boolean');
+    expect((await modelRows(page))[0]?.active).toBe(true);
+
+    // ...and the text 'false', which is a TRUTHY string — the case a truthiness check misses.
+    await page.evaluate(() => navigator.clipboard.writeText('false'));
+    await page.keyboard.press('Control+v');
+    await expect
+      .poll(async () => (await modelRows(page))[0]?.active, { timeout: 10_000 })
+      .toBe(false);
+    expect(typeof (await modelRows(page))[0]?.active).toBe('boolean');
+
+    // Delete over the cell clears it to `false`, not to `''`.
+    await page.evaluate(() => navigator.clipboard.writeText('true'));
+    await page.keyboard.press('Control+v');
+    await expect.poll(async () => (await modelRows(page))[0]?.active, { timeout: 10_000 }).toBe(true);
+    await page.keyboard.press('Delete');
+    await expect
+      .poll(async () => (await modelRows(page))[0]?.active, { timeout: 10_000 })
+      .toBe(false);
+    expect(typeof (await modelRows(page))[0]?.active).toBe('boolean');
+  });
+}

@@ -35,6 +35,24 @@ slice and the declaration is ignored — that case is unchanged.
 
 Because a bare boolean attribute on a child component (`<Column sortable />`) only coerces to `true` on Vue + Lit, **bind it** in the other targets — `:sortable="true"` (React/Solid/Angular/Svelte) — or rely on each consumer framework's own boolean-attribute convention.
 
+### Two `<Column>` details worth knowing up front
+
+**`groupable` defaults to `true`** — the one boolean in this library that does. Everywhere else
+a boolean prop defaults `false` and you opt in; here you opt *out* with `:groupable="false"`.
+The default is deliberate and is not going to be flipped quietly: `groupable` only controls
+whether a column is *offered* to the headless `#groupBar` as a grouping target, and a
+`false` default would mean the group bar starts empty on every table, so the feature would
+look broken until every column was individually opted in. Whether grouping is actually
+engaged is driven by the parent's `grouping` model, never by this flag.
+
+**On the Lit target, `<rozie-column id="…">` is also the element's DOM `id`.** `id` is a
+reflected property inherited from `HTMLElement`, and the column id reflects onto it — so two
+tables on one page that both declare a column called `price` produce two elements with
+`id="price"`, and `document.getElementById('price')` will find one of them. The elements are
+renderless and `display: none`, so nothing renders wrongly; if you need unique DOM ids, give
+the columns distinct ids or scope your lookups to the table. The other five targets are
+unaffected.
+
 ## Two coexisting column-declaration forms
 
 Columns may be declared via `<Column>` children **or** via the `:columns` config-array escape hatch **or both** — they resolve to the same internal column set via an **id-keyed last-write-wins union**: the `:columns` array is applied first (lower precedence), then the `<Column>` children override by id. A leaf config entry accepts the full key set `<Column>` exposes as props — `{ id?, field, header?, sortable?, filterable?, pinned?, width?, expandable?, groupable?, aggregationFn?, editable?, editor?, editorOptions?, validate? }` (each key's semantics match the identically-named `<Column>` attribute; `pinned` behaves exactly as described above — an initial pin seed). `expandable` (reserved per-column metadata flagging participation in the expand affordance; default `false`) is a genuine `<Column>` prop too — the table above doesn't yet list it, but `<Column :expandable="true">` works identically to the config-array key:
