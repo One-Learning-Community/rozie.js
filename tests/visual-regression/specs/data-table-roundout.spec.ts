@@ -202,6 +202,39 @@ for (const target of TARGETS) {
     await expect(
       subrowTable.locator('[data-depth="1"]').first(),
     ).toContainText('Frontend');
+
+    // ── E-06 — and it is actually INDENTED. The two assertions above only prove the rows
+    //    EXIST and carry the attribute; `data-depth` was written on the `<tr>` since phase 50
+    //    and selected by nothing — no rule in the component `<style>`, in any `themes/*.css`,
+    //    or in any compiled leaf — so "depth-indented child rows" (the expandable page, eight
+    //    places in the usage page, and the `getSubRows` docs: string that ships as JSDoc in
+    //    every leaf `.d.ts`) rendered dead flat, parent and child indistinguishable.
+    //    Measured on the ::before spacer's computed width rather than on a screenshot or an
+    //    element offset: the indent is deliberately NOT padding (that would override whatever
+    //    `--rdt-cell-padding` a theme set), so the cell BOX is unchanged and only the pseudo
+    //    element carries it. A depth-0 row must have no such spacer, or the assertion would
+    //    pass against a rule that indented every row equally.
+    const indentOf = async (depth: string): Promise<string> =>
+      page.evaluate((d) => {
+        const deepAll = (root: Document | ShadowRoot | Element, sel: string): Element[] => {
+          const out: Element[] = [...root.querySelectorAll(sel)];
+          for (const el of root.querySelectorAll('*')) {
+            const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+            if (sr) out.push(...deepAll(sr, sel));
+          }
+          return out;
+        };
+        const host = deepAll(document, '[data-testid="subrow-table"]')[0];
+        if (!host) return 'NO-HOST';
+        const cell = deepAll(host, `tr[data-depth="${d}"] > .rdt-expander-td + .rdt-td`)[0];
+        if (!cell) return 'NO-CELL';
+        return getComputedStyle(cell, '::before').width;
+      }, depth);
+
+    // One level of `--rdt-tree-indent` (1.25rem at the 16px root) on the child row...
+    await expect.poll(async () => indentOf('1'), { timeout: 10_000 }).toBe('20px');
+    // ...and none on a top-level row.
+    expect(await indentOf('0')).not.toBe('20px');
   });
 }
 

@@ -4,7 +4,7 @@ import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, ro
 
 import { Popover } from '@rozie-ui/popover-angular';
 
-import { isSafeKey, wrapAggregationFn, indexDefsById, collectGroupableLeafDefs } from './helpers/columnDefUtils';
+import { isSafeKey, wrapAggregationFn, indexDefsById, editorKindWarning, collectGroupableLeafDefs } from './helpers/columnDefUtils';
 import { applyUpdater, clamp, focusables } from './helpers/indexMath';
 import { escapeTsvField, parseTsv, tileGridToBox, tileIndex } from './helpers/tsvGrid';
 import { replaceRowValue, indexOfRowIn, replaceRowValues } from './helpers/rowValueUtils';
@@ -2088,28 +2088,25 @@ export class DataTable {
     const n = Number.parseFloat(m[1]);
     return Number.isFinite(n) && n > 0 ? n : null;
   };
-  // ── E-03: the `editor` union is FOUR built-ins plus the 'custom' gate ────────────────────
-  // `editorTypeOf` falls through to the plain text `<input>` for ANY unrecognised value, so a
-  // consumer writing `editor="date"` — a value the comparison page and the root README both
-  // advertised as a fifth built-in until the 260910 audit corrected them — got a text box with
-  // no error, no warning, and no hint that `EditorDate` is a DROP-IN reached through
-  // `editor="custom"` + an `#editor` fill. Same for any typo. The silent degradation is the
-  // defect; the docs half is already corrected.
+  // ── E-03 ────────────────────────────────────────────────────────────────────────────────
+  // The union check itself is `editorKindWarning` in helpers/columnDefUtils.ts (pure, so the
+  // contract is unit-testable). Here we own the two things that are not pure: WHEN it runs and
+  // how often it speaks.
   //
-  // Warned at column-BUILD time, not in `editorTypeOf`, which is called per cell per render
-  // (D-23) — and latched per `id:value` so a rebuild (the memo misses whenever the column set
-  // changes identity) cannot turn one misconfiguration into a console flood. Unguarded
-  // console.warn, matching the D-07/D-08 virtual-misconfig warns in DataTable.rozie: a
-  // process.env guard is not bundler-portable across six targets, and always-warn-on-misconfig
+  // WHEN: at column-BUILD time, not in `editorTypeOf`, which is called per cell per render (D-23).
+  // HOW OFTEN: latched per `id:value`, so a rebuild — the memo misses whenever the column set
+  // changes identity — cannot turn one misconfiguration into a console flood.
+  // Unguarded console.warn, matching the D-07/D-08 virtual-misconfig warns in DataTable.rozie:
+  // a process.env guard is not bundler-portable across six targets, and always-warn-on-misconfig
   // is the established call in this component.
-  EDITOR_KINDS = ['text', 'number', 'select', 'checkbox', 'custom'];
   editorWarned = Object.create(null);
   checkEditorKind = (id: any, editor: any) => {
-    if (editor == null || this.EDITOR_KINDS.indexOf(editor) !== -1) return editor;
+    const msg = editorKindWarning(id, editor);
+    if (!msg) return editor;
     const key = id + '\u0000' + String(editor);
     if (this.editorWarned[key]) return editor;
     this.editorWarned[key] = true;
-    console.warn('[rozie-data-table] column "' + id + '": editor="' + String(editor) + '" is not a built-in editor. ' + 'The built-ins are text | number | select | checkbox; anything else needs editor="custom" plus an ' + '#editor slot fill (that is how <EditorDate> is used). Falling back to the text input.');
+    console.warn(msg);
     return editor;
   };
   buildConfigDef = (c: any) => {

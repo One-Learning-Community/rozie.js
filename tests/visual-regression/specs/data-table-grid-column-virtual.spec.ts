@@ -517,6 +517,76 @@ for (const target of TARGETS) {
   });
 }
 
+/** The `width:` component of one selector's first match's inline style, in px (null when
+ *  absent). Whitespace-tolerant: Lit serialises the same style string WITHOUT spaces. */
+async function declaredWidthPx(page: Page, selector: string, dataCol: string): Promise<number | null> {
+  return page.evaluate(({ sel, col }) => {
+    const deepAll = (root: Document | ShadowRoot | Element, s: string): Element[] => {
+      const out: Element[] = [...root.querySelectorAll(s)];
+      for (const el of root.querySelectorAll('*')) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) out.push(...deepAll(sr, s));
+      }
+      return out;
+    };
+    const el = deepAll(document, sel).find((e) => e.getAttribute('data-col') === col);
+    if (!el) return null;
+    const m = /(^|;)\s*width:\s*([0-9.]+)px/.exec(el.getAttribute('style') || '');
+    return m ? Number(m[2]) : null;
+  }, { sel: selector, col: dataCol });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// A-03 — a straddling group header's DECLARED WIDTH must describe the same leaves its
+// clamped colspan does.
+//
+// The case above proves the colspan clamps. The width did not: `thStyle` declared
+// `Header.getSize()` — the sum of ALL descendant leaves, in-window or not — against that
+// clamped colspan. Under `table-layout: fixed` (which `.rdt-col-windowed` sets) a first-row
+// spanning cell's declared width is divided across the columns it spans, and only the first
+// row establishes widths, so every rendered column of a straddling group was inflated by the
+// ratio of total leaves to in-window leaves: "Group A" (5 leaves at 150px, getSize() 750)
+// drove its rendered columns 150 -> 187.5 -> 250 -> 375 -> 750px as it scrolled out, taking
+// the container's scrollWidth 9000 -> 9600 with it. Identical on all six.
+//
+// Asserted against a NON-group leaf header's own declared width rather than a hardcoded 150,
+// so a fixture whose column width changes cannot make this silently vacuous.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: A-03 a straddling group header declares the width of its IN-WINDOW leaves only`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    let bodyIdx: number[] = [];
+    let straddled = false;
+    for (let half = 12; half <= 34; half++) {
+      await scrollGridTo(page, half * 75);
+      // eslint-disable-next-line no-await-in-loop
+      await page.waitForTimeout(150);
+      // eslint-disable-next-line no-await-in-loop
+      bodyIdx = await colIndicesFor(page, '[data-grid-cell][data-row="0"][data-col-index]');
+      const inGroup = bodyIdx.filter((i) => i >= 10 && i <= 14).length;
+      if (inGroup > 0 && inGroup < 5) { straddled = true; break; }
+    }
+    expect(straddled).toBe(true);
+    const inWindowLeaves = bodyIdx.filter((i) => i >= 10 && i <= 14).length;
+
+    // A plain leaf header in the same window gives the per-column width this fixture uses.
+    const leafCols = await dataColsFor(page, '[data-header-level="1"]');
+    const plainLeaf = leafCols.find((c) => c != null && c !== 'grpA' && !/^__rdt_/.test(c));
+    expect(plainLeaf).toBeTruthy();
+    const perColumn = await declaredWidthPx(page, '[data-header-level="1"]', plainLeaf as string);
+    expect(perColumn).toBeGreaterThan(0);
+
+    const groupWidth = await declaredWidthPx(page, '[data-header-level="0"]', 'grpA');
+    // Pre-fix this was 5 * perColumn regardless of how many leaves were rendered.
+    expect(groupWidth).toBe(inWindowLeaves * (perColumn as number));
+    // Stated as an inequality too: with a genuine straddle (1..4 of 5 leaves in window) the
+    // full-group width is a DIFFERENT number, so the assertion above cannot pass by accident.
+    expect(groupWidth).not.toBe(5 * (perColumn as number));
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // D-11 — a group whose leaf columns are ALL outside the window renders no <th> at all. At
 // rest (scrollLeft 0) the demo's window sits near columns 0-8 (default overscan), well short
@@ -1438,5 +1508,85 @@ for (const target of TARGETS) {
         )
         .toBe('exact');
     }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// A-02 — a column RESIZE must invalidate the column virtualizer's measurement cache.
+//
+// D-14 above proves the resize GESTURE tracks and commits; it says nothing about whether the
+// windowing geometry noticed. It did not. virtual-core memoizes `getMeasurements()` on
+// `[getMeasurementOptions(), itemSizeCacheVersion]`, and `getMeasurementOptions()` keys on
+// count / paddingStart / scrollMargin / getItemKey / enabled / lanes / laneAssignmentMode —
+// `estimateSize` is NOT among them (verified in the installed @tanstack/virtual-core). The
+// column axis feeds its widths ENTIRELY through `estimateSize: (i) => columnSize(i)` and never
+// calls `measureElement`, so after a resize the memo kept returning the array built from the
+// OLD widths. `measure()` is the only API that bumps the version, and it appeared ZERO times
+// in `data-table/src` or `headless-core/src`.
+//
+// The symptom is oscillation, not a one-off wrong number, which is why the assertion drives
+// the resized column OUT of the window and back: the measured failure was scrollWidth flipping
+// between two values (9000 <-> 10200 on the 60x150 fixture) as the resized column entered and
+// left the window, because the spacer arithmetic and the rendered cells disagreed about how
+// wide it was. A single post-resize read can pass against the bug; the invariant cannot.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-column-virtual [${target}]: A-02 a resize updates the column-window geometry and scrollWidth stays invariant across scroll`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+
+    const widthOf = async () => page.evaluate(() => {
+      const find = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
+      const th = find('[data-header-level="1"][data-col="col1"]') as HTMLElement | null;
+      return th ? th.getBoundingClientRect().width : -1;
+    });
+
+    const widthBefore = await widthOf();
+    expect(widthBefore).toBeGreaterThan(0);
+    const scrollWidthBefore = await stableScrollWidthOf(page);
+    expect(scrollWidthBefore).toBeGreaterThan(0);
+
+    // Widen col1 by a large, unambiguous delta — table-core's resize handler listens for
+    // document `mousemove`/`mouseup` (not pointer events); see the D-14 case above.
+    const start = await page.evaluate(() => {
+      const find = (window as unknown as { __findWithinGridTable: (s: string) => Element | null }).__findWithinGridTable;
+      const th = find('[data-header-level="1"][data-col="col1"]') as HTMLElement | null;
+      const handle = th ? th.querySelector('.rdt-resize-handle') : null;
+      if (!handle) return null;
+      const r = handle.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: x, clientY: y }));
+      return { x, y };
+    });
+    expect(start).not.toBeNull();
+    await page.evaluate(({ x, y }) => {
+      document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x + 400, clientY: y }));
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: x + 400, clientY: y }));
+    }, start as { x: number; y: number });
+
+    // The column really did grow (the gesture's own precondition — shared with D-14).
+    await expect.poll(async () => widthOf(), { timeout: 10_000 }).toBeGreaterThan(widthBefore + 200);
+    const widthAfter = await widthOf();
+    const delta = widthAfter - widthBefore;
+
+    // The total scrollable width grew by the same amount the column did. A stale measurement
+    // cache leaves this at the pre-resize total.
+    const scrollWidthAfter = await stableScrollWidthOf(page);
+    expect(Math.abs(scrollWidthAfter - (scrollWidthBefore + delta))).toBeLessThanOrEqual(4);
+
+    // ...and it stays there as the resized column leaves the window and comes back. This is
+    // the invariant the stale cache broke: the spacer arithmetic used one width while the
+    // rendered cells used another, so the total flipped as col1 recycled in and out.
+    await scrollGridFullyRight(page);
+    await page.waitForTimeout(200);
+    const scrollWidthFarRight = await stableScrollWidthOf(page);
+    expect(Math.abs(scrollWidthFarRight - scrollWidthAfter)).toBeLessThanOrEqual(4);
+
+    await scrollGridTo(page, 0);
+    await page.waitForTimeout(200);
+    const scrollWidthBack = await stableScrollWidthOf(page);
+    expect(Math.abs(scrollWidthBack - scrollWidthAfter)).toBeLessThanOrEqual(4);
   });
 }

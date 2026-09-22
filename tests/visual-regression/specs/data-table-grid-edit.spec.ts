@@ -291,6 +291,79 @@ async function enterEditAt(page: Page, row: number, col: number): Promise<void> 
 // editor at all, so B5's Tab-off-the-last-editable-cell vehicle needs an editor-opening
 // column here).
 
+/** Cells currently painted `.rdt-in-range` inside one scope. Copied from
+ *  data-table-grid-selection.spec.ts (each spec inlines its own shadow-piercing walker —
+ *  `page.evaluate` re-executes a callback's SOURCE TEXT in the browser, so an imported helper
+ *  referenced from inside one throws ReferenceError). */
+async function countInRange(page: Page, testid: string): Promise<number> {
+  return page.evaluate((id) => {
+    const findScope = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector(`[data-testid="${id}"]`);
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = findScope(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    let count = 0;
+    const collect = (root: Element | ShadowRoot): void => {
+      count += root.querySelectorAll('[data-grid-cell].rdt-in-range').length;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const shadow = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (shadow) collect(shadow);
+      }
+    };
+    const scope = findScope(document);
+    if (!scope) return -1;
+    collect(scope);
+    return count;
+  }, testid);
+}
+
+/**
+ * B-02 / B-16 — dispatch a real `pointerdown` + `mousedown` on an element resolved by a
+ * shadow-piercing selector, then (for the click-away case) let native focus follow. A
+ * Playwright `.click()` on a `<pre>`/`<h3>` does move focus to `<body>`, but it does NOT
+ * reliably emit the `pointerdown` the click-away detector listens for through the Lit shadow
+ * boundary in this harness, so the events are dispatched explicitly and identically on all six.
+ */
+async function pointerDownOn(page: Page, selector: string): Promise<boolean> {
+  return page.evaluate((sel) => {
+    const deepFirst = (root: Document | ShadowRoot, s: string): Element | null => {
+      const direct = root.querySelector(s);
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = deepFirst(sr, s);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const el = deepFirst(document, sel) as HTMLElement | null;
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    const x = r.left + Math.min(4, r.width / 2);
+    const y = r.top + Math.min(4, r.height / 2);
+    const opts = { bubbles: true, composed: true, clientX: x, clientY: y };
+    el.dispatchEvent(new PointerEvent('pointerdown', opts));
+    el.dispatchEvent(new MouseEvent('mousedown', opts));
+    // A non-focusable target takes no focus, so the browser drops it to <body> — which is
+    // exactly the null-relatedTarget blur B-02 is about. Reproduce that explicitly.
+    const active = document.activeElement as HTMLElement | null;
+    if (active && typeof active.blur === 'function') active.blur();
+    el.dispatchEvent(new PointerEvent('pointerup', opts));
+    el.dispatchEvent(new MouseEvent('mouseup', opts));
+    el.dispatchEvent(new MouseEvent('click', opts));
+    return true;
+  }, selector);
+}
+
 async function gotoGrid(page: Page, target: Target) {
   await page.goto(`/?example=DataTableGridEdit&target=${target}`);
   await expect(page.getByTestId('rozie-mount')).toBeVisible();
@@ -581,5 +654,99 @@ for (const target of TARGETS) {
     expect(await commitCount(page)).toBe(before);
     expect((await modelRows(page))[0]?.verified).toBe(beforeValue);
     expect(await openEditor(page)).toBeNull();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// B-02 — a click onto a NON-FOCUSABLE region outside the grid commits the edit and releases
+// the keymap.
+//
+// `onEditorBlur` returned unconditionally on a null `relatedTarget`. Clicking the page
+// background, a heading, whitespace — anything unfocusable — blurs the editor exactly that
+// way, so the typed value was discarded AND `endEdit()` never ran: the editor stayed open and
+// `$data.editingRow >= 0`, which `gridKeydownHandlers`' `if ($data.editingRow >= 0) return`
+// reads as "an editor owns the keyboard". Arrows, Enter, F2, Home and Ctrl+C were all dead
+// until the user double-clicked somewhere else. There is no document-level click-away listener
+// anywhere in the family to recover it.
+//
+// All three consequences are asserted, because any one of them alone could pass against a
+// partial fix: the value is committed, the editor is closed, and the keymap is live again.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-edit [${target}]: B-02 clicking a non-focusable region outside the grid commits and unfreezes the keymap`, async ({
+    page,
+  }) => {
+    await gotoGrid(page, target);
+    const before = await commitCount(page);
+
+    await enterEditAt(page, 1, 0);
+    // Confirm the editor <input> actually holds focus before typing — the established
+    // discipline in this file: under container/worker load the keystrokes otherwise go
+    // nowhere and the case fails in its SETUP rather than on its claim. F2 opens with
+    // select-all, so the typed text replaces the cell value outright.
+    await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
+    await page.keyboard.type('ClickAway');
+    await expect.poll(async () => (await openEditor(page))?.value, { timeout: 10_000 }).toBe('ClickAway');
+
+    // The model readout is a `<pre>` OUTSIDE the grid and takes no focus — the exact shape
+    // that produced a null relatedTarget.
+    expect(await pointerDownOn(page, '[data-testid="model-readout"]')).toBe(true);
+
+    // (1) committed.
+    await expect
+      .poll(async () => (await modelRows(page))[1]?.name, { timeout: 10_000 })
+      .toBe('ClickAway');
+    expect(await commitCount(page)).toBe(before + 1);
+    // (2) the editor is closed.
+    await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
+    // (3) the grid keymap is live again: re-enter the grid and arrow down.
+    await focusBodyCellStable(page, 1, 0);
+    await page.keyboard.press('ArrowDown');
+    await expect
+      .poll(async () => { const a = await activeCellCoords(page); return a ? `${a.row},${a.col}` : null; }, { timeout: 10_000 })
+      .toBe('2,0');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// B-16 — a mousedown INSIDE an open editor belongs to the editor, not to drag-select.
+// `onGridMouseDown` is delegated on the `<table>` root and only skipped the fill handle, so
+// pressing into the editor's own `<input>` to place a caret (or to drag-select TEXT) started a
+// document-level grid drag: moving the pointer painted a cell rectangle over the very cell
+// being typed into, and Delete/Ctrl+X then act on a range the user never meant to make.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-edit [${target}]: B-16 a mousedown inside the open editor starts no drag-select`, async ({
+    page,
+  }) => {
+    await gotoGrid(page, target);
+    await enterEditAt(page, 1, 0);
+
+    // Press inside the editor input and drag across two cells, exactly as selecting text does.
+    await page.evaluate(() => {
+      const deepFirst = (root: Document | ShadowRoot, s: string): Element | null => {
+        const direct = root.querySelector(s);
+        if (direct) return direct;
+        for (const el of Array.from(root.querySelectorAll('*'))) {
+          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+          if (sr) { const inner = deepFirst(sr, s); if (inner) return inner; }
+        }
+        return null;
+      };
+      const ed = deepFirst(document, '[data-editing-cell]') as HTMLElement | null;
+      if (!ed) return;
+      const r = ed.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      ed.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true, clientX: x, clientY: y }));
+      document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: x + 240, clientY: y + 60 }));
+      document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: x + 240, clientY: y + 60 }));
+    });
+    await page.waitForTimeout(250);
+
+    // No range was painted...
+    expect(await countInRange(page, 'grid-table')).toBe(0);
+    // ...and the editor is still open, still holding the value it had.
+    expect((await openEditor(page))?.col).toBe('0');
   });
 }

@@ -108,4 +108,27 @@ const collectGroupableLeafDefs = (defs: any): any[] => {
   return out
 }
 
-export { isSafeKey, wrapAggregationFn, collectNestedDefs, indexDefsById, collectGroupableLeafDefs }
+// ── E-03: the `editor` union is FOUR built-ins plus the 'custom' gate ────────────────────
+// `editorTypeOf` falls through to the plain text `<input>` for ANY unrecognised value, so a
+// consumer writing `editor="date"` — a value the comparison page and the root README both
+// advertised as a fifth built-in until the 260910 audit corrected them — got a text box with
+// no error, no warning, and no hint that `EditorDate` is a DROP-IN reached through
+// `editor="custom"` + an `#editor` fill. Same for any typo. The silent degradation was the
+// defect; the docs half is already corrected.
+//
+// Pure and message-returning rather than warning in place, so the contract (which values are
+// accepted, and what a rejected one is told) is unit-testable; `columnBuilders.rzts` owns the
+// latch and the console.warn.
+const EDITOR_KINDS = ['text', 'number', 'select', 'checkbox', 'custom']
+const editorKindWarning = (id: any, editor: any): string | null => {
+  if (editor == null) return null
+  if (typeof editor === 'string' && EDITOR_KINDS.indexOf(editor) !== -1) return null
+  return (
+    '[rozie-data-table] column "' + String(id) + '": editor="' + String(editor) + '" is not a ' +
+    'built-in editor. The built-ins are text | number | select | checkbox; anything else needs ' +
+    'editor="custom" plus an #editor slot fill (that is how <EditorDate> is used). Falling back ' +
+    'to the text input.'
+  )
+}
+
+export { isSafeKey, wrapAggregationFn, collectNestedDefs, indexDefsById, collectGroupableLeafDefs, EDITOR_KINDS, editorKindWarning }
