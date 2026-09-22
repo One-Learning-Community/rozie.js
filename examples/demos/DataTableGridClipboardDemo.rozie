@@ -69,6 +69,14 @@
   // Last cell-edit-commit "columnId=newValue" + a counter (one per committed cell).
   lastCommit: '',
   commitCount: 0,
+  // A-08 vehicle: when true the @cell-edit-commit LISTENER throws. That listener is consumer
+  // code running inside the paste's async continuation, and `pasteRange` used to swallow it
+  // with a bare `.catch(() => {})` while the per-emit loop aborted, so the remaining cells of
+  // a multi-cell paste silently never notified. A throwing VALIDATOR is deliberately NOT the
+  // vehicle: `runValidator` already catches one and reports 'Invalid value', so it never
+  // escapes and could not have proven anything. OFF by default — every other case in
+  // data-table-grid-clipboard.spec.ts is unaffected.
+  throwOnCommit: false,
 }
 </data>
 
@@ -85,6 +93,13 @@ const onRangeChange = (payload: { anchor: { rowIndex: number; colIndex: number }
 const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue: unknown; newValue: unknown }): void => {
   $data.lastCommit = payload ? payload.columnId + '=' + String(payload.newValue) : ''
   $data.commitCount = $data.commitCount + 1
+  // A-08 vehicle (opt-in, off by default) — see $data.throwOnCommit.
+  if ($data.throwOnCommit) throw new Error('cell-edit-commit listener blew up')
+}
+
+// A-08: the opt-in throwing commit listener toggle.
+const toggleThrowOnCommit = (): void => {
+  $data.throwOnCommit = !$data.throwOnCommit
 }
 
 // getSelectedRange() via the live $refs.dt handle (the GridNavDemo idiom — never cache).
@@ -123,6 +138,8 @@ const callCut = (): void => {
     <button type="button" data-testid="sort-qty" @click="sortByQtyAsc">sort qty ↑</button>
     <button type="button" data-testid="get-range" @click="callGetSelectedRange">getSelectedRange()</button>
     <button type="button" data-testid="cut-btn" @click="callCut">cut()</button>
+    <button type="button" data-testid="toggle-throw-commit" @click="toggleThrowOnCommit">toggle throwing commit listener</button>
+    <span class="readout" data-testid="throw-commit-state">{{ $data.throwOnCommit ? 'on' : 'off' }}</span>
     <input
       class="gf"
       type="text"

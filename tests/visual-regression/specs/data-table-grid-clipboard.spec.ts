@@ -491,3 +491,177 @@ for (const target of TARGETS) {
     expect(await readoutText(page, 'model-readout')).toBe(before);
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// B-08 — an UNCHANGED cell is not a commit.
+//
+// `applyGridToRange` staged, emitted and undo-recorded every editable cell whose value passed
+// validation, whether or not that value had actually moved. A fill from one cell into four
+// that already held it fired five `cell-edit-commit` events; a Delete over an already-empty
+// cell pushed an undo step that undoes nothing. A consumer persisting on `cell-edit-commit`
+// was issuing writes for data that had not changed.
+//
+// The announce keeps its old numerator on purpose — a cell that already held the pasted value
+// WAS pasted successfully as far as the user is concerned — so the assertion is on the EVENT
+// count, which is the thing with a consumer contract attached.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-clipboard [${target}]: B-08 re-pasting a value a cell already holds emits no cell-edit-commit`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    // Copy row 1's city ('Lima') and paste it onto row 1's city — a genuine no-op paste.
+    await focusBodyCellStable(page, 1, 3);
+    await page.keyboard.press('Control+c');
+    await page.waitForTimeout(150);
+
+    const before = Number(await readoutText(page, 'commit-count'));
+    const modelBefore = await readoutText(page, 'model-readout');
+    await page.keyboard.press('Control+v');
+    // The announce still reports the cell as pasted — the paste DID apply, there was simply
+    // nothing to change. Poll on it so the async clipboard read has definitely completed
+    // before the commit-count assertion below, which is a negative and would otherwise pass
+    // simply by running too early.
+    await expect
+      .poll(async () => readoutText(page, 'paste-announce'), { timeout: 10_000 })
+      .toBe('1 of 1 cells pasted');
+
+    // ...and no event fired, and the model is untouched.
+    expect(Number(await readoutText(page, 'commit-count'))).toBe(before);
+    expect(await readoutText(page, 'model-readout')).toBe(modelBefore);
+
+    // Control: pasting the SAME clipboard onto a DIFFERENT city cell does emit exactly one.
+    await focusBodyCellStable(page, 2, 3);
+    await page.keyboard.press('Control+v');
+    await expect
+      .poll(async () => Number(await readoutText(page, 'commit-count')), { timeout: 10_000 })
+      .toBe(before + 1);
+    expect((await modelRows(page))[2]?.city).toBe('Lima');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// B-07 — with no usable Clipboard API, Ctrl+C/X/V must fall through to the NATIVE default.
+//
+// The keymap called `e.preventDefault()` and THEN a verb that self-guards on
+// `navigator.clipboard`. On any context where the API is missing — an insecure `http://`
+// origin, a permissions policy, an older embedded webview — that meant the browser's own
+// copy/cut/paste was suppressed and nothing replaced it: the keystroke did nothing at all,
+// with no error. The availability check is now part of the branch condition.
+//
+// Asserted on `defaultPrevented`, which is the actual contract ("did we consume the
+// keystroke?"), rather than on a clipboard side effect that is by definition unobservable
+// once the API is gone.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-clipboard [${target}]: B-07 with no Clipboard API the copy/cut/paste keys are not swallowed`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await focusBodyCellStable(page, 1, 0);
+
+    // Record `defaultPrevented` as seen by a document-level listener on the BUBBLE phase —
+    // it runs after the grid's own delegated handler, so it observes that handler's verdict.
+    await page.evaluate(() => {
+      (window as unknown as { __dp: Record<string, boolean> }).__dp = {};
+      document.addEventListener('keydown', (ev) => {
+        const k = (ev as KeyboardEvent).key.toLowerCase();
+        if ((ev as KeyboardEvent).ctrlKey && (k === 'c' || k === 'v' || k === 'x')) {
+          (window as unknown as { __dp: Record<string, boolean> }).__dp[k] = ev.defaultPrevented;
+        }
+      });
+    });
+
+    // Baseline: WITH the API present the grid owns these keys.
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.keyboard.press('Control+c');
+    await page.waitForTimeout(100);
+    expect(await page.evaluate(() => (window as unknown as { __dp: Record<string, boolean> }).__dp.c)).toBe(true);
+
+    // Now remove the API, exactly as an insecure origin would present it.
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+      (window as unknown as { __dp: Record<string, boolean> }).__dp = {};
+    });
+    await focusBodyCellStable(page, 1, 0);
+    await page.keyboard.press('Control+c');
+    await page.keyboard.press('Control+x');
+    await page.keyboard.press('Control+v');
+    await page.waitForTimeout(150);
+    const dp = await page.evaluate(() => (window as unknown as { __dp: Record<string, boolean> }).__dp);
+    expect(dp.c).toBe(false);
+    expect(dp.x).toBe(false);
+    expect(dp.v).toBe(false);
+    // And Ctrl+X in particular destroyed nothing — a cut that cannot copy must not clear.
+    expect((await modelRows(page))[1]?.label).toBe('Beta');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// A-08 — a throwing consumer listener must not silently truncate a paste.
+//
+// `pasteRange` ended its promise chain with a bare `.catch(() => {})`, which swallowed two
+// entirely different failures: a rejected clipboard READ (permission denied / insecure
+// context — legitimately silent) and anything thrown inside the fulfilment handler, which is
+// consumer code. `applyGridToRange`'s per-cell emit loop was unguarded on top of that, so ONE
+// throwing `cell-edit-commit` listener aborted the rest: the earlier cells of a multi-cell
+// paste notified, the later ones silently never did, and the model had already been written in
+// full. A consumer persisting on that event ended up with a partial write and no error.
+//
+// TWO MEASUREMENTS SHAPED THIS CASE, both of which invalidated an earlier version of it:
+//
+// 1. The vehicle is the LISTENER, not a validator. `runValidator` (editCellLifecycle.rzts)
+//    already wraps a consumer validator in try/catch and reports 'Invalid value', so a
+//    throwing validator never escapes — the first version used one and stayed green against
+//    the UNFIXED code on all six, i.e. it could not fail.
+// 2. Where our own message is observable is target-dependent, and that is a property of the
+//    frameworks, not of the fix. On react/svelte/solid `$emit` is a direct call, so the guard
+//    catches the throw and logs. On vue (callWithAsyncErrorHandling), angular (an RxJS
+//    Subject) and lit (`dispatchEvent`) the framework absorbs a listener throw BEFORE our
+//    frame sees it and reports it through its own channel — so our catch never runs there,
+//    and asserting our message on all six would be asserting a framework detail.
+//
+// The claim asserted on ALL SIX is therefore the consumer-visible one: every cell of the paste
+// still notifies, and the model is fully written. The message assertion is scoped to the three
+// targets where our guard is the operative mechanism.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+const A08_DIRECT_DISPATCH: ReadonlySet<Target> = new Set<Target>(['react', 'svelte', 'solid']);
+
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-clipboard [${target}]: A-08 a throwing cell-edit-commit listener does not truncate the paste`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
+    // Lit reports a listener throw out of `dispatchEvent` as an uncaught page error rather
+    // than a console message; swallow it so it cannot fail the run on its own.
+    page.on('pageerror', () => {});
+
+    await gotoGrid(page, target);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    await page.getByTestId('toggle-throw-commit').click();
+    await expect
+      .poll(async () => readoutText(page, 'throw-commit-state'), { timeout: 10_000 })
+      .toBe('on');
+
+    // Paste one value down a THREE-cell column range, so "the other cells still notify" is a
+    // real claim: pre-fix the first throw aborted the loop and cells 2 and 3 never fired.
+    await page.evaluate(() => navigator.clipboard.writeText('Zzz'));
+    await focusBodyCellStable(page, 1, 3);
+    await extendRangeBy(page, 'Down', 2, 3, 3); // rows 1..3, city column
+    const before = Number(await readoutText(page, 'commit-count'));
+    await page.keyboard.press('Control+v');
+
+    // All three cells notified despite the throw...
+    await expect
+      .poll(async () => Number(await readoutText(page, 'commit-count')), { timeout: 10_000 })
+      .toBe(before + 3);
+    // ...and the model really was written.
+    const rows = await modelRows(page);
+    expect([rows[1]?.city, rows[2]?.city, rows[3]?.city]).toEqual(['Zzz', 'Zzz', 'Zzz']);
+
+    if (A08_DIRECT_DISPATCH.has(target)) {
+      expect(errors.some((e) => e.includes('[rozie-data-table] paste failed partway'))).toBe(true);
+      expect(errors.find((e) => e.includes('[rozie-data-table] paste failed partway'))).toContain(
+        'cell-edit-commit listener threw',
+      );
+    }
+  });
+}

@@ -108,10 +108,16 @@ const onGridKeyDown = (e) => {
   // gated by clipboardActiveAllowed() (== !activeIsHeader) so a header-active Ctrl+C/Ctrl+V
   // falls through to NATIVE behavior — never preventDefault'd, never a silent body mutation
   // (copyRange/pasteRange also self-guard; the verb guard is what plan 63-09's Cut reuses). ──
-  else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
+  // B-07: `clipboardWriteAvailable()` / `clipboardReadAvailable()` are part of the BRANCH
+  // CONDITION, not a guard inside the verb. preventDefault ran first and copyRange/pasteRange
+  // then returned early when `navigator.clipboard` was absent — an insecure `http://` origin, a
+  // permissions policy, an older embedded webview — so the browser's own copy/paste was
+  // suppressed and nothing replaced it: Ctrl+C did nothing whatsoever. Falling through leaves
+  // the native default in charge, which is the only correct behaviour when we cannot act.
+  else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed() && clipboardWriteAvailable()) {
     e.preventDefault(); copyRange(); return
   }
-  else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
+  else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed() && clipboardReadAvailable()) {
     e.preventDefault(); pasteRange(); return
   }
   // ── C3 (phase 63 wave-9) — Ctrl/Cmd+X CUTS the range: copy the range as TSV then clear the
@@ -119,7 +125,9 @@ const onGridKeyDown = (e) => {
   // Ctrl+C/Ctrl+V (clipboardActiveAllowed) so a header-active Ctrl+X falls through to NATIVE cut
   // and never silently clears a body cell (cutRange also self-guards). Placed beside the C/V
   // shortcuts, BEFORE the printable-key edit-entry branch (which excludes ctrl/meta). ──
-  else if ((key === 'x' || key === 'X') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
+  // B-07 applies to Cut too, and gating it on WRITE availability is deliberate: a cut that
+  // cannot copy is data destruction with nothing on the clipboard to paste back.
+  else if ((key === 'x' || key === 'X') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed() && clipboardWriteAvailable()) {
     e.preventDefault(); cutRange(); return
   }
   // ── 260709-8ct (grid-wide undo/redo) — Ctrl/Cmd+Z undoes; Ctrl/Cmd+Y OR Ctrl/Cmd+Shift+Z

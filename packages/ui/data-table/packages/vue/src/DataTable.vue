@@ -3985,11 +3985,17 @@ const onGridKeyDown = (e: any) => {
   // gated by clipboardActiveAllowed() (== !activeIsHeader) so a header-active Ctrl+C/Ctrl+V
   // falls through to NATIVE behavior — never preventDefault'd, never a silent body mutation
   // (copyRange/pasteRange also self-guard; the verb guard is what plan 63-09's Cut reuses). ──
-  else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
+  // B-07: `clipboardWriteAvailable()` / `clipboardReadAvailable()` are part of the BRANCH
+  // CONDITION, not a guard inside the verb. preventDefault ran first and copyRange/pasteRange
+  // then returned early when `navigator.clipboard` was absent — an insecure `http://` origin, a
+  // permissions policy, an older embedded webview — so the browser's own copy/paste was
+  // suppressed and nothing replaced it: Ctrl+C did nothing whatsoever. Falling through leaves
+  // the native default in charge, which is the only correct behaviour when we cannot act.
+  else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed() && clipboardWriteAvailable()) {
     e.preventDefault();
     copyRange();
     return;
-  } else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
+  } else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed() && clipboardReadAvailable()) {
     e.preventDefault();
     pasteRange();
     return;
@@ -3999,7 +4005,9 @@ const onGridKeyDown = (e: any) => {
   // Ctrl+C/Ctrl+V (clipboardActiveAllowed) so a header-active Ctrl+X falls through to NATIVE cut
   // and never silently clears a body cell (cutRange also self-guards). Placed beside the C/V
   // shortcuts, BEFORE the printable-key edit-entry branch (which excludes ctrl/meta). ──
-  else if ((key === 'x' || key === 'X') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
+  // B-07 applies to Cut too, and gating it on WRITE availability is deliberate: a cut that
+  // cannot copy is data destruction with nothing on the clipboard to paste back.
+  else if ((key === 'x' || key === 'X') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed() && clipboardWriteAvailable()) {
     e.preventDefault();
     cutRange();
     return;
@@ -5005,6 +5013,16 @@ const rangeToTsv = () => {
 };
 // copyRange(): write the current range as TSV to the clipboard (async). No-op when the
 // async Clipboard API is unavailable (older/insecure contexts) — a copy is best-effort.
+// B-07: is the async Clipboard API actually usable? Ctrl+C / Ctrl+X / Ctrl+V used to
+// `e.preventDefault()` FIRST and only then call a verb that self-guards on
+// `navigator.clipboard`, so on any page where the API is absent — an insecure `http://` origin,
+// a permissions policy, an older embedded webview — the browser's OWN copy/cut/paste was
+// suppressed and nothing took its place. The keystroke did nothing at all. These predicates
+// move the check into the keymap's branch CONDITION (gridKeydownHandlers.rzts), so an
+// unavailable API means the branch does not match and the native default runs. Separate
+// read/write predicates because a context can grant one and not the other.
+const clipboardWriteAvailable = () => typeof navigator !== 'undefined' && !!navigator.clipboard && typeof navigator.clipboard.writeText === 'function';
+const clipboardReadAvailable = () => typeof navigator !== 'undefined' && !!navigator.clipboard && typeof navigator.clipboard.readText === 'function';
 const copyRange = () => {
   // B11: never copy from a header-active state (the reusable clipboard guard).
   if (!clipboardActiveAllowed()) return;
@@ -5033,10 +5051,22 @@ const applyGridToRange = (grid: any, originRow: any, originCol: any, verb: any) 
   const maxCol = visibleColCount() - 1;
   if (maxRow < 0 || maxCol < 0) return {
     wrote: 0,
+    changed: 0,
     total: 0
   };
+  // B-08: `applied` and `committed` are DIFFERENT counts and used to be one.
+  //   applied   — targets whose value now equals what was pasted, INCLUDING the ones that
+  //               already did. This is the announce's numerator: from the user's point of
+  //               view a cell that already held the pasted value was pasted successfully, and
+  //               reporting "3 of 5" for a 5-cell paste where 2 matched would be a lie.
+  //   committed — targets whose value actually CHANGED. This drives the write, the per-cell
+  //               `cell-edit-commit` emits and (through writeData) the undo step.
+  // Conflating them meant an unchanged cell emitted an edit event and recorded an undo entry:
+  // a 1->5 fill fired 5 commits when 4 cells already held the value, and a Delete over an
+  // already-empty cell pushed an undo step that undoes nothing. Consumers persisting on
+  // `cell-edit-commit` were issuing writes for data that had not moved.
   let total = 0;
-  let wrote = 0;
+  let applied = 0;
   const committed = [];
   // Build the fresh data array incrementally so the whole paste is ONE writeData.
   let next = currentData();
@@ -5072,6 +5102,10 @@ const applyGridToRange = (grid: any, originRow: any, originCol: any, verb: any) 
       const field = fieldOfColId(colId);
       const srcIndex = sourceIndexOfRow(r);
       const oldValue = rowObj ? rowObj[field] : null;
+      applied = applied + 1;
+      // B-08: the cell already holds this value — it counts as applied, but there is nothing
+      // to write, nothing to emit and nothing to undo.
+      if (oldValue === value) continue;
       next = replaceRowValue(next, srcIndex, field, value);
       committed.push({
         rowId: rowIdAt(r),
@@ -5079,22 +5113,37 @@ const applyGridToRange = (grid: any, originRow: any, originCol: any, verb: any) 
         oldValue,
         newValue: value
       });
-      wrote = wrote + 1;
     }
   }
-  if (wrote > 0) {
+  if (committed.length > 0) {
     editTransition = true;
     writeData(next);
     editTransition = false;
     // One cell-edit-commit per COMMITTED cell (the per-cell event contract, D-03).
-    for (let i = 0; i < committed.length; i++) emit('cell-edit-commit', committed[i]);
+    // A-08: each emit is guarded INDIVIDUALLY. These listeners are consumer code, and a single
+    // throwing one used to abort the loop — so on a 40-cell paste, cells 0..k notified and
+    // k+1..39 silently never did, leaving a consumer persisting on this event with a partial
+    // write of a model that had already been fully updated. Measured while building this: a
+    // throwing VALIDATOR is NOT the reachable vehicle here — `runValidator`
+    // (editCellLifecycle.rzts) already catches and reports 'Invalid value' — so the listener
+    // is the first-party code that actually escapes.
+    for (let i = 0; i < committed.length; i++) {
+      try {
+        emit('cell-edit-commit', committed[i]);
+      } catch (err: any) {
+        console.error('[rozie-data-table] paste failed partway: a cell-edit-commit listener threw. The ' + 'model was already written; the remaining cells still notify.', err);
+      }
+    }
   }
   // WR-02: announce the N-of-M summary only when at least one cell was written. When the paste
   // targeted real cells but every one was skipped (validation-failed / non-editable), announce a
   // distinct validation-failed message instead of a misleading "0 of M cells pasted".
-  if (wrote > 0) announce(wrote + ' of ' + total + ' cells ' + opVerb);else if (total > 0) announce('No cells ' + opVerb + ' — ' + total + ' cells were invalid or read-only');
+  if (applied > 0) announce(applied + ' of ' + total + ' cells ' + opVerb);else if (total > 0) announce('No cells ' + opVerb + ' — ' + total + ' cells were invalid or read-only');
+  // `wrote` stays the ANNOUNCED count (targets satisfied), not the written one, so every
+  // existing caller and assertion keeps its meaning; `changed` is the new, narrower number.
   return {
-    wrote,
+    wrote: applied,
+    changed: committed.length,
     total
   };
 };
@@ -5139,14 +5188,26 @@ const pasteRange = () => {
     return;
   }
   if (!p || !p.then) return;
+  // A-08: the two failure modes are separated. A REJECTED clipboard read (permission denied,
+  // insecure context, an empty selection) is a legitimate silent no-op — that is the rejection
+  // handler, the second argument. Anything the fulfilment handler throws is FIRST-PARTY: a
+  // consumer's row accessor, a `data`-model setter, or a `cell-edit-commit` listener (which
+  // `applyGridToRange` now also guards per-emit). A single trailing `.catch(() => {})`
+  // swallowed both, so consumer code failing inside a paste produced no error, no warning and
+  // nothing in the console to search for. NOT a column validator: `runValidator` already
+  // catches a throwing one and reports 'Invalid value' — checked rather than assumed.
   p.then((text: any) => {
-    const grid = parseTsv(text);
-    if (!grid.length) return;
-    // C3: tile the clipboard block to fill the destination range (single→range fill,
-    // smaller-tiles-into-larger); a clipboard larger than the box pastes its full block.
-    const tiled = tileGridToBox(grid, destBox);
-    applyGridToRange(tiled, anchorRow, anchorCol, 'pasted');
-  }).catch(() => {});
+    try {
+      const grid = parseTsv(text);
+      if (!grid.length) return;
+      // C3: tile the clipboard block to fill the destination range (single→range fill,
+      // smaller-tiles-into-larger); a clipboard larger than the box pastes its full block.
+      const tiled = tileGridToBox(grid, destBox);
+      applyGridToRange(tiled, anchorRow, anchorCol, 'pasted');
+    } catch (err: any) {
+      console.error('[rozie-data-table] paste failed: a row accessor, the data model setter or other ' + 'consumer code threw. The paste was abandoned.', err);
+    }
+  }, () => {/* clipboard read rejected (permission / insecure context) — silent by design */});
 };
 // cutRange(): C3 Cut — copy the current range to the clipboard (rangeToTsv — the SAME escaped
 // serialization copyRange uses) THEN CLEAR the source cells through the SAME write-funnel as

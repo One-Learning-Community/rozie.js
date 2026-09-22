@@ -1778,7 +1778,7 @@ let rangeActive = false
 
 import { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, selectAllBody, clearRange, clampRange } from './rangeSelection.rzts'
 
-import { announce, clipboardActiveAllowed, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, tileGridToBox, pasteRange, cutRange, clearActiveRange, tileIndex, fillRange } from './clipboardFill.rzts'
+import { announce, clipboardActiveAllowed, clipboardWriteAvailable, clipboardReadAvailable, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, tileGridToBox, pasteRange, cutRange, clearActiveRange, tileIndex, fillRange } from './clipboardFill.rzts'
 
 // onFillHandlePointerDown: begin a fill-handle drag (req-8 / D-04). The handle sits on the
 // range's bottom-right cell; a pointer drag extends the range (reusing setRangeFocus off the
