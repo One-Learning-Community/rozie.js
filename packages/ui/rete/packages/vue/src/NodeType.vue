@@ -8,6 +8,8 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({ inheritAttrs: false });
+
 import { Fragment, h, inject, onBeforeUnmount, onMounted, onUpdated, provide, render, useSlots, watch } from 'vue';
 
 const props = withDefaults(

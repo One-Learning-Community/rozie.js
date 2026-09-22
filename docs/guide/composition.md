@@ -166,7 +166,7 @@ By default the consumer-passed clusters land on the component's single root elem
 </template>
 ```
 
-Here the consumer-passed attrs and listeners apply to the inner `<button>`, not the outer `<span>` wrapper. The two flags are **fully independent** — turn off attribute fallthrough while keeping listener fallthrough on, or vice versa, and toggling one does not affect the other. The four-corner matrix is proven across all six targets via the `examples/ThemedButton*.rozie` fixtures:
+Here the consumer-passed attrs and listeners apply to the inner `<button>`, not the outer `<span>` wrapper. The two flags are **fully independent** on React, Svelte, Angular, Solid, and Lit — turn off attribute fallthrough while keeping listener fallthrough on, or vice versa, and toggling one does not affect the other (Vue has one switch for both; see the note below the table). The four-corner matrix is proven across all six targets via the `examples/ThemedButton*.rozie` fixtures:
 
 | Variant | `inherit-attrs` | `inherit-listeners` | Where the cluster lands |
 | --- | --- | --- | --- |
@@ -174,6 +174,10 @@ Here the consumer-passed attrs and listeners apply to the inner `<button>`, not 
 | `ThemedButtonManual` | `false` | default (`true`) | Attrs via explicit `r-bind="$attrs"`; listeners still auto-fall through |
 | `ThemedButtonListenersManual` | default (`true`) | `false` | Listeners via explicit `r-on="$listeners"`; attrs still auto-fall through |
 | `ThemedButtonAllManual` | `false` | `false` | Both placed explicitly via `r-bind="$attrs"` and `r-on="$listeners"` |
+
+::: info Vue
+Vue exposes a single `inheritAttrs` switch, and its `$attrs` carries listeners as well as attributes. So only the both-`false` combination maps exactly — to `defineOptions({ inheritAttrs: false })` in the emitted SFC. A mixed setting (only one flag `false`) cannot be expressed on Vue and keeps Vue's default fallthrough on the root element: on Vue, a cluster you place manually on a **non-root** element additionally reaches the root.
+:::
 
 A component with more than one root element and `inherit-attrs` / `inherit-listeners` not set to `false` is a compile error with a code frame (`ROZ970` for attrs, `ROZ973` for listeners) — the auto-fallthrough machinery has no unambiguous target. Reference `$attrs` or `$listeners` manually while leaving the flag on and you'll see a soft warning (`ROZ971` / `ROZ974`) nudging you toward the explicit opt-out, since double application is legal but usually a mistake.
 

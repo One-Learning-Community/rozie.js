@@ -5,6 +5,8 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({ inheritAttrs: false });
+
 import { onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(

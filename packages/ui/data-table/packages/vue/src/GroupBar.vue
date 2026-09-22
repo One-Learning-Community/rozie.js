@@ -19,6 +19,8 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({ inheritAttrs: false });
+
 import { ref } from 'vue';
 
 const props = withDefaults(

@@ -10,6 +10,8 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({ inheritAttrs: false });
+
 import { Fragment, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
 
 const props = withDefaults(

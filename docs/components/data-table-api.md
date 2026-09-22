@@ -42,14 +42,6 @@ component only because `EditorSelect` declares an `autofocus` prop, not by fallt
 Style the table through the [public tokens](/components/data-table-theming) or the stable
 `.rozie-data-table*` / `.rdt-*` class names rather than an injected `class`.
 
-::: warning Vue does not honour this yet
-On the **Vue** leaf only, the opt-out is currently inert: the compiler emits no
-`inheritAttrs: false`, so Vue's own default fallthrough still applies undeclared
-attributes and listeners to the wrapper `<div class="rozie-data-table-wrap">`. Treat the
-behaviour above as the contract on all six targets and do not rely on the Vue fallthrough —
-it will stop working when the compiler closes the gap.
-:::
-
 ## Models (the twelve two-way slices)
 
 Each slice is an independent, optional two-way `r-model` with its own uncontrolled fallback and its own change event (which fires **regardless** of whether the slice is bound). All twelve state transitions are funneled through table-core; the table always writes a **fresh** value (never an in-place mutation, which would be silently dropped on React/Solid/Angular/Lit). The first slice is `data` itself — a committed cell or row edit writes a fresh `data` array back; the remaining eleven are the table-state slices.

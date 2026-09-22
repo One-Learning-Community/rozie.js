@@ -235,6 +235,7 @@
 
 <script setup lang="ts">
 import Popover from '@rozie-ui/popover-vue';
+defineOptions({ inheritAttrs: false });
 
 import { onBeforeUnmount, onMounted, onUpdated, provide, ref, watch } from 'vue';
 

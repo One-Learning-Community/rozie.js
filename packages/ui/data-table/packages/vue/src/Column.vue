@@ -6,6 +6,8 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({ inheritAttrs: false });
+
 import { inject, onBeforeUnmount, onMounted, onUpdated, watch } from 'vue';
 
 const props = withDefaults(

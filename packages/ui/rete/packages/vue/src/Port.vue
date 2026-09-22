@@ -3,6 +3,8 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({ inheritAttrs: false });
+
 import { inject, onMounted, onUpdated } from 'vue';
 
 const props = withDefaults(

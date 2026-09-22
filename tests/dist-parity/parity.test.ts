@@ -120,6 +120,13 @@ const EXAMPLES = [
   'ThemedButtonManual',
   'ThemedButtonConsumer',
   'RBindProbe',
+  // Quick 260922-hk4 (N-03) — the Phase 15 listener-fallthrough corners were
+  // bootstrapped (scripts/bootstrap-fixtures.mjs) but never byte-checked here,
+  // so a Vue emitter change to the both-false opt-out passed this gate
+  // unexamined. All three are single-file leaf producers (no <components>).
+  'ThemedButtonListenersManual',
+  'ThemedButtonAllManual',
+  'ROnProbe',
   'PropDefaultCoercion',
   // Phase 58 (first-class prop documentation) red-first guard. PropDocs carries
   // one prop with a full `docs` object (description + deprecated-string +
