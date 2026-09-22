@@ -7726,7 +7726,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // path. Guarded HERE rather than in the watch because this is the single seam every
     // registration passes through, and because value-equality is the correct test for the
     // registry's own purpose (has anything the table renders from actually changed?).
-    const prev = colReg ? colReg[key] : undefined;
+    const prev = colReg ? (colReg as Record<string, any>)[key] : undefined;
     if (prev !== undefined && columnSpecsEquivalent(prev, spec)) return;
     setColReg(prev => ({
       ...prev,

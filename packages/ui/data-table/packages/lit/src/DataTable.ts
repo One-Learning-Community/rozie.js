@@ -757,7 +757,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // path. Guarded HERE rather than in the watch because this is the single seam every
     // registration passes through, and because value-equality is the correct test for the
     // registry's own purpose (has anything the table renders from actually changed?).
-    const prev = __rozieCtxHost._colReg.value ? __rozieCtxHost._colReg.value[key] : undefined;
+    const prev = __rozieCtxHost._colReg.value ? (__rozieCtxHost._colReg.value as Record<string, any>)[key] : undefined;
     if (prev !== undefined && columnSpecsEquivalent(prev, spec)) return;
     __rozieCtxHost._colReg.value = {
       ...__rozieCtxHost._colReg.value,
@@ -1034,7 +1034,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
         // path. Guarded HERE rather than in the watch because this is the single seam every
         // registration passes through, and because value-equality is the correct test for the
         // registry's own purpose (has anything the table renders from actually changed?).
-        const prev = __rozieCtxHost._colReg.value ? __rozieCtxHost._colReg.value[key] : undefined;
+        const prev = __rozieCtxHost._colReg.value ? (__rozieCtxHost._colReg.value as Record<string, any>)[key] : undefined;
         if (prev !== undefined && columnSpecsEquivalent(prev, spec)) return;
         __rozieCtxHost._colReg.value = {
           ...__rozieCtxHost._colReg.value,

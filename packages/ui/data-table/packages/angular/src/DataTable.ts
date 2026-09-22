@@ -1063,7 +1063,7 @@ interface EditorCtx {
     // path. Guarded HERE rather than in the watch because this is the single seam every
     // registration passes through, and because value-equality is the correct test for the
     // registry's own purpose (has anything the table renders from actually changed?).
-    const prev = __rozieCtxHost.colReg() ? __rozieCtxHost.colReg()[key] : undefined;
+    const prev = __rozieCtxHost.colReg() ? (__rozieCtxHost.colReg() as Record<string, any>)[key] : undefined;
     if (prev !== undefined && columnSpecsEquivalent(prev, spec)) return;
     __rozieCtxHost.colReg.set({
       ...__rozieCtxHost.colReg(),

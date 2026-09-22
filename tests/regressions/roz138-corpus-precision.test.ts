@@ -115,9 +115,13 @@ describe('ROZ138 corpus precision (quick task 260829-8w1)', () => {
         // gridKeydownHandlers.rzts comment above this cluster (the now-false "verified
         // invariant" claim was replaced with the actual isActiveCellEditable/
         // rowIndexIsGrouped mechanism) — same 3 sites, same semantics, +7 lines.
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:574',
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:577',
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:578',
+        // Quick 260922-hk4: shifted again 574/577/578 → 603/606/607 (+29) by the
+        // 260921-tsu clipboard/2C-2D edits above this cluster. Verified statement-by-
+        // statement against 134eb21d5: `if (!$data.activeIsHeader)`, `const row =
+        // clamp($data.activeRow, …)`, `if (row !== $data.activeRow)` — same 3 sites.
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:603',
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:606',
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:607',
       ].sort(),
     );
   });
