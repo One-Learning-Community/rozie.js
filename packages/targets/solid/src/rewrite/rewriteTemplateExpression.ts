@@ -109,6 +109,23 @@ function buildSetterCall(stateName: string, operator: string, rhs: t.Expression)
 /**
  * Optional knobs for callers that need to influence rewriting beyond the IR.
  */
+/**
+ * One slot-scope parameter binding in a consumer fill body: a bare reference to
+ * the LOCAL name is rewritten to `<ident>.<prop>` (a plain scoped fill — the
+ * producer passes a getter-backed ctx object) or `<ident>().<prop>` (a reactive
+ * portal fill — the producer passes an Accessor). Either way the read happens
+ * lazily, inside whichever fine-grained computation uses it (quick 260922-mkb;
+ * Phase 33 / REQ-26 for the portal form).
+ */
+export interface ScopeParamBinding {
+  ident: string;
+  prop: string;
+  invoke: boolean;
+}
+
+/** Local param name → its binding. Nested fills merge their own over the outer map. */
+export type ScopeAccessorParams = ReadonlyMap<string, ScopeParamBinding>;
+
 export interface RewriteTemplateOpts {
   /**
    * Identifiers that resolve to a Solid `Accessor<T>` (a `() => T` getter) at
@@ -137,7 +154,7 @@ export interface RewriteTemplateOpts {
    * undefined is the universal back-compat path (mount-once portals + every
    * non-portal scoped slot keep the destructured-value shape).
    */
-  scopeAccessorParams?: { accessorIdent: string; params: ReadonlyMap<string, string> } | undefined;
+  scopeAccessorParams?: ScopeAccessorParams | undefined;
   /**
    * Spike-012 NEW-4 — identifiers bound to a RAW loop VALUE by an enclosing
    * keyless `<For>` (the item alias). Under `<For>` the item callback param is a
@@ -353,8 +370,12 @@ export function rewriteTemplateExpression(
       // signal each render → in-place re-render on update(scope). Runs FIRST so
       // these locals never fall through to the computed/invokeAccessor branches.
       if (scopeAccessor) {
-        const scopeProp = scopeAccessor.params.get(name);
-        if (scopeProp !== undefined) {
+        const binding = scopeAccessor.get(name);
+        // A binding introduced INSIDE this expression (an arrow param, a catch
+        // clause…) shadows the slot param — leave it alone. Template-level names
+        // are never bindings of the synthetic wrapper program, so this only ever
+        // matches expression-local shadows.
+        if (binding !== undefined && !path.scope.hasBinding(name)) {
           const parentPath = path.parentPath;
           /* v8 ignore next -- defensive: a traversed Identifier always has a parentPath */
           if (parentPath) {
@@ -368,13 +389,29 @@ export function rewriteTemplateExpression(
               t.isObjectProperty(parentNode) &&
               parentNode.key === path.node &&
               !parentNode.computed;
-            if (!isMemberProp && !isObjectKey) {
-              path.replaceWith(
-                t.memberExpression(
-                  t.callExpression(t.identifier(scopeAccessor.accessorIdent), []),
-                  t.identifier(scopeProp),
-                ),
+            const scopeRead = t.memberExpression(
+              binding.invoke
+                ? t.callExpression(t.identifier(binding.ident), [])
+                : t.identifier(binding.ident),
+              t.identifier(binding.prop),
+            );
+            // `{ label }` — a SHORTHAND property whose key and value are the same
+            // identifier: keep the key, rewrite the value (`label: ctx.label`).
+            if (
+              isObjectKey &&
+              t.isObjectProperty(parentNode) &&
+              parentNode.shorthand &&
+              t.isIdentifier(parentNode.value) &&
+              parentNode.value.name === name
+            ) {
+              parentPath.replaceWith(
+                t.objectProperty(t.identifier(name), scopeRead, false, false),
               );
+              parentPath.skip();
+              return;
+            }
+            if (!isMemberProp && !isObjectKey) {
+              path.replaceWith(scopeRead);
               path.skip();
               return;
             }

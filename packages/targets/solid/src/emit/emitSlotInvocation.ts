@@ -41,6 +41,7 @@ import type { IRComponent, SlotDecl, TemplateSlotInvocationIR } from '@rozie/cor
 import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import type { ScopeAccessorParams } from '../rewrite/rewriteTemplateExpression.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
 // Late-import to avoid circular reference; both modules initialize independently.
 import * as _emitTemplateNodeModule from './emitTemplateNode.js';
@@ -98,12 +99,14 @@ function buildParamObj(
   ir: IRComponent,
   invokeAccessors?: ReadonlySet<string> | undefined,
   loopValueBindings?: ReadonlySet<string> | undefined,
+  scopeAccessorParams?: ScopeAccessorParams | undefined,
 ): string {
   if (args.length === 0) return '{}';
   const parts = args.map((a) => {
     const code = rewriteTemplateExpression(a.expression, ir, {
       invokeAccessors,
       loopValueBindings,
+      scopeAccessorParams,
     });
     if (code === a.name) return a.name;
     // A literal cannot read a signal, so a getter would be pure noise. Neither can CREATING a
@@ -191,6 +194,7 @@ export function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNode
       const dynKeyExpr = rewriteTemplateExpression(node.dynamicNameExpr, ctx.ir, {
         invokeAccessors: ctx.invokeAccessors,
         loopValueBindings: ctx.loopValueBindings,
+        scopeAccessorParams: ctx.scopeAccessorParams,
       });
       const dynFieldRef = `_props.slots?.[${dynKeyExpr}]`;
       if (node.args.length > 0) {
@@ -212,7 +216,7 @@ export function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNode
     }
     const slotHasParams = slot ? slot.params.length > 0 : false;
     if (slotHasParams) {
-      const paramObj = buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
+      const paramObj = buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams);
       // Function-child case: invoke with scope. Non-function child case: fall
       // back to the standard `resolved()` (Solid children() accessor) path so
       // existing static-child reactivity semantics are preserved.
@@ -232,7 +236,7 @@ export function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNode
   const hasParams = slot ? slot.params.length > 0 : false;
   const paramObj =
     slot && hasParams
-      ? buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings)
+      ? buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams)
       : null;
 
   // Phase 07.3.2 — merge static slot prop with the consumer-side dynamic

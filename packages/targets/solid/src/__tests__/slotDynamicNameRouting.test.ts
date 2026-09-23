@@ -121,7 +121,8 @@ describe('Solid consumer — matchedFamily fill routes into the merged slots rec
     expect(filler).not.toBeNull();
     filler!.matchedFamily = true;
     const { code } = emitSolid(ir, { filename: 'ConsumerX.rozie' });
-    expect(code).toMatch(/slots=\{\{\s*'cellStatus':\s*\(\{\s*value\s*\}\)\s*=>/);
+    // quick 260922-mkb: scoped fills bind a lazy ctx (`_rozieSlot`), not a destructure.
+    expect(code).toMatch(/slots=\{\{\s*'cellStatus':\s*\(_rozieSlot\)\s*=>/);
     expect(code).not.toMatch(/cellStatusSlot=/);
   });
 
@@ -141,7 +142,7 @@ describe('Solid consumer — matchedFamily fill routes into the merged slots rec
 </rozie>
 `);
     const { code } = emitSolid(ir, { filename: 'ConsumerY.rozie' });
-    expect(code).toContain('cellStatusSlot={({ value }) => (<>');
+    expect(code).toContain('cellStatusSlot={(_rozieSlot) => (<>');
     expect(code).not.toMatch(/slots=\{\{/);
   });
 });

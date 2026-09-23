@@ -47,6 +47,7 @@ import type {
   RuntimeSolidImportCollector,
   SolidImportCollector,
 } from '../rewrite/collectSolidImports.js';
+import type { ScopeAccessorParams } from '../rewrite/rewriteTemplateExpression.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { emitConditional } from './emitConditional.js';
 // Phase 71 (r-keynav) — REFERENCE emitter wiring modeled on the React target
@@ -87,6 +88,22 @@ const VOID_ELEMENTS = new Set([
   'track',
   'wbr',
 ]);
+
+/**
+ * quick 260922-mkb — drop the names a nested binding (a loop alias) shadows from
+ * an enclosing slot fill's lazy scope map. Returns the input untouched when
+ * nothing is shadowed, so ctx identity (and every downstream emit) is unchanged
+ * outside slot fills.
+ */
+function withoutShadowed(
+  params: ScopeAccessorParams | undefined,
+  names: readonly string[],
+): ScopeAccessorParams | undefined {
+  if (!params || !names.some((n) => params.has(n))) return params;
+  const next = new Map(params);
+  for (const n of names) next.delete(n);
+  return next;
+}
 
 export interface EmitNodeCtx {
   ir: IRComponent;
@@ -131,7 +148,7 @@ export interface EmitNodeCtx {
    * so the fragment re-renders in place on `setScopeSig`. Undefined everywhere
    * except inside a reactive portal fill body (back-compat).
    */
-  scopeAccessorParams?: { accessorIdent: string; params: ReadonlyMap<string, string> } | undefined;
+  scopeAccessorParams?: ScopeAccessorParams | undefined;
   /**
    * Phase 71 (r-keynav), extended Phase 77 (multi-root) — the per-component
    * keynav emission plans (resolved ONCE by `emitTemplate.ts` via
@@ -357,6 +374,12 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     ...(ctx.loopValueBindings ?? []),
     ...(keyed ? [] : [node.itemAlias]),
   ]);
+  // quick 260922-mkb — a loop alias shadows an enclosing slot fill's scope param
+  // of the same name for the whole loop body.
+  const bodyScopeAccessorParams = withoutShadowed(ctx.scopeAccessorParams, [
+    node.itemAlias,
+    ...(indexAlias ? [indexAlias] : []),
+  ]);
   const childCtx: EmitNodeCtx =
     keyed || indexAlias
       ? {
@@ -364,11 +387,13 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
           invokeAccessors: bodyAccessors,
           loopValueBindings: bodyLoopValueBindings,
           keynavItemIndexAlias: indexAlias,
+          scopeAccessorParams: bodyScopeAccessorParams,
         }
       : {
           ...ctx,
           loopValueBindings: bodyLoopValueBindings,
           keynavItemIndexAlias: null,
+          scopeAccessorParams: bodyScopeAccessorParams,
         };
 
   let bodyJsx: string;
@@ -414,6 +439,9 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     // threaded only the KEYLESS body; the keyed `by` needs the current alias
     // added on top of the inherited (parent) raw-loop bindings.
     loopValueBindings: new Set([...(ctx.loopValueBindings ?? []), node.itemAlias]),
+    // quick 260922-mkb — the key reads the enclosing slot fill's scope lazily too;
+    // the current item alias shadows a scope param of the same name.
+    scopeAccessorParams: withoutShadowed(ctx.scopeAccessorParams, [node.itemAlias]),
   });
   // `<Key>`'s `each?: readonly T[]` infers `T = unknown` from a bare `any`
   // iterable (e.g. a `Record<string, any>` member access), which then poisons

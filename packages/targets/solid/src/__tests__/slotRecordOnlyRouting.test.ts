@@ -155,7 +155,8 @@ describe('Solid consumer — non-identifier slot fill routes into the merged slo
 </rozie>
 `);
     const { code } = emitSolid(ir, { filename: 'ConsumerX.rozie' });
-    expect(code).toMatch(/slots=\{\{\s*'cell-status':\s*\(\{\s*value\s*\}\)\s*=>/);
+    // quick 260922-mkb: scoped fills bind a lazy ctx (`_rozieSlot`), not a destructure.
+    expect(code).toMatch(/slots=\{\{\s*'cell-status':\s*\(_rozieSlot\)\s*=>/);
     expect(code).not.toMatch(/cell-?statusSlot=/);
     expect(code).not.toMatch(/cellStatusSlot=/);
   });

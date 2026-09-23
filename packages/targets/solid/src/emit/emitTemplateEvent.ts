@@ -36,6 +36,7 @@ import type {
   RuntimeSolidImportCollector,
   SolidImportCollector,
 } from '../rewrite/collectSolidImports.js';
+import type { ScopeAccessorParams } from '../rewrite/rewriteTemplateExpression.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 export interface EmitEventCtx {
@@ -88,7 +89,7 @@ export interface EmitEventCtx {
    * `renderHandler` into `rewriteTemplateExpression`'s rewrite, matching every
    * other expression-attribute path.
    */
-  scopeAccessorParams?: { accessorIdent: string; params: ReadonlyMap<string, string> } | undefined;
+  scopeAccessorParams?: ScopeAccessorParams | undefined;
 }
 
 export interface EmitTemplateEventResult {
@@ -309,7 +310,7 @@ function renderHandler(
   ir: IRComponent,
   invokeAccessors?: ReadonlySet<string> | undefined,
   loopValueBindings?: ReadonlySet<string> | undefined,
-  scopeAccessorParams?: { accessorIdent: string; params: ReadonlyMap<string, string> } | undefined,
+  scopeAccessorParams?: ScopeAccessorParams | undefined,
 ): string {
   // Phase 16 R2 / D-03 — thread the loop-accessor unwrap set into the
   // template-expression rewriter. The set is sourced from `EmitEventCtx`

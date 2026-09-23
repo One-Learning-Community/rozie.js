@@ -151,10 +151,17 @@ describe('Phase 79 Plan 10/11 (R5/D-09) — matchedFamily consumer routing on Re
       expect(code).toContain('#cell-score');
       return;
     }
-    if (target === 'react' || target === 'solid') {
+    if (target === 'react') {
       expect(code).toContain('slots={{');
       expect(code).toContain("'cell-status': ({ row, value }) =>");
       expect(code).toContain("'cell-score': ({ row, value }) =>");
+      return;
+    }
+    if (target === 'solid') {
+      // quick 260922-mkb: Solid fills bind a lazy scope ctx instead of destructuring it.
+      expect(code).toContain('slots={{');
+      expect(code).toContain("'cell-status': (_rozieSlot) =>");
+      expect(code).toContain("'cell-score': (_rozieSlot) =>");
       return;
     }
     if (target === 'angular') {

@@ -55,6 +55,7 @@
  */
 import type { SlotFillerDecl } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import type { ScopeAccessorParams, ScopeParamBinding } from '../rewrite/rewriteTemplateExpression.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
 // Late-import to avoid a circular module-init dependency — emitTemplateNode
@@ -103,6 +104,23 @@ function paramsDestructure(filler: SlotFillerDecl): string {
 const REACTIVE_SCOPE_ACCESSOR_IDENT = '_rozieScope';
 
 /**
+ * quick 260922-mkb — the identifier a plain scoped fill binds its ctx object to.
+ * Same reserved `_rozie` namespace; nested fills append a depth suffix.
+ */
+const LAZY_SLOT_CTX_IDENT = '_rozieSlot';
+
+/**
+ * Does this fill bind its scope LAZILY (a ctx object read at each use site)
+ * rather than by destructuring? Every scoped fill except a mount-once portal
+ * fill, whose producer hands over a static value object by design.
+ */
+function usesLazyScope(filler: SlotFillerDecl): boolean {
+  if (filler.params.length === 0) return false;
+  if (filler.isPortal === true && filler.isReactive !== true) return false;
+  return true;
+}
+
+/**
  * Is this filler a REACTIVE portal slot fill with scope params? Only then does
  * the Solid consumer switch to the accessor-scope arrow form (the producer's
  * reactive portal passes scope as a `() => scope` accessor, not a value).
@@ -123,13 +141,27 @@ function isReactivePortalFill(filler: SlotFillerDecl): boolean {
  */
 function buildScopeAccessorParams(
   filler: SlotFillerDecl,
-): { accessorIdent: string; params: ReadonlyMap<string, string> } {
-  const params = new Map<string, string>();
-  for (const p of filler.params) {
-    const localName = p.bindAs ?? p.name;
-    params.set(localName, p.name);
+  outer: ScopeAccessorParams | undefined,
+): { ident: string; params: ScopeAccessorParams } {
+  const reactivePortal = isReactivePortalFill(filler);
+  // quick 260922-mkb — a nested fill needs its OWN ctx identifier (it closes over
+  // the outer fill's, which must stay reachable): `_rozieSlot`, `_rozieSlot1`, …
+  // numbered by how many distinct plain-fill idents are already in scope. The
+  // reactive-portal ident keeps its historical name.
+  let ident = REACTIVE_SCOPE_ACCESSOR_IDENT;
+  if (!reactivePortal) {
+    const taken = new Set<string>();
+    for (const b of outer?.values() ?? []) taken.add(b.ident);
+    let n = 0;
+    ident = LAZY_SLOT_CTX_IDENT;
+    while (taken.has(ident)) ident = `${LAZY_SLOT_CTX_IDENT}${++n}`;
   }
-  return { accessorIdent: REACTIVE_SCOPE_ACCESSOR_IDENT, params };
+  // Outer bindings stay visible; this fill's own params shadow any of the same name.
+  const params = new Map<string, ScopeParamBinding>(outer ?? []);
+  for (const p of filler.params) {
+    params.set(p.bindAs ?? p.name, { ident, prop: p.name, invoke: reactivePortal });
+  }
+  return { ident, params };
 }
 
 /**
@@ -143,15 +175,32 @@ function buildScopeAccessorParams(
  * of bare destructured-value reads (statically captured) — the in-place
  * re-render fix (REQ-26). Every other fill renders with the unchanged ctx.
  */
-function renderFillerBody(filler: SlotFillerDecl, ctx: EmitNodeCtx): string {
+function renderFillerBody(
+  filler: SlotFillerDecl,
+  ctx: EmitNodeCtx,
+): { jsx: string; argList: string } {
   const emitNodeFn = _emitTemplateNodeModule.emitNode;
-  const bodyCtx: EmitNodeCtx = isReactivePortalFill(filler)
-    ? { ...ctx, scopeAccessorParams: buildScopeAccessorParams(filler) }
-    : ctx;
+  let bodyCtx: EmitNodeCtx = ctx;
+  let argList: string;
+  if (usesLazyScope(filler)) {
+    const built = buildScopeAccessorParams(filler, ctx.scopeAccessorParams);
+    bodyCtx = { ...ctx, scopeAccessorParams: built.params };
+    argList = isReactivePortalFill(filler) ? built.ident : `(${built.ident})`;
+  } else {
+    const destructure = paramsDestructure(filler);
+    argList = destructure === '' ? '()' : `(${destructure})`;
+    // A mount-once portal fill destructures: its own params shadow any outer
+    // lazily-bound slot param of the same name.
+    if (ctx.scopeAccessorParams && filler.params.length > 0) {
+      const params = new Map(ctx.scopeAccessorParams);
+      for (const p of filler.params) params.delete(p.bindAs ?? p.name);
+      bodyCtx = { ...ctx, scopeAccessorParams: params };
+    }
+  }
   const parts = filler.body.map((c) => emitNodeFn(c, bodyCtx));
   const inner = parts.join('');
   // Wrap in a fragment so the arrow returns a single JSX expression.
-  return `<>${inner}</>`;
+  return { jsx: `<>${inner}</>`, argList };
 }
 
 /**
@@ -199,7 +248,7 @@ export function emitSlotFiller(
   }
 
   const fieldName = propFieldName(filler.name);
-  const bodyJsx = renderFillerBody(filler, ctx);
+  const { jsx: bodyJsx, argList } = renderFillerBody(filler, ctx);
 
   // Default-shorthand WITHOUT scoped params: emit as bare children of the
   // component tag. The producer's `children(() => local.children)` accessor
@@ -220,20 +269,11 @@ export function emitSlotFiller(
   // re-tracks on `setScopeSig`, so the consumer fragment updates without remount
   // (matches Spike 009's proven `scope().label` chip). Mount-once portal fills
   // and every non-reactive scoped slot keep the destructured-value shape below.
-  if (isReactivePortalFill(filler)) {
-    return {
-      kind: 'prop',
-      text: `${fieldName}={${REACTIVE_SCOPE_ACCESSOR_IDENT} => (${bodyJsx})}`,
-    };
-  }
-
   // Scoped default OR named fill: arrow wrapper that destructures scoped
   // params (or `()` when no params) and returns the JSX body. The producer's
   // refineSlotTypes treats `_props.headerSlot` / scoped `_props.children` as
   // `(ctx) => JSX.Element`, so the consumer's function-form lines up byte-for-
   // byte.
-  const destructure = paramsDestructure(filler);
-  const argList = destructure === '' ? '()' : `(${destructure})`;
   return { kind: 'prop', text: `${fieldName}={${argList} => (${bodyJsx})}` };
 }
 
@@ -271,12 +311,10 @@ export function emitDynamicSlotsProp(
 
   const entries: string[] = [];
   for (const filler of recordFillers) {
-    const destructure = paramsDestructure(filler);
-    const argList = destructure === '' ? '()' : `(${destructure})`;
-    const bodyJsx = renderFillerBody(filler, ctx);
+    const { jsx: bodyJsx, argList } = renderFillerBody(filler, ctx);
     if (filler.isDynamic) {
       if (!filler.dynamicNameExpr) continue; // ROZ946 was already emitted upstream
-      const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings });
+      const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
       entries.push(`[${keyExpr}]: ${argList} => (${bodyJsx})`);
     } else {
       const keyLiteral = `'${escapeSingleQuotedKey(filler.name)}'`;

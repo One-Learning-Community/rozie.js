@@ -92,6 +92,7 @@ export function emitConditional(
     const testCode = rewriteTemplateExpression(lastBranch.test, ctx.ir, {
       invokeAccessors: ctx.invokeAccessors,
       loopValueBindings: ctx.loopValueBindings,
+      scopeAccessorParams: ctx.scopeAccessorParams,
     });
     const bodyJsx = renderBranchBody(lastBranch.body, ctx, emitNodeFn);
     currentFallback = null;
@@ -113,6 +114,7 @@ export function emitConditional(
       const bTestCode = rewriteTemplateExpression(branch.test, ctx.ir, {
         invokeAccessors: ctx.invokeAccessors,
         loopValueBindings: ctx.loopValueBindings,
+        scopeAccessorParams: ctx.scopeAccessorParams,
       });
       const bBodyJsx = renderBranchBody(branch.body, ctx, emitNodeFn);
       // The "show" we built for the next branch becomes the fallback here
@@ -141,6 +143,7 @@ export function emitConditional(
     const testCode = rewriteTemplateExpression(branch.test, ctx.ir, {
       invokeAccessors: ctx.invokeAccessors,
       loopValueBindings: ctx.loopValueBindings,
+      scopeAccessorParams: ctx.scopeAccessorParams,
     });
     const bodyJsx = renderBranchBody(branch.body, ctx, emitNodeFn);
     result = buildShow(testCode, bodyJsx, currentFallback);

@@ -13,16 +13,16 @@ export default function DynamicSlotsConsumer(_props: DynamicSlotsConsumerProps):
   return (
     <>
     <div {...attrs} class={"dynamic-slots-consumer" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-e638f506="">
-      <DynamicSlots columns={[{ key: 'status' }, { key: 'score' }]} row={{ status: 'Active', score: 42 }} total={7} data-rozie-s-e638f506=""    headerCellSlot={({ title }) => (<>
-          <h2 data-rozie-s-e638f506="">{rozieDisplay(title)}</h2>
-        </>)} slots={{ 'cell-status': ({ row, value }) => (<>
-          <span class={"status"} data-rozie-s-e638f506="">{rozieDisplay(value)}</span>
-        </>), 'cell-score': ({ row, value }) => (<>
-          <span class={"score"} data-rozie-s-e638f506="">{rozieDisplay(value)}</span>
-        </>), 'cell-total': ({ value }) => (<>
-          <strong data-rozie-s-e638f506="">{rozieDisplay(value)}</strong>
-        </>), [dynamicFillKey()]: ({ label }) => (<>
-          <em data-rozie-s-e638f506="">{rozieDisplay(label)}</em>
+      <DynamicSlots columns={[{ key: 'status' }, { key: 'score' }]} row={{ status: 'Active', score: 42 }} total={7} data-rozie-s-e638f506=""    headerCellSlot={(_rozieSlot) => (<>
+          <h2 data-rozie-s-e638f506="">{rozieDisplay(_rozieSlot.title)}</h2>
+        </>)} slots={{ 'cell-status': (_rozieSlot) => (<>
+          <span class={"status"} data-rozie-s-e638f506="">{rozieDisplay(_rozieSlot.value)}</span>
+        </>), 'cell-score': (_rozieSlot) => (<>
+          <span class={"score"} data-rozie-s-e638f506="">{rozieDisplay(_rozieSlot.value)}</span>
+        </>), 'cell-total': (_rozieSlot) => (<>
+          <strong data-rozie-s-e638f506="">{rozieDisplay(_rozieSlot.value)}</strong>
+        </>), [dynamicFillKey()]: (_rozieSlot) => (<>
+          <em data-rozie-s-e638f506="">{rozieDisplay(_rozieSlot.label)}</em>
         </>) }} />
     </div>
     </>

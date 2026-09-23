@@ -28,11 +28,11 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
   return (
     <>
     <div {...attrs} class={"modal-consumer" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-5d081d3a="">
-      <Modal open={open1()} onOpenChange={setOpen1} data-rozie-s-5d081d3a="" headerSlot={({ close }) => (<>
+      <Modal open={open1()} onOpenChange={setOpen1} data-rozie-s-5d081d3a="" headerSlot={(_rozieSlot) => (<>
           <h2 data-rozie-s-5d081d3a="">{local.title}</h2>
-          <button class={"close"} onClick={close} data-rozie-s-5d081d3a="">×</button>
-        </>)} footerSlot={({ close }) => (<>
-          <button onClick={close} data-rozie-s-5d081d3a="">Cancel</button>
+          <button class={"close"} onClick={_rozieSlot.close} data-rozie-s-5d081d3a="">×</button>
+        </>)} footerSlot={(_rozieSlot) => (<>
+          <button onClick={_rozieSlot.close} data-rozie-s-5d081d3a="">Cancel</button>
           <button onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onConfirm(); }} data-rozie-s-5d081d3a="">OK</button>
         </>)}>
         Are you sure you want to proceed?

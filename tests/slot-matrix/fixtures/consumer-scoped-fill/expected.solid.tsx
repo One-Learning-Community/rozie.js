@@ -9,8 +9,8 @@ export default function Consumer(_props: ConsumerProps): JSX.Element {
 
   return (
     <>
-    <Producer data-rozie-s-bd0c3708="" headerSlot={({ close }) => (<>
-        <button onClick={close} data-rozie-s-bd0c3708="">×</button>
+    <Producer data-rozie-s-bd0c3708="" headerSlot={(_rozieSlot) => (<>
+        <button onClick={_rozieSlot.close} data-rozie-s-bd0c3708="">×</button>
       </>)}>
       Body text
     </Producer>

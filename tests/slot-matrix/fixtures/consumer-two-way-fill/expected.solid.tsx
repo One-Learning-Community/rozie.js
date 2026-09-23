@@ -13,9 +13,9 @@ export default function Consumer(_props: ConsumerProps): JSX.Element {
 
   return (
     <>
-    <Producer open={outerOpen()} onOpenChange={setOuterOpen} data-rozie-s-bd0c3708="" footerSlot={({ close }) => (<>
+    <Producer open={outerOpen()} onOpenChange={setOuterOpen} data-rozie-s-bd0c3708="" footerSlot={(_rozieSlot) => (<>
         <Inner open={outerOpen()} onOpenChange={setOuterOpen} data-rozie-s-bd0c3708="" />
-        <button onClick={close} data-rozie-s-bd0c3708="">×</button>
+        <button onClick={_rozieSlot.close} data-rozie-s-bd0c3708="">×</button>
       </>)} />
     </>
   );

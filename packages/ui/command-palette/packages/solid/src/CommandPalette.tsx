@@ -1915,27 +1915,27 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
             </nav></>}
         </div></Show>}<div class={"rozie-command-palette-list-region" + " " + rozieClass({ 'rozie-command-palette-list-region--inert': activeSurface() === 'args' })} aria-hidden={!!(activeSurface() === 'args')} data-rozie-s-768cad96="">
         
-        <Combobox ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={local.groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} ariaLabel={local.ariaLabel} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
-            <span class={"rozie-command-palette-option-anchor"} data-cp-index={rozieAttr(cpAnchorIndex(option))} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96="">
-            {(_props.optionSlot ?? _props.slots?.['option'])?.({ option, index, active, selected, disabled, get matches() { return labelHighlight(labelText(option), query()); } }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
+        <Combobox ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={local.groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} ariaLabel={local.ariaLabel} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={(_rozieSlot) => (<>
+            <span class={"rozie-command-palette-option-anchor"} data-cp-index={rozieAttr(cpAnchorIndex(_rozieSlot.option))} data-cp-value={rozieAttr(commandValue(_rozieSlot.option))} data-rozie-s-768cad96="">
+            {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return _rozieSlot.option; }, get index() { return _rozieSlot.index; }, get active() { return _rozieSlot.active; }, get selected() { return _rozieSlot.selected; }, get disabled() { return _rozieSlot.disabled; }, get matches() { return labelHighlight(labelText(_rozieSlot.option), query()); } }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {<Show when={(_props.iconSlot ?? _props.slots?.['icon'])}><span class={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
-                  {(_props.iconSlot ?? _props.slots?.['icon'])?.({ option })}
+                  {(_props.iconSlot ?? _props.slots?.['icon'])?.({ get option() { return _rozieSlot.option; } })}
                 </span></Show>}<span class={"rozie-command-palette-option-main"} data-rozie-s-768cad96="">
                   <span class={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">
-                    <For each={labelSegments(option)}>{(segment, si) => <span class={rozieClass({ 'rozie-command-palette-option-label-match': segment.match })} data-rozie-s-768cad96="">{rozieDisplay(segment.text)}</span>}</For>
+                    <For each={labelSegments(_rozieSlot.option)}>{(segment, si) => <span class={rozieClass({ 'rozie-command-palette-option-label-match': segment.match })} data-rozie-s-768cad96="">{rozieDisplay(segment.text)}</span>}</For>
                   </span>
-                  {<Show when={groupText(option) && !grouped()}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</span>
+                  {<Show when={groupText(_rozieSlot.option) && !grouped()}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(_rozieSlot.option))}</span></Show>}</span>
                 
-                {<Show when={hotKeyOf(option)}><span class={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), platformIsApple()))}</span></Show>}{<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
-                  {(_props.actionsSlot ?? _props.slots?.['actions'])?.({ option, get actions() { return actionsList(option); } }) ?? <Show when={actionsList(option).length > 0}><span class={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span></Show>}
+                {<Show when={hotKeyOf(_rozieSlot.option)}><span class={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(_rozieSlot.option), platformIsApple()))}</span></Show>}{<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(_rozieSlot.option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(_rozieSlot.option); }} data-rozie-s-768cad96="">
+                  {(_props.actionsSlot ?? _props.slots?.['actions'])?.({ get option() { return _rozieSlot.option; }, get actions() { return actionsList(_rozieSlot.option); } }) ?? <Show when={actionsList(_rozieSlot.option).length > 0}><span class={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span></Show>}
                 </span></Show>}{<Show when={(_props.trailingSlot ?? _props.slots?.['trailing'])}><span class={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
-                  {(_props.trailingSlot ?? _props.slots?.['trailing'])?.({ option })}
+                  {(_props.trailingSlot ?? _props.slots?.['trailing'])?.({ get option() { return _rozieSlot.option; } })}
                 </span></Show>}</div>}
             </span>
-          </>)} groupHeadingSlot={({ group }) => (<>
-            {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ group }) ?? rozieDisplay(groupLabel(group))}
-          </>)} emptySlot={({ query }) => (<>
-            {<Show when={currentStatus() === 'ready'}>{(_props.emptySlot ?? _props.slots?.['empty'])?.({ query }) ?? local.emptyText}</Show>}</>)} />
+          </>)} groupHeadingSlot={(_rozieSlot) => (<>
+            {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ get group() { return _rozieSlot.group; } }) ?? rozieDisplay(groupLabel(_rozieSlot.group))}
+          </>)} emptySlot={(_rozieSlot) => (<>
+            {<Show when={currentStatus() === 'ready'}>{(_props.emptySlot ?? _props.slots?.['empty'])?.({ get query() { return _rozieSlot.query; } }) ?? local.emptyText}</Show>}</>)} />
         </div>
 
         
@@ -1970,27 +1970,27 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
             </nav></>}
         </div></Show>}<div class={"rozie-command-palette-list-region" + " " + rozieClass({ 'rozie-command-palette-list-region--inert': activeSurface() === 'args' })} aria-hidden={!!(activeSurface() === 'args')} data-rozie-s-768cad96="">
         
-        <Combobox ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={local.groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} ariaLabel={local.ariaLabel} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
-            <span class={"rozie-command-palette-option-anchor"} data-cp-index={rozieAttr(cpAnchorIndex(option))} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96="">
-            {(_props.optionSlot ?? _props.slots?.['option'])?.({ option, index, active, selected, disabled, get matches() { return labelHighlight(labelText(option), query()); } }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
+        <Combobox ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={local.groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} ariaLabel={local.ariaLabel} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={(_rozieSlot) => (<>
+            <span class={"rozie-command-palette-option-anchor"} data-cp-index={rozieAttr(cpAnchorIndex(_rozieSlot.option))} data-cp-value={rozieAttr(commandValue(_rozieSlot.option))} data-rozie-s-768cad96="">
+            {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return _rozieSlot.option; }, get index() { return _rozieSlot.index; }, get active() { return _rozieSlot.active; }, get selected() { return _rozieSlot.selected; }, get disabled() { return _rozieSlot.disabled; }, get matches() { return labelHighlight(labelText(_rozieSlot.option), query()); } }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {<Show when={(_props.iconSlot ?? _props.slots?.['icon'])}><span class={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
-                  {(_props.iconSlot ?? _props.slots?.['icon'])?.({ option })}
+                  {(_props.iconSlot ?? _props.slots?.['icon'])?.({ get option() { return _rozieSlot.option; } })}
                 </span></Show>}<span class={"rozie-command-palette-option-main"} data-rozie-s-768cad96="">
                   <span class={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">
-                    <For each={labelSegments(option)}>{(segment, si) => <span class={rozieClass({ 'rozie-command-palette-option-label-match': segment.match })} data-rozie-s-768cad96="">{rozieDisplay(segment.text)}</span>}</For>
+                    <For each={labelSegments(_rozieSlot.option)}>{(segment, si) => <span class={rozieClass({ 'rozie-command-palette-option-label-match': segment.match })} data-rozie-s-768cad96="">{rozieDisplay(segment.text)}</span>}</For>
                   </span>
-                  {<Show when={groupText(option) && !grouped()}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</span>
+                  {<Show when={groupText(_rozieSlot.option) && !grouped()}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(_rozieSlot.option))}</span></Show>}</span>
                 
-                {<Show when={hotKeyOf(option)}><span class={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), platformIsApple()))}</span></Show>}{<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
-                  {(_props.actionsSlot ?? _props.slots?.['actions'])?.({ option, get actions() { return actionsList(option); } }) ?? <Show when={actionsList(option).length > 0}><span class={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span></Show>}
+                {<Show when={hotKeyOf(_rozieSlot.option)}><span class={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(_rozieSlot.option), platformIsApple()))}</span></Show>}{<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(_rozieSlot.option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(_rozieSlot.option); }} data-rozie-s-768cad96="">
+                  {(_props.actionsSlot ?? _props.slots?.['actions'])?.({ get option() { return _rozieSlot.option; }, get actions() { return actionsList(_rozieSlot.option); } }) ?? <Show when={actionsList(_rozieSlot.option).length > 0}><span class={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span></Show>}
                 </span></Show>}{<Show when={(_props.trailingSlot ?? _props.slots?.['trailing'])}><span class={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
-                  {(_props.trailingSlot ?? _props.slots?.['trailing'])?.({ option })}
+                  {(_props.trailingSlot ?? _props.slots?.['trailing'])?.({ get option() { return _rozieSlot.option; } })}
                 </span></Show>}</div>}
             </span>
-          </>)} groupHeadingSlot={({ group }) => (<>
-            {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ group }) ?? rozieDisplay(groupLabel(group))}
-          </>)} emptySlot={({ query }) => (<>
-            {<Show when={currentStatus() === 'ready'}>{(_props.emptySlot ?? _props.slots?.['empty'])?.({ query }) ?? local.emptyText}</Show>}</>)} />
+          </>)} groupHeadingSlot={(_rozieSlot) => (<>
+            {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ get group() { return _rozieSlot.group; } }) ?? rozieDisplay(groupLabel(_rozieSlot.group))}
+          </>)} emptySlot={(_rozieSlot) => (<>
+            {<Show when={currentStatus() === 'ready'}>{(_props.emptySlot ?? _props.slots?.['empty'])?.({ get query() { return _rozieSlot.query; } }) ?? local.emptyText}</Show>}</>)} />
         </div>
 
         

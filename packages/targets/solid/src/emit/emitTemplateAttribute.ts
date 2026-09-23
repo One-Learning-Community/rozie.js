@@ -26,6 +26,7 @@ import type {
   RuntimeSolidImportCollector,
   SolidImportCollector,
 } from '../rewrite/collectSolidImports.js';
+import type { ScopeAccessorParams } from '../rewrite/rewriteTemplateExpression.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { resolveTwoWayTarget } from './resolveTwoWayTarget.js';
 
@@ -50,7 +51,7 @@ export interface EmitAttrCtx {
    * (`:data-selected`, `:data-label`, `:class`, …) rewrite scope-param reads to
    * `<accessor>().<prop>` (in-place re-render). Undefined everywhere else.
    */
-  scopeAccessorParams?: { accessorIdent: string; params: ReadonlyMap<string, string> } | undefined;
+  scopeAccessorParams?: ScopeAccessorParams | undefined;
   /**
    * Phase 26 — host element tagKind + tagName. The `rozieDisplay` wrap (SPEC-4)
    * applies ONLY where a binding renders as attribute TEXT on an HTML host.
@@ -582,7 +583,7 @@ function capitalize(name: string): string {
 type RenderExprOpts = {
   invokeAccessors?: ReadonlySet<string> | undefined;
   loopValueBindings?: ReadonlySet<string> | undefined;
-  scopeAccessorParams?: { accessorIdent: string; params: ReadonlyMap<string, string> } | undefined;
+  scopeAccessorParams?: ScopeAccessorParams | undefined;
 };
 
 function renderExpr(expr: t.Expression, ir: IRComponent, opts?: RenderExprOpts): string {
