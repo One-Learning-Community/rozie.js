@@ -1000,6 +1000,10 @@ export const EXAMPLES = [
   // Angular cross-tree AOT in phase 48).
   'DataTableGridEmpty',
   'DataTableGridGroupedHeader',
+  // Quick 260922-mkb (B-15) — the APG grid selection keys RED-first fixture (loader →
+  // examples/demos/DataTableGridKeysDemo.rozie). Behavioral-only; NOT in matrix.spec.ts
+  // EXAMPLES (no pixel baseline); covered by the same examples/demos/ glob as its siblings.
+  'DataTableGridKeys',
   // Phase 63 Wave-5 (grid emit-hygiene / gating / re-focus) — the P2-cluster RED-first
   // fixture (loader → examples/demos/DataTableGridEmitDemo.rozie, importing
   // ../../packages/ui/data-table/src/DataTable.rozie). A grid instance (range selection +
@@ -1715,6 +1719,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // kebab of DataTableGridEmptyDemo / DataTableGridGroupedHeaderDemo.
   DataTableGridEmpty: 'rozie-data-table-grid-empty',
   DataTableGridGroupedHeader: 'rozie-data-table-grid-grouped-header',
+  // Quick 260922-mkb — '-demo' appended on Lit → 'rozie-data-table-grid-keys-demo'.
+  DataTableGridKeys: 'rozie-data-table-grid-keys',
   // Phase 63 grid emit-hygiene — '-demo' appended on Lit →
   // 'rozie-data-table-grid-emit-demo' = kebab of DataTableGridEmitDemo.
   DataTableGridEmit: 'rozie-data-table-grid-emit',

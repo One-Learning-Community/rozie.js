@@ -5394,6 +5394,44 @@ export class DataTable {
       if (!__activeIsHeader) this.selectAllBody();
       return;
     }
+    // ── B-15: the APG grid pattern's row/column selection keys, and Escape in NAVIGATION mode.
+    // All three were simply absent. They are placed HERE, before every `key === ' '` branch
+    // below, because the boolean in-place toggle matches a bare `' '` without excluding
+    // modifiers — so a Shift+Space on a checkbox cell would have toggled the checkbox instead
+    // of selecting the row, and Ctrl+Space likewise.
+    //
+    // Shift+Space selects the ROW (table-core's own rowSelection slice, through the row's
+    // toggleSelected — the same funnel the per-row checkbox uses, so the change event and the
+    // two-way model behave identically). A no-op when selectionMode is 'none', which is the
+    // honest behaviour: there is no row selection to make.
+    //
+    // Ctrl+Space selects the COLUMN as a full-height CELL RANGE rather than inventing a third
+    // selection concept — the same corners Ctrl+A and shift+arrow drive, so Ctrl+C / Ctrl+X /
+    // Delete / the fill handle all act on it unchanged.
+    //
+    // Escape in navigation mode collapses the range. In-control mode already consumed Escape at
+    // the top of this handler; in navigation mode it did nothing at all, leaving a user who had
+    // shift-arrowed out a rectangle with no keyboard way to drop it short of an arrow key, which
+    // also MOVES. Only preventDefault'd when there is a range to clear, so a consumer's own
+    // Escape handling on a table with no selection is untouched.
+    else if (key === ' ' && e.shiftKey && !e.ctrlKey && !e.metaKey && !__activeIsHeader) {
+      e.preventDefault();
+      if (this.selectionMode() !== 'none') {
+        const selRow = (__rows || [])[__activeRow];
+        if (selRow && selRow.toggleSelected) selRow.toggleSelected(!this.rowIsSelected(selRow));
+      }
+      return;
+    } else if (key === ' ' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !__activeIsHeader) {
+      e.preventDefault();
+      this.selectActiveColumn();
+      return;
+    } else if (key === 'Escape') {
+      if (this.rangeActive || this.rangeAnchor() != null) {
+        e.preventDefault();
+        this.clearRange();
+      }
+      return;
+    }
     // ── Full-row edit entry (phase 51 req-6 / D-06) — Shift+F2 on an editable active cell puts
     // EVERY editable cell in the active row into edit at once. Tested BEFORE the plain F2 branch
     // (a Shift+F2 must NOT fall through to single-cell F2). Shift+F2 was chosen for the lowest
@@ -6219,6 +6257,30 @@ export class DataTable {
     const focus = {
       rowIndex: maxRow,
       colIndex: maxCol
+    };
+    this.rangeAnchor.set(anchor);
+    this.rangeFocus.set(focus);
+    this.rangeActive = true;
+    this.emitRangeChange(anchor, focus);
+  };
+  // B-15: the APG grid pattern's Ctrl+Space — select the COLUMN containing the focused cell.
+  // Expressed as a full-height rectangle over the SAME range corners shift+arrow and Ctrl+A
+  // drive, so Ctrl+C / Ctrl+X / Delete / the fill handle all act on it with no new machinery
+  // and no second selection concept for a consumer to reason about. Emits through the single
+  // emitRangeChange funnel (fresh corners, never a $data re-read). No-op on an empty grid, and
+  // header-active is gated OUT by the caller, exactly as selectAllBody is.
+  selectActiveColumn = () => {
+    const maxRow = this.bodyRowCount() - 1;
+    const maxCol = this.visibleColCount() - 1;
+    if (maxRow < 0 || maxCol < 0) return;
+    const c = clamp(Math.trunc(Number(this.activeColIndex())) || 0, 0, maxCol);
+    const anchor = {
+      rowIndex: 0,
+      colIndex: c
+    };
+    const focus = {
+      rowIndex: maxRow,
+      colIndex: c
     };
     this.rangeAnchor.set(anchor);
     this.rangeFocus.set(focus);

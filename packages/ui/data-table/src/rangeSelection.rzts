@@ -166,6 +166,25 @@ const selectAllBody = () => {
   emitRangeChange(anchor, focus)
 }
 
+// B-15: the APG grid pattern's Ctrl+Space — select the COLUMN containing the focused cell.
+// Expressed as a full-height rectangle over the SAME range corners shift+arrow and Ctrl+A
+// drive, so Ctrl+C / Ctrl+X / Delete / the fill handle all act on it with no new machinery
+// and no second selection concept for a consumer to reason about. Emits through the single
+// emitRangeChange funnel (fresh corners, never a $data re-read). No-op on an empty grid, and
+// header-active is gated OUT by the caller, exactly as selectAllBody is.
+const selectActiveColumn = () => {
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return
+  const c = clamp(Math.trunc(Number($data.activeColIndex)) || 0, 0, maxCol)
+  const anchor = { rowIndex: 0, colIndex: c }
+  const focus = { rowIndex: maxRow, colIndex: c }
+  $data.rangeAnchor = anchor
+  $data.rangeFocus = focus
+  rangeActive = true
+  emitRangeChange(anchor, focus)
+}
+
 // clearRange(): drop the rectangle (a non-shift navigation / edit-entry collapses any
 // range back to a single active cell). Cheap no-op when no range is set (the guard keeps a
 // plain navigation with no active range from emitting). B19: when a range DID exist, emit
@@ -219,4 +238,4 @@ const clampRange = (maxRowArg, maxColArg) => {
   }
 }
 
-export { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, selectAllBody, clearRange, clampRange }
+export { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, selectAllBody, selectActiveColumn, clearRange, clampRange }

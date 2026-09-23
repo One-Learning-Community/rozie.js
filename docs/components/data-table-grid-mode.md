@@ -25,6 +25,12 @@ What flips on:
 
 **Cell range selection.** In grid mode a rectangular cell-range selection extends via `Shift+Arrow` / `Shift+Click`, surfaced through the one-way `range-change` event (payload `{ anchor, focus }`, each corner a `{ rowIndex, colIndex }` pair, or `{ anchor: null, focus: null }`) and the `getSelectedRange()` verb. It is never a `model:true` slice.
 
+The APG grid pattern's selection keys work from any body cell:
+
+- `Shift+Space` toggles the **row** containing the active cell in the row-selection model (the same path as the row checkbox, so `r-model:rowSelection` and its change event behave identically). A no-op when `selectionMode` is `'none'`.
+- `Ctrl`/`Cmd`+`Space` selects the **column** containing the active cell, as a full-height cell range — the same range copy, cut, clear and the fill handle act on.
+- `Escape` in navigation mode collapses the current cell range. It only calls `preventDefault` when there is a range to clear, so your own `Escape` handling is untouched otherwise.
+
 Drive and observe it imperatively via the [`focusCell`](/components/data-table-api#imperative-handle) / `getActiveCell` / `clearActiveCell` handle verbs and the [`activecell-change`](/components/data-table-api#events) event. The exact behavioral contract is locked by a cross-framework visual-regression matrix proving the same behavior on all six targets.
 
 ## Clipboard, fill & clear

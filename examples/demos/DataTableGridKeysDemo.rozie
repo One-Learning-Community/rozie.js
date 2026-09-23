@@ -1,0 +1,97 @@
+<!--
+  DataTableGridKeysDemo.rozie — quick 260922-mkb (B-15) RED-first fixture.
+
+  Drives the APG grid pattern's selection keys across all six targets via
+  data-table-grid-keys.spec.ts:
+    Shift+Space  — selects the ROW containing the focused cell (row selection model)
+    Ctrl+Space   — selects the COLUMN containing the focused cell (a full-height cell range)
+    Escape       — in NAVIGATION mode, collapses an active range
+
+  A SINGLE flat-header DataTable in interactionMode='grid' with selectionMode='multiple'
+  (so col 0 is the select rail) and three text columns. `r-model:rowSelection` is dumped to
+  a readout so the spec asserts the SELECTION MODEL, not the checkbox paint. No loop var /
+  slot named row/cell/header (the Svelte mount-throw discipline).
+-->
+
+<rozie name="DataTableGridKeysDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 1, name: 'Alpha', city: 'Oslo',  code: 'A1' },
+    { id: 2, name: 'Beta',  city: 'Lima',  code: 'B2' },
+    { id: 3, name: 'Gamma', city: 'Cairo', code: 'C3' },
+    { id: 4, name: 'Delta', city: 'Quito', code: 'D4' },
+  ],
+  rowSelection: {},
+  rangeReadout: '',
+}
+</data>
+
+<script lang="ts">
+const onRangeChange = (payload: any): void => {
+  $data.rangeReadout = payload && payload.anchor && payload.focus
+    ? payload.anchor.rowIndex + ',' + payload.anchor.colIndex + '-' + payload.focus.rowIndex + ',' + payload.focus.colIndex
+    : ''
+}
+
+const selectionText = (): string => {
+  const sel = $data.rowSelection || {}
+  return Object.keys(sel).filter((k) => sel[k]).sort().join(',')
+}
+</script>
+
+<template>
+<div class="dt-grid-keys-demo">
+  <h3>DataTable — grid-mode selection keys</h3>
+
+  <div class="controls">
+    <span class="label">selected:</span>
+    <span class="readout" data-testid="selection-readout">{{ selectionText() }}</span>
+    <span class="label">range:</span>
+    <span class="readout" data-testid="range-readout">{{ $data.rangeReadout }}</span>
+  </div>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      selectionMode="multiple"
+      r-model:data="$data.rows"
+      r-model:rowSelection="$data.rowSelection"
+      @range-change="onRangeChange($event)"
+    >
+      <Column field="name" header="Name" />
+      <Column field="city" header="City" />
+      <Column field="code" header="Code" />
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-grid-keys-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-grid-keys-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.label { font-size: 0.8rem; color: #555; }
+.readout { font-family: ui-monospace, monospace; font-size: 0.8rem; }
+</style>
+
+</rozie>

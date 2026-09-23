@@ -1793,7 +1793,7 @@ let rangeClickPending = null
 // across all six targets. A top-level let → React hoists to useRef.
 let rangeActive = false
 
-import { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, selectAllBody, clearRange, clampRange } from './rangeSelection.rzts'
+import { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, selectAllBody, selectActiveColumn, clearRange, clampRange } from './rangeSelection.rzts'
 
 import { announce, clipboardActiveAllowed, clipboardWriteAvailable, clipboardReadAvailable, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, tileGridToBox, pasteRange, cutRange, clearActiveRange, tileIndex, fillRange } from './clipboardFill.rzts'
 
