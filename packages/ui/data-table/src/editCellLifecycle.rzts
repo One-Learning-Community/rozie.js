@@ -267,6 +267,7 @@ const beginEdit = (rowIndex, colIndex, seed) => {
   // editor clears any row-edit state so isEditing never resolves both modes for one cell.
   $data.editingRowIndex = null
   $data.rowDraft = {}
+  rowDraftSync = {}
   $data.editingRow = rowIndex
   $data.editingCol = colIndex
   $data.draftValue = seed != null ? seed : cellValueAt(rowIndex, colIndex)
@@ -340,6 +341,7 @@ const endEdit = () => {
 const endRowEdit = () => {
   $data.editingRowIndex = null
   $data.rowDraft = {}
+  rowDraftSync = {}
   $data.invalidMsg = ''
   $data.activeInControl = false
   $data.editVer = $data.editVer + 1

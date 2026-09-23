@@ -1856,6 +1856,22 @@ let pendingEditFollow = null
 // A top-level `let` (React hoists to useRef → persists).
 let committedThisSession = false
 
+// rowDraftSync (quick 260922-mkb, C-05): a SYNCHRONOUS mirror of `$data.rowDraft`, written at
+// every rowDraft write and read by commitRow. A custom #editor drop-in stages its value with
+// `commit(v)` → setRowDraft in the SAME keydown that then commits the row (the host's drop-in
+// wrapper runs in the bubble phase right after the drop-in's own Enter handler). On React
+// `$data.rowDraft` is a `useState` read, so commitRow in that same tick saw the pre-write draft,
+// found no change and wrote nothing. The built-in editors never hit this only because they stage
+// on every `input` event, long before Enter. Same top-level-`let` technique as
+// committedThisSession above; on the five synchronous targets it always equals $data.rowDraft.
+let rowDraftSync: Record<string, any> = {}
+
+// dropinTabFlush (quick 260922-mkb, C-10): non-null only for the duration of the drop-in
+// wrapper's Tab flush (see onEditorDropinKeyDown). While set, a drop-in's `commit(v)` records
+// that it ran and whether it committed, and commits WITHOUT the focus return (the Tab handler
+// moves focus on to the next editor itself).
+let dropinTabFlush: { called: boolean; committed: boolean } | null = null
+
 // ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
 // In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
 // (editingRowIndex != null) each editable cell owns its OWN draft keyed by columnId in
@@ -1863,7 +1879,7 @@ let committedThisSession = false
 // helpers let the ONE editor template branch serve BOTH modes (no per-mode template fork):
 // the template binds editorValueFor(colId)/editorCheckedFor(colId) and writes via
 // onCellEditorInput(colId, evt)/onCellEditorCheckbox(colId, evt).
-import { inRowEdit, editorValueFor, editorCheckedFor, editorCommitFor, editorCancelFor, onCellEditorInput, onCellEditorCheckbox, setRowDraft, onEditorKeyDown, onEditorBlur, editCell, commitEditing, editRow } from './editorBindings.rzts'
+import { inRowEdit, editorValueFor, editorCheckedFor, editorCommitFor, editorCancelFor, onCellEditorInput, onCellEditorCheckbox, setRowDraft, onEditorKeyDown, onEditorDropinKeyDown, onEditorBlur, editCell, commitEditing, editRow } from './editorBindings.rzts'
 
 import { focusCell, getActiveCell, clearActiveCell } from './gridActiveCellVerbs.rzts'
 
@@ -2489,7 +2505,7 @@ $expose({
                "Deviations from Plan": a single r-if="editorTypeOf===custom" wrapping the whole
                branch with NO sibling ladder was proven, via a compiled-React probe, to render
                genuinely-typed number/select/checkbox/text columns BLANK). -->
-          <span style="display:contents" r-else-if="editorTypeOf(cell.column.id) === 'custom'">
+          <span style="display:contents" r-else-if="editorTypeOf(cell.column.id) === 'custom'" @keydown="onEditorDropinKeyDown($event)">
             <slot
               :name="`editor-${cell.column.id}`"
               :columnId="cell.column.id"
@@ -3010,7 +3026,7 @@ $expose({
           <!-- D-01/D-04 (88-07): editor='custom' gate, shared by BOTH the family and generic
                tiers. See the windowed site's identical comment (above, ~L2308) for the
                empirical justification of the additional text-input occurrence below. -->
-          <span style="display:contents" r-else-if="editorTypeOf(cell.column.id) === 'custom'">
+          <span style="display:contents" r-else-if="editorTypeOf(cell.column.id) === 'custom'" @keydown="onEditorDropinKeyDown($event)">
             <slot
               :name="`editor-${cell.column.id}`"
               :columnId="cell.column.id"

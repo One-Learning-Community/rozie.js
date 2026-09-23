@@ -571,3 +571,108 @@ for (const target of TARGETS) {
       .toBe('..');
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════
+// C-10 / C-05 / B-13 (quick 260922-mkb) — the GRID keymap around a custom #editor drop-in.
+//
+// A drop-in is consumer markup inside the #editor slot: it binds its own Enter/Escape and
+// nothing of the host's. So:
+//   C-10 — single-cell Tab did not commit-and-advance like the built-in editors; it fell
+//          through to native tab order and walked focus out of the grid.
+//   C-05 — in full-row mode (Shift+F2) a drop-in's `commit(v)` is draft-only by design, and
+//          the row only ever committed through handlers bound on the BUILT-IN inputs. Enter
+//          staged a draft and nothing else; editingRowIndex stayed set and arrow nav was dead.
+//   B-13 — once C-05 commits the row from the host wrapper, the focus change that follows
+//          must not commit it a SECOND time (commitRow had no session latch; the guard is an
+//          async useState read on React).
+// Asserted on the MODEL (commit readouts + counts) and on keyboard reachability, not paint.
+// ═══════════════════════════════════════════════════════════════════════════════════
+/** "row,col" of the grid cell holding DOM focus (shadow-pierced via getRootNode), or null. */
+async function focusedGridCell(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const findGridTable = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('table[role="grid"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) { const inner = findGridTable(sr); if (inner) return inner; }
+      }
+      return null;
+    };
+    const grid = findGridTable(document);
+    if (!grid) return null;
+    const ae = (grid.getRootNode() as Document | ShadowRoot).activeElement;
+    const cell = ae && ae.closest ? ae.closest('[data-grid-cell]') : null;
+    return cell && grid.contains(cell) ? cell.getAttribute('data-row') + ',' + cell.getAttribute('data-col-index') : null;
+  });
+}
+
+const NAME_DROPIN = 'input.rdt-cell-editor[data-editing-cell]:not([type="date"])';
+
+async function openRowEditor(page: Page, row: number, col: number): Promise<void> {
+  await focusBodyCell(page, row, col);
+  await expect
+    .poll(async () => activeCellTabindex(page, row, col), { timeout: 5_000 })
+    .toBe('0');
+  await page.keyboard.press('Shift+F2');
+  await expect(page.getByTestId('rozie-mount').locator(NAME_DROPIN)).toBeVisible({ timeout: 10_000 });
+}
+
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-dropins editor [${target}]: C-10 Tab in a drop-in commits the typed value and advances to the next editor`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableEditorDropins&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount.getByTestId('edit-table').locator('table')).toBeVisible({ timeout: 15_000 });
+
+    await openCustomEditor(page, NAME_DROPIN, 0, 0);
+    await mount.locator(NAME_DROPIN).fill('Zeta');
+    await page.keyboard.press('Tab');
+
+    // The TYPED value is what commits — not the host's untouched draft — and exactly once.
+    await expect.poll(async () => mount.getByTestId('commit-readout').textContent(), { timeout: 10_000 }).toBe('name=Zeta');
+    await expect.poll(async () => Number(await mount.getByTestId('commit-count').textContent()), { timeout: 10_000 }).toBe(1);
+    // ...and the edit ADVANCED into (0,1)'s editor, as the built-in editors do.
+    await expect(mount.locator('select.rdt-cell-editor[data-editing-cell]')).toBeVisible({ timeout: 10_000 });
+  });
+
+  runnerFor(target)(`data-table-dropins editor [${target}]: C-05 Enter in a full-row drop-in commits the row and frees arrow nav`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableEditorDropins&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount.getByTestId('edit-table').locator('table')).toBeVisible({ timeout: 15_000 });
+
+    await openRowEditor(page, 0, 0);
+    await mount.locator(NAME_DROPIN).fill('Zeta');
+    await mount.locator(NAME_DROPIN).press('Enter');
+
+    await expect.poll(async () => mount.getByTestId('row-commit-readout').textContent(), { timeout: 10_000 }).toBe('name=Zeta');
+    await expect.poll(async () => anyEditorOpen(page), { timeout: 10_000 }).toBe(false);
+    // Focus is handed back to the committed row's cell ASYNCHRONOUSLY (the row-follow re-seat
+    // runs after the row model re-derives). Wait for it to LAND — this also fails if focus is
+    // never returned — rather than racing a keystroke into <body>.
+    await expect.poll(async () => focusedGridCell(page), { timeout: 10_000 }).toBe('0,0');
+    // The row session is OVER: the grid keymap answers again.
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(async () => activeCellTabindex(page, 1, 0), { timeout: 10_000 }).toBe('0');
+  });
+
+  runnerFor(target)(`data-table-dropins editor [${target}]: B-13 a full-row drop-in commit fires row-edit-commit exactly once`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableEditorDropins&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount.getByTestId('edit-table').locator('table')).toBeVisible({ timeout: 15_000 });
+
+    await openRowEditor(page, 0, 0);
+    await mount.locator(NAME_DROPIN).fill('Zeta');
+    await mount.locator(NAME_DROPIN).press('Enter');
+    await expect.poll(async () => Number(await mount.getByTestId('row-commit-count').textContent()), { timeout: 10_000 }).toBe(1);
+    // Settle past the unmount-blur and any re-render, then assert it is STILL exactly one.
+    await page.waitForTimeout(600);
+    expect(Number(await mount.getByTestId('row-commit-count').textContent())).toBe(1);
+  });
+}
+

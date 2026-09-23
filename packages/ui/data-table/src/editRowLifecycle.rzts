@@ -98,6 +98,7 @@ const beginRowEdit = (row) => {
     draft[ec.colId] = orig ? orig[ec.field] : null
   }
   $data.rowDraft = draft
+  rowDraftSync = draft
   $data.editingRowIndex = rowIndex
   $data.activeInControl = true
   $data.editVer = $data.editVer + 1
@@ -125,7 +126,8 @@ const commitRow = () => {
   const r = rowList[rowIndex]
   const rowOriginal = r ? r.original : null
   const rowId = r ? r.id : null
-  const draft = $data.rowDraft || {}
+  // C-05: the SYNC mirror, not `$data.rowDraft` — see rowDraftSync in DataTable.rozie.
+  const draft = rowDraftSync || {}
   // Validate every edited column FIRST (D-01: a single failure blocks the whole row commit).
   // B3 (Rule 1): coerce each draft by the column's editor type BEFORE validation + write — a
   // 'number' editor must commit a real Number/null, never the raw editor STRING (the single-cell

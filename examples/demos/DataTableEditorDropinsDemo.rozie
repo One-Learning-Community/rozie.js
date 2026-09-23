@@ -54,6 +54,10 @@
   lastCommit: '',
   // Count of cell-edit-commit emits.
   commitCount: 0,
+  // quick 260922-mkb (C-05 / B-13): full-row (Shift+F2) commits. The count is the B-13 probe —
+  // a row of drop-ins must commit EXACTLY once per Enter, never twice.
+  lastRowCommit: '',
+  rowCommitCount: 0,
 }
 </data>
 
@@ -63,6 +67,14 @@
 const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue: unknown; newValue: unknown }): void => {
   $data.lastCommit = payload ? payload.columnId + '=' + String(payload.newValue) : ''
   $data.commitCount = $data.commitCount + 1
+}
+
+// row-edit-commit payload → "field=value,…" readout + a counter (C-05 / B-13).
+const onRowEditCommit = (payload: { rowId: unknown; changes: Array<{ columnId: string; newValue: unknown }> }): void => {
+  $data.lastRowCommit = payload && payload.changes
+    ? payload.changes.map((c) => c.columnId + '=' + String(c.newValue)).join(',')
+    : ''
+  $data.rowCommitCount = $data.rowCommitCount + 1
 }
 </script>
 
@@ -75,6 +87,10 @@ const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue:
     <span class="readout" data-testid="commit-readout">{{ $data.lastCommit }}</span>
     <span class="label">commit-count:</span>
     <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+    <span class="label">row commit:</span>
+    <span class="readout" data-testid="row-commit-readout">{{ $data.lastRowCommit }}</span>
+    <span class="label">row-commit-count:</span>
+    <span class="readout" data-testid="row-commit-count">{{ $data.rowCommitCount }}</span>
   </div>
 
   <div data-testid="edit-table">
@@ -82,6 +98,7 @@ const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue:
       interactionMode="grid"
       r-model:data="$data.rows"
       @cell-edit-commit="onCellEditCommit($event)"
+      @row-edit-commit="onRowEditCommit($event)"
     >
       <!-- editor='custom' routes all three columns through the #editor scoped slot. -->
       <Column field="name"      header="Name"    :editable="true" editor="custom" />

@@ -9,6 +9,16 @@ const editorCheckedFor = (colId) => !!(inRowEdit() ? ($data.rowDraft ? $data.row
 // row-mode commit targets the right draft key.
 const editorCommitFor = (colId) => (value) => {
   if (inRowEdit()) { setRowDraft(colId, value); return }
+  // C-10: during the drop-in wrapper's Tab flush, record the outcome and skip the focus
+  // return — the Tab handler advances focus to the next editor itself.
+  if (dropinTabFlush) {
+    dropinTabFlush.called = true
+    // STICKY: on Solid the commit's own model write re-creates the drop-in synchronously, and
+    // the fresh instance's blur re-enters here (latched → false) BEFORE this call returns. Only
+    // a successful commit may set the outcome; a latched re-entry must not clear it.
+    if (commitEdit(value, true)) dropinTabFlush.committed = true
+    return
+  }
   commitEdit(value)
 }
 const editorCancelFor = () => () => {
@@ -34,10 +44,13 @@ const onCellEditorCheckbox = (colId, evt) => {
 // setRowDraft: write ONE key into a FRESH rowDraft object (whole-object replace — an
 // in-place mutation is silently dropped on React/Solid; the family immutable rule).
 const setRowDraft = (colId, value) => {
-  const src = $data.rowDraft || {}
+  // C-05: build from the SYNC mirror, so two same-tick writes (and a same-tick commitRow) never
+  // see a React-stale `$data.rowDraft`.
+  const src = rowDraftSync || {}
   const next = {}
   for (const k in src) next[k] = src[k]
   next[colId] = value
+  rowDraftSync = next
   $data.rowDraft = next
 }
 
@@ -118,6 +131,95 @@ const onEditorKeyDown = (e) => {
   } else if (key === 'Escape') {
     e.preventDefault()
     cancelEdit()
+  }
+}
+
+// DECLARED AFTER onEditorKeyDown ON PURPOSE. It delegates to it, and the React emitter lowers
+// both to `useCallback`s whose DEPENDENCY ARRAY is evaluated EAGERLY at declaration time — so
+// with this one first, its deps array referenced `onEditorKeyDown` before the const existed and
+// every React cell in the family died with `ReferenceError: Cannot access 'ze' before
+// initialization` at mount. That is the 87-02 useCallback-deps-array ordering lesson, and it is
+// invisible on the other five targets. Keep this block below.
+// ── C-10 + C-05: the grid keymap for a CUSTOM #editor drop-in ───────────────────────────
+// The built-in editors bind `onEditorKeyDown` directly, so Tab commits-and-advances and, in
+// row mode, Enter commits the row. A drop-in binds nothing of ours: it is consumer markup
+// inside the `#editor` slot. Its own keydown handler covers Enter and Escape (the drop-in
+// contract) and stops there, and the keydown then bubbles to the table root where
+// `onGridKeyDown` early-returns because an editor is open. Result:
+//   C-10 — Tab in a drop-in did not commit and advance. It fell through to NATIVE tab order
+//          and walked focus out of the grid, leaving the editor open behind it.
+//   C-05 — in FULL-ROW mode a drop-in's `commit(v)` is draft-only BY DESIGN (committing per
+//          cell would split the row into N writes and N events), and the row commits only
+//          through handlers bound on the built-in inputs — which a row of drop-ins does not
+//          have. So Shift+F2, documented as "Enter commits the whole row in one
+//          `r-model:data` write", wrote a draft and nothing else, `editingRowIndex` stayed
+//          set, and `onGridKeyDown`'s early-return left arrow nav dead. The only exits were
+//          Escape (reverting the whole row) and the imperative verb.
+//
+// Bound on the `display: contents` span that wraps the slot, so it sees the bubbled event
+// from whatever the consumer rendered — including a bespoke editor that never heard of this
+// component. The host owning the GRID keymap while the drop-in owns its own CONTROL is the
+// same division the built-in path already has.
+//
+// Row mode ignores `defaultPrevented` for Enter/Escape on purpose: a drop-in preventDefaults
+// Enter to mean "do not insert a newline", not "the row is handled". Its own handler has
+// already run (target phase before bubble), so the draft is staged by the time we commit.
+// Single-cell mode honours `defaultPrevented` for Tab, so a drop-in that genuinely implements
+// its own Tab (a multi-field editor) keeps it.
+//
+// Single-cell Tab FLUSHES the drop-in before advancing (quick 260922-mkb). A drop-in owns its
+// draft: the host's `draftValue` still holds the value the editor opened with, so routing Tab
+// straight into onEditorKeyDown committed that stale value, opened the next cell's editor, and
+// then the old drop-in's unmount blur ran `commit(typed)` against the NOW-editing cell — the
+// typed text landed in the NEXT column (measured: `status=Zeta` from a Name edit, on four
+// targets). Instead the handler blurs the drop-in while its own cell is still the editing one,
+// so the drop-in's blur-commit (the drop-in contract) writes the right cell, and only then
+// advances. `dropinTabFlush` tells editorCommitFor to report the outcome and skip the focus
+// return. A drop-in that does not commit on blur (EditorCheckbox commits on change, so it holds
+// nothing pending) falls back to the host-draft path, which is exactly right in that case.
+const onEditorDropinKeyDown = (e) => {
+  if (!e) return
+  const key = e.key
+  if (inRowEdit()) {
+    if (key === 'Enter') { e.preventDefault(); commitRow(); return }
+    if (key === 'Escape') { e.preventDefault(); cancelRow(); return }
+    if (key === 'Tab') { e.preventDefault(); rowEditTab(e.target, e.shiftKey); return }
+    return
+  }
+  if (key !== 'Tab' || e.defaultPrevented) return
+  e.preventDefault()
+  const fromRow = $data.editingRow
+  const fromCol = $data.editingCol
+  const target = e.shiftKey ? prevEditableCell(fromRow, fromCol) : nextEditableCell(fromRow, fromCol)
+  const el = e.target
+  // Move focus to the drop-in's OWN cell rather than calling blur(): that still fires the
+  // drop-in's blur-commit, but keeps focus inside the grid instead of dropping it to <body>.
+  const ownCell = el && el.closest ? el.closest('[data-grid-cell]') : null
+  const flush = { called: false, committed: false }
+  dropinTabFlush = flush
+  if (ownCell && ownCell.focus) ownCell.focus()
+  else if (el && el.blur) el.blur()
+  dropinTabFlush = null
+  if (!flush.called) { onEditorKeyDown(e); return }
+  // A validation failure keeps the editor open: give the drop-in its focus back.
+  if (!flush.committed) { if (el && el.focus) el.focus(); return }
+  if (target) {
+    $data.activeRow = target.row
+    $data.activeColIndex = target.col
+    // Open the next editor on the NEXT FRAME, not in this tick. The commit above wrote the
+    // model, and on Solid the resulting row re-derivation re-creates the #editor slot content
+    // AFTER this handler returns — an editor opened synchronously here mounted, took focus, and
+    // was then torn down by that re-render, whose removal-blur closed it (measured). One frame
+    // lets the write settle first; the built-in editors never hit this because they are
+    // template elements, not slot content.
+    const tr = target.row
+    const tc = target.col
+    const open = () => beginEdit(tr, tc, null)
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(open)
+    else setTimeout(open, 16)
+  } else {
+    // B5 twin: no editable cell in the Tab direction — keep focus INSIDE the grid.
+    focusCellWhenReady(fromRow, fromCol)
   }
 }
 
@@ -293,4 +395,4 @@ const editRow = (rowIndex) => {
   beginRowEdit(row)
 }
 
-export { inRowEdit, editorValueFor, editorCheckedFor, editorCommitFor, editorCancelFor, onCellEditorInput, onCellEditorCheckbox, setRowDraft, rowEditTab, onEditorKeyDown, onEditorBlur, editCell, commitEditing, editRow }
+export { inRowEdit, editorValueFor, editorCheckedFor, editorCommitFor, editorCancelFor, onCellEditorInput, onCellEditorCheckbox, setRowDraft, rowEditTab, onEditorKeyDown, onEditorDropinKeyDown, onEditorBlur, editCell, commitEditing, editRow }
