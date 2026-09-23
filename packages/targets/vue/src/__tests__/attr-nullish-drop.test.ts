@@ -89,4 +89,19 @@ function cellTabindex(): number | null { return null; }
     expect(template).toContain(`:accept="x ? x.join(',') : undefined"`);
     expect(template).not.toContain('?? undefined');
   });
+
+  it('NEGATIVE: a ternary whose BOTH branches are provably non-nullish stays RAW (TS2869, quick 260922-mkb)', () => {
+    // `c ? 'true' : 'false'` can never be nullish, so `(…) ?? undefined` is an unreachable right
+    // operand — TS2869, which failed the @rozie-ui/data-table Vue leaf BUILD on GroupBar's
+    // `:aria-pressed`. A ternary with a nullable branch (the normalized `: undefined`) still wraps.
+    const ir = lowerInline(`<rozie name="Test">
+<data>{ on: false, id: null }</data>
+<template>
+  <button :aria-pressed="$data.on ? 'true' : 'false'" :aria-activedescendant="$data.on ? $data.id : null"></button>
+</template>
+</rozie>`);
+    const { template } = emitTemplate(ir, REGISTRY);
+    expect(template).toContain(`:aria-pressed="on ? 'true' : 'false'"`);
+    expect(template).toContain(`:aria-activedescendant="(on ? id : undefined) ?? undefined"`);
+  });
 });

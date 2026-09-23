@@ -223,9 +223,9 @@ const NON_NULLISH_LOGICAL_OPS: ReadonlySet<string> = new Set(['||', '&&', '??'])
  *   - a provably-number member read (`arr.length`, `set.size`);
  *   - a LogicalExpression `a || n` / `a ?? n` / `a && n` whose RHS is itself
  *     provably-non-nullish (`span || 1`).
- * A ConditionalExpression (`x ? n : null`, normalized to `: undefined`) is
- * deliberately NOT recognized, so it falls through to the `?? undefined` drop
- * with a REACHABLE right operand (its `undefined` branch → no TS2869).
+ * A ConditionalExpression is recognized only when BOTH branches are provably
+ * non-nullish (`c ? 'a' : 'b'`); `x ? n : null` (normalized to `: undefined`)
+ * falls through to the `?? undefined` drop with a REACHABLE right operand.
  */
 function isProvablyNonNullishAttr(expr: t.Expression): boolean {
   if (
@@ -240,6 +240,12 @@ function isProvablyNonNullishAttr(expr: t.Expression): boolean {
   // Every BinaryExpression yields a non-null primitive (arithmetic → number,
   // `+` with a string → string, comparison/equality → boolean).
   if (t.isBinaryExpression(expr)) return true;
+  // quick 260922-mkb — a ternary is non-nullish when BOTH branches are
+  // (`c ? 'true' : 'false'`): wrapping it is TS2869. A ternary with a nullable
+  // branch — including the normalized `: undefined` — is not, and still wraps.
+  if (t.isConditionalExpression(expr)) {
+    return isProvablyNonNullishAttr(expr.consequent) && isProvablyNonNullishAttr(expr.alternate);
+  }
   if (t.isUnaryExpression(expr)) {
     return (
       expr.operator === '!' ||
