@@ -207,7 +207,7 @@ interface EditorCtx {
           @if (colsWindowed()) {
     <th class="rdt-col-spacer" aria-hidden="true" [attr.style]="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th>
     }@for (wh of windowedHeadersFor(hg, hgLevel); track wh.header.id) {
-    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(wh.header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(wh.span > 1 ? wh.span : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, wh.header))" [attr.aria-colindex]="rozieAttr(headerLeafStart(hg, wh.header) + 1)" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(wh.header.column.id))" [style]="thStyle(wh.header, wh.width)">
+    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-pinned': columnPinSide(wh.header.column.id) !== '', 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(wh.header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(wh.span > 1 ? wh.span : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, wh.header))" [attr.aria-colindex]="rozieAttr(headerLeafStart(hg, wh.header) + 1)" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(wh.header.column.id))" [style]="thStyle(wh.header, wh.width)">
             @if (isSelectColumn(wh.header.column.id)) {
     <span style="display:contents">
               @if ((selectAllTpl ?? __rozieFillMap()['selectAll'] ?? templates()?.['selectAll'])) {
@@ -280,7 +280,7 @@ interface EditorCtx {
           @if (colsWindowed()) {
     <th class="rdt-col-spacer" aria-hidden="true" [attr.style]="'width:' + colPadLeft() + 'px;padding:0;border:0'"></th>
     }@for (wh of windowedHeadersFor(headerGroups()[headerGroups().length - 1], headerGroups().length - 1); track wh.header.id) {
-    <th class="rdt-filter-cell" role="presentation" [attr.data-col]="rozieAttr(wh.header.column.id)" [style]="pinStyle(wh.header.column.id)">
+    <th class="rdt-filter-cell" [ngClass]="{ 'rdt-pinned': columnPinSide(wh.header.column.id) !== '' }" role="presentation" [attr.data-col]="rozieAttr(wh.header.column.id)" [style]="pinStyle(wh.header.column.id)">
             @if (isSelectColumn(wh.header.column.id)) {
     <span style="display:contents"></span>
     } @else if (isExpanderColumn(wh.header.column.id)) {
@@ -324,7 +324,7 @@ interface EditorCtx {
           @if (colsWindowed()) {
     <td class="rdt-col-spacer" aria-hidden="true" [attr.style]="'width:' + colPadLeft() + 'px;padding:0;border:0'"></td>
     }@for (cell of windowedCells(wr.row); track cell.id) {
-    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell)))" [style]="bodyCellStyle(wr.row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell)))" [attr.aria-colindex]="rozieAttr(colIndexOf(wr.row, cell) + 1)" [attr.aria-selected]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null)" [attr.data-in-range]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
+    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-pinned': columnPinSide(cell.column.id) !== '', 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell)))" [style]="bodyCellStyle(wr.row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell)))" [attr.aria-colindex]="rozieAttr(colIndexOf(wr.row, cell) + 1)" [attr.aria-selected]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null)" [attr.data-in-range]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
             
             @if (isExpanderColumn(cell.column.id)) {
     <span style="display:contents">
@@ -436,7 +436,7 @@ interface EditorCtx {
         @for (hg of headerGroups(); track hg.id; let hgLevel = $index) {
     <tr class="rdt-tr" role="row" [attr.aria-rowindex]="rozieAttr(hgLevel + 1)">
           @for (header of hg.headers; track header.id) {
-    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.aria-colindex]="rozieAttr(headerLeafStart(hg, header) + 1)" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header)">
+    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-pinned': columnPinSide(header.column.id) !== '', 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.aria-colindex]="rozieAttr(headerLeafStart(hg, header) + 1)" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header)">
             
             
             @if (isSelectColumn(header.column.id)) {
@@ -510,7 +510,7 @@ interface EditorCtx {
         @if (hasAnyFilterableColumn()) {
     <tr class="rdt-filter-row">
           @for (header of headerGroups()[headerGroups().length - 1].headers; track header.id) {
-    <th class="rdt-filter-cell" role="presentation" [style]="pinStyle(header.column.id)">
+    <th class="rdt-filter-cell" [ngClass]="{ 'rdt-pinned': columnPinSide(header.column.id) !== '' }" role="presentation" [style]="pinStyle(header.column.id)">
             @if (isSelectColumn(header.column.id)) {
     <span style="display:contents"></span>
     } @else if (isExpanderColumn(header.column.id)) {
@@ -545,7 +545,7 @@ interface EditorCtx {
 
         <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(row) }" role="row" [attr.data-depth]="rozieAttr(row.depth)" [attr.aria-rowindex]="rozieAttr(bodyAriaRowIndex(row))" [attr.data-group-header]="rozieAttr(rowIsGrouped(row) ? row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(row) ? !!rowIsExpanded(row) : null)" [attr.aria-selected]="rozieAttr(selectionMode() !== 'none' ? !!rowIsSelected(row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? row.depth + 1 : null)">
           @for (cell of visibleCellsFor(row); track cell.id) {
-    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row)), colIndexOf(row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell)))" [style]="bodyCellStyle(row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell)))" [attr.aria-colindex]="rozieAttr(colIndexOf(row, cell) + 1)" [attr.aria-selected]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : null)" [attr.data-in-range]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
+    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-pinned': columnPinSide(cell.column.id) !== '', 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row)), colIndexOf(row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell)))" [style]="bodyCellStyle(row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell)))" [attr.aria-colindex]="rozieAttr(colIndexOf(row, cell) + 1)" [attr.aria-selected]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : null)" [attr.data-in-range]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
             
             @if (isExpanderColumn(cell.column.id)) {
     <span style="display:contents">
@@ -838,6 +838,9 @@ interface EditorCtx {
     }
     .rozie-data-table .rdt-filter-row {
       background: var(--rdt-filter-row-bg, rgba(0, 0, 0, 0.015));
+    }
+    .rozie-data-table .rdt-pinned {
+      box-sizing: border-box;
     }
     .rozie-data-table .rdt-filter-cell {
       padding: var(--rdt-filter-cell-padding, 0.35rem 0.75rem);

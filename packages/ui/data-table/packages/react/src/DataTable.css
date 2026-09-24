@@ -175,6 +175,9 @@
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-filter-row[data-rozie-s-d5dcab4c] {
   background: var(--rdt-filter-row-bg, rgba(0, 0, 0, 0.015));
 }
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-pinned[data-rozie-s-d5dcab4c] {
+  box-sizing: border-box;
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-filter-cell[data-rozie-s-d5dcab4c] {
   padding: var(--rdt-filter-cell-padding, 0.35rem 0.75rem);
   border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));

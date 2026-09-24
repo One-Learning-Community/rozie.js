@@ -2099,7 +2099,7 @@ $expose({
         :data-col-index="headerColIndexOf(hg, wh.header)"
         :aria-colindex="headerLeafStart(hg, wh.header) + 1"
         :tabindex="cellTabindex('__header', headerColIndexOf(hg, wh.header), hgLevel)"
-        :class="{ 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }"
+        :class="{ 'rdt-select-th': isSelectColumn(wh.header.column.id), 'rdt-expander-th': isExpanderColumn(wh.header.column.id), 'rdt-pinned': columnPinSide(wh.header.column.id) !== '', 'rdt-th-resizing': columnIsResizing(wh.header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, wh.header), hgLevel) }"
         :aria-sort="ariaSortFor(wh.header.column.id)"
         :style="thStyle(wh.header, wh.width)"
       >
@@ -2277,6 +2277,7 @@ $expose({
       ></th>
       <th
         class="rdt-filter-cell"
+        :class="{ 'rdt-pinned': columnPinSide(wh.header.column.id) !== '' }"
         role="presentation"
         r-for="wh in windowedHeadersFor($data.headerGroups[$data.headerGroups.length - 1], $data.headerGroups.length - 1)"
         :key="wh.header.id"
@@ -2382,7 +2383,7 @@ $expose({
         :data-row="wr.vi.index"
         :data-col-index="colIndexOf(wr.row, cell)"
         :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell))"
-        :class="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }"
+        :class="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-pinned': columnPinSide(cell.column.id) !== '', 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }"
         :style="bodyCellStyle(wr.row, cell.column.id)"
         :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell))"
         :aria-colindex="colIndexOf(wr.row, cell) + 1"
@@ -2660,7 +2661,7 @@ $expose({
         :data-col-index="headerColIndexOf(hg, header)"
         :aria-colindex="headerLeafStart(hg, header) + 1"
         :tabindex="cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)"
-        :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }"
+        :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-pinned': columnPinSide(header.column.id) !== '', 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }"
         :aria-sort="ariaSortFor(header.column.id)"
         :style="thStyle(header)"
       >
@@ -2825,6 +2826,7 @@ $expose({
     <tr class="rdt-filter-row" r-if="hasAnyFilterableColumn()">
       <th
         class="rdt-filter-cell"
+        :class="{ 'rdt-pinned': columnPinSide(header.column.id) !== '' }"
         role="presentation"
         r-for="header in $data.headerGroups[$data.headerGroups.length - 1].headers"
         :key="header.id"
@@ -2896,7 +2898,7 @@ $expose({
         :data-row="rowIndexOf(row)"
         :data-col-index="colIndexOf(row, cell)"
         :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell))"
-        :class="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row)), colIndexOf(row, cell)) }"
+        :class="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-pinned': columnPinSide(cell.column.id) !== '', 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row)), colIndexOf(row, cell)) }"
         :style="bodyCellStyle(row, cell.column.id)"
         :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell))"
         :aria-colindex="colIndexOf(row, cell) + 1"
@@ -3449,6 +3451,24 @@ $expose({
    for the input itself — only the row band + cell sizing is new here. */
 .rozie-data-table .rdt-filter-row {
   background: var(--rdt-filter-row-bg, rgba(0, 0, 0, 0.015));
+}
+/* ── A-06: a PINNED cell's declared width must equal its RENDERED width ──────────────────
+   `pinStyle()` computes the sticky offset from table-core's size model —
+   `column.getStart('left')`, the cumulative sum of the preceding pinned columns'
+   `getSize()`. Outside `.rdt-col-windowed` the cells are content-box, so the cell padding
+   (`--rdt-cell-padding`, 0.5rem 0.75rem by default) renders ON TOP of the declared width and
+   every cell is wider than the model says. Measured: the select rail declares 44px and
+   renders 58.2px, so the `name` column pinned after it sticks at `left: 44px` and overlaps
+   the rail by 14px as soon as the table is scrolled horizontally. Each further pinned column
+   compounds the error.
+
+   `box-sizing: border-box` on the PINNED cells alone makes declared == rendered for exactly
+   the cells whose geometry the sticky math depends on, and leaves every unpinned column's
+   rendering untouched — which is why the windowed path's own border-box rule was deliberately
+   scoped rather than applied to the base `.rdt-th`/`.rdt-td` rule. A pinned column now
+   renders at its declared width, which is what `getStart()` has always assumed it did. */
+.rozie-data-table .rdt-pinned {
+  box-sizing: border-box;
 }
 .rozie-data-table .rdt-filter-cell {
   padding: var(--rdt-filter-cell-padding, 0.35rem 0.75rem);
