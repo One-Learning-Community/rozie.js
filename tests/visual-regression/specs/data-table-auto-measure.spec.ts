@@ -474,3 +474,49 @@ for (const target of TARGETS) {
     }).toPass({ timeout: 5_000 });
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// N-05 (quick 260923-rrr) — after a scrollbar jump into never-measured rows, the view settles
+// within a few frames and then STAYS PUT.
+//
+// The host's remeasure sweep hands each rendered <tr> to virtual-core's measureElement; while
+// virtual-core considers the user to be scrolling that only OBSERVES the row (its
+// ResizeObserver then measures it and applies the above-viewport scroll adjustment). The sweep
+// ran in a microtask + one rAF — early enough on the fine-grained targets and Vue, but React and
+// Angular commit the new window AFTER that rAF, so the sweep measured the OLD rows and the new
+// ones were only handed over when virtual-core's 150ms "scrolling ended" tick fired. The user saw
+// the un-adjusted layout for ~150ms and then the whole view jumped 1–3 rows (measured: React top
+// row 80→77, Angular 80→79). Asserted as the user sees it: the topmost VISIBLE row and its pixel
+// offset at 100ms are the ones still there at 800ms.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+async function topVisibleRow(page: Page): Promise<{ idx: string | null; off: number | null }> {
+  return page.evaluate(() => {
+    const find = (window as unknown as { __findWithinGridTableBoth: (s: string) => Element | null }).__findWithinGridTableBoth;
+    const sc = find('.rdt-scroll') as HTMLElement | null;
+    if (!sc) return { idx: null, off: null };
+    const top = sc.getBoundingClientRect().top;
+    const trs = Array.from(sc.querySelectorAll('tr[data-index]')) as HTMLElement[];
+    const vis = trs
+      .filter((tr) => tr.getBoundingClientRect().bottom > top + 1)
+      .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0];
+    return vis
+      ? { idx: vis.getAttribute('data-index'), off: Math.round((vis.getBoundingClientRect().top - top) * 10) / 10 }
+      : { idx: null, off: null };
+  });
+}
+
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-auto-measure [${target}]: N-05 after a scrollbar jump the view settles within a few frames and does not lurch later`, async ({
+    page,
+  }) => {
+    await gotoDemo(page, target);
+    await scrollBothToOffset(page, 0.4);
+    await page.waitForTimeout(100);
+    const early = await topVisibleRow(page);
+    expect(early.idx).not.toBeNull();
+    await page.waitForTimeout(700);
+    const late = await topVisibleRow(page);
+    expect(late.idx, `early=${JSON.stringify(early)} late=${JSON.stringify(late)}`).toBe(early.idx);
+    expect(Math.abs((late.off ?? 0) - (early.off ?? 0))).toBeLessThanOrEqual(1);
+  });
+}

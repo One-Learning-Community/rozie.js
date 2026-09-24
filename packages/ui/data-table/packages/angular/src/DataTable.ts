@@ -2967,6 +2967,9 @@ export class DataTable {
   //     committed yet), so the rAF pass is what observes React's recycled rows.
   // Each pass only OBSERVES + measures the live window; measureElement is idempotent on an
   // already-observed node, so running both is cheap and loop-free.
+  // Upper bound on the frames scheduleRemeasure() will wait for the framework to commit a recycled
+  // window (N-05). Measured commit lag is 1 frame on React/Angular; 10 is generous headroom.
+  REMEASURE_MAX_FRAMES = 10;
   scheduleRemeasure = () => {
     // 87-13: never arm a new sweep after teardown — an onChange can still fire from a
     // virtualizer whose own ResizeObserver cleanup has run but whose queued tick was already
@@ -2978,10 +2981,22 @@ export class DataTable {
     const microPass = () => {
       this.remeasureWindow();
     };
+    // N-05 (quick 260923-rrr): the rAF pass keys on the OUTCOME, not on "a frame went by". React
+    // and Angular commit the recycled window AFTER that first rAF, so a single pass measured the
+    // OLD rows and the new ones were only handed to measureElement when virtual-core's 150ms
+    // scrolling-ended tick fired an onChange — the user saw the un-adjusted layout, then a 1–3 row
+    // jump (measured). While the committed <tr> set does not yet cover the virtualizer's window,
+    // re-run next frame, bounded so a window that can never be covered cannot spin forever.
+    let rafAttempts = 0;
     const rafPass = () => {
       this.remeasureRaf = null;
+      const covered = this.remeasureWindow();
+      rafAttempts = rafAttempts + 1;
+      if (!covered && rafAttempts < this.REMEASURE_MAX_FRAMES && !this.remeasureDisposed && typeof requestAnimationFrame === 'function') {
+        this.remeasureRaf = requestAnimationFrame(rafPass);
+        return;
+      }
       this.remeasurePending = false;
-      this.remeasureWindow();
     };
     if (typeof queueMicrotask !== 'undefined') {
       ranMicro = true;
@@ -3060,8 +3075,8 @@ export class DataTable {
     // cover unmount — virtualizer/gridRoot are assigned in $onMount and never nulled — so this
     // is the only thing standing between a pass queued pre-unmount and refineRowEstimate()'s
     // setOptions/scrollTop/$data.windowVer writes against a torn-down instance.
-    if (this.remeasureDisposed) return;
-    if (!this.virtualizer || !this.gridRoot) return;
+    if (this.remeasureDisposed) return true;
+    if (!this.virtualizer || !this.gridRoot) return true;
     // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
     // exclusively during scrollToIndex / scrollToOffset (the D-12 scroll-then-focus seam) and
     // null for ordinary user/scrollTop-driven scrolling (verified virtual-core@3.17.1: set in
@@ -3069,9 +3084,23 @@ export class DataTable {
     // resizeItem nudge the offset and starve the scroll target (the Solid off-window focus
     // regression); the next settled onChange re-measures the stable window. Manual-scroll
     // recycling (the CR-01 case) has scrollState === null, so it measures normally.
-    if (this.virtualizer.scrollState) return;
+    if (this.virtualizer.scrollState) return true;
     const trs = this.gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]');
-    for (const tr of trs as any) this.virtualizer.measureElement(tr);
+    const rendered = new Set();
+    for (const tr of trs as any) {
+      this.virtualizer.measureElement(tr);
+      rendered.add(tr.getAttribute('data-index'));
+    }
+    // N-05: did the committed rows cover the virtualizer's CURRENT window? False while the
+    // framework has not yet committed the recycled set (see scheduleRemeasure).
+    let covered = true;
+    const items = this.virtualizer.getVirtualItems();
+    for (let i = 0; i < items.length; i++) {
+      if (!rendered.has(String(items[i].index))) {
+        covered = false;
+        break;
+      }
+    }
     // D-15 (Phase 87 87-07): trigger the shared engine's post-measurement fold + hysteresis
     // re-feed via the afterRowRemeasure mutable-let hook (DataTable.rozie's own script,
     // assigned to windowing.rzts's refineRowEstimate()) — NEVER a direct call from this file
@@ -3080,6 +3109,7 @@ export class DataTable {
     // documents for columnVirtualizerOptions()). Inert (no-op) until the host assigns it; the
     // off/pre-mount path never reaches this line since virtualizer is null there.
     if (this.afterRowRemeasure) this.afterRowRemeasure();
+    return covered;
   };
   // D-04: this shell exports ONLY the impure, data-table-specific host pieces. The pure windowing
   // math (windowedRows / padTop / padBottom / pmIndexInWindow / rowIsOutsideWindow / virtualizerOptions
