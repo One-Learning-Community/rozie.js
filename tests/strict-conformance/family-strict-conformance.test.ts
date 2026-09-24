@@ -201,7 +201,9 @@ const FAMILIES: FamilySpec[] = [
         // calls mirror `cellTabindex`'s existing `level = null` param shape (a `number`
         // hgLevel passed to a param TS narrows to `null`) — the identical inherent
         // strict-null residual already recorded for cellTabindex's header calls.
-        TS2345: 11,
+        // Quick 260922-mkb: 11 → 9 — resolveCellEl's `level` annotated `number | null`
+        // (494ff8630). A decrease only.
+        TS2345: 9,
         // 4 → 6 (gap-closure 87-11, correcting a misattribution in
         // deferred-items.md that blamed gap-closure 87-09's isColRtl() RTL
         // wiring): the actual introducing commit is gap-closure 87-05 Task 1
@@ -233,7 +235,9 @@ const FAMILIES: FamilySpec[] = [
         // 13 → 11 (260712-kl1): `createControllableSignal<T>` now widens to `T | null`
         // for a literal `default: null` model prop — `expanded`/`grouping` (2 sites)
         // no longer TS2345 (`null` not assignable to `T`) under strictNullChecks.
-        TS2345: 11,
+        // Quick 260922-mkb: 11 → 9 — resolveCellEl's `level` annotated `number | null`
+        // (494ff8630). A decrease only.
+        TS2345: 9,
         TS2379: 1,
         TS7023: 1,
         TS7022: 1,
@@ -269,7 +273,9 @@ const FAMILIES: FamilySpec[] = [
         TS2379: 1,
         // 9 → 11 (260708-ni6, grid pointer §1): the two new `isActiveCell(...)` header
         // calls mirror `cellTabindex`'s existing `level = null` inherent strict-null shape.
-        TS2345: 11,
+        // Quick 260922-mkb: 11 → 9 — resolveCellEl's `level` annotated `number | null`
+        // (494ff8630). A decrease only.
+        TS2345: 9,
         TS7006: 2,
         TS7024: 1,
         TS7022: 1,
