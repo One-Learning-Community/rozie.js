@@ -1,0 +1,87 @@
+<!--
+  ComboboxVirtualVariableDemo.rozie — quick 260923-rrr (N-05) RED-first fixture: ComboboxVirtual with
+  every third option three lines tall, for combobox-virtual-variable.spec.ts.
+-->
+
+<rozie name="ComboboxVirtualVariableDemo">
+
+<components>
+{
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+
+<data>
+{
+  options: [],
+  optionCount: 0,
+  value: null,
+}
+</data>
+
+<script>
+// Seed 1,000 deterministic options (stable ids + labels) so the window + measured
+// total are reproducible across the six targets and the Linux VR baselines.
+$onMount(() => {
+  const out = []
+  for (let i = 1; i <= 1000; i++) {
+    // quick 260923-rrr (N-05): every THIRD option is three lines tall (see ListboxVirtualVariable).
+    out.push({ id: i, label: 'Option ' + i, tall: i % 3 === 0, value: 'opt-' + i })
+  }
+  $data.options = out
+  $data.optionCount = out.length
+})
+</script>
+
+<template>
+<div class="combobox-virtual-demo">
+  <h3>Combobox — virtual, variable-height options (1000)</h3>
+
+  <div class="controls">
+    <span class="label">options:</span>
+    <span class="readout" data-testid="option-count">{{ $data.optionCount }}</span>
+    <span class="label">value:</span>
+    <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
+  </div>
+
+  <div data-testid="virtual-variable-combobox">
+    <Combobox
+      :options="$data.options"
+      r-model:value="$data.value"
+      :virtual="true"
+      :disable-filter="true"
+      :close-on-select="false"
+      inline
+      maxHeight="320px"
+      idBase="virtual-variable-combobox"
+      ariaLabel="Pick an option"
+    >
+      <template #option="{ option, selected }">
+        <span class="opt" :class="{ 'opt-selected': selected, 'opt-tall': option.tall }">{{ option.label }}</span>
+      </template>
+    </Combobox>
+  </div>
+</div>
+</template>
+
+<style>
+.combobox-virtual-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.combobox-virtual-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; }
+.opt-tall { display: block; min-height: 4.5em; }
+</style>
+
+</rozie>

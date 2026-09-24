@@ -1,0 +1,89 @@
+<!--
+  ListboxVirtualVariableDemo.rozie — quick 260923-rrr (N-05) RED-first fixture: the ListboxVirtual
+  shape with every third option three lines tall, for listbox-virtual-variable.spec.ts.
+-->
+
+<rozie name="ListboxVirtualVariableDemo">
+
+<components>
+{
+  Listbox: '../../packages/ui/listbox/src/Listbox.rozie',
+}
+</components>
+
+<data>
+{
+  options: [],
+  optionCount: 0,
+  value: [],
+}
+</data>
+
+<script>
+// Seed 1,000 deterministic options (stable ids + labels) so the window + measured
+// total are reproducible across the six targets and the Linux VR baselines.
+$onMount(() => {
+  const out = []
+  for (let i = 1; i <= 1000; i++) {
+    // quick 260923-rrr (N-05): every THIRD option is a three-line entry, so real heights
+    // differ from the estimate and the windowing engine's above-viewport scroll adjustment has
+    // something to correct — the only situation in which a late measurement is visible.
+    out.push({ id: i, label: 'Option ' + i, tall: i % 3 === 0, value: 'opt-' + i })
+  }
+  $data.options = out
+  $data.optionCount = out.length
+})
+</script>
+
+<template>
+<div class="listbox-virtual-variable-demo">
+  <h3>Listbox — virtual, variable-height options (1000)</h3>
+
+  <div class="controls">
+    <span class="label">options:</span>
+    <span class="readout" data-testid="option-count">{{ $data.optionCount }}</span>
+    <span class="label">selected:</span>
+    <span class="readout" data-testid="selected-count">{{ $data.value.length }}</span>
+  </div>
+
+  <div data-testid="virtual-variable-listbox">
+    <Listbox
+      :options="$data.options"
+      r-model:value="$data.value"
+      :virtual="true"
+      :multiple="true"
+      :close-on-select="false"
+      inline
+      maxHeight="320px"
+      id="virtual-variable-listbox"
+      aria-label="Pick options"
+    >
+      <template #option="{ option, selected }">
+        <span class="opt" :class="{ 'opt-selected': selected, 'opt-tall': option.tall }">{{ option.label }}</span>
+      </template>
+    </Listbox>
+  </div>
+</div>
+</template>
+
+<style>
+.listbox-virtual-variable-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.listbox-virtual-variable-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; }
+.opt-tall { display: block; min-height: 4.5em; }
+</style>
+
+</rozie>

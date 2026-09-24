@@ -1037,9 +1037,20 @@ const scheduleRemeasure = () => {
   const microPass = () => {
     remeasureWindow();
   };
+  // N-05 (quick 260923-rrr): key the rAF pass on the OUTCOME. React and Angular commit the
+  // recycled window AFTER the first rAF, so one pass measured the OLD options and the new ones
+  // waited for virtual-core's 150ms scrolling-ended tick — with variable-height options the late
+  // above-viewport adjustment then moved the whole list (measured). Re-run next frame until the
+  // committed options cover the virtualizer's window, bounded (the data-table host twin).
+  let rafAttempts = 0;
   const rafPass = () => {
+    const covered = remeasureWindow();
+    rafAttempts = rafAttempts + 1;
+    if (!covered && rafAttempts < 10 && typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(rafPass);
+      return;
+    }
     remeasurePending = false;
-    remeasureWindow();
   };
   if (typeof queueMicrotask !== 'undefined') {
     ranMicro = true;
@@ -1051,10 +1062,20 @@ const scheduleRemeasure = () => {
 // true height is observed (virtual-core measures ONLY nodes passed to measureElement,
 // keyed by the data-index attribute). Bails during a programmatic scroll.
 const remeasureWindow = () => {
-  if (!virtualizer || !gridScrollEl) return;
-  if (virtualizer.scrollState) return;
+  if (!virtualizer || !gridScrollEl) return true;
+  if (virtualizer.scrollState) return true;
   const els = gridScrollEl.querySelectorAll('.rozie-combobox-option[data-index]');
-  for (const el of els as any) virtualizer.measureElement(el);
+  const rendered = new Set();
+  for (const el of els as any) {
+    virtualizer.measureElement(el);
+    rendered.add(el.getAttribute('data-index'));
+  }
+  // N-05: false while the framework has not yet committed the recycled window.
+  const items = virtualizer.getVirtualItems();
+  for (let i = 0; i < items.length; i++) {
+    if (!rendered.has(String(items[i].index))) return false;
+  }
+  return true;
 };
 // Keep the active option visible inside the popup. When windowing, route through the
 // virtualizer (scrollToIndex) so an active option OUTSIDE the rendered window scrolls

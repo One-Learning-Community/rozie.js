@@ -1445,9 +1445,20 @@ private __rozieFirstUpdateDone = false;
   const microPass = () => {
     this.remeasureWindow();
   };
+  // N-05 (quick 260923-rrr): key the rAF pass on the OUTCOME. React and Angular commit the
+  // recycled window AFTER the first rAF, so one pass measured the OLD options and the new ones
+  // waited for virtual-core's 150ms scrolling-ended tick — with variable-height options the late
+  // above-viewport adjustment then moved the whole list (measured). Re-run next frame until the
+  // committed options cover the virtualizer's window, bounded (the data-table host twin).
+  let rafAttempts = 0;
   const rafPass = () => {
+    const covered = this.remeasureWindow();
+    rafAttempts = rafAttempts + 1;
+    if (!covered && rafAttempts < 10 && typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(rafPass);
+      return;
+    }
     this.remeasurePending = false;
-    this.remeasureWindow();
   };
   if (typeof queueMicrotask !== 'undefined') {
     ranMicro = true;
@@ -1460,10 +1471,20 @@ private __rozieFirstUpdateDone = false;
   // true height is observed (virtual-core measures ONLY nodes passed to measureElement,
   // keyed by the data-index attribute). Bails during a programmatic scroll.
   remeasureWindow = () => {
-  if (!this.virtualizer || !this.gridScrollEl) return;
-  if (this.virtualizer.scrollState) return;
+  if (!this.virtualizer || !this.gridScrollEl) return true;
+  if (this.virtualizer.scrollState) return true;
   const els = this.gridScrollEl.querySelectorAll('.rozie-combobox-option[data-index]');
-  for (const el of els as any) this.virtualizer.measureElement(el);
+  const rendered = new Set();
+  for (const el of els as any) {
+    this.virtualizer.measureElement(el);
+    rendered.add(el.getAttribute('data-index'));
+  }
+  // N-05: false while the framework has not yet committed the recycled window.
+  const items = this.virtualizer.getVirtualItems();
+  for (let i = 0; i < items.length; i++) {
+    if (!rendered.has(String(items[i].index))) return false;
+  }
+  return true;
 };
 
   // Keep the active option visible inside the popup. When windowing, route through the

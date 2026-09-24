@@ -674,7 +674,11 @@ export const EXAMPLES = [
   // sweep already cover them, importing the listbox/combobox source pkgs + the
   // headless-core src root already registered for Angular cross-tree AOT).
   'ListboxVirtual',
+  // quick 260923-rrr (N-05): variable-height options (every 3rd is 3 lines tall).
+  'ListboxVirtualVariable',
   'ComboboxVirtual',
+  // quick 260923-rrr (N-05): variable-height options.
+  'ComboboxVirtualVariable',
   // combobox-virtual-reactivity phase — the live-flip cell (loader →
   // examples/demos/ComboboxVirtualFlipDemo.rozie, importing packages/ui/combobox/src/
   // Combobox.rozie): seeds `virtual: false` + a `flip-virtual` toggle so the matrix can
@@ -1609,7 +1613,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 64 P4 windowing — '-demo' appended on Lit → tags 'rozie-listbox-virtual-demo'
   // / 'rozie-combobox-virtual-demo' = kebab of {Listbox,Combobox}VirtualDemo.
   ListboxVirtual: 'rozie-listbox-virtual',
+  ListboxVirtualVariable: 'rozie-listbox-virtual-variable',
   ComboboxVirtual: 'rozie-combobox-virtual',
+  ComboboxVirtualVariable: 'rozie-combobox-virtual-variable',
   // combobox-virtual-reactivity phase — '-demo' appended on Lit → tag
   // 'rozie-combobox-virtual-flip-demo' = kebab of ComboboxVirtualFlipDemo.
   ComboboxVirtualFlip: 'rozie-combobox-virtual-flip',
@@ -2136,7 +2142,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // 1,000-option list in $onMount and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
   ListboxVirtual: {},
+  ListboxVirtualVariable: {},
   ComboboxVirtual: {},
+  ComboboxVirtualVariable: {},
   // combobox-virtual-reactivity phase — ComboboxVirtualFlipDemo is self-contained: it
   // seeds its own 1,000-option list + `virtual: false` in $onMount/<data> and binds
   // r-model:value + :virtual internally (not parent-supplied), so no MODEL_PROPS entry.
