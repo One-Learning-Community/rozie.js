@@ -560,3 +560,36 @@ for (const target of TARGETS) {
       .toBe('text');
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// B-04 (quick 260922-mkb) — Ctrl/Cmd+Shift+Arrow extends to the EDGE from the range's FOCUS
+// corner, not from the active cell.
+//
+// `extendRange(dRow, dCol)` moves the range FOCUS corner by the delta, but the caller measured
+// the delta from the ACTIVE cell. They agree after shift+arrow, not after a drag-select, which
+// moves the focus corner and leaves the active cell on the mousedown anchor. Drag (2,1)→(3,2):
+// Ctrl+Shift+ArrowUp must reach row 0 (rows 0..2 × cols 1..2 = 6 cells); measuring from the
+// active row stops one row short (4). Ctrl+Shift+ArrowLeft must reach col 0 (rows 2..3 × cols
+// 0..1 = 4); measuring from the active col stops at col 1 (2).
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-selection [${target}]: B-04 Ctrl+Shift+Arrow after a drag extends from the focus corner to the edge`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await dragSelect(page, 2, 1, 3, 2);
+    await expect.poll(async () => countInRange(page, 'grid-table'), { timeout: 10_000 }).toBe(4);
+    await page.keyboard.press('Control+Shift+ArrowUp');
+    await expect.poll(async () => countInRange(page, 'grid-table'), { timeout: 10_000 }).toBe(6);
+    expect(await cellHasClass(page, 'grid-table', 0, 1, 'rdt-in-range')).toBe(true);
+    expect(await cellHasClass(page, 'grid-table', 0, 2, 'rdt-in-range')).toBe(true);
+    expect(await cellHasClass(page, 'grid-table', 3, 1, 'rdt-in-range')).toBe(false);
+
+    // Fresh drag, the other axis.
+    await dragSelect(page, 2, 1, 3, 2);
+    await expect.poll(async () => countInRange(page, 'grid-table'), { timeout: 10_000 }).toBe(4);
+    await page.keyboard.press('Control+Shift+ArrowLeft');
+    await expect.poll(async () => countInRange(page, 'grid-table'), { timeout: 10_000 }).toBe(4);
+    expect(await cellHasClass(page, 'grid-table', 2, 0, 'rdt-in-range')).toBe(true);
+    expect(await cellHasClass(page, 'grid-table', 3, 0, 'rdt-in-range')).toBe(true);
+    expect(await cellHasClass(page, 'grid-table', 2, 2, 'rdt-in-range')).toBe(false);
+  });
+}

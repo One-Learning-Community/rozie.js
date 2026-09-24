@@ -4768,7 +4768,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // nextRow/nextCol locals and FALLS THROUGH to the shared focus seam (like Ctrl+Home/End). ──
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && !activeIsHeader() && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
       e.preventDefault();
-      if (key === 'ArrowUp') extendRange(-activeRow(), 0);else if (key === 'ArrowDown') extendRange(bodyRowCount() - 1 - activeRow(), 0);else if (key === 'ArrowLeft') extendRange(0, -activeColIndex());else extendRange(0, visibleColCount() - 1 - activeColIndex());
+      // B-04: measured from the range's FOCUS corner, which is what extendRange moves — not
+      // from the active cell, which a drag-select or Ctrl+A leaves somewhere else entirely.
+      if (key === 'ArrowUp') extendRange(-rangeFocusRow(), 0);else if (key === 'ArrowDown') extendRange(bodyRowCount() - 1 - rangeFocusRow(), 0);else if (key === 'ArrowLeft') extendRange(0, -rangeFocusCol());else extendRange(0, visibleColCount() - 1 - rangeFocusCol());
       return;
     } else if ((e.ctrlKey || e.metaKey) && !activeIsHeader() && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
       e.preventDefault();
@@ -5828,6 +5830,28 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     setRangeFocus(focus);
     rangeActive = true;
     emitRangeChange(anchor, focus);
+  }
+
+  // ── B-04: where does a range EXTENSION measure its delta from? ──────────────────────────
+  // `extendRange(dRow, dCol)` applies its delta to the range's FOCUS corner, not to the active
+  // cell. For shift+arrow the two always agree (extendRange writes the active cell to the new
+  // focus on every step), but two paths deliberately move the focus corner WITHOUT syncing the
+  // active cell: a drag-select (`setRangeFocus`, which leaves the active cell on the mousedown
+  // anchor) and Ctrl+A (`selectAllBody`, which sets both corners outright). After either,
+  // Ctrl/Cmd+Shift+Arrow computed "distance from the active cell to the edge" and then added it
+  // to a DIFFERENT cell. Drag (5,2)->(7,3) then Ctrl+Shift+ArrowUp extended to row 2 instead of
+  // row 0; Ctrl+Shift+ArrowLeft to column 1 instead of column 0 — an extend-to-edge that stops
+  // short of the edge by exactly the gap between the two.
+  //
+  // These report the corner extendRange will actually move, so the delta and its target are the
+  // same cell by construction. No range yet -> the active cell IS the focus corner.
+  function rangeFocusRow() {
+    const f = rangeFocus();
+    return f && f.rowIndex != null ? f.rowIndex : activeRow();
+  }
+  function rangeFocusCol() {
+    const f = rangeFocus();
+    return f && f.colIndex != null ? f.colIndex : activeColIndex();
   }
 
   // B-15: the APG grid pattern's Ctrl+Space — select the COLUMN containing the focused cell.

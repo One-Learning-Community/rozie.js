@@ -121,9 +121,11 @@ describe('ROZ138 corpus precision (quick task 260829-8w1)', () => {
         // clamp($data.activeRow, …)`, `if (row !== $data.activeRow)` — same 3 sites.
         // Quick 260922-mkb (B-15): +35 more (603/606/607 → 638/641/642) from the
         // Shift+Space / Ctrl+Space / Escape block inserted above; same 3 statements.
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:638',
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:641',
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:642',
+        // Quick 260922-mkb (B-04): +2 (638/641/642 → 640/643/644) from the focus-corner
+        // comment added to the Ctrl+Shift+Arrow branch above; same 3 statements.
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:640',
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:643',
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:644',
       ].sort(),
     );
   });

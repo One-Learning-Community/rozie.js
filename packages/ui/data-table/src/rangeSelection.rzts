@@ -166,6 +166,28 @@ const selectAllBody = () => {
   emitRangeChange(anchor, focus)
 }
 
+// ── B-04: where does a range EXTENSION measure its delta from? ──────────────────────────
+// `extendRange(dRow, dCol)` applies its delta to the range's FOCUS corner, not to the active
+// cell. For shift+arrow the two always agree (extendRange writes the active cell to the new
+// focus on every step), but two paths deliberately move the focus corner WITHOUT syncing the
+// active cell: a drag-select (`setRangeFocus`, which leaves the active cell on the mousedown
+// anchor) and Ctrl+A (`selectAllBody`, which sets both corners outright). After either,
+// Ctrl/Cmd+Shift+Arrow computed "distance from the active cell to the edge" and then added it
+// to a DIFFERENT cell. Drag (5,2)->(7,3) then Ctrl+Shift+ArrowUp extended to row 2 instead of
+// row 0; Ctrl+Shift+ArrowLeft to column 1 instead of column 0 — an extend-to-edge that stops
+// short of the edge by exactly the gap between the two.
+//
+// These report the corner extendRange will actually move, so the delta and its target are the
+// same cell by construction. No range yet -> the active cell IS the focus corner.
+const rangeFocusRow = () => {
+  const f = $data.rangeFocus
+  return f && f.rowIndex != null ? f.rowIndex : $data.activeRow
+}
+const rangeFocusCol = () => {
+  const f = $data.rangeFocus
+  return f && f.colIndex != null ? f.colIndex : $data.activeColIndex
+}
+
 // B-15: the APG grid pattern's Ctrl+Space — select the COLUMN containing the focused cell.
 // Expressed as a full-height rectangle over the SAME range corners shift+arrow and Ctrl+A
 // drive, so Ctrl+C / Ctrl+X / Delete / the fill handle all act on it with no new machinery
@@ -238,4 +260,4 @@ const clampRange = (maxRowArg, maxColArg) => {
   }
 }
 
-export { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, selectAllBody, selectActiveColumn, clearRange, clampRange }
+export { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, selectAllBody, selectActiveColumn, rangeFocusRow, rangeFocusCol, clearRange, clampRange }

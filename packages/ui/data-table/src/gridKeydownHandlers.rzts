@@ -67,10 +67,12 @@ const onGridKeyDown = (e) => {
   // nextRow/nextCol locals and FALLS THROUGH to the shared focus seam (like Ctrl+Home/End). ──
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && !$data.activeIsHeader && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
     e.preventDefault()
-    if (key === 'ArrowUp') extendRange(-$data.activeRow, 0)
-    else if (key === 'ArrowDown') extendRange((bodyRowCount() - 1) - $data.activeRow, 0)
-    else if (key === 'ArrowLeft') extendRange(0, -$data.activeColIndex)
-    else extendRange(0, (visibleColCount() - 1) - $data.activeColIndex)
+    // B-04: measured from the range's FOCUS corner, which is what extendRange moves — not
+    // from the active cell, which a drag-select or Ctrl+A leaves somewhere else entirely.
+    if (key === 'ArrowUp') extendRange(-rangeFocusRow(), 0)
+    else if (key === 'ArrowDown') extendRange((bodyRowCount() - 1) - rangeFocusRow(), 0)
+    else if (key === 'ArrowLeft') extendRange(0, -rangeFocusCol())
+    else extendRange(0, (visibleColCount() - 1) - rangeFocusCol())
     return
   }
   else if ((e.ctrlKey || e.metaKey) && !$data.activeIsHeader && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
