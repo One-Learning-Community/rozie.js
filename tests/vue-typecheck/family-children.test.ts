@@ -102,7 +102,11 @@ const FAMILIES: FamilySpec[] = [
         // `cellTabindex`. Batch 1 bumped the react/solid/lit @rozie/strict-conformance
         // baselines but this SEPARATE @rozie/vue-typecheck family-children gate was
         // missed; recorded here (not `as any`-patched) per "no cosmetic tsc" discipline.
-        TS2345: 11,
+        // Quick 260922-mkb: 11 → 9. resolveCellEl's `level` param is now annotated
+        // `number | null` (an untyped `level = null` inferred `null`, so every header call site
+        // passing a real level was a TS2345). A decrease only — B-03's one new call site is
+        // covered by the same annotation.
+        TS2345: 9,
         TS7006: 2,
         TS7022: 1,
         TS7023: 1,

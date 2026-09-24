@@ -4726,7 +4726,10 @@ export class DataTable {
   // post-mount root. Uniform on all six, shadow-safe (the query runs from inside the
   // component's own scope). rowKey is the literal '__header' or a String(integer index) and
   // colIndex is an integer — NO consumer string is interpolated into the selector (T-49-01).
-  resolveCellEl = (rowKey: any, colIndex: any, level: any = null) => {
+  // `level` is ANNOTATED, not just defaulted: an untyped `level = null` infers the param type as
+  // `null`, so every header call site passing a real level (`lvl`, activeHeaderLevel) was a
+  // TS2345 under the strict leaf typecheck (quick 260922-mkb — B-03 added one more such call).
+  resolveCellEl = (rowKey: any, colIndex: any, level: number | null = null) => {
     if (!this.gridRoot) return null;
     // B12: a grouped multi-level header has MULTIPLE cells sharing data-row="__header" at the
     // same data-col-index across levels (parent vs leaf). Disambiguate header lookups by the
