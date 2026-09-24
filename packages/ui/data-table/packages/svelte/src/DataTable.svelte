@@ -1382,9 +1382,18 @@ const forcedColumns = (): number[] => {
     }
   }
   // Active cell's column (D-10): required or focusActiveCell()'s [data-col-index="N"]
-  // querySelector cannot resolve for an off-window active cell. Body cells only — a header-
-  // active cell has no column-axis rendering dependency here (headers window separately).
-  if (!activeIsHeader && activeColIndex >= 0 && out.indexOf(activeColIndex) === -1) {
+  // querySelector cannot resolve for an off-window active cell.
+  //
+  // B-03: this used to be body-cells-only, on the stated grounds that "a header-active cell
+  // has no column-axis rendering dependency here (headers window separately)". That is false —
+  // `windowedHeadersFor()` slices the header row from `windowedColIndices()`, the very set this
+  // function feeds, so a header cell has EXACTLY the same dependency a body cell does. With the
+  // active header column unforced, focusing a leaf header in a 60-column windowed grid and
+  // pressing End left `resolveCellEl` with nothing to find: focus froze on the old `<th>` while
+  // the roving model moved on, and `cellTabindex` handed `tabindex="0"` to a cell that does not
+  // exist — so the grid had no tab stop at all. The gate is gone; the column is forced for
+  // whichever axis the active cell is on.
+  if (activeColIndex >= 0 && out.indexOf(activeColIndex) === -1) {
     out.push(activeColIndex);
   }
   // Editing column (D-10): required or an open editor unmounts mid-keystroke when a
@@ -3273,10 +3282,18 @@ const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, ne
   // both are out, and the ONE existing poll below is reused unchanged — it already resolves the
   // target cell by BOTH (row, col) via resolveCellEl(String(r), c), so a cell that becomes
   // reachable via the column axis needs no new poll logic (per the plan's own key_links note).
+  // B-03: the COLUMN axis applies to HEADER cells too. This guard used to be `!header &&
+  // (rowOut || colOut)`, so a header-active move to an off-window column never scrolled it in:
+  // `resolveCellEl` returned null, focus froze on the old `<th>` while the state and the ring
+  // ran away to a column with no DOM node, and `cellTabindex` then reported 0 for an unrendered
+  // cell — leaving the grid with ZERO `tabindex="0"` cells and no way back in with Tab. Header
+  // rows genuinely have no ROW-axis window (headers are not row-virtualized), so the row half
+  // stays body-only; only the column half widens.
   const rowOut = rowsWindowed() && virtualizer && rowIsOutsideWindow(r);
   const colOut = colsWindowed() && colVirtualizer && colIsOutsideWindow(c);
-  if (!header && (rowOut || colOut)) {
-    if (rowOut) virtualizer.scrollToIndex(r, {
+  const rowScroll = !header && rowOut;
+  if (rowScroll || colOut) {
+    if (rowScroll) virtualizer.scrollToIndex(r, {
       align: 'center'
     });
     if (colOut) colVirtualizer.scrollToIndex(c, {
@@ -3300,7 +3317,9 @@ const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, ne
       // A newer focus intent superseded this poll — abort WITHOUT focusing (the user has since
       // navigated / clicked elsewhere; re-focusing this off-window target would yank focus back).
       if (focusIntentEpoch !== myEpoch) return;
-      const el = resolveCellEl(String(r), c);
+      // B-03: resolve with the SAME key the synchronous path below uses, so the poll can
+      // find a header cell. `String(r)` alone addresses body rows only.
+      const el = resolveCellEl(header ? '__header' : String(r), c, header ? lvl : null);
       if (el) {
         el.focus();
         return;

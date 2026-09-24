@@ -114,4 +114,18 @@ for (const target of TARGETS) {
     await expect.poll(async () => tabStops(page), { timeout: 5_000 }).toEqual(['0,0']);
   });
 
+  runnerFor(target)(`data-table-grid-tabstop [${target}]: B-03 End on a leaf header reaches an off-window column and keeps the tab stop`, async ({ page }) => {
+    await page.goto(`/?example=DataTableColumnVirtual&target=${target}`);
+    await expect(page.getByTestId('rozie-mount').locator('table[role="grid"]').first()).toBeVisible({ timeout: 15_000 });
+    // A LEAF header cell, column 1. The thead is: group-header row, LEAF row, filter row.
+    await focusGridCell(page, 'thead tr:nth-child(2) [data-grid-cell][data-col-index="1"]');
+    await expect.poll(async () => focusedCell(page), { timeout: 5_000 }).toMatch(/,1$/);
+    const headerRow = ((await focusedCell(page)) || '').split(',')[0];
+
+    await page.keyboard.press('End');
+    // Focus lands on the LAST header cell of that row (col 59 of 60)...
+    await expect.poll(async () => focusedCell(page), { timeout: 10_000 }).toBe(`${headerRow},59`);
+    // ...and it is the grid's one and only tab stop.
+    await expect.poll(async () => tabStops(page), { timeout: 5_000 }).toEqual([`${headerRow},59`]);
+  });
 }

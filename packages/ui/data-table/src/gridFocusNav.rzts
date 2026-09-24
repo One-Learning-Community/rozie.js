@@ -191,10 +191,18 @@ const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, ne
   // both are out, and the ONE existing poll below is reused unchanged — it already resolves the
   // target cell by BOTH (row, col) via resolveCellEl(String(r), c), so a cell that becomes
   // reachable via the column axis needs no new poll logic (per the plan's own key_links note).
+  // B-03: the COLUMN axis applies to HEADER cells too. This guard used to be `!header &&
+  // (rowOut || colOut)`, so a header-active move to an off-window column never scrolled it in:
+  // `resolveCellEl` returned null, focus froze on the old `<th>` while the state and the ring
+  // ran away to a column with no DOM node, and `cellTabindex` then reported 0 for an unrendered
+  // cell — leaving the grid with ZERO `tabindex="0"` cells and no way back in with Tab. Header
+  // rows genuinely have no ROW-axis window (headers are not row-virtualized), so the row half
+  // stays body-only; only the column half widens.
   const rowOut = rowsWindowed() && virtualizer && rowIsOutsideWindow(r)
   const colOut = colsWindowed() && colVirtualizer && colIsOutsideWindow(c)
-  if (!header && (rowOut || colOut)) {
-    if (rowOut) virtualizer.scrollToIndex(r, { align: 'center' })
+  const rowScroll = !header && rowOut
+  if (rowScroll || colOut) {
+    if (rowScroll) virtualizer.scrollToIndex(r, { align: 'center' })
     if (colOut) colVirtualizer.scrollToIndex(c, { align: 'center' })
     // Bounded rAF-poll-until-cell-present (D-12): scrollToIndex → virtual-core onChange → windowVer
     // bump → the framework commits the scrolled-in row/column. On React that commit is async
@@ -214,7 +222,9 @@ const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, ne
       // A newer focus intent superseded this poll — abort WITHOUT focusing (the user has since
       // navigated / clicked elsewhere; re-focusing this off-window target would yank focus back).
       if (focusIntentEpoch !== myEpoch) return
-      const el = resolveCellEl(String(r), c)
+      // B-03: resolve with the SAME key the synchronous path below uses, so the poll can
+      // find a header cell. `String(r)` alone addresses body rows only.
+      const el = resolveCellEl(header ? '__header' : String(r), c, header ? lvl : null)
       if (el) { el.focus(); return }
       focusAttempts = focusAttempts + 1
       if (focusAttempts >= 30) return

@@ -103,9 +103,18 @@ const forcedColumns = (): number[] => {
     }
   }
   // Active cell's column (D-10): required or focusActiveCell()'s [data-col-index="N"]
-  // querySelector cannot resolve for an off-window active cell. Body cells only — a header-
-  // active cell has no column-axis rendering dependency here (headers window separately).
-  if (!$data.activeIsHeader && $data.activeColIndex >= 0 && out.indexOf($data.activeColIndex) === -1) {
+  // querySelector cannot resolve for an off-window active cell.
+  //
+  // B-03: this used to be body-cells-only, on the stated grounds that "a header-active cell
+  // has no column-axis rendering dependency here (headers window separately)". That is false —
+  // `windowedHeadersFor()` slices the header row from `windowedColIndices()`, the very set this
+  // function feeds, so a header cell has EXACTLY the same dependency a body cell does. With the
+  // active header column unforced, focusing a leaf header in a 60-column windowed grid and
+  // pressing End left `resolveCellEl` with nothing to find: focus froze on the old `<th>` while
+  // the roving model moved on, and `cellTabindex` handed `tabindex="0"` to a cell that does not
+  // exist — so the grid had no tab stop at all. The gate is gone; the column is forced for
+  // whichever axis the active cell is on.
+  if ($data.activeColIndex >= 0 && out.indexOf($data.activeColIndex) === -1) {
     out.push($data.activeColIndex)
   }
   // Editing column (D-10): required or an open editor unmounts mid-keystroke when a
