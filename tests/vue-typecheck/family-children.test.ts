@@ -125,7 +125,11 @@ const FAMILIES: FamilySpec[] = [
         // noImplicitAny. Not emitter-fixable without injecting annotations
         // into the emitted body (the same Phase-65 SC-3 finding); not a
         // defect — `idxSet` is a correct, ordinary JS lookup-map idiom.
-        TS7053: 13,
+        // Quick 260922-mkb tightened 13 → 10: C-05 routes the row draft through a
+        // `Record<string, any>`-typed sync mirror (`rowDraftSync`), which removed
+        // the three `next[k] = src[k]` / `next[colId]` / `draft[ec.colId]` sites
+        // that indexed a bare `{}`. A decrease only — no site was added.
+        TS7053: 10,
       },
     },
   },

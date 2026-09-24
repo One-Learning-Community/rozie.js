@@ -11,16 +11,16 @@ import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie
     <div class="rdt-group-bar">
       
       @for (col of groupableColumns(); track col.id) {
-    <span class="rdt-group-token" part="group-token" draggable="true" (dragstart)="onChipDragStart($event, col.id)" (dragend)="onDragEnd()">{{ rozieDisplay(col.label) }}</span>
+    <button type="button" class="rdt-group-token rdt-group-token-add" part="group-token" draggable="true" [attr.aria-pressed]="rozieAttr(grouping().indexOf(col.id) !== -1 ? 'true' : 'false')" [attr.aria-label]="rozieAttr('Group by ' + col.label)" (dragstart)="onChipDragStart($event, col.id)" (dragend)="onDragEnd()" (click)="toggleKey(col.id)">{{ rozieDisplay(col.label) }}</button>
     }
 
       
-      <span class="rdt-group-drop-zone" [ngClass]="{ 'is-over': isOver() }" data-group-drop-zone="" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+      <span class="rdt-group-drop-zone" [ngClass]="{ 'is-over': isOver() }" data-group-drop-zone="" role="list" aria-label="Active grouping" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
         
         @if (!grouping().length) {
     <span class="rdt-group-drop-hint">Drag columns here to group</span>
     }@for (gk of grouping(); track gk) {
-    <span class="rdt-group-token" [ngClass]="{ 'is-drop-target': dragKind() === 'token' && dropKey() === gk && draggingId() !== gk }" part="group-token" data-group-token="" draggable="true" (dragstart)="onTokenDragStart($event, gk)" (dragover)="onTokenDragOver($event, gk)" (dragend)="onDragEnd()">
+    <span class="rdt-group-token" [ngClass]="{ 'is-drop-target': dragKind() === 'token' && dropKey() === gk && draggingId() !== gk }" part="group-token" data-group-token="" draggable="true" role="listitem" tabindex="0" [attr.aria-label]="rozieAttr(labelFor(gk) + ' grouping, position ' + (grouping().indexOf(gk) + 1) + ' of ' + grouping().length + '. Alt+Arrow to reorder, Delete to remove.')" (dragstart)="onTokenDragStart($event, gk)" (dragover)="onTokenDragOver($event, gk)" (dragend)="onDragEnd()" (keydown)="onTokenKeydown($event, gk)">
           {{ rozieDisplay(labelFor(gk)) }}
           <button type="button" class="rdt-group-token-remove" [attr.aria-label]="rozieAttr('Remove ' + labelFor(gk) + ' grouping')" (click)="removeKey(gk)">×</button>
         </span>
@@ -51,6 +51,18 @@ import { rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie
     .rdt-group-drop-zone.is-over {
       border-color: var(--rdt-group-drop-zone-border-over, rgba(37, 99, 235, 0.7));
       background: var(--rdt-group-drop-zone-bg-over, rgba(37, 99, 235, 0.08));
+    }
+    .rdt-group-token-add {
+      font: inherit;
+      color: inherit;
+      border: none;
+      background: none;
+      cursor: pointer;
+    }
+    .rdt-group-token-add:focus-visible,
+    .rdt-group-drop-zone [data-group-token]:focus-visible {
+      outline: var(--rdt-focus-ring, 2px solid #2563eb);
+      outline-offset: 1px;
     }
     .rdt-group-drop-hint {
       opacity: 0.55;
@@ -196,6 +208,67 @@ export class GroupBar {
   removeKey = (key: any) => {
     const __applyGrouping = this.applyGrouping();
     __applyGrouping && __applyGrouping(this.grouping().filter((k: any) => k !== key));
+  };
+  // ── C-04: the keyboard half of the group bar ────────────────────────────────────────────
+  // DECLARED AFTER removeKey ON PURPOSE: toggleKey and onTokenKeydown call it, and the React
+  // emitter lowers each to a useCallback whose dependency array is evaluated EAGERLY — declared
+  // above removeKey, every React GroupBar died at mount with a TDZ ReferenceError (measured in
+  // quick 260922-mkb; the same 87-02 ordering lesson as onEditorDropinKeyDown).
+  // Native HTML5 drag-and-drop was the SOLE input path for both adding and reordering, on
+  // elements with no tabindex, no role and no click/keydown handler. Remove and Clear were real
+  // `<button>`s, so a keyboard user could UNGROUP but could never group or reorder — the bar was
+  // a one-way door. HTML5 DnD has no keyboard equivalent by construction, so a parallel,
+  // explicitly-keyboard path is the only fix; both halves write through the SAME
+  // `applyGrouping` funnel the drop handler uses, so there is one ordering rule, not two.
+  //
+  // The palette chips become real `<button>`s (Enter/Space for free, focusable for free) rather
+  // than spans with `tabindex` + a hand-rolled key handler — the same reasoning that already
+  // made Remove and Clear buttons. A `<button draggable="true">` keeps the existing pointer
+  // path working unchanged.
+  //
+  // Reorder is Alt+Arrow on a grouping token, not plain Arrow: the tokens sit in a toolbar that
+  // a user also arrows THROUGH, and stealing bare arrows would trap them. Alt is the modifier
+  // Windows/macOS list reordering conventionally uses.
+  toggleKey = (id: any) => {
+    const __grouping = this.grouping();
+    const __applyGrouping = this.applyGrouping();
+    if (!id) return;
+    if (__grouping.indexOf(id) !== -1) {
+      this.removeKey(id);
+      return;
+    }
+    __applyGrouping && __applyGrouping(__grouping.concat([id]));
+  };
+  // Move a grouping key one position left/right. No-op at the ends (never wraps: a wrap would
+  // make a held key cycle forever with no signal that the end was reached).
+  moveKey = (key: any, delta: any) => {
+    const __applyGrouping = this.applyGrouping();
+    const cur = this.grouping();
+    const from = cur.indexOf(key);
+    if (from === -1) return;
+    const to = from + delta;
+    if (to < 0 || to >= cur.length) return;
+    const next = cur.slice();
+    next.splice(from, 1);
+    next.splice(to, 0, key);
+    __applyGrouping && __applyGrouping(next);
+  };
+  onTokenKeydown = (e: any, gk: any) => {
+    if (!e) return;
+    const key = e.key;
+    if (key === 'Delete' || key === 'Backspace') {
+      e.preventDefault();
+      this.removeKey(gk);
+      return;
+    }
+    if (!e.altKey) return;
+    if (key === 'ArrowLeft') {
+      e.preventDefault();
+      this.moveKey(gk, -1);
+    } else if (key === 'ArrowRight') {
+      e.preventDefault();
+      this.moveKey(gk, 1);
+    }
   };
   clearAll = () => {
     const __clearGrouping = this.clearGrouping();

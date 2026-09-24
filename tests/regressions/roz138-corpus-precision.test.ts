@@ -119,9 +119,11 @@ describe('ROZ138 corpus precision (quick task 260829-8w1)', () => {
         // 260921-tsu clipboard/2C-2D edits above this cluster. Verified statement-by-
         // statement against 134eb21d5: `if (!$data.activeIsHeader)`, `const row =
         // clamp($data.activeRow, …)`, `if (row !== $data.activeRow)` — same 3 sites.
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:603',
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:606',
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:607',
+        // Quick 260922-mkb (B-15): +35 more (603/606/607 → 638/641/642) from the
+        // Shift+Space / Ctrl+Space / Escape block inserted above; same 3 statements.
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:638',
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:641',
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:642',
       ].sort(),
     );
   });

@@ -6777,9 +6777,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // return — the Tab handler advances focus to the next editor itself.
       if (dropinTabFlush.current) {
         dropinTabFlush.current.called = true;
-        // STICKY: on Solid the commit's own model write re-creates the drop-in synchronously, and
-        // the fresh instance's blur re-enters here (latched → false) BEFORE this call returns. Only
-        // a successful commit may set the outcome; a latched re-entry must not clear it.
+        // STICKY: only a successful commit may set the outcome. A re-entrant commit within the
+        // same flush (any blur the write itself provokes) is latched to false by commitEdit and
+        // must not clear it. Measured: before the Solid slot-fill fix this re-entry was real.
         if (commitEdit(value, true)) dropinTabFlush.current.committed = true;
         return;
       }
@@ -7007,16 +7007,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (target) {
       setActiveRow(target.row);
       setActiveColIndex(target.col);
-      // Open the next editor on the NEXT FRAME, not in this tick. The commit above wrote the
-      // model, and on Solid the resulting row re-derivation re-creates the #editor slot content
-      // AFTER this handler returns — an editor opened synchronously here mounted, took focus, and
-      // was then torn down by that re-render, whose removal-blur closed it (measured). One frame
-      // lets the write settle first; the built-in editors never hit this because they are
-      // template elements, not slot content.
-      const tr = target.row;
-      const tc = target.col;
-      const open = () => beginEdit(tr, tc, null);
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(open);else setTimeout(open, 16);
+      beginEdit(target.row, target.col, null);
     } else {
       // B5 twin: no editable cell in the Tab direction — keep focus INSIDE the grid.
       focusCellWhenReady(fromRow, fromCol);

@@ -25,6 +25,18 @@ export default class GroupBar extends SignalWatcher(LitElement) {
   border-color: var(--rdt-group-drop-zone-border-over, rgba(37, 99, 235, 0.7));
   background: var(--rdt-group-drop-zone-bg-over, rgba(37, 99, 235, 0.08));
 }
+.rdt-group-token-add[data-rozie-s-546c469a] {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.rdt-group-token-add[data-rozie-s-546c469a]:focus-visible,
+.rdt-group-drop-zone[data-rozie-s-546c469a] [data-group-token][data-rozie-s-546c469a]:focus-visible {
+  outline: var(--rdt-focus-ring, 2px solid #2563eb);
+  outline-offset: 1px;
+}
 .rdt-group-drop-hint[data-rozie-s-546c469a] {
   opacity: 0.55;
   font-size: 0.8125em;
@@ -107,12 +119,12 @@ export default class GroupBar extends SignalWatcher(LitElement) {
     return html`
 <div class="rdt-group-bar" data-rozie-s-546c469a>
   
-  ${repeat<any>(this.groupableColumns, (col, _idx) => col.id, (col, _idx) => html`<span class="rdt-group-token" part="group-token" draggable="true" @dragstart=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onChipDragStart($event, col.id); }} @dragend=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDragEnd(); }} data-rozie-s-546c469a>${rozieDisplay(col.label)}</span>`)}
+  ${repeat<any>(this.groupableColumns, (col, _idx) => col.id, (col, _idx) => html`<button class="rdt-group-token rdt-group-token-add" type="button" part="group-token" draggable="true" aria-pressed=${rozieAttr(this.grouping.indexOf(col.id) !== -1 ? 'true' : 'false')} aria-label=${rozieAttr('Group by ' + col.label)} @dragstart=${($event: Event & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onChipDragStart($event, col.id); }} @dragend=${($event: Event & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDragEnd(); }} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.toggleKey(col.id); }} data-rozie-s-546c469a>${rozieDisplay(col.label)}</button>`)}
 
   
-  <span class="${Object.entries({ "rdt-group-drop-zone": true, 'is-over': this._isOver.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-group-drop-zone="" @dragover=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDragOver($event); }} @dragleave=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDragLeave($event); }} @drop=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDrop($event); }} data-rozie-s-546c469a>
+  <span class="${Object.entries({ "rdt-group-drop-zone": true, 'is-over': this._isOver.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-group-drop-zone="" role="list" aria-label="Active grouping" @dragover=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDragOver($event); }} @dragleave=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDragLeave($event); }} @drop=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDrop($event); }} data-rozie-s-546c469a>
     
-    ${!this.grouping.length ? html`<span class="rdt-group-drop-hint" data-rozie-s-546c469a>Drag columns here to group</span>` : nothing}${repeat<any>(this.grouping, (gk, _idx) => gk, (gk, _idx) => html`<span class="${Object.entries({ "rdt-group-token": true, 'is-drop-target': this._dragKind.value === 'token' && this._dropKey.value === gk && this._draggingId.value !== gk }).filter(([, v]) => v).map(([k]) => k).join(' ')}" part="group-token" data-group-token="" draggable="true" @dragstart=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onTokenDragStart($event, gk); }} @dragover=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onTokenDragOver($event, gk); }} @dragend=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDragEnd(); }} data-rozie-s-546c469a>
+    ${!this.grouping.length ? html`<span class="rdt-group-drop-hint" data-rozie-s-546c469a>Drag columns here to group</span>` : nothing}${repeat<any>(this.grouping, (gk, _idx) => gk, (gk, _idx) => html`<span class="${Object.entries({ "rdt-group-token": true, 'is-drop-target': this._dragKind.value === 'token' && this._dropKey.value === gk && this._draggingId.value !== gk }).filter(([, v]) => v).map(([k]) => k).join(' ')}" part="group-token" data-group-token="" draggable="true" role="listitem" tabindex="0" aria-label=${rozieAttr(this.labelFor(gk) + ' grouping, position ' + (this.grouping.indexOf(gk) + 1) + ' of ' + this.grouping.length + '. Alt+Arrow to reorder, Delete to remove.')} @dragstart=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onTokenDragStart($event, gk); }} @dragover=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onTokenDragOver($event, gk); }} @dragend=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDragEnd(); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onTokenKeydown($event, gk); }} data-rozie-s-546c469a>
       ${rozieDisplay(this.labelFor(gk))}
       <button class="rdt-group-token-remove" type="button" aria-label=${rozieAttr('Remove ' + this.labelFor(gk) + ' grouping')} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.removeKey(gk); }} data-rozie-s-546c469a>×</button>
     </span>`)}
@@ -208,6 +220,67 @@ export default class GroupBar extends SignalWatcher(LitElement) {
 
   removeKey = (key: any) => {
   this.applyGrouping && this.applyGrouping(this.grouping.filter((k: any) => k !== key));
+};
+
+  // ── C-04: the keyboard half of the group bar ────────────────────────────────────────────
+  // DECLARED AFTER removeKey ON PURPOSE: toggleKey and onTokenKeydown call it, and the React
+  // emitter lowers each to a useCallback whose dependency array is evaluated EAGERLY — declared
+  // above removeKey, every React GroupBar died at mount with a TDZ ReferenceError (measured in
+  // quick 260922-mkb; the same 87-02 ordering lesson as onEditorDropinKeyDown).
+  // Native HTML5 drag-and-drop was the SOLE input path for both adding and reordering, on
+  // elements with no tabindex, no role and no click/keydown handler. Remove and Clear were real
+  // `<button>`s, so a keyboard user could UNGROUP but could never group or reorder — the bar was
+  // a one-way door. HTML5 DnD has no keyboard equivalent by construction, so a parallel,
+  // explicitly-keyboard path is the only fix; both halves write through the SAME
+  // `applyGrouping` funnel the drop handler uses, so there is one ordering rule, not two.
+  //
+  // The palette chips become real `<button>`s (Enter/Space for free, focusable for free) rather
+  // than spans with `tabindex` + a hand-rolled key handler — the same reasoning that already
+  // made Remove and Clear buttons. A `<button draggable="true">` keeps the existing pointer
+  // path working unchanged.
+  //
+  // Reorder is Alt+Arrow on a grouping token, not plain Arrow: the tokens sit in a toolbar that
+  // a user also arrows THROUGH, and stealing bare arrows would trap them. Alt is the modifier
+  // Windows/macOS list reordering conventionally uses.
+  toggleKey = (id: any) => {
+  if (!id) return;
+  if (this.grouping.indexOf(id) !== -1) {
+    this.removeKey(id);
+    return;
+  }
+  this.applyGrouping && this.applyGrouping(this.grouping.concat([id]));
+};
+
+  // Move a grouping key one position left/right. No-op at the ends (never wraps: a wrap would
+  // make a held key cycle forever with no signal that the end was reached).
+  moveKey = (key: any, delta: any) => {
+  const cur = this.grouping;
+  const from = cur.indexOf(key);
+  if (from === -1) return;
+  const to = from + delta;
+  if (to < 0 || to >= cur.length) return;
+  const next = cur.slice();
+  next.splice(from, 1);
+  next.splice(to, 0, key);
+  this.applyGrouping && this.applyGrouping(next);
+};
+
+  onTokenKeydown = (e: any, gk: any) => {
+  if (!e) return;
+  const key = e.key;
+  if (key === 'Delete' || key === 'Backspace') {
+    e.preventDefault();
+    this.removeKey(gk);
+    return;
+  }
+  if (!e.altKey) return;
+  if (key === 'ArrowLeft') {
+    e.preventDefault();
+    this.moveKey(gk, -1);
+  } else if (key === 'ArrowRight') {
+    e.preventDefault();
+    this.moveKey(gk, 1);
+  }
 };
 
   clearAll = () => {

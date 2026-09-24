@@ -15,6 +15,18 @@
   border-color: var(--rdt-group-drop-zone-border-over, rgba(37, 99, 235, 0.7));
   background: var(--rdt-group-drop-zone-bg-over, rgba(37, 99, 235, 0.08));
 }
+.rdt-group-token-add[data-rozie-s-546c469a] {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.rdt-group-token-add[data-rozie-s-546c469a]:focus-visible,
+.rdt-group-drop-zone[data-rozie-s-546c469a] [data-group-token][data-rozie-s-546c469a]:focus-visible {
+  outline: var(--rdt-focus-ring, 2px solid #2563eb);
+  outline-offset: 1px;
+}
 .rdt-group-drop-hint[data-rozie-s-546c469a] {
   opacity: 0.55;
   font-size: 0.8125em;

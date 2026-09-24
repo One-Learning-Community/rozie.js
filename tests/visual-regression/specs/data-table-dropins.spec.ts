@@ -676,3 +676,60 @@ for (const target of TARGETS) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════
+// C-04 (quick 260922-mkb) — the GroupBar is operable from the KEYBOARD.
+//
+// Native HTML5 DnD was the sole path to ADD or REORDER a grouping, on spans with no tabindex,
+// role or key handler; only Remove/Clear were real buttons, so a keyboard user could ungroup
+// but never group. Driven with real key presses only — Tab into the bar from the button
+// before it, Enter/Space on the palette chips, Alt+Arrow to reorder a token, Delete to remove
+// it — and asserted on the grouping MODEL readout.
+// ═══════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-dropins groupBar [${target}]: C-04 group, reorder and remove from the keyboard alone`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableGroupBar&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    const groupTable = mount.getByTestId('group-bar-table');
+    await expect(groupTable.locator('table')).toBeVisible({ timeout: 15_000 });
+    const groupBar = groupTable.locator('.rdt-group-bar');
+    await expect(groupBar).toBeVisible({ timeout: 10_000 });
+    const readout = page.getByTestId('grouping-readout');
+
+    // Start from the last demo control before the table and Tab forward into the bar — past
+    // the table's own global filter and Columns menu — until the Region palette chip holds
+    // focus. Bounded: pre-fix the chips were unfocusable spans and are never reached.
+    const focusedText = async (): Promise<string> =>
+      page.evaluate(() => {
+        let a: Element | null = document.activeElement;
+        while (a && (a as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot?.activeElement) {
+          a = (a as Element & { shadowRoot: ShadowRoot }).shadowRoot.activeElement;
+        }
+        return a ? (a.textContent || '').trim() : '';
+      });
+    await page.getByTestId('call-clear-grouping').focus();
+    let reached = false;
+    for (let i = 0; i < 6 && !reached; i++) {
+      await page.keyboard.press('Tab');
+      reached = (await focusedText()) === 'Region';
+    }
+    expect(reached).toBe(true);
+    await page.keyboard.press('Enter');
+    await expect.poll(async () => readout.textContent(), { timeout: 10_000 }).toBe('region');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Space');
+    await expect.poll(async () => readout.textContent(), { timeout: 10_000 }).toBe('region,category');
+
+    // Reorder: Alt+ArrowRight on the 'region' grouping token moves it after 'category'.
+    const regionToken = groupBar.locator('[data-group-token]').filter({ hasText: 'Region' });
+    await regionToken.focus();
+    await page.keyboard.press('Alt+ArrowRight');
+    await expect.poll(async () => readout.textContent(), { timeout: 10_000 }).toBe('category,region');
+
+    // Remove: Delete on the (re-rendered) 'region' token.
+    await groupBar.locator('[data-group-token]').filter({ hasText: 'Region' }).focus();
+    await page.keyboard.press('Delete');
+    await expect.poll(async () => readout.textContent(), { timeout: 10_000 }).toBe('category');
+  });
+}

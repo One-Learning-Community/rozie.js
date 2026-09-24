@@ -186,6 +186,58 @@ const removeKey = (key) => {
   $props.applyGrouping && $props.applyGrouping($props.grouping.filter((k) => k !== key))
 }
 
+// ── C-04: the keyboard half of the group bar ────────────────────────────────────────────
+// DECLARED AFTER removeKey ON PURPOSE: toggleKey and onTokenKeydown call it, and the React
+// emitter lowers each to a useCallback whose dependency array is evaluated EAGERLY — declared
+// above removeKey, every React GroupBar died at mount with a TDZ ReferenceError (measured in
+// quick 260922-mkb; the same 87-02 ordering lesson as onEditorDropinKeyDown).
+// Native HTML5 drag-and-drop was the SOLE input path for both adding and reordering, on
+// elements with no tabindex, no role and no click/keydown handler. Remove and Clear were real
+// `<button>`s, so a keyboard user could UNGROUP but could never group or reorder — the bar was
+// a one-way door. HTML5 DnD has no keyboard equivalent by construction, so a parallel,
+// explicitly-keyboard path is the only fix; both halves write through the SAME
+// `applyGrouping` funnel the drop handler uses, so there is one ordering rule, not two.
+//
+// The palette chips become real `<button>`s (Enter/Space for free, focusable for free) rather
+// than spans with `tabindex` + a hand-rolled key handler — the same reasoning that already
+// made Remove and Clear buttons. A `<button draggable="true">` keeps the existing pointer
+// path working unchanged.
+//
+// Reorder is Alt+Arrow on a grouping token, not plain Arrow: the tokens sit in a toolbar that
+// a user also arrows THROUGH, and stealing bare arrows would trap them. Alt is the modifier
+// Windows/macOS list reordering conventionally uses.
+const toggleKey = (id) => {
+  if (!id) return
+  if ($props.grouping.indexOf(id) !== -1) {
+    removeKey(id)
+    return
+  }
+  $props.applyGrouping && $props.applyGrouping($props.grouping.concat([id]))
+}
+
+// Move a grouping key one position left/right. No-op at the ends (never wraps: a wrap would
+// make a held key cycle forever with no signal that the end was reached).
+const moveKey = (key, delta) => {
+  const cur = $props.grouping
+  const from = cur.indexOf(key)
+  if (from === -1) return
+  const to = from + delta
+  if (to < 0 || to >= cur.length) return
+  const next = cur.slice()
+  next.splice(from, 1)
+  next.splice(to, 0, key)
+  $props.applyGrouping && $props.applyGrouping(next)
+}
+
+const onTokenKeydown = (e, gk) => {
+  if (!e) return
+  const key = e.key
+  if (key === 'Delete' || key === 'Backspace') { e.preventDefault(); removeKey(gk); return }
+  if (!e.altKey) return
+  if (key === 'ArrowLeft') { e.preventDefault(); moveKey(gk, -1) }
+  else if (key === 'ArrowRight') { e.preventDefault(); moveKey(gk, 1) }
+}
+
 const clearAll = () => {
   $props.clearGrouping && $props.clearGrouping()
 }
@@ -202,21 +254,27 @@ const labelFor = (key) => {
 <template>
 <div class="rdt-group-bar">
   <!-- (a) draggable column chips (the palette — ADD a new grouping key) -->
-  <span
-    class="rdt-group-token"
+  <button
+    type="button"
+    class="rdt-group-token rdt-group-token-add"
     part="group-token"
     r-for="col in $props.groupableColumns"
     :key="col.id"
     draggable="true"
+    :aria-pressed="$props.grouping.indexOf(col.id) !== -1 ? 'true' : 'false'"
+    :aria-label="'Group by ' + col.label"
     @dragstart="onChipDragStart($event, col.id)"
     @dragend="onDragEnd()"
-  >{{ col.label }}</span>
+    @click="toggleKey(col.id)"
+  >{{ col.label }}</button>
 
   <!-- (b) drop zone listing the ACTIVE grouping as removable tokens -->
   <span
     class="rdt-group-drop-zone"
     :class="{ 'is-over': $data.isOver }"
     data-group-drop-zone
+    role="list"
+    aria-label="Active grouping"
     @dragover="onDragOver($event)"
     @dragleave="onDragLeave($event)"
     @drop="onDrop($event)"
@@ -232,9 +290,13 @@ const labelFor = (key) => {
       :key="gk"
       :class="{ 'is-drop-target': $data.dragKind === 'token' && $data.dropKey === gk && $data.draggingId !== gk }"
       draggable="true"
+      role="listitem"
+      tabindex="0"
+      :aria-label="labelFor(gk) + ' grouping, position ' + ($props.grouping.indexOf(gk) + 1) + ' of ' + $props.grouping.length + '. Alt+Arrow to reorder, Delete to remove.'"
       @dragstart="onTokenDragStart($event, gk)"
       @dragover="onTokenDragOver($event, gk)"
       @dragend="onDragEnd()"
+      @keydown="onTokenKeydown($event, gk)"
     >
       {{ labelFor(gk) }}
       <button type="button" class="rdt-group-token-remove" :aria-label="'Remove ' + labelFor(gk) + ' grouping'" @click="removeKey(gk)">×</button>
@@ -268,6 +330,27 @@ const labelFor = (key) => {
 .rdt-group-drop-zone.is-over {
   border-color: var(--rdt-group-drop-zone-border-over, rgba(37, 99, 235, 0.7));
   background: var(--rdt-group-drop-zone-bg-over, rgba(37, 99, 235, 0.08));
+}
+/* C-04: the palette chips are real `<button>`s now, so they need the UA button reset that
+   makes them read as the same pill the grouping tokens are. `font: inherit` and the
+   background/border reset are the whole of it — the shared `.rdt-group-token` rule (owned by
+   DataTable) supplies the actual pill chrome, and a button inherits none of the UA defaults
+   a span never had. */
+.rdt-group-token-add {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+/* C-04: a visible focus ring on BOTH keyboard affordances. The grouping tokens carry
+   `tabindex="0"` for Alt+Arrow reordering and the palette chips are focusable by being
+   buttons; without a ring, a keyboard user driving the bar has no idea where they are. Uses
+   the same `--rdt-focus-ring` token the rest of the family's keyboard chrome reads. */
+.rdt-group-token-add:focus-visible,
+.rdt-group-drop-zone [data-group-token]:focus-visible {
+  outline: var(--rdt-focus-ring, 2px solid #2563eb);
+  outline-offset: 1px;
 }
 /* Empty-state hint — pointer-events off so it never eats the drag/drop events. */
 .rdt-group-drop-hint {
