@@ -1686,9 +1686,25 @@ const teardownRemeasure = () => {
 // unioned into the windowed slice when it scrolls off-window and its height is subtracted from
 // the appropriate spacer so the total stays exactly getTotalSize() (the 51-01-proven mechanism).
 // This is the data-table half of the D-05 windowing.rzts pin-extension hook (listbox provides none).
+//
+// B-06 widens this from "the editing row" to "the row that must not recycle out of the
+// window", which now includes the ACTIVE row in grid mode. The active cell is the grid's ONLY
+// `tabindex="0"` — `cellTabindex()` returns 0 for it and -1 for every other cell — so once a
+// wheel-scroll carried it out of the window the grid had NO tab stop at all: Tab could not
+// re-enter it, and the roving model still pointed at a cell with no DOM node, so
+// `resolveCellEl` returned null and a subsequent arrow key moved state with nothing to focus.
+// The column axis has forced the active-cell COLUMN since D-10 (`forcedColumns`); this is the
+// row-axis twin of that decision, and it costs at most one extra rendered row, in flow, with
+// its height subtracted from the spacer by the same 51-01 mechanism the editing pin uses.
+//
+// `$props.interactionMode` is read directly rather than through `isGrid()` (gridFocusNav.rzts):
+// that partial is imported AFTER this one, and this file's header documents the
+// forward-cross-partial-reference TDZ on React that the 87-02 lesson established. A prop read
+// has no such hazard.
 const pinnedEditIndex = () => {
   if (editingRow.value >= 0) return editingRow.value;
   if (editingRowIndex.value != null) return editingRowIndex.value;
+  if (props.interactionMode === 'grid' && !activeIsHeader.value && activeRow.value >= 0) return activeRow.value;
   return -1;
 };
 // pinnedMeasurement(pin): the virtual-core measurement { index, start, size, end, key } for the

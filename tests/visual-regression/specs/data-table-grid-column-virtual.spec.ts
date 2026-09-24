@@ -1172,8 +1172,24 @@ for (const target of TARGETS) {
     await page.getByTestId('grid-table-both').locator('table[role="grid"]').waitFor({ state: 'visible', timeout: 15_000 });
     await scopedScrollTo(page, 'grid-table-both', { top: 2000 });
     await page.waitForTimeout(300);
-    const renderedAtRest = await scopedAttrNumbers(page, 'grid-table-both', '[data-grid-cell][data-col-index="0"][data-row]', 'data-row');
-    const srcRow = Math.min(...renderedAtRest);
+    // The topmost row VISIBLE in the scroll viewport — not the smallest rendered index. Quick
+    // 260922-mkb (B-06) keeps the ACTIVE row rendered in flow even when the viewport has scrolled
+    // it away (it is the grid's only tab stop), so after this scroll row 0 is still in the DOM,
+    // off-screen above the window; `min(rendered)` picked it and dragged up from row 0.
+    const srcRow = await page.evaluate(() => {
+      const w = window as unknown as {
+        __findWithinScope: (a: string, s: string) => Element | null;
+        __findAllWithinScope: (a: string, s: string) => Element[];
+      };
+      const anchor = '[data-testid="grid-table-both"]';
+      const sc = w.__findWithinScope(anchor, '.rdt-scroll') as HTMLElement | null;
+      const top = sc ? sc.getBoundingClientRect().top : 0;
+      const rows = w.__findAllWithinScope(anchor, '[data-grid-cell][data-col-index="0"][data-row]')
+        .filter((el) => el.getBoundingClientRect().bottom > top)
+        .map((el) => parseInt(el.getAttribute('data-row') || '', 10))
+        .filter((n) => !Number.isNaN(n));
+      return Math.min(...rows);
+    });
     await focusScopedCell(page, 'grid-table-both', srcRow, 0);
     await establishDegenerateRange(page, 'row', 'grid-table-both');
     const before = await scopedScrollTop(page, 'grid-table-both');
