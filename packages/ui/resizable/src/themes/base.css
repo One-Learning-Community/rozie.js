@@ -15,19 +15,25 @@
  * `.rozie-resizable` element). See themes/shadcn.css, themes/material.css and
  * themes/bootstrap.css for design-system bridges.
  *
- * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
- * an element declares for itself always beats one it would inherit, whatever the selector's
- * specificity, so defaults declared on the `.rozie-resizable` element itself made every ancestor
- * override dead the moment this file was imported. At the root they are only the value of last
- * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
- * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
- * they arrive by inheritance).
+ * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root)`
+ * (zero specificity): `--rrz-x: var(--rozie-resizable-x, <default>)`. The component reads every token
+ * public-first, `var(--rozie-resizable-x, var(--rrz-x, <inline default>))`, so a value set on ANY
+ * ancestor (`:root`, `.dark`, a wrapper) or on the component itself wins by plain inheritance,
+ * in any import order, on all six targets (Lit included: custom properties inherit into its
+ * shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the component may declare a public token.
  * A token whose default is ANOTHER token is not declared here at all: the component reads it
  * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
  * declared at the root it would be computed once, against the root's value.
- * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
- * tokens it maps on the `.rozie-resizable` element itself: with a bridge imported, THOSE tokens can be
- * overridden only on that element (or by a rule of equal-or-higher specificity after it).
+ * The lines that say `inherit` / `initial` stay plain declarations: at the root such a value
+ * is "unset", so the component's own fallback applies, and it never shadows an ancestor.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares only the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * component (`.rozie-resizable` and the Lit host `rozie-resizable`) — so that variable is resolved AT the
+ * component and follows the nearest theme scope — and on `:root`, the copy a Lit component
+ * nested in another shadow root (out of reach of every document selector) inherits. The
+ * `--rrz-*` names are internal: not a stable API.
  */
 :where(:root) {
   /* typography */
@@ -35,24 +41,24 @@
 
   /* accent — the single color most consumers will set; the active handle + focus
      ring derive from it */
-  --rozie-resizable-accent: #0066cc;
+  --rrz-accent: var(--rozie-resizable-accent, #0066cc);
 
   /* the handle (the draggable divider) */
-  --rozie-resizable-handle-size: 0.5rem;
-  --rozie-resizable-handle-bg: rgba(0, 0, 0, 0.08);
-  --rozie-resizable-handle-hover-bg: rgba(0, 0, 0, 0.16);
+  --rrz-handle-size: var(--rozie-resizable-handle-size, 0.5rem);
+  --rrz-handle-bg: var(--rozie-resizable-handle-bg, rgba(0, 0, 0, 0.08));
+  --rrz-handle-hover-bg: var(--rozie-resizable-handle-hover-bg, rgba(0, 0, 0, 0.16));
   /* the first panel's basis along the split axis */
-  --rozie-resizable-size: 50%;
+  --rrz-size: var(--rozie-resizable-size, 50%);
 
   /* the default grip (the short centered bar) */
-  --rozie-resizable-grip-bg: rgba(0, 0, 0, 0.35);
-  --rozie-resizable-grip-thickness: 2px;
-  --rozie-resizable-grip-length: 1.5rem;
+  --rrz-grip-bg: var(--rozie-resizable-grip-bg, rgba(0, 0, 0, 0.35));
+  --rrz-grip-thickness: var(--rozie-resizable-grip-thickness, 2px);
+  --rrz-grip-length: var(--rozie-resizable-grip-length, 1.5rem);
 
   /* focus ring (keyboard focus on the handle) */
-  --rozie-resizable-focus-ring-width: 2px;
-  --rozie-resizable-focus-ring-color: rgba(0, 102, 204, 0.5);
+  --rrz-focus-ring-width: var(--rozie-resizable-focus-ring-width, 2px);
+  --rrz-focus-ring-color: var(--rozie-resizable-focus-ring-color, rgba(0, 102, 204, 0.5));
 
   /* disabled */
-  --rozie-resizable-disabled-opacity: 0.55;
+  --rrz-disabled-opacity: var(--rozie-resizable-disabled-opacity, 0.55);
 }

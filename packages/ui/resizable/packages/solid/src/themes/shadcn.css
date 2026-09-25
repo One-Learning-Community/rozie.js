@@ -10,15 +10,30 @@
  *
  * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
  * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rrz-x: var(--rozie-resizable-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-resizable-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-resizable`
+ *    and the Lit host `rozie-resizable`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-resizable {
-  --rozie-resizable-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
+:root,
+.rozie-resizable,
+rozie-resizable {
+  --rrz-accent: var(--rozie-resizable-accent, hsl(var(--primary, 222.2 47.4% 11.2%)));
 
-  --rozie-resizable-handle-bg: hsl(var(--border, 214.3 31.8% 91.4%));
-  --rozie-resizable-handle-hover-bg: hsl(var(--muted, 210 40% 96.1%));
-  --rozie-resizable-handle-active-bg: hsl(var(--primary, 222.2 47.4% 11.2%));
+  --rrz-handle-bg: var(--rozie-resizable-handle-bg, hsl(var(--border, 214.3 31.8% 91.4%)));
+  --rrz-handle-hover-bg: var(--rozie-resizable-handle-hover-bg, hsl(var(--muted, 210 40% 96.1%)));
+  --rrz-handle-active-bg: var(--rozie-resizable-handle-active-bg, hsl(var(--primary, 222.2 47.4% 11.2%)));
 
-  --rozie-resizable-grip-bg: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+  --rrz-grip-bg: var(--rozie-resizable-grip-bg, hsl(var(--muted-foreground, 215.4 16.3% 46.9%)));
 
-  --rozie-resizable-focus-ring-color: hsl(var(--ring, 222.2 84% 4.9%) / 0.5);
+  --rrz-focus-ring-color: var(--rozie-resizable-focus-ring-color, hsl(var(--ring, 222.2 84% 4.9%) / 0.5));
 }

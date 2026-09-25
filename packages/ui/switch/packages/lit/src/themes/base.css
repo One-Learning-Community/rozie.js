@@ -15,39 +15,43 @@
  * `.rozie-switch` element). See themes/shadcn.css, themes/material.css and
  * themes/bootstrap.css for design-system bridges.
  *
- * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
- * an element declares for itself always beats one it would inherit, whatever the selector's
- * specificity, so defaults declared on the `.rozie-switch` element itself made every ancestor
- * override dead the moment this file was imported. At the root they are only the value of last
- * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
- * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
- * they arrive by inheritance).
- * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
- * tokens it maps on the `.rozie-switch` element itself: with a bridge imported, THOSE tokens can be
- * overridden only on that element (or by a rule of equal-or-higher specificity after it).
+ * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root)`
+ * (zero specificity): `--rsw-x: var(--rozie-switch-x, <default>)`. The component reads every token
+ * public-first, `var(--rozie-switch-x, var(--rsw-x, <inline default>))`, so a value set on ANY
+ * ancestor (`:root`, `.dark`, a wrapper) or on the component itself wins by plain inheritance,
+ * in any import order, on all six targets (Lit included: custom properties inherit into its
+ * shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the component may declare a public token.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares only the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * component (`.rozie-switch` and the Lit host `rozie-switch`) — so that variable is resolved AT the
+ * component and follows the nearest theme scope — and on `:root`, the copy a Lit component
+ * nested in another shadow root (out of reach of every document selector) inherits. The
+ * `--rsw-*` names are internal: not a stable API.
  */
 :where(:root) {
   /* track box model */
-  --rozie-switch-width: 2.75rem;
-  --rozie-switch-height: 1.5rem;
-  --rozie-switch-track-padding: 0.125rem;
-  --rozie-switch-radius: 999px;
+  --rsw-width: var(--rozie-switch-width, 2.75rem);
+  --rsw-height: var(--rozie-switch-height, 1.5rem);
+  --rsw-track-padding: var(--rozie-switch-track-padding, 0.125rem);
+  --rsw-radius: var(--rozie-switch-radius, 999px);
 
   /* track colors — off vs on (on is the single accent most consumers set) */
-  --rozie-switch-off-bg: rgba(0, 0, 0, 0.25);
-  --rozie-switch-on-bg: #0066cc;
+  --rsw-off-bg: var(--rozie-switch-off-bg, rgba(0, 0, 0, 0.25));
+  --rsw-on-bg: var(--rozie-switch-on-bg, #0066cc);
 
   /* thumb */
-  --rozie-switch-thumb-size: 1.25rem;
-  --rozie-switch-thumb-bg: #fff;
-  --rozie-switch-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --rozie-switch-thumb-travel: calc(2.75rem - 1.5rem);
+  --rsw-thumb-size: var(--rozie-switch-thumb-size, 1.25rem);
+  --rsw-thumb-bg: var(--rozie-switch-thumb-bg, #fff);
+  --rsw-thumb-shadow: var(--rozie-switch-thumb-shadow, 0 1px 2px rgba(0, 0, 0, 0.3));
+  --rsw-thumb-travel: var(--rozie-switch-thumb-travel, calc(2.75rem - 1.5rem));
 
   /* focus ring */
-  --rozie-switch-focus-ring-width: 2px;
-  --rozie-switch-focus-ring-color: rgba(0, 102, 204, 0.5);
-  --rozie-switch-focus-ring-offset: 2px;
+  --rsw-focus-ring-width: var(--rozie-switch-focus-ring-width, 2px);
+  --rsw-focus-ring-color: var(--rozie-switch-focus-ring-color, rgba(0, 102, 204, 0.5));
+  --rsw-focus-ring-offset: var(--rozie-switch-focus-ring-offset, 2px);
 
   /* disabled */
-  --rozie-switch-disabled-opacity: 0.55;
+  --rsw-disabled-opacity: var(--rozie-switch-disabled-opacity, 0.55);
 }

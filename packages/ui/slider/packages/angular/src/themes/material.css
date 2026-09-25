@@ -7,20 +7,35 @@
  * are absent, so it renders correctly even without a generated theme.
  *
  *   import '@rozie-ui/slider-react/themes/material.css';
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rsl-x: var(--rozie-slider-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-slider-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-slider`
+ *    and the Lit host `rozie-slider`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-slider {
-  --rozie-slider-accent: var(--md-sys-color-primary, #6750a4);
+:root,
+.rozie-slider,
+rozie-slider {
+  --rsl-accent: var(--rozie-slider-accent, var(--md-sys-color-primary, #6750a4));
 
-  --rozie-slider-track-bg: var(--md-sys-color-surface-container-highest, #e6e0e9);
-  --rozie-slider-fill-bg: var(--md-sys-color-primary, #6750a4);
+  --rsl-track-bg: var(--rozie-slider-track-bg, var(--md-sys-color-surface-container-highest, #e6e0e9));
+  --rsl-fill-bg: var(--rozie-slider-fill-bg, var(--md-sys-color-primary, #6750a4));
 
-  --rozie-slider-thumb-bg: var(--md-sys-color-primary, #6750a4);
-  --rozie-slider-thumb-border: 2px solid var(--md-sys-color-surface, #fef7ff);
-  --rozie-slider-thumb-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  --rsl-thumb-bg: var(--rozie-slider-thumb-bg, var(--md-sys-color-primary, #6750a4));
+  --rsl-thumb-border: var(--rozie-slider-thumb-border, 2px solid var(--md-sys-color-surface, #fef7ff));
+  --rsl-thumb-shadow: var(--rozie-slider-thumb-shadow, 0 1px 2px rgb(0 0 0 / 0.3));
 
-  --rozie-slider-mark-color: var(--md-sys-color-on-surface-variant, #49454f);
+  --rsl-mark-color: var(--rozie-slider-mark-color, var(--md-sys-color-on-surface-variant, #49454f));
 
-  --rozie-slider-bubble-bg: var(--md-sys-color-inverse-surface, #322f35);
-  --rozie-slider-bubble-fg: var(--md-sys-color-inverse-on-surface, #f5eff7);
-  --rozie-slider-bubble-radius: 4px;
+  --rsl-bubble-bg: var(--rozie-slider-bubble-bg, var(--md-sys-color-inverse-surface, #322f35));
+  --rsl-bubble-fg: var(--rozie-slider-bubble-fg, var(--md-sys-color-inverse-on-surface, #f5eff7));
+  --rsl-bubble-radius: var(--rozie-slider-bubble-radius, 4px);
 }

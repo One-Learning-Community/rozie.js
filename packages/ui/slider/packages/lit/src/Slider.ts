@@ -26,8 +26,8 @@ export default class Slider extends SignalWatcher(LitElement) {
   display: block;
   box-sizing: border-box;
   width: 100%;
-  min-height: var(--rozie-slider-thumb-size, 1rem);
-  padding: var(--rozie-slider-pad, 0.5rem 0);
+  min-height: var(--rozie-slider-thumb-size, var(--rsl-thumb-size, 1rem));
+  padding: var(--rozie-slider-pad, var(--rsl-pad, 0.5rem 0));
   font: var(--rozie-slider-font, inherit);
 }
 .rozie-slider-track[data-rozie-s-4e6f0be6] {
@@ -36,9 +36,9 @@ export default class Slider extends SignalWatcher(LitElement) {
   left: 0;
   right: 0;
   transform: translateY(-50%);
-  height: var(--rozie-slider-track-height, 0.375rem);
-  border-radius: var(--rozie-slider-track-radius, 999px);
-  background: var(--rozie-slider-track-bg, rgba(0, 0, 0, 0.18));
+  height: var(--rozie-slider-track-height, var(--rsl-track-height, 0.375rem));
+  border-radius: var(--rozie-slider-track-radius, var(--rsl-track-radius, 999px));
+  background: var(--rozie-slider-track-bg, var(--rsl-track-bg, rgba(0, 0, 0, 0.18)));
   pointer-events: none;
 }
 .rozie-slider-fill[data-rozie-s-4e6f0be6] {
@@ -48,7 +48,7 @@ export default class Slider extends SignalWatcher(LitElement) {
   left: var(--rozie-slider-fill-start, 0%);
   right: calc(100% - var(--rozie-slider-fill-end, 0%));
   border-radius: inherit;
-  background: var(--rozie-slider-fill-bg, var(--rozie-slider-accent, #0066cc));
+  background: var(--rozie-slider-fill-bg, var(--rozie-slider-accent, var(--rsl-fill-bg, var(--rsl-accent, #0066cc))));
 }
 .rozie-slider-input[data-rozie-s-4e6f0be6] {
   -webkit-appearance: none;
@@ -58,24 +58,24 @@ export default class Slider extends SignalWatcher(LitElement) {
   left: 0;
   transform: translateY(-50%);
   width: 100%;
-  height: var(--rozie-slider-thumb-size, 1rem);
+  height: var(--rozie-slider-thumb-size, var(--rsl-thumb-size, 1rem));
   margin: 0;
   background: none;
   pointer-events: none;
   cursor: pointer;
-  accent-color: var(--rozie-slider-accent, #0066cc);
+  accent-color: var(--rozie-slider-accent, var(--rsl-accent, #0066cc));
 }
 .rozie-slider-input[data-rozie-s-4e6f0be6]:focus { outline: none; z-index: 2; }
 .rozie-slider--range[data-rozie-s-4e6f0be6] .rozie-slider-input[data-rozie-s-4e6f0be6] { pointer-events: none; }
 .rozie-slider--disabled[data-rozie-s-4e6f0be6] .rozie-slider-input[data-rozie-s-4e6f0be6] { cursor: not-allowed; }
-.rozie-slider--disabled[data-rozie-s-4e6f0be6] { opacity: var(--rozie-slider-disabled-opacity, 0.55); }
+.rozie-slider--disabled[data-rozie-s-4e6f0be6] { opacity: var(--rozie-slider-disabled-opacity, var(--rsl-disabled-opacity, 0.55)); }
 .rozie-slider-input[data-rozie-s-4e6f0be6]::-webkit-slider-runnable-track {
   background: none;
-  height: var(--rozie-slider-track-height, 0.375rem);
+  height: var(--rozie-slider-track-height, var(--rsl-track-height, 0.375rem));
 }
 .rozie-slider-input[data-rozie-s-4e6f0be6]::-moz-range-track {
   background: none;
-  height: var(--rozie-slider-track-height, 0.375rem);
+  height: var(--rozie-slider-track-height, var(--rsl-track-height, 0.375rem));
 }
 .rozie-slider-input[data-rozie-s-4e6f0be6]::-moz-range-progress {
   background: none;
@@ -84,35 +84,35 @@ export default class Slider extends SignalWatcher(LitElement) {
   -webkit-appearance: none;
   appearance: none;
   pointer-events: auto;
-  width: var(--rozie-slider-thumb-size, 1rem);
-  height: var(--rozie-slider-thumb-size, 1rem);
-  border: var(--rozie-slider-thumb-border, 2px solid #fff);
+  width: var(--rozie-slider-thumb-size, var(--rsl-thumb-size, 1rem));
+  height: var(--rozie-slider-thumb-size, var(--rsl-thumb-size, 1rem));
+  border: var(--rozie-slider-thumb-border, var(--rsl-thumb-border, 2px solid #fff));
   border-radius: 50%;
-  background: var(--rozie-slider-thumb-bg, var(--rozie-slider-accent, #0066cc));
-  box-shadow: var(--rozie-slider-thumb-shadow, 0 1px 3px rgba(0, 0, 0, 0.3));
-  margin-top: var(--rozie-slider-thumb-offset, calc((0.375rem - 1rem) / 2));
+  background: var(--rozie-slider-thumb-bg, var(--rozie-slider-accent, var(--rsl-thumb-bg, var(--rsl-accent, #0066cc))));
+  box-shadow: var(--rozie-slider-thumb-shadow, var(--rsl-thumb-shadow, 0 1px 3px rgba(0, 0, 0, 0.3)));
+  margin-top: var(--rozie-slider-thumb-offset, var(--rsl-thumb-offset, calc((0.375rem - 1rem) / 2)));
   cursor: pointer;
 }
 .rozie-slider-input[data-rozie-s-4e6f0be6]::-moz-range-thumb {
   pointer-events: auto;
-  width: var(--rozie-slider-thumb-size, 1rem);
-  height: var(--rozie-slider-thumb-size, 1rem);
-  border: var(--rozie-slider-thumb-border, 2px solid #fff);
+  width: var(--rozie-slider-thumb-size, var(--rsl-thumb-size, 1rem));
+  height: var(--rozie-slider-thumb-size, var(--rsl-thumb-size, 1rem));
+  border: var(--rozie-slider-thumb-border, var(--rsl-thumb-border, 2px solid #fff));
   border-radius: 50%;
-  background: var(--rozie-slider-thumb-bg, var(--rozie-slider-accent, #0066cc));
-  box-shadow: var(--rozie-slider-thumb-shadow, 0 1px 3px rgba(0, 0, 0, 0.3));
+  background: var(--rozie-slider-thumb-bg, var(--rozie-slider-accent, var(--rsl-thumb-bg, var(--rsl-accent, #0066cc))));
+  box-shadow: var(--rozie-slider-thumb-shadow, var(--rsl-thumb-shadow, 0 1px 3px rgba(0, 0, 0, 0.3)));
   cursor: pointer;
 }
 .rozie-slider--vertical[data-rozie-s-4e6f0be6] {
-  width: var(--rozie-slider-thickness, 2.5rem);
-  height: var(--rozie-slider-length, 12rem);
+  width: var(--rozie-slider-thickness, var(--rsl-thickness, 2.5rem));
+  height: var(--rozie-slider-length, var(--rsl-length, 12rem));
   padding: 0;
 }
 .rozie-slider--vertical[data-rozie-s-4e6f0be6] .rozie-slider-track[data-rozie-s-4e6f0be6],
 .rozie-slider--vertical[data-rozie-s-4e6f0be6] .rozie-slider-input[data-rozie-s-4e6f0be6] {
   top: 50%;
   left: 50%;
-  width: var(--rozie-slider-length, 12rem);
+  width: var(--rozie-slider-length, var(--rsl-length, 12rem));
   transform: translate(-50%, -50%) rotate(-90deg);
   transform-origin: center center;
 }
@@ -124,7 +124,7 @@ export default class Slider extends SignalWatcher(LitElement) {
   /* Overlays follow the rotated axis; left:%-of-length maps to the visual Y. */
   top: 50%;
   left: 50%;
-  width: var(--rozie-slider-length, 12rem);
+  width: var(--rozie-slider-length, var(--rsl-length, 12rem));
   transform: translate(-50%, -50%) rotate(-90deg);
   transform-origin: center center;
 }
@@ -140,14 +140,14 @@ export default class Slider extends SignalWatcher(LitElement) {
   position: absolute;
   top: 0;
   transform: translateX(-50%);
-  color: var(--rozie-slider-mark-color, rgba(0, 0, 0, 0.55));
+  color: var(--rozie-slider-mark-color, var(--rsl-mark-color, rgba(0, 0, 0, 0.55)));
 }
 .rozie-slider-mark-label[data-rozie-s-4e6f0be6] {
   position: absolute;
-  top: var(--rozie-slider-mark-offset, 0.75rem);
+  top: var(--rozie-slider-mark-offset, var(--rsl-mark-offset, 0.75rem));
   left: 50%;
   transform: translateX(-50%);
-  font-size: var(--rozie-slider-mark-font-size, 0.6875rem);
+  font-size: var(--rozie-slider-mark-font-size, var(--rsl-mark-font-size, 0.6875rem));
   white-space: nowrap;
 }
 .rozie-slider-bubbles[data-rozie-s-4e6f0be6] {
@@ -160,16 +160,16 @@ export default class Slider extends SignalWatcher(LitElement) {
 }
 .rozie-slider-bubble[data-rozie-s-4e6f0be6] {
   position: absolute;
-  top: var(--rozie-slider-bubble-offset, -1.25rem);
+  top: var(--rozie-slider-bubble-offset, var(--rsl-bubble-offset, -1.25rem));
   transform: translateX(-50%);
 }
 .rozie-slider-bubble-text[data-rozie-s-4e6f0be6] {
   display: inline-block;
-  padding: var(--rozie-slider-bubble-padding, 0.0625rem 0.375rem);
-  font-size: var(--rozie-slider-bubble-font-size, 0.6875rem);
-  color: var(--rozie-slider-bubble-fg, #fff);
-  background: var(--rozie-slider-bubble-bg, var(--rozie-slider-accent, #0066cc));
-  border-radius: var(--rozie-slider-bubble-radius, 4px);
+  padding: var(--rozie-slider-bubble-padding, var(--rsl-bubble-padding, 0.0625rem 0.375rem));
+  font-size: var(--rozie-slider-bubble-font-size, var(--rsl-bubble-font-size, 0.6875rem));
+  color: var(--rozie-slider-bubble-fg, var(--rsl-bubble-fg, #fff));
+  background: var(--rozie-slider-bubble-bg, var(--rozie-slider-accent, var(--rsl-bubble-bg, var(--rsl-accent, #0066cc))));
+  border-radius: var(--rozie-slider-bubble-radius, var(--rsl-bubble-radius, 4px));
   white-space: nowrap;
 }
 `;

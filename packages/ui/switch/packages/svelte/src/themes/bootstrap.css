@@ -8,15 +8,30 @@
  * switch follows.
  *
  *   import '@rozie-ui/switch-react/themes/bootstrap.css';
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rsw-x: var(--rozie-switch-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-switch-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-switch`
+ *    and the Lit host `rozie-switch`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-switch {
-  --rozie-switch-on-bg: var(--bs-primary, #0d6efd);
-  --rozie-switch-off-bg: var(--bs-border-color, rgba(0, 0, 0, 0.25));
+:root,
+.rozie-switch,
+rozie-switch {
+  --rsw-on-bg: var(--rozie-switch-on-bg, var(--bs-primary, #0d6efd));
+  --rsw-off-bg: var(--rozie-switch-off-bg, var(--bs-border-color, rgba(0, 0, 0, 0.25)));
 
-  --rozie-switch-thumb-bg: var(--bs-body-bg, #fff);
+  --rsw-thumb-bg: var(--rozie-switch-thumb-bg, var(--bs-body-bg, #fff));
 
-  --rozie-switch-radius: 2em;
+  --rsw-radius: var(--rozie-switch-radius, 2em);
 
-  --rozie-switch-focus-ring-color: var(--bs-focus-ring-color, rgba(13, 110, 253, 0.25));
-  --rozie-switch-focus-ring-width: var(--bs-focus-ring-width, 0.25rem);
+  --rsw-focus-ring-color: var(--rozie-switch-focus-ring-color, var(--bs-focus-ring-color, rgba(13, 110, 253, 0.25)));
+  --rsw-focus-ring-width: var(--rozie-switch-focus-ring-width, var(--bs-focus-ring-width, 0.25rem));
 }

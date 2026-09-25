@@ -20,17 +20,17 @@ export default class Tags extends SignalWatcher(LitElement) {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--rozie-tags-gap, 0.4rem);
-  padding: var(--rozie-tags-padding, 0.35rem 0.45rem);
+  gap: var(--rozie-tags-gap, var(--rtg-gap, 0.4rem));
+  padding: var(--rozie-tags-padding, var(--rtg-padding, 0.35rem 0.45rem));
   font: var(--rozie-tags-font, inherit);
-  background: var(--rozie-tags-bg, #fff);
-  border: var(--rozie-tags-border-width, 1px) solid var(--rozie-tags-border-color, rgba(0, 0, 0, 0.25));
-  border-radius: var(--rozie-tags-radius, 0.5rem);
-  min-width: var(--rozie-tags-min-width, 12rem);
+  background: var(--rozie-tags-bg, var(--rtg-bg, #fff));
+  border: var(--rozie-tags-border-width, var(--rtg-border-width, 1px)) solid var(--rozie-tags-border-color, var(--rtg-border-color, rgba(0, 0, 0, 0.25)));
+  border-radius: var(--rozie-tags-radius, var(--rtg-radius, 0.5rem));
+  min-width: var(--rozie-tags-min-width, var(--rtg-min-width, 12rem));
 }
 .rozie-tags[data-rozie-s-64848f8e]:focus-within {
-  border-color: var(--rozie-tags-accent, #0066cc);
-  box-shadow: 0 0 0 var(--rozie-tags-focus-ring-width, 3px) var(--rozie-tags-focus-ring-color, rgba(0, 102, 204, 0.25));
+  border-color: var(--rozie-tags-accent, var(--rtg-accent, #0066cc));
+  box-shadow: 0 0 0 var(--rozie-tags-focus-ring-width, var(--rtg-focus-ring-width, 3px)) var(--rozie-tags-focus-ring-color, var(--rtg-focus-ring-color, rgba(0, 102, 204, 0.25)));
 }
 .rozie-tags-list[data-rozie-s-64848f8e] {
   display: contents;
@@ -41,51 +41,51 @@ export default class Tags extends SignalWatcher(LitElement) {
 .rozie-tags-chip[data-rozie-s-64848f8e] {
   display: inline-flex;
   align-items: center;
-  gap: var(--rozie-tags-chip-gap, 0.3rem);
-  padding: var(--rozie-tags-chip-padding, 0.15rem 0.5rem);
-  font-size: var(--rozie-tags-chip-font-size, 0.85rem);
-  color: var(--rozie-tags-chip-color, inherit);
-  background: var(--rozie-tags-chip-bg, rgba(0, 102, 204, 0.12));
-  border-radius: var(--rozie-tags-chip-radius, 0.375rem);
+  gap: var(--rozie-tags-chip-gap, var(--rtg-chip-gap, 0.3rem));
+  padding: var(--rozie-tags-chip-padding, var(--rtg-chip-padding, 0.15rem 0.5rem));
+  font-size: var(--rozie-tags-chip-font-size, var(--rtg-chip-font-size, 0.85rem));
+  color: var(--rozie-tags-chip-color, var(--rtg-chip-color, inherit));
+  background: var(--rozie-tags-chip-bg, var(--rtg-chip-bg, rgba(0, 102, 204, 0.12)));
+  border-radius: var(--rozie-tags-chip-radius, var(--rtg-chip-radius, 0.375rem));
   white-space: nowrap;
 }
 .rozie-tags-chip__remove[data-rozie-s-64848f8e] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--rozie-tags-remove-size, 1.1rem);
-  height: var(--rozie-tags-remove-size, 1.1rem);
+  width: var(--rozie-tags-remove-size, var(--rtg-remove-size, 1.1rem));
+  height: var(--rozie-tags-remove-size, var(--rtg-remove-size, 1.1rem));
   padding: 0;
   font: inherit;
   line-height: 1;
-  color: var(--rozie-tags-remove-color, currentColor);
+  color: var(--rozie-tags-remove-color, var(--rtg-remove-color, currentColor));
   background: transparent;
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  opacity: var(--rozie-tags-remove-opacity, 0.65);
+  opacity: var(--rozie-tags-remove-opacity, var(--rtg-remove-opacity, 0.65));
   transition: opacity 0.15s, background 0.15s;
 }
 .rozie-tags-chip__remove[data-rozie-s-64848f8e]:hover:not([data-rozie-s-64848f8e]:disabled) {
   opacity: 1;
-  background: var(--rozie-tags-remove-hover-bg, rgba(0, 0, 0, 0.1));
+  background: var(--rozie-tags-remove-hover-bg, var(--rtg-remove-hover-bg, rgba(0, 0, 0, 0.1)));
 }
 .rozie-tags-chip__remove[data-rozie-s-64848f8e]:disabled {
   cursor: not-allowed;
   opacity: 0.4;
 }
 .rozie-tags-input[data-rozie-s-64848f8e] {
-  flex: 1 1 var(--rozie-tags-input-min, 4rem);
-  min-width: var(--rozie-tags-input-min, 4rem);
-  padding: var(--rozie-tags-input-padding, 0.15rem 0.1rem);
+  flex: 1 1 var(--rozie-tags-input-min, var(--rtg-input-min, 4rem));
+  min-width: var(--rozie-tags-input-min, var(--rtg-input-min, 4rem));
+  padding: var(--rozie-tags-input-padding, var(--rtg-input-padding, 0.15rem 0.1rem));
   font: inherit;
-  color: var(--rozie-tags-color, inherit);
+  color: var(--rozie-tags-color, var(--rtg-color, inherit));
   background: transparent;
   border: none;
   outline: none;
 }
 .rozie-tags-input[data-rozie-s-64848f8e]::placeholder {
-  color: var(--rozie-tags-placeholder-color, rgba(0, 0, 0, 0.4));
+  color: var(--rozie-tags-placeholder-color, var(--rtg-placeholder-color, rgba(0, 0, 0, 0.4)));
 }
 .rozie-tags-input[data-rozie-s-64848f8e]:disabled {
   cursor: not-allowed;
@@ -103,8 +103,8 @@ export default class Tags extends SignalWatcher(LitElement) {
 }
 .rozie-tags--disabled[data-rozie-s-64848f8e] {
   cursor: not-allowed;
-  opacity: var(--rozie-tags-disabled-opacity, 0.6);
-  background: var(--rozie-tags-disabled-bg, rgba(0, 0, 0, 0.04));
+  opacity: var(--rozie-tags-disabled-opacity, var(--rtg-disabled-opacity, 0.6));
+  background: var(--rozie-tags-disabled-bg, var(--rtg-disabled-bg, rgba(0, 0, 0, 0.04)));
 }
 `;
 

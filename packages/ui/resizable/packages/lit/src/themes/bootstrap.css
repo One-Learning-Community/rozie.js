@@ -7,16 +7,31 @@
  * default light palette when the vars are absent.
  *
  *   import '@rozie-ui/resizable-react/themes/bootstrap.css';
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rrz-x: var(--rozie-resizable-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-resizable-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-resizable`
+ *    and the Lit host `rozie-resizable`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-resizable {
-  --rozie-resizable-accent: var(--bs-primary, #0d6efd);
+:root,
+.rozie-resizable,
+rozie-resizable {
+  --rrz-accent: var(--rozie-resizable-accent, var(--bs-primary, #0d6efd));
 
-  --rozie-resizable-handle-bg: var(--bs-border-color, #dee2e6);
-  --rozie-resizable-handle-hover-bg: var(--bs-secondary-bg, #e9ecef);
-  --rozie-resizable-handle-active-bg: var(--bs-primary, #0d6efd);
+  --rrz-handle-bg: var(--rozie-resizable-handle-bg, var(--bs-border-color, #dee2e6));
+  --rrz-handle-hover-bg: var(--rozie-resizable-handle-hover-bg, var(--bs-secondary-bg, #e9ecef));
+  --rrz-handle-active-bg: var(--rozie-resizable-handle-active-bg, var(--bs-primary, #0d6efd));
 
-  --rozie-resizable-grip-bg: var(--bs-secondary-color, #6c757d);
+  --rrz-grip-bg: var(--rozie-resizable-grip-bg, var(--bs-secondary-color, #6c757d));
 
-  --rozie-resizable-focus-ring-color: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.5);
-  --rozie-resizable-disabled-opacity: 0.5;
+  --rrz-focus-ring-color: var(--rozie-resizable-focus-ring-color, rgba(var(--bs-primary-rgb, 13, 110, 253), 0.5));
+  --rrz-disabled-opacity: var(--rozie-resizable-disabled-opacity, 0.5);
 }

@@ -21,62 +21,68 @@
  * `.rozie-slider` element). See themes/shadcn.css, themes/material.css and
  * themes/bootstrap.css for design-system bridges.
  *
- * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
- * an element declares for itself always beats one it would inherit, whatever the selector's
- * specificity, so defaults declared on the `.rozie-slider` element itself made every ancestor
- * override dead the moment this file was imported. At the root they are only the value of last
- * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
- * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
- * they arrive by inheritance).
+ * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root)`
+ * (zero specificity): `--rsl-x: var(--rozie-slider-x, <default>)`. The component reads every token
+ * public-first, `var(--rozie-slider-x, var(--rsl-x, <inline default>))`, so a value set on ANY
+ * ancestor (`:root`, `.dark`, a wrapper) or on the component itself wins by plain inheritance,
+ * in any import order, on all six targets (Lit included: custom properties inherit into its
+ * shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the component may declare a public token.
  * A token whose default is ANOTHER token is not declared here at all: the component reads it
  * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
  * declared at the root it would be computed once, against the root's value.
- * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
- * tokens it maps on the `.rozie-slider` element itself: with a bridge imported, THOSE tokens can be
- * overridden only on that element (or by a rule of equal-or-higher specificity after it).
+ * The lines that say `inherit` / `initial` stay plain declarations: at the root such a value
+ * is "unset", so the component's own fallback applies, and it never shadows an ancestor.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares only the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * component (`.rozie-slider` and the Lit host `rozie-slider`) — so that variable is resolved AT the
+ * component and follows the nearest theme scope — and on `:root`, the copy a Lit component
+ * nested in another shadow root (out of reach of every document selector) inherits. The
+ * `--rsl-*` names are internal: not a stable API.
  */
 :where(:root) {
   /* layout / typography */
   --rozie-slider-font: inherit;
-  --rozie-slider-pad: 0.5rem 0;
+  --rsl-pad: var(--rozie-slider-pad, 0.5rem 0);
 
   /* accent — the single color most consumers will set; thumb + fill derive from it */
-  --rozie-slider-accent: #0066cc;
+  --rsl-accent: var(--rozie-slider-accent, #0066cc);
 
   /* track (the thin bar behind the thumbs) */
-  --rozie-slider-track-height: 0.375rem;
-  --rozie-slider-track-radius: 999px;
-  --rozie-slider-track-bg: rgba(0, 0, 0, 0.18);
+  --rsl-track-height: var(--rozie-slider-track-height, 0.375rem);
+  --rsl-track-radius: var(--rozie-slider-track-radius, 999px);
+  --rsl-track-bg: var(--rozie-slider-track-bg, rgba(0, 0, 0, 0.18));
 
   /* fill (the colored <div> underlay; spans the runtime fill-start→fill-end vars) */
 
   /* thumb (the native input pseudo-element; styled per-vendor in the source) */
-  --rozie-slider-thumb-size: 1rem;
-  --rozie-slider-thumb-border: 2px solid #fff;
-  --rozie-slider-thumb-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --rsl-thumb-size: var(--rozie-slider-thumb-size, 1rem);
+  --rsl-thumb-border: var(--rozie-slider-thumb-border, 2px solid #fff);
+  --rsl-thumb-shadow: var(--rozie-slider-thumb-shadow, 0 1px 3px rgba(0, 0, 0, 0.3));
   /* WebKit-only: vertical centering of the thumb over the track. Default keeps
      the thumb centered on the default track height; override if you change the
      thumb-size / track-height pair. */
-  --rozie-slider-thumb-offset: calc((0.375rem - 1rem) / 2);
+  --rsl-thumb-offset: var(--rozie-slider-thumb-offset, calc((0.375rem - 1rem) / 2));
 
   /* disabled */
-  --rozie-slider-disabled-opacity: 0.55;
+  --rsl-disabled-opacity: var(--rozie-slider-disabled-opacity, 0.55);
 
   /* vertical (rotate-90 wrapper) box sizing */
-  --rozie-slider-thickness: 2.5rem;
-  --rozie-slider-length: 12rem;
+  --rsl-thickness: var(--rozie-slider-thickness, 2.5rem);
+  --rsl-length: var(--rozie-slider-length, 12rem);
 
   /* marks overlay */
-  --rozie-slider-mark-color: rgba(0, 0, 0, 0.55);
-  --rozie-slider-mark-offset: 0.75rem;
-  --rozie-slider-mark-font-size: 0.6875rem;
+  --rsl-mark-color: var(--rozie-slider-mark-color, rgba(0, 0, 0, 0.55));
+  --rsl-mark-offset: var(--rozie-slider-mark-offset, 0.75rem);
+  --rsl-mark-font-size: var(--rozie-slider-mark-font-size, 0.6875rem);
 
   /* value bubble overlay (gated by showValue) */
-  --rozie-slider-bubble-offset: -1.25rem;
-  --rozie-slider-bubble-padding: 0.0625rem 0.375rem;
-  --rozie-slider-bubble-font-size: 0.6875rem;
-  --rozie-slider-bubble-fg: #fff;
-  --rozie-slider-bubble-radius: 4px;
+  --rsl-bubble-offset: var(--rozie-slider-bubble-offset, -1.25rem);
+  --rsl-bubble-padding: var(--rozie-slider-bubble-padding, 0.0625rem 0.375rem);
+  --rsl-bubble-font-size: var(--rozie-slider-bubble-font-size, 0.6875rem);
+  --rsl-bubble-fg: var(--rozie-slider-bubble-fg, #fff);
+  --rsl-bubble-radius: var(--rozie-slider-bubble-radius, 4px);
 
   /* runtime fill — computed per-render from value/min/max and written as
      inline custom properties on the root (the `fillStyle` $computed). The

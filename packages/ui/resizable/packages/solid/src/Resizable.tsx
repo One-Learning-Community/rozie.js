@@ -30,11 +30,11 @@ __rozieInjectStyle('Resizable-8330bc5a', `.rozie-resizable[data-rozie-s-8330bc5a
   flex: 0 0 auto;
 }
 .rozie-resizable--horizontal[data-rozie-s-8330bc5a] .rozie-resizable-panel--start[data-rozie-s-8330bc5a] {
-  width: var(--rozie-resizable-size, 50%);
+  width: var(--rozie-resizable-size, var(--rrz-size, 50%));
   height: 100%;
 }
 .rozie-resizable--vertical[data-rozie-s-8330bc5a] .rozie-resizable-panel--start[data-rozie-s-8330bc5a] {
-  height: var(--rozie-resizable-size, 50%);
+  height: var(--rozie-resizable-size, var(--rrz-size, 50%));
   width: 100%;
 }
 .rozie-resizable-panel--end[data-rozie-s-8330bc5a] {
@@ -43,12 +43,12 @@ __rozieInjectStyle('Resizable-8330bc5a', `.rozie-resizable[data-rozie-s-8330bc5a
   min-height: 0;
 }
 .rozie-resizable-handle[data-rozie-s-8330bc5a] {
-  flex: 0 0 var(--rozie-resizable-handle-size, 0.5rem);
+  flex: 0 0 var(--rozie-resizable-handle-size, var(--rrz-handle-size, 0.5rem));
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--rozie-resizable-handle-bg, rgba(0, 0, 0, 0.08));
+  background: var(--rozie-resizable-handle-bg, var(--rrz-handle-bg, rgba(0, 0, 0, 0.08)));
   outline: none;
   transition: background-color 0.15s;
   touch-action: none;
@@ -61,32 +61,32 @@ __rozieInjectStyle('Resizable-8330bc5a', `.rozie-resizable[data-rozie-s-8330bc5a
   cursor: row-resize;
 }
 .rozie-resizable-handle[data-rozie-s-8330bc5a]:hover {
-  background: var(--rozie-resizable-handle-hover-bg, rgba(0, 0, 0, 0.16));
+  background: var(--rozie-resizable-handle-hover-bg, var(--rrz-handle-hover-bg, rgba(0, 0, 0, 0.16)));
 }
 .rozie-resizable-handle[data-rozie-s-8330bc5a]:focus-visible {
-  box-shadow: 0 0 0 var(--rozie-resizable-focus-ring-width, 2px)
-    var(--rozie-resizable-focus-ring-color, rgba(0, 102, 204, 0.5));
+  box-shadow: 0 0 0 var(--rozie-resizable-focus-ring-width, var(--rrz-focus-ring-width, 2px))
+    var(--rozie-resizable-focus-ring-color, var(--rrz-focus-ring-color, rgba(0, 102, 204, 0.5)));
   z-index: 1;
 }
 .rozie-resizable--dragging[data-rozie-s-8330bc5a] .rozie-resizable-handle[data-rozie-s-8330bc5a] {
-  background: var(--rozie-resizable-handle-active-bg, var(--rozie-resizable-accent, #0066cc));
+  background: var(--rozie-resizable-handle-active-bg, var(--rozie-resizable-accent, var(--rrz-handle-active-bg, var(--rrz-accent, #0066cc))));
 }
 .rozie-resizable-grip[data-rozie-s-8330bc5a] {
   display: block;
   border-radius: 999px;
-  background: var(--rozie-resizable-grip-bg, rgba(0, 0, 0, 0.35));
+  background: var(--rozie-resizable-grip-bg, var(--rrz-grip-bg, rgba(0, 0, 0, 0.35)));
 }
 .rozie-resizable--horizontal[data-rozie-s-8330bc5a] .rozie-resizable-grip[data-rozie-s-8330bc5a] {
-  width: var(--rozie-resizable-grip-thickness, 2px);
-  height: var(--rozie-resizable-grip-length, 1.5rem);
+  width: var(--rozie-resizable-grip-thickness, var(--rrz-grip-thickness, 2px));
+  height: var(--rozie-resizable-grip-length, var(--rrz-grip-length, 1.5rem));
 }
 .rozie-resizable--vertical[data-rozie-s-8330bc5a] .rozie-resizable-grip[data-rozie-s-8330bc5a] {
-  height: var(--rozie-resizable-grip-thickness, 2px);
-  width: var(--rozie-resizable-grip-length, 1.5rem);
+  height: var(--rozie-resizable-grip-thickness, var(--rrz-grip-thickness, 2px));
+  width: var(--rozie-resizable-grip-length, var(--rrz-grip-length, 1.5rem));
 }
 .rozie-resizable--disabled[data-rozie-s-8330bc5a] .rozie-resizable-handle[data-rozie-s-8330bc5a] {
   cursor: default;
-  opacity: var(--rozie-resizable-disabled-opacity, 0.55);
+  opacity: var(--rozie-resizable-disabled-opacity, var(--rrz-disabled-opacity, 0.55));
 }`);
 
 interface ResizableProps {
