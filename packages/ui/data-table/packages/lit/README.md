@@ -262,8 +262,8 @@ const statusOptions = [
   ];
 
 // The #editor slot is the `.editor` property — a function returning a Lit template,
-// dispatched by columnId. Pass the slot scope ({ columnId, column, row, value, commit,
-// cancel, autofocus }) as element properties; <rozie-editor-select> also takes `.options`.
+// dispatched by columnId. Pass the slot scope ({ columnId, columnLabel, column, row, value,
+// commit, cancel, autofocus }) as element properties; <rozie-editor-select> also takes `.options`.
 render(html`
   <rozie-data-table
     interactionmode="grid"
@@ -273,11 +273,11 @@ render(html`
     .editor=${({ columnId, column, row, value, commit, cancel, autofocus }) => {
       const p = { columnId, column, row, value, commit, cancel, autofocus };
       switch (columnId) {
-        case 'name':   return html`<rozie-editor-text .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel} .autofocus=${p.autofocus}></rozie-editor-text>`;
-        case 'qty':    return html`<rozie-editor-number .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel} .autofocus=${p.autofocus}></rozie-editor-number>`;
-        case 'status': return html`<rozie-editor-select .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel} .autofocus=${p.autofocus} .options=${statusOptions}></rozie-editor-select>`;
-        case 'active': return html`<rozie-editor-checkbox .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel} .autofocus=${p.autofocus}></rozie-editor-checkbox>`;
-        case 'score':  return html`<rozie-editor-date .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel} .autofocus=${p.autofocus}></rozie-editor-date>`;
+        case 'name':   return html`<rozie-editor-text .columnId=${p.columnId} .columnLabel=${p.columnLabel} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel} .autofocus=${p.autofocus}></rozie-editor-text>`;
+        case 'qty':    return html`<rozie-editor-number .columnId=${p.columnId} .columnLabel=${p.columnLabel} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel} .autofocus=${p.autofocus}></rozie-editor-number>`;
+        case 'status': return html`<rozie-editor-select .columnId=${p.columnId} .columnLabel=${p.columnLabel} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel} .autofocus=${p.autofocus} .options=${statusOptions}></rozie-editor-select>`;
+        case 'active': return html`<rozie-editor-checkbox .columnId=${p.columnId} .columnLabel=${p.columnLabel} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel} .autofocus=${p.autofocus}></rozie-editor-checkbox>`;
+        case 'score':  return html`<rozie-editor-date .columnId=${p.columnId} .columnLabel=${p.columnLabel} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel} .autofocus=${p.autofocus}></rozie-editor-date>`;
         default:       return null;
       }
     }}
@@ -309,8 +309,8 @@ let rows = [
 let columnFilters: { id: string; value: unknown }[] = [];
 
 // The #filter slot is the `.filter` property — a function returning a Lit template,
-// dispatched by columnId. Pass the slot scope ({ columnId, value, uniqueValues, minMax,
-// setFilter }) as element properties.
+// dispatched by columnId. Pass the slot scope ({ columnId, columnLabel, value, uniqueValues,
+// minMax, setFilter }) as element properties.
 render(html`
   <rozie-data-table
     .data=${rows}
@@ -319,9 +319,9 @@ render(html`
     .filter=${({ columnId, value, setFilter, uniqueValues, minMax }) => {
       const p = { columnId, value, setFilter, uniqueValues, minMax };
       switch (columnId) {
-        case 'name':     return html`<rozie-filter-text .columnId=${p.columnId} .value=${p.value} .setFilter=${p.setFilter}></rozie-filter-text>`;
-        case 'category': return html`<rozie-filter-select .columnId=${p.columnId} .value=${p.value} .setFilter=${p.setFilter} .uniqueValues=${p.uniqueValues}></rozie-filter-select>`;
-        case 'price':    return html`<rozie-filter-number-range .columnId=${p.columnId} .value=${p.value} .setFilter=${p.setFilter} .minMax=${p.minMax}></rozie-filter-number-range>`;
+        case 'name':     return html`<rozie-filter-text .columnId=${p.columnId} .columnLabel=${p.columnLabel} .value=${p.value} .setFilter=${p.setFilter}></rozie-filter-text>`;
+        case 'category': return html`<rozie-filter-select .columnId=${p.columnId} .columnLabel=${p.columnLabel} .value=${p.value} .setFilter=${p.setFilter} .uniqueValues=${p.uniqueValues}></rozie-filter-select>`;
+        case 'price':    return html`<rozie-filter-number-range .columnId=${p.columnId} .columnLabel=${p.columnLabel} .value=${p.value} .setFilter=${p.setFilter} .minMax=${p.minMax}></rozie-filter-number-range>`;
         default:         return null;
       }
     }}

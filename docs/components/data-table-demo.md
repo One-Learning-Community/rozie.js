@@ -112,10 +112,11 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
       />
     </template>
     <!-- One #filter slot, dispatched by columnId to the matching filter drop-in -->
-    <template #filter="{ columnId, value, uniqueValues, minMax, setFilter }">
+    <template #filter="{ columnId, columnLabel, value, uniqueValues, minMax, setFilter }">
       <FilterSelect
         v-if="columnId === 'role'"
         :columnId="columnId"
+        :columnLabel="columnLabel"
         :value="value"
         :setFilter="setFilter"
         :uniqueValues="uniqueValues"
@@ -123,6 +124,7 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
       <FilterNumberRange
         v-else-if="columnId === 'level'"
         :columnId="columnId"
+        :columnLabel="columnLabel"
         :value="value"
         :setFilter="setFilter"
         :minMax="minMax"
@@ -130,15 +132,17 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
       <FilterText
         v-else
         :columnId="columnId"
+        :columnLabel="columnLabel"
         :value="value"
         :setFilter="setFilter"
       />
     </template>
     <!-- One #editor slot, dispatched by columnId to the matching editor drop-in -->
-    <template #editor="{ columnId, column, row, value, commit, cancel, autofocus }">
+    <template #editor="{ columnId, columnLabel, column, row, value, commit, cancel, autofocus }">
       <EditorSelect
         v-if="columnId === 'role'"
         :columnId="columnId"
+        :columnLabel="columnLabel"
         :column="column"
         :row="row"
         :value="value"
@@ -150,6 +154,7 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
       <EditorText
         v-else
         :columnId="columnId"
+        :columnLabel="columnLabel"
         :column="column"
         :row="row"
         :value="value"
@@ -284,6 +289,22 @@ Each is a real component for its framework — React `forwardRef` + hooks, Vue `
   border: 1px solid var(--vp-c-divider);
   border-radius: 12px;
   background: var(--vp-c-bg-soft);
+}
+/* base.css ships light defaults only. In the site's dark theme, set the public tokens on an
+   ANCESTOR of the table — the same override a consumer writes for their own dark mode. */
+.dark .dt-live {
+  --rozie-data-table-header-bg: var(--vp-c-bg-alt);
+  --rozie-data-table-border-color: var(--vp-c-divider);
+  --rozie-data-table-control-border-color: var(--vp-c-border);
+  --rozie-data-table-menu-bg: var(--vp-c-bg-elv);
+  --rozie-data-table-menu-shadow: var(--vp-shadow-3);
+  --rozie-data-table-pin-active-bg: var(--vp-c-default-soft);
+  --rozie-data-table-resize-grip-color: var(--vp-c-divider);
+  --rozie-data-table-accent: var(--vp-c-brand-1);
+  /* The per-column ⋯ menu is a composed @rozie-ui/popover — it reads the popover's tokens. */
+  --rozie-popover-bg: var(--vp-c-bg-elv);
+  --rozie-popover-border: 1px solid var(--vp-c-divider);
+  --rozie-popover-shadow: var(--vp-shadow-3);
 }
 .dt-live__head {
   display: flex;

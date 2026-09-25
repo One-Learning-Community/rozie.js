@@ -316,7 +316,7 @@ import {
   template: `
     <!-- OPT-IN drop-in editors fill the #editor template — DataTable stays the headless
          default; the editors are additive named exports. Each takes the slot scope as
-         inputs ([columnId] [column] [row] [value] [commit] [cancel] [autofocus]); EditorSelect
+         inputs ([columnId] [columnLabel] [column] [row] [value] [commit] [cancel] [autofocus]); EditorSelect
          also takes [options]. Mark each column editor="custom" so the #editor slot drives it. -->
     <DataTable
       interactionMode="grid"
@@ -329,22 +329,22 @@ import {
       <Column field="active" header="Active" [editable]="true" editor="custom" />
       <Column field="score" header="Score" [editable]="true" editor="custom" />
 
-      <ng-template #editor let-columnId="columnId" let-column="column" let-row="row" let-value="value" let-commit="commit" let-cancel="cancel" let-autofocus="autofocus">
+      <ng-template #editor let-columnId="columnId" let-columnLabel="columnLabel" let-column="column" let-row="row" let-value="value" let-commit="commit" let-cancel="cancel" let-autofocus="autofocus">
         @switch (columnId) {
           @case ('name') {
-            <rozie-editor-text [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" />
+            <rozie-editor-text [columnId]="columnId" [columnLabel]="columnLabel" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" />
           }
           @case ('qty') {
-            <rozie-editor-number [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" />
+            <rozie-editor-number [columnId]="columnId" [columnLabel]="columnLabel" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" />
           }
           @case ('status') {
-            <rozie-editor-select [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" [options]="statusOptions" />
+            <rozie-editor-select [columnId]="columnId" [columnLabel]="columnLabel" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" [options]="statusOptions" />
           }
           @case ('active') {
-            <rozie-editor-checkbox [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" />
+            <rozie-editor-checkbox [columnId]="columnId" [columnLabel]="columnLabel" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" />
           }
           @case ('score') {
-            <rozie-editor-date [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" />
+            <rozie-editor-date [columnId]="columnId" [columnLabel]="columnLabel" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [autofocus]="autofocus" />
           }
         }
       </ng-template>
@@ -381,7 +381,7 @@ import {
   template: `
     <!-- OPT-IN drop-in filters fill the #filter template — DataTable stays the headless
          default; the filters are additive named exports. Each takes the slot scope as
-         inputs ([columnId] [value] [setFilter]); FilterSelect also takes
+         inputs ([columnId] [columnLabel] [value] [setFilter]); FilterSelect also takes
          [uniqueValues], FilterNumberRange also takes [minMax]. Mark each column
          filterable so the #filter slot renders. -->
     <DataTable [(data)]="rows" [(columnFilters)]="columnFilters">
@@ -389,16 +389,16 @@ import {
       <Column field="category" header="Category" [filterable]="true" />
       <Column field="price" header="Price" [filterable]="true" />
 
-      <ng-template #filter let-columnId="columnId" let-value="value" let-setFilter="setFilter" let-uniqueValues="uniqueValues" let-minMax="minMax">
+      <ng-template #filter let-columnId="columnId" let-columnLabel="columnLabel" let-value="value" let-setFilter="setFilter" let-uniqueValues="uniqueValues" let-minMax="minMax">
         @switch (columnId) {
           @case ('name') {
-            <rozie-filter-text [columnId]="columnId" [value]="value" [setFilter]="setFilter" />
+            <rozie-filter-text [columnId]="columnId" [columnLabel]="columnLabel" [value]="value" [setFilter]="setFilter" />
           }
           @case ('category') {
-            <rozie-filter-select [columnId]="columnId" [value]="value" [setFilter]="setFilter" [uniqueValues]="uniqueValues" />
+            <rozie-filter-select [columnId]="columnId" [columnLabel]="columnLabel" [value]="value" [setFilter]="setFilter" [uniqueValues]="uniqueValues" />
           }
           @case ('price') {
-            <rozie-filter-number-range [columnId]="columnId" [value]="value" [setFilter]="setFilter" [minMax]="minMax" />
+            <rozie-filter-number-range [columnId]="columnId" [columnLabel]="columnLabel" [value]="value" [setFilter]="setFilter" [minMax]="minMax" />
           }
         }
       </ng-template>

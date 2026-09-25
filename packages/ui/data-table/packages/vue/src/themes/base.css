@@ -12,7 +12,9 @@
  * max-height. It does NOT reach every cosmetic value. 58 of the 82 internal tokens
  * have no public counterpart today, including the grid active-cell ring, the range
  * highlight, the fill handle, the invalid-cell outline, the group tokens, the filter
- * row, the per-header column ⋯ menu, most of the pagination bar (only
+ * row, the per-header column ⋯ menu (its panel is a composed @rozie-ui/popover, so its
+ * background, border and shadow follow --rozie-popover-bg, --rozie-popover-border and
+ * --rozie-popover-shadow, set at the same ancestor), most of the pagination bar (only
  * --rozie-data-table-control-border-color, --rozie-data-table-radius, and
  * --rozie-data-table-disabled-opacity are public — its background, padding, and
  * status-text size are not), and the chrome column widths. Those remain internal

@@ -296,8 +296,8 @@ export function Demo() {
   // OPT-IN drop-in editors fill the #editor slot — DataTable stays the headless
   // DEFAULT; the editors are additive named exports. Mark each column editor="custom"
   // (the drop-in owns rendering) and dispatch by columnId. Each editor takes the slot
-  // scope as props ({ columnId, column, row, value, commit, cancel, autofocus });
-  // EditorSelect also takes `options`. Use them as-is, or fork one as a template.
+  // scope as props ({ columnId, columnLabel, column, row, value, commit, cancel,
+  // autofocus }); EditorSelect also takes `options`. Use them as-is, or fork one as a template.
   const [rows, setRows] = useState([
     { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
     { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
@@ -348,7 +348,7 @@ export function Demo() {
   // OPT-IN drop-in filters fill the #filter slot — DataTable stays the headless
   // DEFAULT; the filters are additive named exports. Mark each column `filterable`
   // (the #filter slot only renders for filterable columns) and dispatch by columnId.
-  // Each filter takes the slot scope as props ({ columnId, value, setFilter });
+  // Each filter takes the slot scope as props ({ columnId, columnLabel, value, setFilter });
   // FilterSelect also reads `uniqueValues`, FilterNumberRange also reads `minMax` —
   // both arrive in the slot scope, so spreading it through wires them up.
   const rows = [
