@@ -37,26 +37,20 @@ const ROOT = resolve(HERE, '..');
 const readSrc = (relPath: string) => readFileSync(resolve(ROOT, relPath), 'utf8');
 
 /**
- * The literal OS-dark light-opt-out guard selector (Branch 1 of the two-branch
- * selector list — the five light-DOM targets). Byte-identical between
- * `themes/base.css` and the SFC's `:root {}` escape-hatch copy — one wording,
- * two files.
+ * The literal OS-dark light-opt-out guard selector. Byte-identical between
+ * `themes/base.css` and the SFC's `:root {}` escape-hatch copy — one wording, two files.
+ *
+ * It names the DOCUMENT ROOT, under `:where()`, and nothing else. Until 2026-09-25 it was
+ * `:root:not(.light):not([data-theme="light"]) .rozie-flow-canvas` (plus a Lit-only
+ * `.rozie-flow-canvas:not(html *)` branch), i.e. the dark palette was declared ON the
+ * canvas. A value an element declares for itself always beats one it would inherit, so
+ * that made every `--rozie-flow-*` override set on an ancestor (`body`, a wrapper) dead in
+ * OS dark, even with nothing imported. On the root at zero specificity the palette is a
+ * value of last resort, reaches the canvas by inheritance on all six targets (Lit's shadow
+ * root included — so the Lit branch is gone, and Lit now honours the `.light` opt-out),
+ * and loses to any ancestor override. The pins below changed deliberately with it.
  */
-const GUARD = ':root:not(.light):not([data-theme="light"]) .rozie-flow-canvas';
-
-/**
- * Branch 2 of the selector list — the Lit-only branch that keeps Lit's
- * zero-import OS-dark default alive inside its shadow root, where Branch 1's
- * `:root` ancestor guard can never be observed from outside the shadow boundary.
- * `.rozie-flow-canvas:not(html *)` was chosen over `:host .rozie-flow-canvas`
- * because Angular's own `wrapBareNgDeep` emits a BARE `::ng-deep` (not `:host
- * ::ng-deep`) for `:root {}` engine rules specifically so engine-rendered DOM
- * outside the host still gets pierced — a `:host`-anchored branch would swim
- * against that existing assumption, and its interaction with Angular's own
- * `:host`-rewriting is unverified. `:not(html *)` carries no `:host` token, so it
- * sidesteps the risk entirely.
- */
-const LIT_BRANCH = '.rozie-flow-canvas:not(html *)';
+const GUARD = ':where(:root:not(.light):not([data-theme="light"]))';
 
 /**
  * The five light-DOM emitted leaves that must carry the guard verbatim, using the
@@ -134,22 +128,30 @@ describe('dark-palette-drift — OS-dark guard selector (D-22)', () => {
     expect(src.includes(`::ng-deep ${GUARD}`)).toBe(true);
   });
 
-  it('the lit leaf records the documented shadow-root gap', () => {
-    // Lit's `static styles` copy lives inside a shadow root, where the ancestor
-    // guard (`:root:not(.light)...`) can never match from outside the shadow
-    // boundary — D-01's accepted, documented gap: Lit stays unguarded and keeps
-    // its zero-import OS-dark default regardless of a `.light` /
-    // `[data-theme="light"]` opt-out at the document root. This assertion exists
-    // so that gap stays a recorded contract rather than an accident.
+  it('the lit leaf injects the guard at document level', () => {
+    // The `static styles` copy lives inside the shadow root, where `:root` never
+    // matches; the copy that works is the trailing `injectGlobalStyles(...)` call,
+    // which declares the palette on the document root, whence it inherits into the
+    // shadow tree (and into a canvas nested in another component's shadow root).
     const src = readSrc(LIT_LEAF);
-    // Branch 1 (the light-DOM guard) is present verbatim too — the selector list
-    // is shared source, emitted into BOTH `static styles` (shadow-scoped) and the
-    // trailing `injectGlobalStyles(...)` document-level call — but it is INERT
-    // inside the shadow root, which is exactly what makes Branch 2 necessary.
-    expect(src.includes(GUARD)).toBe(true);
-    // Branch 2 — the selector that keeps Lit's OS-dark default alive — must also
-    // be present verbatim.
-    expect(src.includes(LIT_BRANCH)).toBe(true);
+    const global = src.slice(src.indexOf('injectGlobalStyles('));
+    expect(global.includes(GUARD)).toBe(true);
+  });
+
+  it('no dark copy declares the palette on the canvas element', () => {
+    // The regression this file now also guards: a palette declared ON
+    // `.rozie-flow-canvas` shadows every ancestor override (see GUARD above).
+    const offenders: string[] = [];
+    for (const [name, text] of [
+      ['src/FlowCanvas.rozie', readSrc('src/FlowCanvas.rozie')],
+      ['src/themes/base.css', readSrc('src/themes/base.css')],
+    ] as const) {
+      const stripped = stripComments(text);
+      for (const m of stripped.matchAll(/([^{};]*)\{[^{}]*--rozie-flow-[a-z-]+\s*:/g)) {
+        if (m[1].includes('.rozie-flow-canvas')) offenders.push(`${name}: ${m[1].trim()}`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 
   // Deliberately no assertion on Solid's `__rozieInjectStyle('FlowCanvas-<hash>',
@@ -236,7 +238,7 @@ describe('dark-palette-drift — palette union-of-keys (D-20)', () => {
   const baseCssSrc = readSrc('src/themes/base.css');
 
   const sfcDarkBlock = extractBlock(sfcSrc, '@media (prefers-color-scheme: dark)');
-  const baseDarkClassBlock = extractBlock(baseCssSrc, '.dark .rozie-flow-canvas,');
+  const baseDarkClassBlock = extractBlock(baseCssSrc, ':where(.dark, [data-theme="dark"]) {');
   const baseOsDarkBlock = extractBlock(baseCssSrc, '@media (prefers-color-scheme: dark)', {
     fromLastOccurrence: true,
   });

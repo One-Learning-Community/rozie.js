@@ -1,6 +1,5 @@
 @media (prefers-color-scheme: dark) {
-    :root:not(.light):not([data-theme="light"]) .rozie-flow-canvas,
-    .rozie-flow-canvas:not(html *) {
+    :where(:root:not(.light):not([data-theme="light"])) {
       --rozie-flow-accent: #60a5fa;
       --rozie-flow-bg: #0f172a;
       --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);

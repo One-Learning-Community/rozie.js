@@ -45,7 +45,6 @@ The values listed below are exposed as `--rozie-flow-*` custom properties, each 
 | `--rozie-flow-node-radius` | `8px` |
 | `--rozie-flow-node-shadow` | `0 2px 6px rgba(0, 0, 0, 0.12)` |
 | `--rozie-flow-node-title-fg` | `#1f2937` |
-| `--rozie-flow-node-selected-border` | `var(--rozie-flow-accent)` |
 | `--rozie-flow-node-selected-ring` | `rgba(59, 130, 246, 0.5)` |
 | `--rozie-flow-node-selected-shadow` | `0 2px 8px rgba(0, 0, 0, 0.15)` |
 
@@ -67,7 +66,6 @@ D-15: under box-sizing: border-box this token now means the socket's RENDERED di
 | `--rozie-flow-socket-border-color` | `#ffffff` |
 | `--rozie-flow-socket-border-width` | `2px` |
 | `--rozie-flow-socket-ring` | `rgba(0, 0, 0, 0.2)` |
-| `--rozie-flow-socket-hover-bg` | `var(--rozie-flow-accent)` |
 
 D-11 (ISSUE-6): opacity-only, deliberately carrying no colour — a colour-based hint would need an entry in all three hand-maintained dark palette copies, the very triplicate that produced both ISSUE-3 and A4. Opacity is immune to that drift, reads as "unavailable" rather than "error", and works against any consumer accent. Light-only by design; adds ZERO dark-block entries.
 
@@ -81,7 +79,6 @@ D-11 (ISSUE-6): opacity-only, deliberately carrying no colour — a colour-based
 | --- | --- |
 | `--rozie-flow-connection-stroke` | `#64748b` |
 | `--rozie-flow-connection-width` | `3px` |
-| `--rozie-flow-connection-selected-stroke` | `var(--rozie-flow-accent)` |
 | `--rozie-flow-connection-selected-width` | `4px` |
 | `--rozie-flow-connection-label-fg` | `#334155` |
 | `--rozie-flow-connection-label-halo` | `#ffffff` |
@@ -99,18 +96,15 @@ D-11 (ISSUE-6): opacity-only, deliberately carrying no colour — a colour-based
 | `--rozie-flow-control-active-bg` | `#e2e8f0` |
 | `--rozie-flow-control-selected-bg` | `#dbeafe` |
 | `--rozie-flow-control-selected-fg` | `#1d4ed8` |
-| `--rozie-flow-control-selected-border` | `var(--rozie-flow-accent)` |
 | `--rozie-flow-control-inset` | `10px` |
 | `--rozie-flow-control-btn-size` | `28px` |
 
 ### marquee (mode:'select')
 
-D-25: derives off --rozie-flow-accent in BOTH light and dark, so overriding accent alone recolors the marquee too — zero dark-block entries needed. The historical rgba(59, 130, 246, 0.12) literal lives on as the at-usage-site var() fallback in FlowCanvas.rozie, not as a second declaration here (a "preceding fallback" declaration is a no-op for a custom property). IN-01: that var() fallback only activates when --rozie-flow-marquee-bg is completely UNSET (e.g. an ancestor scope that unsets the variable) — NOT when the color-mix() value it IS set to fails to parse in an older browser. An unsupported color-mix() makes the `background` declaration invalid at computed-value time, which falls back to `background`'s own initial value (transparent), not to this rgba(...) argument. There is no working degrade path today; if one is ever needed, it requires an `@supports not (color: color-mix(in srgb, red, blue))` block, not this fallback argument. Not a functional concern as of 2026 — color-mix() has near-universal evergreen-browser support and is already used in 86 other files in this repo.
+D-25: --rozie-flow-marquee-bg derives off --rozie-flow-accent in BOTH light and dark, so overriding accent alone recolors the marquee too — zero dark-block entries needed. The derivation lives at the component's read site (`color-mix(in srgb, var(--rozie-flow-accent) 12%, transparent)`), not here, so it is resolved against the accent the canvas actually inherits. color-mix() needs an evergreen browser; where it does not parse, the marquee background is transparent.
 
 | Token | Default |
 | --- | --- |
-| `--rozie-flow-marquee-bg` | `color-mix(in srgb, var(--rozie-flow-accent) 12%, transparent)` |
-| `--rozie-flow-marquee-border` | `var(--rozie-flow-accent)` |
 | `--rozie-flow-marquee-radius` | `2px` |
 
 ### MiniMap overlay
@@ -133,7 +127,6 @@ The two tokens below are read from JS via a getComputedStyle-backed flowToken() 
 | Token | Default |
 | --- | --- |
 | `--rozie-flow-resize-handle-bg` | `#ffffff` |
-| `--rozie-flow-resize-handle-border` | `var(--rozie-flow-accent, #3b82f6)` |
 | `--rozie-flow-resize-handle-size` | `8px` |
 | `--rozie-flow-resize-handle-radius` | `2px` |
 
@@ -164,12 +157,26 @@ Splitting the family out from the four per-role sizes means rebranding is ONE ov
 
 ### focus ring
 
-Defaults off --rozie-flow-accent, not a colour literal: both dark blocks already remap accent, so the ring inherits dark automatically and adds ZERO new entries to the three hand-maintained dark palettes. Do not "helpfully" hardcode a colour here — that would reintroduce exactly the drift D-20's predicate exists to catch.
+The ring's colour, --rozie-flow-focus-ring, defaults to --rozie-flow-accent at the read site, so the ring follows dark and any accent override with ZERO entries in the three hand-maintained dark palettes. Do not "helpfully" hardcode a colour for it — that would reintroduce exactly the drift D-20's predicate exists to catch.
 
 | Token | Default |
 | --- | --- |
-| `--rozie-flow-focus-ring` | `var(--rozie-flow-accent)` |
 | `--rozie-flow-focus-ring-width` | `2px` |
+
+### Defaulted where FlowCanvas reads them
+
+Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).
+
+| Token | Default |
+| --- | --- |
+| `--rozie-flow-connection-selected-stroke` | `var(--rozie-flow-accent, #3b82f6)` |
+| `--rozie-flow-control-selected-border` | `var(--rozie-flow-accent, #3b82f6)` |
+| `--rozie-flow-focus-ring` | `var(--rozie-flow-accent, #3b82f6)` |
+| `--rozie-flow-marquee-bg` | `color-mix(in srgb, var(--rozie-flow-accent, #3b82f6) 12%, transparent)` |
+| `--rozie-flow-marquee-border` | `var(--rozie-flow-accent, #3b82f6)` |
+| `--rozie-flow-node-selected-border` | `var(--rozie-flow-accent, #3b82f6)` |
+| `--rozie-flow-resize-handle-border` | `var(--rozie-flow-accent, #3b82f6)` |
+| `--rozie-flow-socket-hover-bg` | `var(--rozie-flow-accent, #3b82f6)` |
 
 ## Design-system bridges
 

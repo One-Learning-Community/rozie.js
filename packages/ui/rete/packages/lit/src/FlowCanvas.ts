@@ -146,7 +146,7 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   display: none;
   z-index: 9;
   pointer-events: none;
-  background: var(--rozie-flow-marquee-bg, rgba(59, 130, 246, 0.12));
+  background: var(--rozie-flow-marquee-bg, color-mix(in srgb, var(--rozie-flow-accent, #3b82f6) 12%, transparent));
   border: 1px solid var(--rozie-flow-marquee-border, var(--rozie-flow-accent, #3b82f6));
   /* D-07: was a hardcoded 2px that ignored --rozie-flow-radius entirely, so a
      consumer setting a sharp-corner theme still got a rounded marquee. */
@@ -217,8 +217,7 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
 .rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:active { background: var(--rozie-flow-control-active-bg, #e2e8f0); }
 .rozie-flow-toolbar__btn--delete[data-rozie-s-cd396d6a] { color: var(--rozie-flow-toolbar-delete-fg, #b91c1c); }
 @media (prefers-color-scheme: dark) {
-    :root:not(.light):not([data-theme="light"]) .rozie-flow-canvas,
-    .rozie-flow-canvas:not(html *) {
+    :where(:root:not(.light):not([data-theme="light"])) {
       --rozie-flow-accent: #60a5fa;
       --rozie-flow-bg: #0f172a;
       --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
@@ -5771,10 +5770,9 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   }
 }
 
-injectGlobalStyles('rozie-flow-canvas-fc7279f1-global', `
+injectGlobalStyles('rozie-flow-canvas-3cc55974-global', `
 @media (prefers-color-scheme: dark) {
-    :root:not(.light):not([data-theme="light"]) .rozie-flow-canvas,
-    .rozie-flow-canvas:not(html *) {
+    :where(:root:not(.light):not([data-theme="light"])) {
       --rozie-flow-accent: #60a5fa;
       --rozie-flow-bg: #0f172a;
       --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);

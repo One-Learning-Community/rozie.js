@@ -10,9 +10,9 @@
  * Importing this file is therefore OPTIONAL. It does two things: (1) makes the full
  * token surface explicit in one place so you can copy/override exactly what you need,
  * and (2) adds the APP-TOGGLED dark strategy (`.dark` / `[data-theme="dark"]`) for
- * apps that switch theme by a root class instead of the OS setting — plus a redundant
- * (identical-value) OS `@media` block so an app that imports ONLY this file, ahead of
- * any custom overrides, still gets OS dark.
+ * apps that switch theme by a root class instead of the OS setting. It also repeats the
+ * OS `@media` dark block (identical values), which keeps OS dark winning over this file's
+ * own light defaults whichever stylesheet loads last.
  *
  *   import '@rozie-ui/rete-react/themes/base.css';
  *
@@ -24,8 +24,30 @@
  *
  * See themes/shadcn.css, themes/material.css and themes/bootstrap.css for
  * design-system bridges.
+ *
+ * WHERE THE DEFAULTS LIVE. Every value in this file is declared on the document root (or on
+ * the `.dark` / `[data-theme="dark"]` element) under `:where()` — zero specificity, a value
+ * of last resort — never on `.rozie-flow-canvas`. A value an element declares for itself
+ * always beats one it would inherit, whatever the selector's specificity, so a default
+ * declared on the canvas would make every override set on an ancestor dead. Declared at the
+ * root, the defaults reach the canvas by inheritance (on Lit too, across its shadow root)
+ * and lose to: a value set on any element between the root and the canvas, a `:root { … }`
+ * rule of yours in either import order, and the canvas element itself.
+ *
+ * Tokens whose default is another token are NOT declared here: declared at the root they
+ * would be computed once, against the root's value, and would ignore an accent set on a
+ * wrapper. Each read site in the component carries that derivation, so the default resolves
+ * at the canvas: --rozie-flow-node-selected-border, --rozie-flow-socket-hover-bg,
+ * --rozie-flow-connection-selected-stroke, --rozie-flow-control-selected-border,
+ * --rozie-flow-marquee-border, --rozie-flow-resize-handle-border and --rozie-flow-focus-ring
+ * default to `var(--rozie-flow-accent)`; --rozie-flow-marquee-bg defaults to
+ * `color-mix(in srgb, var(--rozie-flow-accent) 12%, transparent)`.
+ *
+ * The OS-dark block at the end repeats the component's own zero-import one on purpose: the
+ * light block below is also declared on the root at zero specificity, so it is this file's
+ * own later dark block that keeps OS dark winning over it whichever file loads last.
  */
-.rozie-flow-canvas {
+:where(:root) {
   /* accent — the shared selected/active color. */
   --rozie-flow-accent: #3b82f6;
 
@@ -42,7 +64,6 @@
   --rozie-flow-node-radius: 8px;
   --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
   --rozie-flow-node-title-fg: #1f2937;
-  --rozie-flow-node-selected-border: var(--rozie-flow-accent);
   --rozie-flow-node-selected-ring: rgba(59, 130, 246, 0.5);
   --rozie-flow-node-selected-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   /* D-09: a node editor has real full-bleed body cases — an image, a
@@ -63,7 +84,6 @@
   --rozie-flow-socket-border-color: #ffffff;
   --rozie-flow-socket-border-width: 2px;
   --rozie-flow-socket-ring: rgba(0, 0, 0, 0.2);
-  --rozie-flow-socket-hover-bg: var(--rozie-flow-accent);
   /* D-11 (ISSUE-6): opacity-only, deliberately carrying no colour — a colour-based
      hint would need an entry in all three hand-maintained dark palette copies, the
      very triplicate that produced both ISSUE-3 and A4. Opacity is immune to that
@@ -74,7 +94,6 @@
   /* connections */
   --rozie-flow-connection-stroke: #64748b;
   --rozie-flow-connection-width: 3px;
-  --rozie-flow-connection-selected-stroke: var(--rozie-flow-accent);
   --rozie-flow-connection-selected-width: 4px;
   --rozie-flow-connection-label-fg: #334155;
   --rozie-flow-connection-label-halo: #ffffff;
@@ -89,29 +108,16 @@
   --rozie-flow-control-active-bg: #e2e8f0;
   --rozie-flow-control-selected-bg: #dbeafe;
   --rozie-flow-control-selected-fg: #1d4ed8;
-  --rozie-flow-control-selected-border: var(--rozie-flow-accent);
   --rozie-flow-control-inset: 10px;
   --rozie-flow-control-btn-size: 28px;
 
   /* marquee (mode:'select') */
-  /* D-25: derives off --rozie-flow-accent in BOTH light and dark, so overriding
-     accent alone recolors the marquee too — zero dark-block entries needed. The
-     historical rgba(59, 130, 246, 0.12) literal lives on as the at-usage-site
-     var() fallback in FlowCanvas.rozie, not as a second declaration here (a
-     "preceding fallback" declaration is a no-op for a custom property).
-     IN-01: that var() fallback only activates when --rozie-flow-marquee-bg is
-     completely UNSET (e.g. an ancestor scope that unsets the variable) — NOT
-     when the color-mix() value it IS set to fails to parse in an older browser.
-     An unsupported color-mix() makes the `background` declaration invalid at
-     computed-value time, which falls back to `background`'s own initial value
-     (transparent), not to this rgba(...) argument. There is no working degrade
-     path today; if one is ever needed, it requires an
-     `@supports not (color: color-mix(in srgb, red, blue))` block, not this
-     fallback argument. Not a functional concern as of 2026 — color-mix() has
-     near-universal evergreen-browser support and is already used in 86 other
-     files in this repo. */
-  --rozie-flow-marquee-bg: color-mix(in srgb, var(--rozie-flow-accent) 12%, transparent);
-  --rozie-flow-marquee-border: var(--rozie-flow-accent);
+  /* D-25: --rozie-flow-marquee-bg derives off --rozie-flow-accent in BOTH light and dark,
+     so overriding accent alone recolors the marquee too — zero dark-block entries needed.
+     The derivation lives at the component's read site
+     (`color-mix(in srgb, var(--rozie-flow-accent) 12%, transparent)`), not here, so it is
+     resolved against the accent the canvas actually inherits. color-mix() needs an
+     evergreen browser; where it does not parse, the marquee background is transparent. */
   --rozie-flow-marquee-radius: 2px;
 
   /* MiniMap overlay */
@@ -127,7 +133,6 @@
 
   /* resize handle (the four corner drag affordances on the canvas) */
   --rozie-flow-resize-handle-bg: #ffffff;
-  --rozie-flow-resize-handle-border: var(--rozie-flow-accent, #3b82f6);
   --rozie-flow-resize-handle-size: 8px;
   --rozie-flow-resize-handle-radius: 2px;
 
@@ -151,28 +156,24 @@
   --rozie-flow-toolbar-font-size: 12px;
   --rozie-flow-connection-label-font-size: 11px;
 
-  /* Defaults off --rozie-flow-accent, not a colour literal: both dark blocks
-     already remap accent, so the ring inherits dark automatically and adds
-     ZERO new entries to the three hand-maintained dark palettes. Do not
-     "helpfully" hardcode a colour here — that would reintroduce exactly the
-     drift D-20's predicate exists to catch. */
+  /* The ring's colour, --rozie-flow-focus-ring, defaults to --rozie-flow-accent at the read
+     site, so the ring follows dark and any accent override with ZERO entries in the three
+     hand-maintained dark palettes. Do not "helpfully" hardcode a colour for it — that would
+     reintroduce exactly the drift D-20's predicate exists to catch. */
   /* focus ring */
-  --rozie-flow-focus-ring: var(--rozie-flow-accent);
   --rozie-flow-focus-ring-width: 2px;
 }
 
 /*
  * App-toggled dark theme. The component ships a zero-import
  * `@media (prefers-color-scheme: dark)` default, but an app that toggles dark via a
- * class needs these. Only COLOR tokens are remapped (sizes/radii hold). Applies when
- * a `.dark` or `[data-theme="dark"]` ancestor is present. Custom properties inherit
- * (and pierce shadow DOM), so this reaches the Lit custom element too — the one
- * place a bare class-toggle otherwise can't reach inside the shadow root.
+ * class needs these. Only COLOR tokens are remapped (sizes/radii hold). Declared ON the
+ * `.dark` / `[data-theme="dark"]` element (the root, a wrapper, or the canvas itself), at
+ * zero specificity, so a token set on any element between it and the canvas — or by your
+ * own `.dark { … }` rule — still wins. Custom properties inherit (and pierce shadow DOM), so
+ * this reaches the Lit custom element too.
  */
-.dark .rozie-flow-canvas,
-[data-theme="dark"] .rozie-flow-canvas,
-.dark.rozie-flow-canvas,
-[data-theme="dark"].rozie-flow-canvas {
+:where(.dark, [data-theme="dark"]) {
   --rozie-flow-accent: #60a5fa;
   --rozie-flow-bg: #0f172a;
   --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
@@ -221,7 +222,7 @@
  * An explicit `.dark` / `[data-theme="dark"]` (above) always wins regardless of OS.
  */
 @media (prefers-color-scheme: dark) {
-  :root:not(.light):not([data-theme="light"]) .rozie-flow-canvas {
+  :where(:root:not(.light):not([data-theme="light"])) {
     --rozie-flow-accent: #60a5fa;
     --rozie-flow-bg: #0f172a;
     --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);

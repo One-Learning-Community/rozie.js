@@ -4010,11 +4010,11 @@ for (const target of TARGETS) {
  * on react/vue/svelte/angular/solid until Task 2 lands the corrected `:root { @media
  * {...} } }` escape-hatch shape.
  *
- * The Lit branch below is NOT an oversight — it records a deliberate, documented gap
- * (D-01): Lit's dark palette lives inside a shadow root where an ancestor selector like
- * `:root:not(.light)` can never be observed from outside, so Lit stays unguarded (still
- * dark, opt-out or not). That is the accepted contract, asserted here so it stays a
- * recorded fact rather than an accident.
+ * Lit honours the opt-out too since 2026-09-25. Before, Lit's dark palette was declared
+ * on the canvas inside its shadow root, where the root guard can never be observed, so Lit
+ * stayed dark (D-01's documented gap). The palette is now declared on the document root
+ * (`:where(:root:not(.light):not([data-theme="light"]))`, injected at document level on
+ * every target) and inherits into the shadow tree, so the same guard governs all six.
  *
  * No `toHaveScreenshot` anywhere in this block — per this file's header, structural /
  * behavioral assertions only; a transient DOM-classlist-driven theming check must never
@@ -4058,41 +4058,25 @@ for (const target of TARGETS) {
       .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
       .toBe('rgb(15, 23, 42)');
 
-    // ---- Assertion B (RED today on react/vue/svelte/angular/solid): `.light` class
-    // opt-out ----
+    // ---- Assertion B: `.light` class opt-out (all six targets) ----
     await page.evaluate(() => document.documentElement.classList.add('light'));
-    if (target === 'lit') {
-      // D-01's documented, accepted gap: Lit's OS-dark copy lives inside a shadow root
-      // where the ancestor guard selector can never match, so Lit stays dark regardless
-      // of the opt-out.
-      await expect
-        .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
-        .toBe('rgb(15, 23, 42)');
-    } else {
-      await expect
-        .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
-        .toBe('rgb(247, 248, 250)');
-    }
+    await expect
+      .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe('rgb(247, 248, 250)');
     await page.evaluate(() => document.documentElement.classList.remove('light'));
     // the opt-out is not sticky — removing it returns the canvas to dark.
     await expect
       .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
       .toBe('rgb(15, 23, 42)');
 
-    // ---- Assertion C (RED today on the same five): `[data-theme="light"]` attribute
-    // opt-out — base.css's guard covers both forms and the SFC copy must too ----
+    // ---- Assertion C: `[data-theme="light"]` attribute opt-out — base.css's guard
+    // covers both forms and the SFC copy must too ----
     await page.evaluate(() =>
       document.documentElement.setAttribute('data-theme', 'light'),
     );
-    if (target === 'lit') {
-      await expect
-        .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
-        .toBe('rgb(15, 23, 42)');
-    } else {
-      await expect
-        .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
-        .toBe('rgb(247, 248, 250)');
-    }
+    await expect
+      .poll(canvasBg, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe('rgb(247, 248, 250)');
     await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
   });
 }

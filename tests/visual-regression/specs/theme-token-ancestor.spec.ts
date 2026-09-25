@@ -20,9 +20,11 @@
  *     that source when the source is set on an ancestor — i.e. its default is resolved at the
  *     component, never computed once at the document root against the root's source.
  *
- * rete is deliberately absent: FlowCanvas's own SFC declares its OS-dark palette on the
- * canvas element (the `:root` escape-hatch copy), so its token architecture is not the
- * base.css-only one this spec measures — see packages/ui/rete/src/themes/base.css.
+ * Families with a built-in dark palette (rete: FlowCanvas ships an OS-driven dark default in
+ * its own SFC, and base.css adds the `.dark` / `[data-theme="dark"]` class strategy) get four
+ * more cases: the dark palette is still the default (OS dark with nothing imported; a `.dark`
+ * root with base.css), a `.light` root still opts out, and under OS dark or a `.dark` root
+ * every dark-palette token set on an ancestor wins — with and without base.css.
  *
  * Behavioral-only (no pixel baseline).
  */
@@ -44,6 +46,8 @@ interface Family {
   /** Tokens the component itself sets inline from a prop/state (base.css lists them for
    * reference only; the inline value rightly beats any stylesheet or ancestor). */
   owned?: string[];
+  /** A token and its dark-palette value, when the family ships a dark default. */
+  dark?: [string, string];
 }
 
 const FAMILIES: Family[] = [
@@ -130,6 +134,22 @@ const FAMILIES: Family[] = [
   },
   { family: 'popover', example: 'PopoverScreenshot', root: '.rozie-popover', derived: {} },
   {
+    family: 'rete',
+    example: 'FlowCanvasScreenshot',
+    root: '.rozie-flow-canvas',
+    derived: {
+      '--rozie-flow-node-selected-border': '--rozie-flow-accent',
+      '--rozie-flow-socket-hover-bg': '--rozie-flow-accent',
+      '--rozie-flow-connection-selected-stroke': '--rozie-flow-accent',
+      '--rozie-flow-control-selected-border': '--rozie-flow-accent',
+      '--rozie-flow-marquee-bg': '--rozie-flow-accent',
+      '--rozie-flow-marquee-border': '--rozie-flow-accent',
+      '--rozie-flow-resize-handle-border': '--rozie-flow-accent',
+      '--rozie-flow-focus-ring': '--rozie-flow-accent',
+    },
+    dark: ['--rozie-flow-bg', '#0f172a'],
+  },
+  {
     family: 'resizable',
     example: 'ResizableScreenshot',
     root: '.rozie-resizable',
@@ -165,6 +185,16 @@ function declarations(css: string): Map<string, string> {
     if (!out.has(m[1])) out.set(m[1], m[2].trim().replace(/\s+/g, ' '));
   }
   return out;
+}
+
+/** Every `--rozie-*` name base.css declares more than once (a dark-palette entry). */
+function redeclared(css: string): string[] {
+  const seen = new Map<string, number>();
+  const noComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const m of noComments.matchAll(/(--rozie-[a-z0-9-]+)\s*:\s*([^;{}]+);/g)) {
+    seen.set(m[1], (seen.get(m[1]) ?? 0) + 1);
+  }
+  return [...seen].filter(([, n]) => n > 1).map(([name]) => name);
 }
 
 const CSS_WIDE = new Set(['inherit', 'initial', 'unset', 'revert', 'revert-layer']);
@@ -224,6 +254,56 @@ for (const fam of FAMILIES) {
           expect(ok, `${tok} = "${v}"`).toBe(true);
         }
       });
+    }
+
+    if (fam.dark) {
+      const [probe, darkValue] = fam.dark;
+      const lightValue = decls.get(probe);
+      const darkNames = redeclared(css);
+      /** Mount under the given colour scheme / root class, optionally importing base.css. */
+      const openAs = async (
+        page: import('@playwright/test').Page,
+        opts: { scheme: 'light' | 'dark'; rootClass?: string; base: boolean },
+      ) => {
+        await page.emulateMedia({ colorScheme: opts.scheme });
+        await page.goto(`/?example=${fam.example}&target=${target}`);
+        await expect(page.locator(fam.root).first()).toBeAttached({ timeout: 15_000 });
+        if (opts.rootClass) {
+          await page.evaluate((c) => document.documentElement.classList.add(c), opts.rootClass);
+        }
+        if (opts.base) await page.addStyleTag({ content: css });
+      };
+
+      runner(`[${fam.family}] the dark palette is still the default [${target}]`, async ({ page }) => {
+        expect(darkNames.length).toBeGreaterThan(10);
+        await openAs(page, { scheme: 'dark', base: false });
+        expect((await readAll(page, [probe]))[probe], 'OS dark, nothing imported').toBe(darkValue);
+        await openAs(page, { scheme: 'dark', base: true });
+        expect((await readAll(page, [probe]))[probe], 'OS dark, base.css').toBe(darkValue);
+        await openAs(page, { scheme: 'light', rootClass: 'dark', base: true });
+        expect((await readAll(page, [probe]))[probe], '.dark root, base.css').toBe(darkValue);
+      });
+
+      runner(`[${fam.family}] a .light root still opts out of OS dark [${target}]`, async ({ page }) => {
+        await openAs(page, { scheme: 'dark', rootClass: 'light', base: true });
+        expect((await readAll(page, [probe]))[probe], 'base.css').toBe(lightValue);
+        await openAs(page, { scheme: 'dark', rootClass: 'light', base: false });
+        // Nothing imported: the token is unset and the read site's light fallback applies.
+        expect((await readAll(page, [probe]))[probe], 'nothing imported').toBe('');
+      });
+
+      for (const mode of [
+        { name: 'OS dark, nothing imported', scheme: 'dark', base: false },
+        { name: 'OS dark, base.css', scheme: 'dark', base: true },
+        { name: '.dark root, base.css', scheme: 'light', rootClass: 'dark', base: true },
+      ] as const) {
+        runner(`[${fam.family}] a dark-palette token set on an ancestor wins (${mode.name}) [${target}]`, async ({ page }) => {
+          await openAs(page, mode);
+          const sentinels = Object.fromEntries(darkNames.map((n, i) => [n, `rz-dark-ancestor-${i}`]));
+          await setOnBody(page, sentinels);
+          expect(await readAll(page, darkNames)).toEqual(sentinels);
+        });
+      }
     }
   }
 }
