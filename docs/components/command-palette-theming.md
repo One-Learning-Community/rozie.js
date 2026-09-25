@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-command-palette-*` custom properties, each with a built-in fallback, so `CommandPalette` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-command-palette {
+:root {
   --rozie-command-palette-z: 1000;
   --rozie-command-palette-width: min(40rem, 100%);
   --rozie-command-palette-search-padding: 0.75rem;
@@ -62,7 +62,6 @@ Also drives the vendored Combobox's render-neutral tokens, by aliasing them at p
 | `--rozie-command-palette-input-border-color` | `transparent` |
 | `--rozie-command-palette-input-focus-border-color` | `transparent` |
 | `--rozie-command-palette-input-focus-ring-width` | `0` |
-| `--rozie-command-palette-input-underline` | `var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1))` |
 
 ### breadcrumb/back header (depth>0)
 
@@ -91,7 +90,6 @@ Also drives the vendored Combobox's render-neutral tokens, by aliasing them at p
 | `--rozie-command-palette-breadcrumb-current-color` | `inherit` |
 | `--rozie-command-palette-breadcrumb-current-weight` | `600` |
 | `--rozie-command-palette-breadcrumb-gap` | `0.25rem` |
-| `--rozie-command-palette-breadcrumb-jump-hover-color` | `var(--rozie-command-palette-breadcrumb-current-color, inherit)` |
 | `--rozie-command-palette-breadcrumb-jump-hover-decoration` | `underline` |
 | `--rozie-command-palette-breadcrumb-jump-radius` | `0.25rem` |
 | `--rozie-command-palette-breadcrumb-separator-color` | `rgba(0, 0, 0, 0.35)` |
@@ -139,19 +137,9 @@ The row's right-side hint, plus the flyout trigger that hint opens when the opti
 | `--rozie-command-palette-actions-hover-color` | `rgba(0, 0, 0, 0.85)` |
 | `--rozie-command-palette-actions-radius` | `0.25rem` |
 
-### hotkey badge
+### action menu flyout
 
 The per-item teaching badge. Each token here falls back to the matching actions-hint-* token declared above, so setting the hint styles both.
-
-| Token | Default |
-| --- | --- |
-| `--rozie-command-palette-hotkey-bg` | `var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06))` |
-| `--rozie-command-palette-hotkey-color` | `var(--rozie-command-palette-actions-hint-color, inherit)` |
-| `--rozie-command-palette-hotkey-font-size` | `var(--rozie-command-palette-actions-hint-font-size, 0.6875rem)` |
-| `--rozie-command-palette-hotkey-padding` | `var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem)` |
-| `--rozie-command-palette-hotkey-radius` | `var(--rozie-command-palette-actions-hint-radius, 0.25rem)` |
-
-### action menu flyout
 
 | Token | Default |
 | --- | --- |
@@ -183,10 +171,6 @@ Panel-internal: a chip plus a fields form, which replaces the result list once t
 | `--rozie-command-palette-args-chip-color` | `inherit` |
 | `--rozie-command-palette-args-chip-padding` | `0.125rem 0.5rem` |
 | `--rozie-command-palette-args-dim-opacity` | `0.45` |
-| `--rozie-command-palette-args-field-bg` | `var(--rozie-command-palette-input-bg, transparent)` |
-| `--rozie-command-palette-args-field-border` | `var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1))` |
-| `--rozie-command-palette-args-field-padding` | `var(--rozie-command-palette-input-padding, 0.5rem 0.75rem)` |
-| `--rozie-command-palette-args-field-radius` | `var(--rozie-command-palette-input-radius, 0.5rem)` |
 | `--rozie-command-palette-args-gap` | `0.5rem` |
 | `--rozie-command-palette-args-padding` | `0.75rem` |
 
@@ -208,6 +192,24 @@ Also the loading and error states, which re-project into this same #empty region
 | `--rozie-command-palette-footer-padding` | `0.5rem 0.75rem` |
 | `--rozie-command-palette-footer-font-size` | `0.8125rem` |
 | `--rozie-command-palette-footer-color` | `rgba(0, 0, 0, 0.55)` |
+
+### Defaulted where CommandPalette reads them
+
+Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).
+
+| Token | Default |
+| --- | --- |
+| `--rozie-command-palette-args-field-bg` | `var(--rozie-command-palette-input-bg, transparent)` |
+| `--rozie-command-palette-args-field-border` | `var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1))` |
+| `--rozie-command-palette-args-field-padding` | `var(--rozie-command-palette-input-padding, 0.5rem 0.75rem)` |
+| `--rozie-command-palette-args-field-radius` | `var(--rozie-command-palette-input-radius, 0.5rem)` |
+| `--rozie-command-palette-breadcrumb-jump-hover-color` | `var(--rozie-command-palette-breadcrumb-current-color, inherit)` |
+| `--rozie-command-palette-hotkey-bg` | `var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06))` |
+| `--rozie-command-palette-hotkey-color` | `var(--rozie-command-palette-actions-hint-color, inherit)` |
+| `--rozie-command-palette-hotkey-font-size` | `var(--rozie-command-palette-actions-hint-font-size, 0.6875rem)` |
+| `--rozie-command-palette-hotkey-padding` | `var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem)` |
+| `--rozie-command-palette-hotkey-radius` | `var(--rozie-command-palette-actions-hint-radius, 0.25rem)` |
+| `--rozie-command-palette-input-underline` | `var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1))` |
 
 ## Design-system bridges
 

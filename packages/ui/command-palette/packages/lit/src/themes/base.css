@@ -14,8 +14,22 @@
  * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
  * `.rozie-command-palette` element). See themes/shadcn.css, themes/material.css
  * and themes/bootstrap.css for design-system bridges.
+ *
+ * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
+ * an element declares for itself always beats one it would inherit, whatever the selector's
+ * specificity, so defaults declared on the `.rozie-command-palette` element itself made every ancestor
+ * override dead the moment this file was imported. At the root they are only the value of last
+ * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
+ * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
+ * they arrive by inheritance).
+ * A token whose default is ANOTHER token is not declared here at all: the component reads it
+ * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
+ * declared at the root it would be computed once, against the root's value.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
+ * tokens it maps on the `.rozie-command-palette` element itself: with a bridge imported, THOSE tokens can be
+ * overridden only on that element (or by a rule of equal-or-higher specificity after it).
  */
-.rozie-command-palette {
+:where(:root) {
   /* overlay / scrim */
   --rozie-command-palette-z: 1000;
   --rozie-command-palette-overlay-padding: 12vh 1rem 1rem;
@@ -49,7 +63,6 @@
   --rozie-command-palette-input-border-color: transparent;
   --rozie-command-palette-input-focus-border-color: transparent;
   --rozie-command-palette-input-focus-ring-width: 0;
-  --rozie-command-palette-input-underline: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
 
   /* breadcrumb/back header (depth>0) */
   --rozie-command-palette-header-font-size: 0.875rem;
@@ -69,7 +82,6 @@
   --rozie-command-palette-breadcrumb-current-color: inherit;
   --rozie-command-palette-breadcrumb-current-weight: 600;
   --rozie-command-palette-breadcrumb-gap: 0.25rem;
-  --rozie-command-palette-breadcrumb-jump-hover-color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
   --rozie-command-palette-breadcrumb-jump-hover-decoration: underline;
   --rozie-command-palette-breadcrumb-jump-radius: 0.25rem;
   --rozie-command-palette-breadcrumb-separator-color: rgba(0, 0, 0, 0.35);
@@ -111,11 +123,6 @@
   /* hotkey badge */
   /* The per-item teaching badge. Each token here falls back to the matching
      actions-hint-* token declared above, so setting the hint styles both. */
-  --rozie-command-palette-hotkey-bg: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
-  --rozie-command-palette-hotkey-color: var(--rozie-command-palette-actions-hint-color, inherit);
-  --rozie-command-palette-hotkey-font-size: var(--rozie-command-palette-actions-hint-font-size, 0.6875rem);
-  --rozie-command-palette-hotkey-padding: var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem);
-  --rozie-command-palette-hotkey-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
 
   /* action menu flyout */
   --rozie-command-palette-action-active-bg: rgba(0, 0, 0, 0.08);
@@ -143,10 +150,6 @@
   --rozie-command-palette-args-chip-color: inherit;
   --rozie-command-palette-args-chip-padding: 0.125rem 0.5rem;
   --rozie-command-palette-args-dim-opacity: 0.45;
-  --rozie-command-palette-args-field-bg: var(--rozie-command-palette-input-bg, transparent);
-  --rozie-command-palette-args-field-border: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
-  --rozie-command-palette-args-field-padding: var(--rozie-command-palette-input-padding, 0.5rem 0.75rem);
-  --rozie-command-palette-args-field-radius: var(--rozie-command-palette-input-radius, 0.5rem);
   --rozie-command-palette-args-gap: 0.5rem;
   --rozie-command-palette-args-padding: 0.75rem;
 

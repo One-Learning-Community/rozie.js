@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-combobox-*` custom properties, each with a built-in fallback, so `Combobox` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-combobox {
+:root {
   --rozie-combobox-width: 16rem;
   --rozie-combobox-accent: #0066cc;
   --rozie-combobox-input-padding: 0.5rem 0.75rem;
@@ -50,7 +50,6 @@ accent — the single color most consumers will set; focus ring + selected optio
 | --- | --- |
 | `--rozie-combobox-focus-ring-width` | `3px` |
 | `--rozie-combobox-focus-ring-color` | `rgba(0, 102, 204, 0.25)` |
-| `--rozie-combobox-focus-border-color` | `var(--rozie-combobox-accent, #0066cc)` |
 
 ### disabled
 
@@ -79,7 +78,6 @@ accent — the single color most consumers will set; focus ring + selected optio
 | `--rozie-combobox-option-radius` | `0.375rem` |
 | `--rozie-combobox-option-active-bg` | `rgba(0, 102, 204, 0.12)` |
 | `--rozie-combobox-option-selected-weight` | `600` |
-| `--rozie-combobox-option-selected-color` | `var(--rozie-combobox-accent, #0066cc)` |
 | `--rozie-combobox-option-disabled-opacity` | `0.45` |
 | `--rozie-combobox-option-color` | `inherit` |
 
@@ -113,7 +111,6 @@ creatable — the trailing "Create …" row shown when `creatable` is set and th
 
 | Token | Default |
 | --- | --- |
-| `--rozie-combobox-create-color` | `var(--rozie-combobox-accent, #0066cc)` |
 | `--rozie-combobox-create-bg` | `transparent` |
 
 chip rail — the selected-value chips rendered inside the control, before the input, when `multiple` is set. Mirrors @rozie-ui/tags' own chip theme: `--rozie-combobox-chip-size` sets the chip's font-size (Tags' equivalent of chip-font-size), and the single `--rozie-combobox-chip-remove-size` token drives BOTH the width and the height of the round remove button, same as Tags.
@@ -128,7 +125,6 @@ chip rail — the selected-value chips rendered inside the control, before the i
 | `--rozie-combobox-chip-padding` | `0.15rem 0.5rem` |
 | `--rozie-combobox-chip-size` | `0.85rem` |
 | `--rozie-combobox-chip-remove-color` | `currentColor` |
-| `--rozie-combobox-chip-remove-hover-color` | `var(--rozie-combobox-accent, #0066cc)` |
 | `--rozie-combobox-chip-remove-size` | `1.1rem` |
 
 state-dependent — declared `initial` on purpose. The component reads this token with a DIFFERENT local fallback at each read site (resting input falls back through --rozie-combobox-border-color, the :focus rule falls back through --rozie-combobox-focus-border-color), so declaring a single frozen value here would collapse the focus-state transition. `initial` resets the custom property to the guaranteed-invalid value, which makes every var() substitute its OWN local fallback — exactly today's render output, but now discoverable and overridable.
@@ -136,6 +132,17 @@ state-dependent — declared `initial` on purpose. The component reads this toke
 | Token | Default |
 | --- | --- |
 | `--rozie-combobox-input-underline` | `initial` |
+
+### Defaulted where Combobox reads them
+
+Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).
+
+| Token | Default |
+| --- | --- |
+| `--rozie-combobox-chip-remove-hover-color` | `var(--rozie-combobox-accent, #0066cc)` |
+| `--rozie-combobox-create-color` | `var(--rozie-combobox-accent, #0066cc)` |
+| `--rozie-combobox-focus-border-color` | `var(--rozie-combobox-accent, #0066cc)` |
+| `--rozie-combobox-option-selected-color` | `var(--rozie-combobox-accent, #0066cc)` |
 
 ## Design-system bridges
 

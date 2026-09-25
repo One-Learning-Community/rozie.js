@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-listbox-*` custom properties, each with a built-in fallback, so `Listbox` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-listbox {
+:root {
   --rozie-listbox-min-width: 12rem;
   --rozie-listbox-bg: #fff;
   --rozie-listbox-accent: #0066cc;
@@ -46,7 +46,6 @@ The values listed below are exposed as `--rozie-listbox-*` custom properties, ea
 | Token | Default |
 | --- | --- |
 | `--rozie-listbox-accent` | `#0066cc` |
-| `--rozie-listbox-ring` | `var(--rozie-listbox-accent)` |
 | `--rozie-listbox-ring-width` | `2px` |
 | `--rozie-listbox-ring-offset` | `1px` |
 
@@ -61,9 +60,6 @@ The values listed below are exposed as `--rozie-listbox-*` custom properties, ea
 
 | Token | Default |
 | --- | --- |
-| `--rozie-listbox-popup-bg` | `var(--rozie-listbox-bg)` |
-| `--rozie-listbox-popup-border` | `var(--rozie-listbox-border)` |
-| `--rozie-listbox-popup-radius` | `var(--rozie-listbox-radius)` |
 | `--rozie-listbox-popup-padding` | `0.25rem` |
 | `--rozie-listbox-popup-offset` | `4px` |
 | `--rozie-listbox-shadow` | `0 6px 24px rgba(0, 0, 0, 0.12)` |
@@ -83,8 +79,19 @@ The values listed below are exposed as `--rozie-listbox-*` custom properties, ea
 | `--rozie-listbox-selected-fg` | `inherit` |
 | `--rozie-listbox-selected-weight` | `600` |
 | `--rozie-listbox-check` | `'✓'` |
-| `--rozie-listbox-check-color` | `var(--rozie-listbox-accent)` |
 | `--rozie-listbox-empty-fg` | `rgba(0, 0, 0, 0.5)` |
+
+### Defaulted where Listbox reads them
+
+Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).
+
+| Token | Default |
+| --- | --- |
+| `--rozie-listbox-check-color` | `var(--rozie-listbox-accent, #0066cc)` |
+| `--rozie-listbox-popup-bg` | `var(--rozie-listbox-bg, #fff)` |
+| `--rozie-listbox-popup-border` | `var(--rozie-listbox-border, rgba(0, 0, 0, 0.15))` |
+| `--rozie-listbox-popup-radius` | `var(--rozie-listbox-radius, 6px)` |
+| `--rozie-listbox-ring` | `var(--rozie-listbox-accent, #0066cc)` |
 
 ## Design-system bridges
 

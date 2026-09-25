@@ -9,8 +9,22 @@
  * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
  * `.rozie-listbox` element). See themes/shadcn.css, themes/material.css and
  * themes/bootstrap.css for design-system bridges.
+ *
+ * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
+ * an element declares for itself always beats one it would inherit, whatever the selector's
+ * specificity, so defaults declared on the `.rozie-listbox` element itself made every ancestor
+ * override dead the moment this file was imported. At the root they are only the value of last
+ * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
+ * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
+ * they arrive by inheritance).
+ * A token whose default is ANOTHER token is not declared here at all: the component reads it
+ * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
+ * declared at the root it would be computed once, against the root's value.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
+ * tokens it maps on the `.rozie-listbox` element itself: with a bridge imported, THOSE tokens can be
+ * overridden only on that element (or by a rule of equal-or-higher specificity after it).
  */
-.rozie-listbox {
+:where(:root) {
   /* layout / typography */
   --rozie-listbox-min-width: 12rem;
   --rozie-listbox-font: inherit;
@@ -28,7 +42,6 @@
 
   /* focus ring (defaults to accent) */
   --rozie-listbox-accent: #0066cc;
-  --rozie-listbox-ring: var(--rozie-listbox-accent);
   --rozie-listbox-ring-width: 2px;
   --rozie-listbox-ring-offset: 1px;
 
@@ -37,9 +50,6 @@
   --rozie-listbox-arrow-opacity: 0.7;
 
   /* popup */
-  --rozie-listbox-popup-bg: var(--rozie-listbox-bg);
-  --rozie-listbox-popup-border: var(--rozie-listbox-border);
-  --rozie-listbox-popup-radius: var(--rozie-listbox-radius);
   --rozie-listbox-popup-padding: 0.25rem;
   --rozie-listbox-popup-offset: 4px;
   --rozie-listbox-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
@@ -56,6 +66,5 @@
   --rozie-listbox-selected-fg: inherit;
   --rozie-listbox-selected-weight: 600;
   --rozie-listbox-check: '✓';
-  --rozie-listbox-check-color: var(--rozie-listbox-accent);
   --rozie-listbox-empty-fg: rgba(0, 0, 0, 0.5);
 }
