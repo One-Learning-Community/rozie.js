@@ -7,16 +7,31 @@
  * are absent, so it renders correctly even without a generated theme.
  *
  *   import '@rozie-ui/number-field-react/themes/material.css';
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rnf-x: var(--rozie-number-field-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-number-field-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-number-field`
+ *    and the Lit host `rozie-number-field`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-number-field {
-  --rozie-number-field-bg: var(--md-sys-color-surface, #fef7ff);
-  --rozie-number-field-color: var(--md-sys-color-on-surface, #1d1b20);
-  --rozie-number-field-border-color: var(--md-sys-color-outline, #79747e);
-  --rozie-number-field-radius: 0.5rem;
+:root,
+.rozie-number-field,
+rozie-number-field {
+  --rnf-bg: var(--rozie-number-field-bg, var(--md-sys-color-surface, #fef7ff));
+  --rnf-color: var(--rozie-number-field-color, var(--md-sys-color-on-surface, #1d1b20));
+  --rnf-border-color: var(--rozie-number-field-border-color, var(--md-sys-color-outline, #79747e));
+  --rnf-radius: var(--rozie-number-field-radius, 0.5rem);
 
-  --rozie-number-field-focus-ring-color: color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 30%, transparent);
+  --rnf-focus-ring-color: var(--rozie-number-field-focus-ring-color, color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 30%, transparent));
 
-  --rozie-number-field-btn-color: var(--md-sys-color-on-surface, #1d1b20);
-  --rozie-number-field-btn-bg: var(--md-sys-color-surface-container, #f3edf7);
-  --rozie-number-field-btn-hover-bg: var(--md-sys-color-surface-container-high, #ece6f0);
+  --rnf-btn-color: var(--rozie-number-field-btn-color, var(--md-sys-color-on-surface, #1d1b20));
+  --rnf-btn-bg: var(--rozie-number-field-btn-bg, var(--md-sys-color-surface-container, #f3edf7));
+  --rnf-btn-hover-bg: var(--rozie-number-field-btn-hover-bg, var(--md-sys-color-surface-container-high, #ece6f0));
 }

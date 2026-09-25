@@ -506,55 +506,55 @@ $expose({ focus, increment, decrement, clear })
 .rozie-number-field {
   display: inline-flex;
   align-items: stretch;
-  gap: var(--rozie-number-field-gap, 0);
+  gap: var(--rozie-number-field-gap, var(--rnf-gap, 0));
   font: var(--rozie-number-field-font, inherit);
-  border: var(--rozie-number-field-border-width, 1px) solid var(--rozie-number-field-border-color, rgba(0, 0, 0, 0.25));
-  border-radius: var(--rozie-number-field-radius, 0.5rem);
-  background: var(--rozie-number-field-bg, #fff);
+  border: var(--rozie-number-field-border-width, var(--rnf-border-width, 1px)) solid var(--rozie-number-field-border-color, var(--rnf-border-color, rgba(0, 0, 0, 0.25)));
+  border-radius: var(--rozie-number-field-radius, var(--rnf-radius, 0.5rem));
+  background: var(--rozie-number-field-bg, var(--rnf-bg, #fff));
   overflow: hidden;
 }
 .rozie-number-field-input {
   box-sizing: border-box;
-  width: var(--rozie-number-field-width, 4.5rem);
+  width: var(--rozie-number-field-width, var(--rnf-width, 4.5rem));
   min-width: 0;
-  padding: var(--rozie-number-field-padding, 0.375rem 0.5rem);
-  text-align: var(--rozie-number-field-text-align, right);
+  padding: var(--rozie-number-field-padding, var(--rnf-padding, 0.375rem 0.5rem));
+  text-align: var(--rozie-number-field-text-align, var(--rnf-text-align, right));
   font: inherit;
-  font-size: var(--rozie-number-field-font-size, 1rem);
-  color: var(--rozie-number-field-color, inherit);
+  font-size: var(--rozie-number-field-font-size, var(--rnf-font-size, 1rem));
+  color: var(--rozie-number-field-color, var(--rnf-color, inherit));
   background: transparent;
   border: none;
   outline: none;
 }
 .rozie-number-field-input:focus {
-  box-shadow: inset 0 0 0 var(--rozie-number-field-focus-ring-width, 2px) var(--rozie-number-field-focus-ring-color, rgba(0, 102, 204, 0.35));
+  box-shadow: inset 0 0 0 var(--rozie-number-field-focus-ring-width, var(--rnf-focus-ring-width, 2px)) var(--rozie-number-field-focus-ring-color, var(--rnf-focus-ring-color, rgba(0, 102, 204, 0.35)));
 }
 .rozie-number-field-btn {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--rozie-number-field-btn-size, 2rem);
+  width: var(--rozie-number-field-btn-size, var(--rnf-btn-size, 2rem));
   padding: 0;
-  font-size: var(--rozie-number-field-btn-font-size, 1.1rem);
+  font-size: var(--rozie-number-field-btn-font-size, var(--rnf-btn-font-size, 1.1rem));
   line-height: 1;
-  color: var(--rozie-number-field-btn-color, inherit);
-  background: var(--rozie-number-field-btn-bg, rgba(0, 0, 0, 0.04));
+  color: var(--rozie-number-field-btn-color, var(--rnf-btn-color, inherit));
+  background: var(--rozie-number-field-btn-bg, var(--rnf-btn-bg, rgba(0, 0, 0, 0.04)));
   border: none;
   cursor: pointer;
   user-select: none;
   transition: background-color 0.15s;
 }
 .rozie-number-field-btn:hover {
-  background: var(--rozie-number-field-btn-hover-bg, rgba(0, 0, 0, 0.08));
+  background: var(--rozie-number-field-btn-hover-bg, var(--rnf-btn-hover-bg, rgba(0, 0, 0, 0.08)));
 }
 .rozie-number-field-btn:disabled {
   cursor: not-allowed;
-  opacity: var(--rozie-number-field-disabled-opacity, 0.55);
+  opacity: var(--rozie-number-field-disabled-opacity, var(--rnf-disabled-opacity, 0.55));
 }
 .rozie-number-field--disabled {
   cursor: not-allowed;
-  opacity: var(--rozie-number-field-disabled-opacity, 0.55);
+  opacity: var(--rozie-number-field-disabled-opacity, var(--rnf-disabled-opacity, 0.55));
 }
 </style>
 

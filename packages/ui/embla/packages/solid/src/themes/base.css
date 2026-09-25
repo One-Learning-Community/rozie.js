@@ -10,51 +10,55 @@
  * `.rozie-embla` element). See themes/shadcn.css, themes/material.css and
  * themes/bootstrap.css for design-system bridges.
  *
- * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
- * an element declares for itself always beats one it would inherit, whatever the selector's
- * specificity, so defaults declared on the `.rozie-embla` element itself made every ancestor
- * override dead the moment this file was imported. At the root they are only the value of last
- * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
- * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
- * they arrive by inheritance).
+ * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root)`
+ * (zero specificity): `--rem-x: var(--rozie-embla-x, <default>)`. The component reads every token
+ * public-first, `var(--rozie-embla-x, var(--rem-x, <inline default>))`, so a value set on ANY
+ * ancestor (`:root`, `.dark`, a wrapper) or on the component itself wins by plain inheritance,
+ * in any import order, on all six targets (Lit included: custom properties inherit into its
+ * shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the component may declare a public token.
  * A token whose default is ANOTHER token is not declared here at all: the component reads it
  * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
  * declared at the root it would be computed once, against the root's value.
- * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
- * tokens it maps on the `.rozie-embla` element itself: with a bridge imported, THOSE tokens can be
- * overridden only on that element (or by a rule of equal-or-higher specificity after it).
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares only the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * component (`.rozie-embla` and the Lit host `rozie-carousel`) — so that variable is resolved AT the
+ * component and follows the nearest theme scope — and on `:root`, the copy a Lit component
+ * nested in another shadow root (out of reach of every document selector) inherits. The
+ * `--rem-*` names are internal: not a stable API.
  */
 :where(:root) {
   /* accent — the shared selected/active color. Arrow-fg, dot-selected-bg and
      thumb-selected-border-color all fall back to this ONE token, so overriding
      just --rozie-embla-accent shifts every "selected" affordance at once. */
-  --rozie-embla-accent: #1a1a1a;
+  --rem-accent: var(--rozie-embla-accent, #1a1a1a);
 
   /* arrows (opt-in via `arrows`) */
-  --rozie-embla-arrow-size: 2.25rem;
-  --rozie-embla-arrow-radius: 50%;
-  --rozie-embla-arrow-bg: rgb(255 255 255 / 0.9);
-  --rozie-embla-arrow-hover-bg: #fff;
-  --rozie-embla-arrow-font-size: 1.5rem;
-  --rozie-embla-arrow-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
-  --rozie-embla-arrow-disabled-opacity: 0.35;
-  --rozie-embla-arrow-inset: 0.5rem;
+  --rem-arrow-size: var(--rozie-embla-arrow-size, 2.25rem);
+  --rem-arrow-radius: var(--rozie-embla-arrow-radius, 50%);
+  --rem-arrow-bg: var(--rozie-embla-arrow-bg, rgb(255 255 255 / 0.9));
+  --rem-arrow-hover-bg: var(--rozie-embla-arrow-hover-bg, #fff);
+  --rem-arrow-font-size: var(--rozie-embla-arrow-font-size, 1.5rem);
+  --rem-arrow-shadow: var(--rozie-embla-arrow-shadow, 0 1px 4px rgb(0 0 0 / 0.25));
+  --rem-arrow-disabled-opacity: var(--rozie-embla-arrow-disabled-opacity, 0.35);
+  --rem-arrow-inset: var(--rozie-embla-arrow-inset, 0.5rem);
 
   /* dot pagination (opt-in via `dots`) */
-  --rozie-embla-dots-gap: 0.4rem;
-  --rozie-embla-dots-padding: 0.625rem 0;
-  --rozie-embla-dot-size: 0.5rem;
-  --rozie-embla-dot-bg: rgb(0 0 0 / 0.25);
-  --rozie-embla-dot-hover-bg: rgba(0, 0, 0, 0.45);
-  --rozie-embla-dot-selected-scale: 1.25;
+  --rem-dots-gap: var(--rozie-embla-dots-gap, 0.4rem);
+  --rem-dots-padding: var(--rozie-embla-dots-padding, 0.625rem 0);
+  --rem-dot-size: var(--rozie-embla-dot-size, 0.5rem);
+  --rem-dot-bg: var(--rozie-embla-dot-bg, rgb(0 0 0 / 0.25));
+  --rem-dot-hover-bg: var(--rozie-embla-dot-hover-bg, rgba(0, 0, 0, 0.45));
+  --rem-dot-selected-scale: var(--rozie-embla-dot-selected-scale, 1.25);
 
   /* synced thumbnail strip (opt-in via `thumbnails`) */
-  --rozie-embla-thumbs-gap: 0.5rem;
-  --rozie-embla-thumb-gap: 0.5rem;
-  --rozie-embla-thumb-opacity: 0.5;
-  --rozie-embla-thumb-hover-opacity: 0.8;
-  --rozie-embla-thumb-selected-opacity: 1;
-  --rozie-embla-thumb-border-width: 2px;
-  --rozie-embla-thumb-border-color: transparent;
-  --rozie-embla-thumb-radius: 4px;
+  --rem-thumbs-gap: var(--rozie-embla-thumbs-gap, 0.5rem);
+  --rem-thumb-gap: var(--rozie-embla-thumb-gap, 0.5rem);
+  --rem-thumb-opacity: var(--rozie-embla-thumb-opacity, 0.5);
+  --rem-thumb-hover-opacity: var(--rozie-embla-thumb-hover-opacity, 0.8);
+  --rem-thumb-selected-opacity: var(--rozie-embla-thumb-selected-opacity, 1);
+  --rem-thumb-border-width: var(--rozie-embla-thumb-border-width, 2px);
+  --rem-thumb-border-color: var(--rozie-embla-thumb-border-color, transparent);
+  --rem-thumb-radius: var(--rozie-embla-thumb-radius, 4px);
 }

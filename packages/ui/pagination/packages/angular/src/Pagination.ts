@@ -94,60 +94,60 @@ interface NextControlCtx {
     .rozie-pagination {
       display: inline-flex;
       align-items: center;
-      gap: var(--rozie-pagination-gap, 0.25rem);
+      gap: var(--rozie-pagination-gap, var(--rpg-gap, 0.25rem));
       font: var(--rozie-pagination-font, inherit);
     }
     .rozie-pagination-page,
     .rozie-pagination-control {
       box-sizing: border-box;
-      min-width: var(--rozie-pagination-size, 2.25rem);
-      height: var(--rozie-pagination-size, 2.25rem);
-      padding: 0 var(--rozie-pagination-padding-x, 0.5rem);
+      min-width: var(--rozie-pagination-size, var(--rpg-size, 2.25rem));
+      height: var(--rozie-pagination-size, var(--rpg-size, 2.25rem));
+      padding: 0 var(--rozie-pagination-padding-x, var(--rpg-padding-x, 0.5rem));
       display: inline-flex;
       align-items: center;
       justify-content: center;
       font: inherit;
-      font-weight: var(--rozie-pagination-font-weight, 500);
-      color: var(--rozie-pagination-fg, #1a1a1a);
-      background: var(--rozie-pagination-bg, transparent);
-      border: var(--rozie-pagination-border-width, 1px) solid var(--rozie-pagination-border, rgba(0, 0, 0, 0.18));
-      border-radius: var(--rozie-pagination-radius, 6px);
+      font-weight: var(--rozie-pagination-font-weight, var(--rpg-font-weight, 500));
+      color: var(--rozie-pagination-fg, var(--rpg-fg, #1a1a1a));
+      background: var(--rozie-pagination-bg, var(--rpg-bg, transparent));
+      border: var(--rozie-pagination-border-width, var(--rpg-border-width, 1px)) solid var(--rozie-pagination-border, var(--rpg-border, rgba(0, 0, 0, 0.18)));
+      border-radius: var(--rozie-pagination-radius, var(--rpg-radius, 6px));
       cursor: pointer;
       user-select: none;
       transition: background 0.12s, border-color 0.12s, color 0.12s;
     }
     .rozie-pagination-page:hover,
     .rozie-pagination-control:hover {
-      background: var(--rozie-pagination-hover-bg, rgba(0, 0, 0, 0.05));
-      border-color: var(--rozie-pagination-hover-border, rgba(0, 0, 0, 0.28));
+      background: var(--rozie-pagination-hover-bg, var(--rpg-hover-bg, rgba(0, 0, 0, 0.05)));
+      border-color: var(--rozie-pagination-hover-border, var(--rpg-hover-border, rgba(0, 0, 0, 0.28)));
     }
     .rozie-pagination-page:focus-visible,
     .rozie-pagination-control:focus-visible {
-      outline: var(--rozie-pagination-ring-width, 2px) solid var(--rozie-pagination-ring, var(--rozie-pagination-accent, #0066cc));
-      outline-offset: var(--rozie-pagination-ring-offset, 1px);
+      outline: var(--rozie-pagination-ring-width, var(--rpg-ring-width, 2px)) solid var(--rozie-pagination-ring, var(--rozie-pagination-accent, var(--rpg-ring, var(--rpg-accent, #0066cc))));
+      outline-offset: var(--rozie-pagination-ring-offset, var(--rpg-ring-offset, 1px));
     }
     .rozie-pagination-page.is-active {
-      color: var(--rozie-pagination-active-fg, #fff);
-      background: var(--rozie-pagination-active-bg, var(--rozie-pagination-accent, #0066cc));
-      border-color: var(--rozie-pagination-active-border, var(--rozie-pagination-accent, #0066cc));
+      color: var(--rozie-pagination-active-fg, var(--rpg-active-fg, #fff));
+      background: var(--rozie-pagination-active-bg, var(--rozie-pagination-accent, var(--rpg-active-bg, var(--rpg-accent, #0066cc))));
+      border-color: var(--rozie-pagination-active-border, var(--rozie-pagination-accent, var(--rpg-active-border, var(--rpg-accent, #0066cc))));
     }
     .rozie-pagination-page:disabled,
     .rozie-pagination-control:disabled {
       cursor: not-allowed;
-      opacity: var(--rozie-pagination-disabled-opacity, 0.5);
+      opacity: var(--rozie-pagination-disabled-opacity, var(--rpg-disabled-opacity, 0.5));
       pointer-events: none;
     }
     .rozie-pagination--disabled {
-      opacity: var(--rozie-pagination-disabled-opacity, 0.5);
+      opacity: var(--rozie-pagination-disabled-opacity, var(--rpg-disabled-opacity, 0.5));
       pointer-events: none;
     }
     .rozie-pagination-ellipsis {
-      min-width: var(--rozie-pagination-size, 2.25rem);
-      height: var(--rozie-pagination-size, 2.25rem);
+      min-width: var(--rozie-pagination-size, var(--rpg-size, 2.25rem));
+      height: var(--rozie-pagination-size, var(--rpg-size, 2.25rem));
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      color: var(--rozie-pagination-ellipsis-fg, rgba(0, 0, 0, 0.5));
+      color: var(--rozie-pagination-ellipsis-fg, var(--rpg-ellipsis-fg, rgba(0, 0, 0, 0.5)));
       user-select: none;
     }
   `],

@@ -7,20 +7,35 @@
  * are absent, so it renders correctly even without a generated theme.
  *
  *   import '@rozie-ui/otp-react/themes/material.css';
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rot-x: var(--rozie-otp-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-otp-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-otp`
+ *    and the Lit host `rozie-otp`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-otp {
-  --rozie-otp-accent: var(--md-sys-color-primary, #6750a4);
+:root,
+.rozie-otp,
+rozie-otp {
+  --rot-accent: var(--rozie-otp-accent, var(--md-sys-color-primary, #6750a4));
 
-  --rozie-otp-bg: var(--md-sys-color-surface, #fef7ff);
-  --rozie-otp-color: var(--md-sys-color-on-surface, #1d1b20);
-  --rozie-otp-border-color: var(--md-sys-color-outline, #79747e);
-  --rozie-otp-radius: 0.5rem;
+  --rot-bg: var(--rozie-otp-bg, var(--md-sys-color-surface, #fef7ff));
+  --rot-color: var(--rozie-otp-color, var(--md-sys-color-on-surface, #1d1b20));
+  --rot-border-color: var(--rozie-otp-border-color, var(--md-sys-color-outline, #79747e));
+  --rot-radius: var(--rozie-otp-radius, 0.5rem);
 
-  --rozie-otp-filled-border-color: var(--md-sys-color-primary, #6750a4);
+  --rot-filled-border-color: var(--rozie-otp-filled-border-color, var(--md-sys-color-primary, #6750a4));
 
-  --rozie-otp-focus-ring-color: color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 30%, transparent);
+  --rot-focus-ring-color: var(--rozie-otp-focus-ring-color, color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 30%, transparent));
 
-  --rozie-otp-placeholder-color: var(--md-sys-color-on-surface-variant, #49454f);
+  --rot-placeholder-color: var(--rozie-otp-placeholder-color, var(--md-sys-color-on-surface-variant, #49454f));
 
-  --rozie-otp-disabled-bg: var(--md-sys-color-surface-container-highest, #e6e0e9);
+  --rot-disabled-bg: var(--rozie-otp-disabled-bg, var(--md-sys-color-surface-container-highest, #e6e0e9));
 }

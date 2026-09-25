@@ -16,53 +16,59 @@
  * `.rozie-pagination` element). See themes/shadcn.css, themes/material.css and
  * themes/bootstrap.css for design-system bridges.
  *
- * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
- * an element declares for itself always beats one it would inherit, whatever the selector's
- * specificity, so defaults declared on the `.rozie-pagination` element itself made every ancestor
- * override dead the moment this file was imported. At the root they are only the value of last
- * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
- * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
- * they arrive by inheritance).
+ * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root)`
+ * (zero specificity): `--rpg-x: var(--rozie-pagination-x, <default>)`. The component reads every token
+ * public-first, `var(--rozie-pagination-x, var(--rpg-x, <inline default>))`, so a value set on ANY
+ * ancestor (`:root`, `.dark`, a wrapper) or on the component itself wins by plain inheritance,
+ * in any import order, on all six targets (Lit included: custom properties inherit into its
+ * shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the component may declare a public token.
  * A token whose default is ANOTHER token is not declared here at all: the component reads it
  * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
  * declared at the root it would be computed once, against the root's value.
- * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
- * tokens it maps on the `.rozie-pagination` element itself: with a bridge imported, THOSE tokens can be
- * overridden only on that element (or by a rule of equal-or-higher specificity after it).
+ * The lines that say `inherit` / `initial` stay plain declarations: at the root such a value
+ * is "unset", so the component's own fallback applies, and it never shadows an ancestor.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares only the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * component (`.rozie-pagination` and the Lit host `rozie-pagination`) — so that variable is resolved AT the
+ * component and follows the nearest theme scope — and on `:root`, the copy a Lit component
+ * nested in another shadow root (out of reach of every document selector) inherits. The
+ * `--rpg-*` names are internal: not a stable API.
  */
 :where(:root) {
   /* layout / typography */
-  --rozie-pagination-gap: 0.25rem;
+  --rpg-gap: var(--rozie-pagination-gap, 0.25rem);
   --rozie-pagination-font: inherit;
-  --rozie-pagination-font-weight: 500;
+  --rpg-font-weight: var(--rozie-pagination-font-weight, 500);
 
   /* accent — the single color most consumers will set; the active page + focus
      ring derive from it */
-  --rozie-pagination-accent: #0066cc;
+  --rpg-accent: var(--rozie-pagination-accent, #0066cc);
 
   /* per-control box model */
-  --rozie-pagination-size: 2.25rem;
-  --rozie-pagination-padding-x: 0.5rem;
-  --rozie-pagination-fg: #1a1a1a;
-  --rozie-pagination-bg: transparent;
-  --rozie-pagination-border-width: 1px;
-  --rozie-pagination-border: rgba(0, 0, 0, 0.18);
-  --rozie-pagination-radius: 6px;
+  --rpg-size: var(--rozie-pagination-size, 2.25rem);
+  --rpg-padding-x: var(--rozie-pagination-padding-x, 0.5rem);
+  --rpg-fg: var(--rozie-pagination-fg, #1a1a1a);
+  --rpg-bg: var(--rozie-pagination-bg, transparent);
+  --rpg-border-width: var(--rozie-pagination-border-width, 1px);
+  --rpg-border: var(--rozie-pagination-border, rgba(0, 0, 0, 0.18));
+  --rpg-radius: var(--rozie-pagination-radius, 6px);
 
   /* hover */
-  --rozie-pagination-hover-bg: rgba(0, 0, 0, 0.05);
-  --rozie-pagination-hover-border: rgba(0, 0, 0, 0.28);
+  --rpg-hover-bg: var(--rozie-pagination-hover-bg, rgba(0, 0, 0, 0.05));
+  --rpg-hover-border: var(--rozie-pagination-hover-border, rgba(0, 0, 0, 0.28));
 
   /* active (current) page */
-  --rozie-pagination-active-fg: #fff;
+  --rpg-active-fg: var(--rozie-pagination-active-fg, #fff);
 
   /* focus ring */
-  --rozie-pagination-ring-width: 2px;
-  --rozie-pagination-ring-offset: 1px;
+  --rpg-ring-width: var(--rozie-pagination-ring-width, 2px);
+  --rpg-ring-offset: var(--rozie-pagination-ring-offset, 1px);
 
   /* ellipsis marker */
-  --rozie-pagination-ellipsis-fg: rgba(0, 0, 0, 0.5);
+  --rpg-ellipsis-fg: var(--rozie-pagination-ellipsis-fg, rgba(0, 0, 0, 0.5));
 
   /* disabled */
-  --rozie-pagination-disabled-opacity: 0.5;
+  --rpg-disabled-opacity: var(--rozie-pagination-disabled-opacity, 0.5);
 }

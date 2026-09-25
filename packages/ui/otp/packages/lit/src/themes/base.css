@@ -15,49 +15,55 @@
  * `.rozie-otp` element). See themes/shadcn.css, themes/material.css and
  * themes/bootstrap.css for design-system bridges.
  *
- * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
- * an element declares for itself always beats one it would inherit, whatever the selector's
- * specificity, so defaults declared on the `.rozie-otp` element itself made every ancestor
- * override dead the moment this file was imported. At the root they are only the value of last
- * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
- * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
- * they arrive by inheritance).
+ * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root)`
+ * (zero specificity): `--rot-x: var(--rozie-otp-x, <default>)`. The component reads every token
+ * public-first, `var(--rozie-otp-x, var(--rot-x, <inline default>))`, so a value set on ANY
+ * ancestor (`:root`, `.dark`, a wrapper) or on the component itself wins by plain inheritance,
+ * in any import order, on all six targets (Lit included: custom properties inherit into its
+ * shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the component may declare a public token.
  * A token whose default is ANOTHER token is not declared here at all: the component reads it
  * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
  * declared at the root it would be computed once, against the root's value.
- * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
- * tokens it maps on the `.rozie-otp` element itself: with a bridge imported, THOSE tokens can be
- * overridden only on that element (or by a rule of equal-or-higher specificity after it).
+ * The lines that say `inherit` / `initial` stay plain declarations: at the root such a value
+ * is "unset", so the component's own fallback applies, and it never shadows an ancestor.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares only the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * component (`.rozie-otp` and the Lit host `rozie-otp`) — so that variable is resolved AT the
+ * component and follows the nearest theme scope — and on `:root`, the copy a Lit component
+ * nested in another shadow root (out of reach of every document selector) inherits. The
+ * `--rot-*` names are internal: not a stable API.
  */
 :where(:root) {
   /* layout / typography */
-  --rozie-otp-gap: 0.5rem;
+  --rot-gap: var(--rozie-otp-gap, 0.5rem);
   --rozie-otp-font: inherit;
 
   /* accent — the single color most consumers will set; caret + focus + filled
      border derive from it */
-  --rozie-otp-accent: #0066cc;
+  --rot-accent: var(--rozie-otp-accent, #0066cc);
 
   /* per-cell box model */
-  --rozie-otp-cell-size: 2.75rem;
-  --rozie-otp-font-size: 1.25rem;
-  --rozie-otp-font-weight: 600;
+  --rot-cell-size: var(--rozie-otp-cell-size, 2.75rem);
+  --rot-font-size: var(--rozie-otp-font-size, 1.25rem);
+  --rot-font-weight: var(--rozie-otp-font-weight, 600);
   --rozie-otp-color: inherit;
-  --rozie-otp-bg: #fff;
-  --rozie-otp-border-width: 1px;
-  --rozie-otp-border-color: rgba(0, 0, 0, 0.25);
-  --rozie-otp-radius: 0.5rem;
+  --rot-bg: var(--rozie-otp-bg, #fff);
+  --rot-border-width: var(--rozie-otp-border-width, 1px);
+  --rot-border-color: var(--rozie-otp-border-color, rgba(0, 0, 0, 0.25));
+  --rot-radius: var(--rozie-otp-radius, 0.5rem);
 
   /* filled cell (a cell that already holds a character) */
 
   /* focus ring */
-  --rozie-otp-focus-ring-width: 3px;
-  --rozie-otp-focus-ring-color: rgba(0, 102, 204, 0.25);
+  --rot-focus-ring-width: var(--rozie-otp-focus-ring-width, 3px);
+  --rot-focus-ring-color: var(--rozie-otp-focus-ring-color, rgba(0, 102, 204, 0.25));
 
   /* placeholder character color */
-  --rozie-otp-placeholder-color: rgba(0, 0, 0, 0.3);
+  --rot-placeholder-color: var(--rozie-otp-placeholder-color, rgba(0, 0, 0, 0.3));
 
   /* disabled */
-  --rozie-otp-disabled-opacity: 0.55;
-  --rozie-otp-disabled-bg: rgba(0, 0, 0, 0.04);
+  --rot-disabled-opacity: var(--rozie-otp-disabled-opacity, 0.55);
+  --rot-disabled-bg: var(--rozie-otp-disabled-bg, rgba(0, 0, 0, 0.04));
 }

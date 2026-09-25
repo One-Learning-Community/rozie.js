@@ -7,23 +7,38 @@
  * are absent, so it renders correctly even without a generated theme.
  *
  *   import '@rozie-ui/pagination-react/themes/material.css';
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rpg-x: var(--rozie-pagination-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-pagination-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-pagination`
+ *    and the Lit host `rozie-pagination`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-pagination {
-  --rozie-pagination-accent: var(--md-sys-color-primary, #6750a4);
+:root,
+.rozie-pagination,
+rozie-pagination {
+  --rpg-accent: var(--rozie-pagination-accent, var(--md-sys-color-primary, #6750a4));
 
-  --rozie-pagination-fg: var(--md-sys-color-on-surface, #1d1b20);
-  --rozie-pagination-bg: var(--md-sys-color-surface, #fef7ff);
-  --rozie-pagination-border: var(--md-sys-color-outline, #79747e);
-  --rozie-pagination-radius: 1rem;
+  --rpg-fg: var(--rozie-pagination-fg, var(--md-sys-color-on-surface, #1d1b20));
+  --rpg-bg: var(--rozie-pagination-bg, var(--md-sys-color-surface, #fef7ff));
+  --rpg-border: var(--rozie-pagination-border, var(--md-sys-color-outline, #79747e));
+  --rpg-radius: var(--rozie-pagination-radius, 1rem);
 
-  --rozie-pagination-hover-bg: color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 8%, transparent);
-  --rozie-pagination-hover-border: var(--md-sys-color-outline, #79747e);
+  --rpg-hover-bg: var(--rozie-pagination-hover-bg, color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 8%, transparent));
+  --rpg-hover-border: var(--rozie-pagination-hover-border, var(--md-sys-color-outline, #79747e));
 
-  --rozie-pagination-active-fg: var(--md-sys-color-on-primary, #fff);
-  --rozie-pagination-active-bg: var(--md-sys-color-primary, #6750a4);
-  --rozie-pagination-active-border: var(--md-sys-color-primary, #6750a4);
+  --rpg-active-fg: var(--rozie-pagination-active-fg, var(--md-sys-color-on-primary, #fff));
+  --rpg-active-bg: var(--rozie-pagination-active-bg, var(--md-sys-color-primary, #6750a4));
+  --rpg-active-border: var(--rozie-pagination-active-border, var(--md-sys-color-primary, #6750a4));
 
-  --rozie-pagination-ring: var(--md-sys-color-primary, #6750a4);
+  --rpg-ring: var(--rozie-pagination-ring, var(--md-sys-color-primary, #6750a4));
 
-  --rozie-pagination-ellipsis-fg: var(--md-sys-color-on-surface-variant, #49454f);
+  --rpg-ellipsis-fg: var(--rozie-pagination-ellipsis-fg, var(--md-sys-color-on-surface-variant, #49454f));
 }

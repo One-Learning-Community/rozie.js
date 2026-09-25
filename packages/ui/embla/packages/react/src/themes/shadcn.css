@@ -14,13 +14,28 @@
  * Only the color/shadow tokens are remapped here — sizing tokens (arrow-size,
  * dot-size, radii, gaps, opacities, the dot-selected-scale factor) are left
  * unset so the `.rozie-embla` defaults hold.
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rem-x: var(--rozie-embla-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-embla-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-embla`
+ *    and the Lit host `rozie-carousel`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-embla {
-  --rozie-embla-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
-  --rozie-embla-arrow-bg: hsl(var(--background, 0 0% 100%));
-  --rozie-embla-arrow-fg: hsl(var(--foreground, 222.2 47.4% 11.2%));
-  --rozie-embla-arrow-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --rozie-embla-dot-bg: hsl(var(--muted, 210 40% 96.1%));
+:root,
+.rozie-embla,
+rozie-carousel {
+  --rem-accent: var(--rozie-embla-accent, hsl(var(--primary, 222.2 47.4% 11.2%)));
+  --rem-arrow-bg: var(--rozie-embla-arrow-bg, hsl(var(--background, 0 0% 100%)));
+  --rem-arrow-fg: var(--rozie-embla-arrow-fg, hsl(var(--foreground, 222.2 47.4% 11.2%)));
+  --rem-arrow-shadow: var(--rozie-embla-arrow-shadow, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
+  --rem-dot-bg: var(--rozie-embla-dot-bg, hsl(var(--muted, 210 40% 96.1%)));
 
   /* dot-selected-bg / thumb-selected-border-color intentionally unset — both
      fall back to --rozie-embla-accent (set above), the same nested-fallback

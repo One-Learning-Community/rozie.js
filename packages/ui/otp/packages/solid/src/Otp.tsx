@@ -9,39 +9,39 @@ import { firstEmptyIndex as firstEmpty, isAllowedChar, planEmits, planWrite } fr
 
 __rozieInjectStyle('Otp-8267d52a', `.rozie-otp[data-rozie-s-8267d52a] {
   display: inline-flex;
-  gap: var(--rozie-otp-gap, 0.5rem);
+  gap: var(--rozie-otp-gap, var(--rot-gap, 0.5rem));
   font: var(--rozie-otp-font, inherit);
 }
 .rozie-otp-cell[data-rozie-s-8267d52a] {
   box-sizing: border-box;
-  width: var(--rozie-otp-cell-size, 2.75rem);
-  height: var(--rozie-otp-cell-size, 2.75rem);
+  width: var(--rozie-otp-cell-size, var(--rot-cell-size, 2.75rem));
+  height: var(--rozie-otp-cell-size, var(--rot-cell-size, 2.75rem));
   padding: 0;
   text-align: center;
-  font-size: var(--rozie-otp-font-size, 1.25rem);
-  font-weight: var(--rozie-otp-font-weight, 600);
-  color: var(--rozie-otp-color, inherit);
-  background: var(--rozie-otp-bg, #fff);
-  border: var(--rozie-otp-border-width, 1px) solid var(--rozie-otp-border-color, rgba(0, 0, 0, 0.25));
-  border-radius: var(--rozie-otp-radius, 0.5rem);
+  font-size: var(--rozie-otp-font-size, var(--rot-font-size, 1.25rem));
+  font-weight: var(--rozie-otp-font-weight, var(--rot-font-weight, 600));
+  color: var(--rozie-otp-color, var(--rot-color, inherit));
+  background: var(--rozie-otp-bg, var(--rot-bg, #fff));
+  border: var(--rozie-otp-border-width, var(--rot-border-width, 1px)) solid var(--rozie-otp-border-color, var(--rot-border-color, rgba(0, 0, 0, 0.25)));
+  border-radius: var(--rozie-otp-radius, var(--rot-radius, 0.5rem));
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
-  caret-color: var(--rozie-otp-accent, #0066cc);
+  caret-color: var(--rozie-otp-accent, var(--rot-accent, #0066cc));
 }
 .rozie-otp-cell[data-rozie-s-8267d52a]::placeholder {
-  color: var(--rozie-otp-placeholder-color, rgba(0, 0, 0, 0.3));
+  color: var(--rozie-otp-placeholder-color, var(--rot-placeholder-color, rgba(0, 0, 0, 0.3)));
 }
 .rozie-otp-cell[data-filled='true'][data-rozie-s-8267d52a] {
-  border-color: var(--rozie-otp-filled-border-color, var(--rozie-otp-accent, #0066cc));
+  border-color: var(--rozie-otp-filled-border-color, var(--rozie-otp-accent, var(--rot-filled-border-color, var(--rot-accent, #0066cc))));
 }
 .rozie-otp-cell[data-rozie-s-8267d52a]:focus {
-  border-color: var(--rozie-otp-accent, #0066cc);
-  box-shadow: 0 0 0 var(--rozie-otp-focus-ring-width, 3px) var(--rozie-otp-focus-ring-color, rgba(0, 102, 204, 0.25));
+  border-color: var(--rozie-otp-accent, var(--rot-accent, #0066cc));
+  box-shadow: 0 0 0 var(--rozie-otp-focus-ring-width, var(--rot-focus-ring-width, 3px)) var(--rozie-otp-focus-ring-color, var(--rot-focus-ring-color, rgba(0, 102, 204, 0.25)));
 }
 .rozie-otp--disabled[data-rozie-s-8267d52a] .rozie-otp-cell[data-rozie-s-8267d52a] {
   cursor: not-allowed;
-  opacity: var(--rozie-otp-disabled-opacity, 0.55);
-  background: var(--rozie-otp-disabled-bg, rgba(0, 0, 0, 0.04));
+  opacity: var(--rozie-otp-disabled-opacity, var(--rot-disabled-opacity, 0.55));
+  background: var(--rozie-otp-disabled-bg, var(--rot-disabled-bg, rgba(0, 0, 0, 0.04)));
 }`);
 
 interface OtpProps {
