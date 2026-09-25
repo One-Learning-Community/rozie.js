@@ -370,6 +370,10 @@ const refineRowEstimate = (): void => {
   // makes the eventual render land strictly AFTER this fold + re-feed has fully landed, on
   // every target (the 87-10 fix for the confirmed Solid-specific rendering gap).
   bumpWindowVer()
+  // D-19 (quick 260923-rrr): a re-feed changes every unmeasured row's size, but — unlike a
+  // measurement — it does not go through virtual-core's onChange, so the host's post-commit
+  // pass (which restores an at-the-end view the growth moved off) never ran for it. Schedule it.
+  scheduleRemeasure()
 }
 
 // The FULL virtualizer options. virtual-core's setOptions REPLACES options with

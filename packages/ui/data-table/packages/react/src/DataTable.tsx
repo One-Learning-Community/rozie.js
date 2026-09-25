@@ -313,6 +313,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const measuredRowTotal = useRef(0);
   const windowVerBumpPending = useRef(false);
   const remeasureDisposed = useRef(false);
+  const scrollEndPinnedTop = useRef<number>(-1);
+  const scrollEndPinned = useRef<boolean>(false);
+  const scrollEndPinnedCount = useRef<number>(-1);
   const remeasurePending = useRef(false);
   const remeasureRaf = useRef<any>(null);
   const afterRowRemeasure = useRef(refineRowEstimate);
@@ -483,6 +486,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
 
+  // D-19 (quick 260923-rrr): "the user scrolled to the end" — recorded only when the scroll
+  // offset actually MOVED (a growth-driven onChange leaves it where it was), with the row count
+  // and offset at that moment. See scheduleRemeasure() in virtualization.rzts.
   // Gap-closure 87-13: the deferred sweep's own rAF handle, plus a disposed latch. Until 87-07 a
   // post-unmount sweep was inert — it re-measured a detached tree and wrote nothing. 87-07's D-15
   // re-feed changed that: remeasureWindow() now reaches refineRowEstimate(), which calls
@@ -1671,6 +1677,20 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // virtualizer whose own ResizeObserver cleanup has run but whose queued tick was already
     // in flight.
     if (remeasureDisposed.current) return;
+    // D-19 (quick 260923-rrr): remember whether the view is at the END — but only when the scroll
+    // offset MOVED since the last record. A measurement-driven onChange (rows growing) arrives
+    // with the offset unchanged, and it is exactly that growth that moves the view off the end,
+    // so it must not clear the pin. (virtual-core's isScrolling cannot tell the two apart: it
+    // stays true for 150ms after the user's scroll, spanning the growth.)
+    if (virtualizer.current && gridScrollEl.current && !virtualizer.current.scrollState && gridScrollEl.current.scrollTop !== scrollEndPinnedTop.current) {
+      scrollEndPinnedTop.current = gridScrollEl.current.scrollTop;
+      // Judged on virtual-core's MODEL (total size − viewport − offset), not DOM geometry: its own
+      // above-viewport adjustments move scrollTop before the framework commits the matching
+      // spacer, so the DOM transiently reads "not at the end" for a view that is (measured on
+      // Angular: a 12px adjustment cleared a DOM-judged pin and left the view 12px short).
+      scrollEndPinned.current = virtualizer.current.getVirtualDistanceFromEnd() <= 1;
+      scrollEndPinnedCount.current = windowSource().length;
+    }
     if (remeasurePending.current) return;
     remeasurePending.current = true;
     let ranMicro = false;
@@ -1691,6 +1711,20 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       if (!covered && rafAttempts < REMEASURE_MAX_FRAMES && !remeasureDisposed.current && typeof requestAnimationFrame === 'function') {
         remeasureRaf.current = requestAnimationFrame(rafPass);
         return;
+      }
+      // D-19: keep a user who scrolled to the END at the end. When rows at/above the viewport
+      // measure taller than their estimate, virtual-core compensates with a scroll adjustment — but
+      // on React/Angular that adjustment is written BEFORE the framework commits the taller spacer,
+      // so the browser clamps it to the OLD maximum and it is lost (measured: the view ended
+      // 593–1025px above the bottom on React, 30px on Angular). This pass runs after the commit, so
+      // the real maximum is known. Not when the row count changed: appending rows must not
+      // auto-follow them.
+      if (scrollEndPinned.current && gridScrollEl.current && !remeasureDisposed.current && windowSource().length === scrollEndPinnedCount.current) {
+        const maxTop = gridScrollEl.current.scrollHeight - gridScrollEl.current.clientHeight;
+        if (maxTop - gridScrollEl.current.scrollTop > 1) {
+          gridScrollEl.current.scrollTop = maxTop;
+          scrollEndPinnedTop.current = gridScrollEl.current.scrollTop;
+        }
       }
       remeasurePending.current = false;
     };
@@ -2178,6 +2212,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // makes the eventual render land strictly AFTER this fold + re-feed has fully landed, on
     // every target (the 87-10 fix for the confirmed Solid-specific rendering gap).
     bumpWindowVer();
+    // D-19 (quick 260923-rrr): a re-feed changes every unmeasured row's size, but — unlike a
+    // measurement — it does not go through virtual-core's onChange, so the host's post-commit
+    // pass (which restores an at-the-end view the growth moved off) never ran for it. Schedule it.
+    scheduleRemeasure();
   }
 
   // The FULL virtualizer options. virtual-core's setOptions REPLACES options with

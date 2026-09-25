@@ -1188,6 +1188,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // handle and TS2322s on a numeric seed.
   let remeasureRaf: any = null;
   let remeasureDisposed = false;
+  // D-19 (quick 260923-rrr): "the user scrolled to the end" — recorded only when the scroll
+  // offset actually MOVED (a growth-driven onChange leaves it where it was), with the row count
+  // and offset at that moment. See scheduleRemeasure() in virtualization.rzts.
+  let scrollEndPinned: boolean = false;
+  let scrollEndPinnedCount: number = -1;
+  let scrollEndPinnedTop: number = -1;
 
   // ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
   // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
@@ -2380,6 +2386,20 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // virtualizer whose own ResizeObserver cleanup has run but whose queued tick was already
     // in flight.
     if (remeasureDisposed) return;
+    // D-19 (quick 260923-rrr): remember whether the view is at the END — but only when the scroll
+    // offset MOVED since the last record. A measurement-driven onChange (rows growing) arrives
+    // with the offset unchanged, and it is exactly that growth that moves the view off the end,
+    // so it must not clear the pin. (virtual-core's isScrolling cannot tell the two apart: it
+    // stays true for 150ms after the user's scroll, spanning the growth.)
+    if (virtualizer && gridScrollEl && !virtualizer.scrollState && gridScrollEl.scrollTop !== scrollEndPinnedTop) {
+      scrollEndPinnedTop = gridScrollEl.scrollTop;
+      // Judged on virtual-core's MODEL (total size − viewport − offset), not DOM geometry: its own
+      // above-viewport adjustments move scrollTop before the framework commits the matching
+      // spacer, so the DOM transiently reads "not at the end" for a view that is (measured on
+      // Angular: a 12px adjustment cleared a DOM-judged pin and left the view 12px short).
+      scrollEndPinned = virtualizer.getVirtualDistanceFromEnd() <= 1;
+      scrollEndPinnedCount = windowSource().length;
+    }
     if (remeasurePending) return;
     remeasurePending = true;
     let ranMicro = false;
@@ -2400,6 +2420,20 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       if (!covered && rafAttempts < REMEASURE_MAX_FRAMES && !remeasureDisposed && typeof requestAnimationFrame === 'function') {
         remeasureRaf = requestAnimationFrame(rafPass);
         return;
+      }
+      // D-19: keep a user who scrolled to the END at the end. When rows at/above the viewport
+      // measure taller than their estimate, virtual-core compensates with a scroll adjustment — but
+      // on React/Angular that adjustment is written BEFORE the framework commits the taller spacer,
+      // so the browser clamps it to the OLD maximum and it is lost (measured: the view ended
+      // 593–1025px above the bottom on React, 30px on Angular). This pass runs after the commit, so
+      // the real maximum is known. Not when the row count changed: appending rows must not
+      // auto-follow them.
+      if (scrollEndPinned && gridScrollEl && !remeasureDisposed && windowSource().length === scrollEndPinnedCount) {
+        const maxTop = gridScrollEl.scrollHeight - gridScrollEl.clientHeight;
+        if (maxTop - gridScrollEl.scrollTop > 1) {
+          gridScrollEl.scrollTop = maxTop;
+          scrollEndPinnedTop = gridScrollEl.scrollTop;
+        }
       }
       remeasurePending = false;
     };
@@ -2899,6 +2933,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // makes the eventual render land strictly AFTER this fold + re-feed has fully landed, on
     // every target (the 87-10 fix for the confirmed Solid-specific rendering gap).
     bumpWindowVer();
+    // D-19 (quick 260923-rrr): a re-feed changes every unmeasured row's size, but — unlike a
+    // measurement — it does not go through virtual-core's onChange, so the host's post-commit
+    // pass (which restores an at-the-end view the growth moved off) never ran for it. Schedule it.
+    scheduleRemeasure();
   }
 
   // The FULL virtualizer options. virtual-core's setOptions REPLACES options with

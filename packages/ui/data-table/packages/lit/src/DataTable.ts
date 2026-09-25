@@ -1809,6 +1809,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   remeasureDisposed = false;
 
+  // D-19 (quick 260923-rrr): "the user scrolled to the end" — recorded only when the scroll
+  // offset actually MOVED (a growth-driven onChange leaves it where it was), with the row count
+  // and offset at that moment. See scheduleRemeasure() in virtualization.rzts.
+  scrollEndPinned: boolean = false;
+
+  scrollEndPinnedCount: number = -1;
+
+  scrollEndPinnedTop: number = -1;
+
   // ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
   // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
   // via the same focusActiveCell() scroll-into-view seam — kept a top-level const so that
@@ -3063,6 +3072,20 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // virtualizer whose own ResizeObserver cleanup has run but whose queued tick was already
   // in flight.
   if (this.remeasureDisposed) return;
+  // D-19 (quick 260923-rrr): remember whether the view is at the END — but only when the scroll
+  // offset MOVED since the last record. A measurement-driven onChange (rows growing) arrives
+  // with the offset unchanged, and it is exactly that growth that moves the view off the end,
+  // so it must not clear the pin. (virtual-core's isScrolling cannot tell the two apart: it
+  // stays true for 150ms after the user's scroll, spanning the growth.)
+  if (this.virtualizer && this.gridScrollEl && !this.virtualizer.scrollState && this.gridScrollEl.scrollTop !== this.scrollEndPinnedTop) {
+    this.scrollEndPinnedTop = this.gridScrollEl.scrollTop;
+    // Judged on virtual-core's MODEL (total size − viewport − offset), not DOM geometry: its own
+    // above-viewport adjustments move scrollTop before the framework commits the matching
+    // spacer, so the DOM transiently reads "not at the end" for a view that is (measured on
+    // Angular: a 12px adjustment cleared a DOM-judged pin and left the view 12px short).
+    this.scrollEndPinned = this.virtualizer.getVirtualDistanceFromEnd() <= 1;
+    this.scrollEndPinnedCount = this.windowSource().length;
+  }
   if (this.remeasurePending) return;
   this.remeasurePending = true;
   let ranMicro = false;
@@ -3083,6 +3106,20 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     if (!covered && rafAttempts < this.REMEASURE_MAX_FRAMES && !this.remeasureDisposed && typeof requestAnimationFrame === 'function') {
       this.remeasureRaf = requestAnimationFrame(rafPass);
       return;
+    }
+    // D-19: keep a user who scrolled to the END at the end. When rows at/above the viewport
+    // measure taller than their estimate, virtual-core compensates with a scroll adjustment — but
+    // on React/Angular that adjustment is written BEFORE the framework commits the taller spacer,
+    // so the browser clamps it to the OLD maximum and it is lost (measured: the view ended
+    // 593–1025px above the bottom on React, 30px on Angular). This pass runs after the commit, so
+    // the real maximum is known. Not when the row count changed: appending rows must not
+    // auto-follow them.
+    if (this.scrollEndPinned && this.gridScrollEl && !this.remeasureDisposed && this.windowSource().length === this.scrollEndPinnedCount) {
+      const maxTop = this.gridScrollEl.scrollHeight - this.gridScrollEl.clientHeight;
+      if (maxTop - this.gridScrollEl.scrollTop > 1) {
+        this.gridScrollEl.scrollTop = maxTop;
+        this.scrollEndPinnedTop = this.gridScrollEl.scrollTop;
+      }
     }
     this.remeasurePending = false;
   };
@@ -3588,6 +3625,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // makes the eventual render land strictly AFTER this fold + re-feed has fully landed, on
   // every target (the 87-10 fix for the confirmed Solid-specific rendering gap).
   this.bumpWindowVer();
+  // D-19 (quick 260923-rrr): a re-feed changes every unmeasured row's size, but — unlike a
+  // measurement — it does not go through virtual-core's onChange, so the host's post-commit
+  // pass (which restores an at-the-end view the growth moved off) never ran for it. Schedule it.
+  this.scheduleRemeasure();
 };
 
   // The FULL virtualizer options. virtual-core's setOptions REPLACES options with

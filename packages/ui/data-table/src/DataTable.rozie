@@ -799,6 +799,12 @@ let remeasurePending = false
 // handle and TS2322s on a numeric seed.
 let remeasureRaf = null
 let remeasureDisposed = false
+// D-19 (quick 260923-rrr): "the user scrolled to the end" — recorded only when the scroll
+// offset actually MOVED (a growth-driven onChange leaves it where it was), with the row count
+// and offset at that moment. See scheduleRemeasure() in virtualization.rzts.
+let scrollEndPinned: boolean = false
+let scrollEndPinnedCount: number = -1
+let scrollEndPinnedTop: number = -1
 
 // ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
 // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size

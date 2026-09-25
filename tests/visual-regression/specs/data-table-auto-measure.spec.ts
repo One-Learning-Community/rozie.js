@@ -520,3 +520,43 @@ for (const target of TARGETS) {
     expect(Math.abs((late.off ?? 0) - (early.off ?? 0))).toBeLessThanOrEqual(1);
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// D-19 residual (quick 260923-rrr) — a user who scrolled to the END stays at the end while the
+// rows around them measure, and a user who then scrolls AWAY is not dragged back.
+//
+// virtual-core compensates above-viewport size changes with a scroll adjustment, but on
+// React/Angular that adjustment is written before the framework commits the taller spacer, so
+// the browser clamped it to the old maximum and it was lost: measured before the fix, Angular
+// ended 30px short on every run, React 593–1025px short on 3 of 40 (the D-19 flake). Asserted as
+// the geometry the user sees — distance from the bottom — not just "is the last row rendered".
+// ═══════════════════════════════════════════════════════════════════════════════════════
+async function distanceFromBottom(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const sc = (window as unknown as { __findWithinGridTableBoth: (s: string) => Element | null }).__findWithinGridTableBoth('.rdt-scroll') as HTMLElement;
+    return Math.round(sc.scrollHeight - sc.scrollTop - sc.clientHeight);
+  });
+}
+
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-auto-measure [${target}]: D-19 a user at the end stays at the end as rows measure`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await scrollBothToMax(page);
+    await page.waitForTimeout(500);
+    expect(await distanceFromBottom(page)).toBeLessThanOrEqual(1);
+    await page.waitForTimeout(1000);
+    expect(await distanceFromBottom(page)).toBeLessThanOrEqual(1);
+  });
+
+  runnerFor(target)(`data-table-auto-measure [${target}]: D-19 control — scrolling up from the end is not pulled back down`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await scrollBothToMax(page);
+    await page.waitForTimeout(500);
+    await page.evaluate(() => {
+      const sc = (window as unknown as { __findWithinGridTableBoth: (s: string) => Element | null }).__findWithinGridTableBoth('.rdt-scroll') as HTMLElement;
+      sc.scrollTop = sc.scrollTop - 300;
+    });
+    await page.waitForTimeout(800);
+    expect(await distanceFromBottom(page)).toBeGreaterThan(200);
+  });
+}
