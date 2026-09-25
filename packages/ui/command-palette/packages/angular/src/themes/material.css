@@ -5,15 +5,30 @@
  * (`--md-sys-color-*`, as emitted by Material Web / the M3 theme builder).
  *
  *   import '@rozie-ui/command-palette-react/themes/material.css';
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rcp-x: var(--rozie-command-palette-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-command-palette-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-command-palette`
+ *    and the Lit host `rozie-command-palette`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-command-palette {
-  --rozie-command-palette-bg: var(--md-sys-color-surface-container-high, #fff);
-  --rozie-command-palette-color: var(--md-sys-color-on-surface, #1a1a1a);
-  --rozie-command-palette-radius: 1rem;
-  --rozie-command-palette-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-  --rozie-command-palette-divider-color: var(--md-sys-color-outline-variant, rgba(0, 0, 0, 0.12));
+:root,
+.rozie-command-palette,
+rozie-command-palette {
+  --rcp-bg: var(--rozie-command-palette-bg, var(--md-sys-color-surface-container-high, #fff));
+  --rcp-color: var(--rozie-command-palette-color, var(--md-sys-color-on-surface, #1a1a1a));
+  --rcp-radius: var(--rozie-command-palette-radius, 1rem);
+  --rcp-shadow: var(--rozie-command-palette-shadow, 0 8px 24px rgba(0, 0, 0, 0.28));
+  --rcp-divider-color: var(--rozie-command-palette-divider-color, var(--md-sys-color-outline-variant, rgba(0, 0, 0, 0.12)));
 
-  --rozie-command-palette-group-color: var(--md-sys-color-on-surface-variant, rgba(0, 0, 0, 0.5));
-  --rozie-command-palette-empty-color: var(--md-sys-color-on-surface-variant, rgba(0, 0, 0, 0.5));
-  --rozie-command-palette-footer-color: var(--md-sys-color-on-surface-variant, rgba(0, 0, 0, 0.55));
+  --rcp-group-color: var(--rozie-command-palette-group-color, var(--md-sys-color-on-surface-variant, rgba(0, 0, 0, 0.5)));
+  --rcp-empty-color: var(--rozie-command-palette-empty-color, var(--md-sys-color-on-surface-variant, rgba(0, 0, 0, 0.5)));
+  --rcp-footer-color: var(--rozie-command-palette-footer-color, var(--md-sys-color-on-surface-variant, rgba(0, 0, 0, 0.55)));
 }

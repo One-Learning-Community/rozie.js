@@ -62,7 +62,6 @@ accent — the single color most consumers will set; focus ring + selected optio
 
 | Token | Default |
 | --- | --- |
-| `--rozie-combobox-list-z` | `50` |
 | `--rozie-combobox-list-gap` | `0.25rem` |
 | `--rozie-combobox-list-padding` | `0.25rem` |
 | `--rozie-combobox-list-max-height` | `16rem` |

@@ -94,33 +94,33 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
 .rozie-command-palette[data-rozie-s-768cad96] {
   position: fixed;
   inset: 0;
-  z-index: var(--rozie-command-palette-z, 1000);
+  z-index: var(--rozie-command-palette-z, var(--rcp-z, 1000));
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: var(--rozie-command-palette-overlay-padding, 12vh 1rem 1rem);
-  background: var(--rozie-command-palette-backdrop-bg, rgba(0, 0, 0, 0.5));
-  backdrop-filter: var(--rozie-command-palette-backdrop-filter, none);
+  padding: var(--rozie-command-palette-overlay-padding, var(--rcp-overlay-padding, 12vh 1rem 1rem));
+  background: var(--rozie-command-palette-backdrop-bg, var(--rcp-backdrop-bg, rgba(0, 0, 0, 0.5)));
+  backdrop-filter: var(--rozie-command-palette-backdrop-filter, var(--rcp-backdrop-filter, none));
 }
 .rozie-command-palette-frame[data-rozie-s-768cad96] {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: var(--rozie-command-palette-width, min(40rem, 100%));
+  width: var(--rozie-command-palette-width, var(--rcp-width, min(40rem, 100%)));
   max-width: 100%;
 }
 .rozie-command-palette-panel[data-rozie-s-768cad96] {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-height: var(--rozie-command-palette-max-height, 70vh);
+  max-height: var(--rozie-command-palette-max-height, var(--rcp-max-height, 70vh));
   overflow: hidden;
   font: var(--rozie-command-palette-font, inherit);
-  color: var(--rozie-command-palette-color, inherit);
-  background: var(--rozie-command-palette-bg, #fff);
-  border: var(--rozie-command-palette-border, none);
-  border-radius: var(--rozie-command-palette-radius, 0.75rem);
-  box-shadow: var(--rozie-command-palette-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25));
+  color: var(--rozie-command-palette-color, var(--rcp-color, inherit));
+  background: var(--rozie-command-palette-bg, var(--rcp-bg, #fff));
+  border: var(--rozie-command-palette-border, var(--rcp-border, none));
+  border-radius: var(--rozie-command-palette-radius, var(--rcp-radius, 0.75rem));
+  box-shadow: var(--rozie-command-palette-shadow, var(--rcp-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25)));
   /*
     Drive the vendored <Combobox>'s render-neutral tokens from panel scope
     (260715-50l findings 3+4) — custom properties inherit through the Lit
@@ -131,66 +131,66 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
     focus (the clean cmdk look), plus subtle top separation above group
     headings (separating the leading ungrouped block from the first group).
   */
-  --rozie-combobox-radius: var(--rozie-command-palette-input-radius, 0);
-  --rozie-combobox-border-color: var(--rozie-command-palette-input-border-color, transparent);
-  --rozie-combobox-focus-border-color: var(--rozie-command-palette-input-focus-border-color, transparent);
-  --rozie-combobox-focus-ring-width: var(--rozie-command-palette-input-focus-ring-width, 0);
-  --rozie-combobox-input-underline: var(--rozie-command-palette-input-underline, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
-  --rozie-combobox-group-heading-margin-top: var(--rozie-command-palette-section-gap, 0.375rem);
+  --rozie-combobox-radius: var(--rozie-command-palette-input-radius, var(--rcp-input-radius, 0));
+  --rozie-combobox-border-color: var(--rozie-command-palette-input-border-color, var(--rcp-input-border-color, transparent));
+  --rozie-combobox-focus-border-color: var(--rozie-command-palette-input-focus-border-color, var(--rcp-input-focus-border-color, transparent));
+  --rozie-combobox-focus-ring-width: var(--rozie-command-palette-input-focus-ring-width, var(--rcp-input-focus-ring-width, 0));
+  --rozie-combobox-input-underline: var(--rozie-command-palette-input-underline, var(--rozie-command-palette-border-width, var(--rcp-border-width, 1px)) solid var(--rozie-command-palette-divider-color, var(--rcp-divider-color, rgba(0, 0, 0, 0.1))));
+  --rozie-combobox-group-heading-margin-top: var(--rozie-command-palette-section-gap, var(--rcp-section-gap, 0.375rem));
 }
 .rozie-command-palette-search[data-rozie-s-768cad96] {
-  padding: var(--rozie-command-palette-search-padding, 0.75rem);
-  border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+  padding: var(--rozie-command-palette-search-padding, var(--rcp-search-padding, 0.75rem));
+  border-bottom: var(--rozie-command-palette-border-width, var(--rcp-border-width, 1px)) solid var(--rozie-command-palette-divider-color, var(--rcp-divider-color, rgba(0, 0, 0, 0.1)));
 }
 .rozie-command-palette-header[data-rozie-s-768cad96] {
   display: flex;
   align-items: center;
-  gap: var(--rozie-command-palette-header-gap, 0.5rem);
-  padding: var(--rozie-command-palette-header-padding, 0.5rem 0.75rem);
-  border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
-  font-size: var(--rozie-command-palette-header-font-size, 0.875rem);
+  gap: var(--rozie-command-palette-header-gap, var(--rcp-header-gap, 0.5rem));
+  padding: var(--rozie-command-palette-header-padding, var(--rcp-header-padding, 0.5rem 0.75rem));
+  border-bottom: var(--rozie-command-palette-border-width, var(--rcp-border-width, 1px)) solid var(--rozie-command-palette-divider-color, var(--rcp-divider-color, rgba(0, 0, 0, 0.1)));
+  font-size: var(--rozie-command-palette-header-font-size, var(--rcp-header-font-size, 0.875rem));
 }
 .rozie-command-palette-back[data-rozie-s-768cad96] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: var(--rozie-command-palette-back-padding, 0.125rem 0.375rem);
+  padding: var(--rozie-command-palette-back-padding, var(--rcp-back-padding, 0.125rem 0.375rem));
   font: inherit;
-  font-size: var(--rozie-command-palette-back-font-size, 1.1rem);
+  font-size: var(--rozie-command-palette-back-font-size, var(--rcp-back-font-size, 1.1rem));
   line-height: 1;
   color: inherit;
-  background: var(--rozie-command-palette-back-bg, transparent);
-  border: var(--rozie-command-palette-back-border, none);
-  border-radius: var(--rozie-command-palette-back-radius, 0.375rem);
+  background: var(--rozie-command-palette-back-bg, var(--rcp-back-bg, transparent));
+  border: var(--rozie-command-palette-back-border, var(--rcp-back-border, none));
+  border-radius: var(--rozie-command-palette-back-radius, var(--rcp-back-radius, 0.375rem));
   cursor: pointer;
 }
 .rozie-command-palette-back[data-rozie-s-768cad96]:hover {
-  background: var(--rozie-command-palette-back-hover-bg, rgba(0, 0, 0, 0.06));
+  background: var(--rozie-command-palette-back-hover-bg, var(--rcp-back-hover-bg, rgba(0, 0, 0, 0.06)));
 }
 .rozie-command-palette-title[data-rozie-s-768cad96] {
-  font-weight: var(--rozie-command-palette-title-weight, 600);
+  font-weight: var(--rozie-command-palette-title-weight, var(--rcp-title-weight, 600));
 }
 .rozie-command-palette-breadcrumb-trail[data-rozie-s-768cad96] {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  gap: var(--rozie-command-palette-breadcrumb-gap, var(--rcp-breadcrumb-gap, 0.25rem));
   min-width: 0;
 }
 .rozie-command-palette-breadcrumb-item[data-rozie-s-768cad96] {
   display: inline-flex;
   align-items: baseline;
-  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  gap: var(--rozie-command-palette-breadcrumb-gap, var(--rcp-breadcrumb-gap, 0.25rem));
   min-width: 0;
 }
 .rozie-command-palette-breadcrumb-segment[data-rozie-s-768cad96] {
-  color: var(--rozie-command-palette-breadcrumb-color, rgba(0, 0, 0, 0.55));
-  font-weight: var(--rozie-command-palette-breadcrumb-weight, 400);
+  color: var(--rozie-command-palette-breadcrumb-color, var(--rcp-breadcrumb-color, rgba(0, 0, 0, 0.55)));
+  font-weight: var(--rozie-command-palette-breadcrumb-weight, var(--rcp-breadcrumb-weight, 400));
   white-space: nowrap;
 }
 .rozie-command-palette-breadcrumb-segment--current[data-rozie-s-768cad96] {
   color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
-  font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
+  font-weight: var(--rozie-command-palette-breadcrumb-current-weight, var(--rcp-breadcrumb-current-weight, 600));
 }
 .rozie-command-palette-breadcrumb-segment--link[data-rozie-s-768cad96] {
   padding: 0;
@@ -198,31 +198,31 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   line-height: inherit;
   background: none;
   border: none;
-  border-radius: var(--rozie-command-palette-breadcrumb-jump-radius, 0.25rem);
+  border-radius: var(--rozie-command-palette-breadcrumb-jump-radius, var(--rcp-breadcrumb-jump-radius, 0.25rem));
   cursor: pointer;
 }
 .rozie-command-palette-breadcrumb-segment--link[data-rozie-s-768cad96]:hover {
   color: var(--rozie-command-palette-breadcrumb-jump-hover-color, var(--rozie-command-palette-breadcrumb-current-color, inherit));
-  text-decoration: var(--rozie-command-palette-breadcrumb-jump-hover-decoration, underline);
+  text-decoration: var(--rozie-command-palette-breadcrumb-jump-hover-decoration, var(--rcp-breadcrumb-jump-hover-decoration, underline));
 }
 .rozie-command-palette-breadcrumb-separator[data-rozie-s-768cad96] {
-  color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
+  color: var(--rozie-command-palette-breadcrumb-separator-color, var(--rcp-breadcrumb-separator-color, rgba(0, 0, 0, 0.35)));
 }
 .rozie-command-palette-input[data-rozie-s-768cad96] {
   box-sizing: border-box;
   width: 100%;
-  padding: var(--rozie-command-palette-input-padding, 0.5rem 0.75rem);
+  padding: var(--rozie-command-palette-input-padding, var(--rcp-input-padding, 0.5rem 0.75rem));
   font: inherit;
-  font-size: var(--rozie-command-palette-input-font-size, 1.05rem);
+  font-size: var(--rozie-command-palette-input-font-size, var(--rcp-input-font-size, 1.05rem));
   color: inherit;
-  background: var(--rozie-command-palette-input-bg, transparent);
-  border: var(--rozie-command-palette-input-border, none);
-  border-radius: var(--rozie-command-palette-input-radius, 0.5rem);
+  background: var(--rozie-command-palette-input-bg, var(--rcp-input-bg, transparent));
+  border: var(--rozie-command-palette-input-border, var(--rcp-input-border, none));
+  border-radius: var(--rozie-command-palette-input-radius, var(--rcp-input-radius, 0.5rem));
   outline: none;
 }
 .rozie-command-palette-list[data-rozie-s-768cad96] {
   margin: 0;
-  padding: var(--rozie-command-palette-list-padding, 0.5rem);
+  padding: var(--rozie-command-palette-list-padding, var(--rcp-list-padding, 0.5rem));
   list-style: none;
   overflow-y: auto;
 }
@@ -232,12 +232,12 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
 .rozie-command-palette-option[data-rozie-s-768cad96] {
   display: flex;
   align-items: center;
-  gap: var(--rozie-command-palette-option-gap, 0.75rem);
+  gap: var(--rozie-command-palette-option-gap, var(--rcp-option-gap, 0.75rem));
 }
 .rozie-command-palette-option-main[data-rozie-s-768cad96] {
   display: flex;
   align-items: center;
-  gap: var(--rozie-command-palette-option-gap, 0.75rem);
+  gap: var(--rozie-command-palette-option-gap, var(--rcp-option-gap, 0.75rem));
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -246,64 +246,64 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   align-items: center;
   flex: 0 0 auto;
   color: var(--rozie-command-palette-icon-color, inherit);
-  font-size: var(--rozie-command-palette-icon-size, 1rem);
+  font-size: var(--rozie-command-palette-icon-size, var(--rcp-icon-size, 1rem));
 }
 .rozie-command-palette-option-actions[data-rozie-s-768cad96] {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: var(--rozie-command-palette-actions-gap, 0.375rem);
-  color: var(--rozie-command-palette-actions-color, rgba(0, 0, 0, 0.55));
-  font-size: var(--rozie-command-palette-actions-font-size, 0.75rem);
+  gap: var(--rozie-command-palette-actions-gap, var(--rcp-actions-gap, 0.375rem));
+  color: var(--rozie-command-palette-actions-color, var(--rcp-actions-color, rgba(0, 0, 0, 0.55)));
+  font-size: var(--rozie-command-palette-actions-font-size, var(--rcp-actions-font-size, 0.75rem));
   cursor: pointer;
-  border-radius: var(--rozie-command-palette-actions-radius, 0.25rem);
+  border-radius: var(--rozie-command-palette-actions-radius, var(--rcp-actions-radius, 0.25rem));
 }
 .rozie-command-palette-option-actions[data-rozie-s-768cad96]:hover {
-  color: var(--rozie-command-palette-actions-hover-color, rgba(0, 0, 0, 0.85));
-  background: var(--rozie-command-palette-actions-hover-bg, rgba(0, 0, 0, 0.06));
+  color: var(--rozie-command-palette-actions-hover-color, var(--rcp-actions-hover-color, rgba(0, 0, 0, 0.85)));
+  background: var(--rozie-command-palette-actions-hover-bg, var(--rcp-actions-hover-bg, rgba(0, 0, 0, 0.06)));
 }
 .rozie-command-palette-option-actions-hint[data-rozie-s-768cad96] {
-  padding: var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem);
-  font-size: var(--rozie-command-palette-actions-hint-font-size, 0.6875rem);
+  padding: var(--rozie-command-palette-actions-hint-padding, var(--rcp-actions-hint-padding, 0.0625rem 0.3125rem));
+  font-size: var(--rozie-command-palette-actions-hint-font-size, var(--rcp-actions-hint-font-size, 0.6875rem));
   color: var(--rozie-command-palette-actions-hint-color, inherit);
-  background: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
-  border-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+  background: var(--rozie-command-palette-actions-hint-bg, var(--rcp-actions-hint-bg, rgba(0, 0, 0, 0.06)));
+  border-radius: var(--rozie-command-palette-actions-hint-radius, var(--rcp-actions-hint-radius, 0.25rem));
 }
 .rozie-command-palette-option-hotkey[data-rozie-s-768cad96] {
   flex: 0 0 auto;
-  padding: var(--rozie-command-palette-hotkey-padding, var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem));
-  font-size: var(--rozie-command-palette-hotkey-font-size, var(--rozie-command-palette-actions-hint-font-size, 0.6875rem));
+  padding: var(--rozie-command-palette-hotkey-padding, var(--rozie-command-palette-actions-hint-padding, var(--rcp-actions-hint-padding, 0.0625rem 0.3125rem)));
+  font-size: var(--rozie-command-palette-hotkey-font-size, var(--rozie-command-palette-actions-hint-font-size, var(--rcp-actions-hint-font-size, 0.6875rem)));
   color: var(--rozie-command-palette-hotkey-color, var(--rozie-command-palette-actions-hint-color, inherit));
-  background: var(--rozie-command-palette-hotkey-bg, var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06)));
-  border-radius: var(--rozie-command-palette-hotkey-radius, var(--rozie-command-palette-actions-hint-radius, 0.25rem));
+  background: var(--rozie-command-palette-hotkey-bg, var(--rozie-command-palette-actions-hint-bg, var(--rcp-actions-hint-bg, rgba(0, 0, 0, 0.06))));
+  border-radius: var(--rozie-command-palette-hotkey-radius, var(--rozie-command-palette-actions-hint-radius, var(--rcp-actions-hint-radius, 0.25rem)));
 }
 .rozie-command-palette-actions-menu[data-rozie-s-768cad96] {
   position: absolute;
-  right: var(--rozie-command-palette-action-right, 0.5rem);
-  z-index: var(--rozie-command-palette-action-z, 10);
-  min-width: var(--rozie-command-palette-action-min-width, 10rem);
-  max-width: var(--rozie-command-palette-action-max-width, 16rem);
-  padding: var(--rozie-command-palette-action-padding, 0.25rem);
-  background: var(--rozie-command-palette-action-bg, #fff);
-  border: var(--rozie-command-palette-action-border, 1px solid rgba(0, 0, 0, 0.1));
-  border-radius: var(--rozie-command-palette-action-radius, 0.5rem);
-  box-shadow: var(--rozie-command-palette-action-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+  right: var(--rozie-command-palette-action-right, var(--rcp-action-right, 0.5rem));
+  z-index: var(--rozie-command-palette-action-z, var(--rcp-action-z, 10));
+  min-width: var(--rozie-command-palette-action-min-width, var(--rcp-action-min-width, 10rem));
+  max-width: var(--rozie-command-palette-action-max-width, var(--rcp-action-max-width, 16rem));
+  padding: var(--rozie-command-palette-action-padding, var(--rcp-action-padding, 0.25rem));
+  background: var(--rozie-command-palette-action-bg, var(--rcp-action-bg, #fff));
+  border: var(--rozie-command-palette-action-border, var(--rcp-action-border, 1px solid rgba(0, 0, 0, 0.1)));
+  border-radius: var(--rozie-command-palette-action-radius, var(--rcp-action-radius, 0.5rem));
+  box-shadow: var(--rozie-command-palette-action-shadow, var(--rcp-action-shadow, 0 6px 24px rgba(0, 0, 0, 0.25)));
 }
 .rozie-command-palette-actions-menu-item[data-rozie-s-768cad96] {
   display: flex;
   align-items: center;
-  gap: var(--rozie-command-palette-action-gap, 0.5rem);
-  padding: var(--rozie-command-palette-action-item-padding, 0.375rem 0.5rem);
-  border-radius: var(--rozie-command-palette-action-item-radius, 0.375rem);
+  gap: var(--rozie-command-palette-action-gap, var(--rcp-action-gap, 0.5rem));
+  padding: var(--rozie-command-palette-action-item-padding, var(--rcp-action-item-padding, 0.375rem 0.5rem));
+  border-radius: var(--rozie-command-palette-action-item-radius, var(--rcp-action-item-radius, 0.375rem));
   cursor: pointer;
   outline: none;
 }
 .rozie-command-palette-actions-menu-item--active[data-rozie-s-768cad96],
 .rozie-command-palette-actions-menu-item[data-rozie-s-768cad96]:focus {
-  background: var(--rozie-command-palette-action-active-bg, rgba(0, 0, 0, 0.08));
+  background: var(--rozie-command-palette-action-active-bg, var(--rcp-action-active-bg, rgba(0, 0, 0, 0.08)));
 }
 .rozie-command-palette-actions-menu-item--disabled[data-rozie-s-768cad96] {
-  opacity: var(--rozie-command-palette-action-disabled-opacity, 0.5);
+  opacity: var(--rozie-command-palette-action-disabled-opacity, var(--rcp-action-disabled-opacity, 0.5));
   cursor: default;
 }
 .rozie-command-palette-actions-menu-item-icon[data-rozie-s-768cad96] {
@@ -318,49 +318,49 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
 }
 .rozie-command-palette-actions-menu-item-shortcut[data-rozie-s-768cad96] {
   flex: 0 0 auto;
-  font-size: var(--rozie-command-palette-action-shortcut-font-size, 0.75rem);
-  color: var(--rozie-command-palette-action-shortcut-color, rgba(0, 0, 0, 0.5));
+  font-size: var(--rozie-command-palette-action-shortcut-font-size, var(--rcp-action-shortcut-font-size, 0.75rem));
+  color: var(--rozie-command-palette-action-shortcut-color, var(--rcp-action-shortcut-color, rgba(0, 0, 0, 0.5)));
 }
 .rozie-command-palette-option-trailing[data-rozie-s-768cad96] {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  color: var(--rozie-command-palette-trailing-color, rgba(0, 0, 0, 0.5));
-  font-size: var(--rozie-command-palette-trailing-font-size, 0.75rem);
+  color: var(--rozie-command-palette-trailing-color, var(--rcp-trailing-color, rgba(0, 0, 0, 0.5)));
+  font-size: var(--rozie-command-palette-trailing-font-size, var(--rcp-trailing-font-size, 0.75rem));
 }
 .rozie-command-palette-option-group[data-rozie-s-768cad96] {
-  font-size: var(--rozie-command-palette-group-font-size, 0.75rem);
-  color: var(--rozie-command-palette-group-color, rgba(0, 0, 0, 0.5));
-  text-transform: var(--rozie-command-palette-group-transform, uppercase);
+  font-size: var(--rozie-command-palette-group-font-size, var(--rcp-group-font-size, 0.75rem));
+  color: var(--rozie-command-palette-group-color, var(--rcp-group-color, rgba(0, 0, 0, 0.5)));
+  text-transform: var(--rozie-command-palette-group-transform, var(--rcp-group-transform, uppercase));
   letter-spacing: 0.04em;
 }
 .rozie-command-palette-option-label-match[data-rozie-s-768cad96] {
-  font-weight: var(--rozie-command-palette-match-weight, 600);
+  font-weight: var(--rozie-command-palette-match-weight, var(--rcp-match-weight, 600));
   color: var(--rozie-command-palette-match-color, inherit);
 }
 .rozie-command-palette-empty[data-rozie-s-768cad96] {
-  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  padding: var(--rozie-command-palette-empty-padding, var(--rcp-empty-padding, 1.5rem));
   text-align: center;
-  color: var(--rozie-command-palette-empty-color, rgba(0, 0, 0, 0.5));
+  color: var(--rozie-command-palette-empty-color, var(--rcp-empty-color, rgba(0, 0, 0, 0.5)));
 }
 .rozie-command-palette-list-region--inert[data-rozie-s-768cad96] {
   pointer-events: none;
-  opacity: var(--rozie-command-palette-args-dim-opacity, 0.45);
+  opacity: var(--rozie-command-palette-args-dim-opacity, var(--rcp-args-dim-opacity, 0.45));
 }
 .rozie-command-palette-args[data-rozie-s-768cad96] {
   display: flex;
   flex-direction: column;
-  gap: var(--rozie-command-palette-args-gap, 0.5rem);
-  padding: var(--rozie-command-palette-args-padding, 0.75rem);
+  gap: var(--rozie-command-palette-args-gap, var(--rcp-args-gap, 0.5rem));
+  padding: var(--rozie-command-palette-args-padding, var(--rcp-args-padding, 0.75rem));
 }
 .rozie-command-palette-args-chip[data-rozie-s-768cad96] {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  padding: var(--rozie-command-palette-args-chip-padding, 0.125rem 0.5rem);
+  padding: var(--rozie-command-palette-args-chip-padding, var(--rcp-args-chip-padding, 0.125rem 0.5rem));
   color: var(--rozie-command-palette-args-chip-color, inherit);
-  background: var(--rozie-command-palette-args-chip-bg, rgba(0, 0, 0, 0.06));
-  border-radius: var(--rozie-command-palette-back-radius, 0.375rem);
+  background: var(--rozie-command-palette-args-chip-bg, var(--rcp-args-chip-bg, rgba(0, 0, 0, 0.06)));
+  border-radius: var(--rozie-command-palette-back-radius, var(--rcp-back-radius, 0.375rem));
 }
 .rozie-command-palette-args-field[data-rozie-s-768cad96] {
   display: block;
@@ -368,29 +368,29 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
 .rozie-command-palette-args-input[data-rozie-s-768cad96] {
   box-sizing: border-box;
   width: 100%;
-  padding: var(--rozie-command-palette-args-field-padding, var(--rozie-command-palette-input-padding, 0.5rem 0.75rem));
+  padding: var(--rozie-command-palette-args-field-padding, var(--rozie-command-palette-input-padding, var(--rcp-input-padding, 0.5rem 0.75rem)));
   font: inherit;
   color: inherit;
-  background: var(--rozie-command-palette-args-field-bg, var(--rozie-command-palette-input-bg, transparent));
-  border: var(--rozie-command-palette-args-field-border, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
-  border-radius: var(--rozie-command-palette-args-field-radius, var(--rozie-command-palette-input-radius, 0.5rem));
+  background: var(--rozie-command-palette-args-field-bg, var(--rozie-command-palette-input-bg, var(--rcp-input-bg, transparent)));
+  border: var(--rozie-command-palette-args-field-border, var(--rozie-command-palette-border-width, var(--rcp-border-width, 1px)) solid var(--rozie-command-palette-divider-color, var(--rcp-divider-color, rgba(0, 0, 0, 0.1))));
+  border-radius: var(--rozie-command-palette-args-field-radius, var(--rozie-command-palette-input-radius, var(--rcp-input-radius, 0.5rem)));
   outline: none;
 }
 .rozie-command-palette-loading[data-rozie-s-768cad96] {
-  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  padding: var(--rozie-command-palette-empty-padding, var(--rcp-empty-padding, 1.5rem));
   text-align: center;
-  color: var(--rozie-command-palette-loading-color, rgba(0, 0, 0, 0.5));
+  color: var(--rozie-command-palette-loading-color, var(--rcp-loading-color, rgba(0, 0, 0, 0.5)));
 }
 .rozie-command-palette-error[data-rozie-s-768cad96] {
-  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  padding: var(--rozie-command-palette-empty-padding, var(--rcp-empty-padding, 1.5rem));
   text-align: center;
-  color: var(--rozie-command-palette-error-color, #c0392b);
+  color: var(--rozie-command-palette-error-color, var(--rcp-error-color, #c0392b));
 }
 .rozie-command-palette-footer[data-rozie-s-768cad96] {
-  padding: var(--rozie-command-palette-footer-padding, 0.5rem 0.75rem);
-  border-top: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
-  font-size: var(--rozie-command-palette-footer-font-size, 0.8125rem);
-  color: var(--rozie-command-palette-footer-color, rgba(0, 0, 0, 0.55));
+  padding: var(--rozie-command-palette-footer-padding, var(--rcp-footer-padding, 0.5rem 0.75rem));
+  border-top: var(--rozie-command-palette-border-width, var(--rcp-border-width, 1px)) solid var(--rozie-command-palette-divider-color, var(--rcp-divider-color, rgba(0, 0, 0, 0.1)));
+  font-size: var(--rozie-command-palette-footer-font-size, var(--rcp-footer-font-size, 0.8125rem));
+  color: var(--rozie-command-palette-footer-color, var(--rcp-footer-color, rgba(0, 0, 0, 0.55)));
 }
 `;
 
@@ -2202,37 +2202,37 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   set query(v: string) { this._queryControllable.notifyPropertyWrite(v); }
 }
 
-injectGlobalStyles('rozie-command-palette-2b4aef0c-global', `
+injectGlobalStyles('rozie-command-palette-ebe3f684-global', `
 .rozie-command-palette[data-rozie-s-768cad96] {
   position: fixed;
   inset: 0;
-  z-index: var(--rozie-command-palette-z, 1000);
+  z-index: var(--rozie-command-palette-z, var(--rcp-z, 1000));
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: var(--rozie-command-palette-overlay-padding, 12vh 1rem 1rem);
-  background: var(--rozie-command-palette-backdrop-bg, rgba(0, 0, 0, 0.5));
-  backdrop-filter: var(--rozie-command-palette-backdrop-filter, none);
+  padding: var(--rozie-command-palette-overlay-padding, var(--rcp-overlay-padding, 12vh 1rem 1rem));
+  background: var(--rozie-command-palette-backdrop-bg, var(--rcp-backdrop-bg, rgba(0, 0, 0, 0.5)));
+  backdrop-filter: var(--rozie-command-palette-backdrop-filter, var(--rcp-backdrop-filter, none));
 }
 .rozie-command-palette-frame[data-rozie-s-768cad96] {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: var(--rozie-command-palette-width, min(40rem, 100%));
+  width: var(--rozie-command-palette-width, var(--rcp-width, min(40rem, 100%)));
   max-width: 100%;
 }
 .rozie-command-palette-panel[data-rozie-s-768cad96] {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-height: var(--rozie-command-palette-max-height, 70vh);
+  max-height: var(--rozie-command-palette-max-height, var(--rcp-max-height, 70vh));
   overflow: hidden;
   font: var(--rozie-command-palette-font, inherit);
-  color: var(--rozie-command-palette-color, inherit);
-  background: var(--rozie-command-palette-bg, #fff);
-  border: var(--rozie-command-palette-border, none);
-  border-radius: var(--rozie-command-palette-radius, 0.75rem);
-  box-shadow: var(--rozie-command-palette-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25));
+  color: var(--rozie-command-palette-color, var(--rcp-color, inherit));
+  background: var(--rozie-command-palette-bg, var(--rcp-bg, #fff));
+  border: var(--rozie-command-palette-border, var(--rcp-border, none));
+  border-radius: var(--rozie-command-palette-radius, var(--rcp-radius, 0.75rem));
+  box-shadow: var(--rozie-command-palette-shadow, var(--rcp-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25)));
   /*
     Drive the vendored <Combobox>'s render-neutral tokens from panel scope
     (260715-50l findings 3+4) — custom properties inherit through the Lit
@@ -2243,66 +2243,66 @@ injectGlobalStyles('rozie-command-palette-2b4aef0c-global', `
     focus (the clean cmdk look), plus subtle top separation above group
     headings (separating the leading ungrouped block from the first group).
   */
-  --rozie-combobox-radius: var(--rozie-command-palette-input-radius, 0);
-  --rozie-combobox-border-color: var(--rozie-command-palette-input-border-color, transparent);
-  --rozie-combobox-focus-border-color: var(--rozie-command-palette-input-focus-border-color, transparent);
-  --rozie-combobox-focus-ring-width: var(--rozie-command-palette-input-focus-ring-width, 0);
-  --rozie-combobox-input-underline: var(--rozie-command-palette-input-underline, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
-  --rozie-combobox-group-heading-margin-top: var(--rozie-command-palette-section-gap, 0.375rem);
+  --rozie-combobox-radius: var(--rozie-command-palette-input-radius, var(--rcp-input-radius, 0));
+  --rozie-combobox-border-color: var(--rozie-command-palette-input-border-color, var(--rcp-input-border-color, transparent));
+  --rozie-combobox-focus-border-color: var(--rozie-command-palette-input-focus-border-color, var(--rcp-input-focus-border-color, transparent));
+  --rozie-combobox-focus-ring-width: var(--rozie-command-palette-input-focus-ring-width, var(--rcp-input-focus-ring-width, 0));
+  --rozie-combobox-input-underline: var(--rozie-command-palette-input-underline, var(--rozie-command-palette-border-width, var(--rcp-border-width, 1px)) solid var(--rozie-command-palette-divider-color, var(--rcp-divider-color, rgba(0, 0, 0, 0.1))));
+  --rozie-combobox-group-heading-margin-top: var(--rozie-command-palette-section-gap, var(--rcp-section-gap, 0.375rem));
 }
 .rozie-command-palette-search[data-rozie-s-768cad96] {
-  padding: var(--rozie-command-palette-search-padding, 0.75rem);
-  border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+  padding: var(--rozie-command-palette-search-padding, var(--rcp-search-padding, 0.75rem));
+  border-bottom: var(--rozie-command-palette-border-width, var(--rcp-border-width, 1px)) solid var(--rozie-command-palette-divider-color, var(--rcp-divider-color, rgba(0, 0, 0, 0.1)));
 }
 .rozie-command-palette-header[data-rozie-s-768cad96] {
   display: flex;
   align-items: center;
-  gap: var(--rozie-command-palette-header-gap, 0.5rem);
-  padding: var(--rozie-command-palette-header-padding, 0.5rem 0.75rem);
-  border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
-  font-size: var(--rozie-command-palette-header-font-size, 0.875rem);
+  gap: var(--rozie-command-palette-header-gap, var(--rcp-header-gap, 0.5rem));
+  padding: var(--rozie-command-palette-header-padding, var(--rcp-header-padding, 0.5rem 0.75rem));
+  border-bottom: var(--rozie-command-palette-border-width, var(--rcp-border-width, 1px)) solid var(--rozie-command-palette-divider-color, var(--rcp-divider-color, rgba(0, 0, 0, 0.1)));
+  font-size: var(--rozie-command-palette-header-font-size, var(--rcp-header-font-size, 0.875rem));
 }
 .rozie-command-palette-back[data-rozie-s-768cad96] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: var(--rozie-command-palette-back-padding, 0.125rem 0.375rem);
+  padding: var(--rozie-command-palette-back-padding, var(--rcp-back-padding, 0.125rem 0.375rem));
   font: inherit;
-  font-size: var(--rozie-command-palette-back-font-size, 1.1rem);
+  font-size: var(--rozie-command-palette-back-font-size, var(--rcp-back-font-size, 1.1rem));
   line-height: 1;
   color: inherit;
-  background: var(--rozie-command-palette-back-bg, transparent);
-  border: var(--rozie-command-palette-back-border, none);
-  border-radius: var(--rozie-command-palette-back-radius, 0.375rem);
+  background: var(--rozie-command-palette-back-bg, var(--rcp-back-bg, transparent));
+  border: var(--rozie-command-palette-back-border, var(--rcp-back-border, none));
+  border-radius: var(--rozie-command-palette-back-radius, var(--rcp-back-radius, 0.375rem));
   cursor: pointer;
 }
 .rozie-command-palette-back[data-rozie-s-768cad96]:hover {
-  background: var(--rozie-command-palette-back-hover-bg, rgba(0, 0, 0, 0.06));
+  background: var(--rozie-command-palette-back-hover-bg, var(--rcp-back-hover-bg, rgba(0, 0, 0, 0.06)));
 }
 .rozie-command-palette-title[data-rozie-s-768cad96] {
-  font-weight: var(--rozie-command-palette-title-weight, 600);
+  font-weight: var(--rozie-command-palette-title-weight, var(--rcp-title-weight, 600));
 }
 .rozie-command-palette-breadcrumb-trail[data-rozie-s-768cad96] {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  gap: var(--rozie-command-palette-breadcrumb-gap, var(--rcp-breadcrumb-gap, 0.25rem));
   min-width: 0;
 }
 .rozie-command-palette-breadcrumb-item[data-rozie-s-768cad96] {
   display: inline-flex;
   align-items: baseline;
-  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  gap: var(--rozie-command-palette-breadcrumb-gap, var(--rcp-breadcrumb-gap, 0.25rem));
   min-width: 0;
 }
 .rozie-command-palette-breadcrumb-segment[data-rozie-s-768cad96] {
-  color: var(--rozie-command-palette-breadcrumb-color, rgba(0, 0, 0, 0.55));
-  font-weight: var(--rozie-command-palette-breadcrumb-weight, 400);
+  color: var(--rozie-command-palette-breadcrumb-color, var(--rcp-breadcrumb-color, rgba(0, 0, 0, 0.55)));
+  font-weight: var(--rozie-command-palette-breadcrumb-weight, var(--rcp-breadcrumb-weight, 400));
   white-space: nowrap;
 }
 .rozie-command-palette-breadcrumb-segment--current[data-rozie-s-768cad96] {
   color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
-  font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
+  font-weight: var(--rozie-command-palette-breadcrumb-current-weight, var(--rcp-breadcrumb-current-weight, 600));
 }
 .rozie-command-palette-breadcrumb-segment--link[data-rozie-s-768cad96] {
   padding: 0;
@@ -2310,31 +2310,31 @@ injectGlobalStyles('rozie-command-palette-2b4aef0c-global', `
   line-height: inherit;
   background: none;
   border: none;
-  border-radius: var(--rozie-command-palette-breadcrumb-jump-radius, 0.25rem);
+  border-radius: var(--rozie-command-palette-breadcrumb-jump-radius, var(--rcp-breadcrumb-jump-radius, 0.25rem));
   cursor: pointer;
 }
 .rozie-command-palette-breadcrumb-segment--link[data-rozie-s-768cad96]:hover {
   color: var(--rozie-command-palette-breadcrumb-jump-hover-color, var(--rozie-command-palette-breadcrumb-current-color, inherit));
-  text-decoration: var(--rozie-command-palette-breadcrumb-jump-hover-decoration, underline);
+  text-decoration: var(--rozie-command-palette-breadcrumb-jump-hover-decoration, var(--rcp-breadcrumb-jump-hover-decoration, underline));
 }
 .rozie-command-palette-breadcrumb-separator[data-rozie-s-768cad96] {
-  color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
+  color: var(--rozie-command-palette-breadcrumb-separator-color, var(--rcp-breadcrumb-separator-color, rgba(0, 0, 0, 0.35)));
 }
 .rozie-command-palette-input[data-rozie-s-768cad96] {
   box-sizing: border-box;
   width: 100%;
-  padding: var(--rozie-command-palette-input-padding, 0.5rem 0.75rem);
+  padding: var(--rozie-command-palette-input-padding, var(--rcp-input-padding, 0.5rem 0.75rem));
   font: inherit;
-  font-size: var(--rozie-command-palette-input-font-size, 1.05rem);
+  font-size: var(--rozie-command-palette-input-font-size, var(--rcp-input-font-size, 1.05rem));
   color: inherit;
-  background: var(--rozie-command-palette-input-bg, transparent);
-  border: var(--rozie-command-palette-input-border, none);
-  border-radius: var(--rozie-command-palette-input-radius, 0.5rem);
+  background: var(--rozie-command-palette-input-bg, var(--rcp-input-bg, transparent));
+  border: var(--rozie-command-palette-input-border, var(--rcp-input-border, none));
+  border-radius: var(--rozie-command-palette-input-radius, var(--rcp-input-radius, 0.5rem));
   outline: none;
 }
 .rozie-command-palette-list[data-rozie-s-768cad96] {
   margin: 0;
-  padding: var(--rozie-command-palette-list-padding, 0.5rem);
+  padding: var(--rozie-command-palette-list-padding, var(--rcp-list-padding, 0.5rem));
   list-style: none;
   overflow-y: auto;
 }
@@ -2344,12 +2344,12 @@ injectGlobalStyles('rozie-command-palette-2b4aef0c-global', `
 .rozie-command-palette-option[data-rozie-s-768cad96] {
   display: flex;
   align-items: center;
-  gap: var(--rozie-command-palette-option-gap, 0.75rem);
+  gap: var(--rozie-command-palette-option-gap, var(--rcp-option-gap, 0.75rem));
 }
 .rozie-command-palette-option-main[data-rozie-s-768cad96] {
   display: flex;
   align-items: center;
-  gap: var(--rozie-command-palette-option-gap, 0.75rem);
+  gap: var(--rozie-command-palette-option-gap, var(--rcp-option-gap, 0.75rem));
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -2358,64 +2358,64 @@ injectGlobalStyles('rozie-command-palette-2b4aef0c-global', `
   align-items: center;
   flex: 0 0 auto;
   color: var(--rozie-command-palette-icon-color, inherit);
-  font-size: var(--rozie-command-palette-icon-size, 1rem);
+  font-size: var(--rozie-command-palette-icon-size, var(--rcp-icon-size, 1rem));
 }
 .rozie-command-palette-option-actions[data-rozie-s-768cad96] {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: var(--rozie-command-palette-actions-gap, 0.375rem);
-  color: var(--rozie-command-palette-actions-color, rgba(0, 0, 0, 0.55));
-  font-size: var(--rozie-command-palette-actions-font-size, 0.75rem);
+  gap: var(--rozie-command-palette-actions-gap, var(--rcp-actions-gap, 0.375rem));
+  color: var(--rozie-command-palette-actions-color, var(--rcp-actions-color, rgba(0, 0, 0, 0.55)));
+  font-size: var(--rozie-command-palette-actions-font-size, var(--rcp-actions-font-size, 0.75rem));
   cursor: pointer;
-  border-radius: var(--rozie-command-palette-actions-radius, 0.25rem);
+  border-radius: var(--rozie-command-palette-actions-radius, var(--rcp-actions-radius, 0.25rem));
 }
 .rozie-command-palette-option-actions[data-rozie-s-768cad96]:hover {
-  color: var(--rozie-command-palette-actions-hover-color, rgba(0, 0, 0, 0.85));
-  background: var(--rozie-command-palette-actions-hover-bg, rgba(0, 0, 0, 0.06));
+  color: var(--rozie-command-palette-actions-hover-color, var(--rcp-actions-hover-color, rgba(0, 0, 0, 0.85)));
+  background: var(--rozie-command-palette-actions-hover-bg, var(--rcp-actions-hover-bg, rgba(0, 0, 0, 0.06)));
 }
 .rozie-command-palette-option-actions-hint[data-rozie-s-768cad96] {
-  padding: var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem);
-  font-size: var(--rozie-command-palette-actions-hint-font-size, 0.6875rem);
+  padding: var(--rozie-command-palette-actions-hint-padding, var(--rcp-actions-hint-padding, 0.0625rem 0.3125rem));
+  font-size: var(--rozie-command-palette-actions-hint-font-size, var(--rcp-actions-hint-font-size, 0.6875rem));
   color: var(--rozie-command-palette-actions-hint-color, inherit);
-  background: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
-  border-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+  background: var(--rozie-command-palette-actions-hint-bg, var(--rcp-actions-hint-bg, rgba(0, 0, 0, 0.06)));
+  border-radius: var(--rozie-command-palette-actions-hint-radius, var(--rcp-actions-hint-radius, 0.25rem));
 }
 .rozie-command-palette-option-hotkey[data-rozie-s-768cad96] {
   flex: 0 0 auto;
-  padding: var(--rozie-command-palette-hotkey-padding, var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem));
-  font-size: var(--rozie-command-palette-hotkey-font-size, var(--rozie-command-palette-actions-hint-font-size, 0.6875rem));
+  padding: var(--rozie-command-palette-hotkey-padding, var(--rozie-command-palette-actions-hint-padding, var(--rcp-actions-hint-padding, 0.0625rem 0.3125rem)));
+  font-size: var(--rozie-command-palette-hotkey-font-size, var(--rozie-command-palette-actions-hint-font-size, var(--rcp-actions-hint-font-size, 0.6875rem)));
   color: var(--rozie-command-palette-hotkey-color, var(--rozie-command-palette-actions-hint-color, inherit));
-  background: var(--rozie-command-palette-hotkey-bg, var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06)));
-  border-radius: var(--rozie-command-palette-hotkey-radius, var(--rozie-command-palette-actions-hint-radius, 0.25rem));
+  background: var(--rozie-command-palette-hotkey-bg, var(--rozie-command-palette-actions-hint-bg, var(--rcp-actions-hint-bg, rgba(0, 0, 0, 0.06))));
+  border-radius: var(--rozie-command-palette-hotkey-radius, var(--rozie-command-palette-actions-hint-radius, var(--rcp-actions-hint-radius, 0.25rem)));
 }
 .rozie-command-palette-actions-menu[data-rozie-s-768cad96] {
   position: absolute;
-  right: var(--rozie-command-palette-action-right, 0.5rem);
-  z-index: var(--rozie-command-palette-action-z, 10);
-  min-width: var(--rozie-command-palette-action-min-width, 10rem);
-  max-width: var(--rozie-command-palette-action-max-width, 16rem);
-  padding: var(--rozie-command-palette-action-padding, 0.25rem);
-  background: var(--rozie-command-palette-action-bg, #fff);
-  border: var(--rozie-command-palette-action-border, 1px solid rgba(0, 0, 0, 0.1));
-  border-radius: var(--rozie-command-palette-action-radius, 0.5rem);
-  box-shadow: var(--rozie-command-palette-action-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+  right: var(--rozie-command-palette-action-right, var(--rcp-action-right, 0.5rem));
+  z-index: var(--rozie-command-palette-action-z, var(--rcp-action-z, 10));
+  min-width: var(--rozie-command-palette-action-min-width, var(--rcp-action-min-width, 10rem));
+  max-width: var(--rozie-command-palette-action-max-width, var(--rcp-action-max-width, 16rem));
+  padding: var(--rozie-command-palette-action-padding, var(--rcp-action-padding, 0.25rem));
+  background: var(--rozie-command-palette-action-bg, var(--rcp-action-bg, #fff));
+  border: var(--rozie-command-palette-action-border, var(--rcp-action-border, 1px solid rgba(0, 0, 0, 0.1)));
+  border-radius: var(--rozie-command-palette-action-radius, var(--rcp-action-radius, 0.5rem));
+  box-shadow: var(--rozie-command-palette-action-shadow, var(--rcp-action-shadow, 0 6px 24px rgba(0, 0, 0, 0.25)));
 }
 .rozie-command-palette-actions-menu-item[data-rozie-s-768cad96] {
   display: flex;
   align-items: center;
-  gap: var(--rozie-command-palette-action-gap, 0.5rem);
-  padding: var(--rozie-command-palette-action-item-padding, 0.375rem 0.5rem);
-  border-radius: var(--rozie-command-palette-action-item-radius, 0.375rem);
+  gap: var(--rozie-command-palette-action-gap, var(--rcp-action-gap, 0.5rem));
+  padding: var(--rozie-command-palette-action-item-padding, var(--rcp-action-item-padding, 0.375rem 0.5rem));
+  border-radius: var(--rozie-command-palette-action-item-radius, var(--rcp-action-item-radius, 0.375rem));
   cursor: pointer;
   outline: none;
 }
 .rozie-command-palette-actions-menu-item--active[data-rozie-s-768cad96],
 .rozie-command-palette-actions-menu-item[data-rozie-s-768cad96]:focus {
-  background: var(--rozie-command-palette-action-active-bg, rgba(0, 0, 0, 0.08));
+  background: var(--rozie-command-palette-action-active-bg, var(--rcp-action-active-bg, rgba(0, 0, 0, 0.08)));
 }
 .rozie-command-palette-actions-menu-item--disabled[data-rozie-s-768cad96] {
-  opacity: var(--rozie-command-palette-action-disabled-opacity, 0.5);
+  opacity: var(--rozie-command-palette-action-disabled-opacity, var(--rcp-action-disabled-opacity, 0.5));
   cursor: default;
 }
 .rozie-command-palette-actions-menu-item-icon[data-rozie-s-768cad96] {
@@ -2430,49 +2430,49 @@ injectGlobalStyles('rozie-command-palette-2b4aef0c-global', `
 }
 .rozie-command-palette-actions-menu-item-shortcut[data-rozie-s-768cad96] {
   flex: 0 0 auto;
-  font-size: var(--rozie-command-palette-action-shortcut-font-size, 0.75rem);
-  color: var(--rozie-command-palette-action-shortcut-color, rgba(0, 0, 0, 0.5));
+  font-size: var(--rozie-command-palette-action-shortcut-font-size, var(--rcp-action-shortcut-font-size, 0.75rem));
+  color: var(--rozie-command-palette-action-shortcut-color, var(--rcp-action-shortcut-color, rgba(0, 0, 0, 0.5)));
 }
 .rozie-command-palette-option-trailing[data-rozie-s-768cad96] {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  color: var(--rozie-command-palette-trailing-color, rgba(0, 0, 0, 0.5));
-  font-size: var(--rozie-command-palette-trailing-font-size, 0.75rem);
+  color: var(--rozie-command-palette-trailing-color, var(--rcp-trailing-color, rgba(0, 0, 0, 0.5)));
+  font-size: var(--rozie-command-palette-trailing-font-size, var(--rcp-trailing-font-size, 0.75rem));
 }
 .rozie-command-palette-option-group[data-rozie-s-768cad96] {
-  font-size: var(--rozie-command-palette-group-font-size, 0.75rem);
-  color: var(--rozie-command-palette-group-color, rgba(0, 0, 0, 0.5));
-  text-transform: var(--rozie-command-palette-group-transform, uppercase);
+  font-size: var(--rozie-command-palette-group-font-size, var(--rcp-group-font-size, 0.75rem));
+  color: var(--rozie-command-palette-group-color, var(--rcp-group-color, rgba(0, 0, 0, 0.5)));
+  text-transform: var(--rozie-command-palette-group-transform, var(--rcp-group-transform, uppercase));
   letter-spacing: 0.04em;
 }
 .rozie-command-palette-option-label-match[data-rozie-s-768cad96] {
-  font-weight: var(--rozie-command-palette-match-weight, 600);
+  font-weight: var(--rozie-command-palette-match-weight, var(--rcp-match-weight, 600));
   color: var(--rozie-command-palette-match-color, inherit);
 }
 .rozie-command-palette-empty[data-rozie-s-768cad96] {
-  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  padding: var(--rozie-command-palette-empty-padding, var(--rcp-empty-padding, 1.5rem));
   text-align: center;
-  color: var(--rozie-command-palette-empty-color, rgba(0, 0, 0, 0.5));
+  color: var(--rozie-command-palette-empty-color, var(--rcp-empty-color, rgba(0, 0, 0, 0.5)));
 }
 .rozie-command-palette-list-region--inert[data-rozie-s-768cad96] {
   pointer-events: none;
-  opacity: var(--rozie-command-palette-args-dim-opacity, 0.45);
+  opacity: var(--rozie-command-palette-args-dim-opacity, var(--rcp-args-dim-opacity, 0.45));
 }
 .rozie-command-palette-args[data-rozie-s-768cad96] {
   display: flex;
   flex-direction: column;
-  gap: var(--rozie-command-palette-args-gap, 0.5rem);
-  padding: var(--rozie-command-palette-args-padding, 0.75rem);
+  gap: var(--rozie-command-palette-args-gap, var(--rcp-args-gap, 0.5rem));
+  padding: var(--rozie-command-palette-args-padding, var(--rcp-args-padding, 0.75rem));
 }
 .rozie-command-palette-args-chip[data-rozie-s-768cad96] {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  padding: var(--rozie-command-palette-args-chip-padding, 0.125rem 0.5rem);
+  padding: var(--rozie-command-palette-args-chip-padding, var(--rcp-args-chip-padding, 0.125rem 0.5rem));
   color: var(--rozie-command-palette-args-chip-color, inherit);
-  background: var(--rozie-command-palette-args-chip-bg, rgba(0, 0, 0, 0.06));
-  border-radius: var(--rozie-command-palette-back-radius, 0.375rem);
+  background: var(--rozie-command-palette-args-chip-bg, var(--rcp-args-chip-bg, rgba(0, 0, 0, 0.06)));
+  border-radius: var(--rozie-command-palette-back-radius, var(--rcp-back-radius, 0.375rem));
 }
 .rozie-command-palette-args-field[data-rozie-s-768cad96] {
   display: block;
@@ -2480,28 +2480,28 @@ injectGlobalStyles('rozie-command-palette-2b4aef0c-global', `
 .rozie-command-palette-args-input[data-rozie-s-768cad96] {
   box-sizing: border-box;
   width: 100%;
-  padding: var(--rozie-command-palette-args-field-padding, var(--rozie-command-palette-input-padding, 0.5rem 0.75rem));
+  padding: var(--rozie-command-palette-args-field-padding, var(--rozie-command-palette-input-padding, var(--rcp-input-padding, 0.5rem 0.75rem)));
   font: inherit;
   color: inherit;
-  background: var(--rozie-command-palette-args-field-bg, var(--rozie-command-palette-input-bg, transparent));
-  border: var(--rozie-command-palette-args-field-border, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
-  border-radius: var(--rozie-command-palette-args-field-radius, var(--rozie-command-palette-input-radius, 0.5rem));
+  background: var(--rozie-command-palette-args-field-bg, var(--rozie-command-palette-input-bg, var(--rcp-input-bg, transparent)));
+  border: var(--rozie-command-palette-args-field-border, var(--rozie-command-palette-border-width, var(--rcp-border-width, 1px)) solid var(--rozie-command-palette-divider-color, var(--rcp-divider-color, rgba(0, 0, 0, 0.1))));
+  border-radius: var(--rozie-command-palette-args-field-radius, var(--rozie-command-palette-input-radius, var(--rcp-input-radius, 0.5rem)));
   outline: none;
 }
 .rozie-command-palette-loading[data-rozie-s-768cad96] {
-  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  padding: var(--rozie-command-palette-empty-padding, var(--rcp-empty-padding, 1.5rem));
   text-align: center;
-  color: var(--rozie-command-palette-loading-color, rgba(0, 0, 0, 0.5));
+  color: var(--rozie-command-palette-loading-color, var(--rcp-loading-color, rgba(0, 0, 0, 0.5)));
 }
 .rozie-command-palette-error[data-rozie-s-768cad96] {
-  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  padding: var(--rozie-command-palette-empty-padding, var(--rcp-empty-padding, 1.5rem));
   text-align: center;
-  color: var(--rozie-command-palette-error-color, #c0392b);
+  color: var(--rozie-command-palette-error-color, var(--rcp-error-color, #c0392b));
 }
 .rozie-command-palette-footer[data-rozie-s-768cad96] {
-  padding: var(--rozie-command-palette-footer-padding, 0.5rem 0.75rem);
-  border-top: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
-  font-size: var(--rozie-command-palette-footer-font-size, 0.8125rem);
-  color: var(--rozie-command-palette-footer-color, rgba(0, 0, 0, 0.55));
+  padding: var(--rozie-command-palette-footer-padding, var(--rcp-footer-padding, 0.5rem 0.75rem));
+  border-top: var(--rozie-command-palette-border-width, var(--rcp-border-width, 1px)) solid var(--rozie-command-palette-divider-color, var(--rcp-divider-color, rgba(0, 0, 0, 0.1)));
+  font-size: var(--rozie-command-palette-footer-font-size, var(--rcp-footer-font-size, 0.8125rem));
+  color: var(--rozie-command-palette-footer-color, var(--rcp-footer-color, rgba(0, 0, 0, 0.55)));
 }
 `);

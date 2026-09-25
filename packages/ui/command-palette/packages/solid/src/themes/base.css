@@ -15,154 +15,160 @@
  * `.rozie-command-palette` element). See themes/shadcn.css, themes/material.css
  * and themes/bootstrap.css for design-system bridges.
  *
- * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
- * an element declares for itself always beats one it would inherit, whatever the selector's
- * specificity, so defaults declared on the `.rozie-command-palette` element itself made every ancestor
- * override dead the moment this file was imported. At the root they are only the value of last
- * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
- * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
- * they arrive by inheritance).
+ * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root)`
+ * (zero specificity): `--rcp-x: var(--rozie-command-palette-x, <default>)`. The component reads every token
+ * public-first, `var(--rozie-command-palette-x, var(--rcp-x, <inline default>))`, so a value set on ANY
+ * ancestor (`:root`, `.dark`, a wrapper) or on the component itself wins by plain inheritance,
+ * in any import order, on all six targets (Lit included: custom properties inherit into its
+ * shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the component may declare a public token.
  * A token whose default is ANOTHER token is not declared here at all: the component reads it
  * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
  * declared at the root it would be computed once, against the root's value.
- * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
- * tokens it maps on the `.rozie-command-palette` element itself: with a bridge imported, THOSE tokens can be
- * overridden only on that element (or by a rule of equal-or-higher specificity after it).
+ * The lines that say `inherit` / `initial` stay plain declarations: at the root such a value
+ * is "unset", so the component's own fallback applies, and it never shadows an ancestor.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares only the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * component (`.rozie-command-palette` and the Lit host `rozie-command-palette`) — so that variable is resolved AT the
+ * component and follows the nearest theme scope — and on `:root`, the copy a Lit component
+ * nested in another shadow root (out of reach of every document selector) inherits. The
+ * `--rcp-*` names are internal: not a stable API.
  */
 :where(:root) {
   /* overlay / scrim */
-  --rozie-command-palette-z: 1000;
-  --rozie-command-palette-overlay-padding: 12vh 1rem 1rem;
-  --rozie-command-palette-backdrop-bg: rgba(0, 0, 0, 0.5);
-  --rozie-command-palette-backdrop-filter: none;
+  --rcp-z: var(--rozie-command-palette-z, 1000);
+  --rcp-overlay-padding: var(--rozie-command-palette-overlay-padding, 12vh 1rem 1rem);
+  --rcp-backdrop-bg: var(--rozie-command-palette-backdrop-bg, rgba(0, 0, 0, 0.5));
+  --rcp-backdrop-filter: var(--rozie-command-palette-backdrop-filter, none);
 
   /* panel chrome */
   /* Also carries the depth>0 header's title weight, which shares the panel's
      chrome semantics rather than the header's own. */
-  --rozie-command-palette-width: min(40rem, 100%);
-  --rozie-command-palette-max-height: 70vh;
+  --rcp-width: var(--rozie-command-palette-width, min(40rem, 100%));
+  --rcp-max-height: var(--rozie-command-palette-max-height, 70vh);
   --rozie-command-palette-font: inherit;
   --rozie-command-palette-color: inherit;
-  --rozie-command-palette-bg: #fff;
-  --rozie-command-palette-border: none;
-  --rozie-command-palette-radius: 0.75rem;
-  --rozie-command-palette-shadow: 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25);
-  --rozie-command-palette-border-width: 1px;
-  --rozie-command-palette-divider-color: rgba(0, 0, 0, 0.1);
-  --rozie-command-palette-title-weight: 600;
+  --rcp-bg: var(--rozie-command-palette-bg, #fff);
+  --rcp-border: var(--rozie-command-palette-border, none);
+  --rcp-radius: var(--rozie-command-palette-radius, 0.75rem);
+  --rcp-shadow: var(--rozie-command-palette-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25));
+  --rcp-border-width: var(--rozie-command-palette-border-width, 1px);
+  --rcp-divider-color: var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+  --rcp-title-weight: var(--rozie-command-palette-title-weight, 600);
 
   /* search input */
   /* Also drives the vendored Combobox's render-neutral tokens, by aliasing
      them at panel scope. */
-  --rozie-command-palette-search-padding: 0.75rem;
-  --rozie-command-palette-input-padding: 0.5rem 0.75rem;
-  --rozie-command-palette-input-font-size: 1.05rem;
-  --rozie-command-palette-input-bg: transparent;
-  --rozie-command-palette-input-border: none;
-  --rozie-command-palette-input-radius: 0.5rem;
-  --rozie-command-palette-input-border-color: transparent;
-  --rozie-command-palette-input-focus-border-color: transparent;
-  --rozie-command-palette-input-focus-ring-width: 0;
+  --rcp-search-padding: var(--rozie-command-palette-search-padding, 0.75rem);
+  --rcp-input-padding: var(--rozie-command-palette-input-padding, 0.5rem 0.75rem);
+  --rcp-input-font-size: var(--rozie-command-palette-input-font-size, 1.05rem);
+  --rcp-input-bg: var(--rozie-command-palette-input-bg, transparent);
+  --rcp-input-border: var(--rozie-command-palette-input-border, none);
+  --rcp-input-radius: var(--rozie-command-palette-input-radius, 0.5rem);
+  --rcp-input-border-color: var(--rozie-command-palette-input-border-color, transparent);
+  --rcp-input-focus-border-color: var(--rozie-command-palette-input-focus-border-color, transparent);
+  --rcp-input-focus-ring-width: var(--rozie-command-palette-input-focus-ring-width, 0);
 
   /* breadcrumb/back header (depth>0) */
-  --rozie-command-palette-header-font-size: 0.875rem;
-  --rozie-command-palette-header-gap: 0.5rem;
-  --rozie-command-palette-header-padding: 0.5rem 0.75rem;
+  --rcp-header-font-size: var(--rozie-command-palette-header-font-size, 0.875rem);
+  --rcp-header-gap: var(--rozie-command-palette-header-gap, 0.5rem);
+  --rcp-header-padding: var(--rozie-command-palette-header-padding, 0.5rem 0.75rem);
 
   /* back button */
-  --rozie-command-palette-back-bg: transparent;
-  --rozie-command-palette-back-border: none;
-  --rozie-command-palette-back-font-size: 1.1rem;
-  --rozie-command-palette-back-hover-bg: rgba(0, 0, 0, 0.06);
-  --rozie-command-palette-back-padding: 0.125rem 0.375rem;
-  --rozie-command-palette-back-radius: 0.375rem;
+  --rcp-back-bg: var(--rozie-command-palette-back-bg, transparent);
+  --rcp-back-border: var(--rozie-command-palette-back-border, none);
+  --rcp-back-font-size: var(--rozie-command-palette-back-font-size, 1.1rem);
+  --rcp-back-hover-bg: var(--rozie-command-palette-back-hover-bg, rgba(0, 0, 0, 0.06));
+  --rcp-back-padding: var(--rozie-command-palette-back-padding, 0.125rem 0.375rem);
+  --rcp-back-radius: var(--rozie-command-palette-back-radius, 0.375rem);
 
   /* breadcrumb trail */
-  --rozie-command-palette-breadcrumb-color: rgba(0, 0, 0, 0.55);
+  --rcp-breadcrumb-color: var(--rozie-command-palette-breadcrumb-color, rgba(0, 0, 0, 0.55));
   --rozie-command-palette-breadcrumb-current-color: inherit;
-  --rozie-command-palette-breadcrumb-current-weight: 600;
-  --rozie-command-palette-breadcrumb-gap: 0.25rem;
-  --rozie-command-palette-breadcrumb-jump-hover-decoration: underline;
-  --rozie-command-palette-breadcrumb-jump-radius: 0.25rem;
-  --rozie-command-palette-breadcrumb-separator-color: rgba(0, 0, 0, 0.35);
-  --rozie-command-palette-breadcrumb-weight: 400;
+  --rcp-breadcrumb-current-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
+  --rcp-breadcrumb-gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  --rcp-breadcrumb-jump-hover-decoration: var(--rozie-command-palette-breadcrumb-jump-hover-decoration, underline);
+  --rcp-breadcrumb-jump-radius: var(--rozie-command-palette-breadcrumb-jump-radius, 0.25rem);
+  --rcp-breadcrumb-separator-color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
+  --rcp-breadcrumb-weight: var(--rozie-command-palette-breadcrumb-weight, 400);
 
   /* list + options */
   /* Also the option icon, the fuzzy-match highlight, the trailing slot, and
      group-heading spacing. */
-  --rozie-command-palette-list-padding: 0.5rem;
-  --rozie-command-palette-option-gap: 0.75rem;
+  --rcp-list-padding: var(--rozie-command-palette-list-padding, 0.5rem);
+  --rcp-option-gap: var(--rozie-command-palette-option-gap, 0.75rem);
   --rozie-command-palette-icon-color: inherit;
-  --rozie-command-palette-icon-size: 1rem;
+  --rcp-icon-size: var(--rozie-command-palette-icon-size, 1rem);
   --rozie-command-palette-match-color: inherit;
-  --rozie-command-palette-match-weight: 600;
-  --rozie-command-palette-trailing-color: rgba(0, 0, 0, 0.5);
-  --rozie-command-palette-trailing-font-size: 0.75rem;
-  --rozie-command-palette-section-gap: 0.375rem;
+  --rcp-match-weight: var(--rozie-command-palette-match-weight, 600);
+  --rcp-trailing-color: var(--rozie-command-palette-trailing-color, rgba(0, 0, 0, 0.5));
+  --rcp-trailing-font-size: var(--rozie-command-palette-trailing-font-size, 0.75rem);
+  --rcp-section-gap: var(--rozie-command-palette-section-gap, 0.375rem);
 
   /* per-item group label */
-  --rozie-command-palette-group-font-size: 0.75rem;
-  --rozie-command-palette-group-color: rgba(0, 0, 0, 0.5);
-  --rozie-command-palette-group-transform: uppercase;
+  --rcp-group-font-size: var(--rozie-command-palette-group-font-size, 0.75rem);
+  --rcp-group-color: var(--rozie-command-palette-group-color, rgba(0, 0, 0, 0.5));
+  --rcp-group-transform: var(--rozie-command-palette-group-transform, uppercase);
 
   /* option actions */
   /* The row's right-side hint, plus the flyout trigger that hint opens when
      the option carries more than one action. */
-  --rozie-command-palette-actions-color: rgba(0, 0, 0, 0.55);
-  --rozie-command-palette-actions-font-size: 0.75rem;
-  --rozie-command-palette-actions-gap: 0.375rem;
-  --rozie-command-palette-actions-hint-bg: rgba(0, 0, 0, 0.06);
+  --rcp-actions-color: var(--rozie-command-palette-actions-color, rgba(0, 0, 0, 0.55));
+  --rcp-actions-font-size: var(--rozie-command-palette-actions-font-size, 0.75rem);
+  --rcp-actions-gap: var(--rozie-command-palette-actions-gap, 0.375rem);
+  --rcp-actions-hint-bg: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
   --rozie-command-palette-actions-hint-color: inherit;
-  --rozie-command-palette-actions-hint-font-size: 0.6875rem;
-  --rozie-command-palette-actions-hint-padding: 0.0625rem 0.3125rem;
-  --rozie-command-palette-actions-hint-radius: 0.25rem;
-  --rozie-command-palette-actions-hover-bg: rgba(0, 0, 0, 0.06);
-  --rozie-command-palette-actions-hover-color: rgba(0, 0, 0, 0.85);
-  --rozie-command-palette-actions-radius: 0.25rem;
+  --rcp-actions-hint-font-size: var(--rozie-command-palette-actions-hint-font-size, 0.6875rem);
+  --rcp-actions-hint-padding: var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem);
+  --rcp-actions-hint-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+  --rcp-actions-hover-bg: var(--rozie-command-palette-actions-hover-bg, rgba(0, 0, 0, 0.06));
+  --rcp-actions-hover-color: var(--rozie-command-palette-actions-hover-color, rgba(0, 0, 0, 0.85));
+  --rcp-actions-radius: var(--rozie-command-palette-actions-radius, 0.25rem);
 
   /* hotkey badge */
   /* The per-item teaching badge. Each token here falls back to the matching
      actions-hint-* token declared above, so setting the hint styles both. */
 
   /* action menu flyout */
-  --rozie-command-palette-action-active-bg: rgba(0, 0, 0, 0.08);
-  --rozie-command-palette-action-bg: #fff;
-  --rozie-command-palette-action-border: 1px solid rgba(0, 0, 0, 0.1);
-  --rozie-command-palette-action-disabled-opacity: 0.5;
-  --rozie-command-palette-action-gap: 0.5rem;
+  --rcp-action-active-bg: var(--rozie-command-palette-action-active-bg, rgba(0, 0, 0, 0.08));
+  --rcp-action-bg: var(--rozie-command-palette-action-bg, #fff);
+  --rcp-action-border: var(--rozie-command-palette-action-border, 1px solid rgba(0, 0, 0, 0.1));
+  --rcp-action-disabled-opacity: var(--rozie-command-palette-action-disabled-opacity, 0.5);
+  --rcp-action-gap: var(--rozie-command-palette-action-gap, 0.5rem);
   --rozie-command-palette-action-icon-color: inherit;
-  --rozie-command-palette-action-item-padding: 0.375rem 0.5rem;
-  --rozie-command-palette-action-item-radius: 0.375rem;
-  --rozie-command-palette-action-max-width: 16rem;
-  --rozie-command-palette-action-min-width: 10rem;
-  --rozie-command-palette-action-padding: 0.25rem;
-  --rozie-command-palette-action-radius: 0.5rem;
-  --rozie-command-palette-action-right: 0.5rem;
-  --rozie-command-palette-action-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
-  --rozie-command-palette-action-shortcut-color: rgba(0, 0, 0, 0.5);
-  --rozie-command-palette-action-shortcut-font-size: 0.75rem;
-  --rozie-command-palette-action-z: 10;
+  --rcp-action-item-padding: var(--rozie-command-palette-action-item-padding, 0.375rem 0.5rem);
+  --rcp-action-item-radius: var(--rozie-command-palette-action-item-radius, 0.375rem);
+  --rcp-action-max-width: var(--rozie-command-palette-action-max-width, 16rem);
+  --rcp-action-min-width: var(--rozie-command-palette-action-min-width, 10rem);
+  --rcp-action-padding: var(--rozie-command-palette-action-padding, 0.25rem);
+  --rcp-action-radius: var(--rozie-command-palette-action-radius, 0.5rem);
+  --rcp-action-right: var(--rozie-command-palette-action-right, 0.5rem);
+  --rcp-action-shadow: var(--rozie-command-palette-action-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+  --rcp-action-shortcut-color: var(--rozie-command-palette-action-shortcut-color, rgba(0, 0, 0, 0.5));
+  --rcp-action-shortcut-font-size: var(--rozie-command-palette-action-shortcut-font-size, 0.75rem);
+  --rcp-action-z: var(--rozie-command-palette-action-z, 10);
 
   /* args surface */
   /* Panel-internal: a chip plus a fields form, which replaces the result list
      once the palette descends to an argument-collecting depth. */
-  --rozie-command-palette-args-chip-bg: rgba(0, 0, 0, 0.06);
+  --rcp-args-chip-bg: var(--rozie-command-palette-args-chip-bg, rgba(0, 0, 0, 0.06));
   --rozie-command-palette-args-chip-color: inherit;
-  --rozie-command-palette-args-chip-padding: 0.125rem 0.5rem;
-  --rozie-command-palette-args-dim-opacity: 0.45;
-  --rozie-command-palette-args-gap: 0.5rem;
-  --rozie-command-palette-args-padding: 0.75rem;
+  --rcp-args-chip-padding: var(--rozie-command-palette-args-chip-padding, 0.125rem 0.5rem);
+  --rcp-args-dim-opacity: var(--rozie-command-palette-args-dim-opacity, 0.45);
+  --rcp-args-gap: var(--rozie-command-palette-args-gap, 0.5rem);
+  --rcp-args-padding: var(--rozie-command-palette-args-padding, 0.75rem);
 
   /* empty state */
   /* Also the loading and error states, which re-project into this same
      #empty region. */
-  --rozie-command-palette-empty-padding: 1.5rem;
-  --rozie-command-palette-empty-color: rgba(0, 0, 0, 0.5);
-  --rozie-command-palette-loading-color: rgba(0, 0, 0, 0.5);
-  --rozie-command-palette-error-color: #c0392b;
+  --rcp-empty-padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  --rcp-empty-color: var(--rozie-command-palette-empty-color, rgba(0, 0, 0, 0.5));
+  --rcp-loading-color: var(--rozie-command-palette-loading-color, rgba(0, 0, 0, 0.5));
+  --rcp-error-color: var(--rozie-command-palette-error-color, #c0392b);
 
   /* footer */
-  --rozie-command-palette-footer-padding: 0.5rem 0.75rem;
-  --rozie-command-palette-footer-font-size: 0.8125rem;
-  --rozie-command-palette-footer-color: rgba(0, 0, 0, 0.55);
+  --rcp-footer-padding: var(--rozie-command-palette-footer-padding, 0.5rem 0.75rem);
+  --rcp-footer-font-size: var(--rozie-command-palette-footer-font-size, 0.8125rem);
+  --rcp-footer-color: var(--rozie-command-palette-footer-color, rgba(0, 0, 0, 0.55));
 }

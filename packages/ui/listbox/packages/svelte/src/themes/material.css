@@ -7,26 +7,41 @@
  * are absent, so it renders correctly even without a generated theme.
  *
  *   import '@rozie-ui/listbox-react/themes/material.css';
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rlb-x: var(--rozie-listbox-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-listbox-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-listbox`
+ *    and the Lit host `rozie-listbox`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-listbox {
-  --rozie-listbox-bg: var(--md-sys-color-surface-container, #f3edf7);
-  --rozie-listbox-fg: var(--md-sys-color-on-surface, #1d1b20);
-  --rozie-listbox-border: var(--md-sys-color-outline-variant, #cac4d0);
-  --rozie-listbox-border-width: 1px;
-  --rozie-listbox-radius: 4px;
-  --rozie-listbox-placeholder: var(--md-sys-color-on-surface-variant, #49454f);
+:root,
+.rozie-listbox,
+rozie-listbox {
+  --rlb-bg: var(--rozie-listbox-bg, var(--md-sys-color-surface-container, #f3edf7));
+  --rlb-fg: var(--rozie-listbox-fg, var(--md-sys-color-on-surface, #1d1b20));
+  --rlb-border: var(--rozie-listbox-border, var(--md-sys-color-outline-variant, #cac4d0));
+  --rlb-border-width: var(--rozie-listbox-border-width, 1px);
+  --rlb-radius: var(--rozie-listbox-radius, 4px);
+  --rlb-placeholder: var(--rozie-listbox-placeholder, var(--md-sys-color-on-surface-variant, #49454f));
 
-  --rozie-listbox-accent: var(--md-sys-color-primary, #6750a4);
-  --rozie-listbox-ring: var(--md-sys-color-primary, #6750a4);
+  --rlb-accent: var(--rozie-listbox-accent, var(--md-sys-color-primary, #6750a4));
+  --rlb-ring: var(--rozie-listbox-ring, var(--md-sys-color-primary, #6750a4));
 
-  --rozie-listbox-popup-bg: var(--md-sys-color-surface-container-high, #ece6f0);
-  --rozie-listbox-active-bg: var(--md-sys-color-secondary-container, #e8def8);
-  --rozie-listbox-active-fg: var(--md-sys-color-on-secondary-container, #1d192b);
-  --rozie-listbox-selected-bg: var(--md-sys-color-secondary-container, #e8def8);
-  --rozie-listbox-selected-fg: var(--md-sys-color-on-secondary-container, #1d192b);
-  --rozie-listbox-check-color: var(--md-sys-color-primary, #6750a4);
+  --rlb-popup-bg: var(--rozie-listbox-popup-bg, var(--md-sys-color-surface-container-high, #ece6f0));
+  --rlb-active-bg: var(--rozie-listbox-active-bg, var(--md-sys-color-secondary-container, #e8def8));
+  --rlb-active-fg: var(--rozie-listbox-active-fg, var(--md-sys-color-on-secondary-container, #1d192b));
+  --rlb-selected-bg: var(--rozie-listbox-selected-bg, var(--md-sys-color-secondary-container, #e8def8));
+  --rlb-selected-fg: var(--rozie-listbox-selected-fg, var(--md-sys-color-on-secondary-container, #1d192b));
+  --rlb-check-color: var(--rozie-listbox-check-color, var(--md-sys-color-primary, #6750a4));
 
-  --rozie-listbox-popup-radius: 4px;
-  --rozie-listbox-shadow: 0 2px 6px 2px rgb(0 0 0 / 0.15), 0 1px 2px rgb(0 0 0 / 0.3);
-  --rozie-listbox-empty-fg: var(--md-sys-color-on-surface-variant, #49454f);
+  --rlb-popup-radius: var(--rozie-listbox-popup-radius, 4px);
+  --rlb-shadow: var(--rozie-listbox-shadow, 0 2px 6px 2px rgb(0 0 0 / 0.15), 0 1px 2px rgb(0 0 0 / 0.3));
+  --rlb-empty-fg: var(--rozie-listbox-empty-fg, var(--md-sys-color-on-surface-variant, #49454f));
 }

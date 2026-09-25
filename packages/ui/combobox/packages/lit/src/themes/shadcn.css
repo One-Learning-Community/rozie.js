@@ -10,22 +10,37 @@
  *
  * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
  * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rcb-x: var(--rozie-combobox-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-combobox-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-combobox`
+ *    and the Lit host `rozie-combobox`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-combobox {
-  --rozie-combobox-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
+:root,
+.rozie-combobox,
+rozie-combobox {
+  --rcb-accent: var(--rozie-combobox-accent, hsl(var(--primary, 222.2 47.4% 11.2%)));
 
-  --rozie-combobox-bg: hsl(var(--background, 0 0% 100%));
-  --rozie-combobox-color: hsl(var(--foreground, 222.2 84% 4.9%));
-  --rozie-combobox-border-color: hsl(var(--border, 214.3 31.8% 91.4%));
-  --rozie-combobox-radius: var(--radius, 0.5rem);
+  --rcb-bg: var(--rozie-combobox-bg, hsl(var(--background, 0 0% 100%)));
+  --rcb-color: var(--rozie-combobox-color, hsl(var(--foreground, 222.2 84% 4.9%)));
+  --rcb-border-color: var(--rozie-combobox-border-color, hsl(var(--border, 214.3 31.8% 91.4%)));
+  --rcb-radius: var(--rozie-combobox-radius, var(--radius, 0.5rem));
 
-  --rozie-combobox-focus-ring-color: hsl(var(--ring, 222.2 84% 4.9%) / 0.35);
+  --rcb-focus-ring-color: var(--rozie-combobox-focus-ring-color, hsl(var(--ring, 222.2 84% 4.9%) / 0.35));
 
-  --rozie-combobox-disabled-bg: hsl(var(--muted, 210 40% 96.1%));
+  --rcb-disabled-bg: var(--rozie-combobox-disabled-bg, hsl(var(--muted, 210 40% 96.1%)));
 
-  --rozie-combobox-list-bg: hsl(var(--popover, 0 0% 100%));
-  --rozie-combobox-list-border-color: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rcb-list-bg: var(--rozie-combobox-list-bg, hsl(var(--popover, 0 0% 100%)));
+  --rcb-list-border-color: var(--rozie-combobox-list-border-color, hsl(var(--border, 214.3 31.8% 91.4%)));
 
-  --rozie-combobox-option-active-bg: hsl(var(--accent, 210 40% 96.1%));
-  --rozie-combobox-option-selected-color: hsl(var(--primary, 222.2 47.4% 11.2%));
+  --rcb-option-active-bg: var(--rozie-combobox-option-active-bg, hsl(var(--accent, 210 40% 96.1%)));
+  --rcb-option-selected-color: var(--rozie-combobox-option-selected-color, hsl(var(--primary, 222.2 47.4% 11.2%)));
 }

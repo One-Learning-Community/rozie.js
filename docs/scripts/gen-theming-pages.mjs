@@ -242,9 +242,31 @@ function readSiteFallbacks(css, names, srcTexts = []) {
       if (hay[i] === '(') depth++;
       else if (hay[i] === ')') depth--;
     }
-    if (depth === 0) out.set(name, hay.slice(start, i - 1).trim());
+    if (depth === 0) out.set(name, withoutPrivateLayers(hay.slice(start, i - 1).trim()));
   }
   return out;
+}
+
+/** A read-site fallback with every PRIVATE wiring layer unwrapped: `var(--rlb-accent, #0066cc)`
+ * → `#0066cc`. A family whose component reads each token public-first and then its private
+ * `--r<x>-*` wiring (which base.css and the design-system bridges declare) documents the
+ * public chain and the literal default; the private names are internal. Design-system
+ * variables never occur in a component's own read sites, so every non-`--rozie-` var() with
+ * a fallback here is such a layer. */
+function withoutPrivateLayers(text) {
+  for (;;) {
+    const m = /var\((--(?!rozie-)[a-z0-9-]+)\s*,/.exec(text);
+    if (!m) return text;
+    let i = m.index + m[0].length;
+    let depth = 1;
+    const start = i;
+    for (; i < text.length && depth > 0; i++) {
+      if (text[i] === '(') depth++;
+      else if (text[i] === ')') depth--;
+    }
+    if (depth !== 0) return text;
+    text = text.slice(0, m.index) + text.slice(start, i - 1).trim() + text.slice(i);
+  }
 }
 
 /** Escape `|` inside a table cell so a multi-value CSS default (e.g. a
