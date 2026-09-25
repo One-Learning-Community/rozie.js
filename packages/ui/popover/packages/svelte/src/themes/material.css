@@ -10,10 +10,25 @@
  *
  * Colors-only scope — sizing tokens are left unset so the `.rozie-popover`
  * defaults hold.
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rpo-x: var(--rozie-popover-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-popover-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-popover`
+ *    and the Lit host `rozie-popover`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-popover {
-  --rozie-popover-bg: var(--md-sys-color-surface-container, #f3edf7);
-  --rozie-popover-color: var(--md-sys-color-on-surface, #1d1b20);
-  --rozie-popover-border: 1px solid var(--md-sys-color-outline-variant, #cac4d0);
-  --rozie-popover-shadow: 0 2px 6px 2px rgb(0 0 0 / 0.15), 0 1px 2px rgb(0 0 0 / 0.3);
+:root,
+.rozie-popover,
+rozie-popover {
+  --rpo-bg: var(--rozie-popover-bg, var(--md-sys-color-surface-container, #f3edf7));
+  --rpo-color: var(--rozie-popover-color, var(--md-sys-color-on-surface, #1d1b20));
+  --rpo-border: var(--rozie-popover-border, 1px solid var(--md-sys-color-outline-variant, #cac4d0));
+  --rpo-shadow: var(--rozie-popover-shadow, 0 2px 6px 2px rgb(0 0 0 / 0.15), 0 1px 2px rgb(0 0 0 / 0.3));
 }

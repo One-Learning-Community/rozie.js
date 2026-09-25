@@ -671,12 +671,12 @@ $expose({ show, dismiss, clear, patch, promise })
 */
 .rozie-toaster {
   position: fixed;
-  z-index: var(--rozie-toast-z, 9999);
+  z-index: var(--rozie-toast-z, var(--rto-z, 9999));
   display: flex;
   flex-direction: column;
-  gap: var(--rozie-toast-gap, 0.5rem);
-  padding: var(--rozie-toast-region-padding, 1rem);
-  max-width: var(--rozie-toast-max-width, calc(100vw - 2rem));
+  gap: var(--rozie-toast-gap, var(--rto-gap, 0.5rem));
+  padding: var(--rozie-toast-region-padding, var(--rto-region-padding, 1rem));
+  max-width: var(--rozie-toast-max-width, var(--rto-max-width, calc(100vw - 2rem)));
   pointer-events: none;
   font: var(--rozie-toast-font, inherit);
 }
@@ -708,36 +708,36 @@ $expose({ show, dismiss, clear, patch, promise })
 */
 .rozie-toaster--stacked .rozie-toast {
   grid-area: 1 / 1;
-  z-index: calc(100 - var(--rozie-toast-depth, 0));
+  z-index: calc(100 - var(--rozie-toast-depth, var(--rto-depth, 0)));
 }
 .rozie-toaster--stacked:not(:hover):not(:focus-within) {
   display: grid;
 }
 .rozie-toaster--stacked:not(:hover):not(:focus-within) .rozie-toast {
   transform:
-    translateY(calc(var(--rozie-toast-depth, 0) * var(--rozie-toast-stack-offset, 8px)))
-    scale(calc(1 - var(--rozie-toast-depth, 0) * var(--rozie-toast-stack-scale-step, 0.05)));
-  opacity: calc(1 - min(1, max(0, var(--rozie-toast-depth, 0) - 2)));
+    translateY(calc(var(--rozie-toast-depth, var(--rto-depth, 0)) * var(--rozie-toast-stack-offset, var(--rto-stack-offset, 8px))))
+    scale(calc(1 - var(--rozie-toast-depth, var(--rto-depth, 0)) * var(--rozie-toast-stack-scale-step, var(--rto-stack-scale-step, 0.05))));
+  opacity: calc(1 - min(1, max(0, var(--rozie-toast-depth, var(--rto-depth, 0)) - 2)));
 }
 .rozie-toaster--stacked.rozie-toaster--bottom-left:not(:hover):not(:focus-within) .rozie-toast,
 .rozie-toaster--stacked.rozie-toaster--bottom-right:not(:hover):not(:focus-within) .rozie-toast,
 .rozie-toaster--stacked.rozie-toaster--bottom-center:not(:hover):not(:focus-within) .rozie-toast {
   transform:
-    translateY(calc(var(--rozie-toast-depth, 0) * var(--rozie-toast-stack-offset, 8px) * -1))
-    scale(calc(1 - var(--rozie-toast-depth, 0) * var(--rozie-toast-stack-scale-step, 0.05)));
+    translateY(calc(var(--rozie-toast-depth, var(--rto-depth, 0)) * var(--rozie-toast-stack-offset, var(--rto-stack-offset, 8px)) * -1))
+    scale(calc(1 - var(--rozie-toast-depth, var(--rto-depth, 0)) * var(--rozie-toast-stack-scale-step, var(--rto-stack-scale-step, 0.05))));
 }
 
 .rozie-toast {
   display: flex;
   align-items: center;
-  gap: var(--rozie-toast-content-gap, 0.75rem);
-  min-width: var(--rozie-toast-min-width, 16rem);
-  max-width: var(--rozie-toast-toast-max-width, 24rem);
-  padding: var(--rozie-toast-padding, 0.75rem 1rem);
-  color: var(--rozie-toast-color, #fff);
-  background: var(--rozie-toast-bg, #333);
-  border-radius: var(--rozie-toast-radius, 0.5rem);
-  box-shadow: var(--rozie-toast-shadow, 0 6px 20px rgba(0, 0, 0, 0.25));
+  gap: var(--rozie-toast-content-gap, var(--rto-content-gap, 0.75rem));
+  min-width: var(--rozie-toast-min-width, var(--rto-min-width, 16rem));
+  max-width: var(--rozie-toast-toast-max-width, var(--rto-toast-max-width, 24rem));
+  padding: var(--rozie-toast-padding, var(--rto-padding, 0.75rem 1rem));
+  color: var(--rozie-toast-color, var(--rto-color, #fff));
+  background: var(--rozie-toast-bg, var(--rto-bg, #333));
+  border-radius: var(--rozie-toast-radius, var(--rto-radius, 0.5rem));
+  box-shadow: var(--rozie-toast-shadow, var(--rto-shadow, 0 6px 20px rgba(0, 0, 0, 0.25)));
   /* Swipe: page scroll stays alive on touch along the axis the toast does
      NOT move on. The transition here drives the spring-back (the active-drag
      :style sets an inline `transition: none` to track the finger 1:1;
@@ -749,10 +749,10 @@ $expose({ show, dismiss, clear, patch, promise })
 .rozie-toaster--bottom-center .rozie-toast {
   touch-action: pan-x;
 }
-.rozie-toast--success { background: var(--rozie-toast-success-bg, #16a34a); }
-.rozie-toast--error { background: var(--rozie-toast-error-bg, #dc2626); }
-.rozie-toast--warning { background: var(--rozie-toast-warning-bg, #ca8a04); }
-.rozie-toast--info { background: var(--rozie-toast-info-bg, var(--rozie-toast-bg, #333)); }
+.rozie-toast--success { background: var(--rozie-toast-success-bg, var(--rto-success-bg, #16a34a)); }
+.rozie-toast--error { background: var(--rozie-toast-error-bg, var(--rto-error-bg, #dc2626)); }
+.rozie-toast--warning { background: var(--rozie-toast-warning-bg, var(--rto-warning-bg, #ca8a04)); }
+.rozie-toast--info { background: var(--rozie-toast-info-bg, var(--rozie-toast-bg, var(--rto-info-bg, var(--rto-bg, #333)))); }
 
 /*
   Enter/exit lifecycle. Enter plays on every mount (slide in from the
@@ -780,7 +780,7 @@ $expose({ show, dismiss, clear, patch, promise })
   to { opacity: 0; transform: translateY(0.5rem); }
 }
 .rozie-toast {
-  animation: rozie-toast-enter var(--rozie-toast-enter-duration, 200ms) ease-out;
+  animation: rozie-toast-enter var(--rozie-toast-enter-duration, var(--rto-enter-duration, 200ms)) ease-out;
 }
 .rozie-toaster--bottom-left .rozie-toast,
 .rozie-toaster--bottom-right .rozie-toast,
@@ -788,7 +788,7 @@ $expose({ show, dismiss, clear, patch, promise })
   animation-name: rozie-toast-enter-from-bottom;
 }
 .rozie-toast--exiting {
-  animation: rozie-toast-exit var(--rozie-toast-exit-duration, 200ms) ease-in forwards;
+  animation: rozie-toast-exit var(--rozie-toast-exit-duration, var(--rto-exit-duration, 200ms)) ease-in forwards;
 }
 .rozie-toaster--bottom-left .rozie-toast--exiting,
 .rozie-toaster--bottom-right .rozie-toast--exiting,
@@ -826,11 +826,11 @@ $expose({ show, dismiss, clear, patch, promise })
 */
 @keyframes rozie-toast-swipe-exit-x {
   from { opacity: 1; transform: translateX(0); }
-  to { opacity: 0; transform: translateX(calc(var(--rozie-toast-swipe-exit, 1) * 100%)); }
+  to { opacity: 0; transform: translateX(calc(var(--rozie-toast-swipe-exit, var(--rto-swipe-exit, 1)) * 100%)); }
 }
 @keyframes rozie-toast-swipe-exit-y {
   from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(calc(var(--rozie-toast-swipe-exit, 1) * 100%)); }
+  to { opacity: 0; transform: translateY(calc(var(--rozie-toast-swipe-exit, var(--rto-swipe-exit, 1)) * 100%)); }
 }
 .rozie-toast--exiting.rozie-toast--swipe-exit {
   animation-name: rozie-toast-swipe-exit-x;
@@ -843,10 +843,10 @@ $expose({ show, dismiss, clear, patch, promise })
 /* Decorative — the message text carries the meaning (aria-hidden). */
 .rozie-toast-spinner {
   flex: 0 0 auto;
-  width: var(--rozie-toast-spinner-size, 1em);
-  height: var(--rozie-toast-spinner-size, 1em);
-  border: 2px solid color-mix(in srgb, var(--rozie-toast-spinner-color, currentColor) 25%, transparent);
-  border-top-color: var(--rozie-toast-spinner-color, currentColor);
+  width: var(--rozie-toast-spinner-size, var(--rto-spinner-size, 1em));
+  height: var(--rozie-toast-spinner-size, var(--rto-spinner-size, 1em));
+  border: 2px solid color-mix(in srgb, var(--rozie-toast-spinner-color, var(--rto-spinner-color, currentColor)) 25%, transparent);
+  border-top-color: var(--rozie-toast-spinner-color, var(--rto-spinner-color, currentColor));
   border-radius: 50%;
   animation: rozie-toast-spin 0.75s linear infinite;
 }
@@ -856,15 +856,15 @@ $expose({ show, dismiss, clear, patch, promise })
 
 .rozie-toast-message {
   flex: 1 1 auto;
-  font-size: var(--rozie-toast-font-size, 0.9rem);
+  font-size: var(--rozie-toast-font-size, var(--rto-font-size, 0.9rem));
 }
 .rozie-toast-close {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--rozie-toast-close-size, 1.25rem);
-  height: var(--rozie-toast-close-size, 1.25rem);
+  width: var(--rozie-toast-close-size, var(--rto-close-size, 1.25rem));
+  height: var(--rozie-toast-close-size, var(--rto-close-size, 1.25rem));
   padding: 0;
   font-size: 1.1rem;
   line-height: 1;
@@ -872,7 +872,7 @@ $expose({ show, dismiss, clear, patch, promise })
   background: transparent;
   border: none;
   border-radius: 0.25rem;
-  opacity: var(--rozie-toast-close-opacity, 0.75);
+  opacity: var(--rozie-toast-close-opacity, var(--rto-close-opacity, 0.75));
   cursor: pointer;
 }
 .rozie-toast-close:hover {

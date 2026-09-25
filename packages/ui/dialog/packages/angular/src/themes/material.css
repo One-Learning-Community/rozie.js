@@ -10,13 +10,28 @@
  *
  * M3 dialogs are heavily rounded (28dp), use the surface-container-high color,
  * and a scrim at ~32% of the scrim color role.
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rdg-x: var(--rozie-dialog-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-dialog-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-dialog`
+ *    and the Lit host `rozie-dialog`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-dialog {
-  --rozie-dialog-bg: var(--md-sys-color-surface-container-high, #ece6f0);
-  --rozie-dialog-color: var(--md-sys-color-on-surface, #1d1b20);
-  --rozie-dialog-border: none;
-  --rozie-dialog-radius: 1.75rem;
+:root,
+.rozie-dialog,
+rozie-dialog {
+  --rdg-bg: var(--rozie-dialog-bg, var(--md-sys-color-surface-container-high, #ece6f0));
+  --rdg-color: var(--rozie-dialog-color, var(--md-sys-color-on-surface, #1d1b20));
+  --rdg-border: var(--rozie-dialog-border, none);
+  --rdg-radius: var(--rozie-dialog-radius, 1.75rem);
 
-  --rozie-dialog-backdrop-bg: color-mix(in srgb, var(--md-sys-color-scrim, #000) 32%, transparent);
-  --rozie-dialog-shadow: 0 8px 12px 6px rgba(0, 0, 0, 0.15), 0 4px 4px rgba(0, 0, 0, 0.3);
+  --rdg-backdrop-bg: var(--rozie-dialog-backdrop-bg, color-mix(in srgb, var(--md-sys-color-scrim, #000) 32%, transparent));
+  --rdg-shadow: var(--rozie-dialog-shadow, 0 8px 12px 6px rgba(0, 0, 0, 0.15), 0 4px 4px rgba(0, 0, 0, 0.3));
 }

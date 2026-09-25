@@ -14,102 +14,108 @@
  * `.rozie-datepicker` element). See themes/shadcn.css, themes/material.css and
  * themes/bootstrap.css for design-system bridges.
  *
- * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
- * an element declares for itself always beats one it would inherit, whatever the selector's
- * specificity, so defaults declared on the `.rozie-datepicker` element itself made every ancestor
- * override dead the moment this file was imported. At the root they are only the value of last
- * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
- * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
- * they arrive by inheritance).
+ * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root)`
+ * (zero specificity): `--rdp-x: var(--rozie-datepicker-x, <default>)`. The component reads every token
+ * public-first, `var(--rozie-datepicker-x, var(--rdp-x, <inline default>))`, so a value set on ANY
+ * ancestor (`:root`, `.dark`, a wrapper) or on the component itself wins by plain inheritance,
+ * in any import order, on all six targets (Lit included: custom properties inherit into its
+ * shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the component may declare a public token.
  * A token whose default is ANOTHER token is not declared here at all: the component reads it
  * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
  * declared at the root it would be computed once, against the root's value.
- * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
- * tokens it maps on the `.rozie-datepicker` element itself: with a bridge imported, THOSE tokens can be
- * overridden only on that element (or by a rule of equal-or-higher specificity after it).
+ * The lines that say `inherit` / `initial` stay plain declarations: at the root such a value
+ * is "unset", so the component's own fallback applies, and it never shadows an ancestor.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares only the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * component (`.rozie-datepicker` and the Lit host `rozie-date-picker`) — so that variable is resolved AT the
+ * component and follows the nearest theme scope — and on `:root`, the copy a Lit component
+ * nested in another shadow root (out of reach of every document selector) inherits. The
+ * `--rdp-*` names are internal: not a stable API.
  */
 :where(:root) {
   /* surface */
   --rozie-datepicker-font: inherit;
-  --rozie-datepicker-fg: #1a1a1a;
-  --rozie-datepicker-bg: #fff;
-  --rozie-datepicker-border-width: 1px;
-  --rozie-datepicker-border: rgba(0, 0, 0, 0.18);
-  --rozie-datepicker-radius: 10px;
-  --rozie-datepicker-padding: 0.75rem;
+  --rdp-fg: var(--rozie-datepicker-fg, #1a1a1a);
+  --rdp-bg: var(--rozie-datepicker-bg, #fff);
+  --rdp-border-width: var(--rozie-datepicker-border-width, 1px);
+  --rdp-border: var(--rozie-datepicker-border, rgba(0, 0, 0, 0.18));
+  --rdp-radius: var(--rozie-datepicker-radius, 10px);
+  --rdp-padding: var(--rozie-datepicker-padding, 0.75rem);
 
   /* accent — the single color most consumers will set; selected day, today
      ring + focus ring all derive from it */
-  --rozie-datepicker-accent: #0066cc;
+  --rdp-accent: var(--rozie-datepicker-accent, #0066cc);
 
   /* header */
-  --rozie-datepicker-gap: 0.25rem;
-  --rozie-datepicker-header-gap: 0.5rem;
-  --rozie-datepicker-heading-weight: 600;
-  --rozie-datepicker-heading-size: 0.95rem;
-  --rozie-datepicker-nav-size: 2rem;
-  --rozie-datepicker-nav-bg: transparent;
-  --rozie-datepicker-nav-radius: 6px;
-  --rozie-datepicker-hover-bg: rgba(0, 0, 0, 0.05);
+  --rdp-gap: var(--rozie-datepicker-gap, 0.25rem);
+  --rdp-header-gap: var(--rozie-datepicker-header-gap, 0.5rem);
+  --rdp-heading-weight: var(--rozie-datepicker-heading-weight, 600);
+  --rdp-heading-size: var(--rozie-datepicker-heading-size, 0.95rem);
+  --rdp-nav-size: var(--rozie-datepicker-nav-size, 2rem);
+  --rdp-nav-bg: var(--rozie-datepicker-nav-bg, transparent);
+  --rdp-nav-radius: var(--rozie-datepicker-nav-radius, 6px);
+  --rdp-hover-bg: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
 
   /* focus ring */
-  --rozie-datepicker-ring-width: 2px;
-  --rozie-datepicker-ring-offset: 1px;
+  --rdp-ring-width: var(--rozie-datepicker-ring-width, 2px);
+  --rdp-ring-offset: var(--rozie-datepicker-ring-offset, 1px);
 
   /* grid — the single-month day grid; also covers the gap between grids
      when numberOfMonths > 1 renders them side by side */
-  --rozie-datepicker-cell-size: 2.25rem;
-  --rozie-datepicker-cell-gap: 0.125rem;
-  --rozie-datepicker-weekday-height: 1.75rem;
-  --rozie-datepicker-weekday-size: 0.72rem;
-  --rozie-datepicker-weekday-weight: 600;
-  --rozie-datepicker-weekday-fg: rgba(0, 0, 0, 0.5);
-  --rozie-datepicker-month-gap: 1rem;
+  --rdp-cell-size: var(--rozie-datepicker-cell-size, 2.25rem);
+  --rdp-cell-gap: var(--rozie-datepicker-cell-gap, 0.125rem);
+  --rdp-weekday-height: var(--rozie-datepicker-weekday-height, 1.75rem);
+  --rdp-weekday-size: var(--rozie-datepicker-weekday-size, 0.72rem);
+  --rdp-weekday-weight: var(--rozie-datepicker-weekday-weight, 600);
+  --rdp-weekday-fg: var(--rozie-datepicker-weekday-fg, rgba(0, 0, 0, 0.5));
+  --rdp-month-gap: var(--rozie-datepicker-month-gap, 1rem);
 
   /* day cell */
-  --rozie-datepicker-day-bg: transparent;
-  --rozie-datepicker-day-border-width: 1px;
-  --rozie-datepicker-day-radius: 6px;
-  --rozie-datepicker-day-size: 0.85rem;
-  --rozie-datepicker-outside-fg: rgba(0, 0, 0, 0.35);
+  --rdp-day-bg: var(--rozie-datepicker-day-bg, transparent);
+  --rdp-day-border-width: var(--rozie-datepicker-day-border-width, 1px);
+  --rdp-day-radius: var(--rozie-datepicker-day-radius, 6px);
+  --rdp-day-size: var(--rozie-datepicker-day-size, 0.85rem);
+  --rdp-outside-fg: var(--rozie-datepicker-outside-fg, rgba(0, 0, 0, 0.35));
 
   /* today + selected */
-  --rozie-datepicker-selected-fg: #fff;
-  --rozie-datepicker-selected-weight: 600;
+  --rdp-selected-fg: var(--rozie-datepicker-selected-fg, #fff);
+  --rdp-selected-weight: var(--rozie-datepicker-selected-weight, 600);
 
   /* disabled */
-  --rozie-datepicker-disabled-opacity: 0.4;
+  --rdp-disabled-opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
 
   /* drill/zoom — the month-picker and year-picker grids reached via the
      heading click (calendar drills down/up a level) */
-  --rozie-datepicker-drill-cell-height: 2.5rem;
-  --rozie-datepicker-drill-cell-size: 0.85rem;
-  --rozie-datepicker-drill-cols: 3;
-  --rozie-datepicker-drill-gap: 0.25rem;
-  --rozie-datepicker-drill-header-gap: 0.5rem;
-  --rozie-datepicker-drill-label-bg: transparent;
-  --rozie-datepicker-drill-label-padding: 0.15rem 0.5rem;
+  --rdp-drill-cell-height: var(--rozie-datepicker-drill-cell-height, 2.5rem);
+  --rdp-drill-cell-size: var(--rozie-datepicker-drill-cell-size, 0.85rem);
+  --rdp-drill-cols: var(--rozie-datepicker-drill-cols, 3);
+  --rdp-drill-gap: var(--rozie-datepicker-drill-gap, 0.25rem);
+  --rdp-drill-header-gap: var(--rozie-datepicker-drill-header-gap, 0.5rem);
+  --rdp-drill-label-bg: var(--rozie-datepicker-drill-label-bg, transparent);
+  --rdp-drill-label-padding: var(--rozie-datepicker-drill-label-padding, 0.15rem 0.5rem);
 
   /* footer — the Today/Clear action row */
-  --rozie-datepicker-footer-bg: transparent;
+  --rdp-footer-bg: var(--rozie-datepicker-footer-bg, transparent);
   --rozie-datepicker-footer-fg: inherit;
-  --rozie-datepicker-footer-gap: 0.25rem;
-  --rozie-datepicker-footer-gap-top: 0.5rem;
-  --rozie-datepicker-footer-padding: 0.2rem 0.6rem;
-  --rozie-datepicker-footer-radius: 6px;
-  --rozie-datepicker-footer-size: 0.78rem;
+  --rdp-footer-gap: var(--rozie-datepicker-footer-gap, 0.25rem);
+  --rdp-footer-gap-top: var(--rozie-datepicker-footer-gap-top, 0.5rem);
+  --rdp-footer-padding: var(--rozie-datepicker-footer-padding, 0.2rem 0.6rem);
+  --rdp-footer-radius: var(--rozie-datepicker-footer-radius, 6px);
+  --rdp-footer-size: var(--rozie-datepicker-footer-size, 0.78rem);
 
   /* presets — the quick-range chip row */
-  --rozie-datepicker-preset-bg: transparent;
+  --rdp-preset-bg: var(--rozie-datepicker-preset-bg, transparent);
   --rozie-datepicker-preset-fg: inherit;
-  --rozie-datepicker-preset-padding: 0.2rem 0.6rem;
-  --rozie-datepicker-preset-radius: 999px;
-  --rozie-datepicker-preset-size: 0.78rem;
-  --rozie-datepicker-presets-gap: 0.25rem;
-  --rozie-datepicker-presets-gap-top: 0.5rem;
+  --rdp-preset-padding: var(--rozie-datepicker-preset-padding, 0.2rem 0.6rem);
+  --rdp-preset-radius: var(--rozie-datepicker-preset-radius, 999px);
+  --rdp-preset-size: var(--rozie-datepicker-preset-size, 0.78rem);
+  --rdp-presets-gap: var(--rozie-datepicker-presets-gap, 0.25rem);
+  --rdp-presets-gap-top: var(--rozie-datepicker-presets-gap-top, 0.5rem);
 
   /* range/preview — the range-selection highlight painted between the
      start and end day cells while dragging or hovering */
-  --rozie-datepicker-preview-bg: rgba(0, 102, 204, 0.08);
-  --rozie-datepicker-range-bg: rgba(0, 102, 204, 0.14);
+  --rdp-preview-bg: var(--rozie-datepicker-preview-bg, rgba(0, 102, 204, 0.08));
+  --rdp-range-bg: var(--rozie-datepicker-range-bg, rgba(0, 102, 204, 0.14));
 }

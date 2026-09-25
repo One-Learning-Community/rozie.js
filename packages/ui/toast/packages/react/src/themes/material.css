@@ -8,21 +8,36 @@
  * (info) toast uses the M3 "inverse surface" snackbar convention.
  *
  *   import '@rozie-ui/toast-react/themes/material.css';
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rto-x: var(--rozie-toast-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-toast-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-toaster`
+ *    and the Lit host `rozie-toaster`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-toaster {
-  --rozie-toast-color: var(--md-sys-color-inverse-on-surface, #f5eff7);
-  --rozie-toast-bg: var(--md-sys-color-inverse-surface, #322f35);
-  --rozie-toast-radius: 0.25rem;
-  --rozie-toast-shadow: 0 3px 5px rgba(0, 0, 0, 0.2), 0 6px 10px rgba(0, 0, 0, 0.14);
+:root,
+.rozie-toaster,
+rozie-toaster {
+  --rto-color: var(--rozie-toast-color, var(--md-sys-color-inverse-on-surface, #f5eff7));
+  --rto-bg: var(--rozie-toast-bg, var(--md-sys-color-inverse-surface, #322f35));
+  --rto-radius: var(--rozie-toast-radius, 0.25rem);
+  --rto-shadow: var(--rozie-toast-shadow, 0 3px 5px rgba(0, 0, 0, 0.2), 0 6px 10px rgba(0, 0, 0, 0.14));
 
-  --rozie-toast-success-bg: #2e7d32;
-  --rozie-toast-error-bg: var(--md-sys-color-error, #b3261e);
-  --rozie-toast-warning-bg: #f9a825;
-  --rozie-toast-info-bg: var(--md-sys-color-inverse-surface, #322f35);
+  --rto-success-bg: var(--rozie-toast-success-bg, #2e7d32);
+  --rto-error-bg: var(--rozie-toast-error-bg, var(--md-sys-color-error, #b3261e));
+  --rto-warning-bg: var(--rozie-toast-warning-bg, #f9a825);
+  --rto-info-bg: var(--rozie-toast-info-bg, var(--md-sys-color-inverse-surface, #322f35));
 
   /* MD3's motion system favors slightly longer "emphasized" easing/duration
      for surfaces entering/leaving the screen than the 200ms baseline. */
-  --rozie-toast-enter-duration: 250ms;
-  --rozie-toast-exit-duration: 250ms;
-  --rozie-toast-spinner-color: var(--md-sys-color-inverse-on-surface, #f5eff7);
+  --rto-enter-duration: var(--rozie-toast-enter-duration, 250ms);
+  --rto-exit-duration: var(--rozie-toast-exit-duration, 250ms);
+  --rto-spinner-color: var(--rozie-toast-spinner-color, var(--md-sys-color-inverse-on-surface, #f5eff7));
 }

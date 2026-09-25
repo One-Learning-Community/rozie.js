@@ -423,15 +423,15 @@ $effect(() => {
     position: absolute;
     left: 0;
     top: 0;
-    z-index: var(--rozie-popover-z, 1000);
+    z-index: var(--rozie-popover-z, var(--rpo-z, 1000));
     width: max-content;
-    max-width: var(--rozie-popover-max-width, calc(100vw - 16px));
-    background: var(--rozie-popover-bg, #fff);
-    color: var(--rozie-popover-color, inherit);
-    border: var(--rozie-popover-border, 1px solid rgba(0, 0, 0, 0.12));
-    border-radius: var(--rozie-popover-radius, 8px);
-    box-shadow: var(--rozie-popover-shadow, 0 8px 24px rgba(0, 0, 0, 0.12));
-    padding: var(--rozie-popover-padding, 8px 12px);
+    max-width: var(--rozie-popover-max-width, var(--rpo-max-width, calc(100vw - 16px)));
+    background: var(--rozie-popover-bg, var(--rpo-bg, #fff));
+    color: var(--rozie-popover-color, var(--rpo-color, inherit));
+    border: var(--rozie-popover-border, var(--rpo-border, 1px solid rgba(0, 0, 0, 0.12)));
+    border-radius: var(--rozie-popover-radius, var(--rpo-radius, 8px));
+    box-shadow: var(--rozie-popover-shadow, var(--rpo-shadow, 0 8px 24px rgba(0, 0, 0, 0.12)));
+    padding: var(--rozie-popover-padding, var(--rpo-padding, 8px 12px));
   }
   .rozie-popover-floating--static[data-rozie-s-c6cf02ea] {
     position: static;
@@ -452,10 +452,10 @@ $effect(() => {
   }
   .rozie-popover-arrow[data-rozie-s-c6cf02ea] {
     position: absolute;
-    width: var(--rozie-popover-arrow-size, 8px);
-    height: var(--rozie-popover-arrow-size, 8px);
-    background: var(--rozie-popover-bg, #fff);
-    border: var(--rozie-popover-border, 1px solid rgba(0, 0, 0, 0.12));
+    width: var(--rozie-popover-arrow-size, var(--rpo-arrow-size, 8px));
+    height: var(--rozie-popover-arrow-size, var(--rpo-arrow-size, 8px));
+    background: var(--rozie-popover-bg, var(--rpo-bg, #fff));
+    border: var(--rozie-popover-border, var(--rpo-border, 1px solid rgba(0, 0, 0, 0.12)));
     transform: rotate(45deg);
   }
 }

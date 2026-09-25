@@ -10,13 +10,28 @@
  *
  * Bootstrap modals use a 0.5rem radius, a 1px border, and a 0.5-opacity black
  * backdrop (`$modal-backdrop-bg` / `$modal-backdrop-opacity`).
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rdg-x: var(--rozie-dialog-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-dialog-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-dialog`
+ *    and the Lit host `rozie-dialog`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-dialog {
-  --rozie-dialog-bg: var(--bs-body-bg, #fff);
-  --rozie-dialog-color: var(--bs-body-color, #212529);
-  --rozie-dialog-border: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.175));
-  --rozie-dialog-radius: var(--bs-border-radius-lg, 0.5rem);
+:root,
+.rozie-dialog,
+rozie-dialog {
+  --rdg-bg: var(--rozie-dialog-bg, var(--bs-body-bg, #fff));
+  --rdg-color: var(--rozie-dialog-color, var(--bs-body-color, #212529));
+  --rdg-border: var(--rozie-dialog-border, 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.175)));
+  --rdg-radius: var(--rozie-dialog-radius, var(--bs-border-radius-lg, 0.5rem));
 
-  --rozie-dialog-backdrop-bg: rgba(0, 0, 0, 0.5);
-  --rozie-dialog-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  --rdg-backdrop-bg: var(--rozie-dialog-backdrop-bg, rgba(0, 0, 0, 0.5));
+  --rdg-shadow: var(--rozie-dialog-shadow, 0 0.5rem 1rem rgba(0, 0, 0, 0.15));
 }

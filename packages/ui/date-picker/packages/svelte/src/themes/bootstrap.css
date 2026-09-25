@@ -6,21 +6,36 @@
  * `data-bs-theme="dark"`) and `--bs-primary` accent automatically.
  *
  *   import '@rozie-ui/date-picker-react/themes/bootstrap.css';
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rdp-x: var(--rozie-datepicker-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-datepicker-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-datepicker`
+ *    and the Lit host `rozie-date-picker`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-datepicker {
-  --rozie-datepicker-accent: var(--bs-primary, #0d6efd);
+:root,
+.rozie-datepicker,
+rozie-date-picker {
+  --rdp-accent: var(--rozie-datepicker-accent, var(--bs-primary, #0d6efd));
 
-  --rozie-datepicker-fg: var(--bs-body-color, #212529);
-  --rozie-datepicker-bg: var(--bs-body-bg, #fff);
-  --rozie-datepicker-border: var(--bs-border-color, #dee2e6);
-  --rozie-datepicker-radius: var(--bs-border-radius-lg, 0.5rem);
+  --rdp-fg: var(--rozie-datepicker-fg, var(--bs-body-color, #212529));
+  --rdp-bg: var(--rozie-datepicker-bg, var(--bs-body-bg, #fff));
+  --rdp-border: var(--rozie-datepicker-border, var(--bs-border-color, #dee2e6));
+  --rdp-radius: var(--rozie-datepicker-radius, var(--bs-border-radius-lg, 0.5rem));
 
-  --rozie-datepicker-hover-bg: var(--bs-tertiary-bg, rgba(0, 0, 0, 0.05));
-  --rozie-datepicker-ring: var(--bs-primary, #0d6efd);
+  --rdp-hover-bg: var(--rozie-datepicker-hover-bg, var(--bs-tertiary-bg, rgba(0, 0, 0, 0.05)));
+  --rdp-ring: var(--rozie-datepicker-ring, var(--bs-primary, #0d6efd));
 
-  --rozie-datepicker-weekday-fg: var(--bs-secondary-color, rgba(33, 37, 41, 0.6));
-  --rozie-datepicker-outside-fg: var(--bs-tertiary-color, rgba(33, 37, 41, 0.4));
+  --rdp-weekday-fg: var(--rozie-datepicker-weekday-fg, var(--bs-secondary-color, rgba(33, 37, 41, 0.6)));
+  --rdp-outside-fg: var(--rozie-datepicker-outside-fg, var(--bs-tertiary-color, rgba(33, 37, 41, 0.4)));
 
-  --rozie-datepicker-selected-fg: #fff;
-  --rozie-datepicker-selected-bg: var(--bs-primary, #0d6efd);
+  --rdp-selected-fg: var(--rozie-datepicker-selected-fg, #fff);
+  --rdp-selected-bg: var(--rozie-datepicker-selected-bg, var(--bs-primary, #0d6efd));
 }

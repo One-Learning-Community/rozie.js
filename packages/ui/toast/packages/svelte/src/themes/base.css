@@ -14,59 +14,65 @@
  * `.rozie-toaster` element). See themes/shadcn.css, themes/material.css and
  * themes/bootstrap.css for design-system bridges.
  *
- * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
- * an element declares for itself always beats one it would inherit, whatever the selector's
- * specificity, so defaults declared on the `.rozie-toaster` element itself made every ancestor
- * override dead the moment this file was imported. At the root they are only the value of last
- * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
- * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
- * they arrive by inheritance).
+ * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root)`
+ * (zero specificity): `--rto-x: var(--rozie-toast-x, <default>)`. The component reads every token
+ * public-first, `var(--rozie-toast-x, var(--rto-x, <inline default>))`, so a value set on ANY
+ * ancestor (`:root`, `.dark`, a wrapper) or on the component itself wins by plain inheritance,
+ * in any import order, on all six targets (Lit included: custom properties inherit into its
+ * shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the component may declare a public token.
  * A token whose default is ANOTHER token is not declared here at all: the component reads it
  * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
  * declared at the root it would be computed once, against the root's value.
- * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
- * tokens it maps on the `.rozie-toaster` element itself: with a bridge imported, THOSE tokens can be
- * overridden only on that element (or by a rule of equal-or-higher specificity after it).
+ * The lines that say `inherit` / `initial` stay plain declarations: at the root such a value
+ * is "unset", so the component's own fallback applies, and it never shadows an ancestor.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares only the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * component (`.rozie-toaster` and the Lit host `rozie-toaster`) — so that variable is resolved AT the
+ * component and follows the nearest theme scope — and on `:root`, the copy a Lit component
+ * nested in another shadow root (out of reach of every document selector) inherits. The
+ * `--rto-*` names are internal: not a stable API.
  */
 :where(:root) {
   /* region layout */
-  --rozie-toast-z: 9999;
-  --rozie-toast-gap: 0.5rem;
-  --rozie-toast-region-padding: 1rem;
-  --rozie-toast-max-width: calc(100vw - 2rem);
+  --rto-z: var(--rozie-toast-z, 9999);
+  --rto-gap: var(--rozie-toast-gap, 0.5rem);
+  --rto-region-padding: var(--rozie-toast-region-padding, 1rem);
+  --rto-max-width: var(--rozie-toast-max-width, calc(100vw - 2rem));
   --rozie-toast-font: inherit;
 
   /* per-toast box model */
-  --rozie-toast-content-gap: 0.75rem;
-  --rozie-toast-min-width: 16rem;
-  --rozie-toast-toast-max-width: 24rem;
-  --rozie-toast-padding: 0.75rem 1rem;
-  --rozie-toast-color: #fff;
-  --rozie-toast-bg: #333;
-  --rozie-toast-radius: 0.5rem;
-  --rozie-toast-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  --rto-content-gap: var(--rozie-toast-content-gap, 0.75rem);
+  --rto-min-width: var(--rozie-toast-min-width, 16rem);
+  --rto-toast-max-width: var(--rozie-toast-toast-max-width, 24rem);
+  --rto-padding: var(--rozie-toast-padding, 0.75rem 1rem);
+  --rto-color: var(--rozie-toast-color, #fff);
+  --rto-bg: var(--rozie-toast-bg, #333);
+  --rto-radius: var(--rozie-toast-radius, 0.5rem);
+  --rto-shadow: var(--rozie-toast-shadow, 0 6px 20px rgba(0, 0, 0, 0.25));
 
   /* per-type accents */
-  --rozie-toast-success-bg: #16a34a;
-  --rozie-toast-error-bg: #dc2626;
-  --rozie-toast-warning-bg: #ca8a04;
+  --rto-success-bg: var(--rozie-toast-success-bg, #16a34a);
+  --rto-error-bg: var(--rozie-toast-error-bg, #dc2626);
+  --rto-warning-bg: var(--rozie-toast-warning-bg, #ca8a04);
 
   /* message + close button */
-  --rozie-toast-font-size: 0.9rem;
-  --rozie-toast-close-size: 1.25rem;
-  --rozie-toast-close-opacity: 0.75;
+  --rto-font-size: var(--rozie-toast-font-size, 0.9rem);
+  --rto-close-size: var(--rozie-toast-close-size, 1.25rem);
+  --rto-close-opacity: var(--rozie-toast-close-opacity, 0.75);
 
   /* enter/exit lifecycle */
-  --rozie-toast-enter-duration: 200ms;
-  --rozie-toast-exit-duration: 200ms;
+  --rto-enter-duration: var(--rozie-toast-enter-duration, 200ms);
+  --rto-exit-duration: var(--rozie-toast-exit-duration, 200ms);
 
   /* stacked mode (opt-in `stacked` prop) — collapsed depth transform */
-  --rozie-toast-stack-offset: 8px;
-  --rozie-toast-stack-scale-step: 0.05;
-  --rozie-toast-depth: 0;
-  --rozie-toast-swipe-exit: 1;
+  --rto-stack-offset: var(--rozie-toast-stack-offset, 8px);
+  --rto-stack-scale-step: var(--rozie-toast-stack-scale-step, 0.05);
+  --rto-depth: var(--rozie-toast-depth, 0);
+  --rto-swipe-exit: var(--rozie-toast-swipe-exit, 1);
 
   /* the decorative 'loading' type spinner */
-  --rozie-toast-spinner-size: 1em;
-  --rozie-toast-spinner-color: currentColor;
+  --rto-spinner-size: var(--rozie-toast-spinner-size, 1em);
+  --rto-spinner-color: var(--rozie-toast-spinner-color, currentColor);
 }

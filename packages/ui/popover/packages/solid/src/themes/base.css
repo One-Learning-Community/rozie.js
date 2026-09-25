@@ -11,25 +11,31 @@
  * See themes/shadcn.css, themes/material.css and themes/bootstrap.css for
  * design-system bridges.
  *
- * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
- * an element declares for itself always beats one it would inherit, whatever the selector's
- * specificity, so defaults declared on the `.rozie-popover` element itself made every ancestor
- * override dead the moment this file was imported. At the root they are only the value of last
- * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
- * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
- * they arrive by inheritance).
- * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
- * tokens it maps on the `.rozie-popover` element itself: with a bridge imported, THOSE tokens can be
- * overridden only on that element (or by a rule of equal-or-higher specificity after it).
+ * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root)`
+ * (zero specificity): `--rpo-x: var(--rozie-popover-x, <default>)`. The component reads every token
+ * public-first, `var(--rozie-popover-x, var(--rpo-x, <inline default>))`, so a value set on ANY
+ * ancestor (`:root`, `.dark`, a wrapper) or on the component itself wins by plain inheritance,
+ * in any import order, on all six targets (Lit included: custom properties inherit into its
+ * shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the component may declare a public token.
+ * The lines that say `inherit` / `initial` stay plain declarations: at the root such a value
+ * is "unset", so the component's own fallback applies, and it never shadows an ancestor.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares only the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * component (`.rozie-popover` and the Lit host `rozie-popover`) — so that variable is resolved AT the
+ * component and follows the nearest theme scope — and on `:root`, the copy a Lit component
+ * nested in another shadow root (out of reach of every document selector) inherits. The
+ * `--rpo-*` names are internal: not a stable API.
  */
 :where(:root) {
-  --rozie-popover-z: 1000;
-  --rozie-popover-max-width: calc(100vw - 16px);
-  --rozie-popover-bg: #fff;
+  --rpo-z: var(--rozie-popover-z, 1000);
+  --rpo-max-width: var(--rozie-popover-max-width, calc(100vw - 16px));
+  --rpo-bg: var(--rozie-popover-bg, #fff);
   --rozie-popover-color: inherit;
-  --rozie-popover-border: 1px solid rgba(0, 0, 0, 0.12);
-  --rozie-popover-radius: 8px;
-  --rozie-popover-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --rozie-popover-padding: 8px 12px;
-  --rozie-popover-arrow-size: 8px;
+  --rpo-border: var(--rozie-popover-border, 1px solid rgba(0, 0, 0, 0.12));
+  --rpo-radius: var(--rozie-popover-radius, 8px);
+  --rpo-shadow: var(--rozie-popover-shadow, 0 8px 24px rgba(0, 0, 0, 0.12));
+  --rpo-padding: var(--rozie-popover-padding, 8px 12px);
+  --rpo-arrow-size: var(--rozie-popover-arrow-size, 8px);
 }
