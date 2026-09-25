@@ -86,12 +86,20 @@ Columns may be declared as a `columns` config array **or** as `<Column>` childre
 </DataTable>
 
 <!-- TOKEN form — the same height via the CSS custom property (prop wins when both
-     are set; the token is the fallback). estimateRowHeight tunes the seed. -->
-<DataTable data={rows} virtual estimateRowHeight={48} style="--rozie-data-table-max-height: 400px">
-  <Column field="name" header="Name" />
-  <Column field="email" header="Email" />
-  <Column field="status" header="Status" />
-</DataTable>
+     are set; the token is the fallback). DataTable takes no style/class prop, so set
+     the token on the table's own wrap element, scoped by a parent class (this also
+     outranks the base.css default). estimateRowHeight tunes the seed. -->
+<div class="orders">
+  <DataTable data={rows} virtual estimateRowHeight={48}>
+    <Column field="name" header="Name" />
+    <Column field="email" header="Email" />
+    <Column field="status" header="Status" />
+  </DataTable>
+</div>
+
+<style>
+  .orders :global(.rozie-data-table-wrap) { --rozie-data-table-max-height: 400px; }
+</style>
 ```
 
 ### Editable cells (inline edit + validation)

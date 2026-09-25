@@ -231,7 +231,7 @@ render(html`
     .data=${rows}
     .filter=${({ columnId, uniqueValues, minMax }) =>
       columnId === 'category'
-        ? html`<fieldset>${uniqueValues.map((v) => html`<label><input type="checkbox" /> ${v}</label>`)}</fieldset>`
+        ? html`<fieldset>${uniqueValues.map((v: unknown) => html`<label><input type="checkbox" /> ${v}</label>`)}</fieldset>`
         : html`<input type="range" min=${minMax?.[0]} max=${minMax?.[1]} />`}
   >
     <rozie-column field="name" header="Name"></rozie-column>
@@ -395,7 +395,7 @@ render(html`
       'filter-category': ({ columnId, uniqueValues, setFilter }) => html`
         <select @change=${(e: Event) => setFilter(columnId, (e.target as HTMLSelectElement).value || null)}>
           <option value="">All</option>
-          ${uniqueValues.map((v) => html`<option value=${String(v)}>${String(v)}</option>`)}
+          ${uniqueValues.map((v: unknown) => html`<option value=${String(v)}>${String(v)}</option>`)}
         </select>`,
     }}
   >

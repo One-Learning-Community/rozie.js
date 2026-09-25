@@ -253,9 +253,13 @@ export function Demo() {
 }
 
 // TOKEN form — the same bound height via the CSS custom property (the prop wins
-// when both are set; the token is the fallback). Tune the row estimate too:
-// <DataTable data={rows} virtual estimateRowHeight={48}
-//   style={{ '--rozie-data-table-max-height': '400px' } as React.CSSProperties} />`,
+// when both are set; the token is the fallback). DataTable takes no style/className
+// prop, so set the token in your stylesheet on the table's own wrap element, scoped
+// by a parent class (this also outranks the base.css default). Tune the row estimate too:
+//   .orders .rozie-data-table-wrap { --rozie-data-table-max-height: 400px; }
+// <div className="orders">
+//   <DataTable data={rows} virtual estimateRowHeight={48} />
+// </div>`,
     },
     {
       title: SET_D_TITLE,
@@ -388,7 +392,7 @@ export function Demo() {
       renderFilter={({ columnId, uniqueValues, minMax }) =>
         columnId === 'category' ? (
           <fieldset>
-            {uniqueValues.map((v) => (
+            {uniqueValues.map((v: unknown) => (
               <label key={String(v)}><input type="checkbox" /> {String(v)}</label>
             ))}
           </fieldset>
@@ -547,7 +551,7 @@ export function Demo() {
         'filter-category': ({ columnId, uniqueValues, setFilter }) => (
           <select onChange={(e) => setFilter(columnId, e.target.value || null)}>
             <option value="">All</option>
-            {uniqueValues.map((v) => <option key={String(v)} value={String(v)}>{String(v)}</option>)}
+            {uniqueValues.map((v: unknown) => <option key={String(v)} value={String(v)}>{String(v)}</option>)}
           </select>
         ),
       }}
@@ -620,18 +624,22 @@ const rows = ${MANY_ROWS};
   </DataTable>
 
   <!-- TOKEN form — the same height via the CSS custom property (prop wins when
-       both are set; the token is the fallback). :estimateRowHeight tunes the seed. -->
-  <DataTable
-    :data="rows"
-    :virtual="true"
-    :estimateRowHeight="48"
-    style="--rozie-data-table-max-height: 400px"
-  >
-    <Column field="name" header="Name" />
-    <Column field="email" header="Email" />
-    <Column field="status" header="Status" />
-  </DataTable>
-</template>`,
+       both are set; the token is the fallback). DataTable sets inheritAttrs: false, so a
+       style attribute on it is dropped — set the token on the table's own wrap element,
+       scoped by a parent class (this also outranks the base.css default).
+       :estimateRowHeight tunes the seed. -->
+  <div class="orders">
+    <DataTable :data="rows" :virtual="true" :estimateRowHeight="48">
+      <Column field="name" header="Name" />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" />
+    </DataTable>
+  </div>
+</template>
+
+<style scoped>
+.orders :deep(.rozie-data-table-wrap) { --rozie-data-table-max-height: 400px; }
+</style>`,
     },
     {
       title: SET_D_TITLE,
@@ -955,12 +963,20 @@ const rows = ${FACET_ROWS};
 </DataTable>
 
 <!-- TOKEN form — the same height via the CSS custom property (prop wins when both
-     are set; the token is the fallback). estimateRowHeight tunes the seed. -->
-<DataTable data={rows} virtual estimateRowHeight={48} style="--rozie-data-table-max-height: 400px">
-  <Column field="name" header="Name" />
-  <Column field="email" header="Email" />
-  <Column field="status" header="Status" />
-</DataTable>`,
+     are set; the token is the fallback). DataTable takes no style/class prop, so set
+     the token on the table's own wrap element, scoped by a parent class (this also
+     outranks the base.css default). estimateRowHeight tunes the seed. -->
+<div class="orders">
+  <DataTable data={rows} virtual estimateRowHeight={48}>
+    <Column field="name" header="Name" />
+    <Column field="email" header="Email" />
+    <Column field="status" header="Status" />
+  </DataTable>
+</div>
+
+<style>
+  .orders :global(.rozie-data-table-wrap) { --rozie-data-table-max-height: 400px; }
+</style>`,
     },
     {
       title: SET_D_TITLE,
@@ -1706,9 +1722,13 @@ export function Demo() {
 }
 
 // TOKEN form — the same height via the CSS custom property (the prop wins when
-// both are set; the token is the fallback). estimateRowHeight tunes the seed:
-// <DataTable data={rows} virtual estimateRowHeight={48}
-//   style={{ '--rozie-data-table-max-height': '400px' }} />`,
+// both are set; the token is the fallback). DataTable takes no style/class prop, so
+// set the token in your stylesheet on the table's own wrap element, scoped by a
+// parent class (this also outranks the base.css default). estimateRowHeight tunes the seed:
+//   .orders .rozie-data-table-wrap { --rozie-data-table-max-height: 400px; }
+// <div class="orders">
+//   <DataTable data={rows} virtual estimateRowHeight={48} />
+// </div>`,
     },
     {
       title: SET_D_TITLE,
@@ -1836,7 +1856,7 @@ export function Demo() {
       filterSlot={({ columnId, uniqueValues, minMax }) =>
         columnId === 'category' ? (
           <fieldset>
-            {uniqueValues.map((v) => <label><input type="checkbox" /> {String(v)}</label>)}
+            {uniqueValues.map((v: unknown) => <label><input type="checkbox" /> {String(v)}</label>)}
           </fieldset>
         ) : (
           <input type="range" min={minMax?.[0]} max={minMax?.[1]} />
@@ -1991,7 +2011,7 @@ export function Demo() {
         'filter-category': ({ columnId, uniqueValues, setFilter }) => (
           <select onChange={(e) => setFilter(columnId, e.currentTarget.value || null)}>
             <option value="">All</option>
-            {uniqueValues.map((v) => <option value={String(v)}>{String(v)}</option>)}
+            {uniqueValues.map((v: unknown) => <option value={String(v)}>{String(v)}</option>)}
           </select>
         ),
       }}
@@ -2179,7 +2199,7 @@ render(html\`
     .data=\${rows}
     .filter=\${({ columnId, uniqueValues, minMax }) =>
       columnId === 'category'
-        ? html\`<fieldset>\${uniqueValues.map((v) => html\`<label><input type="checkbox" /> \${v}</label>\`)}</fieldset>\`
+        ? html\`<fieldset>\${uniqueValues.map((v: unknown) => html\`<label><input type="checkbox" /> \${v}</label>\`)}</fieldset>\`
         : html\`<input type="range" min=\${minMax?.[0]} max=\${minMax?.[1]} />\`}
   >
     <rozie-column field="name" header="Name"></rozie-column>
@@ -2317,7 +2337,7 @@ render(html\`
       'filter-category': ({ columnId, uniqueValues, setFilter }) => html\`
         <select @change=\${(e: Event) => setFilter(columnId, (e.target as HTMLSelectElement).value || null)}>
           <option value="">All</option>
-          \${uniqueValues.map((v) => html\`<option value=\${String(v)}>\${String(v)}</option>\`)}
+          \${uniqueValues.map((v: unknown) => html\`<option value=\${String(v)}>\${String(v)}</option>\`)}
         </select>\`,
     }}
   >

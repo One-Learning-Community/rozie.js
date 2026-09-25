@@ -94,18 +94,22 @@ const rows = Array.from({ length: 10_000 }, (_, i) => ({
   </DataTable>
 
   <!-- TOKEN form — the same height via the CSS custom property (prop wins when
-       both are set; the token is the fallback). :estimateRowHeight tunes the seed. -->
-  <DataTable
-    :data="rows"
-    :virtual="true"
-    :estimateRowHeight="48"
-    style="--rozie-data-table-max-height: 400px"
-  >
-    <Column field="name" header="Name" />
-    <Column field="email" header="Email" />
-    <Column field="status" header="Status" />
-  </DataTable>
+       both are set; the token is the fallback). DataTable sets inheritAttrs: false, so a
+       style attribute on it is dropped — set the token on the table's own wrap element,
+       scoped by a parent class (this also outranks the base.css default).
+       :estimateRowHeight tunes the seed. -->
+  <div class="orders">
+    <DataTable :data="rows" :virtual="true" :estimateRowHeight="48">
+      <Column field="name" header="Name" />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" />
+    </DataTable>
+  </div>
 </template>
+
+<style scoped>
+.orders :deep(.rozie-data-table-wrap) { --rozie-data-table-max-height: 400px; }
+</style>
 ```
 
 ### Editable cells (inline edit + validation)
