@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-tags-*` custom properties, each with a built-in fallback, so `Tags` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-tags {
+:root {
   --rozie-tags-gap: 0.4rem;
   --rozie-tags-accent: #0066cc;
   --rozie-tags-chip-gap: 0.3rem;

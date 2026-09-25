@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-resizable-*` custom properties, each with a built-in fallback, so `Resizable` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-resizable {
+:root {
   --rozie-resizable-font: inherit;
   --rozie-resizable-accent: #0066cc;
   --rozie-resizable-handle-size: 0.5rem;
@@ -39,7 +39,6 @@ accent — the single color most consumers will set; the active handle + focus r
 | `--rozie-resizable-handle-size` | `0.5rem` |
 | `--rozie-resizable-handle-bg` | `rgba(0, 0, 0, 0.08)` |
 | `--rozie-resizable-handle-hover-bg` | `rgba(0, 0, 0, 0.16)` |
-| `--rozie-resizable-handle-active-bg` | `var(--rozie-resizable-accent)` |
 
 ### the first panel's basis along the split axis
 
@@ -67,6 +66,14 @@ accent — the single color most consumers will set; the active handle + focus r
 | Token | Default |
 | --- | --- |
 | `--rozie-resizable-disabled-opacity` | `0.55` |
+
+### Defaulted where Resizable reads them
+
+Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).
+
+| Token | Default |
+| --- | --- |
+| `--rozie-resizable-handle-active-bg` | `var(--rozie-resizable-accent, #0066cc)` |
 
 ## Design-system bridges
 

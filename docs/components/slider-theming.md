@@ -10,11 +10,11 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-slider-*` custom properties, each with a built-in fallback, so `Slider` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-slider {
+:root {
   --rozie-slider-font: inherit;
   --rozie-slider-accent: #0066cc;
   --rozie-slider-track-height: 0.375rem;
-  --rozie-slider-fill-bg: var(--rozie-slider-accent);
+  --rozie-slider-thumb-size: 1rem;
 }
 ```
 
@@ -41,18 +41,13 @@ accent — the single color most consumers will set; thumb + fill derive from it
 | `--rozie-slider-track-radius` | `999px` |
 | `--rozie-slider-track-bg` | `rgba(0, 0, 0, 0.18)` |
 
+### thumb (the native input pseudo-element; styled per-vendor in the source)
+
 fill (the colored &lt;div> underlay; spans the runtime fill-start→fill-end vars)
 
 | Token | Default |
 | --- | --- |
-| `--rozie-slider-fill-bg` | `var(--rozie-slider-accent)` |
-
-### thumb (the native input pseudo-element; styled per-vendor in the source)
-
-| Token | Default |
-| --- | --- |
 | `--rozie-slider-thumb-size` | `1rem` |
-| `--rozie-slider-thumb-bg` | `var(--rozie-slider-accent)` |
 | `--rozie-slider-thumb-border` | `2px solid #fff` |
 | `--rozie-slider-thumb-shadow` | `0 1px 3px rgba(0, 0, 0, 0.3)` |
 
@@ -91,7 +86,6 @@ WebKit-only: vertical centering of the thumb over the track. Default keeps the t
 | `--rozie-slider-bubble-padding` | `0.0625rem 0.375rem` |
 | `--rozie-slider-bubble-font-size` | `0.6875rem` |
 | `--rozie-slider-bubble-fg` | `#fff` |
-| `--rozie-slider-bubble-bg` | `var(--rozie-slider-accent)` |
 | `--rozie-slider-bubble-radius` | `4px` |
 
 runtime fill — computed per-render from value/min/max and written as inline custom properties on the root (the `fillStyle` $computed). The inline style always wins over anything declared here. Declared `initial` on purpose: the two read sites disagree on their own local fallback (the fill underlay supplies a `0%` fallback, the bubble read supplies none), so freezing either value would collapse the other. `initial` resets the custom property to the guaranteed-invalid value, which makes each var() substitute its OWN local fallback when the inline value is absent — render-neutral, since the inline style takes priority regardless.
@@ -100,6 +94,16 @@ runtime fill — computed per-render from value/min/max and written as inline cu
 | --- | --- |
 | `--rozie-slider-fill-start` | `initial` |
 | `--rozie-slider-fill-end` | `initial` |
+
+### Defaulted where Slider reads them
+
+Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).
+
+| Token | Default |
+| --- | --- |
+| `--rozie-slider-bubble-bg` | `var(--rozie-slider-accent, #0066cc)` |
+| `--rozie-slider-fill-bg` | `var(--rozie-slider-accent, #0066cc)` |
+| `--rozie-slider-thumb-bg` | `var(--rozie-slider-accent, #0066cc)` |
 
 ## Design-system bridges
 

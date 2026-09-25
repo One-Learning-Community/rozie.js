@@ -20,8 +20,22 @@
  * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
  * `.rozie-slider` element). See themes/shadcn.css, themes/material.css and
  * themes/bootstrap.css for design-system bridges.
+ *
+ * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
+ * an element declares for itself always beats one it would inherit, whatever the selector's
+ * specificity, so defaults declared on the `.rozie-slider` element itself made every ancestor
+ * override dead the moment this file was imported. At the root they are only the value of last
+ * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
+ * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
+ * they arrive by inheritance).
+ * A token whose default is ANOTHER token is not declared here at all: the component reads it
+ * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
+ * declared at the root it would be computed once, against the root's value.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
+ * tokens it maps on the `.rozie-slider` element itself: with a bridge imported, THOSE tokens can be
+ * overridden only on that element (or by a rule of equal-or-higher specificity after it).
  */
-.rozie-slider {
+:where(:root) {
   /* layout / typography */
   --rozie-slider-font: inherit;
   --rozie-slider-pad: 0.5rem 0;
@@ -35,11 +49,9 @@
   --rozie-slider-track-bg: rgba(0, 0, 0, 0.18);
 
   /* fill (the colored <div> underlay; spans the runtime fill-start→fill-end vars) */
-  --rozie-slider-fill-bg: var(--rozie-slider-accent);
 
   /* thumb (the native input pseudo-element; styled per-vendor in the source) */
   --rozie-slider-thumb-size: 1rem;
-  --rozie-slider-thumb-bg: var(--rozie-slider-accent);
   --rozie-slider-thumb-border: 2px solid #fff;
   --rozie-slider-thumb-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   /* WebKit-only: vertical centering of the thumb over the track. Default keeps
@@ -64,7 +76,6 @@
   --rozie-slider-bubble-padding: 0.0625rem 0.375rem;
   --rozie-slider-bubble-font-size: 0.6875rem;
   --rozie-slider-bubble-fg: #fff;
-  --rozie-slider-bubble-bg: var(--rozie-slider-accent);
   --rozie-slider-bubble-radius: 4px;
 
   /* runtime fill — computed per-render from value/min/max and written as

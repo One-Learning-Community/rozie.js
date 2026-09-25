@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-switch-*` custom properties, each with a built-in fallback, so `Switch` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-switch {
+:root {
   --rozie-switch-width: 2.75rem;
   --rozie-switch-off-bg: rgba(0, 0, 0, 0.25);
   --rozie-switch-thumb-size: 1.25rem;

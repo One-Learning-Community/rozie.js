@@ -14,8 +14,22 @@
  * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
  * `.rozie-resizable` element). See themes/shadcn.css, themes/material.css and
  * themes/bootstrap.css for design-system bridges.
+ *
+ * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
+ * an element declares for itself always beats one it would inherit, whatever the selector's
+ * specificity, so defaults declared on the `.rozie-resizable` element itself made every ancestor
+ * override dead the moment this file was imported. At the root they are only the value of last
+ * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
+ * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
+ * they arrive by inheritance).
+ * A token whose default is ANOTHER token is not declared here at all: the component reads it
+ * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
+ * declared at the root it would be computed once, against the root's value.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
+ * tokens it maps on the `.rozie-resizable` element itself: with a bridge imported, THOSE tokens can be
+ * overridden only on that element (or by a rule of equal-or-higher specificity after it).
  */
-.rozie-resizable {
+:where(:root) {
   /* typography */
   --rozie-resizable-font: inherit;
 
@@ -27,7 +41,6 @@
   --rozie-resizable-handle-size: 0.5rem;
   --rozie-resizable-handle-bg: rgba(0, 0, 0, 0.08);
   --rozie-resizable-handle-hover-bg: rgba(0, 0, 0, 0.16);
-  --rozie-resizable-handle-active-bg: var(--rozie-resizable-accent);
   /* the first panel's basis along the split axis */
   --rozie-resizable-size: 50%;
 
