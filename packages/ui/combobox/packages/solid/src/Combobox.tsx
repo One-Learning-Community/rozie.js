@@ -140,6 +140,7 @@ __rozieInjectStyle('Combobox-9546115a', `.rozie-combobox[data-rozie-s-9546115a] 
   background: var(--rozie-combobox-create-bg, transparent);
 }
 .rozie-combobox-spacer[data-rozie-s-9546115a] { margin: 0; padding: 0; border: 0; list-style: none; }
+.rozie-combobox-list--virtual[data-rozie-s-9546115a] { overflow-anchor: none; }
 .rozie-combobox-chips[data-rozie-s-9546115a] {
   display: flex;
   flex-wrap: wrap;
@@ -843,6 +844,11 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   let virtualizerCleanup: any = null;
   let gridScrollEl: any = null;
   let remeasurePending = false;
+  // Scroll-end pin state (see recordScrollEnd()): whether the USER left the view at the end,
+  // the option count at that moment, and the last scrollTop already accounted for.
+  let scrollEndPinned: boolean = false;
+  let scrollEndPinnedCount: number = -1;
+  let scrollEndPinnedTop: number = -1;
   // Non-reactive per-instance flag (Phase 86 R2, plan 86-03, Solid-only): true for
   // the duration of an onFocus-triggered open transition (set before the isOpen
   // write, cleared in the deferred microtask after). Lets onBlur distinguish a
@@ -1236,12 +1242,53 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     setRows(windowSource());
   }
 
+  // SCROLL-END PIN (the data-table D-19 twin, shared shape with Listbox): keep a user who
+  // scrolled to the END of a variable-height list at the end while the options in view measure
+  // taller than their estimate. The view is judged on the DOM, and only at a move the USER
+  // made — a move is virtual-core's own when it still holds an unreconciled scroll adjustment
+  // (scrollAdjustments !== 0): its above-viewport compensation writes an ABSOLUTE scrollTop
+  // computed from its last-observed (stale) offset, so it pulls the view back up from the end
+  // and must neither clear the pin nor be mistaken for the user leaving the end. That position
+  // is remembered so the scroll event that later reports it is not read as a user move either.
+  // (Judging on virtual-core's MODEL, as the data-table host does, fails here: its total grows
+  // with every option measured in the ResizeObserver batch while its offset stays at the stale
+  // value, so the pin was cleared mid-batch — every target ended 10-126px short, measured.)
+  function recordScrollEnd() {
+    if (!virtualizer || !gridScrollEl || virtualizer.scrollState) return;
+    const top: number = gridScrollEl.scrollTop;
+    if (top === scrollEndPinnedTop) return;
+    scrollEndPinnedTop = top;
+    if (virtualizer.scrollAdjustments !== 0) return;
+    // Only a list that actually overflows has an end to hold: while the window has not painted
+    // yet (or the list is closed), scrollHeight <= clientHeight reads as "at the end" and a pin
+    // recorded then would jump the freshly opened list to the bottom.
+    const sh = gridScrollEl.scrollHeight;
+    const ch = gridScrollEl.clientHeight;
+    scrollEndPinned = ch > 0 && sh - ch > 1 && sh - top - ch <= 1;
+    scrollEndPinnedCount = windowSource().length;
+  }
+
+  // Re-apply the pin after the framework has committed the window (called from the rAF pass):
+  // the real maximum is known only then. Not while a programmatic scroll (scrollToIndex) is in
+  // flight, and not when the option count changed since the user reached the end (a new query
+  // or appended options must not be auto-followed).
+  function keepScrollEnd() {
+    if (!scrollEndPinned || !virtualizer || !gridScrollEl || virtualizer.scrollState) return;
+    if (windowSource().length !== scrollEndPinnedCount) return;
+    const maxTop: number = gridScrollEl.scrollHeight - gridScrollEl.clientHeight;
+    if (maxTop - gridScrollEl.scrollTop > 1) {
+      gridScrollEl.scrollTop = maxTop;
+      scrollEndPinnedTop = gridScrollEl.scrollTop;
+    }
+  }
+
   // Defer remeasureWindow() until AFTER the framework commits the recycled window: TWO
   // passes (microtask THEN rAF) behind one in-flight flag (the data-table
   // virtualization.rzts pattern, copied per-consumer per D-04/D-09) — microtask catches
   // Solid's <For> / Svelte's {#each} synchronous commit (the Phase 63 Solid
   // under-convergence hazard — D-09 rAF-defer budget), rAF catches React's async commit.
   function scheduleRemeasure() {
+    recordScrollEnd();
     if (remeasurePending) return;
     remeasurePending = true;
     let ranMicro = false;
@@ -1261,6 +1308,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
         requestAnimationFrame(rafPass);
         return;
       }
+      keepScrollEnd();
       remeasurePending = false;
     };
     if (typeof queueMicrotask !== 'undefined') {

@@ -79,3 +79,77 @@ for (const target of TARGETS) {
     expect(Math.abs((late.off ?? 0) - (early.off ?? 0))).toBeLessThanOrEqual(1);
   });
 }
+
+// D-19 twin (quick 260923-rrr): scrolled to the END, the list stays at the end while the options
+// in view measure taller than their estimate (measured before the fix: vue/angular 38px short,
+// the last option cut off).
+for (const target of TARGETS) {
+  runnerFor(target)(`combobox-virtual-variable [${target}]: a list scrolled to the end stays at the end`, async ({ page }) => {
+    await page.goto(`/?example=ComboboxVirtualVariable&target=${target}`);
+    await expect.poll(async () => page.getByTestId('option-count').textContent(), { timeout: 20_000 }).toBe('1000');
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => (await topVisibleOption(page)).idx, { timeout: 15_000 }).not.toBeNull();
+    const gap = () => page.evaluate(() => {
+      const deep = (sel: string, root: Document | ShadowRoot = document): HTMLElement | null => {
+        const d = root.querySelector(sel) as HTMLElement | null;
+        if (d) return d;
+        for (const el of Array.from(root.querySelectorAll('*'))) {
+          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+          if (sr) { const f = deep(sel, sr); if (f) return f; }
+        }
+        return null;
+      };
+      const sc = deep('.rozie-combobox-list')!;
+      return Math.round(sc.scrollHeight - sc.scrollTop - sc.clientHeight);
+    });
+    await page.evaluate(() => {
+      const deep = (sel: string, root: Document | ShadowRoot = document): HTMLElement | null => {
+        const d = root.querySelector(sel) as HTMLElement | null;
+        if (d) return d;
+        for (const el of Array.from(root.querySelectorAll('*'))) {
+          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+          if (sr) { const f = deep(sel, sr); if (f) return f; }
+        }
+        return null;
+      };
+      const sc = deep('.rozie-combobox-list')!;
+      sc.scrollTop = sc.scrollHeight;
+    });
+    await page.waitForTimeout(800);
+    expect(await gap()).toBeLessThanOrEqual(1);
+  });
+}
+
+// Control for the case above: a user who scrolls UP from the end is not pulled back down.
+for (const target of TARGETS) {
+  runnerFor(target)(`combobox-virtual-variable [${target}]: control — scrolling up from the end is not pulled back`, async ({ page }) => {
+    await page.goto(`/?example=ComboboxVirtualVariable&target=${target}`);
+    await expect.poll(async () => page.getByTestId('option-count').textContent(), { timeout: 20_000 }).toBe('1000');
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => (await topVisibleOption(page)).idx, { timeout: 15_000 }).not.toBeNull();
+    const scroll = (how: 'end' | 'up' | 'gap') => page.evaluate((how) => {
+      const deep = (sel: string, root: Document | ShadowRoot = document): HTMLElement | null => {
+        const d = root.querySelector(sel) as HTMLElement | null;
+        if (d) return d;
+        for (const el of Array.from(root.querySelectorAll('*'))) {
+          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+          if (sr) { const f = deep(sel, sr); if (f) return f; }
+        }
+        return null;
+      };
+      const sc = deep('.rozie-combobox-list')!;
+      if (how === 'end') sc.scrollTop = sc.scrollHeight;
+      if (how === 'up') sc.scrollTop = sc.scrollTop - 300;
+      return Math.round(sc.scrollHeight - sc.scrollTop - sc.clientHeight);
+    }, how);
+    await scroll('end');
+    await page.waitForTimeout(800);
+    await scroll('up');
+    await page.waitForTimeout(800);
+    expect(await scroll('gap')).toBeGreaterThan(200);
+  });
+}

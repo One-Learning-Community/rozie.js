@@ -132,6 +132,9 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   const measuredRowTotal = useRef(0);
   const windowVerBumpPending = useRef(false);
   const remeasurePending = useRef(false);
+  const scrollEndPinnedTop = useRef(-1);
+  const scrollEndPinned = useRef(false);
+  const scrollEndPinnedCount = useRef(-1);
   const typeTimer = useRef<any>(null);
   const typeBuffer = useRef('');
   const [value, setValue] = useControllableState({
@@ -835,6 +838,9 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   // module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
   // when $props.virtual. gridScrollEl is the captured .rozie-listbox-list scroll div the
   // virtualizer observes; remeasurePending dedupes the deferred sweep.
+
+  // Scroll-end pin state (see recordScrollEnd()): whether the USER left the view at the end,
+  // the option count at that moment, and the last scrollTop already accounted for.
   // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
   // set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
   // (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
@@ -920,6 +926,46 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   const syncRows = useCallback(() => {
     setRows(windowSource());
   }, [windowSource]);
+  // SCROLL-END PIN (the data-table D-19 twin): keep a user who scrolled to the END of a
+  // variable-height list at the end while the options in view measure taller than their
+  // estimate. The view is judged on the DOM, and only at a move the USER made — a move is
+  // virtual-core's own when it still holds an unreconciled scroll adjustment
+  // (scrollAdjustments !== 0): its above-viewport compensation writes an ABSOLUTE scrollTop
+  // computed from its last-observed (stale) offset, so it pulls the view back up from the end
+  // and must neither clear the pin nor be mistaken for the user leaving the end. That position
+  // is remembered so the scroll event that later reports it is not read as a user move either.
+  // (Judging on virtual-core's MODEL, as the data-table host does, fails here: its total grows
+  // with every option measured in the ResizeObserver batch while its offset stays at the stale
+  // value, so the pin was cleared mid-batch — every target ended 10-126px short, measured.)
+  function recordScrollEnd() {
+    if (!virtualizer.current || !gridScrollEl.current || virtualizer.current.scrollState) return;
+    const top = gridScrollEl.current.scrollTop;
+    if (top === scrollEndPinnedTop.current) return;
+    scrollEndPinnedTop.current = top;
+    if (virtualizer.current.scrollAdjustments !== 0) return;
+    // Only a list that actually overflows has an end to hold: while the window has not painted
+    // yet (or the list is closed), scrollHeight <= clientHeight reads as "at the end" and a pin
+    // recorded then would jump the freshly opened list to the bottom.
+    const sh = gridScrollEl.current.scrollHeight;
+    const ch = gridScrollEl.current.clientHeight;
+    scrollEndPinned.current = ch > 0 && sh - ch > 1 && sh - top - ch <= 1;
+    scrollEndPinnedCount.current = windowSource().length;
+  }
+
+  // Re-apply the pin after the framework has committed the window (called from the rAF pass):
+  // the real maximum is known only then. Not while a programmatic scroll (scrollToIndex) is in
+  // flight, and not when the option count changed since the user reached the end (a new filter
+  // or appended options must not be auto-followed).
+  function keepScrollEnd() {
+    if (!scrollEndPinned.current || !virtualizer.current || !gridScrollEl.current || virtualizer.current.scrollState) return;
+    if (windowSource().length !== scrollEndPinnedCount.current) return;
+    const maxTop = gridScrollEl.current.scrollHeight - gridScrollEl.current.clientHeight;
+    if (maxTop - gridScrollEl.current.scrollTop > 1) {
+      gridScrollEl.current.scrollTop = maxTop;
+      scrollEndPinnedTop.current = gridScrollEl.current.scrollTop;
+    }
+  }
+
   // Defer remeasureWindow() until AFTER the framework commits the recycled window
   // (onChange fires BEFORE React/Solid commit). TWO deferred passes (microtask THEN rAF)
   // behind one in-flight flag (the data-table virtualization.rzts:46-56 pattern, copied
@@ -928,6 +974,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   // budget), the rAF catches React's async commit. measureElement is idempotent on an
   // already-observed node, so running both is cheap and loop-free.
   function scheduleRemeasure() {
+    recordScrollEnd();
     if (remeasurePending.current) return;
     remeasurePending.current = true;
     let ranMicro = false;
@@ -947,6 +994,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
         requestAnimationFrame(rafPass);
         return;
       }
+      keepScrollEnd();
       remeasurePending.current = false;
     };
     if (typeof queueMicrotask !== 'undefined') {

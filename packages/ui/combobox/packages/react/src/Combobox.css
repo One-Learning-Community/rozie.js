@@ -118,6 +118,7 @@
   background: var(--rozie-combobox-create-bg, transparent);
 }
 .rozie-combobox-spacer[data-rozie-s-9546115a] { margin: 0; padding: 0; border: 0; list-style: none; }
+.rozie-combobox-list--virtual[data-rozie-s-9546115a] { overflow-anchor: none; }
 .rozie-combobox-chips[data-rozie-s-9546115a] {
   display: flex;
   flex-wrap: wrap;
