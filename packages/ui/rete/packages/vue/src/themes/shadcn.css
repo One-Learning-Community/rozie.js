@@ -14,39 +14,57 @@
  * Only color tokens are remapped here — sizing tokens (radii, socket-size, widths,
  * grid-size) are left unset so the `.rozie-flow-canvas` defaults hold. Selected/active
  * tokens are left unset too — they fall back to `--rozie-flow-accent` (set below).
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rfc-x: var(--rozie-flow-x, <design-system variable>)`). The component reads every
+ * token public-first, so on all six targets:
+ *  - a public `--rozie-flow-*` token set on any ancestor (or on the canvas) wins;
+ *  - otherwise the design system's variable applies, resolved AT the canvas
+ *    (`.rozie-flow-canvas` and the Lit host `rozie-flow-canvas`), so a `.dark` /
+ *    `data-bs-theme` wrapper narrower than <html> is followed. It also takes precedence
+ *    over FlowCanvas's own dark palette (OS dark, or base.css's `.dark` class), which
+ *    sits on the document root: with a bridge imported the design system decides the
+ *    scheme for every token it maps;
+ *  - a Lit canvas nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-flow-canvas {
-  --rozie-flow-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
-  --rozie-flow-bg: hsl(var(--muted, 210 40% 96.1%));
-  --rozie-flow-grid-dot-color: hsl(var(--border, 214.3 31.8% 91.4%));
-  --rozie-flow-border-color: hsl(var(--border, 214.3 31.8% 91.4%));
+:root,
+.rozie-flow-canvas,
+rozie-flow-canvas {
+  --rfc-accent: var(--rozie-flow-accent, hsl(var(--primary, 222.2 47.4% 11.2%)));
+  --rfc-bg: var(--rozie-flow-bg, hsl(var(--muted, 210 40% 96.1%)));
+  --rfc-grid-dot-color: var(--rozie-flow-grid-dot-color, hsl(var(--border, 214.3 31.8% 91.4%)));
+  --rfc-border-color: var(--rozie-flow-border-color, hsl(var(--border, 214.3 31.8% 91.4%)));
 
-  --rozie-flow-node-bg: hsl(var(--card, 0 0% 100%));
-  --rozie-flow-node-border: hsl(var(--border, 214.3 31.8% 91.4%));
-  --rozie-flow-node-title-fg: hsl(var(--card-foreground, 222.2 47.4% 11.2%));
-  --rozie-flow-node-shadow: 0 2px 6px hsl(var(--foreground, 222.2 47.4% 11.2%) / 0.12);
+  --rfc-node-bg: var(--rozie-flow-node-bg, hsl(var(--card, 0 0% 100%)));
+  --rfc-node-border: var(--rozie-flow-node-border, hsl(var(--border, 214.3 31.8% 91.4%)));
+  --rfc-node-title-fg: var(--rozie-flow-node-title-fg, hsl(var(--card-foreground, 222.2 47.4% 11.2%)));
+  --rfc-node-shadow: var(--rozie-flow-node-shadow, 0 2px 6px hsl(var(--foreground, 222.2 47.4% 11.2%) / 0.12));
 
-  --rozie-flow-port-fg: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
-  --rozie-flow-socket-bg: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
-  --rozie-flow-socket-border-color: hsl(var(--card, 0 0% 100%));
+  --rfc-port-fg: var(--rozie-flow-port-fg, hsl(var(--muted-foreground, 215.4 16.3% 46.9%)));
+  --rfc-socket-bg: var(--rozie-flow-socket-bg, hsl(var(--muted-foreground, 215.4 16.3% 46.9%)));
+  --rfc-socket-border-color: var(--rozie-flow-socket-border-color, hsl(var(--card, 0 0% 100%)));
 
-  --rozie-flow-connection-stroke: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
-  --rozie-flow-connection-label-fg: hsl(var(--foreground, 222.2 47.4% 11.2%));
-  --rozie-flow-connection-label-halo: hsl(var(--background, 0 0% 100%));
+  --rfc-connection-stroke: var(--rozie-flow-connection-stroke, hsl(var(--muted-foreground, 215.4 16.3% 46.9%)));
+  --rfc-connection-label-fg: var(--rozie-flow-connection-label-fg, hsl(var(--foreground, 222.2 47.4% 11.2%)));
+  --rfc-connection-label-halo: var(--rozie-flow-connection-label-halo, hsl(var(--background, 0 0% 100%)));
 
-  --rozie-flow-control-bg: hsl(var(--background, 0 0% 100%));
-  --rozie-flow-control-fg: hsl(var(--foreground, 222.2 47.4% 11.2%));
-  --rozie-flow-control-border: hsl(var(--border, 214.3 31.8% 91.4%));
-  --rozie-flow-control-hover-bg: hsl(var(--muted, 210 40% 96.1%));
-  --rozie-flow-control-active-bg: hsl(var(--accent, 210 40% 96.1%));
+  --rfc-control-bg: var(--rozie-flow-control-bg, hsl(var(--background, 0 0% 100%)));
+  --rfc-control-fg: var(--rozie-flow-control-fg, hsl(var(--foreground, 222.2 47.4% 11.2%)));
+  --rfc-control-border: var(--rozie-flow-control-border, hsl(var(--border, 214.3 31.8% 91.4%)));
+  --rfc-control-hover-bg: var(--rozie-flow-control-hover-bg, hsl(var(--muted, 210 40% 96.1%)));
+  --rfc-control-active-bg: var(--rozie-flow-control-active-bg, hsl(var(--accent, 210 40% 96.1%)));
 
-  --rozie-flow-minimap-bg: hsl(var(--background, 0 0% 100%) / 0.82);
-  --rozie-flow-minimap-border: hsl(var(--border, 214.3 31.8% 91.4%));
-  --rozie-flow-minimap-node-fill: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+  --rfc-minimap-bg: var(--rozie-flow-minimap-bg, hsl(var(--background, 0 0% 100%) / 0.82));
+  --rfc-minimap-border: var(--rozie-flow-minimap-border, hsl(var(--border, 214.3 31.8% 91.4%)));
+  --rfc-minimap-node-fill: var(--rozie-flow-minimap-node-fill, hsl(var(--muted-foreground, 215.4 16.3% 46.9%)));
 
-  --rozie-flow-toolbar-bg: hsl(var(--popover, 0 0% 100%));
-  --rozie-flow-toolbar-border: hsl(var(--border, 214.3 31.8% 91.4%));
-  --rozie-flow-toolbar-btn-bg: hsl(var(--muted, 210 40% 96.1%));
-  --rozie-flow-toolbar-btn-fg: hsl(var(--foreground, 222.2 47.4% 11.2%));
-  --rozie-flow-toolbar-delete-fg: hsl(var(--destructive, 0 84.2% 60.2%));
+  --rfc-toolbar-bg: var(--rozie-flow-toolbar-bg, hsl(var(--popover, 0 0% 100%)));
+  --rfc-toolbar-border: var(--rozie-flow-toolbar-border, hsl(var(--border, 214.3 31.8% 91.4%)));
+  --rfc-toolbar-btn-bg: var(--rozie-flow-toolbar-btn-bg, hsl(var(--muted, 210 40% 96.1%)));
+  --rfc-toolbar-btn-fg: var(--rozie-flow-toolbar-btn-fg, hsl(var(--foreground, 222.2 47.4% 11.2%)));
+  --rfc-toolbar-delete-fg: var(--rozie-flow-toolbar-delete-fg, hsl(var(--destructive, 0 84.2% 60.2%)));
 }

@@ -25,14 +25,23 @@
  * See themes/shadcn.css, themes/material.css and themes/bootstrap.css for
  * design-system bridges.
  *
- * WHERE THE DEFAULTS LIVE. Every value in this file is declared on the document root (or on
- * the `.dark` / `[data-theme="dark"]` element) under `:where()` — zero specificity, a value
- * of last resort — never on `.rozie-flow-canvas`. A value an element declares for itself
- * always beats one it would inherit, whatever the selector's specificity, so a default
- * declared on the canvas would make every override set on an ancestor dead. Declared at the
- * root, the defaults reach the canvas by inheritance (on Lit too, across its shadow root)
- * and lose to: a value set on any element between the root and the canvas, a `:root { … }`
- * rule of yours in either import order, and the canvas element itself.
+ * WHERE THE DEFAULTS LIVE. This file declares no public token that could shadow yours. Every
+ * value is a PRIVATE `--rfc-*` wiring line declared on the document root (the light defaults
+ * as `--rfc-bg: var(--rozie-flow-bg, #f7f8fa)`; the dark palettes as plain `--rfc-bg: #0f172a`)
+ * or on the `.dark` / `[data-theme="dark"]` element, under `:where()` — zero specificity, a
+ * value of last resort. The canvas reads every token public-first,
+ * `var(--rozie-flow-bg, var(--rfc-bg, <inline default>))`, so a `--rozie-flow-*` value set on
+ * any ancestor (`:root`, `.dark`, a wrapper) or on the canvas itself wins by plain
+ * inheritance, in light and dark, in any import order, on all six targets (on Lit too, across
+ * its shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the canvas may declare a public token. The `--rfc-*`
+ * names are internal: not a stable API.
+ *
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * canvas (`.rozie-flow-canvas` and the Lit host `rozie-flow-canvas`) and on `:root`, so with a
+ * bridge imported the design system's variables — resolved at the canvas — decide those
+ * tokens in light and dark alike.
  *
  * Tokens whose default is another token are NOT declared here: declared at the root they
  * would be computed once, against the root's value, and would ignore an accent set on a
@@ -49,28 +58,28 @@
  */
 :where(:root) {
   /* accent — the shared selected/active color. */
-  --rozie-flow-accent: #3b82f6;
+  --rfc-accent: var(--rozie-flow-accent, #3b82f6);
 
   /* canvas surface */
-  --rozie-flow-bg: #f7f8fa;
-  --rozie-flow-grid-dot-color: rgba(0, 0, 0, 0.08);
-  --rozie-flow-grid-size: 20px;
-  --rozie-flow-border-color: rgba(0, 0, 0, 0.1);
-  --rozie-flow-radius: 8px;
+  --rfc-bg: var(--rozie-flow-bg, #f7f8fa);
+  --rfc-grid-dot-color: var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08));
+  --rfc-grid-size: var(--rozie-flow-grid-size, 20px);
+  --rfc-border-color: var(--rozie-flow-border-color, rgba(0, 0, 0, 0.1));
+  --rfc-radius: var(--rozie-flow-radius, 8px);
 
   /* node chrome */
-  --rozie-flow-node-bg: #ffffff;
-  --rozie-flow-node-border: rgba(0, 0, 0, 0.16);
-  --rozie-flow-node-radius: 8px;
-  --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-  --rozie-flow-node-title-fg: #1f2937;
-  --rozie-flow-node-selected-ring: rgba(59, 130, 246, 0.5);
-  --rozie-flow-node-selected-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --rfc-node-bg: var(--rozie-flow-node-bg, #ffffff);
+  --rfc-node-border: var(--rozie-flow-node-border, rgba(0, 0, 0, 0.16));
+  --rfc-node-radius: var(--rozie-flow-node-radius, 8px);
+  --rfc-node-shadow: var(--rozie-flow-node-shadow, 0 2px 6px rgba(0, 0, 0, 0.12));
+  --rfc-node-title-fg: var(--rozie-flow-node-title-fg, #1f2937);
+  --rfc-node-selected-ring: var(--rozie-flow-node-selected-ring, rgba(59, 130, 246, 0.5));
+  --rfc-node-selected-shadow: var(--rozie-flow-node-selected-shadow, 0 2px 8px rgba(0, 0, 0, 0.15));
   /* D-09: a node editor has real full-bleed body cases — an image, a
      sparkline, a nested chart — where the consumer needs 0 padding; a
      hardcoded value leaves them fighting it with a negative margin. Default
      matches .rozie-flow-node__title's padding so body and title line up. */
-  --rozie-flow-node-body-padding: 0.5rem 0.75rem;
+  --rfc-node-body-padding: var(--rozie-flow-node-body-padding, 0.5rem 0.75rem);
 
   /* ports + sockets */
   /* D-15: under box-sizing: border-box this token now means the socket's
@@ -78,38 +87,38 @@
      default render is unchanged from the previous 12px content-box value —
      only the ~2px centring error is corrected. A consumer who previously
      hand-set 12px now gets a genuinely 12px socket; see the phase changeset. */
-  --rozie-flow-port-fg: #6b7280;
-  --rozie-flow-socket-size: 16px;
-  --rozie-flow-socket-bg: #94a3b8;
-  --rozie-flow-socket-border-color: #ffffff;
-  --rozie-flow-socket-border-width: 2px;
-  --rozie-flow-socket-ring: rgba(0, 0, 0, 0.2);
+  --rfc-port-fg: var(--rozie-flow-port-fg, #6b7280);
+  --rfc-socket-size: var(--rozie-flow-socket-size, 16px);
+  --rfc-socket-bg: var(--rozie-flow-socket-bg, #94a3b8);
+  --rfc-socket-border-color: var(--rozie-flow-socket-border-color, #ffffff);
+  --rfc-socket-border-width: var(--rozie-flow-socket-border-width, 2px);
+  --rfc-socket-ring: var(--rozie-flow-socket-ring, rgba(0, 0, 0, 0.2));
   /* D-11 (ISSUE-6): opacity-only, deliberately carrying no colour — a colour-based
      hint would need an entry in all three hand-maintained dark palette copies, the
      very triplicate that produced both ISSUE-3 and A4. Opacity is immune to that
      drift, reads as "unavailable" rather than "error", and works against any
      consumer accent. Light-only by design; adds ZERO dark-block entries. */
-  --rozie-flow-socket-incompatible-opacity: 0.3;
+  --rfc-socket-incompatible-opacity: var(--rozie-flow-socket-incompatible-opacity, 0.3);
 
   /* connections */
-  --rozie-flow-connection-stroke: #64748b;
-  --rozie-flow-connection-width: 3px;
-  --rozie-flow-connection-selected-width: 4px;
-  --rozie-flow-connection-label-fg: #334155;
-  --rozie-flow-connection-label-halo: #ffffff;
+  --rfc-connection-stroke: var(--rozie-flow-connection-stroke, #64748b);
+  --rfc-connection-width: var(--rozie-flow-connection-width, 3px);
+  --rfc-connection-selected-width: var(--rozie-flow-connection-selected-width, 4px);
+  --rfc-connection-label-fg: var(--rozie-flow-connection-label-fg, #334155);
+  --rfc-connection-label-halo: var(--rozie-flow-connection-label-halo, #ffffff);
 
   /* built-in Controls overlay */
-  --rozie-flow-control-bg: #ffffff;
-  --rozie-flow-control-fg: #334155;
-  --rozie-flow-control-border: rgba(0, 0, 0, 0.16);
-  --rozie-flow-control-radius: 6px;
-  --rozie-flow-control-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
-  --rozie-flow-control-hover-bg: #f1f5f9;
-  --rozie-flow-control-active-bg: #e2e8f0;
-  --rozie-flow-control-selected-bg: #dbeafe;
-  --rozie-flow-control-selected-fg: #1d4ed8;
-  --rozie-flow-control-inset: 10px;
-  --rozie-flow-control-btn-size: 28px;
+  --rfc-control-bg: var(--rozie-flow-control-bg, #ffffff);
+  --rfc-control-fg: var(--rozie-flow-control-fg, #334155);
+  --rfc-control-border: var(--rozie-flow-control-border, rgba(0, 0, 0, 0.16));
+  --rfc-control-radius: var(--rozie-flow-control-radius, 6px);
+  --rfc-control-shadow: var(--rozie-flow-control-shadow, 0 1px 3px rgba(0, 0, 0, 0.14));
+  --rfc-control-hover-bg: var(--rozie-flow-control-hover-bg, #f1f5f9);
+  --rfc-control-active-bg: var(--rozie-flow-control-active-bg, #e2e8f0);
+  --rfc-control-selected-bg: var(--rozie-flow-control-selected-bg, #dbeafe);
+  --rfc-control-selected-fg: var(--rozie-flow-control-selected-fg, #1d4ed8);
+  --rfc-control-inset: var(--rozie-flow-control-inset, 10px);
+  --rfc-control-btn-size: var(--rozie-flow-control-btn-size, 28px);
 
   /* marquee (mode:'select') */
   /* D-25: --rozie-flow-marquee-bg derives off --rozie-flow-accent in BOTH light and dark,
@@ -118,50 +127,50 @@
      (`color-mix(in srgb, var(--rozie-flow-accent) 12%, transparent)`), not here, so it is
      resolved against the accent the canvas actually inherits. color-mix() needs an
      evergreen browser; where it does not parse, the marquee background is transparent. */
-  --rozie-flow-marquee-radius: 2px;
+  --rfc-marquee-radius: var(--rozie-flow-marquee-radius, 2px);
 
   /* MiniMap overlay */
-  --rozie-flow-minimap-bg: rgba(255, 255, 255, 0.82);
-  --rozie-flow-minimap-border: rgba(0, 0, 0, 0.16);
-  --rozie-flow-minimap-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+  --rfc-minimap-bg: var(--rozie-flow-minimap-bg, rgba(255, 255, 255, 0.82));
+  --rfc-minimap-border: var(--rozie-flow-minimap-border, rgba(0, 0, 0, 0.16));
+  --rfc-minimap-shadow: var(--rozie-flow-minimap-shadow, 0 1px 3px rgba(0, 0, 0, 0.14));
   /* The two tokens below are read from JS via a getComputedStyle-backed
      flowToken() lookup at render time (canvas paint code, not a CSS var())
      — declared here (and correctly base-only per the probe) so the public
      surface stays discoverable in one place. */
-  --rozie-flow-minimap-node-fill: #94a3b8;
-  --rozie-flow-minimap-mask: rgba(15, 23, 42, 0.18);
+  --rfc-minimap-node-fill: var(--rozie-flow-minimap-node-fill, #94a3b8);
+  --rfc-minimap-mask: var(--rozie-flow-minimap-mask, rgba(15, 23, 42, 0.18));
 
   /* resize handle (the four corner drag affordances on the canvas) */
-  --rozie-flow-resize-handle-bg: #ffffff;
-  --rozie-flow-resize-handle-size: 8px;
-  --rozie-flow-resize-handle-radius: 2px;
+  --rfc-resize-handle-bg: var(--rozie-flow-resize-handle-bg, #ffffff);
+  --rfc-resize-handle-size: var(--rozie-flow-resize-handle-size, 8px);
+  --rfc-resize-handle-radius: var(--rozie-flow-resize-handle-radius, 2px);
 
   /* NodeToolbar overlay */
-  --rozie-flow-toolbar-bg: #ffffff;
-  --rozie-flow-toolbar-border: rgba(0, 0, 0, 0.16);
-  --rozie-flow-toolbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-  --rozie-flow-toolbar-btn-bg: #f8fafc;
-  --rozie-flow-toolbar-btn-fg: #334155;
-  --rozie-flow-toolbar-btn-border: rgba(0, 0, 0, 0.14);
-  --rozie-flow-toolbar-btn-hover-bg: #eef2f7;
-  --rozie-flow-toolbar-delete-fg: #b91c1c;
+  --rfc-toolbar-bg: var(--rozie-flow-toolbar-bg, #ffffff);
+  --rfc-toolbar-border: var(--rozie-flow-toolbar-border, rgba(0, 0, 0, 0.16));
+  --rfc-toolbar-shadow: var(--rozie-flow-toolbar-shadow, 0 2px 8px rgba(0, 0, 0, 0.18));
+  --rfc-toolbar-btn-bg: var(--rozie-flow-toolbar-btn-bg, #f8fafc);
+  --rfc-toolbar-btn-fg: var(--rozie-flow-toolbar-btn-fg, #334155);
+  --rfc-toolbar-btn-border: var(--rozie-flow-toolbar-btn-border, rgba(0, 0, 0, 0.14));
+  --rfc-toolbar-btn-hover-bg: var(--rozie-flow-toolbar-btn-hover-bg, #eef2f7);
+  --rfc-toolbar-delete-fg: var(--rozie-flow-toolbar-delete-fg, #b91c1c);
 
   /* Splitting the family out from the four per-role sizes means rebranding
      is ONE override, while each role's size stays independently tunable —
      the two knobs solve different problems and shouldn't be conflated. */
   /* typography */
-  --rozie-flow-font-family: system-ui, sans-serif;
-  --rozie-flow-node-font-size: 13px;
-  --rozie-flow-control-font-size: 16px;
-  --rozie-flow-toolbar-font-size: 12px;
-  --rozie-flow-connection-label-font-size: 11px;
+  --rfc-font-family: var(--rozie-flow-font-family, system-ui, sans-serif);
+  --rfc-node-font-size: var(--rozie-flow-node-font-size, 13px);
+  --rfc-control-font-size: var(--rozie-flow-control-font-size, 16px);
+  --rfc-toolbar-font-size: var(--rozie-flow-toolbar-font-size, 12px);
+  --rfc-connection-label-font-size: var(--rozie-flow-connection-label-font-size, 11px);
 
   /* The ring's colour, --rozie-flow-focus-ring, defaults to --rozie-flow-accent at the read
      site, so the ring follows dark and any accent override with ZERO entries in the three
      hand-maintained dark palettes. Do not "helpfully" hardcode a colour for it — that would
      reintroduce exactly the drift D-20's predicate exists to catch. */
   /* focus ring */
-  --rozie-flow-focus-ring-width: 2px;
+  --rfc-focus-ring-width: var(--rozie-flow-focus-ring-width, 2px);
 }
 
 /*
@@ -174,45 +183,45 @@
  * this reaches the Lit custom element too.
  */
 :where(.dark, [data-theme="dark"]) {
-  --rozie-flow-accent: #60a5fa;
-  --rozie-flow-bg: #0f172a;
-  --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
-  --rozie-flow-border-color: rgba(255, 255, 255, 0.1);
-  --rozie-flow-node-bg: #1e293b;
-  --rozie-flow-node-border: rgba(255, 255, 255, 0.12);
-  --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  --rozie-flow-node-selected-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-  --rozie-flow-node-title-fg: #e2e8f0;
-  --rozie-flow-node-selected-ring: rgba(96, 165, 250, 0.5);
-  --rozie-flow-port-fg: #94a3b8;
-  --rozie-flow-socket-bg: #64748b;
-  --rozie-flow-socket-border-color: #1e293b;
-  --rozie-flow-socket-ring: rgba(255, 255, 255, 0.16);
-  --rozie-flow-connection-stroke: #64748b;
-  --rozie-flow-connection-label-fg: #e2e8f0;
-  --rozie-flow-connection-label-halo: #0f172a;
-  --rozie-flow-control-bg: #1e293b;
-  --rozie-flow-control-fg: #cbd5e1;
-  --rozie-flow-control-border: rgba(255, 255, 255, 0.14);
-  --rozie-flow-control-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
-  --rozie-flow-control-hover-bg: #334155;
-  --rozie-flow-control-active-bg: #475569;
-  --rozie-flow-control-selected-bg: #1e3a8a;
-  --rozie-flow-control-selected-fg: #bfdbfe;
-  --rozie-flow-minimap-bg: rgba(15, 23, 42, 0.82);
-  --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
-  --rozie-flow-minimap-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
-  --rozie-flow-minimap-node-fill: #64748b;
-  --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
-  --rozie-flow-resize-handle-bg: #1e293b;
-  --rozie-flow-toolbar-bg: #1e293b;
-  --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
-  --rozie-flow-toolbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-  --rozie-flow-toolbar-btn-bg: #334155;
-  --rozie-flow-toolbar-btn-fg: #cbd5e1;
-  --rozie-flow-toolbar-btn-border: rgba(255, 255, 255, 0.12);
-  --rozie-flow-toolbar-btn-hover-bg: #475569;
-  --rozie-flow-toolbar-delete-fg: #f87171;
+  --rfc-accent: #60a5fa;
+  --rfc-bg: #0f172a;
+  --rfc-grid-dot-color: rgba(255, 255, 255, 0.06);
+  --rfc-border-color: rgba(255, 255, 255, 0.1);
+  --rfc-node-bg: #1e293b;
+  --rfc-node-border: rgba(255, 255, 255, 0.12);
+  --rfc-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  --rfc-node-selected-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --rfc-node-title-fg: #e2e8f0;
+  --rfc-node-selected-ring: rgba(96, 165, 250, 0.5);
+  --rfc-port-fg: #94a3b8;
+  --rfc-socket-bg: #64748b;
+  --rfc-socket-border-color: #1e293b;
+  --rfc-socket-ring: rgba(255, 255, 255, 0.16);
+  --rfc-connection-stroke: #64748b;
+  --rfc-connection-label-fg: #e2e8f0;
+  --rfc-connection-label-halo: #0f172a;
+  --rfc-control-bg: #1e293b;
+  --rfc-control-fg: #cbd5e1;
+  --rfc-control-border: rgba(255, 255, 255, 0.14);
+  --rfc-control-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --rfc-control-hover-bg: #334155;
+  --rfc-control-active-bg: #475569;
+  --rfc-control-selected-bg: #1e3a8a;
+  --rfc-control-selected-fg: #bfdbfe;
+  --rfc-minimap-bg: rgba(15, 23, 42, 0.82);
+  --rfc-minimap-border: rgba(255, 255, 255, 0.14);
+  --rfc-minimap-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --rfc-minimap-node-fill: #64748b;
+  --rfc-minimap-mask: rgba(0, 0, 0, 0.35);
+  --rfc-resize-handle-bg: #1e293b;
+  --rfc-toolbar-bg: #1e293b;
+  --rfc-toolbar-border: rgba(255, 255, 255, 0.14);
+  --rfc-toolbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --rfc-toolbar-btn-bg: #334155;
+  --rfc-toolbar-btn-fg: #cbd5e1;
+  --rfc-toolbar-btn-border: rgba(255, 255, 255, 0.12);
+  --rfc-toolbar-btn-hover-bg: #475569;
+  --rfc-toolbar-delete-fg: #f87171;
 }
 
 /*
@@ -223,44 +232,44 @@
  */
 @media (prefers-color-scheme: dark) {
   :where(:root:not(.light):not([data-theme="light"])) {
-    --rozie-flow-accent: #60a5fa;
-    --rozie-flow-bg: #0f172a;
-    --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
-    --rozie-flow-border-color: rgba(255, 255, 255, 0.1);
-    --rozie-flow-node-bg: #1e293b;
-    --rozie-flow-node-border: rgba(255, 255, 255, 0.12);
-    --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-    --rozie-flow-node-selected-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-    --rozie-flow-node-title-fg: #e2e8f0;
-    --rozie-flow-node-selected-ring: rgba(96, 165, 250, 0.5);
-    --rozie-flow-port-fg: #94a3b8;
-    --rozie-flow-socket-bg: #64748b;
-    --rozie-flow-socket-border-color: #1e293b;
-    --rozie-flow-socket-ring: rgba(255, 255, 255, 0.16);
-    --rozie-flow-connection-stroke: #64748b;
-    --rozie-flow-connection-label-fg: #e2e8f0;
-    --rozie-flow-connection-label-halo: #0f172a;
-    --rozie-flow-control-bg: #1e293b;
-    --rozie-flow-control-fg: #cbd5e1;
-    --rozie-flow-control-border: rgba(255, 255, 255, 0.14);
-    --rozie-flow-control-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
-    --rozie-flow-control-hover-bg: #334155;
-    --rozie-flow-control-active-bg: #475569;
-    --rozie-flow-control-selected-bg: #1e3a8a;
-    --rozie-flow-control-selected-fg: #bfdbfe;
-    --rozie-flow-minimap-bg: rgba(15, 23, 42, 0.82);
-    --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
-    --rozie-flow-minimap-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
-    --rozie-flow-minimap-node-fill: #64748b;
-    --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
-    --rozie-flow-resize-handle-bg: #1e293b;
-    --rozie-flow-toolbar-bg: #1e293b;
-    --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
-    --rozie-flow-toolbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-    --rozie-flow-toolbar-btn-bg: #334155;
-    --rozie-flow-toolbar-btn-fg: #cbd5e1;
-    --rozie-flow-toolbar-btn-border: rgba(255, 255, 255, 0.12);
-    --rozie-flow-toolbar-btn-hover-bg: #475569;
-    --rozie-flow-toolbar-delete-fg: #f87171;
+    --rfc-accent: #60a5fa;
+    --rfc-bg: #0f172a;
+    --rfc-grid-dot-color: rgba(255, 255, 255, 0.06);
+    --rfc-border-color: rgba(255, 255, 255, 0.1);
+    --rfc-node-bg: #1e293b;
+    --rfc-node-border: rgba(255, 255, 255, 0.12);
+    --rfc-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    --rfc-node-selected-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    --rfc-node-title-fg: #e2e8f0;
+    --rfc-node-selected-ring: rgba(96, 165, 250, 0.5);
+    --rfc-port-fg: #94a3b8;
+    --rfc-socket-bg: #64748b;
+    --rfc-socket-border-color: #1e293b;
+    --rfc-socket-ring: rgba(255, 255, 255, 0.16);
+    --rfc-connection-stroke: #64748b;
+    --rfc-connection-label-fg: #e2e8f0;
+    --rfc-connection-label-halo: #0f172a;
+    --rfc-control-bg: #1e293b;
+    --rfc-control-fg: #cbd5e1;
+    --rfc-control-border: rgba(255, 255, 255, 0.14);
+    --rfc-control-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    --rfc-control-hover-bg: #334155;
+    --rfc-control-active-bg: #475569;
+    --rfc-control-selected-bg: #1e3a8a;
+    --rfc-control-selected-fg: #bfdbfe;
+    --rfc-minimap-bg: rgba(15, 23, 42, 0.82);
+    --rfc-minimap-border: rgba(255, 255, 255, 0.14);
+    --rfc-minimap-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    --rfc-minimap-node-fill: #64748b;
+    --rfc-minimap-mask: rgba(0, 0, 0, 0.35);
+    --rfc-resize-handle-bg: #1e293b;
+    --rfc-toolbar-bg: #1e293b;
+    --rfc-toolbar-border: rgba(255, 255, 255, 0.14);
+    --rfc-toolbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    --rfc-toolbar-btn-bg: #334155;
+    --rfc-toolbar-btn-fg: #cbd5e1;
+    --rfc-toolbar-btn-border: rgba(255, 255, 255, 0.12);
+    --rfc-toolbar-btn-hover-bg: #475569;
+    --rfc-toolbar-delete-fg: #f87171;
   }
 }

@@ -138,6 +138,14 @@ describe('dark-palette-drift — OS-dark guard selector (D-22)', () => {
     expect(global.includes(GUARD)).toBe(true);
   });
 
+  it('no dark copy declares a public token', () => {
+    // Declared on the public `--rozie-flow-*` names, the palette would shadow a value an app
+    // sets on any element below the root (and a bridge's mapping); it lives on `--rfc-*`.
+    for (const text of [readSrc('src/FlowCanvas.rozie'), readSrc('src/themes/base.css')]) {
+      expect(stripComments(text).match(/^\s*--rozie-flow-[a-z-]+\s*:/gm) ?? []).toEqual([]);
+    }
+  });
+
   it('no dark copy declares the palette on the canvas element', () => {
     // The regression this file now also guards: a palette declared ON
     // `.rozie-flow-canvas` shadows every ancestor override (see GUARD above).
@@ -147,7 +155,7 @@ describe('dark-palette-drift — OS-dark guard selector (D-22)', () => {
       ['src/themes/base.css', readSrc('src/themes/base.css')],
     ] as const) {
       const stripped = stripComments(text);
-      for (const m of stripped.matchAll(/([^{};]*)\{[^{}]*--rozie-flow-[a-z-]+\s*:/g)) {
+      for (const m of stripped.matchAll(/([^{};]*)\{[^{}]*--(?:rozie-flow|rfc)-[a-z-]+\s*:/g)) {
         if (m[1].includes('.rozie-flow-canvas')) offenders.push(`${name}: ${m[1].trim()}`);
       }
     }
@@ -224,11 +232,15 @@ function extractBlock(
   return stripped.slice(start, end + 1);
 }
 
-/** Every `--rozie-flow-*` declaration in `block`, name -> trimmed value. */
+/**
+ * Every dark-palette declaration in `block`, public name -> trimmed value. The palette is
+ * declared on the PRIVATE `--rfc-*` names (so a public `--rozie-flow-*` token set on an
+ * ancestor wins over it); each is keyed here by its public name.
+ */
 function extractTokens(block: string): Map<string, string> {
   const out = new Map<string, string>();
-  for (const m of stripComments(block).matchAll(/(--rozie-flow-[a-z-]+)\s*:\s*([^;]+);/g)) {
-    out.set(m[1], m[2].trim());
+  for (const m of stripComments(block).matchAll(/--(?:rozie-flow|rfc)-([a-z-]+)\s*:\s*([^;]+);/g)) {
+    out.set(`--rozie-flow-${m[1]}`, m[2].trim());
   }
   return out;
 }

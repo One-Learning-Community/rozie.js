@@ -4,35 +4,35 @@
   min-height: 360px;
   position: relative;
   overflow: hidden;
-  border-radius: var(--rozie-flow-radius, 8px);
+  border-radius: var(--rozie-flow-radius, var(--rfc-radius, 8px));
   background:
-    radial-gradient(circle, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
-    var(--rozie-flow-bg, #f7f8fa);
-  border: 1px solid var(--rozie-flow-border-color, rgba(0, 0, 0, 0.1));
+    radial-gradient(circle, var(--rozie-flow-grid-dot-color, var(--rfc-grid-dot-color, rgba(0, 0, 0, 0.08))) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, var(--rfc-grid-size, 20px)) var(--rozie-flow-grid-size, var(--rfc-grid-size, 20px)),
+    var(--rozie-flow-bg, var(--rfc-bg, #f7f8fa));
+  border: 1px solid var(--rozie-flow-border-color, var(--rfc-border-color, rgba(0, 0, 0, 0.1)));
 }
 .rozie-flow-canvas[data-rozie-s-cd396d6a]:focus-visible {
-  outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
-  outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+  outline: var(--rozie-flow-focus-ring-width, var(--rfc-focus-ring-width, 2px)) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, var(--rfc-accent, #3b82f6)));
+  outline-offset: calc(var(--rozie-flow-focus-ring-width, var(--rfc-focus-ring-width, 2px)) * -1);
 }
 .rozie-flow-canvas.rozie-flow-canvas--lines[data-rozie-s-cd396d6a] {
   background:
-    linear-gradient(to right, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
-    linear-gradient(to bottom, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
-    var(--rozie-flow-bg, #f7f8fa);
+    linear-gradient(to right, var(--rozie-flow-grid-dot-color, var(--rfc-grid-dot-color, rgba(0, 0, 0, 0.08))) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, var(--rfc-grid-size, 20px)) var(--rozie-flow-grid-size, var(--rfc-grid-size, 20px)),
+    linear-gradient(to bottom, var(--rozie-flow-grid-dot-color, var(--rfc-grid-dot-color, rgba(0, 0, 0, 0.08))) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, var(--rfc-grid-size, 20px)) var(--rozie-flow-grid-size, var(--rfc-grid-size, 20px)),
+    var(--rozie-flow-bg, var(--rfc-bg, #f7f8fa));
 }
 .rozie-flow-canvas.rozie-flow-canvas--cross[data-rozie-s-cd396d6a] {
   background:
-    radial-gradient(ellipse 4px 1px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
-    radial-gradient(ellipse 1px 4px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
-    var(--rozie-flow-bg, #f7f8fa);
+    radial-gradient(ellipse 4px 1px at center, var(--rozie-flow-grid-dot-color, var(--rfc-grid-dot-color, rgba(0, 0, 0, 0.08))) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, var(--rfc-grid-size, 20px)) var(--rozie-flow-grid-size, var(--rfc-grid-size, 20px)),
+    radial-gradient(ellipse 1px 4px at center, var(--rozie-flow-grid-dot-color, var(--rfc-grid-dot-color, rgba(0, 0, 0, 0.08))) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, var(--rfc-grid-size, 20px)) var(--rozie-flow-grid-size, var(--rfc-grid-size, 20px)),
+    var(--rozie-flow-bg, var(--rfc-bg, #f7f8fa));
 }
 .rozie-flow-canvas.rozie-flow-canvas--none[data-rozie-s-cd396d6a] {
-  background: var(--rozie-flow-bg, #f7f8fa);
+  background: var(--rozie-flow-bg, var(--rfc-bg, #f7f8fa));
 }
 .rozie-flow-controls[data-rozie-s-cd396d6a] {
   position: absolute;
-  left: var(--rozie-flow-control-inset, 10px);
-  bottom: var(--rozie-flow-control-inset, 10px);
+  left: var(--rozie-flow-control-inset, var(--rfc-control-inset, 10px));
+  bottom: var(--rozie-flow-control-inset, var(--rfc-control-inset, 10px));
   z-index: 10;
   display: flex;
   flex-direction: column;
@@ -46,8 +46,8 @@
 }
 .rozie-flow-controls__btn[data-rozie-s-cd396d6a] {
   pointer-events: auto;
-  width: var(--rozie-flow-control-btn-size, 28px);
-  height: var(--rozie-flow-control-btn-size, 28px);
+  width: var(--rozie-flow-control-btn-size, var(--rfc-control-btn-size, 28px));
+  height: var(--rozie-flow-control-btn-size, var(--rfc-control-btn-size, 28px));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -58,48 +58,48 @@
      would silently change that cascade behavior. Every fallback below
      equals today's hardcoded literal, so the default render is pixel-
      identical to before this token was minted. */
-  font: 600 var(--rozie-flow-control-font-size, 16px)/1 var(--rozie-flow-font-family, system-ui, sans-serif);
-  color: var(--rozie-flow-control-fg, #334155);
-  background: var(--rozie-flow-control-bg, #ffffff);
-  border: 1px solid var(--rozie-flow-control-border, rgba(0, 0, 0, 0.16));
-  border-radius: var(--rozie-flow-control-radius, 6px);
-  box-shadow: var(--rozie-flow-control-shadow, 0 1px 3px rgba(0, 0, 0, 0.14));
+  font: 600 var(--rozie-flow-control-font-size, var(--rfc-control-font-size, 16px))/1 var(--rozie-flow-font-family, var(--rfc-font-family, system-ui, sans-serif));
+  color: var(--rozie-flow-control-fg, var(--rfc-control-fg, #334155));
+  background: var(--rozie-flow-control-bg, var(--rfc-control-bg, #ffffff));
+  border: 1px solid var(--rozie-flow-control-border, var(--rfc-control-border, rgba(0, 0, 0, 0.16)));
+  border-radius: var(--rozie-flow-control-radius, var(--rfc-control-radius, 6px));
+  box-shadow: var(--rozie-flow-control-shadow, var(--rfc-control-shadow, 0 1px 3px rgba(0, 0, 0, 0.14)));
   cursor: pointer;
   user-select: none;
 }
-.rozie-flow-controls__btn[data-rozie-s-cd396d6a]:hover { background: var(--rozie-flow-control-hover-bg, #f1f5f9); }
-.rozie-flow-controls__btn[data-rozie-s-cd396d6a]:active { background: var(--rozie-flow-control-active-bg, #e2e8f0); }
+.rozie-flow-controls__btn[data-rozie-s-cd396d6a]:hover { background: var(--rozie-flow-control-hover-bg, var(--rfc-control-hover-bg, #f1f5f9)); }
+.rozie-flow-controls__btn[data-rozie-s-cd396d6a]:active { background: var(--rozie-flow-control-active-bg, var(--rfc-control-active-bg, #e2e8f0)); }
 .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:focus-visible {
-  outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
-  outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+  outline: var(--rozie-flow-focus-ring-width, var(--rfc-focus-ring-width, 2px)) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, var(--rfc-accent, #3b82f6)));
+  outline-offset: calc(var(--rozie-flow-focus-ring-width, var(--rfc-focus-ring-width, 2px)) * -1);
 }
 .rozie-flow-controls__btn.is-active[data-rozie-s-cd396d6a] {
-  background: var(--rozie-flow-control-selected-bg, #dbeafe);
-  color: var(--rozie-flow-control-selected-fg, #1d4ed8);
-  border-color: var(--rozie-flow-control-selected-border, var(--rozie-flow-accent, #3b82f6));
+  background: var(--rozie-flow-control-selected-bg, var(--rfc-control-selected-bg, #dbeafe));
+  color: var(--rozie-flow-control-selected-fg, var(--rfc-control-selected-fg, #1d4ed8));
+  border-color: var(--rozie-flow-control-selected-border, var(--rozie-flow-accent, var(--rfc-accent, #3b82f6)));
 }
 .rozie-flow-marquee[data-rozie-s-cd396d6a] {
   position: absolute;
   display: none;
   z-index: 9;
   pointer-events: none;
-  background: var(--rozie-flow-marquee-bg, color-mix(in srgb, var(--rozie-flow-accent, #3b82f6) 12%, transparent));
-  border: 1px solid var(--rozie-flow-marquee-border, var(--rozie-flow-accent, #3b82f6));
+  background: var(--rozie-flow-marquee-bg, color-mix(in srgb, var(--rozie-flow-accent, var(--rfc-accent, #3b82f6)) 12%, transparent));
+  border: 1px solid var(--rozie-flow-marquee-border, var(--rozie-flow-accent, var(--rfc-accent, #3b82f6)));
   /* D-07: was a hardcoded 2px that ignored --rozie-flow-radius entirely, so a
      consumer setting a sharp-corner theme still got a rounded marquee. */
-  border-radius: var(--rozie-flow-marquee-radius, 2px);
+  border-radius: var(--rozie-flow-marquee-radius, var(--rfc-marquee-radius, 2px));
 }
 .rozie-flow-resize-handle[data-rozie-s-cd396d6a] {
   position: absolute;
   display: none;
   z-index: 12;
-  width: var(--rozie-flow-resize-handle-size, 8px);
-  height: var(--rozie-flow-resize-handle-size, 8px);
-  background: var(--rozie-flow-resize-handle-bg, #ffffff);
-  border: 1px solid var(--rozie-flow-resize-handle-border, var(--rozie-flow-accent, #3b82f6));
+  width: var(--rozie-flow-resize-handle-size, var(--rfc-resize-handle-size, 8px));
+  height: var(--rozie-flow-resize-handle-size, var(--rfc-resize-handle-size, 8px));
+  background: var(--rozie-flow-resize-handle-bg, var(--rfc-resize-handle-bg, #ffffff));
+  border: 1px solid var(--rozie-flow-resize-handle-border, var(--rozie-flow-accent, var(--rfc-accent, #3b82f6)));
   /* D-07: was a hardcoded 2px that ignored --rozie-flow-radius entirely, same
      fix as the marquee above. */
-  border-radius: var(--rozie-flow-resize-handle-radius, 2px);
+  border-radius: var(--rozie-flow-resize-handle-radius, var(--rfc-resize-handle-radius, 2px));
   pointer-events: auto;
   touch-action: none;
 }
@@ -108,8 +108,8 @@
 .rozie-flow-resize-handle--sw[data-rozie-s-cd396d6a] { cursor: nesw-resize; }
 .rozie-flow-resize-handle--se[data-rozie-s-cd396d6a] { cursor: nwse-resize; }
 .rozie-flow-resize-handle[data-rozie-s-cd396d6a]:focus-visible {
-  outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
-  outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+  outline: var(--rozie-flow-focus-ring-width, var(--rfc-focus-ring-width, 2px)) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, var(--rfc-accent, #3b82f6)));
+  outline-offset: calc(var(--rozie-flow-focus-ring-width, var(--rfc-focus-ring-width, 2px)) * -1);
 }
 .rozie-flow-minimap[data-rozie-s-cd396d6a] {
   position: absolute;
@@ -118,10 +118,10 @@
   z-index: 10;
   width: 200px;
   height: 150px;
-  background: var(--rozie-flow-minimap-bg, rgba(255, 255, 255, 0.82));
-  border: 1px solid var(--rozie-flow-minimap-border, rgba(0, 0, 0, 0.16));
-  border-radius: var(--rozie-flow-control-radius, 6px);
-  box-shadow: var(--rozie-flow-minimap-shadow, 0 1px 3px rgba(0, 0, 0, 0.14));
+  background: var(--rozie-flow-minimap-bg, var(--rfc-minimap-bg, rgba(255, 255, 255, 0.82)));
+  border: 1px solid var(--rozie-flow-minimap-border, var(--rfc-minimap-border, rgba(0, 0, 0, 0.16)));
+  border-radius: var(--rozie-flow-control-radius, var(--rfc-control-radius, 6px));
+  box-shadow: var(--rozie-flow-minimap-shadow, var(--rfc-minimap-shadow, 0 1px 3px rgba(0, 0, 0, 0.14)));
   overflow: hidden;
   cursor: pointer;
   touch-action: none;
@@ -133,23 +133,23 @@
   z-index: 11;
   gap: 4px;
   padding: 3px;
-  background: var(--rozie-flow-toolbar-bg, #ffffff);
-  border: 1px solid var(--rozie-flow-toolbar-border, rgba(0, 0, 0, 0.16));
-  border-radius: var(--rozie-flow-control-radius, 6px);
-  box-shadow: var(--rozie-flow-toolbar-shadow, 0 2px 8px rgba(0, 0, 0, 0.18));
+  background: var(--rozie-flow-toolbar-bg, var(--rfc-toolbar-bg, #ffffff));
+  border: 1px solid var(--rozie-flow-toolbar-border, var(--rfc-toolbar-border, rgba(0, 0, 0, 0.16)));
+  border-radius: var(--rozie-flow-control-radius, var(--rfc-control-radius, 6px));
+  box-shadow: var(--rozie-flow-toolbar-shadow, var(--rfc-toolbar-shadow, 0 2px 8px rgba(0, 0, 0, 0.18)));
   pointer-events: auto;
   white-space: nowrap;
 }
 .rozie-flow-toolbar__btn[data-rozie-s-cd396d6a] {
-  font: 600 var(--rozie-flow-toolbar-font-size, 12px)/1 var(--rozie-flow-font-family, system-ui, sans-serif);
-  color: var(--rozie-flow-toolbar-btn-fg, #334155);
-  background: var(--rozie-flow-toolbar-btn-bg, #f8fafc);
-  border: 1px solid var(--rozie-flow-toolbar-btn-border, rgba(0, 0, 0, 0.14));
+  font: 600 var(--rozie-flow-toolbar-font-size, var(--rfc-toolbar-font-size, 12px))/1 var(--rozie-flow-font-family, var(--rfc-font-family, system-ui, sans-serif));
+  color: var(--rozie-flow-toolbar-btn-fg, var(--rfc-toolbar-btn-fg, #334155));
+  background: var(--rozie-flow-toolbar-btn-bg, var(--rfc-toolbar-btn-bg, #f8fafc));
+  border: 1px solid var(--rozie-flow-toolbar-btn-border, var(--rfc-toolbar-btn-border, rgba(0, 0, 0, 0.14)));
   border-radius: 4px;
   padding: 4px 8px;
   cursor: pointer;
   user-select: none;
 }
-.rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:hover { background: var(--rozie-flow-toolbar-btn-hover-bg, #eef2f7); }
-.rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:active { background: var(--rozie-flow-control-active-bg, #e2e8f0); }
-.rozie-flow-toolbar__btn--delete[data-rozie-s-cd396d6a] { color: var(--rozie-flow-toolbar-delete-fg, #b91c1c); }
+.rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:hover { background: var(--rozie-flow-toolbar-btn-hover-bg, var(--rfc-toolbar-btn-hover-bg, #eef2f7)); }
+.rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:active { background: var(--rozie-flow-control-active-bg, var(--rfc-control-active-bg, #e2e8f0)); }
+.rozie-flow-toolbar__btn--delete[data-rozie-s-cd396d6a] { color: var(--rozie-flow-toolbar-delete-fg, var(--rfc-toolbar-delete-fg, #b91c1c)); }

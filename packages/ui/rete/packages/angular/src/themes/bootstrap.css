@@ -10,39 +10,57 @@
  *
  * Colors-only scope — sizing tokens are left unset so the `.rozie-flow-canvas`
  * defaults hold; selected/active tokens fall back to `--rozie-flow-accent`.
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rfc-x: var(--rozie-flow-x, <design-system variable>)`). The component reads every
+ * token public-first, so on all six targets:
+ *  - a public `--rozie-flow-*` token set on any ancestor (or on the canvas) wins;
+ *  - otherwise the design system's variable applies, resolved AT the canvas
+ *    (`.rozie-flow-canvas` and the Lit host `rozie-flow-canvas`), so a `.dark` /
+ *    `data-bs-theme` wrapper narrower than <html> is followed. It also takes precedence
+ *    over FlowCanvas's own dark palette (OS dark, or base.css's `.dark` class), which
+ *    sits on the document root: with a bridge imported the design system decides the
+ *    scheme for every token it maps;
+ *  - a Lit canvas nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
  */
-.rozie-flow-canvas {
-  --rozie-flow-accent: var(--bs-primary, #0d6efd);
-  --rozie-flow-bg: var(--bs-tertiary-bg, #f8f9fa);
-  --rozie-flow-grid-dot-color: var(--bs-border-color, #dee2e6);
-  --rozie-flow-border-color: var(--bs-border-color, #dee2e6);
+:root,
+.rozie-flow-canvas,
+rozie-flow-canvas {
+  --rfc-accent: var(--rozie-flow-accent, var(--bs-primary, #0d6efd));
+  --rfc-bg: var(--rozie-flow-bg, var(--bs-tertiary-bg, #f8f9fa));
+  --rfc-grid-dot-color: var(--rozie-flow-grid-dot-color, var(--bs-border-color, #dee2e6));
+  --rfc-border-color: var(--rozie-flow-border-color, var(--bs-border-color, #dee2e6));
 
-  --rozie-flow-node-bg: var(--bs-body-bg, #fff);
-  --rozie-flow-node-border: var(--bs-border-color, #dee2e6);
-  --rozie-flow-node-title-fg: var(--bs-body-color, #212529);
-  --rozie-flow-node-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  --rfc-node-bg: var(--rozie-flow-node-bg, var(--bs-body-bg, #fff));
+  --rfc-node-border: var(--rozie-flow-node-border, var(--bs-border-color, #dee2e6));
+  --rfc-node-title-fg: var(--rozie-flow-node-title-fg, var(--bs-body-color, #212529));
+  --rfc-node-shadow: var(--rozie-flow-node-shadow, 0 0.5rem 1rem rgba(0, 0, 0, 0.15));
 
-  --rozie-flow-port-fg: var(--bs-secondary-color, #6c757d);
-  --rozie-flow-socket-bg: var(--bs-secondary, #6c757d);
-  --rozie-flow-socket-border-color: var(--bs-body-bg, #fff);
+  --rfc-port-fg: var(--rozie-flow-port-fg, var(--bs-secondary-color, #6c757d));
+  --rfc-socket-bg: var(--rozie-flow-socket-bg, var(--bs-secondary, #6c757d));
+  --rfc-socket-border-color: var(--rozie-flow-socket-border-color, var(--bs-body-bg, #fff));
 
-  --rozie-flow-connection-stroke: var(--bs-secondary, #6c757d);
-  --rozie-flow-connection-label-fg: var(--bs-body-color, #212529);
-  --rozie-flow-connection-label-halo: var(--bs-body-bg, #fff);
+  --rfc-connection-stroke: var(--rozie-flow-connection-stroke, var(--bs-secondary, #6c757d));
+  --rfc-connection-label-fg: var(--rozie-flow-connection-label-fg, var(--bs-body-color, #212529));
+  --rfc-connection-label-halo: var(--rozie-flow-connection-label-halo, var(--bs-body-bg, #fff));
 
-  --rozie-flow-control-bg: var(--bs-body-bg, #fff);
-  --rozie-flow-control-fg: var(--bs-body-color, #212529);
-  --rozie-flow-control-border: var(--bs-border-color, #dee2e6);
-  --rozie-flow-control-hover-bg: var(--bs-tertiary-bg, #f8f9fa);
-  --rozie-flow-control-active-bg: var(--bs-secondary-bg, #e9ecef);
+  --rfc-control-bg: var(--rozie-flow-control-bg, var(--bs-body-bg, #fff));
+  --rfc-control-fg: var(--rozie-flow-control-fg, var(--bs-body-color, #212529));
+  --rfc-control-border: var(--rozie-flow-control-border, var(--bs-border-color, #dee2e6));
+  --rfc-control-hover-bg: var(--rozie-flow-control-hover-bg, var(--bs-tertiary-bg, #f8f9fa));
+  --rfc-control-active-bg: var(--rozie-flow-control-active-bg, var(--bs-secondary-bg, #e9ecef));
 
-  --rozie-flow-minimap-bg: var(--bs-body-bg, #fff);
-  --rozie-flow-minimap-border: var(--bs-border-color, #dee2e6);
-  --rozie-flow-minimap-node-fill: var(--bs-secondary, #6c757d);
+  --rfc-minimap-bg: var(--rozie-flow-minimap-bg, var(--bs-body-bg, #fff));
+  --rfc-minimap-border: var(--rozie-flow-minimap-border, var(--bs-border-color, #dee2e6));
+  --rfc-minimap-node-fill: var(--rozie-flow-minimap-node-fill, var(--bs-secondary, #6c757d));
 
-  --rozie-flow-toolbar-bg: var(--bs-body-bg, #fff);
-  --rozie-flow-toolbar-border: var(--bs-border-color, #dee2e6);
-  --rozie-flow-toolbar-btn-bg: var(--bs-tertiary-bg, #f8f9fa);
-  --rozie-flow-toolbar-btn-fg: var(--bs-body-color, #212529);
-  --rozie-flow-toolbar-delete-fg: var(--bs-danger, #dc3545);
+  --rfc-toolbar-bg: var(--rozie-flow-toolbar-bg, var(--bs-body-bg, #fff));
+  --rfc-toolbar-border: var(--rozie-flow-toolbar-border, var(--bs-border-color, #dee2e6));
+  --rfc-toolbar-btn-bg: var(--rozie-flow-toolbar-btn-bg, var(--bs-tertiary-bg, #f8f9fa));
+  --rfc-toolbar-btn-fg: var(--rozie-flow-toolbar-btn-fg, var(--bs-body-color, #212529));
+  --rfc-toolbar-delete-fg: var(--rozie-flow-toolbar-delete-fg, var(--bs-danger, #dc3545));
 }

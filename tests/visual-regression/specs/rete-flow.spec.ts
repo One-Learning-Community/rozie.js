@@ -3638,8 +3638,8 @@ for (const target of TARGETS) {
 
     // ---- 1. LIGHT baseline: the tokens are UNDEFINED; the fallbacks render ----
     expect(
-      await cssVar('--rozie-flow-bg'),
-      'in a light context the component defines NO --rozie-flow-* tokens (themes/*.css is an opt-in import the VR demos never make) — the var() fallbacks do the work',
+      await cssVar('--rfc-bg'),
+      'in a light context the component defines NO palette value (themes/*.css is an opt-in import the VR demos never make) — the var() fallbacks do the work',
     ).toBe('');
     expect(await bgColor()).toBe('rgb(247, 248, 250)');
     expect(await nodeBg()).toBe('rgb(255, 255, 255)');
@@ -3647,15 +3647,19 @@ for (const target of TARGETS) {
     // ---- 2. FLIP to dark ----
     await page.emulateMedia({ colorScheme: 'dark' });
 
-    // ---- 3. DARK, DECLARATIVE: tokens defined AND rendered colours changed ----
+    // ---- 3. DARK, DECLARATIVE: palette defined AND rendered colours changed ----
+    // The built-in dark palette lives on the PRIVATE `--rfc-*` names every read site falls
+    // back to after the public token (since 2026-09-25), so the public `--rozie-flow-*`
+    // tokens stay unset — free for an app to set on any ancestor — while the palette applies.
     await expect
-      .poll(() => cssVar('--rozie-flow-bg'), {
+      .poll(() => cssVar('--rfc-bg'), {
         timeout: 10_000,
         intervals: [100, 300, 600, 1000],
       })
       .toBe('#0f172a');
-    expect(await cssVar('--rozie-flow-node-bg')).toBe('#1e293b');
-    expect(await cssVar('--rozie-flow-accent')).toBe('#60a5fa');
+    expect(await cssVar('--rfc-node-bg')).toBe('#1e293b');
+    expect(await cssVar('--rfc-accent')).toBe('#60a5fa');
+    expect(await cssVar('--rozie-flow-bg'), 'the public token stays unset').toBe('');
     // rendered, not merely declared — a declared-but-unapplied token passes a
     // property-only check.
     await expect.poll(bgColor, { timeout: 10_000 }).toBe('rgb(15, 23, 42)');
@@ -3673,7 +3677,7 @@ for (const target of TARGETS) {
     // ---- 5. BACK TO LIGHT: everything reverts (the media query did it, not a hardcode) ----
     await page.emulateMedia({ colorScheme: 'light' });
     await expect
-      .poll(() => cssVar('--rozie-flow-bg'), {
+      .poll(() => cssVar('--rfc-bg'), {
         timeout: 10_000,
         intervals: [100, 300, 600, 1000],
       })

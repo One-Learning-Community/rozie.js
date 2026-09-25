@@ -2031,15 +2031,17 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // Resolve a `--rozie-flow-*` token off the live canvas element for the imperative
     // SVG attributes that can't take a raw `var()` (the arrowhead fill + the minimap
     // node/mask/viewport colors). Reads post-mount (container is live here → ROZ123-safe)
-    // via getComputedStyle; the custom property inherits onto `.rozie-flow-canvas` from
-    // any theme import (themes/base.css dark overrides, the shadcn/material/bootstrap
-    // bridges) or `:root` override, and falls back to the historical literal when unset —
-    // so the zero-import light default stays byte-identical while an imported dark theme
-    // + design-system bridges track automatically.
+    // via getComputedStyle, in the same order the stylesheet's read sites use: the public
+    // token (set on any ancestor or on the canvas), then its private `--rfc-*` wiring (the
+    // built-in OS-dark palette, themes/base.css's defaults and `.dark` palette, or a
+    // shadcn/material/bootstrap bridge), then the historical literal — so the zero-import
+    // light default stays byte-identical while dark and the bridges track automatically.
     const flowToken = (name: any, fallback: any) => {
       try {
-        const v = container ? getComputedStyle(container).getPropertyValue(name) : '';
-        return v && v.trim() || fallback;
+        if (!container) return fallback;
+        const cs = getComputedStyle(container);
+        const v = cs.getPropertyValue(name).trim() || cs.getPropertyValue(name.replace('--rozie-flow-', '--rfc-')).trim();
+        return v || fallback;
       } catch (e: any) {
         return fallback;
       }

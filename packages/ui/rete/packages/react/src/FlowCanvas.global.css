@@ -1,44 +1,44 @@
 @media (prefers-color-scheme: dark) {
     :where(:root:not(.light):not([data-theme="light"])) {
-      --rozie-flow-accent: #60a5fa;
-      --rozie-flow-bg: #0f172a;
-      --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
-      --rozie-flow-border-color: rgba(255, 255, 255, 0.1);
-      --rozie-flow-node-bg: #1e293b;
-      --rozie-flow-node-border: rgba(255, 255, 255, 0.12);
-      --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-      --rozie-flow-node-selected-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-      --rozie-flow-node-title-fg: #e2e8f0;
-      --rozie-flow-node-selected-ring: rgba(96, 165, 250, 0.5);
-      --rozie-flow-port-fg: #94a3b8;
-      --rozie-flow-socket-bg: #64748b;
-      --rozie-flow-socket-border-color: #1e293b;
-      --rozie-flow-socket-ring: rgba(255, 255, 255, 0.16);
-      --rozie-flow-connection-stroke: #64748b;
-      --rozie-flow-connection-label-fg: #e2e8f0;
-      --rozie-flow-connection-label-halo: #0f172a;
-      --rozie-flow-control-bg: #1e293b;
-      --rozie-flow-control-fg: #cbd5e1;
-      --rozie-flow-control-border: rgba(255, 255, 255, 0.14);
-      --rozie-flow-control-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
-      --rozie-flow-control-hover-bg: #334155;
-      --rozie-flow-control-active-bg: #475569;
-      --rozie-flow-control-selected-bg: #1e3a8a;
-      --rozie-flow-control-selected-fg: #bfdbfe;
-      --rozie-flow-minimap-bg: rgba(15, 23, 42, 0.82);
-      --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
-      --rozie-flow-minimap-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
-      --rozie-flow-minimap-node-fill: #64748b;
-      --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
-      --rozie-flow-resize-handle-bg: #1e293b;
-      --rozie-flow-toolbar-bg: #1e293b;
-      --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
-      --rozie-flow-toolbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-      --rozie-flow-toolbar-btn-bg: #334155;
-      --rozie-flow-toolbar-btn-fg: #cbd5e1;
-      --rozie-flow-toolbar-btn-border: rgba(255, 255, 255, 0.12);
-      --rozie-flow-toolbar-btn-hover-bg: #475569;
-      --rozie-flow-toolbar-delete-fg: #f87171;
+      --rfc-accent: #60a5fa;
+      --rfc-bg: #0f172a;
+      --rfc-grid-dot-color: rgba(255, 255, 255, 0.06);
+      --rfc-border-color: rgba(255, 255, 255, 0.1);
+      --rfc-node-bg: #1e293b;
+      --rfc-node-border: rgba(255, 255, 255, 0.12);
+      --rfc-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      --rfc-node-selected-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      --rfc-node-title-fg: #e2e8f0;
+      --rfc-node-selected-ring: rgba(96, 165, 250, 0.5);
+      --rfc-port-fg: #94a3b8;
+      --rfc-socket-bg: #64748b;
+      --rfc-socket-border-color: #1e293b;
+      --rfc-socket-ring: rgba(255, 255, 255, 0.16);
+      --rfc-connection-stroke: #64748b;
+      --rfc-connection-label-fg: #e2e8f0;
+      --rfc-connection-label-halo: #0f172a;
+      --rfc-control-bg: #1e293b;
+      --rfc-control-fg: #cbd5e1;
+      --rfc-control-border: rgba(255, 255, 255, 0.14);
+      --rfc-control-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+      --rfc-control-hover-bg: #334155;
+      --rfc-control-active-bg: #475569;
+      --rfc-control-selected-bg: #1e3a8a;
+      --rfc-control-selected-fg: #bfdbfe;
+      --rfc-minimap-bg: rgba(15, 23, 42, 0.82);
+      --rfc-minimap-border: rgba(255, 255, 255, 0.14);
+      --rfc-minimap-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+      --rfc-minimap-node-fill: #64748b;
+      --rfc-minimap-mask: rgba(0, 0, 0, 0.35);
+      --rfc-resize-handle-bg: #1e293b;
+      --rfc-toolbar-bg: #1e293b;
+      --rfc-toolbar-border: rgba(255, 255, 255, 0.14);
+      --rfc-toolbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      --rfc-toolbar-btn-bg: #334155;
+      --rfc-toolbar-btn-fg: #cbd5e1;
+      --rfc-toolbar-btn-border: rgba(255, 255, 255, 0.12);
+      --rfc-toolbar-btn-hover-bg: #475569;
+      --rfc-toolbar-delete-fg: #f87171;
     }
   }
 .rozie-flow-canvas .rozie-flow-node {
@@ -64,28 +64,28 @@
     grid-template-columns: auto 1fr auto;
     align-items: stretch;
     min-width: 140px;
-    background: var(--rozie-flow-node-bg, #ffffff);
-    border: 1px solid var(--rozie-flow-node-border, rgba(0, 0, 0, 0.16));
-    border-radius: var(--rozie-flow-node-radius, 8px);
-    box-shadow: var(--rozie-flow-node-shadow, 0 2px 6px rgba(0, 0, 0, 0.12));
+    background: var(--rozie-flow-node-bg, var(--rfc-node-bg, #ffffff));
+    border: 1px solid var(--rozie-flow-node-border, var(--rfc-node-border, rgba(0, 0, 0, 0.16)));
+    border-radius: var(--rozie-flow-node-radius, var(--rfc-node-radius, 8px));
+    box-shadow: var(--rozie-flow-node-shadow, var(--rfc-node-shadow, 0 2px 6px rgba(0, 0, 0, 0.12)));
     user-select: none;
     cursor: grab;
-    font: var(--rozie-flow-node-font-size, 13px)/1.4 var(--rozie-flow-font-family, system-ui, sans-serif);
+    font: var(--rozie-flow-node-font-size, var(--rfc-node-font-size, 13px))/1.4 var(--rozie-flow-font-family, var(--rfc-font-family, system-ui, sans-serif));
   }
 .rozie-flow-canvas .rozie-flow-node:active { cursor: grabbing; }
 .rozie-flow-canvas .rozie-flow-node.is-selected {
-    border-color: var(--rozie-flow-node-selected-border, var(--rozie-flow-accent, #3b82f6));
-    box-shadow: 0 0 0 2px var(--rozie-flow-node-selected-ring, rgba(59, 130, 246, 0.5)), var(--rozie-flow-node-selected-shadow, 0 2px 8px rgba(0, 0, 0, 0.15));
+    border-color: var(--rozie-flow-node-selected-border, var(--rozie-flow-accent, var(--rfc-accent, #3b82f6)));
+    box-shadow: 0 0 0 2px var(--rozie-flow-node-selected-ring, var(--rfc-node-selected-ring, rgba(59, 130, 246, 0.5))), var(--rozie-flow-node-selected-shadow, var(--rfc-node-selected-shadow, 0 2px 8px rgba(0, 0, 0, 0.15)));
   }
 .rozie-flow-canvas .rozie-flow-node__title {
     padding: 0.5rem 0.75rem;
     font-weight: 600;
-    color: var(--rozie-flow-node-title-fg, #1f2937);
+    color: var(--rozie-flow-node-title-fg, var(--rfc-node-title-fg, #1f2937));
     white-space: nowrap;
   }
 .rozie-flow-canvas .rozie-flow-node__body {
     min-width: 0;
-    padding: var(--rozie-flow-node-body-padding, 0.5rem 0.75rem);
+    padding: var(--rozie-flow-node-body-padding, var(--rfc-node-body-padding, 0.5rem 0.75rem));
   }
 .rozie-flow-canvas .rozie-flow-node__col {
     display: flex;
@@ -99,25 +99,25 @@
     align-items: center;
     gap: 0.375rem;
     font-size: 0.75rem;
-    color: var(--rozie-flow-port-fg, #6b7280);
+    color: var(--rozie-flow-port-fg, var(--rfc-port-fg, #6b7280));
   }
 .rozie-flow-canvas .rozie-flow-port--output { justify-content: flex-end; }
 .rozie-flow-canvas .rozie-flow-socket {
     box-sizing: border-box;
-    width: var(--rozie-flow-socket-size, 16px);
-    height: var(--rozie-flow-socket-size, 16px);
+    width: var(--rozie-flow-socket-size, var(--rfc-socket-size, 16px));
+    height: var(--rozie-flow-socket-size, var(--rfc-socket-size, 16px));
     border-radius: 50%;
-    background: var(--rozie-flow-socket-bg, #94a3b8);
-    border: var(--rozie-flow-socket-border-width, 2px) solid var(--rozie-flow-socket-border-color, #ffffff);
-    box-shadow: 0 0 0 1px var(--rozie-flow-socket-ring, rgba(0, 0, 0, 0.2));
+    background: var(--rozie-flow-socket-bg, var(--rfc-socket-bg, #94a3b8));
+    border: var(--rozie-flow-socket-border-width, var(--rfc-socket-border-width, 2px)) solid var(--rozie-flow-socket-border-color, var(--rfc-socket-border-color, #ffffff));
+    box-shadow: 0 0 0 1px var(--rozie-flow-socket-ring, var(--rfc-socket-ring, rgba(0, 0, 0, 0.2)));
     cursor: crosshair;
     flex: none;
   }
-.rozie-flow-canvas .rozie-flow-socket--input { margin-left: calc(var(--rozie-flow-socket-size, 16px) / -2); }
-.rozie-flow-canvas .rozie-flow-socket--output { margin-right: calc(var(--rozie-flow-socket-size, 16px) / -2); }
-.rozie-flow-canvas .rozie-flow-socket:hover { background: var(--rozie-flow-socket-hover-bg, var(--rozie-flow-accent, #3b82f6)); }
+.rozie-flow-canvas .rozie-flow-socket--input { margin-left: calc(var(--rozie-flow-socket-size, var(--rfc-socket-size, 16px)) / -2); }
+.rozie-flow-canvas .rozie-flow-socket--output { margin-right: calc(var(--rozie-flow-socket-size, var(--rfc-socket-size, 16px)) / -2); }
+.rozie-flow-canvas .rozie-flow-socket:hover { background: var(--rozie-flow-socket-hover-bg, var(--rozie-flow-accent, var(--rfc-accent, #3b82f6))); }
 .rozie-flow-canvas .rozie-flow-socket--incompatible {
-    opacity: var(--rozie-flow-socket-incompatible-opacity, 0.3);
+    opacity: var(--rozie-flow-socket-incompatible-opacity, var(--rfc-socket-incompatible-opacity, 0.3));
     cursor: not-allowed;
   }
 .rozie-flow-canvas .rozie-flow-node--rows {
@@ -144,8 +144,8 @@
   }
 .rozie-flow-canvas .rozie-flow-socket--top,
   .rozie-flow-canvas .rozie-flow-socket--bottom { margin-left: 0; margin-right: 0; }
-.rozie-flow-canvas .rozie-flow-socket--top { margin-top: calc(var(--rozie-flow-socket-size, 16px) / -2); }
-.rozie-flow-canvas .rozie-flow-socket--bottom { margin-bottom: calc(var(--rozie-flow-socket-size, 16px) / -2); }
+.rozie-flow-canvas .rozie-flow-socket--top { margin-top: calc(var(--rozie-flow-socket-size, var(--rfc-socket-size, 16px)) / -2); }
+.rozie-flow-canvas .rozie-flow-socket--bottom { margin-bottom: calc(var(--rozie-flow-socket-size, var(--rfc-socket-size, 16px)) / -2); }
 .rozie-flow-canvas .rozie-flow-connection { position: absolute; }
 .rozie-flow-canvas .rozie-flow-connection__svg {
     /* display:block is LOAD-BEARING, not cosmetic. An <svg> is display:inline by
@@ -168,25 +168,25 @@
   }
 .rozie-flow-canvas .rozie-flow-connection__path {
     fill: none;
-    stroke: var(--rozie-flow-connection-stroke, #64748b);
-    stroke-width: var(--rozie-flow-connection-width, 3px);
+    stroke: var(--rozie-flow-connection-stroke, var(--rfc-connection-stroke, #64748b));
+    stroke-width: var(--rozie-flow-connection-width, var(--rfc-connection-width, 3px));
     pointer-events: auto;
   }
 .rozie-flow-canvas .rozie-flow-connection__path.is-selected {
-    stroke: var(--rozie-flow-connection-selected-stroke, var(--rozie-flow-accent, #3b82f6));
-    stroke-width: var(--rozie-flow-connection-selected-width, 4px);
+    stroke: var(--rozie-flow-connection-selected-stroke, var(--rozie-flow-accent, var(--rfc-accent, #3b82f6)));
+    stroke-width: var(--rozie-flow-connection-selected-width, var(--rfc-connection-selected-width, 4px));
   }
 .rozie-flow-canvas .rozie-flow-connection__label {
-    font: 600 var(--rozie-flow-connection-label-font-size, 11px) var(--rozie-flow-font-family, system-ui, sans-serif);
-    fill: var(--rozie-flow-connection-label-fg, #334155);
+    font: 600 var(--rozie-flow-connection-label-font-size, var(--rfc-connection-label-font-size, 11px)) var(--rozie-flow-font-family, var(--rfc-font-family, system-ui, sans-serif));
+    fill: var(--rozie-flow-connection-label-fg, var(--rfc-connection-label-fg, #334155));
     paint-order: stroke;
-    stroke: var(--rozie-flow-connection-label-halo, #ffffff);
+    stroke: var(--rozie-flow-connection-label-halo, var(--rfc-connection-label-halo, #ffffff));
     stroke-width: 3px;
     stroke-linejoin: round;
     pointer-events: none;
     user-select: none;
   }
 .rozie-flow-canvas .rozie-flow-toolbar__btn:focus-visible {
-    outline: var(--rozie-flow-focus-ring-width, 2px) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, #3b82f6));
-    outline-offset: calc(var(--rozie-flow-focus-ring-width, 2px) * -1);
+    outline: var(--rozie-flow-focus-ring-width, var(--rfc-focus-ring-width, 2px)) solid var(--rozie-flow-focus-ring, var(--rozie-flow-accent, var(--rfc-accent, #3b82f6)));
+    outline-offset: calc(var(--rozie-flow-focus-ring-width, var(--rfc-focus-ring-width, 2px)) * -1);
   }
