@@ -102,7 +102,6 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
     <Column field="role" header="Role" :sortable="true" :filterable="true" :editable="true" editor="custom" />
     <Column field="level" header="Level" :sortable="true" :filterable="true" />
     <Column field="location" header="Location" :sortable="true" />
-
     <!-- #groupBar → the drag-to-group bar drop-in -->
     <template #groupBar="{ grouping, groupableColumns, applyGrouping, clearGrouping }">
       <GroupBar
@@ -112,7 +111,6 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
         :clearGrouping="clearGrouping"
       />
     </template>
-
     <!-- One #filter slot, dispatched by columnId to the matching filter drop-in -->
     <template #filter="{ columnId, value, uniqueValues, minMax, setFilter }">
       <FilterSelect
@@ -136,7 +134,6 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
         :setFilter="setFilter"
       />
     </template>
-
     <!-- One #editor slot, dispatched by columnId to the matching editor drop-in -->
     <template #editor="{ columnId, column, row, value, commit, cancel, autofocus }">
       <EditorSelect
@@ -161,7 +158,6 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
         :autofocus="autofocus"
       />
     </template>
-
     <!-- #detail → the expandable-row starter panel drop-in -->
     <template #detail="{ row }">
       <DetailPanel :row="row" />
@@ -215,7 +211,6 @@ The same package, now with **no drop-ins** — just the headless `<DataTable>` a
     <Column field="email" header="Email" :sortable="true" />
     <Column field="status" header="Status" :sortable="true" />
     <Column field="score" header="Score" :sortable="true" />
-
     <!-- One #cell slot on <DataTable>, dispatched by columnId -->
     <template #cell="{ columnId, value }">
       <span v-if="columnId === 'status'" class="dt-badge" :class="'dt-badge--' + value">{{ value }}</span>
