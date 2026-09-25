@@ -12,8 +12,8 @@ The values listed below are exposed as `--rozie-data-table-*` custom properties,
 Scope, stated plainly: remapping the public tokens re-skins the table's primary surfaces — type, borders, background, header, row, cell padding, accent, and the max-height. It does NOT reach every cosmetic value. 58 of the 82 internal tokens have no public counterpart today, including the grid active-cell ring, the range highlight, the fill handle, the invalid-cell outline, the group tokens, the filter row, the per-header column ⋯ menu, most of the pagination bar (only --rozie-data-table-control-border-color, --rozie-data-table-radius, and --rozie-data-table-disabled-opacity are public — its background, padding, and status-text size are not), and the chrome column widths. Those remain internal and may be renamed; a design system that needs them should set the `--rdt-*` name directly and accept that it is not yet a stable API. Those two counts are `&lt;DataTable>`'s own; the sibling `&lt;GroupBar>` reads 9 further internal tokens (`--rdt-group-drop-zone-*`, `--rdt-group-drop-marker`, `--rdt-focus-ring`), none of them public and all of them likewise inline-defaulted. One Lit-specific rule: set the public tokens at or ABOVE the `&lt;rozie-data-table>` element (`:root`, a wrapper, or the element itself), never on the `.rozie-data-table` / `.rozie-data-table-wrap` classes — on that target both of those render inside the component's shadow root, where a document stylesheet cannot reach them. The tokens themselves inherit across the boundary, and the component carries the mapping internally, so every one of the 18 works there.
 
 ```css
-:where(:root) {
-  --rozie-data-table-fg: inherit;
+:root {
+  --rozie-data-table-fg: currentColor;
   --rozie-data-table-font: 14px system-ui, sans-serif;
   --rozie-data-table-header-bg: #f7f7f7;
   --rozie-data-table-sort-indicator-opacity: 0.7;
@@ -24,11 +24,12 @@ Scope, stated plainly: remapping the public tokens re-skins the table's primary 
 
 ### palette (the few values most consumers will set)
 
-These public tokens aren't read directly by a CSS var() inside this component's own scoped &lt;style> — that is by design. This is the public surface; the "Wire the PUBLIC tokens..." block further down assigns each one onto the short internal --rdt-* custom property the component actually reads.
+`currentColor` for `color` is the inherited text colour: the table takes its container's colour unless the token is set. The accent is read through the two tokens that default to it — the selection checkboxes (next line) and the resize grip while dragging — so it follows an accent set on any ancestor.
 
 | Token | Default |
 | --- | --- |
-| `--rozie-data-table-fg` | `inherit` |
+| `--rozie-data-table-fg` | `currentColor` |
+| `--rozie-data-table-select-accent` | `var(--rozie-data-table-accent, #0066cc)` |
 | `--rozie-data-table-accent` | `#0066cc` |
 | `--rozie-data-table-border-color` | `rgba(0, 0, 0, 0.08)` |
 | `--rozie-data-table-control-border-color` | `rgba(0, 0, 0, 0.2)` |
@@ -56,13 +57,12 @@ OPAQUE (was rgba(0,0,0,0.03)): a translucent header lets the scrolling body blee
 | --- | --- |
 | `--rozie-data-table-sort-indicator-opacity` | `0.7` |
 
-### resize handle
-
-The grip while dragging takes the public --rozie-data-table-resize-grip-active, which defaults to --rozie-data-table-accent AS RESOLVED AT THE TABLE, so an accent set on any ancestor moves it too. That default is applied where the table reads the token (the wiring below), not declared with the others: declared at the root, it would be computed against the root's accent once and never follow a narrower one.
+### The grip while dragging defaults to the accent, resolved at the table.
 
 | Token | Default |
 | --- | --- |
 | `--rozie-data-table-resize-grip-color` | `rgba(0, 0, 0, 0.12)` |
+| `--rozie-data-table-resize-grip-active` | `var(--rozie-data-table-accent, #0066cc)` |
 
 ### pin controls
 
@@ -79,28 +79,17 @@ The grip while dragging takes the public --rozie-data-table-resize-grip-active, 
 
 ### disabled pagination controls
 
-(The selection checkboxes take the public --rozie-data-table-select-accent, which likewise defaults to the accent resolved at the table — see the resize-handle note.)
-
 | Token | Default |
 | --- | --- |
 | `--rozie-data-table-disabled-opacity` | `0.4` |
 
 ### virtual scroll (row windowing)
 
-Read with NO fallback at its one use site (`max-height: var(--rozie-data-table-max-height);` on `.rdt-scroll`) — when unset the property is invalid at computed-value time and the rule behaves as if `max-height` were never declared there, i.e. `none` (unbounded). Declaring `none` here is the render-neutral equivalent of that unset behavior, made explicit and overridable.
+Read with NO fallback at its one use site (`max-height: var(--rozie-data-table-max-height);` on `.rdt-scroll`) — when unset the property is invalid at computed-value time and the rule behaves as if `max-height` were never declared there, i.e. `none` (unbounded). No bridge maps it, so its default is declared, at zero specificity on the document root: `none` is the render-neutral equivalent of that unset behavior, made explicit and overridable.
 
 | Token | Default |
 | --- | --- |
 | `--rozie-data-table-max-height` | `none` |
-
-### Defaulted where the table reads them
-
-Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the table itself — so it follows a value set on any ancestor.
-
-| Token | Default |
-| --- | --- |
-| `--rozie-data-table-resize-grip-active` | `var(--rozie-data-table-accent)` |
-| `--rozie-data-table-select-accent` | `var(--rozie-data-table-accent)` |
 
 ## Design-system bridges
 

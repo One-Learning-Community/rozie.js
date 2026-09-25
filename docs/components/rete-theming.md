@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-flow-*` custom properties, each with a built-in fallback, so `FlowCanvas` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-flow-canvas {
+:root {
   --rozie-flow-accent: #3b82f6;
   --rozie-flow-bg: #f7f8fa;
   --rozie-flow-node-bg: #ffffff;

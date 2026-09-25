@@ -6,44 +6,62 @@
  * theme builders. Falls back to the baseline M3 light palette when those vars are
  * absent, so it renders correctly even without a generated theme.
  *
- * Import this AFTER base.css (base.css wires the public tokens onto the internal
- * `--rdt-*` the component reads):
+ * Import it together with base.css (which supplies the wiring for every token this file
+ * does not map):
  *
  *   import '@rozie-ui/data-table-react/themes/base.css';
  *   import '@rozie-ui/data-table-react/themes/material.css';
  *
- * SCOPE (changed 2026-09-12, F-01; narrowed to `:root` alone 2026-09-25). A design-system
- * bridge is an app-wide skin by nature, and `:root` is the only scope that reaches the Lit
- * leaf: there, `.rozie-data-table-wrap` and `.rozie-data-table` both render INSIDE the
- * component's shadow root, where a document-level class selector can never match. The bridge
- * used to assign its tokens on those two classes as well, but a value an element declares for
- * itself beats any value it would inherit, so that copy made every ancestor override of a
- * public token dead on the five light-DOM targets. At `:root` only, the bridge beats base.css's
- * zero-specificity defaults in either import order, and a public token set on any ancestor of
- * the table wins over the bridge on all six targets (as does one set on the table's own
- * classes, on the five light-DOM targets).
- * Trade-offs, stated rather than buried: two tables on one page cannot take DIFFERENT bridges
- * by ancestor class alone, and the design system's own variables are read at the document
- * root, so a theme scope set on a narrower wrapper (rather than on `<html>`) does not re-skin
- * the table. Set the public tokens on that wrapper instead.
+ * HOW IT MAPS (2026-09-25). This bridge declares NO public token. It re-declares the lines
+ * of base.css's wiring that read a token it maps, with the design system's variable in place
+ * of base.css's default: `--rdt-header-bg: var(--rozie-data-table-header-bg, <DS variable>)`.
+ * So, on all six targets:
+ *  - a public `--rozie-data-table-*` token set on any ancestor (or on the table itself) wins,
+ *    by plain inheritance — nothing on the way to the table declares one;
+ *  - otherwise the design system's variable is resolved AT the table, so the table follows
+ *    the nearest theme scope — a `.dark` / `data-bs-theme` wrapper as well as `<html>`;
+ *  - otherwise the design system's own default below applies.
+ * The rule names `.rozie-data-table-wrap`, `.rozie-data-table` and the Lit host element
+ * `rozie-data-table` (on Lit the two classes render inside the shadow root, where a document
+ * stylesheet cannot reach; the host is outside it, and a document rule for a host beats the
+ * component's own `:host` rule). base.css's copy sits under `:where()`, so this file wins in
+ * either import order; base.css still supplies every line this file does not map.
  */
+.rozie-data-table-wrap,
+.rozie-data-table,
+rozie-data-table {
+  --rdt-color: var(--rozie-data-table-fg, var(--md-sys-color-on-surface, #1d1b20));
+  --rdt-select-accent: var(--rozie-data-table-select-accent, var(--rozie-data-table-accent, var(--md-sys-color-primary, #6750a4)));
+  --rdt-border: 1px solid var(--rozie-data-table-border-color, var(--md-sys-color-outline-variant, #cac4d0));
+  --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color, var(--md-sys-color-outline, #79747e));
+  --rdt-header-bg: var(--rozie-data-table-header-bg, var(--md-sys-color-surface-container-highest, #e6e0e9));
+  --rdt-header-weight: var(--rozie-data-table-header-weight, 500);
+  --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color, var(--md-sys-color-outline-variant, #cac4d0));
+  --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active, var(--rozie-data-table-accent, var(--md-sys-color-primary, #6750a4)));
+  --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg, var(--md-sys-color-secondary-container, #e8def8));
+  --rdt-colvis-menu-bg: var(--rozie-data-table-menu-bg, var(--md-sys-color-surface-container, #f3edf7));
+  --rdt-colvis-menu-shadow: var(--rozie-data-table-menu-shadow, 0 2px 6px rgb(0 0 0 / 0.3));
+  --rdt-colvis-menu-border: 1px solid var(--rozie-data-table-border-color, var(--md-sys-color-outline-variant, #cac4d0));
+  --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color, var(--md-sys-color-outline, #79747e));
+  --rdt-page-btn-border: 1px solid var(--rozie-data-table-control-border-color, var(--md-sys-color-outline, #79747e));
+  --rdt-page-size-border: 1px solid var(--rozie-data-table-control-border-color, var(--md-sys-color-outline, #79747e));
+}
+
+/* The same mapping as private `--rdt-ds-*` values on the document root, which the Lit
+   leaf's own `:host` wiring falls back to when no selector can reach its host (a table
+   nested in another shadow root): there the design system's variables are read at the
+   document root. Internal: not a stable API. */
 :root {
-  --rozie-data-table-fg: var(--md-sys-color-on-surface, #1d1b20);
-  --rozie-data-table-accent: var(--md-sys-color-primary, #6750a4);
-  --rozie-data-table-border-color: var(--md-sys-color-outline-variant, #cac4d0);
-  --rozie-data-table-control-border-color: var(--md-sys-color-outline, #79747e);
-  --rozie-data-table-radius: 4px;
-
-  --rozie-data-table-header-bg: var(--md-sys-color-surface-container-highest, #e6e0e9);
-  --rozie-data-table-header-weight: 500;
-
-  --rozie-data-table-resize-grip-color: var(--md-sys-color-outline-variant, #cac4d0);
-  --rozie-data-table-resize-grip-active: var(--md-sys-color-primary, #6750a4);
-
-  --rozie-data-table-pin-active-bg: var(--md-sys-color-secondary-container, #e8def8);
-
-  --rozie-data-table-menu-bg: var(--md-sys-color-surface-container, #f3edf7);
-  --rozie-data-table-menu-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
-
-  --rozie-data-table-select-accent: var(--md-sys-color-primary, #6750a4);
+  --rdt-ds-fg: var(--md-sys-color-on-surface, #1d1b20);
+  --rdt-ds-select-accent: var(--md-sys-color-primary, #6750a4);
+  --rdt-ds-border-color: var(--md-sys-color-outline-variant, #cac4d0);
+  --rdt-ds-control-border-color: var(--md-sys-color-outline, #79747e);
+  --rdt-ds-radius: 4px;
+  --rdt-ds-header-bg: var(--md-sys-color-surface-container-highest, #e6e0e9);
+  --rdt-ds-header-weight: 500;
+  --rdt-ds-resize-grip-color: var(--md-sys-color-outline-variant, #cac4d0);
+  --rdt-ds-resize-grip-active: var(--md-sys-color-primary, #6750a4);
+  --rdt-ds-pin-active-bg: var(--md-sys-color-secondary-container, #e8def8);
+  --rdt-ds-menu-bg: var(--md-sys-color-surface-container, #f3edf7);
+  --rdt-ds-menu-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
 }

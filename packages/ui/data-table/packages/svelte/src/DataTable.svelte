@@ -7643,30 +7643,30 @@ $effect(() => { (() => [sorting, columnFilters, globalFilter, sortingDefault, co
 <style>
 :global {
   [data-rozie-s-d5dcab4c]:host {
-    --rdt-font: var(--rozie-data-table-font);
-    --rdt-color: var(--rozie-data-table-fg);
-    --rdt-cell-padding: var(--rozie-data-table-cell-padding);
-    --rdt-border: 1px solid var(--rozie-data-table-border-color);
-    --rdt-header-bg: var(--rozie-data-table-header-bg);
-    --rdt-header-weight: var(--rozie-data-table-header-weight);
-    --rdt-sort-ind-opacity: var(--rozie-data-table-sort-indicator-opacity);
-    --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color);
-    --rdt-filter-radius: var(--rozie-data-table-radius);
-    --rdt-page-btn-border: 1px solid var(--rozie-data-table-control-border-color);
-    --rdt-page-btn-radius: var(--rozie-data-table-radius);
-    --rdt-page-btn-disabled-opacity: var(--rozie-data-table-disabled-opacity);
-    --rdt-page-size-border: 1px solid var(--rozie-data-table-control-border-color);
-    --rdt-page-size-radius: var(--rozie-data-table-radius);
-    --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color);
-    --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active, var(--rozie-data-table-accent));
-    --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg);
-    --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color);
-    --rdt-colvis-summary-radius: var(--rozie-data-table-radius);
-    --rdt-colvis-menu-border: 1px solid var(--rozie-data-table-border-color);
-    --rdt-colvis-menu-radius: var(--rozie-data-table-radius);
-    --rdt-colvis-menu-bg: var(--rozie-data-table-menu-bg);
-    --rdt-colvis-menu-shadow: var(--rozie-data-table-menu-shadow);
-    --rdt-select-accent: var(--rozie-data-table-select-accent, var(--rozie-data-table-accent));
+    --rdt-color: var(--rozie-data-table-fg, var(--rdt-ds-fg));
+    --rdt-select-accent: var(--rozie-data-table-select-accent, var(--rozie-data-table-accent, var(--rdt-ds-select-accent)));
+    --rdt-border: 1px solid var(--rozie-data-table-border-color, var(--rdt-ds-border-color));
+    --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color, var(--rdt-ds-control-border-color));
+    --rdt-filter-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
+    --rdt-font: var(--rozie-data-table-font, var(--rdt-ds-font));
+    --rdt-cell-padding: var(--rozie-data-table-cell-padding, var(--rdt-ds-cell-padding));
+    --rdt-header-bg: var(--rozie-data-table-header-bg, var(--rdt-ds-header-bg));
+    --rdt-header-weight: var(--rozie-data-table-header-weight, var(--rdt-ds-header-weight));
+    --rdt-sort-ind-opacity: var(--rozie-data-table-sort-indicator-opacity, var(--rdt-ds-sort-indicator-opacity));
+    --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color, var(--rdt-ds-resize-grip-color));
+    --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active, var(--rozie-data-table-accent, var(--rdt-ds-resize-grip-active)));
+    --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg, var(--rdt-ds-pin-active-bg));
+    --rdt-colvis-menu-bg: var(--rozie-data-table-menu-bg, var(--rdt-ds-menu-bg));
+    --rdt-colvis-menu-shadow: var(--rozie-data-table-menu-shadow, var(--rdt-ds-menu-shadow));
+    --rdt-colvis-menu-border: 1px solid var(--rozie-data-table-border-color, var(--rdt-ds-border-color));
+    --rdt-colvis-menu-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
+    --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color, var(--rdt-ds-control-border-color));
+    --rdt-colvis-summary-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
+    --rdt-page-btn-disabled-opacity: var(--rozie-data-table-disabled-opacity, var(--rdt-ds-disabled-opacity));
+    --rdt-page-btn-border: 1px solid var(--rozie-data-table-control-border-color, var(--rdt-ds-control-border-color));
+    --rdt-page-btn-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
+    --rdt-page-size-border: 1px solid var(--rozie-data-table-control-border-color, var(--rdt-ds-control-border-color));
+    --rdt-page-size-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
   }
   .rozie-data-table[data-rozie-s-d5dcab4c] {
     border-collapse: collapse;

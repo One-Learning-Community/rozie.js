@@ -342,3 +342,89 @@ for (const target of TARGETS) {
     await expect.poll(headerBg).not.toBe('rgb(247, 247, 247)');
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// F-05d — a design-system bridge follows a theme scope set on a WRAPPER, and still loses to a
+// public token set on an ancestor. A bridge maps the public tokens onto a design system's own
+// variables (shadcn `--muted`, Material `--md-sys-color-*`, Bootstrap `--bs-*`). Those
+// variables are very often scoped to a subtree — `<div class="dark">`, `data-bs-theme` on a
+// wrapper — rather than set on <html>, so the bridge must read them AT the table, not once at
+// the document root. Asserted as the header cell's computed background with the design
+// system's variable set on the demo's own <main> (a wrapper, not <html>; inside the demo's
+// shadow root on Lit): the bridge follows it; a public token on the same wrapper beats it;
+// and with the wrapper's variable removed the bridge's own default comes back.
+// Lit, stated rather than skipped: in this demo the <rozie-data-table> host sits inside the
+// DEMO's shadow root, where no document selector can reach it, so the only thing that gets in
+// is an inherited value — the bridge's private `--rdt-ds-*` layer on :root, with the design
+// system's variables read at the DOCUMENT ROOT. There the variable is set on <html> instead
+// (a wrapper-scoped theme cannot reach a table nested in a shadow root); the public token
+// still goes on the wrapper and must still win.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+const DS_SCOPES = [
+  // [bridge, the design-system variable its header-bg reads, a value for it, the resulting rgb]
+  ['shadcn', '--muted', '0 100% 50%', 'rgb(255, 0, 0)'],
+  ['material', '--md-sys-color-surface-container-highest', 'rgb(0, 0, 255)', 'rgb(0, 0, 255)'],
+  ['bootstrap', '--bs-tertiary-bg', 'rgb(0, 128, 0)', 'rgb(0, 128, 0)'],
+] as const;
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built ? test.fixme : test;
+  runner(`a bridge follows a design-system scope set on a wrapper, under an ancestor's public token [${target}]`, async ({ page }) => {
+    await page.goto(`/?example=DataTableSuper&target=${target}`);
+    const headerBg = () => page.locator('thead .rdt-th').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+    const setOnWrapper = (name: string, value: string | null) => page.getByTestId('dt-super').evaluate((main, [n, v]) => {
+      if (v === null) (main as HTMLElement).style.removeProperty(n as string);
+      else (main as HTMLElement).style.setProperty(n as string, v as string);
+    }, [name, value] as const);
+    await expect.poll(headerBg).toBe('rgb(247, 247, 247)');
+
+    for (const [bridge, dsVar, dsValue, rgb] of DS_SCOPES) {
+      await page.getByTestId('ctl-theme').selectOption(bridge);
+      const bridgeDefault = await (async () => {
+        await expect.poll(headerBg).not.toBe('rgb(247, 247, 247)');
+        return headerBg();
+      })();
+      const setDs = (v: string | null) => target === 'lit'
+        ? page.evaluate(([n, val]) => {
+          if (val === null) document.documentElement.style.removeProperty(n as string);
+          else document.documentElement.style.setProperty(n as string, val as string);
+        }, [dsVar, v] as const)
+        : setOnWrapper(dsVar, v);
+      await setDs(dsValue);
+      await expect.poll(headerBg, `${bridge}: ${dsVar} on the ${target === 'lit' ? 'root' : 'wrapper'}`).toBe(rgb);
+      await setOnWrapper('--rozie-data-table-header-bg', 'rgb(255, 0, 255)');
+      await expect.poll(headerBg, `${bridge}: public token beats the scope`).toBe('rgb(255, 0, 255)');
+      await setOnWrapper('--rozie-data-table-header-bg', null);
+      await setDs(null);
+      await expect.poll(headerBg, `${bridge}: default back`).toBe(bridgeDefault);
+    }
+  });
+}
+
+// F-05d, Lit with the host REACHABLE: a <rozie-data-table> placed in the document's light DOM
+// (not inside another shadow root) under a wrapper that scopes the design system. The bridge's
+// rule names the host element, and a document rule for a host beats the component's `:host`
+// block, so the design system's variable is read AT the table — the wrapper's value applies.
+test(`a bridge follows a design-system scope on a wrapper of a light-DOM Lit host [lit]`, async ({ page }) => {
+  test.skip(!existsSync(resolve(__dirname, '../dist/lit/host/entry.lit.html')), 'lit not built');
+  await page.goto('/?example=DataTableSuper&target=lit');
+  await page.getByTestId('ctl-theme').selectOption('shadcn');
+  await page.evaluate(() => {
+    const wrap = document.createElement('div');
+    wrap.id = 'ds-wrap';
+    const el = document.createElement('rozie-data-table') as HTMLElement & { columns: unknown; data: unknown };
+    el.columns = [{ field: 'a', header: 'A' }];
+    el.data = [{ a: 1 }];
+    wrap.appendChild(el);
+    document.body.appendChild(wrap);
+  });
+  const th = page.locator('#ds-wrap thead .rdt-th').first();
+  const bg = () => th.evaluate((e) => getComputedStyle(e).backgroundColor);
+  await expect.poll(bg).toBe('rgb(241, 245, 249)'); // shadcn's own --muted default
+  await page.evaluate(() => document.getElementById('ds-wrap')!.style.setProperty('--muted', '0 100% 50%'));
+  await expect.poll(bg).toBe('rgb(255, 0, 0)');
+  await page.evaluate(() => document.getElementById('ds-wrap')!.style.setProperty('--rozie-data-table-header-bg', 'rgb(255, 0, 255)'));
+  await expect.poll(bg).toBe('rgb(255, 0, 255)');
+});

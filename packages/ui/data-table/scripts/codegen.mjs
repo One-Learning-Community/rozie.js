@@ -182,16 +182,18 @@ function leafPkg(dir) {
  * A hardcoded copy would drift the moment it does — the exact failure class this remediation
  * exists to remove. This parses the real block, so the two cannot disagree.
  *
- * BEHAVIOUR-NEUTRAL WHEN NO TOKEN IS SET. The wiring passthroughs carry no fallbacks
- * (`--rdt-font: var(--rozie-data-table-font)`), so with the public token unset the declaration is
- * invalid-at-computed-value-time and `--rdt-font` stays unset — leaving the component's own
- * inline `var(--rdt-font, <default>)` to apply, exactly as today. Zero-config Lit is unchanged.
+ * BEHAVIOUR-NEUTRAL WHEN NOTHING IS IMPORTED. base.css's wiring carries each default as the
+ * fallback of the var() reading the public token. The `:host` copy falls back instead to a
+ * private `--rdt-ds-<token>` that base.css and the bridges declare on the document root
+ * (`--rdt-font: var(--rozie-data-table-font, var(--rdt-ds-font))`), so their defaults / skin
+ * reach even a Lit table nested in another shadow root. With neither imported and the public
+ * token unset the declaration is invalid-at-computed-value-time and `--rdt-font` stays unset —
+ * leaving the component's own inline `var(--rdt-font, <default>)` to apply. Zero-config Lit is
+ * unchanged.
  */
 function litHostTokenWiring() {
   const css = readFileSync(resolve(ROOT, 'src/themes/base.css'), 'utf8');
-  // lastIndexOf: the public-token block's own comment names the wiring block by the same
-  // words ("…block further down"), and since the defaults moved to their own `:where(:root)`
-  // rule the first mention no longer sits inside the wiring rule.
+  // lastIndexOf: robust to a comment above the wiring rule naming it by the same words.
   const marker = css.lastIndexOf('Wire the PUBLIC tokens');
   if (marker === -1)
     throw new Error(
@@ -208,6 +210,39 @@ function litHostTokenWiring() {
   if (decls.length === 0)
     throw new Error('codegen: parsed ZERO --rdt-* wiring declarations from base.css');
   return `:host{\n${decls.map((d) => '  ' + d).join('\n')}\n}`;
+}
+
+/** base.css's wiring line → the `:host` copy: the innermost default of each chain of public
+ * reads (`var(--rozie-data-table-P, var(--rozie-data-table-Q, <default>))`) is replaced by the
+ * private root-level `var(--rdt-ds-P)` named for the OUTERMOST token P. */
+function hostLineFor(decl, outer) {
+  const PFX = '--rozie-data-table-';
+  let out = '';
+  let i = 0;
+  while (i < decl.length) {
+    const at = decl.indexOf(`var(${PFX}`, i);
+    if (at === -1) {
+      out += decl.slice(i);
+      break;
+    }
+    out += decl.slice(i, at);
+    let j = at + 4;
+    let depth = 1;
+    for (; j < decl.length && depth > 0; j++) {
+      if (decl[j] === '(') depth++;
+      else if (decl[j] === ')') depth--;
+    }
+    const inner = decl.slice(at + 4, j - 1);
+    const comma = inner.indexOf(',');
+    const name = (comma === -1 ? inner : inner.slice(0, comma)).trim();
+    const fb = comma === -1 ? null : inner.slice(comma + 1).trim();
+    const o = outer ?? name;
+    if (fb === null) out += `var(${name})`;
+    else if (fb.startsWith(`var(${PFX}`)) out += `var(${name}, ${hostLineFor(fb, o)})`;
+    else out += `var(${name}, var(--rdt-ds-${o.slice(PFX.length)}))`;
+    i = j;
+  }
+  return out;
 }
 
 /**
@@ -237,16 +272,20 @@ function assertHostWiringMatchesBaseCss() {
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => /^--rdt-[a-z0-9-]+\s*:/.test(l));
-  const a = actual.join('\n');
-  const e = expected.join('\n');
+  // The :host copy is base.css's wiring with every default replaced by its private
+  // `--rdt-ds-*` root-level name (see hostLineFor); compared order-insensitively.
+  const norm = (list) => [...list].sort();
+  const a = norm(actual).join('\n');
+  const e = norm(expected.map((d) => hostLineFor(d))).join('\n');
   if (a !== e) {
+    const exp = expected.map((d) => hostLineFor(d));
     const only = (x, y) => x.filter((d) => !y.includes(d));
     throw new Error(
       'codegen: the F-01 `:host` wiring in src/DataTable.rozie has DRIFTED from ' +
         'src/themes/base.css.\n' +
         `  base.css has ${expected.length} declaration(s), DataTable.rozie has ${actual.length}.\n` +
-        `  only in base.css:        ${JSON.stringify(only(expected, actual))}\n` +
-        `  only in DataTable.rozie: ${JSON.stringify(only(actual, expected))}\n` +
+        `  only in base.css:        ${JSON.stringify(only(exp, actual))}\n` +
+        `  only in DataTable.rozie: ${JSON.stringify(only(actual, exp))}\n` +
         '  Re-sync the :host block; the Lit leaf reads it, so a gap makes those tokens inert.',
     );
   }

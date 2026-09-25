@@ -1,9 +1,9 @@
 /*
  * @rozie-ui/data-table — base token reference.
  *
- * This file is the PUBLIC token reference. It declares 18 `--rozie-data-table-*`
- * tokens and wires each onto the short internal `--rdt-*` token the component's
- * scoped `<style>` actually reads. The component reads 82 internal `--rdt-*`
+ * This file is the PUBLIC token reference. It wires each of the 18 public
+ * `--rozie-data-table-*` tokens, with its default, onto the short internal `--rdt-*`
+ * token the component's scoped `<style>` actually reads. The component reads 82 internal `--rdt-*`
  * tokens in total, each with an inline `var(--rdt-x, <fallback>)` default, so the
  * table renders ZERO-CONFIG without importing this file.
  *
@@ -39,108 +39,111 @@
  * themes/shadcn.css, themes/material.css and themes/bootstrap.css for the
  * design-system bridges.
  *
- * WHY THE DEFAULTS SIT ON `:where(:root)`. A value an element declares for itself always
- * beats one it would inherit, whatever the selector's specificity — so defaults declared on
- * the table's own elements made every ancestor override (a wrapper, `.dark`) dead the moment
- * this file was imported. Declared once at the document root instead, with zero specificity,
- * they are only the value of last resort: any ancestor, any `:root` rule, and the table's own
- * classes all win, in whatever order the stylesheets load. The WIRING below still sits on the
- * table's elements — it has to resolve there, against whatever value reaches the table.
+ * WHERE THE DEFAULTS LIVE. Every default below is the FALLBACK of the `var()` that reads the
+ * public token, on the table's own elements — not a declaration of the token. Nothing in this
+ * file (or in a bridge) sets a `--rozie-data-table-*` token, so a value set on ANY ancestor
+ * (`:root`, `.dark`, a wrapper) or on the table itself reaches the table by plain inheritance,
+ * and the default applies only while no scope sets it. (A value an element declares for itself
+ * always beats one it would inherit, whatever the selector's specificity — which is why a
+ * declared default, anywhere on the path to the table, would shadow some ancestor's value.) A
+ * design-system bridge is the same mapping with the design system's variable as the fallback,
+ * so that variable too is resolved AT the table and follows the nearest theme scope — a
+ * `.dark` or `data-bs-theme` wrapper, not only `<html>`. The rule sits under `:where()` (zero
+ * specificity) so a bridge's copy wins in either import order; it also names the Lit host
+ * element `rozie-data-table`, the only element of that leaf a document stylesheet can reach.
  */
-:where(:root) {
-  /* These public tokens aren't read directly by a CSS var() inside this
-     component's own scoped <style> — that is by design. This is the public
-     surface; the "Wire the PUBLIC tokens..." block further down assigns each
-     one onto the short internal --rdt-* custom property the component
-     actually reads. */
+:where(.rozie-data-table-wrap, .rozie-data-table, rozie-data-table) {
+  /* ─────────────────────────────────────────────────────────────────────────
+   * Wire the PUBLIC tokens onto the INTERNAL `--rdt-*` the component reads, each
+   * with its default as the fallback. The public tokens are not read by a CSS var()
+   * inside the component's own scoped <style> — that is by design: this block is the
+   * public surface, and a bridge re-declares the lines it maps with the design
+   * system's variable in place of the default. (The component still renders
+   * zero-config without this file via its own inline `var(--rdt-x, <fallback>)`
+   * defaults.) A public token read by several lines carries the same default in each.
+   * ───────────────────────────────────────────────────────────────────────── */
 
   /* ── palette (the few values most consumers will set) ───────────────────── */
-  --rozie-data-table-fg: inherit;
-  --rozie-data-table-accent: #0066cc;
-  --rozie-data-table-border-color: rgba(0, 0, 0, 0.08);
-  --rozie-data-table-control-border-color: rgba(0, 0, 0, 0.2);
-  --rozie-data-table-radius: 4px;
+  /* `currentColor` for `color` is the inherited text colour: the table takes its
+     container's colour unless the token is set. The accent is read through the two tokens
+     that default to it — the selection checkboxes (next line) and the resize grip while
+     dragging — so it follows an accent set on any ancestor. */
+  --rdt-color: var(--rozie-data-table-fg, currentColor);
+  --rdt-select-accent: var(--rozie-data-table-select-accent, var(--rozie-data-table-accent, #0066cc));
+  --rdt-border: 1px solid var(--rozie-data-table-border-color, rgba(0, 0, 0, 0.08));
+  --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color, rgba(0, 0, 0, 0.2));
+  --rdt-filter-radius: var(--rozie-data-table-radius, 4px);
 
   /* ── typography / cell metrics ──────────────────────────────────────────── */
-  --rozie-data-table-font: 14px system-ui, sans-serif;
-  --rozie-data-table-cell-padding: 0.5rem 0.75rem;
+  --rdt-font: var(--rozie-data-table-font, 14px system-ui, sans-serif);
+  --rdt-cell-padding: var(--rozie-data-table-cell-padding, 0.5rem 0.75rem);
 
   /* ── header ─────────────────────────────────────────────────────────────── */
   /* OPAQUE (was rgba(0,0,0,0.03)): a translucent header lets the scrolling body bleed
      through in sticky mode. #f7f7f7 ≈ the old 3%-black tint over white, but solid —
      matching the opaque header backgrounds the design-system themes already ship. */
-  --rozie-data-table-header-bg: #f7f7f7;
-  --rozie-data-table-header-weight: 600;
+  --rdt-header-bg: var(--rozie-data-table-header-bg, #f7f7f7);
+  --rdt-header-weight: var(--rozie-data-table-header-weight, 600);
 
   /* ── sort indicator ─────────────────────────────────────────────────────── */
-  --rozie-data-table-sort-indicator-opacity: 0.7;
+  --rdt-sort-ind-opacity: var(--rozie-data-table-sort-indicator-opacity, 0.7);
 
   /* ── resize handle ──────────────────────────────────────────────────────── */
-  /* The grip while dragging takes the public --rozie-data-table-resize-grip-active, which
-     defaults to --rozie-data-table-accent AS RESOLVED AT THE TABLE, so an accent set on any
-     ancestor moves it too. That default is applied where the table reads the token (the
-     wiring below), not declared with the others: declared at the root, it would be computed
-     against the root's accent once and never follow a narrower one. */
-  --rozie-data-table-resize-grip-color: rgba(0, 0, 0, 0.12);
+  /* The grip while dragging defaults to the accent, resolved at the table. */
+  --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color, rgba(0, 0, 0, 0.12));
+  --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active, var(--rozie-data-table-accent, #0066cc));
 
   /* ── pin controls ───────────────────────────────────────────────────────── */
-  --rozie-data-table-pin-active-bg: rgba(0, 0, 0, 0.1);
+  --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg, rgba(0, 0, 0, 0.1));
 
   /* ── column-visibility menu ─────────────────────────────────────────────── */
-  --rozie-data-table-menu-bg: #fff;
-  --rozie-data-table-menu-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --rdt-colvis-menu-bg: var(--rozie-data-table-menu-bg, #fff);
+  --rdt-colvis-menu-shadow: var(--rozie-data-table-menu-shadow, 0 2px 8px rgba(0, 0, 0, 0.12));
+  --rdt-colvis-menu-border: 1px solid var(--rozie-data-table-border-color, rgba(0, 0, 0, 0.08));
+  --rdt-colvis-menu-radius: var(--rozie-data-table-radius, 4px);
+  --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color, rgba(0, 0, 0, 0.2));
+  --rdt-colvis-summary-radius: var(--rozie-data-table-radius, 4px);
 
   /* ── disabled pagination controls ──────────────────────────────────────── */
-  /* (The selection checkboxes take the public --rozie-data-table-select-accent, which
-     likewise defaults to the accent resolved at the table — see the resize-handle note.) */
-  --rozie-data-table-disabled-opacity: 0.4;
-
-  /* ── virtual scroll (row windowing) ─────────────────────────────────────── */
-  /* Read with NO fallback at its one use site (`max-height: var(--rozie-data-table-max-height);`
-     on `.rdt-scroll`) — when unset the property is invalid at computed-value
-     time and the rule behaves as if `max-height` were never declared there,
-     i.e. `none` (unbounded). Declaring `none` here is the render-neutral
-     equivalent of that unset behavior, made explicit and overridable. */
-  --rozie-data-table-max-height: none;
+  --rdt-page-btn-disabled-opacity: var(--rozie-data-table-disabled-opacity, 0.4);
+  --rdt-page-btn-border: 1px solid var(--rozie-data-table-control-border-color, rgba(0, 0, 0, 0.2));
+  --rdt-page-btn-radius: var(--rozie-data-table-radius, 4px);
+  --rdt-page-size-border: 1px solid var(--rozie-data-table-control-border-color, rgba(0, 0, 0, 0.2));
+  --rdt-page-size-radius: var(--rozie-data-table-radius, 4px);
 }
 
-.rozie-data-table-wrap,
-.rozie-data-table {
-  /* ─────────────────────────────────────────────────────────────────────────
-   * Wire the PUBLIC tokens onto the INTERNAL `--rdt-*` the component reads. A
-   * bridge only needs to remap the public tokens above; these passthroughs do
-   * the rest. (The component still renders zero-config without this file via its
-   * own inline `var(--rdt-x, <fallback>)` defaults.) The two accent-derived
-   * tokens carry their default here, so it is resolved against the accent that
-   * reaches the table.
-   * ───────────────────────────────────────────────────────────────────────── */
-  --rdt-font: var(--rozie-data-table-font);
-  --rdt-color: var(--rozie-data-table-fg);
-  --rdt-cell-padding: var(--rozie-data-table-cell-padding);
-  --rdt-border: 1px solid var(--rozie-data-table-border-color);
-  --rdt-header-bg: var(--rozie-data-table-header-bg);
-  --rdt-header-weight: var(--rozie-data-table-header-weight);
-  --rdt-sort-ind-opacity: var(--rozie-data-table-sort-indicator-opacity);
+/* The same defaults, once more, as private `--rdt-ds-*` values on the document root — for the
+   Lit leaf only. Inside a shadow root (and a Lit table nested in another component's shadow
+   root is out of reach of every document selector, the host element's included) the
+   component's own `:host` wiring reads each public token with `var(--rdt-ds-<token>)` as its
+   fallback, and only an INHERITED value can get there. A bridge declares the same names at
+   `:root`, which is how its skin reaches a Lit table no selector can match. Internal: not a
+   stable API. */
+:where(:root) {
+  --rdt-ds-fg: currentColor;
+  --rdt-ds-select-accent: #0066cc;
+  --rdt-ds-border-color: rgba(0, 0, 0, 0.08);
+  --rdt-ds-control-border-color: rgba(0, 0, 0, 0.2);
+  --rdt-ds-radius: 4px;
+  --rdt-ds-font: 14px system-ui, sans-serif;
+  --rdt-ds-cell-padding: 0.5rem 0.75rem;
+  --rdt-ds-header-bg: #f7f7f7;
+  --rdt-ds-header-weight: 600;
+  --rdt-ds-sort-indicator-opacity: 0.7;
+  --rdt-ds-resize-grip-color: rgba(0, 0, 0, 0.12);
+  --rdt-ds-resize-grip-active: #0066cc;
+  --rdt-ds-pin-active-bg: rgba(0, 0, 0, 0.1);
+  --rdt-ds-menu-bg: #fff;
+  --rdt-ds-menu-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --rdt-ds-disabled-opacity: 0.4;
+}
 
-  --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color);
-  --rdt-filter-radius: var(--rozie-data-table-radius);
-  --rdt-page-btn-border: 1px solid var(--rozie-data-table-control-border-color);
-  --rdt-page-btn-radius: var(--rozie-data-table-radius);
-  --rdt-page-btn-disabled-opacity: var(--rozie-data-table-disabled-opacity);
-  --rdt-page-size-border: 1px solid var(--rozie-data-table-control-border-color);
-  --rdt-page-size-radius: var(--rozie-data-table-radius);
-
-  --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color);
-  --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active, var(--rozie-data-table-accent));
-
-  --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg);
-
-  --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color);
-  --rdt-colvis-summary-radius: var(--rozie-data-table-radius);
-  --rdt-colvis-menu-border: 1px solid var(--rozie-data-table-border-color);
-  --rdt-colvis-menu-radius: var(--rozie-data-table-radius);
-  --rdt-colvis-menu-bg: var(--rozie-data-table-menu-bg);
-  --rdt-colvis-menu-shadow: var(--rozie-data-table-menu-shadow);
-
-  --rdt-select-accent: var(--rozie-data-table-select-accent, var(--rozie-data-table-accent));
+/* ── virtual scroll (row windowing) ─────────────────────────────────────── */
+/* Read with NO fallback at its one use site (`max-height: var(--rozie-data-table-max-height);`
+   on `.rdt-scroll`) — when unset the property is invalid at computed-value time and the rule
+   behaves as if `max-height` were never declared there, i.e. `none` (unbounded). No bridge
+   maps it, so its default is declared, at zero specificity on the document root: `none` is
+   the render-neutral equivalent of that unset behavior, made explicit and overridable. */
+:where(:root) {
+  --rozie-data-table-max-height: none;
 }

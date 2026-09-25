@@ -158,20 +158,49 @@ function parseDeclarations(css) {
       run = [];
     }
     const name = m[1];
-    if (seen.has(name)) continue;
-    seen.add(name);
-    decls.push({ name, value: m[2].trim(), ...current });
+    if (name.startsWith('--rozie-')) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      decls.push({ name, value: m[2].trim(), ...current });
+      continue;
+    }
+    // A wiring line (`--rdt-x: … var(--rozie-…, <default>) …`): a family whose base.css
+    // carries its defaults as the FALLBACK of the var() reading the public token, rather than
+    // as a declaration of it (data-table — so that nothing on the way to the component sets
+    // the token and a design-system bridge can swap in its own variable), documents each such
+    // token at its first read, with that fallback as its default.
+    for (const read of publicReads(m[2])) {
+      if (seen.has(read.name)) continue;
+      seen.add(read.name);
+      decls.push({ ...read, ...current });
+    }
   }
   return decls;
 }
 
-/** The first rule's full selector text, verbatim, from just after the file's
- * leading doc-comment block to its opening brace — kept whole (not split on
- * commas) so a multi-selector rule like data-table's stays a faithful copy. */
-function firstSelector(css) {
-  const withoutHeadComment = css.replace(/^\s*\/\*[\s\S]*?\*\/\s*/, '');
-  const braceIdx = withoutHeadComment.indexOf('{');
-  return withoutHeadComment.slice(0, braceIdx).trim();
+/** Every `var(--rozie-…, <fallback>)` in a value, outermost first, parens balanced. */
+function publicReads(value) {
+  const out = [];
+  let i = 0;
+  while (i < value.length) {
+    const at = value.indexOf('var(--rozie-', i);
+    if (at === -1) break;
+    let j = at + 4;
+    let depth = 1;
+    for (; j < value.length && depth > 0; j++) {
+      if (value[j] === '(') depth++;
+      else if (value[j] === ')') depth--;
+    }
+    const inner = value.slice(at + 4, j - 1);
+    const comma = inner.indexOf(',');
+    if (comma !== -1) {
+      const fallback = inner.slice(comma + 1).trim();
+      out.push({ name: inner.slice(0, comma).trim(), value: fallback });
+      out.push(...publicReads(fallback));
+    }
+    i = j;
+  }
+  return out;
 }
 
 /** Anti-prose read-scan: requires at least one real segment after the prefix
@@ -200,19 +229,20 @@ function scanReads(srcDir, prefix) {
  * accent-derived tokens, whose default must resolve against the accent that reaches the
  * table rather than once at the rule that would declare it — so it is documented with that
  * fallback rather than listed as having no default. */
-function readSiteFallbacks(css, names) {
+function readSiteFallbacks(css, names, srcTexts = []) {
   const out = new Map();
   for (const name of names) {
-    const at = css.indexOf(`var(${name},`);
-    if (at === -1) continue;
+    const hay = [css, ...srcTexts].find((t) => t.includes(`var(${name},`));
+    if (hay === undefined) continue;
+    const at = hay.indexOf(`var(${name},`);
     let i = at + `var(${name},`.length;
     let depth = 1;
     const start = i;
-    for (; i < css.length && depth > 0; i++) {
-      if (css[i] === '(') depth++;
-      else if (css[i] === ')') depth--;
+    for (; i < hay.length && depth > 0; i++) {
+      if (hay[i] === '(') depth++;
+      else if (hay[i] === ')') depth--;
     }
-    if (depth === 0) out.set(name, css.slice(start, i - 1).trim());
+    if (depth === 0) out.set(name, hay.slice(start, i - 1).trim());
   }
   return out;
 }
@@ -282,10 +312,10 @@ function renderPage(slug, name, prefix, groups, undeclared, readDefaulted, overr
     parts.push('');
   }
   if (readDefaulted.size) {
-    parts.push('### Defaulted where the table reads them');
+    parts.push(`### Defaulted where ${name} reads them`);
     parts.push('');
     parts.push(
-      'Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the table itself — so it follows a value set on any ancestor.',
+      `Public, but declared nowhere by \`base.css\`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).`,
     );
     parts.push('');
     parts.push('| Token | Default |');
@@ -346,7 +376,11 @@ function main() {
     const declaredSet = new Set(publicDecls.map((d) => d.name));
     const readNames = scanReads(join(UI_DIR, slug, 'src'), prefix);
     const notDeclared = [...readNames].filter((n) => !declaredSet.has(n)).sort();
-    const readDefaulted = readSiteFallbacks(css, notDeclared);
+    const srcTexts = walk(join(UI_DIR, slug, 'src'))
+      .filter((f) => f.endsWith('.rozie'))
+      .sort()
+      .map((f) => readFileSync(f, 'utf8'));
+    const readDefaulted = readSiteFallbacks(css, notDeclared, srcTexts);
     const undeclared = notDeclared.filter((n) => !readDefaulted.has(n));
     if (undeclared.length) {
       console.warn(`[gen-theming-pages] ${slug}: ${undeclared.length} token(s) read but undeclared in base.css: ${undeclared.join(', ')}`);
@@ -363,7 +397,9 @@ function main() {
     const overrides =
       groupKeys.length >= 4 ? groupKeys.slice(0, 4).map((g) => groups.get(g)[0]) : publicDecls.slice(0, 4);
 
-    const selector = firstSelector(css);
+    // The snippet shows a CONSUMER override, so it names `:root` — not base.css's own
+    // selector, which sits at zero specificity (`:where(…)`) precisely so that any such rule wins.
+    const selector = ':root';
 
     const bridgeFilesRaw = readdirSync(themesDir).filter((f) => f.endsWith('.css'));
     const bridgeRest = bridgeFilesRaw.filter((f) => f !== 'base.css').sort();
