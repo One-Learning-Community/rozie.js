@@ -288,3 +288,57 @@ for (const target of TARGETS) {
     await expect(page.getByTestId('readout').locator('[data-slice="grouping"]')).toContainText('category');
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// F-05c — a public token set on an ANCESTOR reaches the table while base.css is imported.
+// base.css documents "override any token at any ancestor scope (`:root`, `.dark`, a
+// wrapper…)", but it declared all 18 defaults on the table's OWN elements, and a value an
+// element declares always beats one it would inherit — so an ancestor override was dead on the
+// five light-DOM targets whenever base.css (or a bridge, which did the same) was loaded.
+// Asserted as computed values: the header background (a plain token), the derived
+// `--rdt-select-accent` (which must follow an ancestor's accent), both with base.css alone and
+// with the material bridge layered on top; and that the defaults still apply when nothing is set.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built ? test.fixme : test;
+  runner(`a public token set on an ancestor overrides base.css's default [${target}]`, async ({ page }) => {
+    await page.goto(`/?example=DataTableSuper&target=${target}`);
+    const enabledIds = () => page.evaluate(() =>
+      Array.from(document.querySelectorAll('[id^="rdt-theme-"]'))
+        .filter((s) => !(s as HTMLStyleElement & { disabled?: boolean }).disabled)
+        .map((s) => s.id)
+        .sort()
+        .join(','));
+    await expect.poll(enabledIds).toBe('rdt-theme-base');
+    const headerBg = () => page.locator('thead .rdt-th').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+    const selectAccent = () => page.locator('table.rozie-data-table').first()
+      .evaluate((el) => getComputedStyle(el).getPropertyValue('--rdt-select-accent').trim());
+    // The demo's own <main> (an ancestor of the table; inside the demo's shadow root on Lit,
+    // which the locator pierces).
+    const setOnAncestor = (name: string, value: string | null) => page.getByTestId('dt-super').evaluate((main, [n, v]) => {
+      if (v === null) (main as HTMLElement).style.removeProperty(n as string);
+      else (main as HTMLElement).style.setProperty(n as string, v as string);
+    }, [name, value] as const);
+
+    // Defaults apply with nothing set (base.css's #f7f7f7 header).
+    await expect.poll(headerBg).toBe('rgb(247, 247, 247)');
+
+    await setOnAncestor('--rozie-data-table-header-bg', 'rgb(255, 0, 0)');
+    await setOnAncestor('--rozie-data-table-accent', 'rgb(0, 128, 0)');
+    await expect.poll(headerBg).toBe('rgb(255, 0, 0)');
+    await expect.poll(selectAccent).toBe('rgb(0, 128, 0)');
+
+    // A bridge layered on top must not shadow the ancestor's value either.
+    await page.getByTestId('ctl-theme').selectOption('material');
+    await expect.poll(enabledIds).toBe('rdt-theme-base,rdt-theme-material');
+    await expect.poll(headerBg).toBe('rgb(255, 0, 0)');
+
+    // And removing the ancestor value falls back to the bridge's own mapping, not base's.
+    await setOnAncestor('--rozie-data-table-header-bg', null);
+    await expect.poll(headerBg).not.toBe('rgb(255, 0, 0)');
+    await expect.poll(headerBg).not.toBe('rgb(247, 247, 247)');
+  });
+}

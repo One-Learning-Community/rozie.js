@@ -189,7 +189,10 @@ function leafPkg(dir) {
  */
 function litHostTokenWiring() {
   const css = readFileSync(resolve(ROOT, 'src/themes/base.css'), 'utf8');
-  const marker = css.indexOf('Wire the PUBLIC tokens');
+  // lastIndexOf: the public-token block's own comment names the wiring block by the same
+  // words ("…block further down"), and since the defaults moved to their own `:where(:root)`
+  // rule the first mention no longer sits inside the wiring rule.
+  const marker = css.lastIndexOf('Wire the PUBLIC tokens');
   if (marker === -1)
     throw new Error(
       'codegen: base.css no longer contains the "Wire the PUBLIC tokens" marker — the F-01 ' +

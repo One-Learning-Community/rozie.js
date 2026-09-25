@@ -7658,7 +7658,7 @@ $effect(() => { (() => [sorting, columnFilters, globalFilter, sortingDefault, co
     --rdt-page-size-border: 1px solid var(--rozie-data-table-control-border-color);
     --rdt-page-size-radius: var(--rozie-data-table-radius);
     --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color);
-    --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active);
+    --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active, var(--rozie-data-table-accent));
     --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg);
     --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color);
     --rdt-colvis-summary-radius: var(--rozie-data-table-radius);
@@ -7666,7 +7666,7 @@ $effect(() => { (() => [sorting, columnFilters, globalFilter, sortingDefault, co
     --rdt-colvis-menu-radius: var(--rozie-data-table-radius);
     --rdt-colvis-menu-bg: var(--rozie-data-table-menu-bg);
     --rdt-colvis-menu-shadow: var(--rozie-data-table-menu-shadow);
-    --rdt-select-accent: var(--rozie-data-table-select-accent);
+    --rdt-select-accent: var(--rozie-data-table-select-accent, var(--rozie-data-table-accent));
   }
   .rozie-data-table[data-rozie-s-d5dcab4c] {
     border-collapse: collapse;

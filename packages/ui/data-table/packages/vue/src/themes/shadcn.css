@@ -18,19 +18,22 @@
  * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
  * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
  *
- * SCOPE (changed 2026-09-12, F-01). This bridge assigns its tokens at `:root` as well as on
- * the table's own classes. A design-system bridge is an app-wide skin by nature, and `:root`
- * is the only scope that reaches the Lit leaf: there, `.rozie-data-table-wrap` and
- * `.rozie-data-table` both render INSIDE the component's shadow root, where a document-level
- * class selector can never match — so before this change all four bridges were inert on Lit.
- * Trade-off, stated rather than buried: two tables on one page can no longer take DIFFERENT
- * bridges by ancestor class alone. Per-instance overrides still work on the five light-DOM
- * targets via the class selectors below, and on all six by setting the public tokens on any
- * ancestor of the table.
+ * SCOPE (changed 2026-09-12, F-01; narrowed to `:root` alone 2026-09-25). A design-system
+ * bridge is an app-wide skin by nature, and `:root` is the only scope that reaches the Lit
+ * leaf: there, `.rozie-data-table-wrap` and `.rozie-data-table` both render INSIDE the
+ * component's shadow root, where a document-level class selector can never match. The bridge
+ * used to assign its tokens on those two classes as well, but a value an element declares for
+ * itself beats any value it would inherit, so that copy made every ancestor override of a
+ * public token dead on the five light-DOM targets. At `:root` only, the bridge beats base.css's
+ * zero-specificity defaults in either import order, and a public token set on any ancestor of
+ * the table wins over the bridge on all six targets (as does one set on the table's own
+ * classes, on the five light-DOM targets).
+ * Trade-offs, stated rather than buried: two tables on one page cannot take DIFFERENT bridges
+ * by ancestor class alone, and the design system's own variables are read at the document
+ * root, so a theme scope set on a narrower wrapper (rather than on `<html>`) does not re-skin
+ * the table. Set the public tokens on that wrapper instead.
  */
-:root,
-.rozie-data-table-wrap,
-.rozie-data-table {
+:root {
   --rozie-data-table-fg: hsl(var(--foreground, 222.2 47.4% 11.2%));
   --rozie-data-table-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
   --rozie-data-table-border-color: hsl(var(--border, 214.3 31.8% 91.4%));

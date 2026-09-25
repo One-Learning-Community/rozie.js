@@ -3181,7 +3181,8 @@ $expose({
 <style>
 /* ── F-01: the PUBLIC→INTERNAL token wiring, repeated for a SHADOW ROOT ───────────────
    themes/base.css maps every public `--rozie-data-table-*` token onto the internal
-   `--rdt-*` the rules below read, under `.rozie-data-table-wrap, .rozie-data-table`.
+   `--rdt-*` the rules below read, under `.rozie-data-table-wrap, .rozie-data-table` (its
+   defaults sit on `:where(:root)` and reach this shadow root by inheritance).
    On the LIT leaf both of those elements render INSIDE this component's shadow root, and
    a document-level class selector cannot match inside one — so the wiring never applied
    there and 17 of the 18 public tokens were inert. (Measured: `--rdt-header-bg` resolved
@@ -3211,7 +3212,7 @@ $expose({
   --rdt-page-size-border: 1px solid var(--rozie-data-table-control-border-color);
   --rdt-page-size-radius: var(--rozie-data-table-radius);
   --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color);
-  --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active);
+  --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active, var(--rozie-data-table-accent));
   --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg);
   --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color);
   --rdt-colvis-summary-radius: var(--rozie-data-table-radius);
@@ -3219,7 +3220,7 @@ $expose({
   --rdt-colvis-menu-radius: var(--rozie-data-table-radius);
   --rdt-colvis-menu-bg: var(--rozie-data-table-menu-bg);
   --rdt-colvis-menu-shadow: var(--rozie-data-table-menu-shadow);
-  --rdt-select-accent: var(--rozie-data-table-select-accent);
+  --rdt-select-accent: var(--rozie-data-table-select-accent, var(--rozie-data-table-accent));
 }
 
 .rozie-data-table {

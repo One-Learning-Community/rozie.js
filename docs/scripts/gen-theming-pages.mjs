@@ -194,6 +194,29 @@ function scanReads(srcDir, prefix) {
   return found;
 }
 
+/** For each name, the fallback base.css itself gives it where it READS the token
+ * (`var(--name, <fallback>)`, parens balanced), if any. A token defaulted that way
+ * instead of by a declaration is deliberately left undeclared — data-table's two
+ * accent-derived tokens, whose default must resolve against the accent that reaches the
+ * table rather than once at the rule that would declare it — so it is documented with that
+ * fallback rather than listed as having no default. */
+function readSiteFallbacks(css, names) {
+  const out = new Map();
+  for (const name of names) {
+    const at = css.indexOf(`var(${name},`);
+    if (at === -1) continue;
+    let i = at + `var(${name},`.length;
+    let depth = 1;
+    const start = i;
+    for (; i < css.length && depth > 0; i++) {
+      if (css[i] === '(') depth++;
+      else if (css[i] === ')') depth--;
+    }
+    if (depth === 0) out.set(name, css.slice(start, i - 1).trim());
+  }
+  return out;
+}
+
 /** Escape `|` inside a table cell so a multi-value CSS default (e.g. a
  * `font` shorthand with commas is fine, but a value containing a literal
  * pipe would otherwise restructure the row) can never break the table. */
@@ -211,7 +234,7 @@ function escapeAngles(text) {
   return String(text).replace(/</g, '&lt;');
 }
 
-function renderPage(slug, name, prefix, groups, undeclared, overrides, selector, bridgeFiles, seeAlso, scopeNote) {
+function renderPage(slug, name, prefix, groups, undeclared, readDefaulted, overrides, selector, bridgeFiles, seeAlso, scopeNote) {
   const parts = [];
   parts.push('---');
   parts.push(`title: ${name} theming`);
@@ -256,6 +279,18 @@ function renderPage(slug, name, prefix, groups, undeclared, overrides, selector,
     parts.push('| Token | Default |');
     parts.push('| --- | --- |');
     for (const d of entries) parts.push(`| ${cell(d.name)} | ${cell(d.value)} |`);
+    parts.push('');
+  }
+  if (readDefaulted.size) {
+    parts.push('### Defaulted where the table reads them');
+    parts.push('');
+    parts.push(
+      'Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the table itself — so it follows a value set on any ancestor.',
+    );
+    parts.push('');
+    parts.push('| Token | Default |');
+    parts.push('| --- | --- |');
+    for (const [tok, fallback] of readDefaulted) parts.push(`| ${cell(tok)} | ${cell(fallback)} |`);
     parts.push('');
   }
   if (undeclared.length) {
@@ -310,7 +345,9 @@ function main() {
 
     const declaredSet = new Set(publicDecls.map((d) => d.name));
     const readNames = scanReads(join(UI_DIR, slug, 'src'), prefix);
-    const undeclared = [...readNames].filter((n) => !declaredSet.has(n)).sort();
+    const notDeclared = [...readNames].filter((n) => !declaredSet.has(n)).sort();
+    const readDefaulted = readSiteFallbacks(css, notDeclared);
+    const undeclared = notDeclared.filter((n) => !readDefaulted.has(n));
     if (undeclared.length) {
       console.warn(`[gen-theming-pages] ${slug}: ${undeclared.length} token(s) read but undeclared in base.css: ${undeclared.join(', ')}`);
     }
@@ -350,7 +387,7 @@ function main() {
     }
 
     const scopeNote = scopeNoteFrom(headDocBlock(css));
-    const page = renderPage(slug, name, prefix, groups, undeclared, overrides, selector, bridgeFiles, seeAlso, scopeNote);
+    const page = renderPage(slug, name, prefix, groups, undeclared, readDefaulted, overrides, selector, bridgeFiles, seeAlso, scopeNote);
     const out = resolve(COMPONENTS_DIR, `${slug}-theming.md`);
     writeFileSync(out, page);
     written.push(`${slug} → ${name} (${publicDecls.length} tokens)`);

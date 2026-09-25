@@ -38,9 +38,16 @@
  * `.rozie-data-table` / `.rozie-data-table-wrap` element). See
  * themes/shadcn.css, themes/material.css and themes/bootstrap.css for the
  * design-system bridges.
+ *
+ * WHY THE DEFAULTS SIT ON `:where(:root)`. A value an element declares for itself always
+ * beats one it would inherit, whatever the selector's specificity — so defaults declared on
+ * the table's own elements made every ancestor override (a wrapper, `.dark`) dead the moment
+ * this file was imported. Declared once at the document root instead, with zero specificity,
+ * they are only the value of last resort: any ancestor, any `:root` rule, and the table's own
+ * classes all win, in whatever order the stylesheets load. The WIRING below still sits on the
+ * table's elements — it has to resolve there, against whatever value reaches the table.
  */
-.rozie-data-table-wrap,
-.rozie-data-table {
+:where(:root) {
   /* These public tokens aren't read directly by a CSS var() inside this
      component's own scoped <style> — that is by design. This is the public
      surface; the "Wire the PUBLIC tokens..." block further down assigns each
@@ -69,8 +76,12 @@
   --rozie-data-table-sort-indicator-opacity: 0.7;
 
   /* ── resize handle ──────────────────────────────────────────────────────── */
+  /* The grip while dragging takes the public --rozie-data-table-resize-grip-active, which
+     defaults to --rozie-data-table-accent AS RESOLVED AT THE TABLE, so an accent set on any
+     ancestor moves it too. That default is applied where the table reads the token (the
+     wiring below), not declared with the others: declared at the root, it would be computed
+     against the root's accent once and never follow a narrower one. */
   --rozie-data-table-resize-grip-color: rgba(0, 0, 0, 0.12);
-  --rozie-data-table-resize-grip-active: var(--rozie-data-table-accent);
 
   /* ── pin controls ───────────────────────────────────────────────────────── */
   --rozie-data-table-pin-active-bg: rgba(0, 0, 0, 0.1);
@@ -79,10 +90,9 @@
   --rozie-data-table-menu-bg: #fff;
   --rozie-data-table-menu-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 
-  /* ── selection checkboxes ───────────────────────────────────────────────── */
-  --rozie-data-table-select-accent: var(--rozie-data-table-accent);
-
   /* ── disabled pagination controls ──────────────────────────────────────── */
+  /* (The selection checkboxes take the public --rozie-data-table-select-accent, which
+     likewise defaults to the accent resolved at the table — see the resize-handle note.) */
   --rozie-data-table-disabled-opacity: 0.4;
 
   /* ── virtual scroll (row windowing) ─────────────────────────────────────── */
@@ -92,12 +102,17 @@
      i.e. `none` (unbounded). Declaring `none` here is the render-neutral
      equivalent of that unset behavior, made explicit and overridable. */
   --rozie-data-table-max-height: none;
+}
 
+.rozie-data-table-wrap,
+.rozie-data-table {
   /* ─────────────────────────────────────────────────────────────────────────
    * Wire the PUBLIC tokens onto the INTERNAL `--rdt-*` the component reads. A
    * bridge only needs to remap the public tokens above; these passthroughs do
    * the rest. (The component still renders zero-config without this file via its
-   * own inline `var(--rdt-x, <fallback>)` defaults.)
+   * own inline `var(--rdt-x, <fallback>)` defaults.) The two accent-derived
+   * tokens carry their default here, so it is resolved against the accent that
+   * reaches the table.
    * ───────────────────────────────────────────────────────────────────────── */
   --rdt-font: var(--rozie-data-table-font);
   --rdt-color: var(--rozie-data-table-fg);
@@ -116,7 +131,7 @@
   --rdt-page-size-radius: var(--rozie-data-table-radius);
 
   --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color);
-  --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active);
+  --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active, var(--rozie-data-table-accent));
 
   --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg);
 
@@ -127,5 +142,5 @@
   --rdt-colvis-menu-bg: var(--rozie-data-table-menu-bg);
   --rdt-colvis-menu-shadow: var(--rozie-data-table-menu-shadow);
 
-  --rdt-select-accent: var(--rozie-data-table-select-accent);
+  --rdt-select-accent: var(--rozie-data-table-select-accent, var(--rozie-data-table-accent));
 }
