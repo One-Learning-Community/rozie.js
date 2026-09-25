@@ -961,6 +961,9 @@ interface EditorCtx {
     .rozie-data-table-wrap .rdt-colvis-summary {
       cursor: pointer;
       font: inherit;
+      /* Own the margin too: content-site typography styles bare \`summary\` (VitePress sets
+         \`margin: 16px 0\`), which grew the <details> and stretched the toolbar's search input. */
+      margin: 0;
       padding: var(--rdt-colvis-summary-padding, 0.25rem 0.6rem);
       border: var(--rdt-colvis-summary-border, 1px solid rgba(0, 0, 0, 0.2));
       border-radius: var(--rdt-colvis-summary-radius, 4px);
