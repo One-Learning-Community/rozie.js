@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-toast-*` custom properties, each with a built-in fallback, so `Toaster` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-toaster {
+:root {
   --rozie-toast-z: 9999;
   --rozie-toast-content-gap: 0.75rem;
   --rozie-toast-success-bg: #16a34a;
@@ -50,7 +50,6 @@ The values listed below are exposed as `--rozie-toast-*` custom properties, each
 | `--rozie-toast-success-bg` | `#16a34a` |
 | `--rozie-toast-error-bg` | `#dc2626` |
 | `--rozie-toast-warning-bg` | `#ca8a04` |
-| `--rozie-toast-info-bg` | `var(--rozie-toast-bg, #333)` |
 
 ### message + close button
 
@@ -82,6 +81,14 @@ The values listed below are exposed as `--rozie-toast-*` custom properties, each
 | --- | --- |
 | `--rozie-toast-spinner-size` | `1em` |
 | `--rozie-toast-spinner-color` | `currentColor` |
+
+### Defaulted where Toaster reads them
+
+Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).
+
+| Token | Default |
+| --- | --- |
+| `--rozie-toast-info-bg` | `var(--rozie-toast-bg, #333)` |
 
 ## Design-system bridges
 

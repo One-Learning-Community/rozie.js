@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-popover-*` custom properties, each with a built-in fallback, so `Popover` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-popover {
+:root {
   --rozie-popover-z: 1000;
   --rozie-popover-max-width: calc(100vw - 16px);
   --rozie-popover-bg: #fff;

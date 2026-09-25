@@ -10,11 +10,11 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-datepicker-*` custom properties, each with a built-in fallback, so `DatePicker` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-datepicker {
+:root {
   --rozie-datepicker-font: inherit;
   --rozie-datepicker-accent: #0066cc;
   --rozie-datepicker-gap: 0.25rem;
-  --rozie-datepicker-ring: var(--rozie-datepicker-accent);
+  --rozie-datepicker-ring-width: 2px;
 }
 ```
 
@@ -55,7 +55,6 @@ accent — the single color most consumers will set; selected day, today ring + 
 
 | Token | Default |
 | --- | --- |
-| `--rozie-datepicker-ring` | `var(--rozie-datepicker-accent)` |
 | `--rozie-datepicker-ring-width` | `2px` |
 | `--rozie-datepicker-ring-offset` | `1px` |
 
@@ -85,10 +84,7 @@ grid — the single-month day grid; also covers the gap between grids when numbe
 
 | Token | Default |
 | --- | --- |
-| `--rozie-datepicker-today-border` | `var(--rozie-datepicker-accent)` |
 | `--rozie-datepicker-selected-fg` | `#fff` |
-| `--rozie-datepicker-selected-bg` | `var(--rozie-datepicker-accent)` |
-| `--rozie-datepicker-selected-hover-bg` | `color-mix(in srgb, var(--rozie-datepicker-selected-bg) 85%, #000)` |
 | `--rozie-datepicker-selected-weight` | `600` |
 
 ### disabled
@@ -139,7 +135,18 @@ range/preview — the range-selection highlight painted between the start and en
 | --- | --- |
 | `--rozie-datepicker-preview-bg` | `rgba(0, 102, 204, 0.08)` |
 | `--rozie-datepicker-range-bg` | `rgba(0, 102, 204, 0.14)` |
+
+### Defaulted where DatePicker reads them
+
+Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).
+
+| Token | Default |
+| --- | --- |
 | `--rozie-datepicker-range-endpoint-bg` | `var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc))` |
+| `--rozie-datepicker-ring` | `var(--rozie-datepicker-accent, #0066cc)` |
+| `--rozie-datepicker-selected-bg` | `var(--rozie-datepicker-accent, #0066cc)` |
+| `--rozie-datepicker-selected-hover-bg` | `color-mix(in srgb, var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc)) 85%, #000)` |
+| `--rozie-datepicker-today-border` | `var(--rozie-datepicker-accent, #0066cc)` |
 
 ## Design-system bridges
 

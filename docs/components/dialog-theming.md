@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-dialog-*` custom properties, each with a built-in fallback, so `Dialog` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-dialog {
+:root {
   --rozie-dialog-width: auto;
   --rozie-dialog-border: none;
   --rozie-dialog-backdrop-bg: rgba(0, 0, 0, 0.5);
