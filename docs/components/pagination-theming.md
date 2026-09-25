@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-pagination-*` custom properties, each with a built-in fallback, so `Pagination` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-pagination {
+:root {
   --rozie-pagination-gap: 0.25rem;
   --rozie-pagination-accent: #0066cc;
   --rozie-pagination-size: 2.25rem;
@@ -58,15 +58,12 @@ accent — the single color most consumers will set; the active page + focus rin
 | Token | Default |
 | --- | --- |
 | `--rozie-pagination-active-fg` | `#fff` |
-| `--rozie-pagination-active-bg` | `var(--rozie-pagination-accent)` |
-| `--rozie-pagination-active-border` | `var(--rozie-pagination-accent)` |
 
 ### focus ring
 
 | Token | Default |
 | --- | --- |
 | `--rozie-pagination-ring-width` | `2px` |
-| `--rozie-pagination-ring` | `var(--rozie-pagination-accent)` |
 | `--rozie-pagination-ring-offset` | `1px` |
 
 ### ellipsis marker
@@ -80,6 +77,16 @@ accent — the single color most consumers will set; the active page + focus rin
 | Token | Default |
 | --- | --- |
 | `--rozie-pagination-disabled-opacity` | `0.5` |
+
+### Defaulted where Pagination reads them
+
+Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).
+
+| Token | Default |
+| --- | --- |
+| `--rozie-pagination-active-bg` | `var(--rozie-pagination-accent, #0066cc)` |
+| `--rozie-pagination-active-border` | `var(--rozie-pagination-accent, #0066cc)` |
+| `--rozie-pagination-ring` | `var(--rozie-pagination-accent, #0066cc)` |
 
 ## Design-system bridges
 

@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-embla-*` custom properties, each with a built-in fallback, so `Carousel` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-embla {
+:root {
   --rozie-embla-accent: #1a1a1a;
   --rozie-embla-arrow-size: 2.25rem;
   --rozie-embla-dots-gap: 0.4rem;
@@ -34,7 +34,6 @@ accent — the shared selected/active color. Arrow-fg, dot-selected-bg and thumb
 | `--rozie-embla-arrow-radius` | `50%` |
 | `--rozie-embla-arrow-bg` | `rgb(255 255 255 / 0.9)` |
 | `--rozie-embla-arrow-hover-bg` | `#fff` |
-| `--rozie-embla-arrow-fg` | `var(--rozie-embla-accent)` |
 | `--rozie-embla-arrow-font-size` | `1.5rem` |
 | `--rozie-embla-arrow-shadow` | `0 1px 4px rgb(0 0 0 / 0.25)` |
 | `--rozie-embla-arrow-disabled-opacity` | `0.35` |
@@ -49,7 +48,6 @@ accent — the shared selected/active color. Arrow-fg, dot-selected-bg and thumb
 | `--rozie-embla-dot-size` | `0.5rem` |
 | `--rozie-embla-dot-bg` | `rgb(0 0 0 / 0.25)` |
 | `--rozie-embla-dot-hover-bg` | `rgba(0, 0, 0, 0.45)` |
-| `--rozie-embla-dot-selected-bg` | `var(--rozie-embla-accent)` |
 | `--rozie-embla-dot-selected-scale` | `1.25` |
 
 ### synced thumbnail strip (opt-in via `thumbnails`)
@@ -64,7 +62,16 @@ accent — the shared selected/active color. Arrow-fg, dot-selected-bg and thumb
 | `--rozie-embla-thumb-border-width` | `2px` |
 | `--rozie-embla-thumb-border-color` | `transparent` |
 | `--rozie-embla-thumb-radius` | `4px` |
-| `--rozie-embla-thumb-selected-border-color` | `var(--rozie-embla-accent)` |
+
+### Defaulted where Carousel reads them
+
+Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).
+
+| Token | Default |
+| --- | --- |
+| `--rozie-embla-arrow-fg` | `var(--rozie-embla-accent, #1a1a1a)` |
+| `--rozie-embla-dot-selected-bg` | `var(--rozie-embla-accent, #1a1a1a)` |
+| `--rozie-embla-thumb-selected-border-color` | `var(--rozie-embla-accent, #1a1a1a)` |
 
 ## Design-system bridges
 

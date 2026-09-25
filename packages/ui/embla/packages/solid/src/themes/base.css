@@ -9,8 +9,22 @@
  * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
  * `.rozie-embla` element). See themes/shadcn.css, themes/material.css and
  * themes/bootstrap.css for design-system bridges.
+ *
+ * WHERE THE DEFAULTS SIT. On `:where(:root)` — the document root, at zero specificity. A value
+ * an element declares for itself always beats one it would inherit, whatever the selector's
+ * specificity, so defaults declared on the `.rozie-embla` element itself made every ancestor
+ * override dead the moment this file was imported. At the root they are only the value of last
+ * resort: any ancestor, any `:root` rule and the component's own element all win, in any import
+ * order (and on Lit, whose element renders inside a shadow root no document selector reaches,
+ * they arrive by inheritance).
+ * A token whose default is ANOTHER token is not declared here at all: the component reads it
+ * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
+ * declared at the root it would be computed once, against the root's value.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) still assigns the
+ * tokens it maps on the `.rozie-embla` element itself: with a bridge imported, THOSE tokens can be
+ * overridden only on that element (or by a rule of equal-or-higher specificity after it).
  */
-.rozie-embla {
+:where(:root) {
   /* accent — the shared selected/active color. Arrow-fg, dot-selected-bg and
      thumb-selected-border-color all fall back to this ONE token, so overriding
      just --rozie-embla-accent shifts every "selected" affordance at once. */
@@ -21,7 +35,6 @@
   --rozie-embla-arrow-radius: 50%;
   --rozie-embla-arrow-bg: rgb(255 255 255 / 0.9);
   --rozie-embla-arrow-hover-bg: #fff;
-  --rozie-embla-arrow-fg: var(--rozie-embla-accent);
   --rozie-embla-arrow-font-size: 1.5rem;
   --rozie-embla-arrow-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
   --rozie-embla-arrow-disabled-opacity: 0.35;
@@ -33,7 +46,6 @@
   --rozie-embla-dot-size: 0.5rem;
   --rozie-embla-dot-bg: rgb(0 0 0 / 0.25);
   --rozie-embla-dot-hover-bg: rgba(0, 0, 0, 0.45);
-  --rozie-embla-dot-selected-bg: var(--rozie-embla-accent);
   --rozie-embla-dot-selected-scale: 1.25;
 
   /* synced thumbnail strip (opt-in via `thumbnails`) */
@@ -45,5 +57,4 @@
   --rozie-embla-thumb-border-width: 2px;
   --rozie-embla-thumb-border-color: transparent;
   --rozie-embla-thumb-radius: 4px;
-  --rozie-embla-thumb-selected-border-color: var(--rozie-embla-accent);
 }

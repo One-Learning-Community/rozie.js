@@ -10,11 +10,11 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-otp-*` custom properties, each with a built-in fallback, so `Otp` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-otp {
+:root {
   --rozie-otp-gap: 0.5rem;
   --rozie-otp-accent: #0066cc;
   --rozie-otp-cell-size: 2.75rem;
-  --rozie-otp-filled-border-color: var(--rozie-otp-accent);
+  --rozie-otp-focus-ring-width: 3px;
 }
 ```
 
@@ -46,12 +46,6 @@ accent — the single color most consumers will set; caret + focus + filled bord
 | `--rozie-otp-border-color` | `rgba(0, 0, 0, 0.25)` |
 | `--rozie-otp-radius` | `0.5rem` |
 
-### filled cell (a cell that already holds a character)
-
-| Token | Default |
-| --- | --- |
-| `--rozie-otp-filled-border-color` | `var(--rozie-otp-accent)` |
-
 ### focus ring
 
 | Token | Default |
@@ -71,6 +65,14 @@ accent — the single color most consumers will set; caret + focus + filled bord
 | --- | --- |
 | `--rozie-otp-disabled-opacity` | `0.55` |
 | `--rozie-otp-disabled-bg` | `rgba(0, 0, 0, 0.04)` |
+
+### Defaulted where Otp reads them
+
+Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).
+
+| Token | Default |
+| --- | --- |
+| `--rozie-otp-filled-border-color` | `var(--rozie-otp-accent, #0066cc)` |
 
 ## Design-system bridges
 

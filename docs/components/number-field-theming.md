@@ -10,7 +10,7 @@ outline: [2, 3]
 The values listed below are exposed as `--rozie-number-field-*` custom properties, each with a built-in fallback, so `NumberField` works with **zero configuration** and re-skins by remapping tokens. The structural rules compile per-leaf and are **not** consumer-overridable.
 
 ```css
-.rozie-number-field {
+:root {
   --rozie-number-field-gap: 0;
   --rozie-number-field-bg: #fff;
   --rozie-number-field-width: 4.5rem;
