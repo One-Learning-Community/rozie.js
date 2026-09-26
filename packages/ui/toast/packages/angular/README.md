@@ -25,6 +25,7 @@ import { Toaster } from '@rozie-ui/toast-angular';
   template: `
     <button (click)="toaster.show({ message: 'Saved!', type: 'success' })">Save</button>
     <button (click)="toaster.show({ message: 'Something failed', type: 'error' })">Fail</button>
+    <button (click)="toaster.show({ message: 'Conversation archived', data: { threadId: 't42' }, action: { label: 'Undo', onClick: onUndo } })">Archive</button>
 
     <!-- Mount the host once (typically near the app root). -->
     <Toaster #toaster position="bottom-right" [duration]="4000" />
@@ -32,6 +33,7 @@ import { Toaster } from '@rozie-ui/toast-angular';
 })
 export class DemoComponent {
   @ViewChild('toaster') toaster!: Toaster;
+  onUndo(ctx: { id: string; data: { threadId: string } }) { restore(ctx.data.threadId); }
 }
 ```
 
@@ -59,7 +61,7 @@ import '@rozie-ui/toast-angular/themes/shadcn.css';    // or material.css, boots
 
 | Event | Description |
 | --- | --- |
-| `dismissed` | Fired exactly once per toast, at dismissal initiation (before the exit animation runs). Payload is ONE object `{ toast, reason }` — `toast` is the full queue entry, `reason` is `'timeout'` (auto-dismiss), `'swipe'` (pointer swipe past threshold), `'close'` (the built-in close button), or `'api'` (the `dismiss(id)` verb). `clear()` removes every toast immediately and does NOT fire `dismissed` (documented bulk behavior). |
+| `dismissed` | Fired exactly once per toast, at dismissal initiation (before the exit animation runs). Payload is ONE object `{ toast, reason }` — `toast` is the full queue entry, `reason` is `'timeout'` (auto-dismiss), `'swipe'` (pointer swipe past threshold), `'close'` (the built-in close button), `'action'` (the default toast's action button), or `'api'` (the `dismiss(id)` verb). `clear()` removes every toast immediately and does NOT fire `dismissed` (documented bulk behavior). |
 
 ## Imperative handle
 
@@ -67,10 +69,10 @@ The component has no events — its primary API is an imperative handle (declare
 
 | Method | Description |
 | --- | --- |
-| `show` | Enqueue a toast. Accepts `{ message, type, duration, id }` (all optional — `message` defaults to `''`, `type` to `'info'`, `duration` to the `duration` prop). Returns the toast `id`. A non-sticky toast (duration > 0) auto-dismisses; `duration: 0` makes it sticky. |
+| `show` | Enqueue a toast. Accepts `{ message, type, duration, id, action, data }` (all optional — `message` defaults to `''`, `type` to `'info'`, `duration` to the `duration` prop). Returns the toast `id`. A non-sticky toast (duration > 0) auto-dismisses; `duration: 0` makes it sticky. `action: { label, onClick }` renders an action button in the default toast (dropped if `onClick` is not a function — no dead button ships); clicking it calls `onClick({ id, data })` and dismisses with reason `'action'` (the dismiss ALWAYS runs, even if `onClick` throws — the error itself is never swallowed). `data` is an arbitrary payload carried through untouched, available in the `#toast` slot scope, the `dismissed` payload, and the action callback. |
 | `dismiss` | Remove a single toast by the `id` returned from `show` (routes through the exit lifecycle with reason `'api'` — fires `dismissed`, plays the exit animation, then removes it). |
 | `clear` | Remove every visible toast at once immediately (no exit animation) and clear all pending auto-dismiss timers. Does NOT fire `dismissed`. |
-| `patch` | Update an existing toast in place. Accepts `(id, { message, type, duration })` — only the keys you pass are merged into the matching entry. Returns `true` if the id existed, `false` otherwise (no throw). Including a `duration` key clears and restarts that toast's auto-dismiss timer (`0` makes it sticky; a positive value arms/re-arms it); omitting `duration` leaves a running timer untouched. |
+| `patch` | Update an existing toast in place. Accepts `(id, { message, type, duration, action, data })` — only the keys you pass are merged into the matching entry. Returns `true` if the id existed, `false` otherwise (no throw). Including a `duration` key clears and restarts that toast's auto-dismiss timer (`0` makes it sticky; a positive value arms/re-arms it); omitting `duration` leaves a running timer untouched. `action`/`data` merge the same way `show()` accepts them — handy for adding an "Undo" action once a `promise()` toast settles. |
 | `promise` | Sugar over `show`/`patch` for an async operation: `promise(p, { loading, success, error })` immediately shows a `{ type: 'loading', duration: 0 }` toast and returns its `id` SYNCHRONOUSLY. On resolve it patches the SAME toast to `{ type: 'success', message: resolve(success, value) }` (the auto-dismiss timer starts AT SETTLE); on reject, likewise with `error`. `success`/`error` accept a string or a `(value) => string` function. Never resurrects a toast dismissed while `p` was still pending, and never returns a derived promise — your own `.then`/`.catch` on `p` still fire. |
 
 ```ts

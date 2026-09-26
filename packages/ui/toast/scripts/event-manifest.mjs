@@ -13,7 +13,7 @@
  */
 export const eventManifest = {
   dismissed:
-    "Fired exactly once per toast, at dismissal initiation (before the exit animation runs). Payload is ONE object `{ toast, reason }` — `toast` is the full queue entry, `reason` is `'timeout'` (auto-dismiss), `'swipe'` (pointer swipe past threshold), `'close'` (the built-in close button), or `'api'` (the `dismiss(id)` verb). `clear()` removes every toast immediately and does NOT fire `dismissed` (documented bulk behavior).",
+    "Fired exactly once per toast, at dismissal initiation (before the exit animation runs). Payload is ONE object `{ toast, reason }` — `toast` is the full queue entry, `reason` is `'timeout'` (auto-dismiss), `'swipe'` (pointer swipe past threshold), `'close'` (the built-in close button), `'action'` (the default toast's action button), or `'api'` (the `dismiss(id)` verb). `clear()` removes every toast immediately and does NOT fire `dismissed` (documented bulk behavior).",
 };
 
 export default eventManifest;

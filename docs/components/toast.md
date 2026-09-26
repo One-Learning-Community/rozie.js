@@ -101,7 +101,7 @@ The imperative handle is the primary write API. Declared once in the source via 
 
 | Method | Description |
 | --- | --- |
-| `show` | Enqueue a toast. Accepts `{ message, type, duration, id }` (all optional — `message` defaults to `''`, `type` to `'info'`, `duration` to the `duration` prop; `type` also accepts `'loading'`, see below). Returns the toast `id`. A non-sticky toast (duration > 0) schedules a `window.setTimeout` to auto-dismiss. |
+| `show` | Enqueue a toast. Accepts `{ message, type, duration, id, action, data }` (all optional — `message` defaults to `''`, `type` to `'info'`, `duration` to the `duration` prop; `type` also accepts `'loading'`, see below). Returns the toast `id`. A non-sticky toast (duration > 0) schedules a `window.setTimeout` to auto-dismiss. `action: { label, onClick }` renders an action button in the default toast (an action with no `onClick` function is dropped — no dead button); clicking it calls `onClick({ id, data })` and dismisses with reason `'action'` — the dismiss always runs, even if `onClick` throws (see [Accessibility](#accessibility)). `data` is an arbitrary payload carried through untouched to the `#toast` slot scope, the `dismissed` payload, and the action callback. |
 | `dismiss` | Remove a single toast by the `id` returned from `show`. Routes through the exit lifecycle with reason `'api'` — fires `dismissed`, plays the exit animation, then removes it. |
 | `clear` | Remove every visible toast at once **immediately** (no exit animation) and clear all pending auto-dismiss timers. Does **not** fire `dismissed`. |
 | `patch` | Update an existing toast in place: `patch(id, { message, type, duration, action, data })` — only the keys you pass are merged into the matching entry. Returns `true` if the id existed, `false` otherwise (no throw). A `duration` key clears and restarts that toast's auto-dismiss timer (`0` makes it sticky; a positive value arms/re-arms it); omitting `duration` leaves a running timer untouched. |
@@ -111,7 +111,7 @@ The imperative handle is the primary write API. Declared once in the source via 
 
 | Slot | Params | Description |
 | --- | --- | --- |
-| `toast` | `toast, dismiss` | Custom per-toast rendering. The scope gives you the `toast` record (`{ id, message, type, duration }`) and the `dismiss` function so your chrome can close itself. Without it, each toast renders the (optional loading spinner +) message text plus a close button. |
+| `toast` | `toast, dismiss` | Custom per-toast rendering. The scope gives you the `toast` record (`{ id, message, type, duration, action, data }`) and the `dismiss` function so your chrome can close itself. Without it, each toast renders the (optional loading spinner +) message text, the action button (if `action` is set), plus a close button. |
 
 ## Swipe-to-dismiss
 
@@ -153,6 +153,8 @@ The complete token table and the design-system bridges live on the [dedicated th
 - Each toast is a `role="status"` with `aria-live` chosen by its `type`: `'error'` and `'warning'` toasts announce `assertive` (interrupt), while everything else — including `'loading'` — announces `polite` (wait for a gap).
 - The loading spinner is purely decorative (`aria-hidden`); the message text carries the meaning. `patch()` mutates the *same* `role="status"` element in place, so a loading → success/error transition (including via `promise()`) is announced naturally by screen readers — no element is added or removed.
 - The close button is a real `<button type="button">` with `aria-label="Dismiss"`, so it is keyboard- and screen-reader-operable. Focusing it (`:focus-within`) also expands a `stacked` region, so a keyboard user can always reach every toast.
+- **Auto-dismiss timers pause on keyboard focus, not just pointer hover** (WCAG 2.2.1 Timing Adjustable). Tabbing into the region — the action button, the close button, or any other focusable element inside a toast — pauses every running timer with the same exact-remainder precision as hover, so a keyboard user reading or acting on a toast never loses it to the timeout mid-interaction. Hover-pause and focus-pause compose: leaving one (mouse or focus) does **not** resume the timers while the other is still active, and this pause is unconditional — it is **not** gated by `disablePauseOnHover`, which only opts out of the pointer-hover behavior.
+- **An action's `onClick` that throws still dismisses the toast.** `show({ action })`'s callback runs inside a `try`/`finally`: the dismiss (reason `'action'`) always fires, so a throwing handler can never strand a toast. The error itself is **not** swallowed — it propagates out of the click handler exactly like any other native DOM event-handler exception (each target's own runtime reports it, e.g. Vue logs an "unhandled error in native event handler" warning).
 - Swipe is never the only way to dismiss a toast — the close button and the imperative verbs work identically whether `disableSwipe` is set or not.
 - `@media (prefers-reduced-motion: reduce)` collapses the enter/exit/collapse transforms to near-instant fades; the dismissal lifecycle (including the `@dismissed` event and removal timing) is unaffected.
 - The region is `position: fixed` with `pointer-events: none`, and only the individual toasts re-enable pointer events — so an empty stack never intercepts clicks on the page beneath it.

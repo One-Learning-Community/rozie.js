@@ -67,10 +67,9 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## What Rozie defers {#what-rozie-defers}
 
-`sonner` and `react-hot-toast` are extremely polished, battle-tested single-framework libraries, and on React alone they are more capable today. Promise/loading toasts, swipe-to-dismiss, the animated stack, and remaining-time-aware pause have all since shipped and are no longer gaps; the two structural stances below are deliberate, permanent choices:
+`sonner` and `react-hot-toast` are extremely polished, battle-tested single-framework libraries, and on React alone they are more capable today. Promise/loading toasts, swipe-to-dismiss, the animated stack, remaining-time-aware pause, and a per-toast action-button API have all since shipped and are no longer gaps; the one structural stance below is a deliberate, permanent choice:
 
 - **The global `toast()` ergonomic.** `sonner` / `react-hot-toast` let you `import { toast } from '…'` and call it from anywhere with zero wiring. Rozie's ref-driven model is deliberately less ergonomic: you must thread the ref to call sites (or wrap it in your own app context / store). More explicit, slightly more setup; see [The global-singleton question](#the-global-singleton-question) above for why this is a permanent stance, not a gap.
-- **Per-toast action-button API.** Some incumbents ship a dedicated `action: { label, onClick }` option. `@rozie-ui/toast` covers this with the `#toast` scoped slot instead (full custom chrome, not a fixed one-button shape) rather than adding a second, narrower API surface for the same job.
 - **`@rozie-ui/toast` is a MINOR (not yet 1.0).** The surface is stable and gate-verified, but it is younger and less battle-tested than the established per-framework libraries. The full prop, event, handle, and slot tables live in the [showcase + API reference](/components/toast).
 
 ## Try it
