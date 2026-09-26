@@ -23,6 +23,12 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './specs',
+  // Quick 260926 — tiptap-strictmode.spec.ts needs a DEV-mode React server
+  // (StrictMode's double-invoke is a no-op against this config's production
+  // `vite build` + preview output) — it runs under its own
+  // playwright.strictmode.config.ts instead. Excluded here so a plain
+  // `playwright test` doesn't pick it up against the wrong server.
+  testIgnore: 'tiptap-strictmode.spec.ts',
   timeout: 30_000,
   // Retry under CI (incl. the pinned Docker container, which exports CI=true):
   // headless Chromium occasionally SIGSEGVs at browser launch under Docker

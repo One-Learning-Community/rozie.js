@@ -1873,6 +1873,14 @@ export const LIT_TAGS: Record<Example, string> = {
 export interface HostQuery {
   example: Example;
   target: Target;
+  // Quick 260926 — opt-in React-only StrictMode wrap (`&strict=1`), consumed
+  // ONLY by entry.react.ts. Defaults false so every existing cell (all 5 other
+  // targets + react's default un-strict render) is byte-unchanged. React's
+  // synthetic StrictMode double-invoke is dev-only, so this flag is only
+  // meaningful against a `vite` DEV server, never this package's normal `vite
+  // build` + preview pipeline — see playwright.strictmode.config.ts, the one
+  // consumer of this flag.
+  strict: boolean;
 }
 
 export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
@@ -2461,7 +2469,8 @@ export function parseQuery(): HostQuery {
   const target = (TARGETS as readonly string[]).includes(targetParam)
     ? (targetParam as Target)
     : 'vue';
-  return { example, target };
+  const strict = params.get('strict') === '1';
+  return { example, target, strict };
 }
 
 /** The chrome-reset wrapper element Playwright clips its screenshot to. */

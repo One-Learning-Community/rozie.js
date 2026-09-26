@@ -5,11 +5,19 @@
  * `.rozie` files; `@rozie/unplugin` (target: react) + `@vitejs/plugin-react`
  * compile each to a `.tsx` component. The runtime mount is `createRoot`.
  *
- * NOTE: deliberately NOT wrapped in `<StrictMode>` — the visual-regression
- * host renders the production-shaped output for pixel comparison; StrictMode
- * double-invoke coverage is QA-03's separate dev-mode stress harness.
+ * NOTE: NOT wrapped in `<StrictMode>` by default — the visual-regression host
+ * renders the production-shaped output for pixel comparison; QA-03
+ * (examples/consumers/react-vite) is the standing dev-mode stress harness.
+ * Quick 260926 added a narrow, OPT-IN escape hatch: `&strict=1` wraps the
+ * mounted element in `<StrictMode>`. This is a no-op against this package's
+ * normal `vite build` output (StrictMode's double-invoke is dev-only), so it
+ * is meaningless for every existing pixel-comparison cell, which never passes
+ * the flag; it is meaningful ONLY when this same vite.config.ts is run as a
+ * DEV server (see playwright.strictmode.config.ts), which tiptap-strictmode.spec.ts
+ * uses to reproduce the async-construction double-Editor regression that only
+ * React's real StrictMode double-invoke can trigger.
  */
-import { createElement, createRef } from 'react';
+import { createElement, createRef, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   parseQuery,
@@ -28,7 +36,7 @@ const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dro
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
 
 async function main(): Promise<void> {
-  const { example } = parseQuery();
+  const { example, strict } = parseQuery();
   const demoKey = `../../../examples/demos/${example}Demo.rozie`;
   const baseKey = `../../../examples/${example}.rozie`;
   const isDemo = demoKey in demoModules;
@@ -67,16 +75,17 @@ async function main(): Promise<void> {
   // seed prop so the component owns its state — without it, React's strict
   // `useControllableState` freezes the value (the host wires no listener) and
   // every interaction in the compare.html 6-up is inert. See main.ts.
+  const element = createElement(
+    mod.default,
+    isDemo
+      ? null
+      : toUncontrolledProps(
+          example,
+          DEFAULT_PROPS[example] as Record<string, unknown>,
+        ),
+  );
   createRoot(mountWrapper()).render(
-    createElement(
-      mod.default,
-      isDemo
-        ? null
-        : toUncontrolledProps(
-            example,
-            DEFAULT_PROPS[example] as Record<string, unknown>,
-          ),
-    ),
+    strict ? createElement(StrictMode, null, element) : element,
   );
 }
 

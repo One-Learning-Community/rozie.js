@@ -45,6 +45,14 @@
   (it previously omitted `@tiptap/extensions` and `bubble-menu` and claimed both menu peers were
   optional).
 
+  **Fixed: a stale pre-unmount async construction could double-construct the Editor
+  under React StrictMode** (`maxLength`/`uploadImage`/`floatingMenu` lazy-extension path
+  only). React's dev-mode StrictMode double-invoke (mount → cleanup → mount, against the
+  SAME component instance) could let a stale first invocation's async extension-load
+  `.then()` construct a SECOND Editor onto the same DOM node and fire `ready` twice,
+  because the internal `disposed` guard was reset by the second invocation before the
+  first's `.then()` ever settled. Fixed with a per-mount-invocation guard; no API change.
+
 ### Patch Changes
 
 - @rozie/runtime-svelte@0.7.5

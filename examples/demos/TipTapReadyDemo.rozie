@@ -11,6 +11,17 @@
       import() first and the editor is constructed a tick later.
   Each records its ready payload; `counted` focuses its editor FROM the handler — the exact
   consumer need — through the payload, not a component ref (Angular's ref is the host).
+
+  Audit follow-up (quick 260926): `plain-ready-count` / `counted-ready-count` tally EVERY
+  `ready` fire (not just the latest status) — tiptap-strictmode.spec.ts asserts
+  `counted-ready-count` stays "1" through a React-StrictMode dev-mode double-invoke,
+  proving only the live invocation's async construction path actually constructs.
+
+  Also (quick 260926): `counted` now wires `@error`, recording the extension name from
+  the event payload. tiptap-import-failure.spec.ts aborts the CharacterCount chunk's
+  network request and asserts BOTH that `error` fires with `{ extension: 'count', error }`
+  AND that the editor still constructs WITHOUT that extension (degrade, not a permanently
+  uncreated editor) — see TipTap.rozie's $onMount comment for the fix.
 -->
 
 <rozie name="TipTapReadyDemo">
@@ -27,29 +38,41 @@
   countedHtml: '<p>Counted</p>',
   plainReady: 'waiting',
   countedReady: 'waiting',
+  plainReadyCount: 0,
+  countedReadyCount: 0,
+  countedError: '(none)',
 }
 </data>
 
 <script>
 const onPlainReady = (editor) => {
   $data.plainReady = editor && typeof editor.getHTML === 'function' ? 'ready' : 'no editor'
+  $data.plainReadyCount = $data.plainReadyCount + 1
 }
 const onCountedReady = (editor) => {
   if (!editor || typeof editor.getHTML !== 'function') {
     $data.countedReady = 'no editor'
+    $data.countedReadyCount = $data.countedReadyCount + 1
     return
   }
   editor.commands.focus('end')
   $data.countedReady = 'ready'
+  $data.countedReadyCount = $data.countedReadyCount + 1
+}
+const onCountedError = (payload) => {
+  $data.countedError = payload && payload.extension ? payload.extension : 'error-no-context'
 }
 </script>
 
 <template>
 <div class="tiptap-ready-demo">
   <div data-testid="plain"><TipTap r-model:html="$data.plainHtml" @ready="onPlainReady" /></div>
-  <div data-testid="counted"><TipTap r-model:html="$data.countedHtml" :maxLength="50" @ready="onCountedReady" /></div>
+  <div data-testid="counted"><TipTap r-model:html="$data.countedHtml" :maxLength="50" @ready="onCountedReady" @error="onCountedError" /></div>
   <pre data-testid="plain-ready">{{ $data.plainReady }}</pre>
   <pre data-testid="counted-ready">{{ $data.countedReady }}</pre>
+  <pre data-testid="plain-ready-count">{{ $data.plainReadyCount }}</pre>
+  <pre data-testid="counted-ready-count">{{ $data.countedReadyCount }}</pre>
+  <pre data-testid="counted-error">{{ $data.countedError }}</pre>
 </div>
 </template>
 

@@ -247,11 +247,6 @@ import { BubbleMenu } from '@tiptap/extension-bubble-menu'
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
 let editor = null
 
-// Set by the mount cleanup. When a conditional extension is being loaded, the editor
-// is constructed after the import() settles — by then the component may already be
-// gone, and constructing into a detached element would leak an Editor.
-// COMPONENT-scope for the Solid cleanup-hoist reason documented at toolbarDispose.
-let disposed = false
 
 // The raw HTML string the editor currently reflects. Compared against in the
 // $props.html reconciler so the watcher's mount-time fire is a no-op: the
@@ -808,7 +803,21 @@ function handleDrop(view, event, slice, moved) {
 }
 
 $onMount(() => {
-  disposed = false
+  // mount-local (NOT a top-level script `let`) — set here so a late-resolving
+  // dynamic import() below bails, and read by the returned teardown. Emitter-
+  // hardening backlog item #2 (project_emitter_hardening_backlog): every
+  // target keeps a $onMount setup-local in scope for its own returned
+  // teardown, so this no longer needs a TOP-LEVEL-`let` workaround (mirrors
+  // PdfViewer.rozie's `cancelled`). Crucially, a $onMount-LOCAL binding is
+  // per-INVOCATION, not per-component-instance: React StrictMode's dev-mode
+  // double-invoke re-runs this SAME function body (setup → cleanup → setup
+  // again) against the SAME component instance WITHOUT creating a new one, so
+  // a top-level or ref-hoisted `disposed` would be shared/reset across both
+  // invocations (the bug this fixes) — a plain local re-declares fresh on each
+  // invocation, so the FIRST invocation's stale `.then()` reads the closure IT
+  // captured (permanently `true` after its own cleanup ran), never the SECOND
+  // invocation's separate `false`.
+  let disposed = false
 
   // Which optional extensions this editor needs. Read ONCE here (setup-once, like
   // placeholder/nodeSpecs). When none is needed the editor is constructed right now,
