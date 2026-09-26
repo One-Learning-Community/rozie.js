@@ -1,0 +1,79 @@
+<!--
+  TipTapAsyncModelRaceDemo.rozie — behavioral cell for the async-construction
+  write race (quick 260926, audit follow-up to quick 260925-r41's `ready`
+  event).
+
+  `maxLength` forces the CharacterCount extension to load with a dynamic
+  import() before the Editor is constructed (see TipTap.rozie's $onMount).
+  This demo's OWN $onMount defers the child's exposed `setContent()` call by
+  ONE microtask (`queueMicrotask`) — strictly before the child's
+  maxLength-triggered import() can possibly settle (a real dynamic import()
+  always takes at least a task, not just a microtask, to resolve), but
+  strictly AFTER every onMount callback queued in the CURRENT synchronous
+  render pass has run. That second property matters: Solid's onMount queue is
+  REGISTRATION order, not DOM-tree order — a bare `$onMount(() =>
+  $refs.ed.setContent(...))` (registered textually above the `<TipTap>`, hence
+  queued BEFORE it) would fire before the child ever assigns its ref, silently
+  no-op'ing the whole reproduction on Solid only. The microtask deferral makes
+  the sequencing deterministic and target-agnostic without depending on
+  Playwright click timing (which raced ready in local dev/preview — the
+  dynamic import can resolve faster than a real click round-trip).
+
+  Before the fix, `setContent` returned early on `!editor` and silently
+  dropped the write; the eventual `ready` payload's `getHTML()` still showed
+  the ORIGINAL seed. After the fix, the write updates the model even
+  pre-construction, so `construct()` (which reads the html model fresh) picks
+  it up and the final content reflects the injected value.
+
+  Angular's component ref resolves to the host element, not the exposed
+  handle (the documented per-target idiom — same gate as tiptap.spec.ts), so
+  `$refs.ed?.setContent?.()` is a harmless no-op there; the spec excludes
+  Angular from the assertion.
+-->
+
+<rozie name="TipTapAsyncModelRaceDemo">
+
+<components>
+{
+  TipTap: '../../packages/ui/tiptap/src/TipTap.rozie',
+}
+</components>
+
+<data>
+{
+  html: '<p>original seed</p>',
+  finalHtml: '(pending)',
+}
+</data>
+
+<script>
+const onReady = (editor) => {
+  $data.finalHtml = editor && typeof editor.getHTML === 'function' ? editor.getHTML() : '(no editor)'
+}
+
+$onMount(() => {
+  queueMicrotask(() => {
+    $refs.ed?.setContent?.('<p>INJECTED BEFORE READY</p>')
+  })
+})
+</script>
+
+<template>
+<div class="tiptap-race-demo">
+  <h3>TipTap — async model race</h3>
+  <div data-testid="editor"><TipTap ref="ed" r-model:html="$data.html" :maxLength="50" @ready="onReady" /></div>
+  <pre data-testid="final-html">{{ $data.finalHtml }}</pre>
+</div>
+</template>
+
+<style>
+.tiptap-race-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+.tiptap-race-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+</style>
+
+</rozie>

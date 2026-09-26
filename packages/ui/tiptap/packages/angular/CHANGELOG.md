@@ -53,6 +53,11 @@
   because the internal `disposed` guard was reset by the second invocation before the
   first's `.then()` ever settled. Fixed with a per-mount-invocation guard; no API change.
 
+  **Fixed: `setContent()`/`clearContent()` no longer drop a write made during the async
+  construction gap** (`maxLength`/`uploadImage`/`floatingMenu` lazy-extension path only).
+  Calling either before `ready` now updates the bound `html` model immediately, and the
+  editor constructs with that value once it exists, instead of the write silently vanishing.
+
 ### Patch Changes
 
 - @rozie/runtime-angular@0.7.5

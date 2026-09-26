@@ -25,13 +25,13 @@ Each package carries **four required `@tiptap/*` peers** — `@tiptap/core`, `@t
 npm i @rozie-ui/tiptap-react @tiptap/core @tiptap/starter-kit @tiptap/extensions @tiptap/extension-bubble-menu
 ```
 
-Three more peers are **optional** and loaded only when you use their feature: `@tiptap/extension-character-count` (`maxLength` or the `#count` slot), `@tiptap/extension-image` (`uploadImage`) and `@tiptap/extension-floating-menu` (the `floatingMenu` slot). Install one only if you use it; an editor that uses one is constructed a tick later, once the extension has loaded — wait for the `ready` event before calling the handle.
+Three more peers are **optional** and loaded only when you use their feature: `@tiptap/extension-character-count` (`maxLength` or the `#count` slot), `@tiptap/extension-image` (`uploadImage`) and `@tiptap/extension-floating-menu` (the `floatingMenu` slot). Install one only if you use it; an editor that uses one is constructed a tick later, once the extension has loaded — wait for the `ready` event before calling the handle. `setContent()` / `clearContent()` are safe to call before `ready` too — a write during that gap updates the bound model immediately rather than being dropped, and the editor constructs with it. If the extension's own `import()` fails (a network blip), the editor still constructs — just without that one extension — and an `error` event reports which one and why.
 
 TipTap is built from ProseMirror, which is framework-agnostic — the official wrappers exist only to glue `onUpdate` to component state and forward extensions. Rozie's wrapper does that plus a **controlled two-way `html` binding** (with an echo-guard), a **batteries-included toolbar** (or bring your own via the `toolbar` slot), a full **imperative command handle**, and two consumer-extensibility passthroughs (`editorProps` for ProseMirror, `extensions` for extra TipTap extensions composed onto StarterKit).
 
 ## Quick start
 
-The two-way value is `html` — the editor's document as an **HTML string**. Typing writes the new HTML back through the two-way path (TipTap's `onUpdate`), and a consumer write reflects into the live document (echo-guarded so a programmatic set doesn't reset the selection). The wrapper also emits `ready` / `update` / `selectionUpdate` / `focus` / `blur` events.
+The two-way value is `html` — the editor's document as an **HTML string**. Typing writes the new HTML back through the two-way path (TipTap's `onUpdate`), and a consumer write reflects into the live document (echo-guarded so a programmatic set doesn't reset the selection). The wrapper also emits `ready` / `update` / `selectionUpdate` / `focus` / `blur` / `error` events.
 
 ### React
 
@@ -169,8 +169,8 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | `getHTML` | Return the current document serialized as an HTML string. |
 | `getJSON` | Return the current document as a ProseMirror JSON object. |
 | `getText` | Return the current document as plain text (TipTap's `getText()`; marks and structure stripped). `''` before mount. |
-| `setContent` | Replace the document — `setContent(html)`. Echo-guarded: reflects into the bound `html` model without bouncing an extra `update`. |
-| `clearContent` | Clear the document to an empty paragraph (reflects the empty value into the `html` model). |
+| `setContent` | Replace the document — `setContent(html)`. Echo-guarded: reflects into the bound `html` model without bouncing an extra `update`. Safe to call BEFORE `ready` (the async gap while an optional extension's `import()` is pending) — the write updates the model immediately and the editor constructs with it once it exists, instead of being silently dropped. |
+| `clearContent` | Clear the document to an empty paragraph (reflects the empty value into the `html` model). Also safe to call before `ready`, same as `setContent`. |
 | `toggleBold` | Toggle bold on the current selection. |
 | `toggleItalic` | Toggle italic on the current selection. |
 | `toggleHeading` | Toggle a heading at a level — `toggleHeading(level)` (defaults to 1). |

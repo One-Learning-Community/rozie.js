@@ -256,6 +256,10 @@ export const EXAMPLES = [
   'TipTapBehavior',
   // quick 260925-r41 — TipTap `ready` event, sync + lazy-extension construction paths.
   'TipTapReady',
+  // quick 260926 — TipTap async-construction model-write race (audit follow-up).
+  // Loader → examples/demos/TipTapAsyncModelRaceDemo.rozie. Built for all 6 targets
+  // but NOT a screenshot cell — covered by tiptap-async-model-race.spec.ts.
+  'TipTapAsyncModelRace',
   // Phase 33 (reactive-portal-slots) — the reactive nodeView portal slot proving
   // cells. TipTapNodeView is the BEHAVIORAL cell (loader →
   // examples/demos/TipTapNodeViewDemo.rozie, which fills the `nodeView` REACTIVE
@@ -1508,6 +1512,7 @@ export const LIT_TAGS: Record<Example, string> = {
   TipTapScreenshot: 'rozie-tip-tap-screenshot',
   TipTapBehavior: 'rozie-tip-tap-behavior',
   TipTapReady: 'rozie-tip-tap-ready',
+  TipTapAsyncModelRace: 'rozie-tip-tap-async-model-race',
   // Phase 33 — the lit entry appends '-demo' → tags
   // 'rozie-tip-tap-node-view-demo' / 'rozie-tip-tap-node-view-screenshot-demo' =
   // kebab of TipTapNodeViewDemo / TipTapNodeViewScreenshotDemo.
@@ -2023,6 +2028,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   TipTapScreenshot: {},
   TipTapBehavior: {},
   TipTapReady: {},
+  // quick 260926 — self-contained: seeds its own html + calls the child's
+  // setContent() handle from its own $onMount. No parent props needed.
+  TipTapAsyncModelRace: {},
   // Phase 33 — both node-view demos are self-contained: each seeds its own
   // fixed/seed doc (with the custom nodes) in <data>/<script> and fills the
   // nodeView slot. No parent props needed.

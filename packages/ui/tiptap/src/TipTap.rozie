@@ -1140,9 +1140,19 @@ function getText()          { return editor ? editor.getText() : '' }
 // setContent routes through the SAME suppress-echo bookkeeping as $watch(html):
 // update lastHtml first, set with emitUpdate:false (no onUpdate bounce), then
 // reflect into the model so a programmatic set keeps the bound state in sync.
+//
+// Pre-construction (`!editor`) is the async lazy-extension gap (maxLength /
+// uploadImage / #floatingMenu delay construction behind a dynamic import()) — a
+// write here must NOT be dropped. construct() always reads `$props.html` FRESH
+// (`lastHtml = $props.html` is the first thing it does — see $onMount), so
+// writing the MODEL now is enough: the editor constructs with this value once it
+// exists, instead of the caller's write silently vanishing into the gap.
 function setContent(next) {
-  if (!editor) return
   const v = next ?? ''
+  if (!editor) {
+    $model.html = v
+    return
+  }
   if (v === lastHtml) return
   lastHtml = v
   editor.commands.setContent(v, { emitUpdate: false })
@@ -1152,7 +1162,14 @@ function setContent(next) {
   refreshLink()
 }
 function clearContent() {
-  if (!editor) return
+  if (!editor) {
+    // Same pre-construction reasoning as setContent — TipTap/ProseMirror's
+    // canonical empty-document HTML (StarterKit's default paragraph node), so
+    // construct() seeds the SAME state `editor.commands.clearContent()` would
+    // have produced had the editor already existed.
+    $model.html = '<p></p>'
+    return
+  }
   editor.commands.clearContent()
   lastHtml = editor.getHTML()
   $model.html = lastHtml
