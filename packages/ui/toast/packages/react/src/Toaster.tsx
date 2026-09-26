@@ -68,6 +68,8 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   const exitFailsafes = useRef({});
   const seqLocal = useRef(0);
   const paused = useRef(false);
+  const hovering = useRef(false);
+  const focusedWithin = useRef(false);
   const swipeGesture = useRef<any>(null);
   const [toasts, setToasts] = useState<any[]>([]);
   const [seq, setSeq] = useState(0);
@@ -316,15 +318,24 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   }, [_rozieProp_onDismissed, clearTimer, removeToast, toasts]);
   // The default toast's action button: run the consumer's callback with the toast's id and
   // data, then dismiss with reason 'action'. Read before dismissing — the entry is replaced
-  // (exiting: true) by dismissBegin.
+  // (exiting: true) by dismissBegin. try/finally: dismissBegin MUST run even if onClick
+  // throws (else the toast is stuck forever — it never dismisses and there is no other
+  // event to route through the funnel). The error itself is NOT swallowed: it is left to
+  // propagate out of the click handler like any other native DOM handler exception (every
+  // target's own event-dispatch reports it — e.g. Vue logs "Unhandled error during
+  // execution of native event handler" — matching the field's existing convention of never
+  // wrapping a consumer callback in a silencing try/catch elsewhere in this codebase).
   const runAction = useCallback((t: any) => {
     const a = t.action;
     if (!a) return;
-    a.onClick({
-      id: t.id,
-      data: t.data
-    });
-    dismissBegin(t.id, 'action');
+    try {
+      a.onClick({
+        id: t.id,
+        data: t.data
+      });
+    } finally {
+      dismissBegin(t.id, 'action');
+    }
   }, [dismissBegin]);
   function dismiss(id: any) {
     dismissBegin(id, 'api');
@@ -542,13 +553,45 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     return depthDecl + ' transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
   }
 
-  // ---- hover pause -------------------------------------------------------
+  // ---- hover pause + keyboard-focus pause (WCAG 2.2.1) -------------------
+  // `hovering`/`focusedWithin` are independent pause SOURCES that must compose:
+  // leaving one must NOT resume the timers while the other is still active
+  // (else a keyboard user tabbing to the action button while the pointer has
+  // already left loses the toast to the timeout mid-interaction — the exact
+  // 2.2.1 failure this fixes). Keyboard focus ALWAYS pauses regardless of
+  // `disablePauseOnHover` — that prop's docs scope it to "the pointer is over
+  // the stack"; gating the keyboard-only equivalent behind the same opt-out
+  // would let an author silently ship a stack that fails 2.2.1 for
+  // assistive-tech users while remaining "compliant-looking" for mouse users.
+  // Both are top-level `let`s reachable only from these template-bound
+  // handlers, same hoisting class as `paused`/`swipeGesture` above.
   const onMouseEnter = useCallback(() => {
+    hovering.current = true;
     if (props.disablePauseOnHover) return;
     pauseTimers();
   }, [pauseTimers, props.disablePauseOnHover]);
   const onMouseLeave = useCallback(() => {
+    hovering.current = false;
     if (props.disablePauseOnHover) return;
+    // Focus is still inside the region — do not resume out from under it.
+    if (focusedWithin.current) return;
+    resumeTimers();
+  }, [props.disablePauseOnHover, resumeTimers]);
+  const onFocusIn = useCallback(() => {
+    focusedWithin.current = true;
+    pauseTimers();
+  }, [pauseTimers]);
+  const onFocusOut = useCallback((event: any) => {
+    // focusout bubbles for EVERY focus change, including one child of the
+    // region handing off to another (action button → close button). Only a
+    // relatedTarget outside the region counts as actually leaving it.
+    const region = event && event.currentTarget;
+    const next = event && event.relatedTarget;
+    if (region && next && region.contains && region.contains(next)) return;
+    focusedWithin.current = false;
+    // The pointer is still hovering (and hover-pause is enabled) — do not
+    // resume out from under it.
+    if (hovering.current && !props.disablePauseOnHover) return;
     resumeTimers();
   }, [props.disablePauseOnHover, resumeTimers]);
   // ---- helpers -----------------------------------------------------------
@@ -576,7 +619,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
 
   return (
     <>
-    <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} className={clsx(clsx("rozie-toaster", 'rozie-toaster--' + props.position + (props.stacked ? ' rozie-toaster--stacked' : '')), (attrs.className as string | undefined))} onMouseEnter={($event) => { onMouseEnter(); }} onMouseLeave={($event) => { onMouseLeave(); }} data-rozie-s-12d4265c="">
+    <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} className={clsx(clsx("rozie-toaster", 'rozie-toaster--' + props.position + (props.stacked ? ' rozie-toaster--stacked' : '')), (attrs.className as string | undefined))} onMouseEnter={($event) => { onMouseEnter(); }} onMouseLeave={($event) => { onMouseLeave(); }} onFocus={($event) => { onFocusIn(); }} onBlur={($event) => { onFocusOut($event); }} data-rozie-s-12d4265c="">
       
       {toasts.map((t, ti) => <div key={t.id} className={clsx("rozie-toast", 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))} style={parseInlineStyle(toastStyle(t, ti))} role="status" aria-live={rozieAttr(liveFor(t.type))} onAnimationEnd={($event) => { t.exiting && removeToast(t.id); }} onPointerDown={($event) => { onToastPointerDown(t, $event); }} onPointerMove={($event) => { onToastPointerMove(t, $event); }} onPointerUp={($event) => { onToastPointerUp(t, $event); }} onPointerCancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c="">
         {(props.renderToast ?? props.slots?.['toast']) ? ((props.renderToast ?? props.slots?.['toast']) as Function)({ toast: t, dismiss }) : <>{!!(t.type === 'loading') && <span className={"rozie-toast-spinner"} aria-hidden="true" data-rozie-s-12d4265c="" />}<span className={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t.message)}</span>{!!(t.action) && <button type="button" className={"rozie-toast-action"} onClick={($event) => { runAction(t); }} data-rozie-s-12d4265c="">{rozieDisplay(t.action.label)}</button>}<button type="button" className={"rozie-toast-close"} aria-label="Dismiss" onClick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}

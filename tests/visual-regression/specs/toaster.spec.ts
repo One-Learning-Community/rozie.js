@@ -218,6 +218,61 @@ for (const target of TARGETS) {
     await expect(page.locator('[role="status"]')).toHaveCount(1, { timeout: 5_000 });
   });
 
+  // quick 260926-i1f Item 2 (WCAG 2.2.1): a keyboard user tabbing to the
+  // action button must not lose the toast to the auto-dismiss timeout — the
+  // SAME pause hover already gets. RED-FIRST: on the un-fixed source there is
+  // no focus handler at all, so the toast dismisses on schedule regardless of
+  // focus — this assertion (`toHaveCount(1)` after the duration elapses)
+  // fails. GREEN once onFocusIn/onFocusOut are wired to pauseTimers/
+  // resumeTimers on the region.
+  runner(`toaster [${target}]: keyboard focus on the action button pauses auto-dismiss; leaving focus resumes it`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ToasterBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('show-short-action-toast').click();
+    const action = page.getByRole('button', { name: 'Act', exact: true });
+    await expect(action).toBeVisible({ timeout: 15_000 });
+
+    // Move keyboard focus onto the action button — the 900ms toast would
+    // otherwise time out well within this wait.
+    await action.focus();
+    await page.waitForTimeout(1_400);
+    await expect(page.getByRole('status')).toHaveCount(1);
+
+    // Leave focus (tab away) — resumes the timer; the toast then dismisses.
+    await action.blur();
+    await expect(page.getByRole('status')).toHaveCount(0, { timeout: 5_000 });
+  });
+
+  // Composition: hover-pause and focus-pause must not resume each other's
+  // pause. Mouse leaves first while focus is STILL inside the region — the
+  // toast must stay paused; only once focus ALSO leaves does it resume.
+  runner(`toaster [${target}]: hover-leave does not resume while keyboard focus is still inside the region`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ToasterBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('show-short-action-toast').click();
+    const action = page.getByRole('button', { name: 'Act', exact: true });
+    await expect(action).toBeVisible({ timeout: 15_000 });
+    const region = page.locator('.rozie-toaster');
+
+    await region.hover();
+    await action.focus();
+    // Leaving the hover state (mouse moves off the region entirely) while
+    // focus remains inside — must NOT resume.
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(1_400);
+    await expect(page.getByRole('status')).toHaveCount(1);
+
+    // NOW focus also leaves — both pause sources cleared, resumes + dismisses.
+    await action.blur();
+    await expect(page.getByRole('status')).toHaveCount(0, { timeout: 5_000 });
+  });
+
   runner(`toaster [${target}]: disableSwipe makes all three pointer handlers inert`, async ({
     page,
   }) => {

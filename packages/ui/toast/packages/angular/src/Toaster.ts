@@ -14,7 +14,7 @@ interface ToastCtx {
   imports: [NgTemplateOutlet, NgClass],
   template: `
 
-    <div class="rozie-toaster" [ngClass]="'rozie-toaster--' + position() + (stacked() ? ' rozie-toaster--stacked' : '')" role="region" [attr.aria-label]="rozieAttr(regionLabel())" #rozieSpread_0 (mouseenter)="onMouseEnter()" (mouseleave)="onMouseLeave()" #rozieListenersTarget_1>
+    <div class="rozie-toaster" [ngClass]="'rozie-toaster--' + position() + (stacked() ? ' rozie-toaster--stacked' : '')" role="region" [attr.aria-label]="rozieAttr(regionLabel())" #rozieSpread_0 (mouseenter)="onMouseEnter()" (mouseleave)="onMouseLeave()" (focusin)="onFocusIn()" (focusout)="onFocusOut($event)" #rozieListenersTarget_1>
       
       @for (t of toasts(); track t.id; let ti = $index) {
     <div class="rozie-toast" [ngClass]="'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')" [style]="toastStyle(t, ti)" role="status" [attr.aria-live]="rozieAttr(liveFor(t.type))" (animationend)="t.exiting && removeToast(t.id)" (pointerdown)="onToastPointerDown(t, $event)" (pointermove)="onToastPointerMove(t, $event)" (pointerup)="onToastPointerUp(t, $event)" (pointercancel)="onToastPointerCancel(t)">
@@ -500,15 +500,24 @@ export class Toaster {
   };
   // The default toast's action button: run the consumer's callback with the toast's id and
   // data, then dismiss with reason 'action'. Read before dismissing — the entry is replaced
-  // (exiting: true) by dismissBegin.
+  // (exiting: true) by dismissBegin. try/finally: dismissBegin MUST run even if onClick
+  // throws (else the toast is stuck forever — it never dismisses and there is no other
+  // event to route through the funnel). The error itself is NOT swallowed: it is left to
+  // propagate out of the click handler like any other native DOM handler exception (every
+  // target's own event-dispatch reports it — e.g. Vue logs "Unhandled error during
+  // execution of native event handler" — matching the field's existing convention of never
+  // wrapping a consumer callback in a silencing try/catch elsewhere in this codebase).
   runAction = (t: any) => {
     const a = t.action;
     if (!a) return;
-    a.onClick({
-      id: t.id,
-      data: t.data
-    });
-    this.dismissBegin(t.id, 'action');
+    try {
+      a.onClick({
+        id: t.id,
+        data: t.data
+      });
+    } finally {
+      this.dismissBegin(t.id, 'action');
+    }
   };
   dismiss = (id: any) => {
     this.dismissBegin(id, 'api');
@@ -716,13 +725,47 @@ export class Toaster {
     const opacity = magnitude > 0 && dragState.size > 0 ? Math.max(0.3, 1 - magnitude / dragState.size) : 1;
     return depthDecl + ' transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
   };
-  // ---- hover pause -------------------------------------------------------
+  // ---- hover pause + keyboard-focus pause (WCAG 2.2.1) -------------------
+  // `hovering`/`focusedWithin` are independent pause SOURCES that must compose:
+  // leaving one must NOT resume the timers while the other is still active
+  // (else a keyboard user tabbing to the action button while the pointer has
+  // already left loses the toast to the timeout mid-interaction — the exact
+  // 2.2.1 failure this fixes). Keyboard focus ALWAYS pauses regardless of
+  // `disablePauseOnHover` — that prop's docs scope it to "the pointer is over
+  // the stack"; gating the keyboard-only equivalent behind the same opt-out
+  // would let an author silently ship a stack that fails 2.2.1 for
+  // assistive-tech users while remaining "compliant-looking" for mouse users.
+  // Both are top-level `let`s reachable only from these template-bound
+  // handlers, same hoisting class as `paused`/`swipeGesture` above.
+  hovering = false;
+  focusedWithin = false;
   onMouseEnter = () => {
+    this.hovering = true;
     if (this.disablePauseOnHover()) return;
     this.pauseTimers();
   };
   onMouseLeave = () => {
+    this.hovering = false;
     if (this.disablePauseOnHover()) return;
+    // Focus is still inside the region — do not resume out from under it.
+    if (this.focusedWithin) return;
+    this.resumeTimers();
+  };
+  onFocusIn = () => {
+    this.focusedWithin = true;
+    this.pauseTimers();
+  };
+  onFocusOut = (event: any) => {
+    // focusout bubbles for EVERY focus change, including one child of the
+    // region handing off to another (action button → close button). Only a
+    // relatedTarget outside the region counts as actually leaving it.
+    const region = event && event.currentTarget;
+    const next = event && event.relatedTarget;
+    if (region && next && region.contains && region.contains(next)) return;
+    this.focusedWithin = false;
+    // The pointer is still hovering (and hover-pause is enabled) — do not
+    // resume out from under it.
+    if (this.hovering && !this.disablePauseOnHover()) return;
     this.resumeTimers();
   };
   // ---- helpers -----------------------------------------------------------

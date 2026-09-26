@@ -105,4 +105,43 @@ describe('Toaster action + data (behavioral)', () => {
     expect(actionButton(host)).toBeNull();
     app.unmount();
   });
+
+  // quick 260926-i1f Item 1: runAction() called onClick with no try/finally, so a
+  // throwing callback skipped dismissBegin(id, 'action') entirely — the toast was
+  // stuck forever. RED-FIRST: on the un-fixed source this assertion fails (the
+  // toast is still present, no 'action' dismissal fired) and the thrown error is
+  // never observed (silently lost inside Vue's synthetic event dispatch). GREEN
+  // once runAction wraps the callback in try/finally (always dismiss) and does
+  // NOT swallow the error — it is allowed to propagate (Vue surfaces it via its
+  // own global unhandled-error reporting, the same as any other native DOM click
+  // handler that throws).
+  it('an onClick that throws still dismisses with reason \'action\' (does not swallow the error)', async () => {
+    const { app, host, handle, dismissed } = mountToaster();
+    const id = handle().show({
+      message: 'Conversation archived',
+      duration: 0,
+      action: { label: 'Undo', onClick: () => { throw new Error('boom'); } },
+    });
+    await nextTick();
+
+    const btn = actionButton(host);
+    expect(btn).not.toBeNull();
+
+    let observedThrow = false;
+    const onWindowError = () => { observedThrow = true; };
+    window.addEventListener('error', onWindowError);
+    try {
+      btn!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    } catch {
+      observedThrow = true;
+    }
+    await settleExit();
+    window.removeEventListener('error', onWindowError);
+
+    expect(observedThrow, 'onClick throw must not be silently swallowed').toBe(true);
+    expect(dismissed.map((d) => d.reason)).toEqual(['action']);
+    expect(dismissed[0].toast.id).toBe(id);
+    expect(host.querySelectorAll('[role="status"]').length).toBe(0);
+    app.unmount();
+  });
 });

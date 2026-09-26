@@ -275,7 +275,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 
   render() {
     return html`
-<div class="rozie-toaster ${(rozieClass('rozie-toaster--' + this.position + (this.stacked ? ' rozie-toaster--stacked' : '')))}" role="region" aria-label=${rozieAttr(this.regionLabel())} ${rozieSpread(this.$attrs)} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onMouseEnter(); }} @mouseleave=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onMouseLeave(); }} ${rozieListeners(this.$listeners)} data-rozie-s-12d4265c>
+<div class="rozie-toaster ${(rozieClass('rozie-toaster--' + this.position + (this.stacked ? ' rozie-toaster--stacked' : '')))}" role="region" aria-label=${rozieAttr(this.regionLabel())} ${rozieSpread(this.$attrs)} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onMouseEnter(); }} @mouseleave=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onMouseLeave(); }} @focusin=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onFocusIn(); }} @focusout=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onFocusOut($event); }} ${rozieListeners(this.$listeners)} data-rozie-s-12d4265c>
   
   ${repeat<any>(this._toasts.value, (t, ti) => t.id, (t, ti) => html`<div class="rozie-toast ${(rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')))}" style=${rozieStyle(this.toastStyle(t, ti))} role="status" aria-live=${rozieAttr(this.liveFor(t.type))} @animationend=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { t.exiting && this.removeToast(t.id); }} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerDown(t, $event); }} @pointermove=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerMove(t, $event); }} @pointerup=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerUp(t, $event); }} @pointercancel=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerCancel(t); }} data-rozie-s-12d4265c>
     ${this.toast !== undefined ? this.toast({toast: t, dismiss: this.dismiss}) : html`<slot name="toast" data-rozie-params=${(() => { try { return JSON.stringify({toast: t}); } catch { return '{}'; } })()} @rozie-toast-dismiss=${($event: CustomEvent) => ((this.dismiss) as (...args: any[]) => any)($event.detail)}>
@@ -548,15 +548,24 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 
   // The default toast's action button: run the consumer's callback with the toast's id and
   // data, then dismiss with reason 'action'. Read before dismissing — the entry is replaced
-  // (exiting: true) by dismissBegin.
+  // (exiting: true) by dismissBegin. try/finally: dismissBegin MUST run even if onClick
+  // throws (else the toast is stuck forever — it never dismisses and there is no other
+  // event to route through the funnel). The error itself is NOT swallowed: it is left to
+  // propagate out of the click handler like any other native DOM handler exception (every
+  // target's own event-dispatch reports it — e.g. Vue logs "Unhandled error during
+  // execution of native event handler" — matching the field's existing convention of never
+  // wrapping a consumer callback in a silencing try/catch elsewhere in this codebase).
   runAction = (t: any) => {
   const a = t.action;
   if (!a) return;
-  a.onClick({
-    id: t.id,
-    data: t.data
-  });
-  this.dismissBegin(t.id, 'action');
+  try {
+    a.onClick({
+      id: t.id,
+      data: t.data
+    });
+  } finally {
+    this.dismissBegin(t.id, 'action');
+  }
 };
 
   dismiss = (id: any) => {
@@ -777,14 +786,52 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   return depthDecl + ' transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
 };
 
-  // ---- hover pause -------------------------------------------------------
+  // ---- hover pause + keyboard-focus pause (WCAG 2.2.1) -------------------
+  // `hovering`/`focusedWithin` are independent pause SOURCES that must compose:
+  // leaving one must NOT resume the timers while the other is still active
+  // (else a keyboard user tabbing to the action button while the pointer has
+  // already left loses the toast to the timeout mid-interaction — the exact
+  // 2.2.1 failure this fixes). Keyboard focus ALWAYS pauses regardless of
+  // `disablePauseOnHover` — that prop's docs scope it to "the pointer is over
+  // the stack"; gating the keyboard-only equivalent behind the same opt-out
+  // would let an author silently ship a stack that fails 2.2.1 for
+  // assistive-tech users while remaining "compliant-looking" for mouse users.
+  // Both are top-level `let`s reachable only from these template-bound
+  // handlers, same hoisting class as `paused`/`swipeGesture` above.
+  hovering = false;
+
+  focusedWithin = false;
+
   onMouseEnter = () => {
+  this.hovering = true;
   if (this.disablePauseOnHover) return;
   this.pauseTimers();
 };
 
   onMouseLeave = () => {
+  this.hovering = false;
   if (this.disablePauseOnHover) return;
+  // Focus is still inside the region — do not resume out from under it.
+  if (this.focusedWithin) return;
+  this.resumeTimers();
+};
+
+  onFocusIn = () => {
+  this.focusedWithin = true;
+  this.pauseTimers();
+};
+
+  onFocusOut = (event: any) => {
+  // focusout bubbles for EVERY focus change, including one child of the
+  // region handing off to another (action button → close button). Only a
+  // relatedTarget outside the region counts as actually leaving it.
+  const region = event && event.currentTarget;
+  const next = event && event.relatedTarget;
+  if (region && next && region.contains && region.contains(next)) return;
+  this.focusedWithin = false;
+  // The pointer is still hovering (and hover-pause is enabled) — do not
+  // resume out from under it.
+  if (this.hovering && !this.disablePauseOnHover) return;
   this.resumeTimers();
 };
 

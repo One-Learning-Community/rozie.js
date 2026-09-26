@@ -15,7 +15,11 @@
   and resumed exactly on leave — a 1000ms toast hovered ~600ms in resumes to
   ~400ms, NOT a full restart), and $onUnmount clears them all. `timers` is a
   top-level `let` (mutable cross-render scratch → React hoists it to useRef;
-  the engine-wrapper persistence guarantee).
+  the engine-wrapper persistence guarantee). Keyboard focus landing anywhere
+  inside the region (e.g. tabbing to a toast's action button) pauses the SAME
+  way hover does — an unconditional WCAG 2.2.1 guarantee, not gated by
+  `disablePauseOnHover` — and composes with hover: leaving one pause source
+  does not resume the timers while the other is still active.
 
   Exit lifecycle: every dismissal routes through the single funnel
   `dismissBegin(id, reason)` — idempotent via the entry's `exiting` flag,
@@ -419,12 +423,21 @@ const dismissBegin = (id, reason, extra?: { swipeExitSign?: number }) => {
 
 // The default toast's action button: run the consumer's callback with the toast's id and
 // data, then dismiss with reason 'action'. Read before dismissing — the entry is replaced
-// (exiting: true) by dismissBegin.
+// (exiting: true) by dismissBegin. try/finally: dismissBegin MUST run even if onClick
+// throws (else the toast is stuck forever — it never dismisses and there is no other
+// event to route through the funnel). The error itself is NOT swallowed: it is left to
+// propagate out of the click handler like any other native DOM handler exception (every
+// target's own event-dispatch reports it — e.g. Vue logs "Unhandled error during
+// execution of native event handler" — matching the field's existing convention of never
+// wrapping a consumer callback in a silencing try/catch elsewhere in this codebase).
 const runAction = (t) => {
   const a = t.action
   if (!a) return
-  a.onClick({ id: t.id, data: t.data })
-  dismissBegin(t.id, 'action')
+  try {
+    a.onClick({ id: t.id, data: t.data })
+  } finally {
+    dismissBegin(t.id, 'action')
+  }
 }
 
 const dismiss = (id) => {
@@ -624,13 +637,48 @@ const toastStyle = (t, ti) => {
   return depthDecl + ' transform: ' + translate + '; opacity: ' + opacity + '; transition: none;'
 }
 
-// ---- hover pause -------------------------------------------------------
+// ---- hover pause + keyboard-focus pause (WCAG 2.2.1) -------------------
+// `hovering`/`focusedWithin` are independent pause SOURCES that must compose:
+// leaving one must NOT resume the timers while the other is still active
+// (else a keyboard user tabbing to the action button while the pointer has
+// already left loses the toast to the timeout mid-interaction — the exact
+// 2.2.1 failure this fixes). Keyboard focus ALWAYS pauses regardless of
+// `disablePauseOnHover` — that prop's docs scope it to "the pointer is over
+// the stack"; gating the keyboard-only equivalent behind the same opt-out
+// would let an author silently ship a stack that fails 2.2.1 for
+// assistive-tech users while remaining "compliant-looking" for mouse users.
+// Both are top-level `let`s reachable only from these template-bound
+// handlers, same hoisting class as `paused`/`swipeGesture` above.
+let hovering = false
+let focusedWithin = false
+
 const onMouseEnter = () => {
+  hovering = true
   if ($props.disablePauseOnHover) return
   pauseTimers()
 }
 const onMouseLeave = () => {
+  hovering = false
   if ($props.disablePauseOnHover) return
+  // Focus is still inside the region — do not resume out from under it.
+  if (focusedWithin) return
+  resumeTimers()
+}
+const onFocusIn = () => {
+  focusedWithin = true
+  pauseTimers()
+}
+const onFocusOut = (event) => {
+  // focusout bubbles for EVERY focus change, including one child of the
+  // region handing off to another (action button → close button). Only a
+  // relatedTarget outside the region counts as actually leaving it.
+  const region = event && event.currentTarget
+  const next = event && event.relatedTarget
+  if (region && next && region.contains && region.contains(next)) return
+  focusedWithin = false
+  // The pointer is still hovering (and hover-pause is enabled) — do not
+  // resume out from under it.
+  if (hovering && !$props.disablePauseOnHover) return
   resumeTimers()
 }
 
@@ -657,6 +705,8 @@ $expose({ show, dismiss, clear, patch, promise })
   :aria-label="regionLabel()"
   @mouseenter="onMouseEnter()"
   @mouseleave="onMouseLeave()"
+  @focusin="onFocusIn()"
+  @focusout="onFocusOut($event)"
 >
   <!-- Loop var is `t`, NOT `toast`: a loop var named `toast` shadows the `#toast`
        slot snippet on Svelte (`{#each … as toast}` collides with the `toast`

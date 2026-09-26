@@ -18,6 +18,12 @@
   `stacked` on to assert the collapsed depth-driven grid overlay (depth>=3
   hidden) and its hover-triggered expand. Behavioral-only (no pixel baseline
   here) — stacked's own pixel proof is the ToasterStackedScreenshot cell.
+
+  quick 260926-i1f — `show-short-action-toast` drives the keyboard-focus-pause
+  a11y VR battery: a SHORT (`:duration="900"`) toast carrying an action button,
+  so the spec can focus the action via keyboard, wait past the duration, and
+  assert the timer stayed paused (WCAG 2.2.1), then blur/leave and assert it
+  resumes + dismisses.
 -->
 <rozie name="ToasterBehaviorDemo">
 
@@ -51,6 +57,16 @@ const showActionToast = () => {
     action: { label: 'Undo', onClick: (ctx) => { $data.actionResult = 'undo ' + ctx.data.threadId } },
   })
 }
+// quick 260926-i1f — a SHORT-duration action toast for the keyboard-focus-pause
+// (WCAG 2.2.1) VR battery: long enough to reliably render + focus, short enough
+// that "well past the duration" is a fast, non-flaky wait.
+const showShortActionToast = () => {
+  $refs.toaster.show({
+    message: 'Short-lived',
+    duration: 900,
+    action: { label: 'Act', onClick: () => {} },
+  })
+}
 const toggleDisableSwipe = () => {
   $data.disableSwipe = !$data.disableSwipe
 }
@@ -74,6 +90,7 @@ const onDismissed = (payload) => {
     <span class="readout" data-testid="dismissed-reason">{{ $data.dismissedReason }}</span>
     <button type="button" data-testid="show-action-toast" @click="showActionToast()">Show action toast</button>
     <span class="readout" data-testid="action-result">{{ $data.actionResult }}</span>
+    <button type="button" data-testid="show-short-action-toast" @click="showShortActionToast()">Show short action toast</button>
   </div>
 
   <Toaster

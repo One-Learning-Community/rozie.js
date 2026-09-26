@@ -484,15 +484,24 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
 
   // The default toast's action button: run the consumer's callback with the toast's id and
   // data, then dismiss with reason 'action'. Read before dismissing — the entry is replaced
-  // (exiting: true) by dismissBegin.
+  // (exiting: true) by dismissBegin. try/finally: dismissBegin MUST run even if onClick
+  // throws (else the toast is stuck forever — it never dismisses and there is no other
+  // event to route through the funnel). The error itself is NOT swallowed: it is left to
+  // propagate out of the click handler like any other native DOM handler exception (every
+  // target's own event-dispatch reports it — e.g. Vue logs "Unhandled error during
+  // execution of native event handler" — matching the field's existing convention of never
+  // wrapping a consumer callback in a silencing try/catch elsewhere in this codebase).
   function runAction(t: any) {
     const a = t.action;
     if (!a) return;
-    a.onClick({
-      id: t.id,
-      data: t.data
-    });
-    dismissBegin(t.id, 'action');
+    try {
+      a.onClick({
+        id: t.id,
+        data: t.data
+      });
+    } finally {
+      dismissBegin(t.id, 'action');
+    }
   }
   function dismiss(id: any) {
     dismissBegin(id, 'api');
@@ -711,13 +720,47 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
     return depthDecl + ' transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
   }
 
-  // ---- hover pause -------------------------------------------------------
+  // ---- hover pause + keyboard-focus pause (WCAG 2.2.1) -------------------
+  // `hovering`/`focusedWithin` are independent pause SOURCES that must compose:
+  // leaving one must NOT resume the timers while the other is still active
+  // (else a keyboard user tabbing to the action button while the pointer has
+  // already left loses the toast to the timeout mid-interaction — the exact
+  // 2.2.1 failure this fixes). Keyboard focus ALWAYS pauses regardless of
+  // `disablePauseOnHover` — that prop's docs scope it to "the pointer is over
+  // the stack"; gating the keyboard-only equivalent behind the same opt-out
+  // would let an author silently ship a stack that fails 2.2.1 for
+  // assistive-tech users while remaining "compliant-looking" for mouse users.
+  // Both are top-level `let`s reachable only from these template-bound
+  // handlers, same hoisting class as `paused`/`swipeGesture` above.
+  let hovering = false;
+  let focusedWithin = false;
   function onMouseEnter() {
+    hovering = true;
     if (local.disablePauseOnHover) return;
     pauseTimers();
   }
   function onMouseLeave() {
+    hovering = false;
     if (local.disablePauseOnHover) return;
+    // Focus is still inside the region — do not resume out from under it.
+    if (focusedWithin) return;
+    resumeTimers();
+  }
+  function onFocusIn() {
+    focusedWithin = true;
+    pauseTimers();
+  }
+  function onFocusOut(event: any) {
+    // focusout bubbles for EVERY focus change, including one child of the
+    // region handing off to another (action button → close button). Only a
+    // relatedTarget outside the region counts as actually leaving it.
+    const region = event && event.currentTarget;
+    const next = event && event.relatedTarget;
+    if (region && next && region.contains && region.contains(next)) return;
+    focusedWithin = false;
+    // The pointer is still hovering (and hover-pause is enabled) — do not
+    // resume out from under it.
+    if (hovering && !local.disablePauseOnHover) return;
     resumeTimers();
   }
 
@@ -735,7 +778,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
 
   return (
     <>
-    <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} class={"rozie-toaster" + " " + rozieClass('rozie-toaster--' + local.position + (local.stacked ? ' rozie-toaster--stacked' : '')) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onMouseEnter: ($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onMouseEnter(); }, onMouseLeave: ($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onMouseLeave(); } }, pickListeners(attrs))} data-rozie-s-12d4265c="">
+    <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} class={"rozie-toaster" + " " + rozieClass('rozie-toaster--' + local.position + (local.stacked ? ' rozie-toaster--stacked' : '')) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onMouseEnter: ($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onMouseEnter(); }, onMouseLeave: ($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onMouseLeave(); }, onFocusIn: ($event: FocusEvent & { currentTarget: HTMLDivElement; target: Element }) => { onFocusIn(); }, onFocusOut: ($event: FocusEvent & { currentTarget: HTMLDivElement; target: Element }) => { onFocusOut($event); } }, pickListeners(attrs))} data-rozie-s-12d4265c="">
       
       <Key each={toasts() as readonly any[]} by={(t) => t.id}>{(t, ti) => <div role="status" aria-live={rozieAttr(liveFor(t().type))} class={"rozie-toast" + " " + rozieClass('rozie-toast--' + t().type + (t().exiting ? ' rozie-toast--exiting' : '') + (t().swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))} style={parseInlineStyle(toastStyle(t(), ti()))} onAnimationEnd={($event: AnimationEvent & { currentTarget: HTMLDivElement; target: Element }) => { t().exiting && removeToast(t().id); }} onPointerDown={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerDown(t(), $event); }} onPointerMove={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerMove(t(), $event); }} onPointerUp={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerUp(t(), $event); }} onPointerCancel={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerCancel(t()); }} data-rozie-s-12d4265c="">
         {(_props.toastSlot ?? _props.slots?.['toast'])?.({ get toast() { return t(); }, dismiss }) ?? <>{<Show when={t().type === 'loading'}><span class={"rozie-toast-spinner"} aria-hidden="true" data-rozie-s-12d4265c="" /></Show>}<span class={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t().message)}</span>{<Show when={t().action}><button type="button" class={"rozie-toast-action"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { runAction(t()); }} data-rozie-s-12d4265c="">{rozieDisplay(t().action.label)}</button></Show>}<button type="button" aria-label="Dismiss" class={"rozie-toast-close"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { dismissBegin(t().id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}

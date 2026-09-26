@@ -300,15 +300,24 @@ const dismissBegin = (id: any, reason: any, extra?: {
 };
 // The default toast's action button: run the consumer's callback with the toast's id and
 // data, then dismiss with reason 'action'. Read before dismissing — the entry is replaced
-// (exiting: true) by dismissBegin.
+// (exiting: true) by dismissBegin. try/finally: dismissBegin MUST run even if onClick
+// throws (else the toast is stuck forever — it never dismisses and there is no other
+// event to route through the funnel). The error itself is NOT swallowed: it is left to
+// propagate out of the click handler like any other native DOM handler exception (every
+// target's own event-dispatch reports it — e.g. Vue logs "Unhandled error during
+// execution of native event handler" — matching the field's existing convention of never
+// wrapping a consumer callback in a silencing try/catch elsewhere in this codebase).
 const runAction = (t: any) => {
   const a = t.action;
   if (!a) return;
-  a.onClick({
-    id: t.id,
-    data: t.data
-  });
-  dismissBegin(t.id, 'action');
+  try {
+    a.onClick({
+      id: t.id,
+      data: t.data
+    });
+  } finally {
+    dismissBegin(t.id, 'action');
+  }
 };
 export const dismiss = (id: any) => {
   dismissBegin(id, 'api');
@@ -515,13 +524,47 @@ const toastStyle = (t: any, ti: any) => {
   const opacity = magnitude > 0 && dragState.size > 0 ? Math.max(0.3, 1 - magnitude / dragState.size) : 1;
   return depthDecl + ' transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
 };
-// ---- hover pause -------------------------------------------------------
+// ---- hover pause + keyboard-focus pause (WCAG 2.2.1) -------------------
+// `hovering`/`focusedWithin` are independent pause SOURCES that must compose:
+// leaving one must NOT resume the timers while the other is still active
+// (else a keyboard user tabbing to the action button while the pointer has
+// already left loses the toast to the timeout mid-interaction — the exact
+// 2.2.1 failure this fixes). Keyboard focus ALWAYS pauses regardless of
+// `disablePauseOnHover` — that prop's docs scope it to "the pointer is over
+// the stack"; gating the keyboard-only equivalent behind the same opt-out
+// would let an author silently ship a stack that fails 2.2.1 for
+// assistive-tech users while remaining "compliant-looking" for mouse users.
+// Both are top-level `let`s reachable only from these template-bound
+// handlers, same hoisting class as `paused`/`swipeGesture` above.
+let hovering = false;
+let focusedWithin = false;
 const onMouseEnter = () => {
+  hovering = true;
   if (disablePauseOnHover) return;
   pauseTimers();
 };
 const onMouseLeave = () => {
+  hovering = false;
   if (disablePauseOnHover) return;
+  // Focus is still inside the region — do not resume out from under it.
+  if (focusedWithin) return;
+  resumeTimers();
+};
+const onFocusIn = () => {
+  focusedWithin = true;
+  pauseTimers();
+};
+const onFocusOut = (event: any) => {
+  // focusout bubbles for EVERY focus change, including one child of the
+  // region handing off to another (action button → close button). Only a
+  // relatedTarget outside the region counts as actually leaving it.
+  const region = event && event.currentTarget;
+  const next = event && event.relatedTarget;
+  if (region && next && region.contains && region.contains(next)) return;
+  focusedWithin = false;
+  // The pointer is still hovering (and hover-pause is enabled) — do not
+  // resume out from under it.
+  if (hovering && !disablePauseOnHover) return;
   resumeTimers();
 };
 // ---- helpers -----------------------------------------------------------
@@ -538,7 +581,7 @@ onDestroy(() => (() => {
 })());
 </script>
 
-<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position + (stacked ? ' rozie-toaster--stacked' : '')), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as t, ti (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))]} style={rozieStyle(toastStyle(t, ti))} role="status" aria-live={rozieAttr(liveFor(t.type))} onanimationend={($event) => { t.exiting && removeToast(t.id); }} onpointerdown={($event) => { onToastPointerDown(t, $event); }} onpointermove={($event) => { onToastPointerMove(t, $event); }} onpointerup={($event) => { onToastPointerUp(t, $event); }} onpointercancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}{#if t.type === 'loading'}<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>{/if}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span>{#if t.action}<button type="button" class="rozie-toast-action" onclick={($event) => { runAction(t); }} data-rozie-s-12d4265c>{rozieDisplay(t.action.label)}</button>{/if}<button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
+<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position + (stacked ? ' rozie-toaster--stacked' : '')), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} onfocusin={($event) => { onFocusIn(); }} onfocusout={($event) => { onFocusOut($event); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as t, ti (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))]} style={rozieStyle(toastStyle(t, ti))} role="status" aria-live={rozieAttr(liveFor(t.type))} onanimationend={($event) => { t.exiting && removeToast(t.id); }} onpointerdown={($event) => { onToastPointerDown(t, $event); }} onpointermove={($event) => { onToastPointerMove(t, $event); }} onpointerup={($event) => { onToastPointerUp(t, $event); }} onpointercancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}{#if t.type === 'loading'}<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>{/if}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span>{#if t.action}<button type="button" class="rozie-toast-action" onclick={($event) => { runAction(t); }} data-rozie-s-12d4265c>{rozieDisplay(t.action.label)}</button>{/if}<button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
 
 <style>
 :global {
