@@ -5,7 +5,7 @@
   <div v-for="(t, ti) in toasts" :key="t.id" :class="['rozie-toast', 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')]" :style="toastStyle(t, ti)" role="status" :aria-live="liveFor(t.type)" @animationend="t.exiting && removeToast(t.id)" @pointerdown="onToastPointerDown(t, $event)" @pointermove="onToastPointerMove(t, $event)" @pointerup="onToastPointerUp(t, $event)" @pointercancel="onToastPointerCancel(t)">
     <slot name="toast" :toast="t" :dismiss="dismiss">
       <span v-if="t.type === 'loading'" class="rozie-toast-spinner" aria-hidden="true"></span><span class="rozie-toast-message">{{ t.message }}</span>
-      <button type="button" class="rozie-toast-close" aria-label="Dismiss" @click="dismissBegin(t.id, 'close')">×</button>
+      <button v-if="t.action" type="button" class="rozie-toast-action" @click="runAction(t)">{{ t.action.label }}</button><button type="button" class="rozie-toast-close" aria-label="Dismiss" @click="dismissBegin(t.id, 'close')">×</button>
     </slot>
   </div>
 </div>
@@ -208,6 +208,12 @@ const teardownTimers = () => {
   exitFailsafes = {};
 };
 // ---- queue (imperative handle implementations) -------------------------
+// An action button's spec, normalized once at the entry points (show / patch). Kept only
+// when `onClick` is a function — a label with nothing to call would render a dead button.
+const normAction = (a: any) => a && typeof a.onClick === 'function' ? {
+  label: a.label != null ? String(a.label) : '',
+  onClick: a.onClick
+} : null;
 const show = (input: any) => {
   const t = input || {};
   let id;
@@ -232,7 +238,12 @@ const show = (input: any) => {
     id,
     message: t.message != null ? t.message : '',
     type: t.type || 'info',
-    duration: t.duration != null ? t.duration : props.duration
+    duration: t.duration != null ? t.duration : props.duration,
+    // Rendered as a button in the default toast; see runAction().
+    action: normAction(t.action),
+    // Consumer payload, carried untouched: in the #toast slot scope, the `dismissed`
+    // payload and the action callback (e.g. the thread an "Undo" restores).
+    data: t.data !== undefined ? t.data : null
   };
   // ONE self-referential assignment so the React emitter lowers it to the
   // concurrent-safe functional updater `setToasts(prev => …)` (it only does so
@@ -289,6 +300,18 @@ const dismissBegin = (id: any, reason: any, extra?: {
     exitFailsafes[id] = window.setTimeout(() => removeToast(id), EXIT_FAILSAFE_MS);
   }
 };
+// The default toast's action button: run the consumer's callback with the toast's id and
+// data, then dismiss with reason 'action'. Read before dismissing — the entry is replaced
+// (exiting: true) by dismissBegin.
+const runAction = (t: any) => {
+  const a = t.action;
+  if (!a) return;
+  a.onClick({
+    id: t.id,
+    data: t.data
+  });
+  dismissBegin(t.id, 'action');
+};
 const dismiss = (id: any) => {
   dismissBegin(id, 'api');
 };
@@ -321,6 +344,8 @@ const patch = (id: any, changes: any) => {
     if (c.message !== undefined) merged.message = c.message;
     if (c.type !== undefined) merged.type = c.type;
     if (c.duration !== undefined) merged.duration = c.duration;
+    if (c.action !== undefined) merged.action = normAction(c.action);
+    if (c.data !== undefined) merged.data = c.data;
     return merged;
   });
   if (!existed) return false;
@@ -646,6 +671,22 @@ to { transform: rotate(360deg); }
 .rozie-toast-message {
   flex: 1 1 auto;
   font-size: var(--rozie-toast-font-size, var(--rto-font-size, 0.9rem));
+}
+.rozie-toast-action {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.6rem;
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.rozie-toast-action:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }
 .rozie-toast-close {
   flex: 0 0 auto;

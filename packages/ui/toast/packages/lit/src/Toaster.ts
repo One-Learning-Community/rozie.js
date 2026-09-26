@@ -144,6 +144,22 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   flex: 1 1 auto;
   font-size: var(--rozie-toast-font-size, var(--rto-font-size, 0.9rem));
 }
+.rozie-toast-action[data-rozie-s-12d4265c] {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.6rem;
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.rozie-toast-action[data-rozie-s-12d4265c]:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
 .rozie-toast-close[data-rozie-s-12d4265c] {
   flex: 0 0 auto;
   display: inline-flex;
@@ -264,7 +280,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   ${repeat<any>(this._toasts.value, (t, ti) => t.id, (t, ti) => html`<div class="rozie-toast ${(rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')))}" style=${rozieStyle(this.toastStyle(t, ti))} role="status" aria-live=${rozieAttr(this.liveFor(t.type))} @animationend=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { t.exiting && this.removeToast(t.id); }} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerDown(t, $event); }} @pointermove=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerMove(t, $event); }} @pointerup=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerUp(t, $event); }} @pointercancel=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerCancel(t); }} data-rozie-s-12d4265c>
     ${this.toast !== undefined ? this.toast({toast: t, dismiss: this.dismiss}) : html`<slot name="toast" data-rozie-params=${(() => { try { return JSON.stringify({toast: t}); } catch { return '{}'; } })()} @rozie-toast-dismiss=${($event: CustomEvent) => ((this.dismiss) as (...args: any[]) => any)($event.detail)}>
       ${t.type === 'loading' ? html`<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>` : nothing}<span class="rozie-toast-message" data-rozie-s-12d4265c>${rozieDisplay(t.message)}</span>
-      <button class="rozie-toast-close" type="button" aria-label="Dismiss" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>
+      ${t.action ? html`<button class="rozie-toast-action" type="button" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.runAction(t); }} data-rozie-s-12d4265c>${rozieDisplay(t.action.label)}</button>` : nothing}<button class="rozie-toast-close" type="button" aria-label="Dismiss" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>
     </slot>`}
   </div>`)}
 </div>
@@ -429,6 +445,13 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 };
 
   // ---- queue (imperative handle implementations) -------------------------
+  // An action button's spec, normalized once at the entry points (show / patch). Kept only
+  // when `onClick` is a function — a label with nothing to call would render a dead button.
+  normAction = (a: any) => a && typeof a.onClick === 'function' ? {
+  label: a.label != null ? String(a.label) : '',
+  onClick: a.onClick
+} : null;
+
   show = (input: any) => {
   const t = input || {};
   let id;
@@ -453,7 +476,12 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
     id,
     message: t.message != null ? t.message : '',
     type: t.type || 'info',
-    duration: t.duration != null ? t.duration : this.duration
+    duration: t.duration != null ? t.duration : this.duration,
+    // Rendered as a button in the default toast; see runAction().
+    action: this.normAction(t.action),
+    // Consumer payload, carried untouched: in the #toast slot scope, the `dismissed`
+    // payload and the action callback (e.g. the thread an "Undo" restores).
+    data: t.data !== undefined ? t.data : null
   };
   // ONE self-referential assignment so the React emitter lowers it to the
   // concurrent-safe functional updater `setToasts(prev => …)` (it only does so
@@ -518,6 +546,19 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   }
 };
 
+  // The default toast's action button: run the consumer's callback with the toast's id and
+  // data, then dismiss with reason 'action'. Read before dismissing — the entry is replaced
+  // (exiting: true) by dismissBegin.
+  runAction = (t: any) => {
+  const a = t.action;
+  if (!a) return;
+  a.onClick({
+    id: t.id,
+    data: t.data
+  });
+  this.dismissBegin(t.id, 'action');
+};
+
   dismiss = (id: any) => {
   this.dismissBegin(id, 'api');
 };
@@ -552,6 +593,8 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
     if (c.message !== undefined) merged.message = c.message;
     if (c.type !== undefined) merged.type = c.type;
     if (c.duration !== undefined) merged.duration = c.duration;
+    if (c.action !== undefined) merged.action = this.normAction(c.action);
+    if (c.data !== undefined) merged.data = c.data;
     return merged;
   });
   if (!existed) return false;

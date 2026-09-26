@@ -33,6 +33,7 @@
   disableSwipe: false,
   stacked: false,
   dismissedReason: '',
+  actionResult: '',
 }
 </data>
 
@@ -41,6 +42,14 @@ const showToast = () => {
   const n = $data.count + 1
   $data.count = n
   $refs.toaster.show({ message: 'Saved ' + n, type: 'success' })
+}
+// quick 260925-rb6 — a toast carrying an action + pass-through data.
+const showActionToast = () => {
+  $refs.toaster.show({
+    message: 'Conversation archived',
+    data: { threadId: 't42' },
+    action: { label: 'Undo', onClick: (ctx) => { $data.actionResult = 'undo ' + ctx.data.threadId } },
+  })
 }
 const toggleDisableSwipe = () => {
   $data.disableSwipe = !$data.disableSwipe
@@ -63,6 +72,8 @@ const onDismissed = (payload) => {
     <button type="button" data-testid="toggle-disable-swipe" @click="toggleDisableSwipe()">Toggle disableSwipe</button>
     <button type="button" data-testid="toggle-stacked" @click="toggleStacked()">Toggle stacked</button>
     <span class="readout" data-testid="dismissed-reason">{{ $data.dismissedReason }}</span>
+    <button type="button" data-testid="show-action-toast" @click="showActionToast()">Show action toast</button>
+    <span class="readout" data-testid="action-result">{{ $data.actionResult }}</span>
   </div>
 
   <Toaster

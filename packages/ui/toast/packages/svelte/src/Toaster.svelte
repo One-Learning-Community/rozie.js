@@ -206,6 +206,12 @@ const teardownTimers = () => {
   exitFailsafes = {};
 };
 // ---- queue (imperative handle implementations) -------------------------
+// An action button's spec, normalized once at the entry points (show / patch). Kept only
+// when `onClick` is a function — a label with nothing to call would render a dead button.
+const normAction = (a: any) => a && typeof a.onClick === 'function' ? {
+  label: a.label != null ? String(a.label) : '',
+  onClick: a.onClick
+} : null;
 export const show = (input: any) => {
   const t = input || {};
   let id;
@@ -230,7 +236,12 @@ export const show = (input: any) => {
     id,
     message: t.message != null ? t.message : '',
     type: t.type || 'info',
-    duration: t.duration != null ? t.duration : duration
+    duration: t.duration != null ? t.duration : duration,
+    // Rendered as a button in the default toast; see runAction().
+    action: normAction(t.action),
+    // Consumer payload, carried untouched: in the #toast slot scope, the `dismissed`
+    // payload and the action callback (e.g. the thread an "Undo" restores).
+    data: t.data !== undefined ? t.data : null
   };
   // ONE self-referential assignment so the React emitter lowers it to the
   // concurrent-safe functional updater `setToasts(prev => …)` (it only does so
@@ -287,6 +298,18 @@ const dismissBegin = (id: any, reason: any, extra?: {
     exitFailsafes[id] = window.setTimeout(() => removeToast(id), EXIT_FAILSAFE_MS);
   }
 };
+// The default toast's action button: run the consumer's callback with the toast's id and
+// data, then dismiss with reason 'action'. Read before dismissing — the entry is replaced
+// (exiting: true) by dismissBegin.
+const runAction = (t: any) => {
+  const a = t.action;
+  if (!a) return;
+  a.onClick({
+    id: t.id,
+    data: t.data
+  });
+  dismissBegin(t.id, 'action');
+};
 export const dismiss = (id: any) => {
   dismissBegin(id, 'api');
 };
@@ -319,6 +342,8 @@ export const patch = (id: any, changes: any) => {
     if (c.message !== undefined) merged.message = c.message;
     if (c.type !== undefined) merged.type = c.type;
     if (c.duration !== undefined) merged.duration = c.duration;
+    if (c.action !== undefined) merged.action = normAction(c.action);
+    if (c.data !== undefined) merged.data = c.data;
     return merged;
   });
   if (!existed) return false;
@@ -513,7 +538,7 @@ onDestroy(() => (() => {
 })());
 </script>
 
-<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position + (stacked ? ' rozie-toaster--stacked' : '')), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as t, ti (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))]} style={rozieStyle(toastStyle(t, ti))} role="status" aria-live={rozieAttr(liveFor(t.type))} onanimationend={($event) => { t.exiting && removeToast(t.id); }} onpointerdown={($event) => { onToastPointerDown(t, $event); }} onpointermove={($event) => { onToastPointerMove(t, $event); }} onpointerup={($event) => { onToastPointerUp(t, $event); }} onpointercancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}{#if t.type === 'loading'}<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>{/if}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span><button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
+<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position + (stacked ? ' rozie-toaster--stacked' : '')), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as t, ti (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))]} style={rozieStyle(toastStyle(t, ti))} role="status" aria-live={rozieAttr(liveFor(t.type))} onanimationend={($event) => { t.exiting && removeToast(t.id); }} onpointerdown={($event) => { onToastPointerDown(t, $event); }} onpointermove={($event) => { onToastPointerMove(t, $event); }} onpointerup={($event) => { onToastPointerUp(t, $event); }} onpointercancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}{#if t.type === 'loading'}<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>{/if}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span>{#if t.action}<button type="button" class="rozie-toast-action" onclick={($event) => { runAction(t); }} data-rozie-s-12d4265c>{rozieDisplay(t.action.label)}</button>{/if}<button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
 
 <style>
 :global {
@@ -645,6 +670,22 @@ onDestroy(() => (() => {
   .rozie-toast-message[data-rozie-s-12d4265c] {
     flex: 1 1 auto;
     font-size: var(--rozie-toast-font-size, var(--rto-font-size, 0.9rem));
+  }
+  .rozie-toast-action[data-rozie-s-12d4265c] {
+    flex: 0 0 auto;
+    padding: 0.2rem 0.6rem;
+    font: inherit;
+    font-weight: 600;
+    line-height: 1.2;
+    color: inherit;
+    background: transparent;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .rozie-toast-action[data-rozie-s-12d4265c]:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
   }
   .rozie-toast-close[data-rozie-s-12d4265c] {
     flex: 0 0 auto;

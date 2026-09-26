@@ -108,6 +108,24 @@ for (const target of TARGETS) {
   );
   const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
 
+  // quick 260925-rb6 (oinbox dogfooding): show({ action, data }) renders an action button;
+  // clicking it calls onClick({ id, data }) and dismisses with reason 'action'.
+  runner(`toaster [${target}]: an action toast runs onClick with its data and dismisses with reason 'action'`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ToasterBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('show-action-toast').click();
+    const action = page.getByRole('button', { name: 'Undo' });
+    await expect(action).toBeVisible();
+    await action.click();
+
+    await expect(page.getByTestId('action-result')).toHaveText('undo t42');
+    await expect(page.getByTestId('dismissed-reason')).toHaveText('action');
+    await expect(page.getByRole('status')).toHaveCount(0);
+  });
+
   runner(`toaster [${target}]: swipe past threshold dismisses with reason 'swipe'`, async ({
     page,
   }) => {

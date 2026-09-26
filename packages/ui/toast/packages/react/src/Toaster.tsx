@@ -218,6 +218,14 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     exitFailsafes.current = {};
   }, []);
   // ---- queue (imperative handle implementations) -------------------------
+  // An action button's spec, normalized once at the entry points (show / patch). Kept only
+  // when `onClick` is a function — a label with nothing to call would render a dead button.
+  function normAction(a: any) {
+    return a && typeof a.onClick === 'function' ? {
+      label: a.label != null ? String(a.label) : '',
+      onClick: a.onClick
+    } : null;
+  }
   function show(input: any) {
     const t = input || {};
     let id;
@@ -242,7 +250,12 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       id,
       message: t.message != null ? t.message : '',
       type: t.type || 'info',
-      duration: t.duration != null ? t.duration : props.duration
+      duration: t.duration != null ? t.duration : props.duration,
+      // Rendered as a button in the default toast; see runAction().
+      action: normAction(t.action),
+      // Consumer payload, carried untouched: in the #toast slot scope, the `dismissed`
+      // payload and the action callback (e.g. the thread an "Undo" restores).
+      data: t.data !== undefined ? t.data : null
     };
     // ONE self-referential assignment so the React emitter lowers it to the
     // concurrent-safe functional updater `setToasts(prev => …)` (it only does so
@@ -301,6 +314,18 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       exitFailsafes.current[id] = window.setTimeout(() => removeToast(id), EXIT_FAILSAFE_MS);
     }
   }, [_rozieProp_onDismissed, clearTimer, removeToast, toasts]);
+  // The default toast's action button: run the consumer's callback with the toast's id and
+  // data, then dismiss with reason 'action'. Read before dismissing — the entry is replaced
+  // (exiting: true) by dismissBegin.
+  const runAction = useCallback((t: any) => {
+    const a = t.action;
+    if (!a) return;
+    a.onClick({
+      id: t.id,
+      data: t.data
+    });
+    dismissBegin(t.id, 'action');
+  }, [dismissBegin]);
   function dismiss(id: any) {
     dismissBegin(id, 'api');
   }
@@ -335,6 +360,8 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       if (c.message !== undefined) merged.message = c.message;
       if (c.type !== undefined) merged.type = c.type;
       if (c.duration !== undefined) merged.duration = c.duration;
+      if (c.action !== undefined) merged.action = normAction(c.action);
+      if (c.data !== undefined) merged.data = c.data;
       return merged;
     });
     if (!existed) return false;
@@ -552,7 +579,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} className={clsx(clsx("rozie-toaster", 'rozie-toaster--' + props.position + (props.stacked ? ' rozie-toaster--stacked' : '')), (attrs.className as string | undefined))} onMouseEnter={($event) => { onMouseEnter(); }} onMouseLeave={($event) => { onMouseLeave(); }} data-rozie-s-12d4265c="">
       
       {toasts.map((t, ti) => <div key={t.id} className={clsx("rozie-toast", 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))} style={parseInlineStyle(toastStyle(t, ti))} role="status" aria-live={rozieAttr(liveFor(t.type))} onAnimationEnd={($event) => { t.exiting && removeToast(t.id); }} onPointerDown={($event) => { onToastPointerDown(t, $event); }} onPointerMove={($event) => { onToastPointerMove(t, $event); }} onPointerUp={($event) => { onToastPointerUp(t, $event); }} onPointerCancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c="">
-        {(props.renderToast ?? props.slots?.['toast']) ? ((props.renderToast ?? props.slots?.['toast']) as Function)({ toast: t, dismiss }) : <>{!!(t.type === 'loading') && <span className={"rozie-toast-spinner"} aria-hidden="true" data-rozie-s-12d4265c="" />}<span className={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t.message)}</span><button type="button" className={"rozie-toast-close"} aria-label="Dismiss" onClick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}
+        {(props.renderToast ?? props.slots?.['toast']) ? ((props.renderToast ?? props.slots?.['toast']) as Function)({ toast: t, dismiss }) : <>{!!(t.type === 'loading') && <span className={"rozie-toast-spinner"} aria-hidden="true" data-rozie-s-12d4265c="" />}<span className={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t.message)}</span>{!!(t.action) && <button type="button" className={"rozie-toast-action"} onClick={($event) => { runAction(t); }} data-rozie-s-12d4265c="">{rozieDisplay(t.action.label)}</button>}<button type="button" className={"rozie-toast-close"} aria-label="Dismiss" onClick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}
       </div>)}
     </div>
     </>

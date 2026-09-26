@@ -127,6 +127,22 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   flex: 1 1 auto;
   font-size: var(--rozie-toast-font-size, var(--rto-font-size, 0.9rem));
 }
+.rozie-toast-action[data-rozie-s-12d4265c] {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.6rem;
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.rozie-toast-action[data-rozie-s-12d4265c]:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
 .rozie-toast-close[data-rozie-s-12d4265c] {
   flex: 0 0 auto;
   display: inline-flex;

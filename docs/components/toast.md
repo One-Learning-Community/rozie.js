@@ -41,7 +41,17 @@ Mount the host **once** (typically near your app root), grab a ref to it, and ca
 </template>
 ```
 
-`show({ message, type, duration, id })` enqueues a toast and returns its `id`; `dismiss(id)` removes one; `clear()` removes them all. Pass `duration: 0` (or set the `duration` prop to `0`) for a sticky toast that only goes away on dismiss. Hovering the stack pauses the auto-dismiss timers **precisely** — leaving resumes exactly where it paused, not a full restart (opt out with `disablePauseOnHover`).
+`show({ message, type, duration, id, action, data })` enqueues a toast and returns its `id`; `dismiss(id)` removes one; `clear()` removes them all. Pass `duration: 0` (or set the `duration` prop to `0`) for a sticky toast that only goes away on dismiss.
+
+`action: { label, onClick }` adds a button to the default toast (an "Undo"). Clicking it calls `onClick({ id, data })` and then dismisses the toast with reason `'action'`; an action without an `onClick` function is ignored. `data` is any payload you want back later — it rides on the toast untouched and reaches the `#toast` slot scope (`toast.data`), the `dismissed` payload and the action callback:
+
+```js
+toaster.show({
+  message: 'Conversation archived',
+  data: { threadId },
+  action: { label: 'Undo', onClick: ({ data }) => unarchive(data.threadId) },
+})
+``` Hovering the stack pauses the auto-dismiss timers **precisely** — leaving resumes exactly where it paused, not a full restart (opt out with `disablePauseOnHover`).
 
 ### Promise / loading toasts
 
@@ -81,7 +91,7 @@ It shows a `{ type: 'loading', duration: 0 }` toast (a decorative spinner) and r
 
 | Event | Payload | Description |
 | --- | --- | --- |
-| `dismissed` | `{ toast, reason }` | Fired exactly once per toast, at dismissal *initiation* (before the exit animation runs). `toast` is the full queue entry; `reason` is `'timeout'` (auto-dismiss), `'swipe'` (pointer swipe past threshold), `'close'` (the built-in close button), or `'api'` (the `dismiss(id)` verb). `clear()` removes every toast immediately and does **not** fire `dismissed`. |
+| `dismissed` | `{ toast, reason }` | Fired exactly once per toast, at dismissal *initiation* (before the exit animation runs). `toast` is the full queue entry; `reason` is `'timeout'` (auto-dismiss), `'swipe'` (pointer swipe past threshold), `'close'` (the built-in close button), `'action'` (the default toast's action button), or `'api'` (the `dismiss(id)` verb). `clear()` removes every toast immediately and does **not** fire `dismissed`. |
 
 There is no `model: true` prop and no Angular `ControlValueAccessor` — correct for a host that is not a form control; the imperative handle plus this one event are the entire write/notify surface.
 
@@ -94,7 +104,7 @@ The imperative handle is the primary write API. Declared once in the source via 
 | `show` | Enqueue a toast. Accepts `{ message, type, duration, id }` (all optional — `message` defaults to `''`, `type` to `'info'`, `duration` to the `duration` prop; `type` also accepts `'loading'`, see below). Returns the toast `id`. A non-sticky toast (duration > 0) schedules a `window.setTimeout` to auto-dismiss. |
 | `dismiss` | Remove a single toast by the `id` returned from `show`. Routes through the exit lifecycle with reason `'api'` — fires `dismissed`, plays the exit animation, then removes it. |
 | `clear` | Remove every visible toast at once **immediately** (no exit animation) and clear all pending auto-dismiss timers. Does **not** fire `dismissed`. |
-| `patch` | Update an existing toast in place: `patch(id, { message, type, duration })` — only the keys you pass are merged into the matching entry. Returns `true` if the id existed, `false` otherwise (no throw). A `duration` key clears and restarts that toast's auto-dismiss timer (`0` makes it sticky; a positive value arms/re-arms it); omitting `duration` leaves a running timer untouched. |
+| `patch` | Update an existing toast in place: `patch(id, { message, type, duration, action, data })` — only the keys you pass are merged into the matching entry. Returns `true` if the id existed, `false` otherwise (no throw). A `duration` key clears and restarts that toast's auto-dismiss timer (`0` makes it sticky; a positive value arms/re-arms it); omitting `duration` leaves a running timer untouched. |
 | `promise` | Sugar over `show`/`patch` for an async operation — see [Promise / loading toasts](#promise-loading-toasts) above. |
 
 ### Slots
