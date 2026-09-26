@@ -68,11 +68,11 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## Try it
 
-The [`@rozie-ui/slider` showcase + API reference](/components/slider) documents the `@rozie-ui/slider-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/slider-react`, etc.). There is no engine to import and no required CSS: the native-input behaviour, the cross-browser pseudo-element styling, and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/slider-demo) runs the real Vue package in the page.
+The [`@rozie-ui/slider` showcase + API reference](/components/slider) documents the `@rozie-ui/slider-*` packages — designed as one pre-compiled, per-framework install each, but today only `@rozie-ui/slider-solid` (`npm i @rozie-ui/slider-solid`) is on npm — the other five targets are still in dogfooding. There is no engine to import and no required CSS: the native-input behaviour, the cross-browser pseudo-element styling, and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/slider-demo) runs the Vue leaf's workspace build in the page (not yet the published npm package).
 
 ## Cross-references
 
 - [Slider — showcase & API](/components/slider) — the full `@rozie-ui/slider` surface, quick start, theming, keyboard, and accessibility reference.
-- [Slider — live demo](/components/slider-demo) — the real Vue package running in the page (single + range + vertical), plus the one `.rozie` source and the six generated outputs.
+- [Slider — live demo](/components/slider-demo) — the Vue leaf's workspace build running in the page (single + range + vertical), plus the one `.rozie` source and the six generated outputs.
 - [`Slider.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/src/Slider.rozie)
 - [Listbox — headless select / combobox](/components/listbox-comparison) — the sibling no-engine headless family, contrasting the *behaviour-only* story with this *native-input* one.

@@ -4,18 +4,20 @@
 
 There is no vanilla-JS dependency: selection state, keyboard navigation, type-ahead, and focus management are implemented directly against the platform. Every visual value is a CSS custom property, so the listbox re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
+<PublishedTargetsNotice family="listbox" :published="['solid']" />
+
 ## The `@rozie-ui/listbox` packages
 
-`Listbox` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
+`Listbox` is designed to ship as six pre-compiled, per-framework packages, but today only `@rozie-ui/listbox-solid` is on npm — the rest are still in dogfooding. Install the published one for real use; the other rows below link to their workspace README for review:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/listbox-react` | `npm i @rozie-ui/listbox-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/react/README.md) |
-| `@rozie-ui/listbox-vue` | `npm i @rozie-ui/listbox-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/vue/README.md) |
-| `@rozie-ui/listbox-svelte` | `npm i @rozie-ui/listbox-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/svelte/README.md) |
-| `@rozie-ui/listbox-angular` | `npm i @rozie-ui/listbox-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/angular/README.md) |
+| `@rozie-ui/listbox-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/react/README.md) |
+| `@rozie-ui/listbox-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/vue/README.md) |
+| `@rozie-ui/listbox-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/svelte/README.md) |
+| `@rozie-ui/listbox-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/angular/README.md) |
 | `@rozie-ui/listbox-solid` | `npm i @rozie-ui/listbox-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/solid/README.md) |
-| `@rozie-ui/listbox-lit` | `npm i @rozie-ui/listbox-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/lit/README.md) |
+| `@rozie-ui/listbox-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/lit/README.md) |
 
 Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 

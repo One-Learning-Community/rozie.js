@@ -6,18 +6,20 @@ This page covers the compositional API (the `<LexicalEditor>` shell + plugin chi
 
 The full source for `LexicalEditor.rozie` lives in the [`@rozie-ui/lexical` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/src/LexicalEditor.rozie).
 
+<PublishedTargetsNotice family="lexical" :published="[]" />
+
 ## The `@rozie-ui/lexical` packages
 
-`LexicalEditor` ships as six pre-compiled, per-framework packages. Install the one for your framework; no build step is required:
+`LexicalEditor` is designed to ship as six pre-compiled, per-framework packages, but none has published to npm yet — every row below is still in dogfooding. The links go to each target's workspace README for review:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/lexical-react` | `npm i @rozie-ui/lexical-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/react/README.md) |
-| `@rozie-ui/lexical-vue` | `npm i @rozie-ui/lexical-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/vue/README.md) |
-| `@rozie-ui/lexical-svelte` | `npm i @rozie-ui/lexical-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/svelte/README.md) |
-| `@rozie-ui/lexical-angular` | `npm i @rozie-ui/lexical-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/angular/README.md) |
-| `@rozie-ui/lexical-solid` | `npm i @rozie-ui/lexical-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/solid/README.md) |
-| `@rozie-ui/lexical-lit` | `npm i @rozie-ui/lexical-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/lit/README.md) |
+| `@rozie-ui/lexical-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/react/README.md) |
+| `@rozie-ui/lexical-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/vue/README.md) |
+| `@rozie-ui/lexical-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/svelte/README.md) |
+| `@rozie-ui/lexical-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/angular/README.md) |
+| `@rozie-ui/lexical-solid` | *not yet published (dogfooding)* | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/solid/README.md) |
+| `@rozie-ui/lexical-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/lit/README.md) |
 
 The Lit package is a web component that hosts the editor in an **open shadow root**. It carries the one parity caveat the other five don't: a **browser-version floor of Chrome 137+ / Firefox 142+ / Safari 17+** (Lexical resolves selection across the shadow boundary via `getComposedRanges`, which those versions gate). See the [decorator recipe's Lit section](/components/lexical-recipe-decorator#lit-the-open-shadow-root-target) for the shadow-DOM obligations, and the [roadmap](#roadmap-staging) for what remains in v1.1.
 

@@ -8,18 +8,20 @@ Rozie owns the **author-side API**: the two-way `open` binding, the open↔nativ
 
 Every cosmetic value is a CSS custom property, so the dialog re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
+<PublishedTargetsNotice family="dialog" :published="['solid']" />
+
 ## The `@rozie-ui/dialog` packages
 
-`Dialog` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
+`Dialog` is designed to ship as six pre-compiled, per-framework packages, but today only `@rozie-ui/dialog-solid` is on npm — the rest are still in dogfooding. Install the published one for real use; the other rows below link to their workspace README for review:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/dialog-react` | `npm i @rozie-ui/dialog-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/packages/react/README.md) |
-| `@rozie-ui/dialog-vue` | `npm i @rozie-ui/dialog-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/packages/vue/README.md) |
-| `@rozie-ui/dialog-svelte` | `npm i @rozie-ui/dialog-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/packages/svelte/README.md) |
-| `@rozie-ui/dialog-angular` | `npm i @rozie-ui/dialog-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/packages/angular/README.md) |
+| `@rozie-ui/dialog-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/packages/react/README.md) |
+| `@rozie-ui/dialog-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/packages/vue/README.md) |
+| `@rozie-ui/dialog-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/packages/svelte/README.md) |
+| `@rozie-ui/dialog-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/packages/angular/README.md) |
 | `@rozie-ui/dialog-solid` | `npm i @rozie-ui/dialog-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/packages/solid/README.md) |
-| `@rozie-ui/dialog-lit` | `npm i @rozie-ui/dialog-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/packages/lit/README.md) |
+| `@rozie-ui/dialog-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/packages/lit/README.md) |
 
 Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 

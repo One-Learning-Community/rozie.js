@@ -15,7 +15,7 @@ const volBox = ref();
 
 # Slider — live demo
 
-This is the **real `@rozie-ui/slider-vue` package** running on this page (VitePress is itself a Vue app). Drag a thumb with the mouse or touch, focus it and press the arrow / `Home` / `End` / `PageUp` keys, drag the two range thumbs past each other (they clamp and stay sorted), or tip the vertical one — then watch the two-way bound value update. The same `Slider` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on the browser's native `<input type="range">` with **no engine and no required CSS** — the platform input behaviour, the cross-browser thumb styling, and a tokenised skin all ship inside the component.
+This is the **real `@rozie-ui/slider-vue` package** running on this page (VitePress is itself a Vue app) — built from this repo's workspace, not npm: `@rozie-ui/slider-vue` has not published yet, only `@rozie-ui/slider-solid` has debuted so far. Drag a thumb with the mouse or touch, focus it and press the arrow / `Home` / `End` / `PageUp` keys, drag the two range thumbs past each other (they clamp and stay sorted), or tip the vertical one — then watch the two-way bound value update. The same `Slider` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on the browser's native `<input type="range">` with **no engine and no required CSS** — the platform input behaviour, the cross-browser thumb styling, and a tokenised skin all ship inside the component.
 
 <ClientOnly>
 <div class="sl-live">

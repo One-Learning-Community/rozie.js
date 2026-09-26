@@ -92,4 +92,4 @@ import '@rozie-ui/resizable-react/themes/shadcn.css';
 - [Resizable — API reference](/components/resizable-api) — every prop, event, slot, and handle verb.
 - [Resizable — usage examples](/components/resizable-usage) — idiomatic per-framework consumption code.
 - [Resizable comparison](/components/resizable-comparison) — how it stacks up against the per-framework libraries.
-- [Resizable — live demo](/components/resizable-demo) — the real package running in the page.
+- [Resizable — live demo](/components/resizable-demo) — the Vue leaf's workspace build running in the page (not yet the published npm package).

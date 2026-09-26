@@ -23,6 +23,7 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { COMPONENTS_DIR, UI_DIR, displayNameFor } from './display-name.mjs';
+import { isPartialDebut } from './publish-status.mjs';
 
 /** Longest common segment-prefix (hyphen-delimited) of a set of token names.
  * Reused verbatim from the phase's probe-tokens.mjs prototype. */
@@ -441,7 +442,11 @@ function main() {
       seeAlso.push(`[${name} comparison](/components/${slug}-comparison) — how it stacks up against the per-framework libraries.`);
     }
     if (existsSync(resolve(COMPONENTS_DIR, `${slug}-demo.md`))) {
-      seeAlso.push(`[${name} — live demo](/components/${slug}-demo) — the real package running in the page.`);
+      seeAlso.push(
+        isPartialDebut(slug)
+          ? `[${name} — live demo](/components/${slug}-demo) — the Vue leaf's workspace build running in the page (not yet the published npm package).`
+          : `[${name} — live demo](/components/${slug}-demo) — the real package running in the page.`,
+      );
     }
 
     const scopeNote = scopeNoteFrom(headDocBlock(css));

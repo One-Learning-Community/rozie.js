@@ -6,18 +6,20 @@ The foundation is the platform itself: a native `<input>` for text entry, browse
 
 Every visual value is a CSS custom property, so the field re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
+<PublishedTargetsNotice family="number-field" :published="['solid']" />
+
 ## The `@rozie-ui/number-field` packages
 
-`NumberField` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
+`NumberField` is designed to ship as six pre-compiled, per-framework packages, but today only `@rozie-ui/number-field-solid` is on npm — the rest are still in dogfooding. Install the published one for real use; the other rows below link to their workspace README for review:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/number-field-react` | `npm i @rozie-ui/number-field-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/react/README.md) |
-| `@rozie-ui/number-field-vue` | `npm i @rozie-ui/number-field-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/vue/README.md) |
-| `@rozie-ui/number-field-svelte` | `npm i @rozie-ui/number-field-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/svelte/README.md) |
-| `@rozie-ui/number-field-angular` | `npm i @rozie-ui/number-field-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/angular/README.md) |
+| `@rozie-ui/number-field-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/react/README.md) |
+| `@rozie-ui/number-field-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/vue/README.md) |
+| `@rozie-ui/number-field-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/svelte/README.md) |
+| `@rozie-ui/number-field-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/angular/README.md) |
 | `@rozie-ui/number-field-solid` | `npm i @rozie-ui/number-field-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/solid/README.md) |
-| `@rozie-ui/number-field-lit` | `npm i @rozie-ui/number-field-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/lit/README.md) |
+| `@rozie-ui/number-field-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/lit/README.md) |
 
 Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 

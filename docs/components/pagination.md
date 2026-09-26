@@ -6,18 +6,20 @@ It is headless: the component computes the page-item model and exposes it throug
 
 Every visual value is a CSS custom property, so the pager re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
+<PublishedTargetsNotice family="pagination" :published="['solid']" />
+
 ## The `@rozie-ui/pagination` packages
 
-`Pagination` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
+`Pagination` is designed to ship as six pre-compiled, per-framework packages, but today only `@rozie-ui/pagination-solid` is on npm — the rest are still in dogfooding. Install the published one for real use; the other rows below link to their workspace README for review:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/pagination-react` | `npm i @rozie-ui/pagination-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/react/README.md) |
-| `@rozie-ui/pagination-vue` | `npm i @rozie-ui/pagination-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/vue/README.md) |
-| `@rozie-ui/pagination-svelte` | `npm i @rozie-ui/pagination-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/svelte/README.md) |
-| `@rozie-ui/pagination-angular` | `npm i @rozie-ui/pagination-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/angular/README.md) |
+| `@rozie-ui/pagination-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/react/README.md) |
+| `@rozie-ui/pagination-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/vue/README.md) |
+| `@rozie-ui/pagination-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/svelte/README.md) |
+| `@rozie-ui/pagination-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/angular/README.md) |
 | `@rozie-ui/pagination-solid` | `npm i @rozie-ui/pagination-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/solid/README.md) |
-| `@rozie-ui/pagination-lit` | `npm i @rozie-ui/pagination-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/lit/README.md) |
+| `@rozie-ui/pagination-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/lit/README.md) |
 
 Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 

@@ -6,18 +6,20 @@ The foundation is the platform itself: a focusable native element, a native clic
 
 Every visual value is a CSS custom property, so the switch re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
+<PublishedTargetsNotice family="switch" :published="['solid']" />
+
 ## The `@rozie-ui/switch` packages
 
-`Switch` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
+`Switch` is designed to ship as six pre-compiled, per-framework packages, but today only `@rozie-ui/switch-solid` is on npm — the rest are still in dogfooding. Install the published one for real use; the other rows below link to their workspace README for review:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/switch-react` | `npm i @rozie-ui/switch-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/react/README.md) |
-| `@rozie-ui/switch-vue` | `npm i @rozie-ui/switch-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/vue/README.md) |
-| `@rozie-ui/switch-svelte` | `npm i @rozie-ui/switch-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/svelte/README.md) |
-| `@rozie-ui/switch-angular` | `npm i @rozie-ui/switch-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/angular/README.md) |
+| `@rozie-ui/switch-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/react/README.md) |
+| `@rozie-ui/switch-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/vue/README.md) |
+| `@rozie-ui/switch-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/svelte/README.md) |
+| `@rozie-ui/switch-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/angular/README.md) |
 | `@rozie-ui/switch-solid` | `npm i @rozie-ui/switch-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/solid/README.md) |
-| `@rozie-ui/switch-lit` | `npm i @rozie-ui/switch-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/lit/README.md) |
+| `@rozie-ui/switch-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/lit/README.md) |
 
 Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 

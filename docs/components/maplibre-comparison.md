@@ -61,7 +61,7 @@ Sources and layers can be authored as declarative `<Source>` / `<Layer>` childre
 
 ## Try it
 
-The [`@rozie-ui/maplibre` showcase + API reference](/components/maplibre) documents the `@rozie-ui/maplibre-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/maplibre-react maplibre-gl`, etc.), plus the `import 'maplibre-gl/dist/maplibre-gl.css'` the engine DOM needs. The showcase walks the four two-way camera bindings, the 20-event surface, the imperative handle, both the `<Source>` / `<Layer>` declarative children and the `:sources` / `:layers` config-array passthroughs, and the per-target recipe for the `marker` / `popup` / `control` portal slots.
+The [`@rozie-ui/maplibre` showcase + API reference](/components/maplibre) documents the `@rozie-ui/maplibre-*` packages — designed as one pre-compiled, per-framework install each, but today only `@rozie-ui/maplibre-solid` (`npm i @rozie-ui/maplibre-solid maplibre-gl`) is on npm — the other five targets are still in dogfooding — plus the `import 'maplibre-gl/dist/maplibre-gl.css'` the engine DOM needs. The showcase walks the four two-way camera bindings, the 20-event surface, the imperative handle, both the `<Source>` / `<Layer>` declarative children and the `:sources` / `:layers` config-array passthroughs, and the per-target recipe for the `marker` / `popup` / `control` portal slots.
 
 ## Cross-references
 

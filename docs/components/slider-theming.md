@@ -121,4 +121,4 @@ import '@rozie-ui/slider-react/themes/shadcn.css';
 - [Slider — showcase & API](/components/slider) — the full prop / event / slot / handle reference.
 - [Slider — usage examples](/components/slider-usage) — idiomatic per-framework consumption code.
 - [Slider comparison](/components/slider-comparison) — how it stacks up against the per-framework libraries.
-- [Slider — live demo](/components/slider-demo) — the real package running in the page.
+- [Slider — live demo](/components/slider-demo) — the Vue leaf's workspace build running in the page (not yet the published npm package).

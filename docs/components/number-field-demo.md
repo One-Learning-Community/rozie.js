@@ -19,7 +19,7 @@ function onChange(e: { value: number | null }) {
 
 # NumberField — live demo
 
-This is the **real `@rozie-ui/number-field-vue` package** running on this page (VitePress is itself a Vue app). Type a value (it parses + clamps on blur), use the +/- buttons (hold one to watch the press-and-hold acceleration ramp), or focus the field and press Arrow / PageUp·Down / Home / End. The same `NumberField` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on a native `<input>` with **no engine and no required CSS** — the platform input behaviour, the clamp/snap math, and a tokenised skin all ship inside the component.
+This is the **real `@rozie-ui/number-field-vue` package** running on this page (VitePress is itself a Vue app) — built from this repo's workspace, not npm: `@rozie-ui/number-field-vue` has not published yet, only `@rozie-ui/number-field-solid` has debuted so far. Type a value (it parses + clamps on blur), use the +/- buttons (hold one to watch the press-and-hold acceleration ramp), or focus the field and press Arrow / PageUp·Down / Home / End. The same `NumberField` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on a native `<input>` with **no engine and no required CSS** — the platform input behaviour, the clamp/snap math, and a tokenised skin all ship inside the component.
 
 <ClientOnly>
 <div class="nf-live">

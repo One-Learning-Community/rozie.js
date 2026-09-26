@@ -13,7 +13,7 @@ import LexicalEditor, {
 
 # Lexical — live demo
 
-This is the **real `@rozie-ui/lexical-vue` package** running on this page (VitePress is itself a Vue app). Type in the editor, select some text and hit the toolbar buttons — **Bold**, *Italic*, • List, and Link — and watch each button light up as the caret moves through matching formatting. The same Lexical components, with the same API, ship for React, Vue, Svelte, Angular, Solid, and Lit.
+This is the **real `@rozie-ui/lexical-vue` package** running on this page (VitePress is itself a Vue app) — built from this repo's workspace, not npm: no `@rozie-ui/lexical-*` package has published yet. Type in the editor, select some text and hit the toolbar buttons — **Bold**, *Italic*, • List, and Link — and watch each button light up as the caret moves through matching formatting. The same Lexical components, with the same API, ship for React, Vue, Svelte, Angular, Solid, and Lit.
 
 <ClientOnly>
 <div class="lexical-live">

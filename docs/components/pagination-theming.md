@@ -105,4 +105,4 @@ import '@rozie-ui/pagination-react/themes/shadcn.css';
 - [Pagination — API reference](/components/pagination-api) — every prop, event, slot, and handle verb.
 - [Pagination — usage examples](/components/pagination-usage) — idiomatic per-framework consumption code.
 - [Pagination comparison](/components/pagination-comparison) — how it stacks up against the per-framework libraries.
-- [Pagination — live demo](/components/pagination-demo) — the real package running in the page.
+- [Pagination — live demo](/components/pagination-demo) — the Vue leaf's workspace build running in the page (not yet the published npm package).

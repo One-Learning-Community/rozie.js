@@ -60,12 +60,12 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## Try it
 
-The [`@rozie-ui/listbox` showcase + API reference](/components/listbox) documents the `@rozie-ui/listbox-*` packages: one pre-compiled, per-framework install (`npm i @rozie-ui/listbox-react`, etc.). There is no engine to import and no required CSS: the ARIA behaviour and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/listbox-demo) runs the real Vue package in the page.
+The [`@rozie-ui/listbox` showcase + API reference](/components/listbox) documents the `@rozie-ui/listbox-*` packages: designed as one pre-compiled, per-framework install each, but today only `@rozie-ui/listbox-solid` (`npm i @rozie-ui/listbox-solid`) is on npm — the other five targets are still in dogfooding. There is no engine to import and no required CSS: the ARIA behaviour and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/listbox-demo) runs the Vue leaf's workspace build in the page (not yet the published npm package).
 
 ## Cross-references
 
 - [Listbox — showcase & API](/components/listbox) — the full `@rozie-ui/listbox` surface, quick start, theming, keyboard, and accessibility reference.
-- [Listbox — live demo](/components/listbox-demo) — the real Vue package running in the page, plus the Rozie source and the six generated outputs.
+- [Listbox — live demo](/components/listbox-demo) — the Vue leaf's workspace build running in the page, plus the Rozie source and the six generated outputs.
 - [`Listbox.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/src/Listbox.rozie)
 - [Combobox libraries comparison](/components/combobox-comparison) — the sibling type-to-filter family.
 - [Embla libraries comparison](/components/embla-comparison) — a sibling port, contrasting the *engine-wrapper* story with this *headless-behaviour* one.

@@ -6,23 +6,25 @@ This page is the **show-and-tell**: the API surface, per-framework quick starts,
 
 The full source for `MapLibre.rozie` lives in the [`@rozie-ui/maplibre` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/src/MapLibre.rozie).
 
+<PublishedTargetsNotice family="maplibre" :published="['solid']" />
+
 ## The `@rozie-ui/maplibre` packages
 
-`MapLibre` ships as six pre-compiled, per-framework packages; install only the one for your framework. There is no build step and no Rozie toolchain to add:
+`MapLibre` is designed to ship as six pre-compiled, per-framework packages, but today only `@rozie-ui/maplibre-solid` is on npm — the rest are still in dogfooding. Install the published one for real use; the other rows below link to their workspace README for review:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/maplibre-react` | `npm i @rozie-ui/maplibre-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/packages/react/README.md) |
-| `@rozie-ui/maplibre-vue` | `npm i @rozie-ui/maplibre-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/packages/vue/README.md) |
-| `@rozie-ui/maplibre-svelte` | `npm i @rozie-ui/maplibre-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/packages/svelte/README.md) |
-| `@rozie-ui/maplibre-angular` | `npm i @rozie-ui/maplibre-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/packages/angular/README.md) |
+| `@rozie-ui/maplibre-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/packages/react/README.md) |
+| `@rozie-ui/maplibre-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/packages/vue/README.md) |
+| `@rozie-ui/maplibre-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/packages/svelte/README.md) |
+| `@rozie-ui/maplibre-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/packages/angular/README.md) |
 | `@rozie-ui/maplibre-solid` | `npm i @rozie-ui/maplibre-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/packages/solid/README.md) |
-| `@rozie-ui/maplibre-lit` | `npm i @rozie-ui/maplibre-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/packages/lit/README.md) |
+| `@rozie-ui/maplibre-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/packages/lit/README.md) |
 
-Each package carries the **`maplibre-gl` engine peer** (`^5`) plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). Install the engine peer alongside the framework package:
+Each package carries the **`maplibre-gl` engine peer** (`^5`) plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). Install the engine peer alongside the framework package — today that's only the Solid package (see the notice above):
 
 ```bash
-npm i @rozie-ui/maplibre-react maplibre-gl
+npm i @rozie-ui/maplibre-solid maplibre-gl
 ```
 
 You must **import the engine CSS once** at your app entry. The component's scoped `<style>` cannot reach the engine-rendered control / popup / marker DOM (that DOM never carries Rozie's `[data-rozie-s-*]` scope attribute), so the base MapLibre styles come from the engine's own stylesheet:

@@ -109,4 +109,4 @@ import '@rozie-ui/listbox-react/themes/shadcn.css';
 - [Listbox — showcase & API](/components/listbox) — the full prop / event / slot / handle reference.
 - [Listbox — usage examples](/components/listbox-usage) — idiomatic per-framework consumption code.
 - [Listbox comparison](/components/listbox-comparison) — how it stacks up against the per-framework libraries.
-- [Listbox — live demo](/components/listbox-demo) — the real package running in the page.
+- [Listbox — live demo](/components/listbox-demo) — the Vue leaf's workspace build running in the page (not yet the published npm package).

@@ -19,7 +19,7 @@ function onResize(e: { size: number }) {
 
 # Resizable — live demo
 
-This is the **real `@rozie-ui/resizable-vue` package** running on this page (VitePress is itself a Vue app). Drag the handle between the panels, or focus it (`Tab`) and use the Arrow keys / `Home` / `End` — then watch the two-way bound `size` percent update and the `@resize` readout fire. The same `Resizable` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on native Pointer Events with **no engine and no required CSS** — the drag behaviour and a tokenised skin all ship inside the component.
+This is the **real `@rozie-ui/resizable-vue` package** running on this page (VitePress is itself a Vue app) — built from this repo's workspace, not npm: `@rozie-ui/resizable-vue` has not published yet, only `@rozie-ui/resizable-solid` has debuted so far. Drag the handle between the panels, or focus it (`Tab`) and use the Arrow keys / `Home` / `End` — then watch the two-way bound `size` percent update and the `@resize` readout fire. The same `Resizable` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on native Pointer Events with **no engine and no required CSS** — the drag behaviour and a tokenised skin all ship inside the component.
 
 <ClientOnly>
 <div class="rz-live">

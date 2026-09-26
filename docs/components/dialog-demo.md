@@ -19,7 +19,7 @@ function onClose(e: { reason: string }) {
 
 # Dialog — live demo
 
-This is the **real `@rozie-ui/dialog-vue` package** running on this page (VitePress is itself a Vue app). Open the dialog, then dismiss it by clicking the backdrop, pressing Escape, or using a button — and watch the two-way bound `open` value and the `@close` reason readout update. The same `Dialog` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on the native `<dialog>` element with **no portal, no engine, and no required CSS** — top-layer rendering, the `::backdrop` scrim, the focus trap, and Esc-to-dismiss all ship inside the platform.
+This is the **real `@rozie-ui/dialog-vue` package** running on this page (VitePress is itself a Vue app) — built from this repo's workspace, not npm: `@rozie-ui/dialog-vue` has not published yet, only `@rozie-ui/dialog-solid` has debuted so far. Open the dialog, then dismiss it by clicking the backdrop, pressing Escape, or using a button — and watch the two-way bound `open` value and the `@close` reason readout update. The same `Dialog` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on the native `<dialog>` element with **no portal, no engine, and no required CSS** — top-layer rendering, the `::backdrop` scrim, the focus trap, and Esc-to-dismiss all ship inside the platform.
 
 <ClientOnly>
 <div class="dialog-live">

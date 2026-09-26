@@ -25,7 +25,7 @@ const FRUITS = [
 
 # Listbox — live demo
 
-This is the **real `@rozie-ui/listbox-vue` package** running on this page (VitePress is itself a Vue app). Open the select with the keyboard or mouse, type to filter the combobox, toggle options in the multi-select — then watch the two-way bound value update. The same `Listbox` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It needs **no engine and no required CSS** — the ARIA behaviour and a tokenised skin ship inside the component.
+This is the **real `@rozie-ui/listbox-vue` package** running on this page (VitePress is itself a Vue app) — built from this repo's workspace, not npm: `@rozie-ui/listbox-vue` has not published yet, only `@rozie-ui/listbox-solid` has debuted so far. Open the select with the keyboard or mouse, type to filter the combobox, toggle options in the multi-select — then watch the two-way bound value update. The same `Listbox` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It needs **no engine and no required CSS** — the ARIA behaviour and a tokenised skin ship inside the component.
 
 <ClientOnly>
 <div class="lb-live">

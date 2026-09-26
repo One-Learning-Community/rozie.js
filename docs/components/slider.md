@@ -6,18 +6,20 @@ The foundation is the browser's own native `<input type="range">`: drag (mouse a
 
 Every visual value is a CSS custom property, so the slider re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5, plus the cross-browser thumb/track pseudo-element styling that native range inputs require.
 
+<PublishedTargetsNotice family="slider" :published="['solid']" />
+
 ## The `@rozie-ui/slider` packages
 
-`Slider` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
+`Slider` is designed to ship as six pre-compiled, per-framework packages, but today only `@rozie-ui/slider-solid` is on npm — the rest are still in dogfooding. Install the published one for real use; the other rows below link to their workspace README for review:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/slider-react` | `npm i @rozie-ui/slider-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/react/README.md) |
-| `@rozie-ui/slider-vue` | `npm i @rozie-ui/slider-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/vue/README.md) |
-| `@rozie-ui/slider-svelte` | `npm i @rozie-ui/slider-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/svelte/README.md) |
-| `@rozie-ui/slider-angular` | `npm i @rozie-ui/slider-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/angular/README.md) |
+| `@rozie-ui/slider-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/react/README.md) |
+| `@rozie-ui/slider-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/vue/README.md) |
+| `@rozie-ui/slider-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/svelte/README.md) |
+| `@rozie-ui/slider-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/angular/README.md) |
 | `@rozie-ui/slider-solid` | `npm i @rozie-ui/slider-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/solid/README.md) |
-| `@rozie-ui/slider-lit` | `npm i @rozie-ui/slider-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/lit/README.md) |
+| `@rozie-ui/slider-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/lit/README.md) |
 
 Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 

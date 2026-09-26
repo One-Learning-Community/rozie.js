@@ -6,18 +6,20 @@ The foundation is the platform itself: native Pointer Events (with pointer captu
 
 Every visual value is a CSS custom property, so the splitter re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
+<PublishedTargetsNotice family="resizable" :published="['solid']" />
+
 ## The `@rozie-ui/resizable` packages
 
-`Resizable` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
+`Resizable` is designed to ship as six pre-compiled, per-framework packages, but today only `@rozie-ui/resizable-solid` is on npm — the rest are still in dogfooding. Install the published one for real use; the other rows below link to their workspace README for review:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/resizable-react` | `npm i @rozie-ui/resizable-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/react/README.md) |
-| `@rozie-ui/resizable-vue` | `npm i @rozie-ui/resizable-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/vue/README.md) |
-| `@rozie-ui/resizable-svelte` | `npm i @rozie-ui/resizable-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/svelte/README.md) |
-| `@rozie-ui/resizable-angular` | `npm i @rozie-ui/resizable-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/angular/README.md) |
+| `@rozie-ui/resizable-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/react/README.md) |
+| `@rozie-ui/resizable-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/vue/README.md) |
+| `@rozie-ui/resizable-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/svelte/README.md) |
+| `@rozie-ui/resizable-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/angular/README.md) |
 | `@rozie-ui/resizable-solid` | `npm i @rozie-ui/resizable-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/solid/README.md) |
-| `@rozie-ui/resizable-lit` | `npm i @rozie-ui/resizable-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/lit/README.md) |
+| `@rozie-ui/resizable-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/lit/README.md) |
 
 Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 

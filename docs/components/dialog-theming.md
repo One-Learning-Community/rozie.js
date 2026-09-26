@@ -74,4 +74,4 @@ import '@rozie-ui/dialog-react/themes/shadcn.css';
 - [Dialog — showcase & API](/components/dialog) — the full prop / event / slot / handle reference.
 - [Dialog — usage examples](/components/dialog-usage) — idiomatic per-framework consumption code.
 - [Dialog comparison](/components/dialog-comparison) — how it stacks up against the per-framework libraries.
-- [Dialog — live demo](/components/dialog-demo) — the real package running in the page.
+- [Dialog — live demo](/components/dialog-demo) — the Vue leaf's workspace build running in the page (not yet the published npm package).

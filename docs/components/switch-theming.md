@@ -76,4 +76,4 @@ import '@rozie-ui/switch-react/themes/shadcn.css';
 - [Switch — API reference](/components/switch-api) — every prop, event, slot, and handle verb.
 - [Switch — usage examples](/components/switch-usage) — idiomatic per-framework consumption code.
 - [Switch comparison](/components/switch-comparison) — how it stacks up against the per-framework libraries.
-- [Switch — live demo](/components/switch-demo) — the real package running in the page.
+- [Switch — live demo](/components/switch-demo) — the Vue leaf's workspace build running in the page (not yet the published npm package).

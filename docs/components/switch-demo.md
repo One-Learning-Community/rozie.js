@@ -19,7 +19,7 @@ function onChange(e: { checked: boolean }) {
 
 # Switch — live demo
 
-This is the **real `@rozie-ui/switch-vue` package** running on this page (VitePress is itself a Vue app). Click a switch, or focus one and press **Space** / **Enter**. The same `Switch` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on a native focusable element with **no engine and no required CSS** — the toggle behaviour, the ARIA wiring, and a tokenised skin all ship inside the component.
+This is the **real `@rozie-ui/switch-vue` package** running on this page (VitePress is itself a Vue app) — built from this repo's workspace, not npm: `@rozie-ui/switch-vue` has not published yet, only `@rozie-ui/switch-solid` has debuted so far. Click a switch, or focus one and press **Space** / **Enter**. The same `Switch` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on a native focusable element with **no engine and no required CSS** — the toggle behaviour, the ARIA wiring, and a tokenised skin all ship inside the component.
 
 <ClientOnly>
 <div class="sw-live">
