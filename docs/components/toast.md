@@ -41,7 +41,7 @@ Mount the host **once** (typically near your app root), grab a ref to it, and ca
 </template>
 ```
 
-`show({ message, type, duration, id, action, data })` enqueues a toast and returns its `id`; `dismiss(id)` removes one; `clear()` removes them all. Pass `duration: 0` (or set the `duration` prop to `0`) for a sticky toast that only goes away on dismiss.
+`show({ message, type, duration, id, action, data })` enqueues a toast and returns its `id`; `dismiss(id)` removes one; `clear()` removes them all. Pass `duration: 0` (or set the `duration` prop to `0`) for a sticky toast that only goes away on dismiss. Hovering the stack pauses the auto-dismiss timers **precisely** — leaving resumes exactly where it paused, not a full restart (opt out with `disablePauseOnHover`).
 
 `action: { label, onClick }` adds a button to the default toast (an "Undo"). Clicking it calls `onClick({ id, data })` and then dismisses the toast with reason `'action'`; an action without an `onClick` function is ignored. `data` is any payload you want back later — it rides on the toast untouched and reaches the `#toast` slot scope (`toast.data`), the `dismissed` payload and the action callback:
 
@@ -51,7 +51,7 @@ toaster.show({
   data: { threadId },
   action: { label: 'Undo', onClick: ({ data }) => unarchive(data.threadId) },
 })
-``` Hovering the stack pauses the auto-dismiss timers **precisely** — leaving resumes exactly where it paused, not a full restart (opt out with `disablePauseOnHover`).
+```
 
 ### Promise / loading toasts
 
