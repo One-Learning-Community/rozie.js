@@ -77,10 +77,10 @@
       "optional": true
     },
     "@lexical/list": {
-      "optional": true
+      "optional": false
     },
     "@lexical/link": {
-      "optional": true
+      "optional": false
     }
   },
   "scripts": {

@@ -32,6 +32,7 @@
     "@rozie-ui/lexical-svelte",
     "@rozie-ui/lexical-lit",
     "@rozie-ui/lexical-angular",
+    "@rozie-ui/lexical-solid",
     "@rozie-ui/listbox-react",
     "@rozie-ui/listbox-vue",
     "@rozie-ui/listbox-svelte",
