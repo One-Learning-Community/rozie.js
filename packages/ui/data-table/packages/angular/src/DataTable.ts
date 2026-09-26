@@ -1591,6 +1591,10 @@ export class DataTable {
       // NEVER in a render helper (Pitfall 1). Pass the COMPLETE options set (virtual-core's
       // setOptions replaces, not merges). Guarded so the off path executes no virtual-core code.
       if (this.rowsWindowed() && this.virtualizer) {
+        // Rekey any placeholder rows this re-feed just filled (quick 260926, VR probe) BEFORE
+        // handing the virtualizer its fresh options — see migratePlaceholderSizeCache()'s own
+        // comment (virtualization.rzts) for the itemSizeCache/getMeasurements memo root cause.
+        this.migratePlaceholderSizeCache();
         this.virtualizer.setOptions(this.virtualizerOptions());
         this.virtualizer._willUpdate();
       }
@@ -3212,6 +3216,12 @@ export class DataTable {
   // activated. ONLY the table-core feed is padded: every write-back derives from currentData(), the
   // consumer's own array, so a sentinel can never leak into `data`.
   LAZY_PLACEHOLDER_KEY = '__rdtLazyPlaceholder';
+  // LAZY_PLACEHOLDER_ROW_ID_PREFIX: the table-core row-id table.rowIdOption() (DataTable.rozie)
+  // assigns to a placeholder ('__rdt_ph_' + index — no consumer row to ask, so it keys by
+  // position). Shared here (not re-literaled) because migratePlaceholderSizeCache() below and
+  // rowIdOption() must agree byte-for-byte on the prefix or the migration's key scan silently
+  // finds nothing.
+  LAZY_PLACEHOLDER_ROW_ID_PREFIX = '__rdt_ph_';
   lazyPlaceholders: Record<number, any> = {};
   lazyRowsActive = () => this.rowsWindowed() && !!this.manual() && this.rowCount() != null && this.rowCount() > 0;
   isLazyPlaceholder = (orig: any): boolean => !!orig && orig[this.LAZY_PLACEHOLDER_KEY] === true;
@@ -3234,6 +3244,39 @@ export class DataTable {
       }
     }
     return out;
+  };
+  // migratePlaceholderSizeCache() (quick 260926, VR probe on data-table-lazy [react]): a filled
+  // placeholder's row id changes ('__rdt_ph_' + i -> the real getRowId id), and virtual-core's
+  // getItemKey re-keys by it — but virtual-core's itemSizeCache (dist/esm/index.js@3.17.1) is a
+  // bare Map keyed by the OLD key, so the new key has no entry. The next getMeasurements() recompute
+  // then estimates that row at $props.estimateRowHeight instead of its already-known measured size;
+  // the CR-01 sweep re-measures it moments later and each delta fires one applyScrollAdjustment,
+  // walking the window's anchor off by their sum (measured: 9 rows x -4px = -36px, row 5000 -> 4999
+  // on React — the other 5 targets happened to keep reading the stale pre-refeed measurements array
+  // and never saw the estimate at all). Fix: carry the cached size across the rekey, keyed off
+  // table-core's OWN freshly-assigned id (table.getCoreRowModel().rows[i].id, NOT a locally
+  // recomputed getRowId() call — must be byte-identical to what virtualItemKey(i) reads next) so
+  // the cache is already correct before the caller's virtualizer.setOptions()/_willUpdate() re-feed.
+  // Bumping itemSizeCacheVersion is required, not cosmetic: getMeasurements() is memoized on
+  // [getMeasurementOptions(), itemSizeCacheVersion] only — mutating the Map alone does not
+  // invalidate it (confirmed from the installed source; the same fact windowing.rzts's
+  // refineRowEstimate() comment documents). Scans the CACHE's own placeholder-prefixed keys
+  // (bounded by rows actually measured so far), never rowCount (unbounded — 10,000+ here).
+  migratePlaceholderSizeCache = (): void => {
+    if (!this.virtualizer || !this.virtualizer.itemSizeCache || !this.table) return;
+    const cache = this.virtualizer.itemSizeCache;
+    const coreRows = this.table.getCoreRowModel().rows;
+    let migrated = false;
+    for (const oldKey of Array.from(cache.keys()) as any) {
+      if (typeof oldKey !== 'string' || oldKey.indexOf(this.LAZY_PLACEHOLDER_ROW_ID_PREFIX) !== 0) continue;
+      const i = Number(oldKey.slice(this.LAZY_PLACEHOLDER_ROW_ID_PREFIX.length));
+      const row = coreRows[i];
+      if (!row || this.rowIsLazyPlaceholder(row) || row.id === oldKey) continue;
+      cache.set(row.id, cache.get(oldKey));
+      cache.delete(oldKey);
+      migrated = true;
+    }
+    if (migrated) this.virtualizer.itemSizeCacheVersion++;
   };
   // `visible-range-change { start, end }` — the RENDERED row window (overscan included), `end`
   // exclusive, over the full row space. Driven by the window-version bump every virtualizer change
@@ -4012,7 +4055,8 @@ export class DataTable {
   rowIdOption = () => {
     const f = this.getRowId();
     // A lazy placeholder has no consumer row to ask — key it by its index (see feedData()).
-    return f ? (originalRow: any, index: any, parent: any) => this.isLazyPlaceholder(originalRow) ? '__rdt_ph_' + originalRow.index : String(f(originalRow, index, parent)) : undefined;
+    // Prefix shared with migratePlaceholderSizeCache() (virtualization.rzts) — see its own comment.
+    return f ? (originalRow: any, index: any, parent: any) => this.isLazyPlaceholder(originalRow) ? this.LAZY_PLACEHOLDER_ROW_ID_PREFIX + originalRow.index : String(f(originalRow, index, parent)) : undefined;
   };
   // table-core `enableRowSelection`: off for selectionMode 'none'; with lazy rows a placeholder
   // (a row not loaded yet) is never selectable, so select-all takes the loaded rows only.
