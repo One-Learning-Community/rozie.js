@@ -928,8 +928,10 @@ export function rewriteScript(
       //     skip. If the grandparent is an ObjectExpression (a VALUE position,
       //     e.g. `return { X }`), un-shorthand the property and rewrite the
       //     value to `this.X`, leaving the key as `X`.
-      if (parentPath.isObjectProperty() && parentPath.node.key === path.node) {
-        if (parentPath.node.computed) return;
+      //   - a COMPUTED key `{ [X]: expr }` (in an object literal or a pattern) is an
+      //     expression, i.e. a real reference: fall through and rewrite it like any
+      //     other reference (it used to return here, leaving `[X]` bare).
+      if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) {
         if (!parentPath.node.shorthand) return;
         const grandparent = parentPath.parentPath?.node;
         if (t.isObjectPattern(grandparent)) return;

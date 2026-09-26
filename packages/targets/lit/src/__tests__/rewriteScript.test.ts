@@ -511,6 +511,15 @@ describe('rewriteScript — Identifier-visitor skips', () => {
     expect(out).toContain('this.doThing');
   });
 
+  it('a component-scope name used DIRECTLY as a computed object key is rewritten', () => {
+    const ir = buildIR();
+    // `{ [doThing]: 1 }` — the key is an expression, a real reference. It was left bare
+    // (the early `computed` return), so a top-level const used this way threw
+    // "X is not defined" at runtime on Lit only (data-table lazy placeholders, quick 260925-dtl).
+    const out = rewrite('function doThing() {} const o = { [doThing]: 1 };', ir);
+    expect(out).toContain('[this.doThing]: 1');
+  });
+
   it('method name as a bare function param stays bare', () => {
     const ir = buildIR();
     const out = rewrite('function doThing() {} const f = (doThing) => doThing;', ir);
