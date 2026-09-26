@@ -21,7 +21,7 @@ const scroller = (page: Page) => table(page).locator('.rdt-scroll');
 const rangeOf = async (page: Page) => {
   const t = (await page.getByTestId('range').textContent()) ?? '';
   const [s, e] = t.split('-').map(Number);
-  return { start: s, end: e };
+  return { start: s ?? NaN, end: e ?? NaN };
 };
 
 for (const target of TARGETS) {
@@ -58,7 +58,18 @@ for (const target of TARGETS) {
       const first = rows.find((r) => r.getBoundingClientRect().bottom > top + 1);
       return first ? { row: first.getAttribute('data-row'), offset: first.getBoundingClientRect().top - top } : null;
     });
-    const before = await anchorOf();
+    // The baseline must be read after the SCROLL's own remeasure has converged, not merely once
+    // the range report arrives (that is estimate arithmetic). Under CPU load (Docker, 3 workers)
+    // the report can beat convergence: 2 of 500 runs read a mid-convergence {5000, -12.5}, the
+    // fill then finished that convergence at the settled {4999, -32.5} every other run already
+    // had, and the anchor check blamed the fill. Wait for two identical reads 100ms apart.
+    let before: Awaited<ReturnType<typeof anchorOf>> = null;
+    await expect.poll(async () => {
+      const a = await anchorOf();
+      const settled = !!a && !!before && a.row === before.row && Math.abs(a.offset - before.offset) < 0.5;
+      before = a;
+      return settled;
+    }, { intervals: [100], timeout: 5_000 }).toBe(true);
     await page.getByTestId('load-range').click();
     await expect(table(page).locator('tbody td', { hasText: /^\s*Row 5000\s*$/ })).toBeVisible();
     await expect.poll(async () => {
