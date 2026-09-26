@@ -2646,14 +2646,18 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   );
   lines.push('');
   lines.push(
-    'The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filtering) ' +
-      'scoped slots follow the SAME render-prop convention: on React they are `renderDetail` / ' +
-      '`renderGroupBar` / `renderFilter`; on Solid they are `detailSlot` / `groupBarSlot` / ' +
-      '`filterSlot`; on Lit they are the `.detail` / `.groupBar` / `.filter` properties — the ' +
-      'documented React render-prop edge (per the cross-framework compatibility bar). On Vue / ' +
-      'Svelte / Angular they are ordinary named scoped slots (`#detail` / `#groupBar` / `#filter`). ' +
-      'The `groupBar` and `filter` slots are HEADLESS — the component ships NO built-in group-bar / ' +
-      'facet control, so the consumer builds the UI purely from the exposed slot props.',
+    'The `detail` (expandable rows), `groupBar` (grouping), `filter` (faceted filtering) and ' +
+      '`placeholder` (lazy-loading skeleton) scoped slots follow the SAME render-prop ' +
+      'convention: on React they are `renderDetail` / `renderGroupBar` / `renderFilter` / ' +
+      '`renderPlaceholder`; on Solid they are `detailSlot` / `groupBarSlot` / `filterSlot` / ' +
+      '`placeholderSlot`; on Lit they are the `.detail` / `.groupBar` / `.filter` / ' +
+      '`.placeholder` properties — the documented React render-prop edge (per the ' +
+      'cross-framework compatibility bar). On Vue / Svelte / Angular they are ordinary named ' +
+      'scoped slots (`#detail` / `#groupBar` / `#filter` / `#placeholder`). The `groupBar` and ' +
+      '`filter` slots are HEADLESS — the component ships NO built-in group-bar / facet control, ' +
+      'so the consumer builds the UI purely from the exposed slot props. `placeholder` DOES ship ' +
+      'a default (a skeleton bar) — fill it only to replace that default with your own loading ' +
+      'affordance; it renders for a `virtual` + `manual` + `rowCount` row not yet present in `data`.',
   );
   lines.push('');
   lines.push(
