@@ -53,6 +53,7 @@ export default defineConfig({
     include: [
       'regressions.test.ts',
       'runtime-side-effects.test.ts',
+      'ui-leaf-packaging.test.ts',
       'collision/**/*.test.ts',
       'dynamic-slot-name-rfor.test.ts',
       'example-jsdoc-authoring-notation-guard.test.ts',
