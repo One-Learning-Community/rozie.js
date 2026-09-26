@@ -918,7 +918,7 @@ let refreshRowModel = null
 
 import { onSortingChangeCb, onExpandedChangeCb, onGroupingChangeCb, onGlobalFilterChangeCb, onColumnFiltersChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onColumnVisibilityChangeCb, onColumnSizingChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingInfoChangeCb } from './stateChangeCallbacks.rzts'
 
-import { windowSource, scheduleRemeasure, teardownRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn, lazyRowsActive, isLazyPlaceholder, rowIsLazyPlaceholder, feedData, emitVisibleRangeIfChanged } from './virtualization.rzts'
+import { windowSource, scheduleRemeasure, teardownRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn, lazyRowsActive, isLazyPlaceholder, rowIsLazyPlaceholder, feedData, emitVisibleRangeIfChanged, LAZY_PLACEHOLDER_ROW_ID_PREFIX, migratePlaceholderSizeCache } from './virtualization.rzts'
 import { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow, columnVirtualizerOptions, windowedColIndices, colPadLeft, colPadRight, colIsOutsideWindow, refineRowEstimate, teardownColRtlWatch, bumpWindowVer } from '@rozie-ui/headless-core/windowing.rzts'
 
 // afterRowRemeasure (Phase 87 87-07, D-15): a mutable-`let` indirection so
@@ -1010,7 +1010,8 @@ const buildSortFilterAnnounce = () => {
 const rowIdOption = () => {
   const f = $props.getRowId
   // A lazy placeholder has no consumer row to ask — key it by its index (see feedData()).
-  return f ? ((originalRow, index, parent) => (isLazyPlaceholder(originalRow) ? '__rdt_ph_' + originalRow.index : String(f(originalRow, index, parent)))) : undefined
+  // Prefix shared with migratePlaceholderSizeCache() (virtualization.rzts) — see its own comment.
+  return f ? ((originalRow, index, parent) => (isLazyPlaceholder(originalRow) ? LAZY_PLACEHOLDER_ROW_ID_PREFIX + originalRow.index : String(f(originalRow, index, parent)))) : undefined
 }
 
 // table-core `enableRowSelection`: off for selectionMode 'none'; with lazy rows a placeholder
@@ -1150,6 +1151,10 @@ $onMount(() => {
     // NEVER in a render helper (Pitfall 1). Pass the COMPLETE options set (virtual-core's
     // setOptions replaces, not merges). Guarded so the off path executes no virtual-core code.
     if (rowsWindowed() && virtualizer) {
+      // Rekey any placeholder rows this re-feed just filled (quick 260926, VR probe) BEFORE
+      // handing the virtualizer its fresh options — see migratePlaceholderSizeCache()'s own
+      // comment (virtualization.rzts) for the itemSizeCache/getMeasurements memo root cause.
+      migratePlaceholderSizeCache()
       virtualizer.setOptions(virtualizerOptions())
       virtualizer._willUpdate()
     }
