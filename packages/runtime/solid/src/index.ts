@@ -29,6 +29,7 @@ export { parseInlineStyle, toStyleObjectKey } from './parseInlineStyle.js';
 export { normalizeAttrs, normalizeComponentAttrs, SOLID_ATTR_KEY_MAP } from './normalizeAttrs.js';
 export { normalizeListeners, SOLID_LISTENER_KEY_MAP } from './normalizeListeners.js';
 export { mergeListeners } from './mergeListeners.js';
+export { pickListeners } from './pickListeners.js';
 export { __rozieInjectStyle } from './injectStyle.js';
 export { rozieDisplay } from './rozieDisplay.js';
 export { rozieAttr } from './rozieAttr.js';

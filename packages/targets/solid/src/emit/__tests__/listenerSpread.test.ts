@@ -165,7 +165,7 @@ const f1 = () => undefined;
     expect(jsx).not.toContain('mergeListeners');
   });
 
-  it('(7) bare $listeners + @click (R6 + D-19): mergeListeners({ onClick: ... }, attrs)', () => {
+  it('(7) bare $listeners + @click (R6 + D-19): mergeListeners({ onClick: ... }, pickListeners(attrs))', () => {
     const src = `${PROLOGUE}
 <template>
   <button @click="f1" r-on="$listeners">go</button>
@@ -178,9 +178,46 @@ const f1 = () => undefined;
     const jsx = extractJsx(code);
     expect(jsx).toMatchSnapshot();
     expect(jsx).toContain('mergeListeners(');
-    expect(jsx).toContain('attrs');
+    // BUGFIX (quick 260926) — the bare `$listeners`/`attrs` merge-partial is
+    // filtered to its listener-shaped keys via `pickListeners` BEFORE it
+    // re-enters `mergeListeners`, so an element's own already-merged
+    // `class=`/`style=` (computed one attribute earlier) is never re-
+    // clobbered by the untouched rest of `attrs` riding along in the same
+    // merge call. See `mergeListenersAttrsClobber.test.ts` for the
+    // behavioral (real-DOM) regression test.
+    expect(jsx).toContain('pickListeners(attrs)');
     expect(jsx).toContain('onClick:');
     expect(jsx).not.toContain('$listeners');
     expect(jsx).not.toContain('normalizeListeners(attrs)');
+    expect(code).toMatch(/import\s*\{[^}]*\bpickListeners\b/);
+  });
+
+  it('(8) bare $listeners + @click + owned class (R6 clobber regression): class merge survives the mergeListeners spread', () => {
+    // Reproduces the exact Dialog/Switch/Pagination/Toast shape: a root
+    // element with an OWN class, a directly-bound `@click`, AND the
+    // auto-fallthrough `$listeners`/`$attrs` spread. Before the fix,
+    // `mergeListeners({ onClick: ... }, attrs)` re-spread the WHOLE `attrs`
+    // bucket (including `attrs.class`) AFTER the element's own merged
+    // `class=`, silently overwriting it.
+    const src = `${PROLOGUE}
+<template>
+  <button class="rozie-btn" @click="f1" r-on="$listeners">go</button>
+</template>
+<script>
+const f1 = () => undefined;
+</script>
+</rozie>`;
+    const code = compile(src);
+    const jsx = extractJsx(code);
+    expect(jsx).toMatchSnapshot();
+    // The `class=` attribute must be emitted AFTER the `mergeListeners(...)`
+    // spread now carries ONLY `pickListeners(attrs)` (listener-shaped keys),
+    // never the raw `attrs` bucket — so `class=` (computed one attribute
+    // earlier, or deferred post-spread) is not fed a `class` key a second
+    // time by the listener merge.
+    const mergeListenersIdx = jsx.indexOf('mergeListeners(');
+    expect(mergeListenersIdx).toBeGreaterThan(-1);
+    expect(jsx.slice(mergeListenersIdx)).not.toMatch(/\bclass\s*:/);
+    expect(jsx).toContain('pickListeners(attrs)');
   });
 });

@@ -1171,20 +1171,48 @@ export function emitListenerSpread(spread: ListenerSpreadIR, ctx: EmitAttrCtx): 
  * Phase 15 — produce the source-text expression that builds an `r-on`
  * partial for inclusion in a `mergeListeners(...)` call.
  *
- *   - bare `$listeners` (D-19 exempt) → `$listeners` raw (consumer's
- *      $listeners cluster already carries target-native keys)
+ *   - bare `$listeners` (D-19 exempt) → `pickListeners($listeners)` — see
+ *      the R6-clobber bugfix note below
  *   - DYNAMIC expression              → `normalizeListeners(<expr>)`
+ *
+ * BUGFIX (quick 260926) — the bare `$listeners`/`$attrs` identifier lowers to
+ * the SAME `attrs` rest-of-props bucket in Solid (Phase 16 D-19/D-04 — see
+ * `hasBareAttrsSpread`'s doc comment). That bucket carries every UNDECLARED
+ * pass-through key, not just listeners: `class`, `style`, `id`, `aria-*`,
+ * `data-*`, … When this element ALSO has an `@event` handler, the caller
+ * (`emitElementListeners`'s mixed/dynamic-merge case) builds a SINGLE
+ * `mergeListeners(<events-partial>, <this-partial>)` call that is spread onto
+ * the element AFTER its own already-computed `class=`/`style=` attribute.
+ * `mergeListeners` copies every key of every partial (non-function values
+ * last-wins), so handing it the RAW `attrs` bucket re-introduces
+ * `attrs.class`/`attrs.style` UNMODIFIED at the tail of the JSX attribute
+ * list — silently overwriting the class/style the emitter just merged one
+ * attribute earlier. Confirmed by a solid-js 1.9.12 render audit: a
+ * consumer's `class="consumer-class"` REPLACED `"rozie-dialog"` instead of
+ * appending to it (dialog/switch/pagination/toast, everywhere this shape
+ * occurs).
+ *
+ * `pickListeners` filters the bucket down to its `on*`-prefixed,
+ * function-valued keys ONLY — the sole shape `mergeListeners` needs for R6
+ * all-fire — before it re-enters the merge, so class/style/other pass-
+ * through attrs (already delivered via the element's own spread/recompute)
+ * are never seen a second time. This does NOT affect the standalone
+ * `emitListenerSpread` (no-events) path just above: with no `@event`s there
+ * is no `mergeListeners` call, `attrs` IS the sole attrs carrier, and it must
+ * stay whole.
  */
 export function emitListenerSpreadAsMergePartial(
   spread: ListenerSpreadIR,
   ctx: EmitAttrCtx,
 ): string {
   if (isListenersIdentifier(spread.expression)) {
-    return renderExpr(spread.expression, ctx.ir, {
+    ctx.collectors.runtime.add('pickListeners');
+    const exprCode = renderExpr(spread.expression, ctx.ir, {
       invokeAccessors: ctx.invokeAccessors,
       loopValueBindings: ctx.loopValueBindings,
       scopeAccessorParams: ctx.scopeAccessorParams,
     });
+    return `pickListeners(${exprCode})`;
   }
   ctx.collectors.runtime.add('normalizeListeners');
   return `normalizeListeners(${renderExpr(spread.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })})`;
@@ -1256,6 +1284,67 @@ function opaqueSpreadClassReadExpr(
 }
 
 /**
+ * BUGFIX (quick 260926) — the `style` twin of `opaqueSpreadClassReadExpr`.
+ *
+ * A root element that computes its OWN `style` (e.g. `:style="fillStyle"`)
+ * AND carries an opaque attrs spread (`$attrs` auto-fallthrough, or a
+ * dynamic `r-bind`) previously emitted `style={parseInlineStyle(fillStyle())}
+ * {...attrs}` — `style=` BEFORE the spread, with no re-merge after. Solid's
+ * compiler flattens same-element attrs/spreads into ONE `mergeProps(...)`
+ * call where a LATER source's key always wins (see `web.js`'s `mergeProps`,
+ * a plain later-source-wins property merge — it has no special-cased style/
+ * class handling of its own); a consumer's pass-through `style` prop (an
+ * UNDECLARED key, so it lands in the `attrs` rest bucket) therefore replaced
+ * the component's own style OUTRIGHT instead of merging (verified: Slider's
+ * `--rozie-slider-fill-*` custom properties were wiped by a consumer
+ * `style` prop). Vue's fallthrough-attrs system merges class AND style by
+ * design (`normalizeStyle([own, fallthrough])`, fallthrough wins per
+ * OVERLAPPING key, own properties the consumer didn't set survive) — that is
+ * the parity target: React/Solid's own hand-authored `class` merge already
+ * matches it (own class + `attrs.class` are concatenated at emitAttributes'
+ * post-spread `class=` re-emit, below); `style` never got the equivalent
+ * treatment.
+ *
+ * Only the OPAQUE (non-literal) spread shapes are handled — the ONE shape
+ * that actually occurs today (Slider/Resizable's bare `$attrs`
+ * auto-fallthrough). A LITERAL `r-bind="{ style: {...} }"` spread's `style`
+ * key is left untouched (existing behavior; `extractLiteralClassStyle`
+ * already extracts it for FUTURE use but no current leaf exercises that
+ * combination — extending it is out of scope for this bugfix).
+ *
+ * `$attrs`            → `attrs.style`
+ * Dynamic `r-bind`    → `(<rewritten expr>).style`
+ * LITERAL `r-bind`    → null (out of scope — see above)
+ */
+function opaqueSpreadStyleReadExpr(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+  ctx: EmitAttrCtx,
+): string | null {
+  if (t.isObjectExpression(attr.expression)) return null;
+  if (isAttrsIdentifier(attr.expression)) {
+    return `((attrs as unknown as Record<string, unknown>).style as string | JSX.CSSProperties | undefined)`;
+  }
+  const exprCode = renderExpr(attr.expression, ctx.ir, {
+    invokeAccessors: ctx.invokeAccessors,
+    loopValueBindings: ctx.loopValueBindings,
+    scopeAccessorParams: ctx.scopeAccessorParams,
+  });
+  return `((${exprCode}) as unknown as Record<string, unknown>)?.style as string | JSX.CSSProperties | undefined`;
+}
+
+/**
+ * Strip the outer JSX `style={...}` wrapper off an already-rendered `style`
+ * attribute string, returning just the inner value expression source. Used
+ * to re-wrap an existing style emit (object-literal, string-literal-parsed,
+ * or `parseInlineStyle(<expr>)`) inside a `parseInlineStyle([<value>, …])`
+ * array-merge without re-implementing every style emit shape.
+ */
+function extractStyleValueExpr(jsx: string): string {
+  const match = jsx.match(/^style=\{([\s\S]*)\}$/);
+  return match ? match[1]! : jsx;
+}
+
+/**
  * Top-level entry: emit all attributes for an element.
  * Buckets `class` and `:class` together for composition.
  * Skips consumed (r-* / @event / :key) attributes.
@@ -1272,9 +1361,27 @@ export function emitAttributes(attrs: AttributeBinding[], ctx: EmitAttrCtx): Emi
    * after spreads so JSX last-write ordering keeps our (merged) class wins.
    */
   let pendingPostSpreadClass: string | null = null;
+  /** BUGFIX (quick 260926) — the `style` twin of `pendingPostSpreadClass`. */
+  let pendingPostSpreadStyle: string | null = null;
 
   // Phase 14 R6 — does the element have an explicit `class` binding?
   const hasExplicitClass = (buckets.get('class')?.length ?? 0) > 0;
+  // BUGFIX (quick 260926) — does the element have an explicit `style` binding?
+  const hasExplicitStyle = (buckets.get('style')?.length ?? 0) > 0;
+
+  // BUGFIX (quick 260926) — OPAQUE-spread style-merge (Slider/Resizable's
+  // clobbered `--rozie-slider-fill-*` custom properties). Mirrors the class
+  // merge just below, minus the LITERAL-spread extraction path (out of scope
+  // — see `opaqueSpreadStyleReadExpr`'s doc comment).
+  const opaqueSpreadStyleReads: string[] = [];
+  if (hasExplicitStyle) {
+    for (const a of attrs) {
+      if (a.kind !== 'spreadBinding') continue;
+      const readExpr = opaqueSpreadStyleReadExpr(a, ctx);
+      if (readExpr !== null) opaqueSpreadStyleReads.push(readExpr);
+    }
+  }
+  const needsPostSpreadStyle = opaqueSpreadStyleReads.length > 0;
 
   // Phase 14 R6 — synthesise extra `class` AttributeBindings from any `r-bind`
   // LITERAL that carries a `class` key, in spread source order, so the existing
@@ -1386,16 +1493,34 @@ export function emitAttributes(attrs: AttributeBinding[], ctx: EmitAttrCtx): Emi
       continue;
     }
 
+    // BUGFIX (quick 260926) — `style` twin of the `class` bucket above. Only
+    // engages when an opaque spread's `style` was actually found (Slider/
+    // Resizable's shape); otherwise `style` falls through to the unchanged
+    // generic emit path below, so every other component's output is
+    // byte-identical.
+    if (a.name === 'style' && needsPostSpreadStyle) {
+      const result = emitNonClassAttribute(a, ctx);
+      for (const d of result.diagnostics) diagnostics.push(d);
+      ctx.collectors.runtime.add('parseInlineStyle');
+      const ownValueExpr = extractStyleValueExpr(result.jsx);
+      pendingPostSpreadStyle = `style={parseInlineStyle([${ownValueExpr}, ${opaqueSpreadStyleReads.join(', ')}])}`;
+      consumed.add(a);
+      continue;
+    }
+
     const result = emitNonClassAttribute(a, ctx);
     out.push(result.jsx);
     for (const d of result.diagnostics) diagnostics.push(d);
     consumed.add(a);
   }
 
-  // R6 opaque-spread merge: emit the deferred `class=` AFTER all attrs/spreads
-  // so it wins JSX's last-write ordering.
+  // R6 opaque-spread merge: emit the deferred `class=`/`style=` AFTER all
+  // attrs/spreads so it wins JSX's last-write ordering.
   if (pendingPostSpreadClass !== null) {
     out.push(pendingPostSpreadClass);
+  }
+  if (pendingPostSpreadStyle !== null) {
+    out.push(pendingPostSpreadStyle);
   }
 
   return { jsx: out.join(' '), diagnostics };

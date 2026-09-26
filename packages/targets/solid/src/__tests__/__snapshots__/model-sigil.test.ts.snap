@@ -3,7 +3,7 @@
 exports[`Solid $model producer-side two-way-write sigil > emitted model fixture matches snapshot 1`] = `
 "import type { JSX } from 'solid-js';
 import { splitProps } from 'solid-js';
-import { createControllableSignal, mergeListeners } from '@rozie/runtime-solid';
+import { createControllableSignal, mergeListeners, pickListeners } from '@rozie/runtime-solid';
 
 interface ModelSigilProps {
   value?: number;
@@ -31,7 +31,7 @@ export default function ModelSigil(_props: ModelSigilProps): JSX.Element {
 
   return (
     <>
-      <button {...attrs} {...mergeListeners({ onClick: ($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { setValue(prev => prev + 1); } }, attrs)} data-rozie-s-78a54232="">{value()}</button>
+      <button {...attrs} {...mergeListeners({ onClick: ($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { setValue(prev => prev + 1); } }, pickListeners(attrs))} data-rozie-s-78a54232="">{value()}</button>
     </>
   );
 }

@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { mergeProps, splitProps } from 'solid-js';
-import { __rozieInjectStyle } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, parseInlineStyle } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('ThemedButtonAllManual-de172510', `.btn[data-rozie-s-de172510] {
   display: inline-flex;
@@ -30,7 +30,7 @@ export default function ThemedButtonAllManual(_props: ThemedButtonAllManualProps
 
   return (
     <>
-    <button style={{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }} {...attrs} class={"btn" + " " + (local.variant) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-de172510="">
+    <button {...attrs} class={"btn" + " " + (local.variant) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} style={parseInlineStyle([{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }, ((attrs as unknown as Record<string, unknown>).style as string | JSX.CSSProperties | undefined)])} data-rozie-s-de172510="">
       {local.label}
     </button>
     </>

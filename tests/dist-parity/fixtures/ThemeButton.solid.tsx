@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { splitProps, useContext } from 'solid-js';
-import { __rozieInjectStyle, mergeListeners, rozieContext, rozieDisplay } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, mergeListeners, pickListeners, rozieContext, rozieDisplay } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('ThemeButton-9f40a7ea', `.theme-button[data-rozie-s-9f40a7ea] {
   font-family: system-ui, -apple-system, sans-serif;
@@ -19,7 +19,7 @@ export default function ThemeButton(_props: ThemeButtonProps): JSX.Element {
 
   return (
     <>
-    <button data-theme-button="" type="button" {...attrs} class={"theme-button" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { theme && theme.cycle(); } }, attrs)} data-rozie-s-9f40a7ea="">
+    <button data-theme-button="" type="button" {...attrs} class={"theme-button" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { theme && theme.cycle(); } }, pickListeners(attrs))} data-rozie-s-9f40a7ea="">
       {rozieDisplay(theme && theme.color)}
     </button>
     </>

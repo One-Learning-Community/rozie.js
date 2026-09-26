@@ -59,6 +59,16 @@ function classBinding(exprSrc: string): AttributeBinding {
   };
 }
 
+function styleBinding(exprSrc: string): AttributeBinding {
+  return {
+    kind: 'binding',
+    name: 'style',
+    expression: parseExpression(exprSrc) as t.Expression,
+    deps: [],
+    sourceLoc: { start: 0, end: exprSrc.length },
+  };
+}
+
 function freshCtx(ir: IRComponent): EmitAttrCtx {
   return {
     ir,
@@ -118,6 +128,34 @@ describe('emitTemplateAttribute (Solid) — spreadBinding (Plan 14-03 Task 2)', 
     expect(jsx).toContain(`'a'`);
     expect(jsx).toContain(`'b'`);
     expect(jsx).toContain(`{...{ id: 'x' }}`);
+  });
+
+  it('(6) BUGFIX 260926 — :style + $attrs opaque spread: own style survives, consumer style merges', () => {
+    // Reproduces the Slider/Resizable shape: a root element computes its OWN
+    // `style` (e.g. `:style="fillStyle"`, a `$computed` custom-property map)
+    // AND auto-fallthrough-spreads `$attrs`. Before the fix, `style=` was
+    // emitted BEFORE `{...attrs}` with no re-merge, so a consumer's own
+    // `style` prop (landing in `attrs.style`, an undeclared pass-through key)
+    // REPLACED the component's style outright instead of merging — wiping
+    // custom properties like `--rozie-slider-fill-start`.
+    const ir = emptyIR();
+    const ctx = freshCtx(ir);
+    const { jsx } = emitAttributes([styleBinding('fillStyle'), spread('$attrs')], ctx);
+    expect(jsx).toMatchSnapshot();
+    // The spread must land BEFORE the (deferred) style attribute so the
+    // style attribute wins JSX's last-write ordering.
+    const spreadIdx = jsx.indexOf('{...attrs}');
+    const styleIdx = jsx.indexOf('style=');
+    expect(spreadIdx).toBeGreaterThan(-1);
+    expect(styleIdx).toBeGreaterThan(spreadIdx);
+    // The own style value AND the consumer's `attrs.style` both feed into a
+    // single `parseInlineStyle([...])` merge call (array — "later wins" per
+    // overlapping declaration, own custom properties the consumer never set
+    // are preserved — matches Vue's `normalizeStyle([own, fallthrough])`
+    // fallthrough-attrs parity).
+    expect(jsx).toContain('parseInlineStyle([');
+    expect(jsx).toContain('attrs as unknown as Record<string, unknown>).style');
+    expect(ctx.collectors.runtime.has('parseInlineStyle')).toBe(true);
   });
 
   it('SECURITY (T-14-06): LITERAL key walk skips __proto__/constructor/prototype', () => {

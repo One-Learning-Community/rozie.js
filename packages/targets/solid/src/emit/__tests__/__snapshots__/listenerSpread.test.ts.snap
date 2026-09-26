@@ -36,8 +36,14 @@ exports[`emitTemplateAttribute (Solid) — ListenerSpreadIR (Plan 15-03) > (6) b
     </>"
 `;
 
-exports[`emitTemplateAttribute (Solid) — ListenerSpreadIR (Plan 15-03) > (7) bare $listeners + @click (R6 + D-19): mergeListeners({ onClick: ... }, attrs) 1`] = `
+exports[`emitTemplateAttribute (Solid) — ListenerSpreadIR (Plan 15-03) > (7) bare $listeners + @click (R6 + D-19): mergeListeners({ onClick: ... }, pickListeners(attrs)) 1`] = `
 "<>
-      <button {...mergeListeners({ onClick: f1 }, attrs)} data-rozie-s-8fd6d49e="">go</button>
+      <button {...mergeListeners({ onClick: f1 }, pickListeners(attrs))} data-rozie-s-8fd6d49e="">go</button>
+    </>"
+`;
+
+exports[`emitTemplateAttribute (Solid) — ListenerSpreadIR (Plan 15-03) > (8) bare $listeners + @click + owned class (R6 clobber regression): class merge survives the mergeListeners spread 1`] = `
+"<>
+      <button class={"rozie-btn"} {...mergeListeners({ onClick: f1 }, pickListeners(attrs))} data-rozie-s-8fd6d49e="">go</button>
     </>"
 `;

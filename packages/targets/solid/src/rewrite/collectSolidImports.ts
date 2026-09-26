@@ -91,6 +91,15 @@ export type RuntimeSolidImport =
   | 'normalizeComponentAttrs'
   | 'normalizeListeners'
   | 'mergeListeners'
+  // Quick 260926 (R6 mergeListeners full-attrs clobber fix) — filters an
+  // opaque `attrs`/`$listeners` merge-partial down to its listener-shaped
+  // (`on*`, function-valued) keys before it reaches `mergeListeners`, so the
+  // component's own already-merged `class`/`style` isn't re-clobbered by the
+  // untouched rest of `attrs` riding along in the same merge call. Added by
+  // `emitListenerSpreadAsMergePartial` ONLY on the bare `$attrs`/`$listeners`
+  // merge-partial branch, so an unaffected component's `@rozie/runtime-solid`
+  // import line stays byte-identical.
+  | 'pickListeners'
   /**
    * Pre-Phase-16 Item-1-residual closure — `__rozieInjectStyle` runtime
    * helper. Emitted at module top by the shell when `emitStyle` produced

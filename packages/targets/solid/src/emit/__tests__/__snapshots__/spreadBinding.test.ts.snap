@@ -1,0 +1,3 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emitTemplateAttribute (Solid) — spreadBinding (Plan 14-03 Task 2) > (6) BUGFIX 260926 — :style + $attrs opaque spread: own style survives, consumer style merges 1`] = `"{...attrs} style={parseInlineStyle([parseInlineStyle(fillStyle), ((attrs as unknown as Record<string, unknown>).style as string | JSX.CSSProperties | undefined)])}"`;
