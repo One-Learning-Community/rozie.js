@@ -6415,15 +6415,25 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // it to this single funnel, so guarding the four callers individually would be four
       // chances to miss one.
       const rowGrouped = rowIndexIsGrouped(r);
+      // Debug 260926-dtl-edit-guard: a LAZY PLACEHOLDER row (virtual+manual+rowCount, a row not
+      // loaded yet) has no real underlying record — rowOriginalAt(r) returns the placeholder
+      // sentinel ({__rdtLazyPlaceholder:true,index:i}, virtualization.rzts), which is never IN
+      // currentData() (only the consumer's own array is), so sourceIndexOfRow's data.indexOf(...)
+      // is always -1 and falls back to the VISIBLE index — either a no-op write with a FABRICATED
+      // cell-edit-commit, or, inside a sparse hole, the hole gets clobbered with a partial row via
+      // replaceRowValue. Hoisted per-ROW exactly like rowGrouped above (the SAME single placement
+      // closes pasteRange/cutRange/clearActiveRange/fillRange all at once).
+      const rowPlaceholder = rowIsLazyPlaceholder((rows() || [])[r]);
       const cols = grid[gr] || [];
       for (let gc = 0; gc < cols.length; gc++) {
         const c = originCol + gc;
         if (c > maxCol) break;
-        // A group-row cell still counts toward `total` — it is a skipped TARGET, exactly like
-        // a non-editable or validator-rejected cell — so the "N of M cells pasted" / "no cells
-        // pasted" announce keeps its existing semantics (never silently under-reports M).
+        // A group-row / placeholder-row cell still counts toward `total` — it is a skipped
+        // TARGET, exactly like a non-editable or validator-rejected cell — so the "N of M cells
+        // pasted" / "no cells pasted" announce keeps its existing semantics (never silently
+        // under-reports M).
         total = total + 1;
-        if (rowGrouped) continue;
+        if (rowGrouped || rowPlaceholder) continue;
         const colId = columnIdAt(r, c);
         if (colId == null || !columnEditable(colId)) continue;
         const rowObj = rowOriginalAt(r);
@@ -7491,11 +7501,17 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // checkbox branch, so this line is redundant AT HEAD — it earns its place by making "no
     // write ever targets a group row" a property of the write funnels themselves.
     if (rowIndexIsGrouped(activeRow())) return;
-    const colId = columnIdAt(activeRow(), activeColIndex());
-    if (colId == null || !columnEditable(colId)) return;
     const rowList = rows() || [];
     const row = rowList[activeRow()];
     if (!row) return;
+    // Debug 260926-dtl-edit-guard: defense-in-depth, matching the redundant rowIndexIsGrouped
+    // check just above (Layer 4 is reachable ONLY through the Layer-1-gated checkbox branch in
+    // onGridKeyDown, whose isActiveCellEditable() already excludes a placeholder row — this makes
+    // "no write ever targets a placeholder row" a property of the write funnel itself, not just of
+    // its one caller).
+    if (rowIsLazyPlaceholder(row)) return;
+    const colId = columnIdAt(activeRow(), activeColIndex());
+    if (colId == null || !columnEditable(colId)) return;
     const rowOriginal = row.original;
     const rowId = row.id;
     const oldValue = cellValueAt(activeRow(), activeColIndex());
@@ -7628,6 +7644,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // redundant at HEAD; kept for the same reason as Layer 4 — it is a mutation entry point,
     // and the natural call site for a future #rowActions "Edit" drop-in button.
     if (rowIndexIsGrouped(rowIndex)) return;
+    // Debug 260926-dtl-edit-guard: a LAZY PLACEHOLDER row (a row not loaded yet, virtual+manual+
+    // rowCount) has nothing to edit — beginEdit (editCellLifecycle.rzts) already carries this
+    // guard for single-cell entry; this full-row twin was missing it, so the public editRow()
+    // verb (and, redundantly with isActiveCellEditable's own placeholder check, Shift+F2) could
+    // seed a row editor from a placeholder's undefined fields and commit through the same
+    // sourceIndexOfRow fallback bug applyGridToRange's placeholder skip closes.
+    if (rowIsLazyPlaceholder((rows() || [])[rowIndex])) return;
     const editable = editableColumnsForRow(rowIndex);
     if (editable.length === 0) return;
     // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
