@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, Show, mergeProps, onMount, splitProps } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, mergeListeners, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, mergeListeners, pickListeners, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 import { paginationItems } from './internal/paginationItems';
 
 // ---- derived view (ONE plain function, uniform x6) ---------------------
@@ -286,7 +286,7 @@ export default function Pagination(_props: PaginationProps): JSX.Element {
 
   return (
     <>
-    <nav ref={(el) => { navRef = el as HTMLElement; }} aria-label={local.ariaLabel} {...attrs} class={"rozie-pagination" + " " + rozieClass({ 'rozie-pagination--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onKeyDown: ($event: KeyboardEvent & { currentTarget: HTMLElement; target: Element }) => { onControlKeydown($event); } }, attrs)} data-rozie-s-de247ae2="">
+    <nav ref={(el) => { navRef = el as HTMLElement; }} aria-label={local.ariaLabel} {...attrs} class={"rozie-pagination" + " " + rozieClass({ 'rozie-pagination--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onKeyDown: ($event: KeyboardEvent & { currentTarget: HTMLElement; target: Element }) => { onControlKeydown($event); } }, pickListeners(attrs))} data-rozie-s-de247ae2="">
       
       {(_props.prevControlSlot ?? _props.slots?.['prevControl'])?.({ get disabled() { return !canPrev() || local.disabled; }, get goto() { return goPrev; }, get page() { return currentPage() - 1; } }) ?? <button type="button" data-page-control="" aria-disabled={!!(!canPrev() || local.disabled)} aria-label="Previous page" class={"rozie-pagination-control rozie-pagination-prev"} tabIndex={rozieAttr(tabIndexFor(true))} disabled={!canPrev() || local.disabled} onClick={goPrev} data-rozie-s-de247ae2="">‹</button>}
 

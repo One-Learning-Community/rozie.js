@@ -241,7 +241,7 @@ export default function Resizable(_props: ResizableProps): JSX.Element {
 
   return (
     <>
-    <div ref={(el) => { rootRef = el as HTMLElement; }} style={parseInlineStyle(sizeStyle())} {...attrs} class={"rozie-resizable" + " " + rozieClass({ 'rozie-resizable--vertical': isVertical(), 'rozie-resizable--horizontal': !isVertical(), 'rozie-resizable--dragging': dragging(), 'rozie-resizable--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-8330bc5a="">
+    <div ref={(el) => { rootRef = el as HTMLElement; }} {...attrs} class={"rozie-resizable" + " " + rozieClass({ 'rozie-resizable--vertical': isVertical(), 'rozie-resizable--horizontal': !isVertical(), 'rozie-resizable--dragging': dragging(), 'rozie-resizable--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} style={parseInlineStyle([parseInlineStyle(sizeStyle()), ((attrs as unknown as Record<string, unknown>).style as string | JSX.CSSProperties | undefined)])} data-rozie-s-8330bc5a="">
       
       <div class={"rozie-resizable-panel rozie-resizable-panel--start"} data-rozie-s-8330bc5a="">
         {(_props.startSlot ?? _props.slots?.['start']?.({}))}

@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { children, mergeProps, onMount, splitProps } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, mergeListeners, rozieAttr, rozieClass } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, mergeListeners, pickListeners, rozieAttr, rozieClass } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('Switch-5a76e232', `.rozie-switch[data-rozie-s-5a76e232] {
   display: inline-flex;
@@ -158,7 +158,7 @@ export default function Switch(_props: SwitchProps): JSX.Element {
 
   return (
     <>
-    <button ref={(el) => { controlRef = el as HTMLElement; }} type="button" role="switch" tabIndex={rozieAttr(controlTabindex())} disabled={!!local.disabled} aria-checked={!!modelValue()} aria-disabled={!!local.disabled} aria-readonly={!!local.readonly} aria-label={rozieAttr(local.ariaLabel)} {...attrs} class={"rozie-switch" + " " + rozieClass({ 'rozie-switch--checked': isChecked(), 'rozie-switch--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onClick(); }, onKeyDown: ($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onKeydown($event); } }, attrs)} data-rozie-s-5a76e232="">
+    <button ref={(el) => { controlRef = el as HTMLElement; }} type="button" role="switch" tabIndex={rozieAttr(controlTabindex())} disabled={!!local.disabled} aria-checked={!!modelValue()} aria-disabled={!!local.disabled} aria-readonly={!!local.readonly} aria-label={rozieAttr(local.ariaLabel)} {...attrs} class={"rozie-switch" + " " + rozieClass({ 'rozie-switch--checked': isChecked(), 'rozie-switch--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onClick(); }, onKeyDown: ($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onKeydown($event); } }, pickListeners(attrs))} data-rozie-s-5a76e232="">
       {typeof local.children === 'function' ? (local.children as (s: any) => any)({ get checked() { return isChecked(); }, toggle }) : (resolved() ?? <span class={"rozie-switch-track"} data-rozie-s-5a76e232="">
           <span class={"rozie-switch-thumb"} data-rozie-s-5a76e232="" />
         </span>)}

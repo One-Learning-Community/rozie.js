@@ -431,7 +431,7 @@ export default function Slider(_props: SliderProps): JSX.Element {
 
   return (
     <>
-    <div style={parseInlineStyle(fillStyle())} {...attrs} class={"rozie-slider" + " " + rozieClass({ 'rozie-slider--vertical': local.orientation === 'vertical', 'rozie-slider--horizontal': local.orientation !== 'vertical', 'rozie-slider--range': local.range, 'rozie-slider--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-4e6f0be6="">
+    <div {...attrs} class={"rozie-slider" + " " + rozieClass({ 'rozie-slider--vertical': local.orientation === 'vertical', 'rozie-slider--horizontal': local.orientation !== 'vertical', 'rozie-slider--range': local.range, 'rozie-slider--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} style={parseInlineStyle([parseInlineStyle(fillStyle()), ((attrs as unknown as Record<string, unknown>).style as string | JSX.CSSProperties | undefined)])} data-rozie-s-4e6f0be6="">
       
       <div class={"rozie-slider-track"} aria-hidden="true" data-rozie-s-4e6f0be6="">
         <div class={"rozie-slider-fill"} data-rozie-s-4e6f0be6="" />
