@@ -820,6 +820,8 @@ export const EXAMPLES = [
   'DataTableRowId',
   // quick 260925-dtl — row-activate (click + grid Enter).
   'DataTableRowActivate',
+  // quick 260925-dtl part 2 — virtual lazy loading (sparse data + rowCount + visible-range-change).
+  'DataTableLazy',
   'DataTableColumnMgmt',
   'DataTableSticky',
   // Phase 49 (data-table grid interaction mode) WAVE-0 FOCUS PROBE — the
@@ -1688,6 +1690,7 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableSelection: 'rozie-data-table-selection',
   DataTableRowId: 'rozie-data-table-row-id',
   DataTableRowActivate: 'rozie-data-table-row-activate',
+  DataTableLazy: 'rozie-data-table-lazy',
   DataTableColumnMgmt: 'rozie-data-table-column-mgmt',
   DataTableSticky: 'rozie-data-table-sticky',
   // Phase 49 grid-probe — '-demo' appended on Lit → 'rozie-data-table-grid-probe-demo'
@@ -2228,6 +2231,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DataTableSelection: {},
   DataTableRowId: {},
   DataTableRowActivate: {},
+  DataTableLazy: {},
   DataTableColumnMgmt: {},
   DataTableSticky: {},
   // Phase 49 grid-probe — self-contained ($data only: interactionMode='grid' +

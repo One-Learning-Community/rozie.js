@@ -61,6 +61,24 @@ Set `autoMeasure` alongside row windowing (`virtual='rows'`/`true`/`'both'`) to 
 
 **`estimateRowHeight` is unchanged and still required.** It is not deprecated, superseded, or legacy — it is still read on every first paint, since the very first render has zero measurements regardless of `autoMeasure`. When `autoMeasure` is `true`, later renders progressively replace this seed with the running-mean estimate; when `autoMeasure` is `false`, `estimateRowHeight` remains the explicit, permanent override for every render, exactly as it always has been.
 
+## Lazy loading
+
+For a long server-side list (a mail folder, an audit log), let the table own the scroll space and fetch only what the viewport needs. Set `virtual`, `manual` and `rowCount` to the server's total, and pass `data` as a **sparse** array: an `undefined`/`null` entry — or anything past `data.length` — is a row not loaded yet and renders as a placeholder row (the `#placeholder` slot, a skeleton bar by default, with `aria-busy` on the row). Placeholder rows can't be selected, expanded, edited or activated, and select-all takes the loaded rows only.
+
+`visible-range-change { start, end }` reports the rendered window (overscan included) whenever it changes; fetch that range and write the rows into it. A placeholder is replaced in place, so the scroll position doesn't move. Supply [`getRowId`](/components/data-table-api#props) so a selection follows its row when rows arrive or move.
+
+```vue
+<DataTable
+  :data="rows" virtual manual :row-count="total" max-height="600px"
+  :get-row-id="(r) => r.id"
+  @visible-range-change="({ start, end }) => fetchRows(start, end)"
+>
+  <Column field="subject" header="Subject" />
+</DataTable>
+```
+
+`manual` is required: with holes in the data, client-side sorting and filtering have nothing meaningful to sort — the server owns order and filters. Without `virtual`, `rowCount` keeps its pagination meaning.
+
 ## Known limitations
 
 None currently open for column windowing. Two limitations documented here previously — the Svelte

@@ -79,11 +79,19 @@
     </tr>
     
     <template v-for="wr in windowedRows()" :key="wr.row.id">
-    <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }]" role="row" :data-row="wr.vi.index" :aria-rowindex="headerRowCount() + wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined" :data-depth="wr.row.depth" :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined" :aria-expanded="(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined" :aria-selected="(props.selectionMode !== 'none' ? !!rowIsSelected(wr.row) : undefined) ?? undefined" :aria-level="(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined">
+    <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned, 'rdt-placeholder-row': rowIsLazyPlaceholder(wr.row) }]" role="row" :data-row="wr.vi.index" :aria-rowindex="headerRowCount() + wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined" :data-depth="wr.row.depth" :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined" :aria-expanded="(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined" :aria-selected="(props.selectionMode !== 'none' ? !!rowIsSelected(wr.row) : undefined) ?? undefined" :aria-level="(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined" :aria-busy="(rowIsLazyPlaceholder(wr.row) ? 'true' : undefined) ?? undefined">
       
       <td v-if="colsWindowed()" class="rdt-col-spacer" aria-hidden="true" :style="'width:' + colPadLeft() + 'px;padding:0;border:0'"></td><td v-for="cell in windowedCells(wr.row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-pinned': columnPinSide(cell.column.id) !== '', 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cell)" :tabindex="(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell))) ?? undefined" :style="bodyCellStyle(wr.row, cell.column.id)" :aria-invalid="(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell))) ?? undefined" :aria-colindex="colIndexOf(wr.row, cell) + 1" :aria-selected="(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined) ?? undefined" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
         
-        <span v-if="isExpanderColumn(cell.column.id)" style="display:contents">
+        
+        <span v-if="rowIsLazyPlaceholder(wr.row) && isSelectColumn(cell.column.id)" style="display:contents">
+          
+          <input class="rdt-select-placeholder" type="checkbox" :disabled="true" tabindex="-1" aria-hidden="true" style="visibility:hidden" />
+        </span><span v-else-if="rowIsLazyPlaceholder(wr.row) && isExpanderColumn(cell.column.id)" style="display:contents"></span><span v-else-if="rowIsLazyPlaceholder(wr.row)" style="display:contents">
+          <slot name="placeholder" :index="wr.vi.index" :columnId="cell.column.id">
+            <span class="rdt-skeleton" aria-hidden="true">&#8203;</span>
+          </slot>
+        </span><span v-else-if="isExpanderColumn(cell.column.id)" style="display:contents">
           <button v-if="rowCanExpand(wr.row)" type="button" class="rdt-expander" data-expander="" :aria-expanded="!!rowIsExpanded(wr.row)" :aria-label="rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row'" @click="onToggleExpand(wr.row, $event)">{{ rowIsExpanded(wr.row) ? '▾' : '▸' }}</button></span><span v-else-if="isSelectColumn(cell.column.id)" style="display:contents">
           <slot name="selectCell" :row="cellSlotRow(wr.row)" :checked="rowIsSelected(wr.row)" :toggle="e => onToggleRow(wr.row, e)">
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" :checked="rowIsSelected(wr.row)" @change="onToggleRow(wr.row, $event)" />
@@ -386,6 +394,7 @@ const emit = defineEmits<{
   'reorder-change': [...args: any[]];
   'pin-change': [...args: any[]];
   'history-change': [...args: any[]];
+  'visible-range-change': [...args: any[]];
   'activecell-change': [...args: any[]];
   'row-activate': [...args: any[]];
   'range-change': [...args: any[]];
@@ -399,6 +408,7 @@ defineSlots<{
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   [key: `colHeader-${string}`]: ((props: { columnId: any; column: any; label: any }) => any) | undefined;
   [key: `filter-${string}`]: ((props: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }) => any) | undefined;
+  placeholder(props: { index: any; columnId: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   [key: `cell-${string}`]: ((props: { columnId: any; column: any; row: any; value: any }) => any) | undefined;
   [key: `editor-${string}`]: ((props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }) => any) | undefined;
@@ -1829,6 +1839,62 @@ const remeasureWindow = () => {
   if (afterRowRemeasure) afterRowRemeasure();
   return covered;
 };
+// D-04: this shell exports ONLY the impure, data-table-specific host pieces. The pure windowing
+// math (windowedRows / padTop / padBottom / pmIndexInWindow / rowIsOutsideWindow / virtualizerOptions
+// / virtualItemKey) is imported DIRECTLY by the host (DataTable.rozie) from
+// `@rozie-ui/headless-core/windowing.rzts` via bare specifier — the P0-proven cross-package inline
+// path that DISSOLVES the partial into the leaf (a re-export-from THROUGH this shell would survive as
+// a runtime import, not inline — verified). The math closes over these host symbols by convention.
+// ── Lazy rows (quick 260925-dtl part 2, oinbox dogfooding) ─────────────────────────────────────
+// `virtual` + `manual` + `rowCount`: the row space is rowCount long and `data` may be SPARSE —
+// an `undefined`/`null` entry (or anything past data.length) is a row not loaded yet. Such holes
+// are fed to table-core as placeholder sentinels (one cached object per index, so a re-feed does
+// not churn them) that render as placeholder rows and can't be selected, expanded, edited or
+// activated. ONLY the table-core feed is padded: every write-back derives from currentData(), the
+// consumer's own array, so a sentinel can never leak into `data`.
+const LAZY_PLACEHOLDER_KEY = '__rdtLazyPlaceholder';
+let lazyPlaceholders: Record<number, any> = {};
+const lazyRowsActive = () => rowsWindowed() && !!props.manual && props.rowCount != null && props.rowCount > 0;
+const isLazyPlaceholder = (orig: any): boolean => !!orig && orig[LAZY_PLACEHOLDER_KEY] === true;
+const rowIsLazyPlaceholder = (row: any): boolean => !!row && isLazyPlaceholder(row.original);
+const feedData = () => {
+  const d: any[] = currentData() || [];
+  if (!lazyRowsActive()) return d;
+  const n = Math.max(d.length, Number(props.rowCount));
+  const out: any[] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const v = d[i];
+    if (v != null) {
+      out[i] = v;
+    } else {
+      if (!lazyPlaceholders[i]) lazyPlaceholders[i] = {
+        [LAZY_PLACEHOLDER_KEY]: true,
+        index: i
+      };
+      out[i] = lazyPlaceholders[i];
+    }
+  }
+  return out;
+};
+// `visible-range-change { start, end }` — the RENDERED row window (overscan included), `end`
+// exclusive, over the full row space. Driven by the window-version bump every virtualizer change
+// routes through, deduped here so a scroll that doesn't move the window emits nothing.
+let lastRangeStart = -1;
+let lastRangeEnd = -1;
+const emitVisibleRangeIfChanged = () => {
+  if (!rowsWindowed() || !virtualizer) return;
+  const items = virtualizer.getVirtualItems();
+  if (!items.length) return;
+  const start = items[0].index;
+  const end = items[items.length - 1].index + 1;
+  if (start === lastRangeStart && end === lastRangeEnd) return;
+  lastRangeStart = start;
+  lastRangeEnd = end;
+  emit('visible-range-change', {
+    start,
+    end
+  });
+};
 // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
 // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
 // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -2586,7 +2652,14 @@ const buildSortFilterAnnounce = () => {
 // compares ids as strings.
 const rowIdOption = () => {
   const f = props.getRowId;
-  return f ? (originalRow: any, index: any, parent: any) => String(f(originalRow, index, parent)) : undefined;
+  // A lazy placeholder has no consumer row to ask — key it by its index (see feedData()).
+  return f ? (originalRow: any, index: any, parent: any) => isLazyPlaceholder(originalRow) ? '__rdt_ph_' + originalRow.index : String(f(originalRow, index, parent)) : undefined;
+};
+// table-core `enableRowSelection`: off for selectionMode 'none'; with lazy rows a placeholder
+// (a row not loaded yet) is never selectable, so select-all takes the loaded rows only.
+const rowSelectionOption = () => {
+  if (props.selectionMode === 'none') return false;
+  return lazyRowsActive() ? (row: any) => !rowIsLazyPlaceholder(row) : true;
 };
 // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
 // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
@@ -2600,10 +2673,10 @@ const reFeed = () => {
   // below (`maybeClearHistoryOnExternalSwap`), which runs on all six targets.
   table.setOptions((prev: any) => ({
     ...prev,
-    data: currentData(),
+    data: feedData(),
     columns: tableColumns(),
     state: currentState(),
-    enableRowSelection: props.selectionMode !== 'none',
+    enableRowSelection: rowSelectionOption(),
     enableMultiRowSelection: props.selectionMode === 'multiple',
     // Re-pass the server-side page-count sources (#2) so a RUNTIME rowCount/pageCount change
     // takes effect: setOptions REPLACES via `...prev`, which holds the value captured at
@@ -2619,7 +2692,7 @@ const reFeed = () => {
     // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
     // other row-model fns.
     getRowId: rowIdOption(),
-    getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
+    getRowCanExpand: props.expandable === true && props.getSubRows == null ? (row: any) => !rowIsLazyPlaceholder(row) : undefined,
     onExpandedChange: onExpandedChangeCb,
     // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
     // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
@@ -4544,7 +4617,7 @@ const onGridDblClick = (e: any) => {
 // resolves a row.
 const activateRowAt = (index: any, trigger: any) => {
   const row = (rows.value || [])[index];
-  if (!row || rowIsGrouped(row)) return;
+  if (!row || rowIsGrouped(row) || rowIsLazyPlaceholder(row)) return;
   emit('row-activate', {
     row: row.original,
     index,
@@ -5934,6 +6007,8 @@ const activeCellColumnId = () => {
 // row reaches the group-toggle branch below them instead of opening an editor.
 const isActiveCellEditable = () => {
   if (rowIndexIsGrouped(activeRow.value)) return false;
+  // A lazy placeholder (a row not loaded yet) has nothing to edit (quick 260925-dtl part 2).
+  if (rowIsLazyPlaceholder((rows.value || [])[activeRow.value])) return false;
   const colId = activeCellColumnId();
   return colId != null && columnEditable(colId);
 };
@@ -6153,6 +6228,7 @@ const beginEdit = (rowIndex: any, colIndex: any, seed: any) => {
   // calls beginEdit directly gated ONLY on columnEditable — isActiveCellEditable (Layer 1)
   // does not run on that path at all.
   if (rowIndexIsGrouped(rowIndex)) return;
+  if (rowIsLazyPlaceholder((rows.value || [])[rowIndex])) return;
   const colId = columnIdAt(rowIndex, colIndex);
   if (colId == null || !columnEditable(colId)) return;
   // A new edit session starts — reset the sync idempotency latch so THIS session's eventual
@@ -7496,7 +7572,7 @@ onMounted(() => {
     // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
     // currentData() = the bound prop when controlled, else the uncontrolled $data.dataDefault
     // (Phase 51 req-4 — so a committed edit's writeData re-feed is observed either way).
-    data: currentData(),
+    data: feedData(),
     columns: tableColumns(),
     state: currentState(),
     getCoreRowModel: getCoreRowModel(),
@@ -7514,7 +7590,7 @@ onMounted(() => {
     // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
     // other row-model fns.
     getRowId: rowIdOption(),
-    getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
+    getRowCanExpand: props.expandable === true && props.getSubRows == null ? (row: any) => !rowIsLazyPlaceholder(row) : undefined,
     onExpandedChange: onExpandedChangeCb,
     // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
     // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
@@ -7559,7 +7635,7 @@ onMounted(() => {
     // Row selection (req-7): enabled unless 'none'; 'single' caps at ≤1
     // (enableMultiRowSelection:false). Select-all scope = filtered rows (TanStack
     // default, D-06 — NOT overridden).
-    enableRowSelection: props.selectionMode !== 'none',
+    enableRowSelection: rowSelectionOption(),
     enableMultiRowSelection: props.selectionMode === 'multiple',
     // PER-SLICE callbacks (Open-Q1: each maps 1:1 to a slice's r-model + change event,
     // no global onStateChange diff) — hoisted top-level consts, re-passed by the re-feed
@@ -7842,6 +7918,11 @@ onBeforeUnmount(() => {
 });
 onUpdated(() => {
   maybeClearHistoryOnExternalSwap();
+  // visible-range-change backstop (quick 260925-dtl part 2): a re-render from new data can move
+  // the rendered window WITHOUT a window-version bump (measured on React: filling placeholders
+  // shifted the window by two rows and nothing was reported). Deduped, so a render that leaves
+  // the window where it was emits nothing.
+  emitVisibleRangeIfChanged();
   // A-02: the post-render hook is the one place that observes EVERY column-width change on all
   // six targets — an interactive resize writes `columnSizing` through table-core under
   // `columnResizeMode: 'onChange'` and never reaches the coarse re-feed watch (which keys on
@@ -7860,6 +7941,7 @@ onUpdated(() => {
   reFeed();
 });
 
+watch(() => windowVer.value, () => emitVisibleRangeIfChanged(), { flush: 'post' });
 watch(() => [sorting.value, globalFilter.value, columnFilters.value, pagination.value,
 // Server-side page-count sources (#2): re-feed when the consumer's rowCount/pageCount
 // changes at runtime (e.g. a server response updates the total) so getPageCount() and the
@@ -8046,6 +8128,16 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
   display: flex;
   flex-direction: column;
   gap: var(--rdt-chrome-gap, 0.5rem);
+}
+.rozie-data-table .rdt-skeleton {
+  /* inline-block on the cell's own line box, exactly like a text value (a block box was 2px
+     short of a text row). */
+  display: inline-block;
+  width: 100%;
+  vertical-align: baseline;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: transparent;
 }
 .rozie-data-table-wrap .rdt-toolbar {
   display: flex;

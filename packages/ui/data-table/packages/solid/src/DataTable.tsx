@@ -196,6 +196,16 @@ __rozieInjectStyle('DataTable-d5dcab4c', `[data-rozie-s-d5dcab4c]:host {
   flex-direction: column;
   gap: var(--rdt-chrome-gap, 0.5rem);
 }
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-skeleton[data-rozie-s-d5dcab4c] {
+  /* inline-block on the cell's own line box, exactly like a text value (a block box was 2px
+     short of a text row). */
+  display: inline-block;
+  width: 100%;
+  vertical-align: baseline;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: transparent;
+}
 .rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-toolbar[data-rozie-s-d5dcab4c] {
   display: flex;
   gap: var(--rdt-toolbar-gap, 0.5rem);
@@ -439,6 +449,8 @@ interface GroupBarSlotCtx { grouping: any; groupableColumns: any; applyGrouping:
 
 interface SelectAllSlotCtx { checked: any; indeterminate: any; toggle: any; }
 
+interface PlaceholderSlotCtx { index: any; columnId: any; }
+
 interface SelectCellSlotCtx { row: any; checked: any; toggle: any; }
 
 interface DetailSlotCtx { row: any; }
@@ -609,6 +621,7 @@ interface DataTableProps {
   onReorderChange?: (...args: unknown[]) => void;
   onPinChange?: (...args: unknown[]) => void;
   onHistoryChange?: (...args: unknown[]) => void;
+  onVisibleRangeChange?: (...args: unknown[]) => void;
   onActivecellChange?: (...args: unknown[]) => void;
   onRowActivate?: (...args: unknown[]) => void;
   onRangeChange?: (...args: unknown[]) => void;
@@ -618,6 +631,7 @@ interface DataTableProps {
   children?: JSX.Element;
   groupBarSlot?: (ctx: GroupBarSlotCtx) => JSX.Element;
   selectAllSlot?: (ctx: SelectAllSlotCtx) => JSX.Element;
+  placeholderSlot?: (ctx: PlaceholderSlotCtx) => JSX.Element;
   selectCellSlot?: (ctx: SelectCellSlotCtx) => JSX.Element;
   detailSlot?: (ctx: DetailSlotCtx) => JSX.Element;
   colHeaderSlot?: (ctx: ColHeaderSlotCtx) => JSX.Element;
@@ -667,7 +681,7 @@ export interface DataTableHandle {
 
 export default function DataTable(_props: DataTableProps): JSX.Element {
   const _merged = mergeProps({ columns: (() => [])() as any[], selectionMode: 'none', manual: false, rowCount: null, pageCount: null, expandable: false, getRowId: null, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, virtual: false, estimateRowHeight: 40, autoMeasure: false, maxHeight: '' }, _props);
-  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'rowCount', 'pageCount', 'expandable', 'expanded', 'getRowId', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'singleClickEdit', 'undoable', 'undoLimit', 'virtual', 'estimateRowHeight', 'autoMeasure', 'maxHeight', 'children', 'ref', 'onSortChange', 'onExpandChange', 'onGroupChange', 'onFilterChange', 'onPageChange', 'onSelectionChange', 'onVisibilityChange', 'onResizeChange', 'onReorderChange', 'onPinChange', 'onHistoryChange', 'onActivecellChange', 'onRowActivate', 'onRangeChange', 'onCellEditCommit', 'onRowEditCommit']);
+  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'rowCount', 'pageCount', 'expandable', 'expanded', 'getRowId', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'singleClickEdit', 'undoable', 'undoLimit', 'virtual', 'estimateRowHeight', 'autoMeasure', 'maxHeight', 'children', 'ref', 'onSortChange', 'onExpandChange', 'onGroupChange', 'onFilterChange', 'onPageChange', 'onSelectionChange', 'onVisibilityChange', 'onResizeChange', 'onReorderChange', 'onPinChange', 'onHistoryChange', 'onVisibleRangeChange', 'onActivecellChange', 'onRowActivate', 'onRangeChange', 'onCellEditCommit', 'onRowEditCommit']);
   const resolved = () => local.children;
   onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory }); });
 
@@ -762,7 +776,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
       // currentData() = the bound prop when controlled, else the uncontrolled $data.dataDefault
       // (Phase 51 req-4 — so a committed edit's writeData re-feed is observed either way).
-      data: currentData(),
+      data: feedData(),
       columns: tableColumns(),
       state: currentState(),
       getCoreRowModel: getCoreRowModel(),
@@ -780,7 +794,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
       // other row-model fns.
       getRowId: rowIdOption(),
-      getRowCanExpand: local.expandable === true && local.getSubRows == null ? () => true : undefined,
+      getRowCanExpand: local.expandable === true && local.getSubRows == null ? (row: any) => !rowIsLazyPlaceholder(row) : undefined,
       onExpandedChange: onExpandedChangeCb,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
       // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
@@ -825,7 +839,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // Row selection (req-7): enabled unless 'none'; 'single' caps at ≤1
       // (enableMultiRowSelection:false). Select-all scope = filtered rows (TanStack
       // default, D-06 — NOT overridden).
-      enableRowSelection: local.selectionMode !== 'none',
+      enableRowSelection: rowSelectionOption(),
       enableMultiRowSelection: local.selectionMode === 'multiple',
       // PER-SLICE callbacks (Open-Q1: each maps 1:1 to a slice's r-model + change event,
       // no global onStateChange diff) — hoisted top-level consts, re-passed by the re-feed
@@ -1108,6 +1122,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   });
   createEffect(() => {
     maybeClearHistoryOnExternalSwap();
+    // visible-range-change backstop (quick 260925-dtl part 2): a re-render from new data can move
+    // the rendered window WITHOUT a window-version bump (measured on React: filling placeholders
+    // shifted the window by two rows and nothing was reported). Deduped, so a render that leaves
+    // the window where it was emits nothing.
+    emitVisibleRangeIfChanged();
     // A-02: the post-render hook is the one place that observes EVERY column-width change on all
     // six targets — an interactive resize writes `columnSizing` through table-core under
     // `columnResizeMode: 'onChange'` and never reaches the coarse re-feed watch (which keys on
@@ -1125,6 +1144,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     lastDataLen = d.length;
     reFeed();
   });
+  createEffect(on(() => (() => windowVer())(), (v) => untrack(() => (() => emitVisibleRangeIfChanged())()), { defer: true }));
   createEffect(on(() => (() => [sorting(), globalFilter(), columnFilters(), pagination(),
   // Server-side page-count sources (#2): re-feed when the consumer's rowCount/pageCount
   // changes at runtime (e.g. a server response updates the total) so getPageCount() and the
@@ -2568,6 +2588,64 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // `@rozie-ui/headless-core/windowing.rzts` via bare specifier — the P0-proven cross-package inline
   // path that DISSOLVES the partial into the leaf (a re-export-from THROUGH this shell would survive as
   // a runtime import, not inline — verified). The math closes over these host symbols by convention.
+  // ── Lazy rows (quick 260925-dtl part 2, oinbox dogfooding) ─────────────────────────────────────
+  // `virtual` + `manual` + `rowCount`: the row space is rowCount long and `data` may be SPARSE —
+  // an `undefined`/`null` entry (or anything past data.length) is a row not loaded yet. Such holes
+  // are fed to table-core as placeholder sentinels (one cached object per index, so a re-feed does
+  // not churn them) that render as placeholder rows and can't be selected, expanded, edited or
+  // activated. ONLY the table-core feed is padded: every write-back derives from currentData(), the
+  // consumer's own array, so a sentinel can never leak into `data`.
+  const LAZY_PLACEHOLDER_KEY = '__rdtLazyPlaceholder';
+  let lazyPlaceholders: Record<number, any> = {};
+  function lazyRowsActive() {
+    return rowsWindowed() && !!local.manual && local.rowCount != null && local.rowCount > 0;
+  }
+  function isLazyPlaceholder(orig: any): boolean {
+    return !!orig && orig[LAZY_PLACEHOLDER_KEY] === true;
+  }
+  function rowIsLazyPlaceholder(row: any): boolean {
+    return !!row && isLazyPlaceholder(row.original);
+  }
+  function feedData() {
+    const d: any[] = currentData() || [];
+    if (!lazyRowsActive()) return d;
+    const n = Math.max(d.length, Number(local.rowCount));
+    const out: any[] = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const v = d[i];
+      if (v != null) {
+        out[i] = v;
+      } else {
+        if (!lazyPlaceholders[i]) lazyPlaceholders[i] = {
+          [LAZY_PLACEHOLDER_KEY]: true,
+          index: i
+        };
+        out[i] = lazyPlaceholders[i];
+      }
+    }
+    return out;
+  }
+
+  // `visible-range-change { start, end }` — the RENDERED row window (overscan included), `end`
+  // exclusive, over the full row space. Driven by the window-version bump every virtualizer change
+  // routes through, deduped here so a scroll that doesn't move the window emits nothing.
+  let lastRangeStart = -1;
+  let lastRangeEnd = -1;
+  function emitVisibleRangeIfChanged() {
+    if (!rowsWindowed() || !virtualizer) return;
+    const items = virtualizer.getVirtualItems();
+    if (!items.length) return;
+    const start = items[0].index;
+    const end = items[items.length - 1].index + 1;
+    if (start === lastRangeStart && end === lastRangeEnd) return;
+    lastRangeStart = start;
+    lastRangeEnd = end;
+    _props.onVisibleRangeChange?.({
+      start,
+      end
+    });
+  }
+
   // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
   // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
   // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -3355,7 +3433,15 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // compares ids as strings.
   function rowIdOption() {
     const f = local.getRowId;
-    return f ? (originalRow: any, index: any, parent: any) => String(f(originalRow, index, parent)) : undefined;
+    // A lazy placeholder has no consumer row to ask — key it by its index (see feedData()).
+    return f ? (originalRow: any, index: any, parent: any) => isLazyPlaceholder(originalRow) ? '__rdt_ph_' + originalRow.index : String(f(originalRow, index, parent)) : undefined;
+  }
+
+  // table-core `enableRowSelection`: off for selectionMode 'none'; with lazy rows a placeholder
+  // (a row not loaded yet) is never selectable, so select-all takes the loaded rows only.
+  function rowSelectionOption() {
+    if (local.selectionMode === 'none') return false;
+    return lazyRowsActive() ? (row: any) => !rowIsLazyPlaceholder(row) : true;
   }
   // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
   // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
@@ -3369,10 +3455,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // below (`maybeClearHistoryOnExternalSwap`), which runs on all six targets.
     table.setOptions((prev: any) => ({
       ...prev,
-      data: currentData(),
+      data: feedData(),
       columns: tableColumns(),
       state: currentState(),
-      enableRowSelection: local.selectionMode !== 'none',
+      enableRowSelection: rowSelectionOption(),
       enableMultiRowSelection: local.selectionMode === 'multiple',
       // Re-pass the server-side page-count sources (#2) so a RUNTIME rowCount/pageCount change
       // takes effect: setOptions REPLACES via `...prev`, which holds the value captured at
@@ -3388,7 +3474,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
       // other row-model fns.
       getRowId: rowIdOption(),
-      getRowCanExpand: local.expandable === true && local.getSubRows == null ? () => true : undefined,
+      getRowCanExpand: local.expandable === true && local.getSubRows == null ? (row: any) => !rowIsLazyPlaceholder(row) : undefined,
       onExpandedChange: onExpandedChangeCb,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
       // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
@@ -5428,7 +5514,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // resolves a row.
   function activateRowAt(index: any, trigger: any) {
     const row = (rows() || [])[index];
-    if (!row || rowIsGrouped(row)) return;
+    if (!row || rowIsGrouped(row) || rowIsLazyPlaceholder(row)) return;
     _props.onRowActivate?.({
       row: row.original,
       index,
@@ -6864,6 +6950,8 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // row reaches the group-toggle branch below them instead of opening an editor.
   function isActiveCellEditable() {
     if (rowIndexIsGrouped(activeRow())) return false;
+    // A lazy placeholder (a row not loaded yet) has nothing to edit (quick 260925-dtl part 2).
+    if (rowIsLazyPlaceholder((rows() || [])[activeRow()])) return false;
     const colId = activeCellColumnId();
     return colId != null && columnEditable(colId);
   }
@@ -7095,6 +7183,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // calls beginEdit directly gated ONLY on columnEditable — isActiveCellEditable (Layer 1)
     // does not run on that path at all.
     if (rowIndexIsGrouped(rowIndex)) return;
+    if (rowIsLazyPlaceholder((rows() || [])[rowIndex])) return;
     const colId = columnIdAt(rowIndex, colIndex);
     if (colId == null || !columnEditable(colId)) return;
     // A new edit session starts — reset the sync idempotency latch so THIS session's eventual
@@ -8609,11 +8698,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         </tr>
         
         <Key each={windowedRows() as readonly any[]} by={(wr) => wr.row.id}>{(wr) => <>
-        <tr class={"rdt-tr" + " " + rozieClass({ 'rdt-group-header': rowIsGrouped(wr().row), 'rdt-row-pinned': wr().pinned })} role="row" data-row={rozieAttr(wr().vi.index)} aria-rowindex={rozieAttr(headerRowCount() + wr().vi.index + 1)} data-index={rozieAttr(wr().vi.index)} data-pinned={rozieAttr(wr().pinned ? 'true' : null)} data-depth={rozieAttr(wr().row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr().row) ? wr().row.id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr().row) ? wr().row.id : null)} aria-expanded={(rowIsGrouped(wr().row) ? !!rowIsExpanded(wr().row) : null) ?? undefined} aria-selected={(local.selectionMode !== 'none' ? !!rowIsSelected(wr().row) : null) ?? undefined} aria-level={rozieAttr(groupingActive() ? wr().row.depth + 1 : null)} data-rozie-s-d5dcab4c="">
+        <tr class={"rdt-tr" + " " + rozieClass({ 'rdt-group-header': rowIsGrouped(wr().row), 'rdt-row-pinned': wr().pinned, 'rdt-placeholder-row': rowIsLazyPlaceholder(wr().row) })} role="row" data-row={rozieAttr(wr().vi.index)} aria-rowindex={rozieAttr(headerRowCount() + wr().vi.index + 1)} data-index={rozieAttr(wr().vi.index)} data-pinned={rozieAttr(wr().pinned ? 'true' : null)} data-depth={rozieAttr(wr().row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr().row) ? wr().row.id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr().row) ? wr().row.id : null)} aria-expanded={(rowIsGrouped(wr().row) ? !!rowIsExpanded(wr().row) : null) ?? undefined} aria-selected={(local.selectionMode !== 'none' ? !!rowIsSelected(wr().row) : null) ?? undefined} aria-level={rozieAttr(groupingActive() ? wr().row.depth + 1 : null)} aria-busy={(rowIsLazyPlaceholder(wr().row) ? 'true' : null) ?? undefined} data-rozie-s-d5dcab4c="">
           
           {<Show when={colsWindowed()}><td class={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadLeft() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" /></Show>}<Key each={windowedCells(wr().row) as readonly any[]} by={(cell) => cell.id}>{(cell) => <td class={"rdt-td" + " " + rozieClass({ 'rdt-select-td': isSelectColumn(cell().column.id), 'rdt-expander-td': isExpanderColumn(cell().column.id), 'rdt-pinned': columnPinSide(cell().column.id) !== '', 'rdt-in-range': inRange(wr().vi.index, colIndexOf(wr().row, cell())), 'rdt-cell-active': isActiveCell(String(wr().vi.index), colIndexOf(wr().row, cell())) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cell().column.id)} data-grid-cell="" data-row={rozieAttr(wr().vi.index)} data-col-index={rozieAttr(colIndexOf(wr().row, cell()))} tabIndex={rozieAttr(cellTabindex(String(wr().vi.index), colIndexOf(wr().row, cell())))} style={parseInlineStyle(bodyCellStyle(wr().row, cell().column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr().vi.index, colIndexOf(wr().row, cell())))} aria-colindex={rozieAttr(colIndexOf(wr().row, cell()) + 1)} aria-selected={(inRange(wr().vi.index, colIndexOf(wr().row, cell())) ? 'true' : null) ?? undefined} data-in-range={rozieAttr(inRange(wr().vi.index, colIndexOf(wr().row, cell())) ? 'true' : null)} data-agg-cell={rozieAttr(cellIsAggregated(cell()) ? cell().column.id : null)} data-rozie-s-d5dcab4c="">
             
-            {<Show when={isExpanderColumn(cell().column.id)} fallback={<Show when={isSelectColumn(cell().column.id)} fallback={<Show when={cellIsGrouped(cell())} fallback={<Show when={isEditing(wr().vi.index, colIndexOf(wr().row, cell()))} fallback={<Show when={cellIsPlaceholder(cell())} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
+            
+            {<Show when={rowIsLazyPlaceholder(wr().row) && isSelectColumn(cell().column.id)} fallback={<Show when={rowIsLazyPlaceholder(wr().row) && isExpanderColumn(cell().column.id)} fallback={<Show when={rowIsLazyPlaceholder(wr().row)} fallback={<Show when={isExpanderColumn(cell().column.id)} fallback={<Show when={isSelectColumn(cell().column.id)} fallback={<Show when={cellIsGrouped(cell())} fallback={<Show when={isEditing(wr().vi.index, colIndexOf(wr().row, cell()))} fallback={<Show when={cellIsPlaceholder(cell())} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {_props.slots?.[`cell-${cell().column.id}`]?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(wr().row); }, get value() { return cell().getValue(); } }) ?? (_props.cellSlot ?? _props.slots?.['cell'])?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(wr().row); }, get value() { return cell().getValue(); } }) ?? rozieDisplay(cell().getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<Show when={editorTypeOf(cell().column.id) === 'custom'} fallback={<input type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><span style={{ display: "contents" }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onEditorDropinKeyDown($event); }} data-rozie-s-d5dcab4c="">
@@ -8629,7 +8719,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
             </span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(_props.selectCellSlot ?? _props.slots?.['selectCell'])?.({ get row() { return cellSlotRow(wr().row); }, get checked() { return rowIsSelected(wr().row); }, toggle: e => onToggleRow(wr().row, e) }) ?? <input type="checkbox" aria-label="Select row" class={"rdt-select-row"} checked={rowIsSelected(wr().row)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onToggleRow(wr().row, $event); }} data-rozie-s-d5dcab4c="" />}
             </span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={rowCanExpand(wr().row)}><button type="button" data-expander="" aria-expanded={!!rowIsExpanded(wr().row)} aria-label={rozieAttr(rowIsExpanded(wr().row) ? 'Collapse row' : 'Expand row')} class={"rdt-expander"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onToggleExpand(wr().row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr().row) ? '▾' : '▸')}</button></Show>}</span></Show>}{<Show when={isFillHandleCell(wr().vi.index, colIndexOf(wr().row, cell()))}><span data-fill-handle="" data-testid="fill-handle" aria-hidden="true" class={"rdt-fill-handle"} onPointerDown={($event: PointerEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" /></Show>}</td>}</Key>
+              {<Show when={rowCanExpand(wr().row)}><button type="button" data-expander="" aria-expanded={!!rowIsExpanded(wr().row)} aria-label={rozieAttr(rowIsExpanded(wr().row) ? 'Collapse row' : 'Expand row')} class={"rdt-expander"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onToggleExpand(wr().row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr().row) ? '▾' : '▸')}</button></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {(_props.placeholderSlot ?? _props.slots?.['placeholder'])?.({ get index() { return wr().vi.index; }, get columnId() { return cell().column.id; } }) ?? <span class={"rdt-skeleton"} aria-hidden="true" data-rozie-s-d5dcab4c="">&#8203;</span>}
+            </span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              
+              <input class={"rdt-select-placeholder"} type="checkbox" disabled={true} tabIndex={-1} aria-hidden="true" style={{ visibility: "hidden" }} data-rozie-s-d5dcab4c="" />
+            </span></Show>}{<Show when={isFillHandleCell(wr().vi.index, colIndexOf(wr().row, cell()))}><span data-fill-handle="" data-testid="fill-handle" aria-hidden="true" class={"rdt-fill-handle"} onPointerDown={($event: PointerEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" /></Show>}</td>}</Key>
           
           {<Show when={colsWindowed()}><td class={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadRight() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" /></Show>}</tr>
         

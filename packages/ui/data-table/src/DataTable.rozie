@@ -918,7 +918,7 @@ let refreshRowModel = null
 
 import { onSortingChangeCb, onExpandedChangeCb, onGroupingChangeCb, onGlobalFilterChangeCb, onColumnFiltersChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onColumnVisibilityChangeCb, onColumnSizingChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingInfoChangeCb } from './stateChangeCallbacks.rzts'
 
-import { windowSource, scheduleRemeasure, teardownRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn } from './virtualization.rzts'
+import { windowSource, scheduleRemeasure, teardownRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn, lazyRowsActive, isLazyPlaceholder, rowIsLazyPlaceholder, feedData, emitVisibleRangeIfChanged } from './virtualization.rzts'
 import { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow, columnVirtualizerOptions, windowedColIndices, colPadLeft, colPadRight, colIsOutsideWindow, refineRowEstimate, teardownColRtlWatch, bumpWindowVer } from '@rozie-ui/headless-core/windowing.rzts'
 
 // afterRowRemeasure (Phase 87 87-07, D-15): a mutable-`let` indirection so
@@ -1009,7 +1009,15 @@ const buildSortFilterAnnounce = () => {
 // compares ids as strings.
 const rowIdOption = () => {
   const f = $props.getRowId
-  return f ? ((originalRow, index, parent) => String(f(originalRow, index, parent))) : undefined
+  // A lazy placeholder has no consumer row to ask — key it by its index (see feedData()).
+  return f ? ((originalRow, index, parent) => (isLazyPlaceholder(originalRow) ? '__rdt_ph_' + originalRow.index : String(f(originalRow, index, parent)))) : undefined
+}
+
+// table-core `enableRowSelection`: off for selectionMode 'none'; with lazy rows a placeholder
+// (a row not loaded yet) is never selectable, so select-all takes the loaded rows only.
+const rowSelectionOption = () => {
+  if ($props.selectionMode === 'none') return false
+  return lazyRowsActive() ? ((row) => !rowIsLazyPlaceholder(row)) : true
 }
 $onMount(() => {
   // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
@@ -1034,7 +1042,7 @@ $onMount(() => {
     // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
     // currentData() = the bound prop when controlled, else the uncontrolled $data.dataDefault
     // (Phase 51 req-4 — so a committed edit's writeData re-feed is observed either way).
-    data: currentData(),
+    data: feedData(),
     columns: tableColumns(),
     state: currentState(),
     getCoreRowModel: getCoreRowModel(),
@@ -1052,7 +1060,7 @@ $onMount(() => {
     // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
     // other row-model fns.
     getRowId: rowIdOption(),
-    getRowCanExpand: ($props.expandable === true && $props.getSubRows == null) ? (() => true) : undefined,
+    getRowCanExpand: ($props.expandable === true && $props.getSubRows == null) ? ((row) => !rowIsLazyPlaceholder(row)) : undefined,
     onExpandedChange: onExpandedChangeCb,
     // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
     // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
@@ -1097,7 +1105,7 @@ $onMount(() => {
     // Row selection (req-7): enabled unless 'none'; 'single' caps at ≤1
     // (enableMultiRowSelection:false). Select-all scope = filtered rows (TanStack
     // default, D-06 — NOT overridden).
-    enableRowSelection: $props.selectionMode !== 'none',
+    enableRowSelection: rowSelectionOption(),
     enableMultiRowSelection: $props.selectionMode === 'multiple',
     // PER-SLICE callbacks (Open-Q1: each maps 1:1 to a slice's r-model + change event,
     // no global onStateChange diff) — hoisted top-level consts, re-passed by the re-feed
@@ -1383,6 +1391,11 @@ $onUnmount(() => {
   teardownRangeDrag()
 })
 
+// visible-range-change (quick 260925-dtl part 2): every virtualizer change routes through the
+// window-version bump, so watching it reports the rendered window; emitVisibleRangeIfChanged()
+// dedups an unchanged window.
+$watch(() => $data.windowVer, () => emitVisibleRangeIfChanged())
+
 // Reactive re-feed: when the bound sorting slice OR data length OR the column registry
 // changes, push fresh options into table-core and re-pull the row model. Watch the
 // bound references / a derived primitive — never a freshly-built array (Pitfall 3).
@@ -1472,10 +1485,10 @@ const reFeed = () => {
   // below (`maybeClearHistoryOnExternalSwap`), which runs on all six targets.
   table.setOptions((prev) => ({
     ...prev,
-    data: currentData(),
+    data: feedData(),
     columns: tableColumns(),
     state: currentState(),
-    enableRowSelection: $props.selectionMode !== 'none',
+    enableRowSelection: rowSelectionOption(),
     enableMultiRowSelection: $props.selectionMode === 'multiple',
     // Re-pass the server-side page-count sources (#2) so a RUNTIME rowCount/pageCount change
     // takes effect: setOptions REPLACES via `...prev`, which holds the value captured at
@@ -1491,7 +1504,7 @@ const reFeed = () => {
     // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
     // other row-model fns.
     getRowId: rowIdOption(),
-    getRowCanExpand: ($props.expandable === true && $props.getSubRows == null) ? (() => true) : undefined,
+    getRowCanExpand: ($props.expandable === true && $props.getSubRows == null) ? ((row) => !rowIsLazyPlaceholder(row)) : undefined,
     onExpandedChange: onExpandedChangeCb,
     // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
     // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
@@ -1566,6 +1579,11 @@ let lastData = null
 let lastDataLen = -1
 $onUpdate(() => {
   maybeClearHistoryOnExternalSwap()
+  // visible-range-change backstop (quick 260925-dtl part 2): a re-render from new data can move
+  // the rendered window WITHOUT a window-version bump (measured on React: filling placeholders
+  // shifted the window by two rows and nothing was reported). Deduped, so a render that leaves
+  // the window where it was emits nothing.
+  emitVisibleRangeIfChanged()
   // A-02: the post-render hook is the one place that observes EVERY column-width change on all
   // six targets — an interactive resize writes `columnSizing` through table-core under
   // `columnResizeMode: 'onChange'` and never reaches the coarse re-feed watch (which keys on
@@ -2391,7 +2409,8 @@ $expose({
       :aria-expanded="rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : null"
       :aria-selected="$props.selectionMode !== 'none' ? !!rowIsSelected(wr.row) : null"
       :aria-level="groupingActive() ? (wr.row.depth + 1) : null"
-      :class="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }"
+      :class="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned, 'rdt-placeholder-row': rowIsLazyPlaceholder(wr.row) }"
+      :aria-busy="rowIsLazyPlaceholder(wr.row) ? 'true' : null"
     >
       <!-- Leading horizontal spacer (Phase 87 87-04, D-06/D-11): occupies the width of
            the leaf columns scrolled past the left of the window. No data-grid-cell/
@@ -2425,7 +2444,23 @@ $expose({
              shape to the non-virtual body (~1797): a native <button> (Enter/Space → click
              natively) gated on rowCanExpand(wr.row); aria-expanded reflects wr.row's expanded
              state. FIRST branch (matching the non-virtual order). -->
-        <span style="display:contents" r-if="isExpanderColumn(cell.column.id)">
+        <!-- Lazy placeholder row (quick 260925-dtl part 2): a row not loaded yet. Chrome
+             cells stay empty; each data cell renders the #placeholder slot (a skeleton bar by
+             default). FIRST so no expander/checkbox/editor/value branch ever sees a sentinel. -->
+        <span style="display:contents" r-if="rowIsLazyPlaceholder(wr.row) && isSelectColumn(cell.column.id)">
+          <!-- A hidden, inert stand-in with the checkbox's own metrics: a data row's select
+               cell holds a checkbox taller than a text line, so an EMPTY cell made placeholder
+               rows 2px short and every fill slid the view (measured). Not .rdt-select-row, so
+               select-all and selection never see it. -->
+          <input class="rdt-select-placeholder" type="checkbox" :disabled="true" tabindex="-1" aria-hidden="true" style="visibility:hidden" />
+        </span>
+        <span style="display:contents" r-else-if="rowIsLazyPlaceholder(wr.row) && isExpanderColumn(cell.column.id)"></span>
+        <span style="display:contents" r-else-if="rowIsLazyPlaceholder(wr.row)">
+          <slot name="placeholder" :index="wr.vi.index" :columnId="cell.column.id">
+            <span class="rdt-skeleton" aria-hidden="true">&#8203;</span>
+          </slot>
+        </span>
+        <span style="display:contents" r-else-if="isExpanderColumn(cell.column.id)">
           <button
             r-if="rowCanExpand(wr.row)"
             type="button"
@@ -3439,6 +3474,20 @@ $expose({
   display: flex;
   flex-direction: column;
   gap: var(--rdt-chrome-gap, 0.5rem);
+}
+/* Lazy placeholder row (quick 260925-dtl part 2): a skeleton bar per data cell. It holds a
+   zero-width space so it takes exactly one text line — a placeholder row is then as tall as a
+   one-line data row, and filling it does not shift the rows below (measured: a text-less bar
+   made placeholder rows 28px against 36px data rows, and every fill slid the view by 8px/row). */
+.rozie-data-table .rdt-skeleton {
+  /* inline-block on the cell's own line box, exactly like a text value (a block box was 2px
+     short of a text row). */
+  display: inline-block;
+  width: 100%;
+  vertical-align: baseline;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: transparent;
 }
 .rozie-data-table-wrap .rdt-toolbar {
   display: flex;

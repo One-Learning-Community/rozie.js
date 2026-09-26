@@ -495,7 +495,7 @@ const onGridDblClick = (e) => {
 // resolves a row.
 const activateRowAt = (index, trigger) => {
   const row = ($data.rows || [])[index]
-  if (!row || rowIsGrouped(row)) return
+  if (!row || rowIsGrouped(row) || rowIsLazyPlaceholder(row)) return
   $emit('row-activate', { row: row.original, index, trigger })
 }
 

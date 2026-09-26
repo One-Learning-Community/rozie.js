@@ -33,6 +33,8 @@ const activeCellColumnId = () => {
 // row reaches the group-toggle branch below them instead of opening an editor.
 const isActiveCellEditable = () => {
   if (rowIndexIsGrouped($data.activeRow)) return false
+  // A lazy placeholder (a row not loaded yet) has nothing to edit (quick 260925-dtl part 2).
+  if (rowIsLazyPlaceholder(($data.rows || [])[$data.activeRow])) return false
   const colId = activeCellColumnId()
   return colId != null && columnEditable(colId)
 }
@@ -257,6 +259,7 @@ const beginEdit = (rowIndex, colIndex, seed) => {
   // calls beginEdit directly gated ONLY on columnEditable — isActiveCellEditable (Layer 1)
   // does not run on that path at all.
   if (rowIndexIsGrouped(rowIndex)) return
+  if (rowIsLazyPlaceholder(($data.rows || [])[rowIndex])) return
   const colId = columnIdAt(rowIndex, colIndex)
   if (colId == null || !columnEditable(colId)) return
   // A new edit session starts — reset the sync idempotency latch so THIS session's eventual

@@ -48,6 +48,8 @@ interface GroupBarCtx { grouping: any; groupableColumns: any; applyGrouping: any
 
 interface SelectAllCtx { checked: any; indeterminate: any; toggle: any; }
 
+interface PlaceholderCtx { index: any; columnId: any; }
+
 interface SelectCellCtx { row: any; checked: any; toggle: any; }
 
 interface DetailCtx { row: any; }
@@ -218,6 +220,7 @@ interface DataTableProps {
   onReorderChange?: (...args: any[]) => void;
   onPinChange?: (...args: any[]) => void;
   onHistoryChange?: (...args: any[]) => void;
+  onVisibleRangeChange?: (...args: any[]) => void;
   onActivecellChange?: (...args: any[]) => void;
   onRowActivate?: (...args: any[]) => void;
   onRangeChange?: (...args: any[]) => void;
@@ -226,6 +229,7 @@ interface DataTableProps {
   children?: ReactNode;
   renderGroupBar?: (ctx: GroupBarCtx) => ReactNode;
   renderSelectAll?: (ctx: SelectAllCtx) => ReactNode;
+  renderPlaceholder?: (ctx: PlaceholderCtx) => ReactNode;
   renderSelectCell?: (ctx: SelectCellCtx) => ReactNode;
   renderDetail?: (ctx: DetailCtx) => ReactNode;
   renderColHeader?: (ctx: ColHeaderCtx) => ReactNode;
@@ -312,6 +316,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const columnDefsCacheColumnsRef = useRef<any>(undefined);
   const columnDefsCacheColRegRef = useRef<any>(undefined);
   const columnDefsIndexCache = useRef<any>(null);
+  const lazyPlaceholders = useRef<Record<number, any>>({});
   const expandedTouched = useRef(false);
   const programmatic = useRef(0);
   const columnSizingInfoSync = useRef<any>(null);
@@ -343,6 +348,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const lastPropsData = useRef<unknown>(null);
   const undoStack = useRef<unknown[]>([]);
   const redoStack = useRef<unknown[]>([]);
+  const lastRangeStart = useRef(-1);
+  const lastRangeEnd = useRef(-1);
   const focusIntentEpoch = useRef(0);
   const committedThisSession = useRef(false);
   const rowDraftSync = useRef<Record<string, any>>({});
@@ -491,6 +498,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
+  const _watch2First = useRef(true);
 
   // D-19 (quick 260923-rrr): "the user scrolled to the end" — recorded only when the scroll
   // offset actually MOVED (a growth-driven onChange leaves it where it was), with the row count
@@ -1852,6 +1860,58 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // `@rozie-ui/headless-core/windowing.rzts` via bare specifier — the P0-proven cross-package inline
   // path that DISSOLVES the partial into the leaf (a re-export-from THROUGH this shell would survive as
   // a runtime import, not inline — verified). The math closes over these host symbols by convention.
+  // ── Lazy rows (quick 260925-dtl part 2, oinbox dogfooding) ─────────────────────────────────────
+  // `virtual` + `manual` + `rowCount`: the row space is rowCount long and `data` may be SPARSE —
+  // an `undefined`/`null` entry (or anything past data.length) is a row not loaded yet. Such holes
+  // are fed to table-core as placeholder sentinels (one cached object per index, so a re-feed does
+  // not churn them) that render as placeholder rows and can't be selected, expanded, edited or
+  // activated. ONLY the table-core feed is padded: every write-back derives from currentData(), the
+  // consumer's own array, so a sentinel can never leak into `data`.
+  const LAZY_PLACEHOLDER_KEY = useMemo(() => '__rdtLazyPlaceholder', []);
+  function lazyRowsActive() {
+    return rowsWindowed() && !!props.manual && props.rowCount != null && props.rowCount > 0;
+  }
+  function isLazyPlaceholder(orig: any): boolean {
+    return !!orig && orig[LAZY_PLACEHOLDER_KEY] === true;
+  }
+  const rowIsLazyPlaceholder = useCallback((row: any): boolean => !!row && isLazyPlaceholder(row.original), [isLazyPlaceholder]);
+  const feedData = useCallback(() => {
+    const d: any[] = currentData() || [];
+    if (!lazyRowsActive()) return d;
+    const n = Math.max(d.length, Number(props.rowCount));
+    const out: any[] = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const v = d[i];
+      if (v != null) {
+        out[i] = v;
+      } else {
+        if (!lazyPlaceholders.current[i]) lazyPlaceholders.current[i] = {
+          [LAZY_PLACEHOLDER_KEY]: true,
+          index: i
+        };
+        out[i] = lazyPlaceholders.current[i];
+      }
+    }
+    return out;
+  }, [currentData, lazyRowsActive, props.rowCount]);
+  // `visible-range-change { start, end }` — the RENDERED row window (overscan included), `end`
+  // exclusive, over the full row space. Driven by the window-version bump every virtualizer change
+  // routes through, deduped here so a scroll that doesn't move the window emits nothing.
+  const { onVisibleRangeChange: _rozieProp_onVisibleRangeChange } = props;
+    const emitVisibleRangeIfChanged = useCallback(() => {
+    if (!rowsWindowed() || !virtualizer.current) return;
+    const items = virtualizer.current.getVirtualItems();
+    if (!items.length) return;
+    const start = items[0].index;
+    const end = items[items.length - 1].index + 1;
+    if (start === lastRangeStart.current && end === lastRangeEnd.current) return;
+    lastRangeStart.current = start;
+    lastRangeEnd.current = end;
+    _rozieProp_onVisibleRangeChange && _rozieProp_onVisibleRangeChange({
+      start,
+      end
+    });
+  }, [_rozieProp_onVisibleRangeChange, rowsWindowed]);
   // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
   // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
   // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -2618,8 +2678,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // compares ids as strings.
   const rowIdOption = useCallback(() => {
     const f = props.getRowId;
-    return f ? (originalRow: any, index: any, parent: any) => String(f(originalRow, index, parent)) : undefined;
-  }, [props.getRowId]);
+    // A lazy placeholder has no consumer row to ask — key it by its index (see feedData()).
+    return f ? (originalRow: any, index: any, parent: any) => isLazyPlaceholder(originalRow) ? '__rdt_ph_' + originalRow.index : String(f(originalRow, index, parent)) : undefined;
+  }, [isLazyPlaceholder, props.getRowId]);
+  // table-core `enableRowSelection`: off for selectionMode 'none'; with lazy rows a placeholder
+  // (a row not loaded yet) is never selectable, so select-all takes the loaded rows only.
+  const rowSelectionOption = useCallback(() => {
+    if (props.selectionMode === 'none') return false;
+    return lazyRowsActive() ? (row: any) => !rowIsLazyPlaceholder(row) : true;
+  }, [lazyRowsActive, props.selectionMode, rowIsLazyPlaceholder]);
   // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
   // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
   const reFeed = useCallback(() => {
@@ -2632,10 +2699,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // below (`maybeClearHistoryOnExternalSwap`), which runs on all six targets.
     table.current.setOptions((prev: any) => ({
       ...prev,
-      data: currentData(),
+      data: feedData(),
       columns: tableColumns(),
       state: currentState(),
-      enableRowSelection: props.selectionMode !== 'none',
+      enableRowSelection: rowSelectionOption(),
       enableMultiRowSelection: props.selectionMode === 'multiple',
       // Re-pass the server-side page-count sources (#2) so a RUNTIME rowCount/pageCount change
       // takes effect: setOptions REPLACES via `...prev`, which holds the value captured at
@@ -2651,7 +2718,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
       // other row-model fns.
       getRowId: rowIdOption(),
-      getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
+      getRowCanExpand: props.expandable === true && props.getSubRows == null ? (row: any) => !rowIsLazyPlaceholder(row) : undefined,
       onExpandedChange: onExpandedChangeCb,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
       // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
@@ -2688,7 +2755,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       onColumnSizingInfoChange: onColumnSizingInfoChangeCb
     }));
     if (refreshRowModel.current) refreshRowModel.current();
-  }, [currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.pageCount, props.rowCount, props.selectionMode, rowIdOption, tableColumns]);
+  }, [currentState, feedData, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.pageCount, props.rowCount, props.selectionMode, rowIdOption, rowIsLazyPlaceholder, rowSelectionOption, tableColumns]);
   // LIT (+ any fine-grained target whose effect-tracked watch does NOT observe the plain
   // `data` PROPERTY): the re-feed $watch reads `(this.data||[]).length` inside a
   // preact-signals effect, but `data` is a Lit @property (not a signal) so the effect
@@ -4669,7 +4736,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // resolves a row.
   function activateRowAt(index: any, trigger: any) {
     const row = (rows || [])[index];
-    if (!row || rowIsGrouped(row)) return;
+    if (!row || rowIsGrouped(row) || rowIsLazyPlaceholder(row)) return;
     props.onRowActivate && props.onRowActivate({
       row: row.original,
       index,
@@ -6079,6 +6146,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // row reaches the group-toggle branch below them instead of opening an editor.
   function isActiveCellEditable() {
     if (rowIndexIsGrouped(activeRow)) return false;
+    // A lazy placeholder (a row not loaded yet) has nothing to edit (quick 260925-dtl part 2).
+    if (rowIsLazyPlaceholder((rows || [])[activeRow])) return false;
     const colId = activeCellColumnId();
     return colId != null && columnEditable(colId);
   }
@@ -6310,6 +6379,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // calls beginEdit directly gated ONLY on columnEditable — isActiveCellEditable (Layer 1)
     // does not run on that path at all.
     if (rowIndexIsGrouped(rowIndex)) return;
+    if (rowIsLazyPlaceholder((rows || [])[rowIndex])) return;
     const colId = columnIdAt(rowIndex, colIndex);
     if (colId == null || !columnEditable(colId)) return;
     // A new edit session starts — reset the sync idempotency latch so THIS session's eventual
@@ -7640,8 +7710,6 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   _colsWindowedRef.current = colsWindowed;
   const _columnVirtualizerOptionsRef = useRef(columnVirtualizerOptions);
   _columnVirtualizerOptionsRef.current = columnVirtualizerOptions;
-  const _currentDataRef = useRef(currentData);
-  _currentDataRef.current = currentData;
   const _currentStateRef = useRef(currentState);
   _currentStateRef.current = currentState;
   const _effectiveColumnFiltersRef = useRef(effectiveColumnFilters);
@@ -7650,6 +7718,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   _effectiveGlobalFilterRef.current = effectiveGlobalFilter;
   const _effectiveSortingRef = useRef(effectiveSorting);
   _effectiveSortingRef.current = effectiveSorting;
+  const _feedDataRef = useRef(feedData);
+  _feedDataRef.current = feedData;
   const _focusCellWhenReadyRef = useRef(focusCellWhenReady);
   _focusCellWhenReadyRef.current = focusCellWhenReady;
   const _isGridRef = useRef(isGrid);
@@ -7684,6 +7754,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   _remeasureColumnWindowRef.current = remeasureColumnWindow;
   const _rowIdOptionRef = useRef(rowIdOption);
   _rowIdOptionRef.current = rowIdOption;
+  const _rowIsLazyPlaceholderRef = useRef(rowIsLazyPlaceholder);
+  _rowIsLazyPlaceholderRef.current = rowIsLazyPlaceholder;
+  const _rowSelectionOptionRef = useRef(rowSelectionOption);
+  _rowSelectionOptionRef.current = rowSelectionOption;
   const _rowsWindowedRef = useRef(rowsWindowed);
   _rowsWindowedRef.current = rowsWindowed;
   const _seedColumnPinningRef = useRef(seedColumnPinning);
@@ -7734,7 +7808,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
       // currentData() = the bound prop when controlled, else the uncontrolled $data.dataDefault
       // (Phase 51 req-4 — so a committed edit's writeData re-feed is observed either way).
-      data: _currentDataRef.current(),
+      data: _feedDataRef.current(),
       columns: _tableColumnsRef.current(),
       state: _currentStateRef.current(),
       getCoreRowModel: getCoreRowModel(),
@@ -7752,7 +7826,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
       // other row-model fns.
       getRowId: _rowIdOptionRef.current(),
-      getRowCanExpand: _expandableRef.current === true && _getSubRowsRef.current == null ? () => true : undefined,
+      getRowCanExpand: _expandableRef.current === true && _getSubRowsRef.current == null ? (row: any) => !_rowIsLazyPlaceholderRef.current(row) : undefined,
       onExpandedChange: _onExpandedChangeCbStable,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
       // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
@@ -7797,7 +7871,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // Row selection (req-7): enabled unless 'none'; 'single' caps at ≤1
       // (enableMultiRowSelection:false). Select-all scope = filtered rows (TanStack
       // default, D-06 — NOT overridden).
-      enableRowSelection: _selectionModeRef.current !== 'none',
+      enableRowSelection: _rowSelectionOptionRef.current(),
       enableMultiRowSelection: _selectionModeRef.current === 'multiple',
       // PER-SLICE callbacks (Open-Q1: each maps 1:1 to a slice's r-model + change event,
       // no global onStateChange diff) — hoisted top-level consts, re-passed by the re-feed
@@ -8082,6 +8156,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }, []);
   useEffect(() => {
     maybeClearHistoryOnExternalSwap();
+    // visible-range-change backstop (quick 260925-dtl part 2): a re-render from new data can move
+    // the rendered window WITHOUT a window-version bump (measured on React: filling placeholders
+    // shifted the window by two rows and nothing was reported). Deduped, so a render that leaves
+    // the window where it was emits nothing.
+    emitVisibleRangeIfChanged();
     // A-02: the post-render hook is the one place that observes EVERY column-width change on all
     // six targets — an interactive resize writes `columnSizing` through table-core under
     // `columnResizeMode: 'onChange'` and never reaches the coarse re-feed watch (which keys on
@@ -8098,9 +8177,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     lastData.current = d;
     lastDataLen.current = d.length;
     reFeed();
-  }, [currentData, lastData, lastDataLen, maybeClearHistoryOnExternalSwap, reFeed, remeasureColumnSizes, table]);
+  }, [currentData, emitVisibleRangeIfChanged, lastData, lastDataLen, maybeClearHistoryOnExternalSwap, reFeed, remeasureColumnSizes, table]);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
+    emitVisibleRangeIfChanged();
+  }, [windowVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch1First.current) { _watch1First.current = false; return; }
     // Seed BEFORE the re-feed so the pinning this call may write is part of the state object
     // table-core receives on this same tick (rather than landing a frame late and re-ordering
     // getVisibleCells() a render after the columns appear). One-shot and self-latching — see
@@ -8111,7 +8194,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     maybeClearHistoryOnExternalSwap();
   }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, expanded, globalFilter, grouping, pagination, props.columns, props.expandable, props.groupable, props.pageCount, props.rowCount, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch1First.current) { _watch1First.current = false; return; }
+    if (_watch2First.current) { _watch2First.current = false; return; }
     const msg = buildSortFilterAnnounce();
     if (msg) setLiveAnnounce(msg);
   }, [columnFilters, columnFiltersDefault, globalFilter, globalFilterDefault, sorting, sortingDefault]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -8219,11 +8302,17 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         </tr>
         
         {windowedRows().map((wr) => <Fragment key={wr.row.id}>
-        <tr key={wr.row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(wr.row), "rdt-row-pinned": wr.pinned })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={headerRowCount() + wr.vi.index + 1} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : undefined)} data-depth={rozieAttr(wr.row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined)} aria-expanded={(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined} aria-selected={(props.selectionMode !== 'none' ? !!rowIsSelected(wr.row) : undefined) ?? undefined} aria-level={(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined} data-rozie-s-d5dcab4c="">
+        <tr key={wr.row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(wr.row), "rdt-row-pinned": wr.pinned, "rdt-placeholder-row": rowIsLazyPlaceholder(wr.row) })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={headerRowCount() + wr.vi.index + 1} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : undefined)} data-depth={rozieAttr(wr.row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined)} aria-expanded={(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined} aria-selected={(props.selectionMode !== 'none' ? !!rowIsSelected(wr.row) : undefined) ?? undefined} aria-level={(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined} aria-busy={(rowIsLazyPlaceholder(wr.row) ? 'true' : undefined) ?? undefined} data-rozie-s-d5dcab4c="">
           
           {!!(colsWindowed()) && <td className={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadLeft() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" />}{windowedCells(wr.row).map((cell) => <td key={cell.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cell.column.id), "rdt-expander-td": isExpanderColumn(cell.column.id), "rdt-pinned": columnPinSide(cell.column.id) !== '', "rdt-in-range": inRange(wr.vi.index, colIndexOf(wr.row, cell)), "rdt-cell-active": isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cell.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cell))} tabIndex={cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell))} style={parseInlineStyle(bodyCellStyle(wr.row, cell.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell)))} aria-colindex={colIndexOf(wr.row, cell) + 1} aria-selected={(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined) ?? undefined} data-in-range={rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined)} data-agg-cell={rozieAttr(cellIsAggregated(cell) ? cell.column.id : undefined)} data-rozie-s-d5dcab4c="">
             
-            {(isExpanderColumn(cell.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+            
+            {(rowIsLazyPlaceholder(wr.row) && isSelectColumn(cell.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              
+              <input className={"rdt-select-placeholder"} type="checkbox" disabled={true} tabIndex={-1} aria-hidden="true" style={{ visibility: "hidden" }} data-rozie-s-d5dcab4c="" />
+            </span> : (rowIsLazyPlaceholder(wr.row) && isExpanderColumn(cell.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : (rowIsLazyPlaceholder(wr.row)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {(props.renderPlaceholder ?? props.slots?.['placeholder']) ? ((props.renderPlaceholder ?? props.slots?.['placeholder']) as Function)({ index: wr.vi.index, columnId: cell.column.id }) : <span className={"rdt-skeleton"} aria-hidden="true" data-rozie-s-d5dcab4c="">&#8203;</span>}
+            </span> : (isExpanderColumn(cell.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {!!(rowCanExpand(wr.row)) && <button type="button" className={"rdt-expander"} data-expander="" aria-expanded={!!rowIsExpanded(wr.row)} aria-label={rozieAttr(rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row')} onClick={($event) => { onToggleExpand(wr.row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸')}</button>}</span> : (isSelectColumn(cell.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(props.renderSelectCell ?? props.slots?.['selectCell']) ? ((props.renderSelectCell ?? props.slots?.['selectCell']) as Function)({ row: cellSlotRow(wr.row), checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) }) : <input className={"rdt-select-row"} type="checkbox" aria-label="Select row" checked={rowIsSelected(wr.row)} onChange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c="" />}
             </span> : (cellIsGrouped(cell)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">

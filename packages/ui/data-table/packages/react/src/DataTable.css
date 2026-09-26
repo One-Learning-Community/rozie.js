@@ -150,6 +150,16 @@
   flex-direction: column;
   gap: var(--rdt-chrome-gap, 0.5rem);
 }
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-skeleton[data-rozie-s-d5dcab4c] {
+  /* inline-block on the cell's own line box, exactly like a text value (a block box was 2px
+     short of a text row). */
+  display: inline-block;
+  width: 100%;
+  vertical-align: baseline;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: transparent;
+}
 .rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-toolbar[data-rozie-s-d5dcab4c] {
   display: flex;
   gap: var(--rdt-toolbar-gap, 0.5rem);

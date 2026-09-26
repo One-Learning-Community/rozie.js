@@ -160,6 +160,7 @@ export interface DataTableProps {
   onReorderChange?: (...args: unknown[]) => void;
   onPinChange?: (...args: unknown[]) => void;
   onHistoryChange?: (...args: unknown[]) => void;
+  onVisibleRangeChange?: (...args: unknown[]) => void;
   onActivecellChange?: (...args: unknown[]) => void;
   onRowActivate?: (...args: unknown[]) => void;
   onRangeChange?: (...args: unknown[]) => void;
@@ -168,6 +169,7 @@ export interface DataTableProps {
   children?: ReactNode;
   renderGroupBar?: (params: { grouping: unknown; groupableColumns: unknown; applyGrouping: (...args: any[]) => any; clearGrouping: (...args: any[]) => any }) => ReactNode;
   renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: (...args: any[]) => any }) => ReactNode;
+  renderPlaceholder?: (params: { index: unknown; columnId: unknown }) => ReactNode;
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
   renderDetail?: (params: { row: unknown }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;

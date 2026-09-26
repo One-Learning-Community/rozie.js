@@ -367,4 +367,50 @@ const remeasureWindow = () => {
 // `@rozie-ui/headless-core/windowing.rzts` via bare specifier — the P0-proven cross-package inline
 // path that DISSOLVES the partial into the leaf (a re-export-from THROUGH this shell would survive as
 // a runtime import, not inline — verified). The math closes over these host symbols by convention.
-export { windowSource, scheduleRemeasure, teardownRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn }
+// ── Lazy rows (quick 260925-dtl part 2, oinbox dogfooding) ─────────────────────────────────────
+// `virtual` + `manual` + `rowCount`: the row space is rowCount long and `data` may be SPARSE —
+// an `undefined`/`null` entry (or anything past data.length) is a row not loaded yet. Such holes
+// are fed to table-core as placeholder sentinels (one cached object per index, so a re-feed does
+// not churn them) that render as placeholder rows and can't be selected, expanded, edited or
+// activated. ONLY the table-core feed is padded: every write-back derives from currentData(), the
+// consumer's own array, so a sentinel can never leak into `data`.
+const LAZY_PLACEHOLDER_KEY = '__rdtLazyPlaceholder'
+let lazyPlaceholders: Record<number, any> = {}
+const lazyRowsActive = () => rowsWindowed() && !!$props.manual && $props.rowCount != null && $props.rowCount > 0
+const isLazyPlaceholder = (orig: any): boolean => !!orig && orig[LAZY_PLACEHOLDER_KEY] === true
+const rowIsLazyPlaceholder = (row: any): boolean => !!row && isLazyPlaceholder(row.original)
+const feedData = () => {
+  const d: any[] = currentData() || []
+  if (!lazyRowsActive()) return d
+  const n = Math.max(d.length, Number($props.rowCount))
+  const out: any[] = new Array(n)
+  for (let i = 0; i < n; i++) {
+    const v = d[i]
+    if (v != null) {
+      out[i] = v
+    } else {
+      if (!lazyPlaceholders[i]) lazyPlaceholders[i] = { [LAZY_PLACEHOLDER_KEY]: true, index: i }
+      out[i] = lazyPlaceholders[i]
+    }
+  }
+  return out
+}
+
+// `visible-range-change { start, end }` — the RENDERED row window (overscan included), `end`
+// exclusive, over the full row space. Driven by the window-version bump every virtualizer change
+// routes through, deduped here so a scroll that doesn't move the window emits nothing.
+let lastRangeStart = -1
+let lastRangeEnd = -1
+const emitVisibleRangeIfChanged = () => {
+  if (!rowsWindowed() || !virtualizer) return
+  const items = virtualizer.getVirtualItems()
+  if (!items.length) return
+  const start = items[0].index
+  const end = items[items.length - 1].index + 1
+  if (start === lastRangeStart && end === lastRangeEnd) return
+  lastRangeStart = start
+  lastRangeEnd = end
+  $emit('visible-range-change', { start, end })
+}
+
+export { lazyRowsActive, isLazyPlaceholder, rowIsLazyPlaceholder, feedData, emitVisibleRangeIfChanged, windowSource, scheduleRemeasure, teardownRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn }

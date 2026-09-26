@@ -62,6 +62,12 @@ interface SelectAllCtx {
   toggle: any;
 }
 
+interface PlaceholderCtx {
+  $implicit: { index: any; columnId: any };
+  index: any;
+  columnId: any;
+}
+
 interface SelectCellCtx {
   $implicit: { row: any; checked: any; toggle: any };
   row: any;
@@ -319,14 +325,32 @@ interface EditorCtx {
         
         @for (wr of windowedRows(); track wr.row.id) {
 
-        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(headerRowCount() + wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)" [attr.data-pinned]="rozieAttr(wr.pinned ? 'true' : null)" [attr.data-depth]="rozieAttr(wr.row.depth)" [attr.data-group-header]="rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : null)" [attr.aria-selected]="rozieAttr(selectionMode() !== 'none' ? !!rowIsSelected(wr.row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? wr.row.depth + 1 : null)">
+        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned, 'rdt-placeholder-row': rowIsLazyPlaceholder(wr.row) }" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(headerRowCount() + wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)" [attr.data-pinned]="rozieAttr(wr.pinned ? 'true' : null)" [attr.data-depth]="rozieAttr(wr.row.depth)" [attr.data-group-header]="rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : null)" [attr.aria-selected]="rozieAttr(selectionMode() !== 'none' ? !!rowIsSelected(wr.row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? wr.row.depth + 1 : null)" [attr.aria-busy]="rozieAttr(rowIsLazyPlaceholder(wr.row) ? 'true' : null)">
           
           @if (colsWindowed()) {
     <td class="rdt-col-spacer" aria-hidden="true" [attr.style]="'width:' + colPadLeft() + 'px;padding:0;border:0'"></td>
     }@for (cell of windowedCells(wr.row); track cell.id) {
     <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-pinned': columnPinSide(cell.column.id) !== '', 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell)))" [style]="bodyCellStyle(wr.row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell)))" [attr.aria-colindex]="rozieAttr(colIndexOf(wr.row, cell) + 1)" [attr.aria-selected]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null)" [attr.data-in-range]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
             
-            @if (isExpanderColumn(cell.column.id)) {
+            
+            @if (rowIsLazyPlaceholder(wr.row) && isSelectColumn(cell.column.id)) {
+    <span style="display:contents">
+              
+              <input class="rdt-select-placeholder" type="checkbox" [disabled]="true" tabindex="-1" aria-hidden="true" style="visibility:hidden" />
+            </span>
+    } @else if (rowIsLazyPlaceholder(wr.row) && isExpanderColumn(cell.column.id)) {
+    <span style="display:contents"></span>
+    } @else if (rowIsLazyPlaceholder(wr.row)) {
+    <span style="display:contents">
+              @if ((placeholderTpl ?? __rozieFillMap()['placeholder'] ?? templates()?.['placeholder'])) {
+    <ng-container *ngTemplateOutlet="(placeholderTpl ?? __rozieFillMap()['placeholder'] ?? templates()?.['placeholder']); context: { $implicit: { index: wr.vi.index, columnId: cell.column.id }, index: wr.vi.index, columnId: cell.column.id }" />
+    } @else {
+
+                <span class="rdt-skeleton" aria-hidden="true">&#8203;</span>
+              
+    }
+            </span>
+    } @else if (isExpanderColumn(cell.column.id)) {
     <span style="display:contents">
               @if (rowCanExpand(wr.row)) {
     <button type="button" class="rdt-expander" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(wr.row)" [attr.aria-label]="rozieAttr(rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row')" (click)="onToggleExpand(wr.row, $event)">{{ rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸') }}</button>
@@ -814,6 +838,16 @@ interface EditorCtx {
       flex-direction: column;
       gap: var(--rdt-chrome-gap, 0.5rem);
     }
+    .rozie-data-table .rdt-skeleton {
+      /* inline-block on the cell's own line box, exactly like a text value (a block box was 2px
+         short of a text row). */
+      display: inline-block;
+      width: 100%;
+      vertical-align: baseline;
+      border-radius: 4px;
+      background: color-mix(in srgb, currentColor 12%, transparent);
+      color: transparent;
+    }
     .rozie-data-table-wrap .rdt-toolbar {
       display: flex;
       gap: var(--rdt-toolbar-gap, 0.5rem);
@@ -1278,6 +1312,7 @@ export class DataTable {
   reorderChange = output<unknown>({ alias: 'reorder-change' });
   pinChange = output<unknown>({ alias: 'pin-change' });
   historyChange = output<unknown>({ alias: 'history-change' });
+  visibleRangeChange = output<unknown>({ alias: 'visible-range-change' });
   activecellChange = output<unknown>({ alias: 'activecell-change' });
   rowActivate = output<unknown>({ alias: 'row-activate' });
   rangeChange = output<unknown>({ alias: 'range-change' });
@@ -1286,6 +1321,7 @@ export class DataTable {
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('groupBar', { read: TemplateRef }) groupBarTpl?: TemplateRef<GroupBarCtx>;
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
+  @ContentChild('placeholder', { read: TemplateRef }) placeholderTpl?: TemplateRef<PlaceholderCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
   @ContentChild('detail', { read: TemplateRef }) detailTpl?: TemplateRef<DetailCtx>;
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
@@ -1308,6 +1344,7 @@ export class DataTable {
   __rozieSlotWarned = false;
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
+  private __rozieWatchInitial_2 = true;
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
@@ -1336,6 +1373,11 @@ export class DataTable {
     });
     effect(() => () => {
       this.maybeClearHistoryOnExternalSwap();
+      // visible-range-change backstop (quick 260925-dtl part 2): a re-render from new data can move
+      // the rendered window WITHOUT a window-version bump (measured on React: filling placeholders
+      // shifted the window by two rows and nothing was reported). Deduped, so a render that leaves
+      // the window where it was emits nothing.
+      this.emitVisibleRangeIfChanged();
       // A-02: the post-render hook is the one place that observes EVERY column-width change on all
       // six targets — an interactive resize writes `columnSizing` through table-core under
       // `columnResizeMode: 'onChange'` and never reaches the coarse re-feed watch (which keys on
@@ -1368,6 +1410,7 @@ export class DataTable {
         seen.add(k);
       }
     });
+    effect(() => { const __watchVal = (() => this.windowVer())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => this.emitVisibleRangeIfChanged())(); }); });
     effect(() => { const __watchVal = (() => [this.sorting(), this.globalFilter(), this.columnFilters(), this.pagination(),
     // Server-side page-count sources (#2): re-feed when the consumer's rowCount/pageCount
     // changes at runtime (e.g. a server response updates the total) so getPageCount() and the
@@ -1384,7 +1427,7 @@ export class DataTable {
     // columnDefs()/tableColumns() build the UNION of both, and reFeed re-passes columns.
     // (Consumers memoize the array as with $props.data/$props.sorting; the uncontrolled
     // <Column>-children path leaves $props.columns undefined — a stable no-op getter.)
-    this.columns(), this.colReg()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    this.columns(), this.colReg()])(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
       // Seed BEFORE the re-feed so the pinning this call may write is part of the state object
       // table-core receives on this same tick (rather than landing a frame late and re-ordering
       // getVisibleCells() a render after the columns appear). One-shot and self-latching — see
@@ -1394,7 +1437,7 @@ export class DataTable {
       this.reFeed();
       this.maybeClearHistoryOnExternalSwap();
     })(); }); });
-    effect(() => { const __watchVal = (() => [this.sorting(), this.columnFilters(), this.globalFilter(), this.sortingDefault(), this.columnFiltersDefault(), this.globalFilterDefault()])(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => [this.sorting(), this.columnFilters(), this.globalFilter(), this.sortingDefault(), this.columnFiltersDefault(), this.globalFilterDefault()])(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
       const msg = this.buildSortFilterAnnounce();
       if (msg) this.liveAnnounce.set(msg);
     })(); }); });
@@ -1402,7 +1445,7 @@ export class DataTable {
 
   ngAfterContentInit() {
     if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;
-    const claimedByStaticRefs = [this.defaultTpl, this.groupBarTpl, this.selectAllTpl, this.selectCellTpl, this.detailTpl, this.colHeaderTpl, this.filterTpl, this.cellTpl, this.editorTpl].filter((t) => t != null).length;
+    const claimedByStaticRefs = [this.defaultTpl, this.groupBarTpl, this.selectAllTpl, this.placeholderTpl, this.selectCellTpl, this.detailTpl, this.colHeaderTpl, this.filterTpl, this.cellTpl, this.editorTpl].filter((t) => t != null).length;
     if (this.__rozieFills().length === 0 && this.__rozieProjectedTpls().length > claimedByStaticRefs) {
       this.__rozieSlotWarned = true;
       console.warn('[ROZ750] DataTable: projected template content was found but no keyed fills were collected — did you forget to add RozieSlot to the consumer\'s imports: array?');
@@ -1412,7 +1455,6 @@ export class DataTable {
   ngAfterViewInit() {
     const __getSubRows = this.getSubRows();
     const __manual = this.manual();
-    const __selectionMode = this.selectionMode();
     // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
     // edit committed BEFORE the consumer ever pushes new rows (or when the consumer passes
     // a one-way `:data`) has a base array to whole-array-replace. currentData() then sources
@@ -1442,7 +1484,7 @@ export class DataTable {
       // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
       // currentData() = the bound prop when controlled, else the uncontrolled $data.dataDefault
       // (Phase 51 req-4 — so a committed edit's writeData re-feed is observed either way).
-      data: this.currentData(),
+      data: this.feedData(),
       columns: this.tableColumns(),
       state: this.currentState(),
       getCoreRowModel: getCoreRowModel(),
@@ -1460,7 +1502,7 @@ export class DataTable {
       // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
       // other row-model fns.
       getRowId: this.rowIdOption(),
-      getRowCanExpand: this.expandable() === true && __getSubRows == null ? () => true : undefined,
+      getRowCanExpand: this.expandable() === true && __getSubRows == null ? (row: any) => !this.rowIsLazyPlaceholder(row) : undefined,
       onExpandedChange: this.onExpandedChangeCb,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
       // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
@@ -1505,8 +1547,8 @@ export class DataTable {
       // Row selection (req-7): enabled unless 'none'; 'single' caps at ≤1
       // (enableMultiRowSelection:false). Select-all scope = filtered rows (TanStack
       // default, D-06 — NOT overridden).
-      enableRowSelection: __selectionMode !== 'none',
-      enableMultiRowSelection: __selectionMode === 'multiple',
+      enableRowSelection: this.rowSelectionOption(),
+      enableMultiRowSelection: this.selectionMode() === 'multiple',
       // PER-SLICE callbacks (Open-Q1: each maps 1:1 to a slice's r-model + change event,
       // no global onStateChange diff) — hoisted top-level consts, re-passed by the re-feed
       // $watch so React reads fresh currentState (the stale-closure fix, F6).
@@ -3162,6 +3204,56 @@ export class DataTable {
   // `@rozie-ui/headless-core/windowing.rzts` via bare specifier — the P0-proven cross-package inline
   // path that DISSOLVES the partial into the leaf (a re-export-from THROUGH this shell would survive as
   // a runtime import, not inline — verified). The math closes over these host symbols by convention.
+  // ── Lazy rows (quick 260925-dtl part 2, oinbox dogfooding) ─────────────────────────────────────
+  // `virtual` + `manual` + `rowCount`: the row space is rowCount long and `data` may be SPARSE —
+  // an `undefined`/`null` entry (or anything past data.length) is a row not loaded yet. Such holes
+  // are fed to table-core as placeholder sentinels (one cached object per index, so a re-feed does
+  // not churn them) that render as placeholder rows and can't be selected, expanded, edited or
+  // activated. ONLY the table-core feed is padded: every write-back derives from currentData(), the
+  // consumer's own array, so a sentinel can never leak into `data`.
+  LAZY_PLACEHOLDER_KEY = '__rdtLazyPlaceholder';
+  lazyPlaceholders: Record<number, any> = {};
+  lazyRowsActive = () => this.rowsWindowed() && !!this.manual() && this.rowCount() != null && this.rowCount() > 0;
+  isLazyPlaceholder = (orig: any): boolean => !!orig && orig[this.LAZY_PLACEHOLDER_KEY] === true;
+  rowIsLazyPlaceholder = (row: any): boolean => !!row && this.isLazyPlaceholder(row.original);
+  feedData = () => {
+    const d: any[] = this.currentData() || [];
+    if (!this.lazyRowsActive()) return d;
+    const n = Math.max(d.length, Number(this.rowCount()));
+    const out: any[] = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const v = d[i];
+      if (v != null) {
+        out[i] = v;
+      } else {
+        if (!this.lazyPlaceholders[i]) this.lazyPlaceholders[i] = {
+          [this.LAZY_PLACEHOLDER_KEY]: true,
+          index: i
+        };
+        out[i] = this.lazyPlaceholders[i];
+      }
+    }
+    return out;
+  };
+  // `visible-range-change { start, end }` — the RENDERED row window (overscan included), `end`
+  // exclusive, over the full row space. Driven by the window-version bump every virtualizer change
+  // routes through, deduped here so a scroll that doesn't move the window emits nothing.
+  lastRangeStart = -1;
+  lastRangeEnd = -1;
+  emitVisibleRangeIfChanged = () => {
+    if (!this.rowsWindowed() || !this.virtualizer) return;
+    const items = this.virtualizer.getVirtualItems();
+    if (!items.length) return;
+    const start = items[0].index;
+    const end = items[items.length - 1].index + 1;
+    if (start === this.lastRangeStart && end === this.lastRangeEnd) return;
+    this.lastRangeStart = start;
+    this.lastRangeEnd = end;
+    this.visibleRangeChange.emit({
+      start,
+      end
+    });
+  };
   // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
   // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
   // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -3919,7 +4011,14 @@ export class DataTable {
   // compares ids as strings.
   rowIdOption = () => {
     const f = this.getRowId();
-    return f ? (originalRow: any, index: any, parent: any) => String(f(originalRow, index, parent)) : undefined;
+    // A lazy placeholder has no consumer row to ask — key it by its index (see feedData()).
+    return f ? (originalRow: any, index: any, parent: any) => this.isLazyPlaceholder(originalRow) ? '__rdt_ph_' + originalRow.index : String(f(originalRow, index, parent)) : undefined;
+  };
+  // table-core `enableRowSelection`: off for selectionMode 'none'; with lazy rows a placeholder
+  // (a row not loaded yet) is never selectable, so select-all takes the loaded rows only.
+  rowSelectionOption = () => {
+    if (this.selectionMode() === 'none') return false;
+    return this.lazyRowsActive() ? (row: any) => !this.rowIsLazyPlaceholder(row) : true;
   };
   // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
   // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
@@ -3933,10 +4032,10 @@ export class DataTable {
     // below (`maybeClearHistoryOnExternalSwap`), which runs on all six targets.
     this.table.setOptions((prev: any) => ({
       ...prev,
-      data: this.currentData(),
+      data: this.feedData(),
       columns: this.tableColumns(),
       state: this.currentState(),
-      enableRowSelection: this.selectionMode() !== 'none',
+      enableRowSelection: this.rowSelectionOption(),
       enableMultiRowSelection: this.selectionMode() === 'multiple',
       // Re-pass the server-side page-count sources (#2) so a RUNTIME rowCount/pageCount change
       // takes effect: setOptions REPLACES via `...prev`, which holds the value captured at
@@ -3952,7 +4051,7 @@ export class DataTable {
       // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
       // other row-model fns.
       getRowId: this.rowIdOption(),
-      getRowCanExpand: this.expandable() === true && this.getSubRows() == null ? () => true : undefined,
+      getRowCanExpand: this.expandable() === true && this.getSubRows() == null ? (row: any) => !this.rowIsLazyPlaceholder(row) : undefined,
       onExpandedChange: this.onExpandedChangeCb,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
       // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
@@ -5879,7 +5978,7 @@ export class DataTable {
   // resolves a row.
   activateRowAt = (index: any, trigger: any) => {
     const row = (this.rows() || [])[index];
-    if (!row || this.rowIsGrouped(row)) return;
+    if (!row || this.rowIsGrouped(row) || this.rowIsLazyPlaceholder(row)) return;
     this.rowActivate.emit({
       row: row.original,
       index,
@@ -7272,7 +7371,10 @@ export class DataTable {
   // `else if` branches gated on this predicate), AND restores fallthrough so Enter on a group
   // row reaches the group-toggle branch below them instead of opening an editor.
   isActiveCellEditable = () => {
-    if (this.rowIndexIsGrouped(this.activeRow())) return false;
+    const __activeRow = this.activeRow();
+    if (this.rowIndexIsGrouped(__activeRow)) return false;
+    // A lazy placeholder (a row not loaded yet) has nothing to edit (quick 260925-dtl part 2).
+    if (this.rowIsLazyPlaceholder((this.rows() || [])[__activeRow])) return false;
     const colId = this.activeCellColumnId();
     return colId != null && this.columnEditable(colId);
   };
@@ -7493,6 +7595,7 @@ export class DataTable {
     // calls beginEdit directly gated ONLY on columnEditable — isActiveCellEditable (Layer 1)
     // does not run on that path at all.
     if (this.rowIndexIsGrouped(rowIndex)) return;
+    if (this.rowIsLazyPlaceholder((this.rows() || [])[rowIndex])) return;
     const colId = this.columnIdAt(rowIndex, colIndex);
     if (colId == null || !this.columnEditable(colId)) return;
     // A new edit session starts — reset the sync idempotency latch so THIS session's eventual
@@ -8794,7 +8897,7 @@ export class DataTable {
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | SelectCellCtx | DetailCtx | ColHeaderCtx | FilterCtx | CellCtx | EditorCtx {
+  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | PlaceholderCtx | SelectCellCtx | DetailCtx | ColHeaderCtx | FilterCtx | CellCtx | EditorCtx {
     return true;
   }
 
