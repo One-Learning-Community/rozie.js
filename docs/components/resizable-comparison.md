@@ -1,5 +1,5 @@
 ---
-surface_hash: af3d40aabb57
+surface_hash: 2c0ff37c13d0
 ---
 
 # Headless split-pane comparison
@@ -24,7 +24,7 @@ How `@rozie-ui/resizable` compares to the existing split-pane / resizable-panel 
 | [`@corvu/resizable`](https://corvu.dev/docs/primitives/resizable/) | Solid | ✅ unstyled | ✅ Window-Splitter pattern; arrow + shift-expand | ✅ v0.2 | ✅ N-panel | Solid's accessible primitive; closely follows the WAI-ARIA pattern. |
 | [`solid-resizable-panels`](https://github.com/elite174/solid-resizable-panels) | Solid | ✅ | ⚠️ | ⚠️ community | N-panel | A second Solid option, modeled on react-resizable-panels. |
 | [Split.js](https://www.npmjs.com/package/split.js) / [Split-Grid](https://www.npmjs.com/package/split-grid) | vanilla (agnostic) | ⚠️ ships CSS | ❌ no separator/keyboard a11y | ❌ Split.js v1.6.5 (4y), Split-Grid v1.0.11 (5y, inactive) | N-panel | The only framework-agnostic engines — but stale, no a11y, and you write the per-framework wrapper. No maintained **web-component** splitter exists. |
-| **`@rozie-ui/resizable`** | **React · Vue · Svelte · Angular · Solid · Lit** | ✅ tokenised, re-skinnable | ✅ `role="separator"` + Arrow/Home/End + live `aria-value*` | ✅ new (pre-1.0) | ❌ 2-panel only; persist via `r-model` | Same API, six packages. |
+| **`@rozie-ui/resizable`** | **React · Vue · Svelte · Angular · Solid · Lit** | ✅ tokenised, re-skinnable | ✅ `role="separator"` + accessible name (`ariaLabel`) + Arrow/Home/End + live `aria-value*` | ✅ new (pre-1.0) | ❌ 2-panel only; persist via `r-model` | Same API, six packages. |
 
 On its home framework each of these is a solid pick. The case for Rozie is consistency, coverage, and an accessibility floor that is the same everywhere: no split-pane component spans every framework with the same API. Even the popular React model (`react-resizable-panels`) is reproduced framework-by-framework through separate ports (`paneforge`, `solid-resizable-panels`), and Lit / web components have no maintained splitter at all. `@rozie-ui/resizable` gives them all the same `<Resizable>`, with the WAI-ARIA window-splitter keyboard pattern wired in on every target; several incumbents (the vanilla engines, `re-resizable`) still lack keyboard resize entirely, and `angular-split` implements it on `role="slider"` gutters rather than the separator pattern.
 
@@ -62,7 +62,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 - **First-class packages everywhere**, including Lit / web components, which have no maintained split-pane component at all. Where the ecosystem offers a different library per framework, `@rozie-ui/resizable` is one `<Resizable>` to learn, document, and migrate: the same props, the same `resize` event, the same two-way `size`, and the same `applySize` / `reset` handle.
 - **A real two-way `size`.** `r-model:size` reads and writes the split with no `onChange → setState` glue, and because `size` is the sole `model: true` prop the Angular output is a `ControlValueAccessor`, so `[formControl]` / `[(ngModel)]` bind directly. The per-framework incumbents each expose a different binding shape (React callbacks, Vue events, Svelte stores, Solid signals, Angular outputs).
-- **A uniform keyboard + ARIA floor.** Arrow / Home / End resizing on a `role="separator"` with live `aria-value*` ships on every target. That matters because the floor is uneven in the incumbents: the vanilla engines (Split.js / Split-Grid) ship no keyboard a11y at all, `re-resizable` exposes no separator semantics, `angular-split` resizes from the keyboard but marks its gutters `role="slider"` rather than the APG separator pattern, and `splitpanes` only gained keyboard support in its 4.1 line. Rozie's accessibility doesn't depend on which framework you picked.
+- **A uniform keyboard + ARIA floor.** Arrow / Home / End resizing on a `role="separator"` with an accessible name (`ariaLabel`, defaulted to `"Resize panels"`) and live, clamped `aria-value*` ships on every target. That matters because the floor is uneven in the incumbents: the vanilla engines (Split.js / Split-Grid) ship no keyboard a11y at all, `re-resizable` exposes no separator semantics, `angular-split` resizes from the keyboard but marks its gutters `role="slider"` rather than the APG separator pattern, and `splitpanes` only gained keyboard support in its 4.1 line. Rozie's accessibility doesn't depend on which framework you picked.
 - **Zero-config styling that re-skins to any design system.** Every rendered value is a `--rozie-resizable-*` CSS custom property, plus ready-made token bridges for shadcn/ui, Material 3, and Bootstrap 5, where most incumbents ship unstyled and leave the skin to you.
 
 ## When a competitor is the better pick
@@ -83,13 +83,13 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## Try it
 
-The [`@rozie-ui/resizable` showcase](/components/resizable) documents the `@rozie-ui/resizable-*` packages — one pre-compiled, per-framework install. There is no engine to import and no required CSS: the native-pointer behaviour and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/resizable-demo) runs the real Vue package in the page.
+The [`@rozie-ui/resizable` showcase](/components/resizable) documents the `@rozie-ui/resizable-*` packages — designed as one pre-compiled, per-framework install each, but today only `@rozie-ui/resizable-solid` (`npm i @rozie-ui/resizable-solid`) is on npm — the other five targets are still in dogfooding. There is no engine to import and no required CSS: the native-pointer behaviour and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/resizable-demo) runs the Vue leaf's workspace build in the page (not yet the published npm package).
 
 ## Cross-references
 
 - [Resizable — showcase](/components/resizable) — the full `@rozie-ui/resizable` surface, quick start, theming, keyboard, and accessibility reference.
 - [Resizable — API reference](/components/resizable-api) — every prop, the two-way `size` model, the `resize` event, the `applySize` / `reset` handle, and the three slots.
-- [Resizable — live demo](/components/resizable-demo) — the real Vue package running in the page, plus the one `.rozie` source and the six generated outputs.
+- [Resizable — live demo](/components/resizable-demo) — the Vue leaf's workspace build running in the page, plus the one `.rozie` source and the six generated outputs.
 - [All components](/components/) — the rest of the `@rozie-ui` family.
 - [Slider — headless slider / range](/components/slider-comparison) — a sibling no-engine pure-Rozie family built on a native `<input type="range">`.
 - [`Resizable.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/src/Resizable.rozie)

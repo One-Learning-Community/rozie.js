@@ -26,6 +26,10 @@ interface Props {
    * Disable resizing — the handle becomes non-interactive (pointer drag and keyboard are ignored) and the panels lock at the current `size`. Also sets the Angular `ControlValueAccessor` disabled state.
    */
   disabled?: boolean;
+  /**
+   * Accessible name applied to the `role="separator"` handle (its `aria-label`). The handle has no visible text of its own, so a screen reader needs this to announce it. Defaults to `"Resize panels"`.
+   */
+  ariaLabel?: string;
   start?: Snippet;
   handle?: Snippet;
   end?: Snippet;
@@ -40,6 +44,7 @@ let {
   min = 10,
   max = 90,
   disabled = false,
+  ariaLabel = 'Resize panels',
   start: __startProp,
   handle: __handleProp,
   end: __endProp,
@@ -148,7 +153,7 @@ export const applySize = (percent: any) => commitSize(percent);
 export const reset = () => commitSize((min + max) / 2);
 </script>
 
-<div bind:this={root} style={rozieStyle(sizeStyle())} {...__rozieAttrs} class={["rozie-resizable", { 'rozie-resizable--vertical': isVertical(), 'rozie-resizable--horizontal': !isVertical(), 'rozie-resizable--dragging': dragging, 'rozie-resizable--disabled': disabled }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-8330bc5a><div class="rozie-resizable-panel rozie-resizable-panel--start" data-rozie-s-8330bc5a>{@render start?.()}</div><div class="rozie-resizable-handle" role="separator" tabindex="0" aria-orientation={rozieAttr(isVertical() ? 'horizontal' : 'vertical')} aria-valuenow={size} aria-valuemin={min} aria-valuemax={max} aria-disabled={!!disabled} onpointerdown={($event) => { onPointerDown($event); }} onpointermove={($event) => { onPointerMove($event); }} onpointerup={($event) => { onPointerUp($event); }} onkeydown={($event) => { onKeydown($event); }} data-rozie-s-8330bc5a>{#if handle}{@render handle()}{:else}<span class="rozie-resizable-grip" aria-hidden="true" data-rozie-s-8330bc5a></span>{/if}</div><div class="rozie-resizable-panel rozie-resizable-panel--end" data-rozie-s-8330bc5a>{@render end?.()}</div></div>
+<div bind:this={root} style={rozieStyle(sizeStyle())} {...__rozieAttrs} class={["rozie-resizable", { 'rozie-resizable--vertical': isVertical(), 'rozie-resizable--horizontal': !isVertical(), 'rozie-resizable--dragging': dragging, 'rozie-resizable--disabled': disabled }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-8330bc5a><div class="rozie-resizable-panel rozie-resizable-panel--start" data-rozie-s-8330bc5a>{@render start?.()}</div><div class="rozie-resizable-handle" role="separator" tabindex="0" aria-orientation={rozieAttr(isVertical() ? 'horizontal' : 'vertical')} aria-valuenow={rozieAttr(currentSize())} aria-valuemin={min} aria-valuemax={max} aria-disabled={!!disabled} aria-label={ariaLabel} onpointerdown={($event) => { onPointerDown($event); }} onpointermove={($event) => { onPointerMove($event); }} onpointerup={($event) => { onPointerUp($event); }} onkeydown={($event) => { onKeydown($event); }} data-rozie-s-8330bc5a>{#if handle}{@render handle()}{:else}<span class="rozie-resizable-grip" aria-hidden="true" data-rozie-s-8330bc5a></span>{/if}</div><div class="rozie-resizable-panel rozie-resizable-panel--end" data-rozie-s-8330bc5a>{@render end?.()}</div></div>
 
 <style>
 :global {

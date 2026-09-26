@@ -112,6 +112,18 @@
         'Disable resizing — the handle becomes non-interactive (pointer drag and keyboard are ignored) and the panels lock at the current `size`. Also sets the Angular `ControlValueAccessor` disabled state.',
     },
   },
+
+  // Accessible name for the draggable role="separator" handle — it has no
+  // visible text, so it needs one (matches NumberField/Pagination's ariaLabel
+  // convention).
+  ariaLabel: {
+    type: String,
+    default: 'Resize panels',
+    docs: {
+      description:
+        'Accessible name applied to the `role="separator"` handle (its `aria-label`). The handle has no visible text of its own, so a screen reader needs this to announce it. Defaults to `"Resize panels"`.',
+    },
+  },
 }
 </props>
 
@@ -239,21 +251,23 @@ $expose({ applySize, reset })
   <!-- draggable handle. role="separator" + aria-value* is the WAI-ARIA window-
        splitter pattern; tabindex=0 makes it keyboard-focusable. The #handle slot
        overrides the visual grip but keeps the behavior.
-       aria-valuenow binds the BARE `$props.size` (a provably-primitive Number)
-       rather than `currentSize()` — a call expression wraps in `rozieAttr` and
-       returns `string`, which React's `aria-valuenow: number` rejects (TS2322;
-       the aria-numeric sibling of listbox's `!!` boolean wrap). Since every
-       commit writes the model back CLAMPED, `$props.size` is in range in
-       practice; the layout itself still uses the clamped `currentSize()`. -->
+       aria-valuenow binds the CLAMPED `currentSize()` (not the bare, possibly
+       out-of-range `$props.size`) — the LB6 SEAM 2 emitter fix (React target,
+       `NUMERIC_HTML_ATTRS` + `isProvablyNonNullishNumeric`) raw-emits a
+       call-expression `aria-value*` binding as `number` instead of widening it
+       to `string` via `rozieAttr`, so this no longer needs the bare-prop
+       workaround an earlier revision used.
+       aria-label gives the handle its accessible name — it has no visible text. -->
   <div
     class="rozie-resizable-handle"
     role="separator"
     tabindex="0"
     :aria-orientation="isVertical() ? 'horizontal' : 'vertical'"
-    :aria-valuenow="$props.size"
+    :aria-valuenow="currentSize()"
     :aria-valuemin="$props.min"
     :aria-valuemax="$props.max"
     :aria-disabled="!!$props.disabled"
+    :aria-label="$props.ariaLabel"
     @pointerdown="onPointerDown($event)"
     @pointermove="onPointerMove($event)"
     @pointerup="onPointerUp($event)"

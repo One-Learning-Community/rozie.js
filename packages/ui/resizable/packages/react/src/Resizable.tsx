@@ -34,6 +34,10 @@ interface ResizableProps {
    * Disable resizing — the handle becomes non-interactive (pointer drag and keyboard are ignored) and the panels lock at the current `size`. Also sets the Angular `ControlValueAccessor` disabled state.
    */
   disabled?: boolean;
+  /**
+   * Accessible name applied to the `role="separator"` handle (its `aria-label`). The handle has no visible text of its own, so a screen reader needs this to announce it. Defaults to `"Resize panels"`.
+   */
+  ariaLabel?: string;
   onResize?: (...args: any[]) => void;
   renderStart?: () => ReactNode;
   renderHandle?: () => ReactNode;
@@ -47,16 +51,17 @@ export interface ResizableHandle {
 }
 
 const Resizable = forwardRef<ResizableHandle, ResizableProps>(function Resizable(_props: ResizableProps, ref): JSX.Element {
-  const props: Omit<ResizableProps, 'direction' | 'min' | 'max' | 'disabled'> & { direction: string; min: number; max: number; disabled: boolean } = {
+  const props: Omit<ResizableProps, 'direction' | 'min' | 'max' | 'disabled' | 'ariaLabel'> & { direction: string; min: number; max: number; disabled: boolean; ariaLabel: string } = {
     ..._props,
     direction: _props.direction ?? 'horizontal',
     min: _props.min ?? 10,
     max: _props.max ?? 90,
     disabled: _props.disabled ?? false,
+    ariaLabel: _props.ariaLabel ?? 'Resize panels',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { size, direction, min, max, disabled, defaultValue, onSizeChange, defaultSize, onResize, ...rest } = _props as ResizableProps & Record<string, unknown>;
-    void size; void direction; void min; void max; void disabled; void defaultValue; void onSizeChange; void defaultSize; void onResize;
+    const { size, direction, min, max, disabled, ariaLabel, defaultValue, onSizeChange, defaultSize, onResize, ...rest } = _props as ResizableProps & Record<string, unknown>;
+    void size; void direction; void min; void max; void disabled; void ariaLabel; void defaultValue; void onSizeChange; void defaultSize; void onResize;
     return rest;
   })();
   const [size, setSize] = useControllableState({
@@ -181,7 +186,7 @@ const Resizable = forwardRef<ResizableHandle, ResizableProps>(function Resizable
       </div>
 
       
-      <div className={"rozie-resizable-handle"} role="separator" tabIndex={0} aria-orientation={rozieAttr(isVertical() ? 'horizontal' : 'vertical')} aria-valuenow={size} aria-valuemin={props.min} aria-valuemax={props.max} aria-disabled={!!props.disabled} onPointerDown={($event) => { onPointerDown($event); }} onPointerMove={($event) => { onPointerMove($event); }} onPointerUp={($event) => { onPointerUp($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-8330bc5a="">
+      <div className={"rozie-resizable-handle"} role="separator" tabIndex={0} aria-orientation={rozieAttr(isVertical() ? 'horizontal' : 'vertical')} aria-valuenow={currentSize()} aria-valuemin={props.min} aria-valuemax={props.max} aria-disabled={!!props.disabled} aria-label={props.ariaLabel} onPointerDown={($event) => { onPointerDown($event); }} onPointerMove={($event) => { onPointerMove($event); }} onPointerUp={($event) => { onPointerUp($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-8330bc5a="">
         {(props.renderHandle ?? props.slots?.['handle']) ? ((props.renderHandle ?? props.slots?.['handle']) as Function)() : <span className={"rozie-resizable-grip"} aria-hidden="true" data-rozie-s-8330bc5a="" />}
       </div>
 

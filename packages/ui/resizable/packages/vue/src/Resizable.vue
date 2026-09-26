@@ -7,7 +7,7 @@
   </div>
 
   
-  <div class="rozie-resizable-handle" role="separator" tabindex="0" :aria-orientation="isVertical() ? 'horizontal' : 'vertical'" :aria-valuenow="size" :aria-valuemin="(props.min) ?? undefined" :aria-valuemax="(props.max) ?? undefined" :aria-disabled="!!props.disabled" @pointerdown="onPointerDown($event)" @pointermove="onPointerMove($event)" @pointerup="onPointerUp($event)" @keydown="onKeydown($event)">
+  <div class="rozie-resizable-handle" role="separator" tabindex="0" :aria-orientation="isVertical() ? 'horizontal' : 'vertical'" :aria-valuenow="(currentSize()) ?? undefined" :aria-valuemin="(props.min) ?? undefined" :aria-valuemax="(props.max) ?? undefined" :aria-disabled="!!props.disabled" :aria-label="props.ariaLabel" @pointerdown="onPointerDown($event)" @pointermove="onPointerMove($event)" @pointerup="onPointerUp($event)" @keydown="onKeydown($event)">
     <slot name="handle">
       <span class="rozie-resizable-grip" aria-hidden="true"></span>
     </slot>
@@ -42,8 +42,12 @@ const props = withDefaults(
      * Disable resizing — the handle becomes non-interactive (pointer drag and keyboard are ignored) and the panels lock at the current `size`. Also sets the Angular `ControlValueAccessor` disabled state.
      */
     disabled?: boolean;
+    /**
+     * Accessible name applied to the `role="separator"` handle (its `aria-label`). The handle has no visible text of its own, so a screen reader needs this to announce it. Defaults to `"Resize panels"`.
+     */
+    ariaLabel?: string;
   }>(),
-  { direction: 'horizontal', min: 10, max: 90, disabled: false }
+  { direction: 'horizontal', min: 10, max: 90, disabled: false, ariaLabel: 'Resize panels' }
 );
 
 /**

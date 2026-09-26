@@ -178,8 +178,8 @@ export function Demo() {
         min={20}
         max={80}
         direction="horizontal"
-        renderStart={() => <nav>Sidebar</nav>}
-        renderEnd={() => <main>Content</main>}
+        startSlot={<nav>Sidebar</nav>}
+        endSlot={<main>Content</main>}
         onResize={(e) => console.log('split:', e.size)}
       />
     </div>
@@ -464,9 +464,9 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('');
   lines.push(
     'Project the two panes into the `start` and `end` slots; the optional `handle` slot replaces ' +
-      'the default grip while keeping the drag/keyboard behavior. On React/Solid the slots are ' +
-      '`render*` props (`renderStart` / `renderEnd` / `renderHandle`) — the documented ' +
-      'cross-framework slot divergence.',
+      'the default grip while keeping the drag/keyboard behavior. On React the slots are `render*` ' +
+      'props (`renderStart` / `renderEnd` / `renderHandle`); on Solid they are plain JSX-element ' +
+      'props (`startSlot` / `endSlot` / `handleSlot`) — the documented cross-framework slot divergence.',
   );
   lines.push('');
 

@@ -54,25 +54,7 @@ const JSX_RENDER_PROP_ATTR = /^\s+([a-zA-Z][A-Za-z0-9]*)=\{[({]/gm;
  * repo-wide without silently losing the defect. Each entry must reproduce a
  * real mismatch every run — see the self-clearing check below.
  */
-const KNOWN_UNFIXED = [
-  {
-    family: 'resizable',
-    target: 'solid',
-    attr: 'renderStart',
-    reason:
-      "Solid's declared prop is `startSlot`, not `renderStart` — same bug class as combobox/popover, " +
-      'out of the 260903-qw5 wave fence (combobox/popover/command-palette only). See ' +
-      '.planning/quick/260903-qw5-docs-pass-fix-the-readme-mjs-slot-exampl/260903-qw5-PLAN.md measured_baseline.',
-  },
-  {
-    family: 'resizable',
-    target: 'solid',
-    attr: 'renderEnd',
-    reason:
-      "Solid's declared prop is `endSlot`, not `renderEnd` — same bug class as combobox/popover, " +
-      'out of the 260903-qw5 wave fence. See the same measured_baseline note as `renderStart` above.',
-  },
-];
+const KNOWN_UNFIXED = [];
 
 function stripComments(text) {
   return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');

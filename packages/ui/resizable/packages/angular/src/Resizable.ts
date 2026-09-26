@@ -29,7 +29,7 @@ interface EndCtx {}
       </div>
 
       
-      <div class="rozie-resizable-handle" role="separator" tabindex="0" [attr.aria-orientation]="rozieAttr(isVertical() ? 'horizontal' : 'vertical')" [attr.aria-valuenow]="size()" [attr.aria-valuemin]="min()" [attr.aria-valuemax]="max()" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (pointerdown)="onPointerDown($event)" (pointermove)="onPointerMove($event)" (pointerup)="onPointerUp($event)" (keydown)="onKeydown($event)">
+      <div class="rozie-resizable-handle" role="separator" tabindex="0" [attr.aria-orientation]="rozieAttr(isVertical() ? 'horizontal' : 'vertical')" [attr.aria-valuenow]="rozieAttr(currentSize())" [attr.aria-valuemin]="min()" [attr.aria-valuemax]="max()" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="ariaLabel()" (pointerdown)="onPointerDown($event)" (pointermove)="onPointerMove($event)" (pointerup)="onPointerUp($event)" (keydown)="onKeydown($event)">
         @if ((handleTpl ?? __rozieFillMap()['handle'] ?? templates()?.['handle'])) {
     <ng-container *ngTemplateOutlet="(handleTpl ?? __rozieFillMap()['handle'] ?? templates()?.['handle'])" />
     } @else {
@@ -161,6 +161,10 @@ export class Resizable {
    * Disable resizing — the handle becomes non-interactive (pointer drag and keyboard are ignored) and the panels lock at the current `size`. Also sets the Angular `ControlValueAccessor` disabled state.
    */
   disabled = input<boolean>(false);
+  /**
+   * Accessible name applied to the `role="separator"` handle (its `aria-label`). The handle has no visible text of its own, so a screen reader needs this to announce it. Defaults to `"Resize panels"`.
+   */
+  ariaLabel = input<string>('Resize panels');
   dragging = signal(false);
   root = viewChild<ElementRef<HTMLDivElement>>('root');
   resize = output<unknown>();

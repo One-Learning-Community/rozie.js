@@ -28,8 +28,8 @@ export function Demo() {
         min={20}
         max={80}
         direction="horizontal"
-        renderStart={() => <nav>Sidebar</nav>}
-        renderEnd={() => <main>Content</main>}
+        startSlot={<nav>Sidebar</nav>}
+        endSlot={<main>Content</main>}
         onResize={(e) => console.log('split:', e.size)}
       />
     </div>
@@ -54,6 +54,7 @@ import '@rozie-ui/resizable-solid/themes/shadcn.css';    // or material.css, boo
 | `min` | `Number` | `10` |  |  | The minimum `size` percent — the first panel can never be dragged or nudged below this. Clamps every commit. |
 | `max` | `Number` | `90` |  |  | The maximum `size` percent — the first panel can never be dragged or nudged beyond this (so the second panel keeps at least `100 - max` percent). Clamps every commit. |
 | `disabled` | `Boolean` | `false` |  |  | Disable resizing — the handle becomes non-interactive (pointer drag and keyboard are ignored) and the panels lock at the current `size`. Also sets the Angular `ControlValueAccessor` disabled state. |
+| `ariaLabel` | `String` | `"Resize panels"` |  |  | Accessible name applied to the `role="separator"` handle (its `aria-label`). The handle has no visible text of its own, so a screen reader needs this to announce it. Defaults to `"Resize panels"`. |
 
 ## Events
 
@@ -87,4 +88,4 @@ handle?.reset();
 | handle |  |
 | end |  |
 
-Project the two panes into the `start` and `end` slots; the optional `handle` slot replaces the default grip while keeping the drag/keyboard behavior. On React/Solid the slots are `render*` props (`renderStart` / `renderEnd` / `renderHandle`) — the documented cross-framework slot divergence.
+Project the two panes into the `start` and `end` slots; the optional `handle` slot replaces the default grip while keeping the drag/keyboard behavior. On React the slots are `render*` props (`renderStart` / `renderEnd` / `renderHandle`); on Solid they are plain JSX-element props (`startSlot` / `endSlot` / `handleSlot`) — the documented cross-framework slot divergence.

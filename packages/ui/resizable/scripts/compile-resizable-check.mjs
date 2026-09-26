@@ -20,7 +20,7 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'Resizable',
-  props: ['size', 'direction', 'min', 'max', 'disabled'],
+  props: ['size', 'direction', 'min', 'max', 'disabled', 'ariaLabel'],
   models: ['size'],
   emits: ['resize'],
   slots: ['start', 'end', 'handle'],

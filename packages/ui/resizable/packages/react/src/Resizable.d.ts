@@ -27,6 +27,10 @@ export interface ResizableProps {
    * Disable resizing — the handle becomes non-interactive (pointer drag and keyboard are ignored) and the panels lock at the current `size`. Also sets the Angular `ControlValueAccessor` disabled state.
    */
   disabled?: boolean;
+  /**
+   * Accessible name applied to the `role="separator"` handle (its `aria-label`). The handle has no visible text of its own, so a screen reader needs this to announce it. Defaults to `"Resize panels"`.
+   */
+  ariaLabel?: string;
   onResize?: (...args: unknown[]) => void;
   renderStart?: () => ReactNode;
   renderHandle?: () => ReactNode;

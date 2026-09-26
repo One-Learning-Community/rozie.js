@@ -114,6 +114,10 @@ interface ResizableProps {
    * Disable resizing — the handle becomes non-interactive (pointer drag and keyboard are ignored) and the panels lock at the current `size`. Also sets the Angular `ControlValueAccessor` disabled state.
    */
   disabled?: boolean;
+  /**
+   * Accessible name applied to the `role="separator"` handle (its `aria-label`). The handle has no visible text of its own, so a screen reader needs this to announce it. Defaults to `"Resize panels"`.
+   */
+  ariaLabel?: string;
   onResize?: (...args: unknown[]) => void;
   startSlot?: JSX.Element;
   handleSlot?: JSX.Element;
@@ -128,8 +132,8 @@ export interface ResizableHandle {
 }
 
 export default function Resizable(_props: ResizableProps): JSX.Element {
-  const _merged = mergeProps({ direction: 'horizontal', min: 10, max: 90, disabled: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['size', 'direction', 'min', 'max', 'disabled', 'ref', 'onResize']);
+  const _merged = mergeProps({ direction: 'horizontal', min: 10, max: 90, disabled: false, ariaLabel: 'Resize panels' }, _props);
+  const [local, attrs] = splitProps(_merged, ['size', 'direction', 'min', 'max', 'disabled', 'ariaLabel', 'ref', 'onResize']);
   onMount(() => { local.ref?.({ applySize, reset }); });
 
   const [size, setSize] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'size', 50);
@@ -248,7 +252,7 @@ export default function Resizable(_props: ResizableProps): JSX.Element {
       </div>
 
       
-      <div role="separator" aria-orientation={rozieAttr(isVertical() ? 'horizontal' : 'vertical')} aria-valuenow={size()} aria-valuemin={local.min} aria-valuemax={local.max} aria-disabled={!!local.disabled} class={"rozie-resizable-handle"} tabIndex={0} onPointerDown={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPointerDown($event); }} onPointerMove={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPointerMove($event); }} onPointerUp={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPointerUp($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onKeydown($event); }} data-rozie-s-8330bc5a="">
+      <div role="separator" aria-orientation={rozieAttr(isVertical() ? 'horizontal' : 'vertical')} aria-valuenow={rozieAttr(currentSize())} aria-valuemin={local.min} aria-valuemax={local.max} aria-disabled={!!local.disabled} aria-label={local.ariaLabel} class={"rozie-resizable-handle"} tabIndex={0} onPointerDown={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPointerDown($event); }} onPointerMove={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPointerMove($event); }} onPointerUp={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPointerUp($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onKeydown($event); }} data-rozie-s-8330bc5a="">
         {(_props.handleSlot ?? _props.slots?.['handle']?.({})) ?? <span class={"rozie-resizable-grip"} aria-hidden="true" data-rozie-s-8330bc5a="" />}
       </div>
 

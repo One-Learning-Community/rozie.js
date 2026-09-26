@@ -118,6 +118,10 @@ export default class Resizable extends SignalWatcher(LitElement) {
    * Disable resizing — the handle becomes non-interactive (pointer drag and keyboard are ignored) and the panels lock at the current `size`. Also sets the Angular `ControlValueAccessor` disabled state.
    */
   @property({ type: Boolean, reflect: true }) disabled: boolean = false;
+  /**
+   * Accessible name applied to the `role="separator"` handle (its `aria-label`). The handle has no visible text of its own, so a screen reader needs this to announce it. Defaults to `"Resize panels"`.
+   */
+  @property({ type: String, reflect: true }) ariaLabel: string = 'Resize panels';
   private _dragging = signal(false);
   @query('[data-rozie-ref="root"]') private _refRoot!: HTMLElement;
 
@@ -205,7 +209,7 @@ export default class Resizable extends SignalWatcher(LitElement) {
   </div>
 
   
-  <div class="rozie-resizable-handle" role="separator" tabindex="0" aria-orientation=${rozieAttr(this.isVertical() ? 'horizontal' : 'vertical')} aria-valuenow=${this.size} aria-valuemin=${this.min} aria-valuemax=${this.max} aria-disabled=${!!this.disabled} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPointerDown($event); }} @pointermove=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPointerMove($event); }} @pointerup=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPointerUp($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onKeydown($event); }} data-rozie-s-8330bc5a>
+  <div class="rozie-resizable-handle" role="separator" tabindex="0" aria-orientation=${rozieAttr(this.isVertical() ? 'horizontal' : 'vertical')} aria-valuenow=${rozieAttr(this.currentSize())} aria-valuemin=${this.min} aria-valuemax=${this.max} aria-disabled=${!!this.disabled} aria-label=${this.ariaLabel} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPointerDown($event); }} @pointermove=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPointerMove($event); }} @pointerup=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPointerUp($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onKeydown($event); }} data-rozie-s-8330bc5a>
     <slot name="handle">
       <span class="rozie-resizable-grip" aria-hidden="true" data-rozie-s-8330bc5a></span>
     </slot>
@@ -340,7 +344,7 @@ export default class Resizable extends SignalWatcher(LitElement) {
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'size', 'direction', 'min', 'max', 'disabled']);
+    const __skip = new Set<string>(['data-rozie-ref', 'size', 'direction', 'min', 'max', 'disabled', 'aria-label', 'arialabel']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

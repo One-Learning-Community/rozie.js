@@ -34,4 +34,4 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `end` | — | The second panel — takes the remaining space. |
 | `handle` | — | Optional. Replaces the default grip (a short centered bar) while keeping the drag and keyboard behavior on the wrapping `role="separator"` element. |
 
-On React / Solid the slots are `render*` props (`renderStart` / `renderEnd` / `renderHandle`) — the documented cross-framework slot divergence. None of the slot names equals a prop key: a slot/prop name collision is a hard compile error, because Svelte 5 collapses snippets and props into one `$props()` bag.
+On React the slots are `render*` props (`renderStart` / `renderEnd` / `renderHandle`); on Solid they are plain JSX-element props (`startSlot` / `endSlot` / `handleSlot`) — the documented cross-framework slot divergence. None of the slot names equals a prop key: a slot/prop name collision is a hard compile error, because Svelte 5 collapses snippets and props into one `$props()` bag.
