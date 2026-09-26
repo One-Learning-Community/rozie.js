@@ -12,7 +12,7 @@ Peer dependencies: `solid-js`. Install them alongside this package.
 
 **Required peers** — beyond the framework peer above, this package requires these non-optional peers to actually render:
 
-- `@rozie-ui/combobox-solid` `^0.5.0` — required by `@rozie-ui/command-palette-solid`
+- `@rozie-ui/combobox-solid` `^0.5.0 || ^0.6.0` — required by `@rozie-ui/command-palette-solid`
 - `@rozie-ui/popover-solid` `^0.2.0` — required by `@rozie-ui/combobox-solid`
 - `@floating-ui/dom` `^1.7.2` — required by `@rozie-ui/popover-solid`
 
