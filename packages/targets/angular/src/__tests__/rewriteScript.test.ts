@@ -708,6 +708,62 @@ describe('rewriteRozieIdentifiers — scope-aware binding guards', () => {
     expect(code).toContain('unknownName');
     expect(code).not.toContain(': this.');
   });
+
+  // Same class of gap as the Lit target's de1d0c8c3 fix (`{ [X]: expr }` object
+  // literals): `isInBindingPosition` is mirrored byte-identical from Lit's
+  // scopeAwareSkip.ts and had the identical hole for a computed key inside a
+  // DESTRUCTURING pattern — it walked straight past the ObjectProperty to the
+  // enclosing ObjectPattern and reported ANY identifier reachable through it,
+  // including the computed KEY (an expression, not a binding), as bound.
+  it('a computed key in a DESTRUCTURING pattern is rewritten (the key is a reference, not a binding)', () => {
+    const ir = buildIR();
+    const { code } = rewrite('const fn = () => {}; const { [fn]: v } = obj;', ir);
+    expect(code).toContain('[this.fn]: v');
+  });
+
+  it('a computed key inside a NESTED destructuring pattern is rewritten', () => {
+    const ir = buildIR();
+    const { code } = rewrite('const fn = () => {}; const { a: { [fn]: w } } = obj;', ir);
+    expect(code).toContain('[this.fn]: w');
+  });
+
+  it('a computed key in a destructured FUNCTION-PARAM pattern is rewritten', () => {
+    const ir = buildIR();
+    const { code } = rewrite('const fn = () => {}; (({ [fn]: v }) => v);', ir);
+    expect(code).toContain('[this.fn]: v');
+  });
+
+  it('a computed key in an ASSIGNMENT pattern (`{ [X]: v } = o`) is rewritten', () => {
+    const ir = buildIR();
+    const { code } = rewrite('const fn = () => {}; ({ [fn]: v } = obj);', ir);
+    expect(code).toContain('[this.fn]: v');
+  });
+
+  it('a NON-computed key in a destructuring pattern is NOT rewritten (it is a property name)', () => {
+    const ir = buildIR();
+    const { code } = rewrite('const fn = () => {}; const { fn: v } = obj;', ir);
+    expect(code).not.toContain('this.fn');
+    expect(code).toContain('fn: v');
+  });
+
+  it('a computed-key pattern binding that SHADOWS a DIFFERENT promoted name still rewrites the key but not the shadowed value binding', () => {
+    // `fn` (computed key — a reference) is unrelated to `total` (the pattern's
+    // VALUE, a BINDING that shadows the class member `total` for the rest of
+    // the block). `patternIntroducesBinding` only ever inspects the VALUE
+    // side of an ObjectProperty, so it already reports this as a shadowing
+    // binding regardless of whether the key is computed — no change needed
+    // there. (A same-name `{ [total]: total }` self-reference also exists,
+    // but hits a separate, pre-existing, order-insensitive approximation in
+    // `hasShadowingBinding` — orthogonal to this fix, out of scope here.)
+    const ir = buildIR({ computed: [mkComputed('total')] });
+    const { code } = rewrite(
+      'const fn = () => {}; const f = () => { const { [fn]: total } = obj; return total; };',
+      ir,
+    );
+    expect(code).toContain('[this.fn]: total');
+    expect(code).not.toContain('return this.total');
+    expect(code).toContain('return total;');
+  });
 });
 
 describe('rewriteRozieIdentifiers — $el free read', () => {

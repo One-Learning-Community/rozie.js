@@ -172,6 +172,16 @@ export function isInBindingPosition(path: {
   while (walker) {
     const node = walker.node;
     if (t.isObjectPattern(node) || t.isArrayPattern(node)) return true;
+    if (t.isObjectProperty(node) && node.computed && node.key === child) {
+      // Descended via a COMPUTED KEY (`{ [X]: v }`) — an expression, i.e. a
+      // real reference, even when this property lives inside an enclosing
+      // ObjectPattern (destructuring). Only the property's VALUE side is a
+      // binding; the walk must stop here rather than keep climbing to the
+      // enclosing ObjectPattern, which would otherwise report ANY identifier
+      // reachable through this property — including the key — as bound.
+      // Mirrors the AssignmentPattern.right treatment below.
+      return false;
+    }
     if (t.isAssignmentPattern(node)) {
       // Descended via `right` (default value) → expression side, NOT a
       // binding. Stop the walk: a default value can legitimately reference
