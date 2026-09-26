@@ -20,35 +20,31 @@ import { Toaster, type ToasterHandle } from '@rozie-ui/toast-solid';
 export function Demo() {
   let toaster: ToasterHandle | undefined;
   // The ref callback receives the HANDLE object (not the DOM node).
+  // An action button on the toast; `data` rides along to the callback and the `dismissed` event.
+  const archive = () =>
+    toaster?.show({
+      message: 'Conversation archived',
+      data: { threadId: 't42' },
+      action: { label: 'Undo', onClick: (ctx) => restore(ctx.data.threadId) },
+    });
   return (
     <>
       <button onClick={() => toaster?.show({ message: 'Saved!', type: 'success' })}>Save</button>
       <button onClick={() => toaster?.show({ message: 'Something failed', type: 'error' })}>Fail</button>
-      <button
-        onClick={() =>
-          toaster?.show({
-            message: 'Conversation archived',
-            data: { threadId: 't42' },
-            action: { label: 'Undo', onClick: (ctx) => restore(ctx.data.threadId) },
-          })
-        }
-      >
-        Archive
-      </button>
+      <button onClick={archive}>Archive</button>
 
       {/* Mount the host once (typically near the app root). */}
       <Toaster ref={(h) => (toaster = h)} position="bottom-right" duration={4000} />
       {/* Custom per-toast chrome via the #toast scoped slot — the `toastSlot` prop
-          (or `slots={{ toast: ... }}`):
-      <Toaster
-        ref={(h) => (toaster = h)}
-        toastSlot={({ toast, dismiss }) => (
-          <div class="my-toast">
-            <strong>{toast().type}</strong> {toast().message}
-            <button onClick={() => dismiss(toast().id)}>OK</button>
-          </div>
-        )}
-      /> */}
+          (or `slots={{ toast: ... }}`). Read the scope through `ctx` (its fields are
+          getters) rather than destructuring it:
+      const toastChrome = (ctx) => (
+        <div class="my-toast">
+          <strong>{ctx.toast.type}</strong> {ctx.toast.message}
+          <button onClick={() => ctx.dismiss(ctx.toast.id)}>OK</button>
+        </div>
+      );
+      <Toaster ref={(h) => (toaster = h)} toastSlot={toastChrome} /> */}
     </>
   );
 }
