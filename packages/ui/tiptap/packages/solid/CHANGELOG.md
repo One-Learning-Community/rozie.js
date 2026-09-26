@@ -1,5 +1,103 @@
 # @rozie-ui/tiptap-solid
 
+## 0.4.0
+
+### Minor Changes
+
+- 4f2148d: Two findings from dogfooding, both consumer-visible on install and on construction timing.
+
+  **BREAKING — `@tiptap/extension-bubble-menu` is now a required peer dependency, not
+  optional.** The built-in link editor is a `BubbleMenu` on every editor, unconditionally, so
+  declaring it optional was never accurate — a consumer who never installed it simply never
+  noticed until they hit the link-editor path. If you don't already have it installed:
+
+  ```
+  npm install @tiptap/extension-bubble-menu
+  ```
+
+  **`character-count`, `image`, and `floating-menu` extension peers are now lazy-loaded, only
+  when their feature is actually used**, instead of being statically imported by every leaf
+  regardless of whether the consumer installed them. `@tiptap/extension-character-count` loads
+  only when `maxLength` (or the `#count` slot) is used; `@tiptap/extension-image` only when
+  `uploadImage` is used; `@tiptap/extension-floating-menu` only when the `floatingMenu` slot is
+  used. Declaring these peers `peerDependenciesMeta.optional: true` is now actually true — you may
+  drop whichever of the three you don't use.
+
+  **New event: `ready`.** Fired once per mount, on both the synchronous and the (new) lazy
+  construction path, with the live `Editor` instance as its payload. **If your component uses
+  `maxLength`, `uploadImage`, or a `floatingMenu` slot, construction is now asynchronous** — use
+  `ready` (`onReady` / `@ready`) to know when calling a handle verb like `focusEditor()` will
+  actually work, rather than an arbitrary delay. With none of the three lazy features in use, the
+  editor is still constructed synchronously at mount, exactly as before. `ready`'s payload is typed
+  `unknown`, matching every other emitted event today.
+
+  **`tiptap-vue` — Vue's `inherit-attrs`/`inherit-listeners` opt-out now applies** (see the
+  `@rozie/core` changeset in this same release for the underlying emitter fix): undeclared
+  attributes and listeners no longer fall through onto `tiptap-vue`'s wrapper element, matching the
+  other five targets. This is a **behaviour change** if you were relying on that fallthrough on Vue
+  specifically.
+
+  **Solid packaging.** `@rozie-ui/tiptap-solid` ships the same compiled-JS-by-default,
+  JSX-under-the-`solid`-condition packaging shape as every other published Solid leaf this release
+  — see the dedicated Solid packaging changeset for the full description. No API change.
+
+  Docs updated: the install line now lists all four required peers plus the three optional ones
+  (it previously omitted `@tiptap/extensions` and `bubble-menu` and claimed both menu peers were
+  optional).
+
+### Patch Changes
+
+- 4f2148d: **Fixed: a stale pre-unmount async construction could double-construct the Editor
+  under React StrictMode** (`maxLength`/`uploadImage`/`floatingMenu` lazy-extension path
+  only). React's dev-mode StrictMode double-invoke (mount → cleanup → mount, against the
+  SAME component instance) could let a stale first invocation's async extension-load
+  `.then()` construct a SECOND Editor onto the same DOM node and fire `ready` twice,
+  because the internal `disposed` guard was reset by the second invocation before the
+  first's `.then()` ever settled. Fixed with a per-mount-invocation guard; no API change.
+
+  **Fixed: `setContent()`/`clearContent()` no longer drop a write made during the async
+  construction gap** (`maxLength`/`uploadImage`/`floatingMenu` lazy-extension path only).
+  Calling either before `ready` now updates the bound `html` model immediately, and the
+  editor constructs with that value once it exists, instead of the write silently vanishing.
+
+  **New event: `error`.** Fired when an optional extension (`floatingMenu`/`image`/`count`)
+  fails to load via its dynamic `import()` — payload is `{ extension, error }`. Previously
+  an unhandled rejection on the internal `Promise.all` left the editor permanently
+  uncreated, silently, on ANY chunk-load failure (a real-world CDN/network blip). The
+  editor now still constructs WITHOUT the failed extension (degrade) instead of never
+  constructing at all; the failure is also reported via `console.error`.
+
+  **Docs: the `ready` event's README table row is no longer empty.** Its description was
+  missing from the generator's event-description map since `ready` shipped last release;
+  now documented, alongside the new `error` event above.
+
+- 4f2148d: **Fixed: published Solid leaves now ship compiled JavaScript for `import`/`require`, with JSX
+  kept only under the `solid` export condition.**
+
+  Every `@rozie-ui/*-solid` leaf with markup previously shipped Solid JSX inside
+  `dist/index.{mjs,cjs}` under a plain `import`/`require` (`chartjs-solid` renders no markup of its
+  own, but ships the same corrected export shape for consistency with its siblings). That is not
+  valid JavaScript on its own — a default `vite-plugin-solid` setup
+  fails with "JSX syntax is disabled" (the plugin only transforms `.[mc]?[jt]sx` files), and any
+  bundler without a Solid plugin fails outright. The only way to consume these packages was to
+  manually point `vite-plugin-solid` at the package's `.mjs` files inside `node_modules` — a
+  workaround, not a supported shape.
+
+  New export shape (the standard one for a published Solid library):
+  - `import` / `require` → `dist/<entry>.{mjs,cjs}`, compiled to plain DOM output by
+    `babel-preset-solid`. Any bundler consumes this with no Solid plugin at all.
+  - `solid` (export condition) → `dist/source/<entry>.jsx`, JSX kept intact. `vite-plugin-solid`
+    and SolidStart resolve this condition first and compile it themselves for their own mode (DOM /
+    SSR / hydration).
+
+  **If you were using the `extensions: ['.mjs']` / `node_modules` `include` workaround with
+  `vite-plugin-solid` to consume one of these packages, remove it — it is no longer needed** and a
+  default `vite-plugin-solid` setup now resolves the `solid` condition correctly on its own. No
+  public API change on any of these leaves.
+
+- Updated dependencies [4f2148d]
+  - @rozie/runtime-solid@0.7.5
+
 ## 0.3.6
 
 ### Patch Changes
