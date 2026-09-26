@@ -82,6 +82,19 @@
   No breaking type-shape change: the public `.d.ts` surface only grows (`getRowId`, the
   `row-activate` event, the `visible-range-change` event, and the `#placeholder` slot scope).
 
+  **Fixed: lazy placeholder rows are now excluded from every clipboard write and from full-row
+  edit**, making the "excluded from selection, expansion, editing and activation" claim above
+  actually true. A paste, a cut, the Delete/Backspace range clear, and a fill-drag that span a
+  placeholder row (including a Ctrl+A that spans the whole `rowCount` space) no longer fabricate
+  a `cell-edit-commit` for it, inflate the N-of-M aria-live announce, or write a partial row into
+  the still-unloaded sparse hole; `editRow()` (and Shift+F2) on a placeholder row is now a no-op
+  instead of opening a row editor seeded with `undefined`s.
+
+  **Docs: the `placeholder` slot's per-target prop name is now documented**, alongside
+  `detail`/`groupBar`/`filter`, in the Slots section below (`renderPlaceholder` on React,
+  `placeholderSlot` on Solid, the `.placeholder` property on Lit, `#placeholder` elsewhere) — it
+  was previously listed only in the generic slots table with no naming note.
+
 ### Patch Changes
 
 - @rozie/runtime-angular@0.7.5
