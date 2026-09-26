@@ -11,7 +11,7 @@ export default function BareAttrComponent(_props: BareAttrComponentProps): JSX.E
     <>
     <div {...attrs} class={"bare-attr-component" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-81da069c="">
       <BareAttrChild combobox={true} data-rozie-s-81da069c="" />
-      <div hidden="" data-rozie-s-81da069c="" />
+      <div hidden={true} data-rozie-s-81da069c="" />
     </div>
     </>
   );

@@ -896,6 +896,19 @@ function emitNonClassAttribute(
   if (attr.kind === 'static') {
     // 260812-2ur — ctx.producerProps lets a declared prop win on component tags.
     const jsxName = htmlAttrToSolidName(attr.name, ctx.elementTagKind, ctx.producerProps);
+    // Valueless boolean HTML attribute (`<input disabled>`) — emit the JSX
+    // boolean form `disabled={true}` (not `disabled=""`, which is a STRING and
+    // fails Solid's strict boolean-typed JSX prop, TS2322 "Type 'string' is
+    // not assignable to type 'boolean'"). Straight port of the React target's
+    // fix for the identical bug class (quick task 260520-w18 bug class 4,
+    // `react/…/emitTemplateAttribute.ts:1256-1258`). The IR collapses a
+    // genuinely-valueless attr and an explicit `attr=""` to the same
+    // `{ kind: 'static', value: '' }` shape (lowerTemplate.ts's `attr.value ??
+    // ''`), so the BOOLEAN_HTML_ATTRS name whitelist is the only safe signal —
+    // `alt=""` is not in that set and stays a plain string literal.
+    if (attr.value === '' && BOOLEAN_HTML_ATTRS.has(attr.name.toLowerCase())) {
+      return { jsx: `${jsxName}={true}`, diagnostics };
+    }
     if (NUMERIC_HTML_ATTRS.has(attr.name.toLowerCase()) && /^-?\d+(?:\.\d+)?$/.test(attr.value)) {
       return { jsx: `${jsxName}={${attr.value}}`, diagnostics };
     }
