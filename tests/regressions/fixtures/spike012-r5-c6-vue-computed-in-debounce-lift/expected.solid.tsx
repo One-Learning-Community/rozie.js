@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { createMemo, createSignal, splitProps } from 'solid-js';
-import { createDebouncedHandler, mergeListeners } from '@rozie/runtime-solid';
+import { createDebouncedHandler, mergeListeners, pickListeners } from '@rozie/runtime-solid';
 
 interface ComputedInDebounceLiftProps {}
 
@@ -14,7 +14,7 @@ export default function ComputedInDebounceLift(_props: ComputedInDebounceLiftPro
 
   return (
     <>
-    <input {...attrs} {...mergeListeners({ onInput: _rozieDebouncedHandler0 }, attrs)} data-rozie-s-e598eaaa="" />
+    <input {...attrs} {...mergeListeners({ onInput: _rozieDebouncedHandler0 }, pickListeners(attrs))} data-rozie-s-e598eaaa="" />
     </>
   );
 }
