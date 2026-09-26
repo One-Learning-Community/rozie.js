@@ -7,7 +7,7 @@
  * even without a generated theme, and follows the app's light/dark M3 scheme when it
  * is present.
  *
- *   import '@rozie-ui/rete-react/themes/material.css';
+ *   import '@rozie-ui/rete-lit/themes/material.css';
  *
  * Colors-only scope — sizing tokens are left unset so the `.rozie-flow-canvas`
  * defaults hold; selected/active tokens fall back to `--rozie-flow-accent`.

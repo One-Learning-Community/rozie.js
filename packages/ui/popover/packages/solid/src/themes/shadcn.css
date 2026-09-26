@@ -6,7 +6,7 @@
  * consumed as `hsl(var(--popover))`). Because it reads those vars live, the
  * popover panel automatically follows light/dark theme switches.
  *
- *   import '@rozie-ui/popover-react/themes/shadcn.css';
+ *   import '@rozie-ui/popover-solid/themes/shadcn.css';
  *
  * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
  * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.

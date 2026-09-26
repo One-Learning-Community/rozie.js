@@ -7,7 +7,7 @@
  * the control automatically follows light/dark theme switches and accent
  * changes.
  *
- *   import '@rozie-ui/pagination-react/themes/shadcn.css';
+ *   import '@rozie-ui/pagination-svelte/themes/shadcn.css';
  *
  * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
  * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.

@@ -6,7 +6,7 @@
  * Falls back to the baseline M3 light palette when those vars are absent, so
  * it renders correctly even without a generated theme.
  *
- *   import '@rozie-ui/popover-react/themes/material.css';
+ *   import '@rozie-ui/popover-lit/themes/material.css';
  *
  * Colors-only scope — sizing tokens are left unset so the `.rozie-popover`
  * defaults hold.

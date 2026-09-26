@@ -7,7 +7,7 @@
  * switch palette. Override the M3 tokens at your theme scope and the switch
  * follows.
  *
- *   import '@rozie-ui/switch-react/themes/material.css';
+ *   import '@rozie-ui/switch-vue/themes/material.css';
  *
  * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
  * each token it maps, with the design system's variable as the fallback

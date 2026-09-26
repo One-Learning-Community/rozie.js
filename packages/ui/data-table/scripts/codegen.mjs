@@ -68,7 +68,7 @@
  * BUILD-ORDER CONTRACT: this writes each leaf's src/<Component>.*, so it MUST run
  * before the bundled-leaf tsdown builds (`turbo run build --force`).
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, ProducerResolver, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
@@ -293,11 +293,23 @@ function assertHostWiringMatchesBaseCss() {
 
 
 /** Copy src/themes/ → leaf src/themes/ (the design-token presets). */
-function copyThemes(leafSrc) {
+function copyThemes(leafSrc, pkgName) {
   const src = resolve(ROOT, 'src/themes');
   if (!existsSync(src))
     throw new Error('codegen: src/themes/ not found (token presets must exist)');
-  cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
+  const dest = resolve(leafSrc, 'themes');
+  cpSync(src, dest, { recursive: true });
+  // The canonical theme-bridge doc comments hardcode a `-react` example import
+  // (only the react leaf's copy happens to be byte-correct). Rewrite that one
+  // reference per leaf so every OTHER target's copy names its OWN package
+  // instead of silently claiming to be `${family}-react`.
+  for (const file of readdirSync(dest)) {
+    if (!file.endsWith('.css')) continue;
+    const filePath = resolve(dest, file);
+    const content = readFileSync(filePath, 'utf8');
+    const patched = content.replace(/@rozie-ui\/[\w-]+-react\/themes\//g, `${pkgName}/themes/`);
+    if (patched !== content) writeFileSync(filePath, patched);
+  }
 }
 
 /**
@@ -473,7 +485,7 @@ function main() {
     // (4) vendor the design-token presets, plus the D-22 pure-helper modules (when present)
     // that the hoisted `./helpers/<name>` imports inside DataTable's emitted code resolve
     // against.
-    copyThemes(leafSrc);
+    copyThemes(leafSrc, leafPkg(cfg.dir).name);
     copyHelpers(leafSrc);
 
     // (5) README from the single PARENT IR parse. The peer-dependency install

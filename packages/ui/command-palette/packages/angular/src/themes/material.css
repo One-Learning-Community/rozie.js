@@ -4,7 +4,7 @@
  * Maps the palette tokens onto Material Design 3 system color roles
  * (`--md-sys-color-*`, as emitted by Material Web / the M3 theme builder).
  *
- *   import '@rozie-ui/command-palette-react/themes/material.css';
+ *   import '@rozie-ui/command-palette-angular/themes/material.css';
  *
  * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
  * each token it maps, with the design system's variable as the fallback

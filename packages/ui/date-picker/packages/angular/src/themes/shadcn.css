@@ -6,7 +6,7 @@
  * consumed as `hsl(var(--background))`). Because it reads those vars live, the
  * calendar automatically follows light/dark theme switches and accent changes.
  *
- *   import '@rozie-ui/date-picker-react/themes/shadcn.css';
+ *   import '@rozie-ui/date-picker-angular/themes/shadcn.css';
  *
  * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
  * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.

@@ -7,7 +7,7 @@
  * tokens (or switch to a `.dark` / `[data-bs-theme="dark"]` scope) and the
  * switch follows.
  *
- *   import '@rozie-ui/switch-react/themes/bootstrap.css';
+ *   import '@rozie-ui/switch-lit/themes/bootstrap.css';
  *
  * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
  * each token it maps, with the design system's variable as the fallback

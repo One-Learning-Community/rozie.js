@@ -14,7 +14,7 @@
  * OS `@media` dark block (identical values), which keeps OS dark winning over this file's
  * own light defaults whichever stylesheet loads last.
  *
- *   import '@rozie-ui/rete-react/themes/base.css';
+ *   import '@rozie-ui/rete-angular/themes/base.css';
  *
  * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
  * `.rozie-flow-canvas` element). One `--rozie-flow-accent` drives every

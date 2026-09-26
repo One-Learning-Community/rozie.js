@@ -7,13 +7,13 @@
  * reads those vars live, the table automatically follows light/dark theme
  * switches and accent changes.
  *
- *   import '@rozie-ui/data-table-react/themes/shadcn.css';
+ *   import '@rozie-ui/data-table-angular/themes/shadcn.css';
  *
  * Import it together with base.css (which supplies the wiring for every token this file
  * does not map):
  *
- *   import '@rozie-ui/data-table-react/themes/base.css';
- *   import '@rozie-ui/data-table-react/themes/shadcn.css';
+ *   import '@rozie-ui/data-table-angular/themes/base.css';
+ *   import '@rozie-ui/data-table-angular/themes/shadcn.css';
  *
  * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
  * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.

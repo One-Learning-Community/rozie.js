@@ -6,7 +6,7 @@
  * and any custom `$primary` build automatically. Falls back to Bootstrap's
  * default light palette when the vars are absent.
  *
- *   import '@rozie-ui/popover-react/themes/bootstrap.css';
+ *   import '@rozie-ui/popover-angular/themes/bootstrap.css';
  *
  * Colors-only scope — sizing tokens are left unset so the `.rozie-popover`
  * defaults hold.

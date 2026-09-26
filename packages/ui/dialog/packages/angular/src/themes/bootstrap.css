@@ -6,7 +6,7 @@
  * any custom build automatically. Falls back to Bootstrap's default light
  * palette when the vars are absent.
  *
- *   import '@rozie-ui/dialog-react/themes/bootstrap.css';
+ *   import '@rozie-ui/dialog-angular/themes/bootstrap.css';
  *
  * Bootstrap modals use a 0.5rem radius, a 1px border, and a 0.5-opacity black
  * backdrop (`$modal-backdrop-bg` / `$modal-backdrop-opacity`).

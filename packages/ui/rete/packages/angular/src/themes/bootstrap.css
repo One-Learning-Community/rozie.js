@@ -6,7 +6,7 @@
  * `$primary` build automatically. Falls back to Bootstrap's default light palette
  * when the vars are absent.
  *
- *   import '@rozie-ui/rete-react/themes/bootstrap.css';
+ *   import '@rozie-ui/rete-angular/themes/bootstrap.css';
  *
  * Colors-only scope — sizing tokens are left unset so the `.rozie-flow-canvas`
  * defaults hold; selected/active tokens fall back to `--rozie-flow-accent`.

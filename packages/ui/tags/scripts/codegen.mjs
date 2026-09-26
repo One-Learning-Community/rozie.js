@@ -33,7 +33,7 @@
  * its src/Tags.vue + themes + README (it never cleans the leaf src, so the
  * committed barrel survives).
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
@@ -63,11 +63,23 @@ function leafPkgName(dir) {
 }
 
 /** Copy src/themes/ → leaf src/themes/ (the design-token presets). */
-function copyThemes(leafSrc) {
+function copyThemes(leafSrc, pkgName) {
   const src = resolve(ROOT, 'src/themes');
   if (!existsSync(src))
     throw new Error('codegen: src/themes/ not found (token presets must exist)');
-  cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
+  const dest = resolve(leafSrc, 'themes');
+  cpSync(src, dest, { recursive: true });
+  // The canonical theme-bridge doc comments hardcode a `-react` example import
+  // (only the react leaf's copy happens to be byte-correct). Rewrite that one
+  // reference per leaf so every OTHER target's copy names its OWN package
+  // instead of silently claiming to be `${family}-react`.
+  for (const file of readdirSync(dest)) {
+    if (!file.endsWith('.css')) continue;
+    const filePath = resolve(dest, file);
+    const content = readFileSync(filePath, 'utf8');
+    const patched = content.replace(/@rozie-ui\/[\w-]+-react\/themes\//g, `${pkgName}/themes/`);
+    if (patched !== content) writeFileSync(filePath, patched);
+  }
 }
 
 function main() {
@@ -133,7 +145,7 @@ function main() {
     }
 
     // (4) vendor the design-token presets.
-    copyThemes(leafSrc);
+    copyThemes(leafSrc, leafPkgName(cfg.dir));
 
     // (5) README from the single IR parse.
     const pkgName = leafPkgName(cfg.dir);

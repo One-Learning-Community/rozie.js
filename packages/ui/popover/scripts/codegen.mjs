@@ -30,7 +30,7 @@
  *   7. ENFORCE validateDocsSurfaceNames — every emitted event / exposed handle
  *      name must appear backticked in the docs page(s) (../../docs-surface-guard.mjs)
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { buildManifest, compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
@@ -81,11 +81,23 @@ function copyInternal(leafSrc) {
 }
 
 /** Copy src/themes/ → leaf src/themes/ (the design-token presets). */
-function copyThemes(leafSrc) {
+function copyThemes(leafSrc, pkgName) {
   const src = resolve(ROOT, 'src/themes');
   if (!existsSync(src))
     throw new Error('codegen: src/themes/ not found (token presets must exist)');
-  cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
+  const dest = resolve(leafSrc, 'themes');
+  cpSync(src, dest, { recursive: true });
+  // The canonical theme-bridge doc comments hardcode a `-react` example import
+  // (only the react leaf's copy happens to be byte-correct). Rewrite that one
+  // reference per leaf so every OTHER target's copy names its OWN package
+  // instead of silently claiming to be `${family}-react`.
+  for (const file of readdirSync(dest)) {
+    if (!file.endsWith('.css')) continue;
+    const filePath = resolve(dest, file);
+    const content = readFileSync(filePath, 'utf8');
+    const patched = content.replace(/@rozie-ui\/[\w-]+-react\/themes\//g, `${pkgName}/themes/`);
+    if (patched !== content) writeFileSync(filePath, patched);
+  }
 }
 
 /** Common Vite-lib build devDeps shared by every Vue leaf (engine devDep added per-family). */
@@ -188,7 +200,13 @@ export { default } from './${componentName}.vue';
     './rozie-manifest.json': './rozie-manifest.json',
   };
   pkg.files = ['dist', 'src', 'rozie-manifest.json'];
-  pkg.sideEffects = false;
+  // This leaf publishes `./themes/*` (design-token bridge CSS under src/themes/) —
+  // a bare boolean `sideEffects: false` tells a bundler it may drop ANY module of
+  // ours it doesn't statically import, including those CSS files a consumer pulls
+  // in via `import '@rozie-ui/popover-vue/themes/bootstrap.css'`. Match the React
+  // leaf's glob so the CSS is exempted from tree-shaking instead of the whole
+  // package pretending to be side-effect-free.
+  pkg.sideEffects = ['*.css', '**/*.css'];
   pkg.scripts = {
     ...pkg.scripts,
     build: 'vite build && vue-tsc --declaration --emitDeclarationOnly',
@@ -297,7 +315,7 @@ function main() {
 
     // (4) vendor the internal helper (middleware builder) + design-token themes.
     copyInternal(leafSrc);
-    copyThemes(leafSrc);
+    copyThemes(leafSrc, leafPkgName(cfg.dir));
 
     // (5) README from the single IR parse.
     const pkgName = leafPkgName(cfg.dir);

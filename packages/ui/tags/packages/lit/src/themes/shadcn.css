@@ -6,7 +6,7 @@
  * consumed as `hsl(var(--background))`). Because it reads those vars live, the
  * input automatically follows light/dark theme switches and accent changes.
  *
- *   import '@rozie-ui/tags-react/themes/shadcn.css';
+ *   import '@rozie-ui/tags-lit/themes/shadcn.css';
  *
  * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
  * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.

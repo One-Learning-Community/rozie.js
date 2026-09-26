@@ -6,7 +6,7 @@
  * Falls back to the baseline M3 light palette when those vars are absent, so it
  * renders correctly even without a generated theme.
  *
- *   import '@rozie-ui/dialog-react/themes/material.css';
+ *   import '@rozie-ui/dialog-angular/themes/material.css';
  *
  * M3 dialogs are heavily rounded (28dp), use the surface-container-high color,
  * and a scrim at ~32% of the scrim color role.

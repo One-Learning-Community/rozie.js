@@ -7,7 +7,7 @@
  * are absent, so it renders correctly even without a generated theme. The default
  * (info) toast uses the M3 "inverse surface" snackbar convention.
  *
- *   import '@rozie-ui/toast-react/themes/material.css';
+ *   import '@rozie-ui/toast-vue/themes/material.css';
  *
  * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
  * each token it maps, with the design system's variable as the fallback

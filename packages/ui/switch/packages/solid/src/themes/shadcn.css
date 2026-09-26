@@ -6,7 +6,7 @@
  * consumed as `hsl(var(--primary))`). Because it reads those vars live, the
  * switch automatically follows light/dark theme switches and accent changes.
  *
- *   import '@rozie-ui/switch-react/themes/shadcn.css';
+ *   import '@rozie-ui/switch-solid/themes/shadcn.css';
  *
  * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
  * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.

@@ -6,7 +6,7 @@
  * theme builders. Falls back to the baseline M3 light palette when those vars
  * are absent, so it renders correctly even without a generated theme.
  *
- *   import '@rozie-ui/listbox-react/themes/material.css';
+ *   import '@rozie-ui/listbox-lit/themes/material.css';
  *
  * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
  * each token it maps, with the design system's variable as the fallback

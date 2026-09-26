@@ -9,8 +9,8 @@
  * Import it together with base.css (which supplies the wiring for every token this file
  * does not map):
  *
- *   import '@rozie-ui/data-table-react/themes/base.css';
- *   import '@rozie-ui/data-table-react/themes/bootstrap.css';
+ *   import '@rozie-ui/data-table-angular/themes/base.css';
+ *   import '@rozie-ui/data-table-angular/themes/bootstrap.css';
  *
  * HOW IT MAPS (2026-09-25). This bridge declares NO public token. It re-declares the lines
  * of base.css's wiring that read a token it maps, with the design system's variable in place
