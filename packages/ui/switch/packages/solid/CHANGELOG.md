@@ -4,6 +4,7 @@
 
 ### Patch Changes
 
+- Fixed: the `themes/*.css` design-token bridge files' example `import` line named the wrong package (`@rozie-ui/<family>-react`) on every non-React target — copied byte-for-byte from one canonical source. It now names `@rozie-ui/switch-solid`, this package's own.
 - 57607be: **Debut — the Solid target of nine families publishes for the first time.** The React/Vue/
   Svelte/Lit/Angular targets of these nine families (`dialog`, `lexical`, `listbox`, `maplibre`,
   `number-field`, `pagination`, `resizable`, `slider`, `switch`) remain unpublished for now, held

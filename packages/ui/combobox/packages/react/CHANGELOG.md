@@ -4,6 +4,7 @@
 
 ### Minor Changes
 
+- Fixed: the generated README's `## Slots` table listed some slots more than once — once per internal template branch that declares the same logical slot (e.g. the virtualized vs. non-virtualized rendering path). The generator now dedupes by slot identity before rendering. Docs/packaging only; no runtime behavior changed.
 - 57607be: Two virtualization correctness fixes, shared with `@rozie-ui/listbox`, plus this release's
   theming fix and a token removal.
 

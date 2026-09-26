@@ -4,6 +4,7 @@
 
 ### Minor Changes
 
+- Fixed: the `themes/*.css` design-token bridge files' example `import` line named the wrong package (`@rozie-ui/<family>-react`) on every non-React target — copied byte-for-byte from one canonical source. It now names `@rozie-ui/data-table-svelte`, this package's own.
 - 57607be: Three new capabilities, a cross-target `<select>` correctness fix, an extensive keyboard/a11y
   hardening pass, and the theming + packaging fixes shared with the rest of this release.
 
