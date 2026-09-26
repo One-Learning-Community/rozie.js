@@ -1,5 +1,12 @@
 # @rozie/babel-plugin
 
+## 0.7.5
+
+### Patch Changes
+
+- Updated dependencies [57607be]
+  - @rozie/core@0.7.5
+
 ## 0.7.4
 
 ### Patch Changes

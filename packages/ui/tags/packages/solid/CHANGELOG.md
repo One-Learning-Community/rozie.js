@@ -1,5 +1,70 @@
 # @rozie-ui/tags-solid
 
+## 0.1.10
+
+### Patch Changes
+
+- 57607be: **Fixed: published Solid leaves now ship compiled JavaScript for `import`/`require`, with JSX
+  kept only under the `solid` export condition.**
+
+  Every `@rozie-ui/*-solid` leaf with markup previously shipped Solid JSX inside
+  `dist/index.{mjs,cjs}` under a plain `import`/`require` (`chartjs-solid` renders no markup of its
+  own, but ships the same corrected export shape for consistency with its siblings). That is not
+  valid JavaScript on its own — a default `vite-plugin-solid` setup
+  fails with "JSX syntax is disabled" (the plugin only transforms `.[mc]?[jt]sx` files), and any
+  bundler without a Solid plugin fails outright. The only way to consume these packages was to
+  manually point `vite-plugin-solid` at the package's `.mjs` files inside `node_modules` — a
+  workaround, not a supported shape.
+
+  New export shape (the standard one for a published Solid library):
+  - `import` / `require` → `dist/<entry>.{mjs,cjs}`, compiled to plain DOM output by
+    `babel-preset-solid`. Any bundler consumes this with no Solid plugin at all.
+  - `solid` (export condition) → `dist/source/<entry>.jsx`, JSX kept intact. `vite-plugin-solid`
+    and SolidStart resolve this condition first and compile it themselves for their own mode (DOM /
+    SSR / hydration).
+
+  **If you were using the `extensions: ['.mjs']` / `node_modules` `include` workaround with
+  `vite-plugin-solid` to consume one of these packages, remove it — it is no longer needed** and a
+  default `vite-plugin-solid` setup now resolves the `solid` condition correctly on its own. No
+  public API change on any of these leaves.
+
+- 57607be: Design-system bridges now yield to a token set on any ancestor, and apply correctly on Lit.
+
+  Each family's `bootstrap`/`material`/`shadcn` theme bridge previously assigned the tokens it
+  maps directly on the component's own class. In CSS, a value an element declares for itself
+  always beats one it would inherit — so with a bridge imported, a public
+  `--rozie-<family>-*` token set on an ancestor (`:root`, `.dark`, a themed wrapper) had no effect;
+  only setting it on the component element itself worked. On Lit specifically, where the
+  component's class lives inside a shadow root that a document-level bridge selector can never
+  match, every bridge was completely inert.
+
+  Every read site that base.css gives a default, or a bridge maps, is now public-token-first, then
+  a private wiring name, then the inline default — e.g.
+  `var(--rozie-switch-on-bg, var(--rsw-on-bg, #0066cc))` — so a value set on any ancestor always
+  wins over a bridge's own mapping, and a public accent set on an ancestor now also recolours the
+  bridge-mapped tokens that default to it (ring colour, check colour, etc). Each bridge now
+  redeclares only the wiring for the tokens it maps, with the design system's own variable as the
+  fallback, resolved on the component itself — so it follows the nearest theme scope rather than
+  only ever reading `:root`, and a Lit host in the document's light DOM is matched directly by its
+  tag. Zero-import rendering is unchanged in every case: with nothing imported, every chain still
+  resolves to the same built-in default it always has.
+
+  **Behaviour changes a consumer can see:** with a bridge imported, a `--rozie-<family>-*` token
+  set on any ancestor now wins over the bridge's mapping (previously it only won when set directly
+  on the component element). On Lit, the bridges now actually apply (previously inert); a Lit
+  component nested inside another shadow root reads the design system's variables at the document
+  root.
+
+  **`@rozie-ui/rete`** additionally fixes its dark palette specifically: `FlowCanvas`'s
+  OS-dark palette was declared directly on the canvas element (competing with base.css's own
+  `.dark`/OS-dark declarations on the same element), so any ancestor override of a
+  `--rozie-flow-*` token was dead in OS-dark mode even with nothing else imported. The palette now
+  lives at the document root at zero specificity, so an ancestor override reaches it in every mode.
+
+  No component source behaviour changes beyond the CSS cascade described above; this is a pure
+  theming/cascade fix in every family listed.
+  - @rozie/runtime-solid@0.7.5
+
 ## 0.1.9
 
 ### Patch Changes

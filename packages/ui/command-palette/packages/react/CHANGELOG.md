@@ -1,5 +1,66 @@
 # @rozie-ui/command-palette-react
 
+## 0.4.12
+
+### Patch Changes
+
+- 57607be: All six `@rozie-ui/command-palette-<target>` leaves widen their required
+  `@rozie-ui/combobox-<target>` peer dependency from `^0.5.0` to `^0.5.0 || ^0.6.0`.
+
+  `@rozie-ui/combobox` moves to `0.6.0` in this same release (see that changeset). A caret range
+  on a 0.x version pins the minor, so leaving command-palette's declared range at `^0.5.0` would
+  make every command-palette leaf uninstallable against the combobox version it now needs once
+  combobox actually publishes at `0.6.0` — the same shape as the `data-table`/`popover` peer-widen
+  precedent from an earlier release.
+
+  **Why it is safe to admit both, not just force the new one.** Command-palette composes exactly
+  one `<Combobox>` per leaf, and combobox's `0.6.0` changes in this release are internal
+  virtualization-timing fixes, a CSS-cascade theming fix, and the removal of an already-inert
+  `--rozie-combobox-list-z` token — none of which command-palette's own usage reads or depends on.
+  There is no runtime, API, or DOM change in `@rozie-ui/command-palette-<target>` itself from this
+  edit; the entire diff is the one peer-dependency range line per target.
+
+  This changeset is deliberately kept separate from the theming changeset covering
+  command-palette in this same release — it is its own story about command-palette's peer
+  contract, not a restatement of the theming fix.
+
+- 57607be: Design-system bridges now yield to a token set on any ancestor, and apply correctly on Lit.
+
+  Each family's `bootstrap`/`material`/`shadcn` theme bridge previously assigned the tokens it
+  maps directly on the component's own class. In CSS, a value an element declares for itself
+  always beats one it would inherit — so with a bridge imported, a public
+  `--rozie-<family>-*` token set on an ancestor (`:root`, `.dark`, a themed wrapper) had no effect;
+  only setting it on the component element itself worked. On Lit specifically, where the
+  component's class lives inside a shadow root that a document-level bridge selector can never
+  match, every bridge was completely inert.
+
+  Every read site that base.css gives a default, or a bridge maps, is now public-token-first, then
+  a private wiring name, then the inline default — e.g.
+  `var(--rozie-switch-on-bg, var(--rsw-on-bg, #0066cc))` — so a value set on any ancestor always
+  wins over a bridge's own mapping, and a public accent set on an ancestor now also recolours the
+  bridge-mapped tokens that default to it (ring colour, check colour, etc). Each bridge now
+  redeclares only the wiring for the tokens it maps, with the design system's own variable as the
+  fallback, resolved on the component itself — so it follows the nearest theme scope rather than
+  only ever reading `:root`, and a Lit host in the document's light DOM is matched directly by its
+  tag. Zero-import rendering is unchanged in every case: with nothing imported, every chain still
+  resolves to the same built-in default it always has.
+
+  **Behaviour changes a consumer can see:** with a bridge imported, a `--rozie-<family>-*` token
+  set on any ancestor now wins over the bridge's mapping (previously it only won when set directly
+  on the component element). On Lit, the bridges now actually apply (previously inert); a Lit
+  component nested inside another shadow root reads the design system's variables at the document
+  root.
+
+  **`@rozie-ui/rete`** additionally fixes its dark palette specifically: `FlowCanvas`'s
+  OS-dark palette was declared directly on the canvas element (competing with base.css's own
+  `.dark`/OS-dark declarations on the same element), so any ancestor override of a
+  `--rozie-flow-*` token was dead in OS-dark mode even with nothing else imported. The palette now
+  lives at the document root at zero specificity, so an ancestor override reaches it in every mode.
+
+  No component source behaviour changes beyond the CSS cascade described above; this is a pure
+  theming/cascade fix in every family listed.
+  - @rozie/runtime-react@0.7.5
+
 ## 0.4.11
 
 ### Patch Changes

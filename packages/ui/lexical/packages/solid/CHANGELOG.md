@@ -1,6 +1,6 @@
-# @rozie-ui/resizable-solid
+# @rozie-ui/lexical-solid
 
-## 0.1.3
+## 0.1.1
 
 ### Patch Changes
 
@@ -41,15 +41,3 @@
 
   `solid-js ^1.8` is a required peer on all nine, consistent with every other Solid leaf.
   - @rozie/runtime-solid@0.7.5
-
-## 0.1.2
-
-### Patch Changes
-
-- @rozie/runtime-solid@0.2.1
-
-## 0.1.1
-
-### Patch Changes
-
-- @rozie/runtime-solid@0.2.0
