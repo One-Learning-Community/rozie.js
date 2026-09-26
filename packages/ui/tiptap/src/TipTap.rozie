@@ -1059,11 +1059,30 @@ $onMount(() => {
     $emit('ready', editor)
   }
 
+  // A failed optional-extension chunk (a real-world CDN/network blip) must NOT sink
+  // the whole editor — each import() is caught INDIVIDUALLY so one rejection can't
+  // reject the shared Promise.all (which would otherwise leave the `.then()` below
+  // never firing: no editor, no `ready`, no error, permanently — an unhandled
+  // rejection that just evaporates). A caught failure is reported (console.error +
+  // the `error` event, mirroring RecaptchaV3/Captcha/MapLibre/PdfViewer/Waveform's
+  // `$emit('error', ...)` convention) and resolves `null` — construct() already
+  // treats a `null` mod exactly like "this extension wasn't needed" (see the
+  // `floatingMod ? floatingMod.FloatingMenu : null` guards below), so the editor
+  // still constructs, just degraded (missing that one extension) instead of never
+  // constructing at all.
+  const onOptionalExtensionFailed = (name) => (err) => {
+    if (!disposed) {
+      console.error(`[@rozie-ui/tiptap] optional extension "${name}" failed to load — constructing without it.`, err)
+      $emit('error', { extension: name, error: err })
+    }
+    return null
+  }
+
   if (needsFloating || needsImage || needsCount) {
     Promise.all([
-      needsFloating ? import('@tiptap/extension-floating-menu') : null,
-      needsImage ? import('@tiptap/extension-image') : null,
-      needsCount ? import('@tiptap/extension-character-count') : null,
+      needsFloating ? import('@tiptap/extension-floating-menu').catch(onOptionalExtensionFailed('floatingMenu')) : null,
+      needsImage ? import('@tiptap/extension-image').catch(onOptionalExtensionFailed('image')) : null,
+      needsCount ? import('@tiptap/extension-character-count').catch(onOptionalExtensionFailed('count')) : null,
     ]).then((mods) => {
       if (!disposed) construct(mods[0], mods[1], mods[2])
     })

@@ -156,6 +156,7 @@ el.addEventListener('html-change', (e) => {
 | `selectionUpdate` | — | The selection (caret / range) moved. |
 | `focus` | — | The editor gained focus. |
 | `blur` | — | The editor lost focus. |
+| `error` | `{ extension, error }` | An optional extension (`floatingMenu`, `image`, `count`) failed to load via dynamic `import()` — payload is `{ extension, error }`. The editor still constructs WITHOUT that extension (degrade); a network blip never leaves a mounted `<TipTap>` permanently blank. |
 
 ### Imperative handle
 

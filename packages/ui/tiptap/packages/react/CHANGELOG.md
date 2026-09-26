@@ -58,6 +58,13 @@
   Calling either before `ready` now updates the bound `html` model immediately, and the
   editor constructs with that value once it exists, instead of the write silently vanishing.
 
+  **New event: `error`.** Fired when an optional extension (`floatingMenu`/`image`/`count`)
+  fails to load via its dynamic `import()` — payload is `{ extension, error }`. Previously
+  an unhandled rejection on the internal `Promise.all` left the editor permanently
+  uncreated, silently, on ANY chunk-load failure (a real-world CDN/network blip). The
+  editor now still constructs WITHOUT the failed extension (degrade) instead of never
+  constructing at all; the failure is also reported via `console.error`.
+
 ### Patch Changes
 
 - @rozie/runtime-react@0.7.5
