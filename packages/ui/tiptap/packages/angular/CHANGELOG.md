@@ -65,6 +65,10 @@
   editor now still constructs WITHOUT the failed extension (degrade) instead of never
   constructing at all; the failure is also reported via `console.error`.
 
+  **Docs: the `ready` event's README table row is no longer empty.** Its description was
+  missing from the generator's event-description map since `ready` shipped last release;
+  now documented, alongside the new `error` event above.
+
 ### Patch Changes
 
 - @rozie/runtime-angular@0.7.5
