@@ -102,5 +102,3 @@ const lb = ref();          // template ref
 | selected | selected, value |
 | option | option, index, active, selected, disabled |
 | empty | query |
-| option | option, index, active, selected, disabled |
-| empty | query |

@@ -84,5 +84,3 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | --- | --- |
 | mark | value, label, position |
 | bubble | value |
-| bubble | value |
-| bubble | value |

@@ -124,14 +124,4 @@ handle?.clear();
 | empty | query |
 | create | query |
 | groupHeading | group |
-| option | option, index, active, selected, disabled |
-| empty | query |
-| create | query |
-| groupHeading | group |
-| option | option, index, active, selected, disabled |
 | groupMore | group, hidden, expand |
-| empty | query |
-| create | query |
-| option | option, index, active, selected, disabled |
-| empty | query |
-| create | query |

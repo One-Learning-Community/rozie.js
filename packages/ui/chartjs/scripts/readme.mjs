@@ -391,7 +391,10 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}, variantNa
     lines.push('');
     lines.push('| Slot | Params |');
     lines.push('| --- | --- |');
+    const seenSlotNames = new Set();
     for (const s of ir.slots) {
+      if (seenSlotNames.has(s.name)) continue;
+      seenSlotNames.add(s.name);
       lines.push(`| ${renderSlotName(s.name)} | ${slotParams(s)} |`);
     }
     lines.push('');

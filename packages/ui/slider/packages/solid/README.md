@@ -86,5 +86,3 @@ handle?.increment();
 | --- | --- |
 | mark | value, label, position |
 | bubble | value |
-| bubble | value |
-| bubble | value |

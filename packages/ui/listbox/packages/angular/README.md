@@ -134,5 +134,3 @@ export class DemoComponent {
 | selected | selected, value |
 | option | option, index, active, selected, disabled |
 | empty | query |
-| option | option, index, active, selected, disabled |
-| empty | query |

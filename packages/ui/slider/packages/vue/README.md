@@ -90,5 +90,3 @@ const sl = ref();          // template ref
 | --- | --- |
 | mark | value, label, position |
 | bubble | value |
-| bubble | value |
-| bubble | value |
