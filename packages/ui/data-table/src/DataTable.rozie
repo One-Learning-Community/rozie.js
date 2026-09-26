@@ -2452,7 +2452,7 @@ $expose({
                cell holds a checkbox taller than a text line, so an EMPTY cell made placeholder
                rows 2px short and every fill slid the view (measured). Not .rdt-select-row, so
                select-all and selection never see it. -->
-          <input class="rdt-select-placeholder" type="checkbox" :disabled="true" tabindex="-1" aria-hidden="true" style="visibility:hidden" />
+          <input class="rdt-select-placeholder" type="checkbox" disabled tabindex="-1" aria-hidden="true" style="visibility:hidden" />
         </span>
         <span style="display:contents" r-else-if="rowIsLazyPlaceholder(wr.row) && isExpanderColumn(cell.column.id)"></span>
         <span style="display:contents" r-else-if="rowIsLazyPlaceholder(wr.row)">

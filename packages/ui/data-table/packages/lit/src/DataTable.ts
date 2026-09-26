@@ -1669,7 +1669,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
         
         ${this.rowIsLazyPlaceholder(wr.row) && this.isSelectColumn(cell.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           
-          <input class="rdt-select-placeholder" type="checkbox" ?disabled=${true} tabindex="-1" aria-hidden="true" style="visibility:hidden" data-rozie-s-d5dcab4c />
+          <input class="rdt-select-placeholder" type="checkbox" disabled="" tabindex="-1" aria-hidden="true" style="visibility:hidden" data-rozie-s-d5dcab4c />
         </span>` : this.rowIsLazyPlaceholder(wr.row) && this.isExpanderColumn(cell.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : this.rowIsLazyPlaceholder(wr.row) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.placeholder !== undefined ? this.placeholder({index: wr.vi.index, columnId: cell.column.id}) : html`<slot name="placeholder" data-rozie-params=${(() => { try { return JSON.stringify({index: wr.vi.index, columnId: cell.column.id}); } catch { return '{}'; } })()}>
             <span class="rdt-skeleton" aria-hidden="true" data-rozie-s-d5dcab4c>&#8203;</span>

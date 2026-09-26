@@ -336,7 +336,7 @@ interface EditorCtx {
             @if (rowIsLazyPlaceholder(wr.row) && isSelectColumn(cell.column.id)) {
     <span style="display:contents">
               
-              <input class="rdt-select-placeholder" type="checkbox" [disabled]="true" tabindex="-1" aria-hidden="true" style="visibility:hidden" />
+              <input class="rdt-select-placeholder" type="checkbox" disabled="" tabindex="-1" aria-hidden="true" style="visibility:hidden" />
             </span>
     } @else if (rowIsLazyPlaceholder(wr.row) && isExpanderColumn(cell.column.id)) {
     <span style="display:contents"></span>

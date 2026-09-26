@@ -86,7 +86,7 @@
         
         <span v-if="rowIsLazyPlaceholder(wr.row) && isSelectColumn(cell.column.id)" style="display:contents">
           
-          <input class="rdt-select-placeholder" type="checkbox" :disabled="true" tabindex="-1" aria-hidden="true" style="visibility:hidden" />
+          <input class="rdt-select-placeholder" type="checkbox" disabled tabindex="-1" aria-hidden="true" style="visibility:hidden" />
         </span><span v-else-if="rowIsLazyPlaceholder(wr.row) && isExpanderColumn(cell.column.id)" style="display:contents"></span><span v-else-if="rowIsLazyPlaceholder(wr.row)" style="display:contents">
           <slot name="placeholder" :index="wr.vi.index" :columnId="cell.column.id">
             <span class="rdt-skeleton" aria-hidden="true">&#8203;</span>
