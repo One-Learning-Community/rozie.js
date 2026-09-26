@@ -3257,10 +3257,17 @@ export class DataTable {
   // table-core's OWN freshly-assigned id (table.getCoreRowModel().rows[i].id, NOT a locally
   // recomputed getRowId() call — must be byte-identical to what virtualItemKey(i) reads next) so
   // the cache is already correct before the caller's virtualizer.setOptions()/_willUpdate() re-feed.
-  // Bumping itemSizeCacheVersion is required, not cosmetic: getMeasurements() is memoized on
-  // [getMeasurementOptions(), itemSizeCacheVersion] only — mutating the Map alone does not
-  // invalidate it (confirmed from the installed source; the same fact windowing.rzts's
-  // refineRowEstimate() comment documents). Scans the CACHE's own placeholder-prefixed keys
+  // Invalidating the memo needs BOTH strategies below, not just one: getMeasurements() is
+  // memoized on [getMeasurementOptions(), itemSizeCacheVersion] on 3.15+ (confirmed from the
+  // installed source; the same fact windowing.rzts's refineRowEstimate() comment documents) —
+  // but our peer range is `^3`, and versions <=3.14 have NO itemSizeCacheVersion at all and key
+  // the SAME memo on `this.itemSizeCache` (Map IDENTITY) instead — verified against the 3.14.0
+  // tarball, whose own resizeItem() invalidates by reassigning `this.itemSizeCache = new Map(...)`,
+  // never by bumping a version counter. Mutating the Map in place would be silently invisible to
+  // that memo on <=3.14 (a stray `itemSizeCacheVersion++` there just creates a NaN-valued own
+  // property nobody reads). So this reassigns the Map (a public field on every 3.x we support —
+  // harmless on 3.15+, whose memo body re-reads `this.itemSizeCache` fresh) AND bumps the version
+  // counter only where it actually exists. Scans the CACHE's own placeholder-prefixed keys
   // (bounded by rows actually measured so far), never rowCount (unbounded — 10,000+ here).
   migratePlaceholderSizeCache = (): void => {
     if (!this.virtualizer || !this.virtualizer.itemSizeCache || !this.table) return;
@@ -3276,7 +3283,9 @@ export class DataTable {
       cache.delete(oldKey);
       migrated = true;
     }
-    if (migrated) this.virtualizer.itemSizeCacheVersion++;
+    if (!migrated) return;
+    this.virtualizer.itemSizeCache = new Map(cache);
+    if (typeof this.virtualizer.itemSizeCacheVersion === 'number') this.virtualizer.itemSizeCacheVersion++;
   };
   // `visible-range-change { start, end }` — the RENDERED row window (overscan included), `end`
   // exclusive, over the full row space. Driven by the window-version bump every virtualizer change
