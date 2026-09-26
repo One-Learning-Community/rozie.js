@@ -520,6 +520,69 @@ describe('rewriteScript — Identifier-visitor skips', () => {
     expect(out).toContain('[this.doThing]: 1');
   });
 
+  it('a computed key in a DESTRUCTURING pattern is rewritten (the key is a reference, not a binding)', () => {
+    const ir = buildIR();
+    // `const { [doThing]: v } = o` — same "key is an expression" fact as the
+    // object-literal case above, but here the ObjectProperty sits inside an
+    // ObjectPattern. `isInBindingPosition` walked straight past the
+    // ObjectProperty to the enclosing ObjectPattern and returned true for
+    // ANY identifier reachable through it — including the computed KEY, which
+    // is not a binding at all. Known remaining edge called out in de1d0c8c3.
+    const out = rewrite('function doThing() {} const { [doThing]: v } = obj;', ir);
+    expect(out).toContain('[this.doThing]: v');
+  });
+
+  it('a computed key inside a NESTED destructuring pattern is rewritten', () => {
+    const ir = buildIR();
+    const out = rewrite('function doThing() {} const { a: { [doThing]: w } } = obj;', ir);
+    expect(out).toContain('[this.doThing]: w');
+  });
+
+  it('a computed key in a destructured FUNCTION-PARAM pattern is rewritten', () => {
+    const ir = buildIR();
+    const out = rewrite('function doThing() {} (({ [doThing]: v }) => v);', ir);
+    expect(out).toContain('[this.doThing]: v');
+  });
+
+  it('a computed key in an ASSIGNMENT pattern (`{ [X]: v } = o`) is rewritten', () => {
+    const ir = buildIR();
+    const out = rewrite('function doThing() {} ({ [doThing]: v } = obj);', ir);
+    expect(out).toContain('[this.doThing]: v');
+  });
+
+  it('a NON-computed key in a destructuring pattern is NOT rewritten (it is a property name)', () => {
+    const ir = buildIR();
+    // `const { doThing: v } = o` — `doThing` here is a plain key, not a
+    // reference; it must stay bare regardless of the computed-key fix above.
+    const out = rewrite('function doThing() {} const { doThing: v } = obj;', ir);
+    expect(out).not.toContain('this.doThing');
+    expect(out).toContain('doThing: v');
+  });
+
+  it('a computed-key pattern binding that SHADOWS a DIFFERENT promoted name still rewrites the key but not the shadowed value binding', () => {
+    const ir = buildIR();
+    // `otherKey` (computed key — a reference) is unrelated to `doThing` (the
+    // pattern's VALUE, a BINDING that shadows the promoted `doThing` for the
+    // rest of the block). Exercises both mechanisms at once without the two
+    // occurrences colliding on the same name: `patternIntroducesBinding` only
+    // ever inspects the VALUE side of an ObjectProperty (never the key), so
+    // it already correctly reports this as a shadowing binding regardless of
+    // whether the property's key happens to be computed — no change needed
+    // there. (A same-name `{ [doThing]: doThing }` self-reference also
+    // exists, but hits a separate, pre-existing, order-insensitive
+    // approximation in `hasShadowingBinding` — it scans an enclosing block's
+    // declarations without regard to source order or self-reference, which
+    // is orthogonal to this computed-key-in-pattern fix and out of scope
+    // here.)
+    const out = rewrite(
+      'function doThing() {} function otherKey() {} const f = () => { const { [otherKey]: doThing } = obj; return doThing; };',
+      ir,
+    );
+    expect(out).toContain('[this.otherKey]: doThing');
+    expect(out).not.toContain('return this.doThing');
+    expect(out).toContain('return doThing;');
+  });
+
   it('method name as a bare function param stays bare', () => {
     const ir = buildIR();
     const out = rewrite('function doThing() {} const f = (doThing) => doThing;', ir);
