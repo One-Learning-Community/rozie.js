@@ -76,6 +76,7 @@ export interface TipTapProps {
   onFocus?: (...args: unknown[]) => void;
   onBlur?: (...args: unknown[]) => void;
   onReady?: (...args: unknown[]) => void;
+  onError?: (...args: unknown[]) => void;
   renderCount?: (params: { characters: unknown; words: unknown; maxLength: number; over: unknown }) => ReactNode;
   renderToolbar?: (params: { editor: unknown }) => ReactNode;
   renderBubbleMenu?: (params: { editor: unknown }) => ReactNode;

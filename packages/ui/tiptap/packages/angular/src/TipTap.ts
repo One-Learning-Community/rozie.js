@@ -339,6 +339,7 @@ export class TipTap {
   focus = output<void>();
   blur = output<void>();
   ready = output<unknown>();
+  error = output<unknown>();
   @ContentChild('count', { read: TemplateRef }) countTpl?: TemplateRef<CountCtx>;
   @ContentChild('toolbar', { read: TemplateRef }) toolbarTpl?: TemplateRef<ToolbarCtx>;
   @ContentChild('bubbleMenu', { read: TemplateRef }) bubbleMenuTpl?: TemplateRef<BubbleMenuCtx>;
@@ -473,7 +474,21 @@ export class TipTap {
   }
 
   ngAfterViewInit() {
-    this.disposed = false;
+    // mount-local (NOT a top-level script `let`) — set here so a late-resolving
+    // dynamic import() below bails, and read by the returned teardown. Emitter-
+    // hardening backlog item #2 (project_emitter_hardening_backlog): every
+    // target keeps a $onMount setup-local in scope for its own returned
+    // teardown, so this no longer needs a TOP-LEVEL-`let` workaround (mirrors
+    // PdfViewer.rozie's `cancelled`). Crucially, a $onMount-LOCAL binding is
+    // per-INVOCATION, not per-component-instance: React StrictMode's dev-mode
+    // double-invoke re-runs this SAME function body (setup → cleanup → setup
+    // again) against the SAME component instance WITHOUT creating a new one, so
+    // a top-level or ref-hoisted `disposed` would be shared/reset across both
+    // invocations (the bug this fixes) — a plain local re-declares fresh on each
+    // invocation, so the FIRST invocation's stale `.then()` reads the closure IT
+    // captured (permanently `true` after its own cleanup ran), never the SECOND
+    // invocation's separate `false`.
+    let disposed = false;
 
     // Which optional extensions this editor needs. Read ONCE here (setup-once, like
     // placeholder/nodeSpecs). When none is needed the editor is constructed right now,
@@ -736,15 +751,48 @@ export class TipTap {
       }
       this.ready.emit(this.editor);
     };
+
+    // A failed optional-extension chunk (a real-world CDN/network blip) must NOT sink
+    // the whole editor — each import() is caught INDIVIDUALLY so one rejection can't
+    // reject the shared Promise.all (which would otherwise leave the `.then()` below
+    // never firing: no editor, no `ready`, no error, permanently — an unhandled
+    // rejection that just evaporates). A caught failure is reported (console.error +
+    // the `error` event, mirroring RecaptchaV3/Captcha/MapLibre/PdfViewer/Waveform's
+    // `$emit('error', ...)` convention) and resolves `null` — construct() already
+    // treats a `null` mod exactly like "this extension wasn't needed" (see the
+    // `floatingMod ? floatingMod.FloatingMenu : null` guards below), so the editor
+    // still constructs, just degraded (missing that one extension) instead of never
+    // constructing at all.
+    // A failed optional-extension chunk (a real-world CDN/network blip) must NOT sink
+    // the whole editor — each import() is caught INDIVIDUALLY so one rejection can't
+    // reject the shared Promise.all (which would otherwise leave the `.then()` below
+    // never firing: no editor, no `ready`, no error, permanently — an unhandled
+    // rejection that just evaporates). A caught failure is reported (console.error +
+    // the `error` event, mirroring RecaptchaV3/Captcha/MapLibre/PdfViewer/Waveform's
+    // `$emit('error', ...)` convention) and resolves `null` — construct() already
+    // treats a `null` mod exactly like "this extension wasn't needed" (see the
+    // `floatingMod ? floatingMod.FloatingMenu : null` guards below), so the editor
+    // still constructs, just degraded (missing that one extension) instead of never
+    // constructing at all.
+    const onOptionalExtensionFailed = (name: any) => (err: any) => {
+      if (!disposed) {
+        console.error(`[@rozie-ui/tiptap] optional extension "${name}" failed to load — constructing without it.`, err);
+        this.error.emit({
+          extension: name,
+          error: err
+        });
+      }
+      return null;
+    };
     if (needsFloating || needsImage || needsCount) {
-      Promise.all([needsFloating ? import('@tiptap/extension-floating-menu') : null, needsImage ? import('@tiptap/extension-image') : null, needsCount ? import('@tiptap/extension-character-count') : null]).then((mods: any) => {
-        if (!this.disposed) construct(mods[0], mods[1], mods[2]);
+      Promise.all([needsFloating ? import('@tiptap/extension-floating-menu').catch(onOptionalExtensionFailed('floatingMenu')) : null, needsImage ? import('@tiptap/extension-image').catch(onOptionalExtensionFailed('image')) : null, needsCount ? import('@tiptap/extension-character-count').catch(onOptionalExtensionFailed('count')) : null]).then((mods: any) => {
+        if (!disposed) construct(mods[0], mods[1], mods[2]);
       });
     } else {
       construct(null, null, null);
     }
     this.__rozieDestroyRef.onDestroy(() => {
-      this.disposed = true;
+      disposed = true;
       this.toolbarDispose?.();
       this.toolbarDispose = null;
       this.bubbleMenuDispose?.();
@@ -764,11 +812,6 @@ export class TipTap {
   }
 
   editor: any = null;
-  // Set by the mount cleanup. When a conditional extension is being loaded, the editor
-  // is constructed after the import() settles — by then the component may already be
-  // gone, and constructing into a detached element would leak an Editor.
-  // COMPONENT-scope for the Solid cleanup-hoist reason documented at toolbarDispose.
-  disposed = false;
   // The raw HTML string the editor currently reflects. Compared against in the
   // $props.html reconciler so the watcher's mount-time fire is a no-op: the
   // editor is created with `content: $props.html`, so right after mount the bound
@@ -1406,9 +1449,19 @@ export class TipTap {
   // setContent routes through the SAME suppress-echo bookkeeping as $watch(html):
   // update lastHtml first, set with emitUpdate:false (no onUpdate bounce), then
   // reflect into the model so a programmatic set keeps the bound state in sync.
+  //
+  // Pre-construction (`!editor`) is the async lazy-extension gap (maxLength /
+  // uploadImage / #floatingMenu delay construction behind a dynamic import()) — a
+  // write here must NOT be dropped. construct() always reads `$props.html` FRESH
+  // (`lastHtml = $props.html` is the first thing it does — see $onMount), so
+  // writing the MODEL now is enough: the editor constructs with this value once it
+  // exists, instead of the caller's write silently vanishing into the gap.
   setContent = (next: any) => {
-    if (!this.editor) return;
     const v = next ?? '';
+    if (!this.editor) {
+      this.html.set(v), this.__rozieCvaOnChange(v);
+      return;
+    }
     if (v === this.lastHtml) return;
     this.lastHtml = v;
     this.editor.commands.setContent(v, {
@@ -1420,7 +1473,14 @@ export class TipTap {
     this.refreshLink();
   };
   clearContent = () => {
-    if (!this.editor) return;
+    if (!this.editor) {
+      // Same pre-construction reasoning as setContent — TipTap/ProseMirror's
+      // canonical empty-document HTML (StarterKit's default paragraph node), so
+      // construct() seeds the SAME state `editor.commands.clearContent()` would
+      // have produced had the editor already existed.
+      this.html.set('<p></p>'), this.__rozieCvaOnChange('<p></p>');
+      return;
+    }
     this.editor.commands.clearContent();
     this.lastHtml = this.editor.getHTML();
     this.html.set(this.lastHtml), this.__rozieCvaOnChange(this.lastHtml);

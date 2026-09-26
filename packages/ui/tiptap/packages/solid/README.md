@@ -51,7 +51,8 @@ export function Demo() {
 | `selectionUpdate` | The selection (caret/range) moved. |
 | `focus` | The editor gained focus. |
 | `blur` | The editor lost focus. |
-| `ready` |  |
+| `ready` | The editor exists — the live TipTap `Editor` instance. Fires once per mount. Handle verbs (`focusEditor()`, `setContent()`, …) work from here on; with an optional extension in use (`maxLength`, `uploadImage`, the `floatingMenu` slot) construction waits for its import, so this is the moment to act rather than a fixed delay. |
+| `error` | An optional extension (`floatingMenu`, `image`, `count`) failed to load via dynamic `import()` — payload is `{ extension, error }`. The editor still constructs WITHOUT that extension (degrade); a network blip never leaves a mounted `<TipTap>` permanently blank. |
 
 ## Imperative handle
 

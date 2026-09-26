@@ -116,6 +116,7 @@ interface TipTapProps {
   onFocus?: (...args: any[]) => void;
   onBlur?: (...args: any[]) => void;
   onReady?: (...args: any[]) => void;
+  onError?: (...args: any[]) => void;
   renderCount?: (ctx: CountCtx) => ReactNode;
   renderToolbar?: (ctx: ToolbarCtx) => ReactNode;
   renderBubbleMenu?: (ctx: BubbleMenuCtx) => ReactNode;
@@ -278,7 +279,6 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       };
     },
   };
-  const disposed = useRef(false);
   const lastHtml = useRef<any>(null);
   const bubbleMenuEl = useRef<any>(null);
   const floatingMenuEl = useRef<any>(null);
@@ -318,6 +318,8 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   _nodeSpecsRef.current = props.nodeSpecs;
   const _onBlurRef = useRef(props.onBlur);
   _onBlurRef.current = props.onBlur;
+  const _onErrorRef = useRef(props.onError);
+  _onErrorRef.current = props.onError;
   const _onFocusRef = useRef(props.onFocus);
   _onFocusRef.current = props.onFocus;
   const _onReadyRef = useRef(props.onReady);
@@ -397,10 +399,6 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   // @tiptap/* wrappers guard the same way against the *raw* value, never against
   // the normalized `editor.getHTML()`). This is the CodeMirror suppress-echo
   // guard in HTML-string form (flatpickr lineage).
-  // Set by the mount cleanup. When a conditional extension is being loaded, the editor
-  // is constructed after the import() settles — by then the component may already be
-  // gone, and constructing into a detached element would leak an Editor.
-  // COMPONENT-scope for the Solid cleanup-hoist reason documented at toolbarDispose.
   // The live editor instance — null before mount / after destroy. Named `editor`
   // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
   // declaration trap (the Chart.js canvasEl/canvasNode lesson).
@@ -995,9 +993,19 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   // setContent routes through the SAME suppress-echo bookkeeping as $watch(html):
   // update lastHtml first, set with emitUpdate:false (no onUpdate bounce), then
   // reflect into the model so a programmatic set keeps the bound state in sync.
+  //
+  // Pre-construction (`!editor`) is the async lazy-extension gap (maxLength /
+  // uploadImage / #floatingMenu delay construction behind a dynamic import()) — a
+  // write here must NOT be dropped. construct() always reads `$props.html` FRESH
+  // (`lastHtml = $props.html` is the first thing it does — see $onMount), so
+  // writing the MODEL now is enough: the editor constructs with this value once it
+  // exists, instead of the caller's write silently vanishing into the gap.
   function setContent(next: any) {
-    if (!editor.current) return;
     const v = next ?? '';
+    if (!editor.current) {
+      setHtml(v);
+      return;
+    }
     if (v === lastHtml.current) return;
     lastHtml.current = v;
     editor.current.commands.setContent(v, {
@@ -1009,7 +1017,14 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     refreshLink();
   }
   function clearContent() {
-    if (!editor.current) return;
+    if (!editor.current) {
+      // Same pre-construction reasoning as setContent — TipTap/ProseMirror's
+      // canonical empty-document HTML (StarterKit's default paragraph node), so
+      // construct() seeds the SAME state `editor.commands.clearContent()` would
+      // have produced had the editor already existed.
+      setHtml('<p></p>');
+      return;
+    }
     editor.current.commands.clearContent();
     lastHtml.current = editor.current.getHTML();
     setHtml(lastHtml.current);
@@ -1127,7 +1142,21 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   useEffect(() => {
     const _handleDropStable: typeof _handleDropRef.current = (...args) => _handleDropRef.current(...args);
     const _handlePasteStable: typeof _handlePasteRef.current = (...args) => _handlePasteRef.current(...args);
-    disposed.current = false;
+    // mount-local (NOT a top-level script `let`) — set here so a late-resolving
+    // dynamic import() below bails, and read by the returned teardown. Emitter-
+    // hardening backlog item #2 (project_emitter_hardening_backlog): every
+    // target keeps a $onMount setup-local in scope for its own returned
+    // teardown, so this no longer needs a TOP-LEVEL-`let` workaround (mirrors
+    // PdfViewer.rozie's `cancelled`). Crucially, a $onMount-LOCAL binding is
+    // per-INVOCATION, not per-component-instance: React StrictMode's dev-mode
+    // double-invoke re-runs this SAME function body (setup → cleanup → setup
+    // again) against the SAME component instance WITHOUT creating a new one, so
+    // a top-level or ref-hoisted `disposed` would be shared/reset across both
+    // invocations (the bug this fixes) — a plain local re-declares fresh on each
+    // invocation, so the FIRST invocation's stale `.then()` reads the closure IT
+    // captured (permanently `true` after its own cleanup ran), never the SECOND
+    // invocation's separate `false`.
+    let disposed = false;
 
     // Which optional extensions this editor needs. Read ONCE here (setup-once, like
     // placeholder/nodeSpecs). When none is needed the editor is constructed right now,
@@ -1379,9 +1408,31 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       }
       _onReadyRef.current && _onReadyRef.current(editor.current);
     };
+
+    // A failed optional-extension chunk (a real-world CDN/network blip) must NOT sink
+    // the whole editor — each import() is caught INDIVIDUALLY so one rejection can't
+    // reject the shared Promise.all (which would otherwise leave the `.then()` below
+    // never firing: no editor, no `ready`, no error, permanently — an unhandled
+    // rejection that just evaporates). A caught failure is reported (console.error +
+    // the `error` event, mirroring RecaptchaV3/Captcha/MapLibre/PdfViewer/Waveform's
+    // `$emit('error', ...)` convention) and resolves `null` — construct() already
+    // treats a `null` mod exactly like "this extension wasn't needed" (see the
+    // `floatingMod ? floatingMod.FloatingMenu : null` guards below), so the editor
+    // still constructs, just degraded (missing that one extension) instead of never
+    // constructing at all.
+    const onOptionalExtensionFailed = (name: any) => (err: any) => {
+      if (!disposed) {
+        console.error(`[@rozie-ui/tiptap] optional extension "${name}" failed to load — constructing without it.`, err);
+        _onErrorRef.current && _onErrorRef.current({
+          extension: name,
+          error: err
+        });
+      }
+      return null;
+    };
     if (needsFloating || needsImage || needsCount) {
-      Promise.all([needsFloating ? import('@tiptap/extension-floating-menu') : null, needsImage ? import('@tiptap/extension-image') : null, needsCount ? import('@tiptap/extension-character-count') : null]).then((mods: any) => {
-        if (!disposed.current) construct(mods[0], mods[1], mods[2]);
+      Promise.all([needsFloating ? import('@tiptap/extension-floating-menu').catch(onOptionalExtensionFailed('floatingMenu')) : null, needsImage ? import('@tiptap/extension-image').catch(onOptionalExtensionFailed('image')) : null, needsCount ? import('@tiptap/extension-character-count').catch(onOptionalExtensionFailed('count')) : null]).then((mods: any) => {
+        if (!disposed) construct(mods[0], mods[1], mods[2]);
       });
     } else {
       construct(null, null, null);
@@ -1389,7 +1440,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     return () => {
       for (const root of portalRoots.current) root.unmount();
   portalRoots.current.clear();
-      disposed.current = true;
+      disposed = true;
       toolbarDispose.current?.();
       toolbarDispose.current = null;
       bubbleMenuDispose.current?.();

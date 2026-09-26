@@ -221,6 +221,7 @@ interface TipTapProps {
   onFocus?: (...args: unknown[]) => void;
   onBlur?: (...args: unknown[]) => void;
   onReady?: (...args: unknown[]) => void;
+  onError?: (...args: unknown[]) => void;
   countSlot?: (ctx: CountSlotCtx) => JSX.Element;
   toolbarSlot?: (ctx: ToolbarSlotCtx) => JSX.Element;
   bubbleMenuSlot?: (ctx: BubbleMenuSlotCtx) => JSX.Element;
@@ -261,7 +262,7 @@ export interface TipTapHandle {
 
 export default function TipTap(_props: TipTapProps): JSX.Element {
   const _merged = mergeProps({ editable: true, placeholder: '', autofocus: false, editorClass: '', ariaLabel: 'Rich text editor', editorProps: (() => ({}))() as Record<string, any>, extensions: (() => [])() as any[], starterKit: (() => ({}))() as Record<string, any>, nodeSpecs: (() => [])() as any[], uploadImage: null, maxLength: null, enforceMaxLength: false, bubbleMenuShouldShow: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['html', 'editable', 'placeholder', 'autofocus', 'editorClass', 'ariaLabel', 'editorProps', 'extensions', 'starterKit', 'nodeSpecs', 'uploadImage', 'maxLength', 'enforceMaxLength', 'bubbleMenuShouldShow', 'ref', 'onUpdate', 'onSelectionUpdate', 'onFocus', 'onBlur', 'onReady']);
+  const [local, attrs] = splitProps(_merged, ['html', 'editable', 'placeholder', 'autofocus', 'editorClass', 'ariaLabel', 'editorProps', 'extensions', 'starterKit', 'nodeSpecs', 'uploadImage', 'maxLength', 'enforceMaxLength', 'bubbleMenuShouldShow', 'ref', 'onUpdate', 'onSelectionUpdate', 'onFocus', 'onBlur', 'onReady', 'onError']);
   onMount(() => { local.ref?.({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor, setLink, unsetLink }); });
 
   const [html, setHtml] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'html', '<p>Start writing…</p>');
@@ -367,8 +368,21 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     portalDisposers.clear();
   });
   onMount(() => {
-    const _cleanup = (() => {
-    disposed = false;
+    // mount-local (NOT a top-level script `let`) — set here so a late-resolving
+    // dynamic import() below bails, and read by the returned teardown. Emitter-
+    // hardening backlog item #2 (project_emitter_hardening_backlog): every
+    // target keeps a $onMount setup-local in scope for its own returned
+    // teardown, so this no longer needs a TOP-LEVEL-`let` workaround (mirrors
+    // PdfViewer.rozie's `cancelled`). Crucially, a $onMount-LOCAL binding is
+    // per-INVOCATION, not per-component-instance: React StrictMode's dev-mode
+    // double-invoke re-runs this SAME function body (setup → cleanup → setup
+    // again) against the SAME component instance WITHOUT creating a new one, so
+    // a top-level or ref-hoisted `disposed` would be shared/reset across both
+    // invocations (the bug this fixes) — a plain local re-declares fresh on each
+    // invocation, so the FIRST invocation's stale `.then()` reads the closure IT
+    // captured (permanently `true` after its own cleanup ran), never the SECOND
+    // invocation's separate `false`.
+    let disposed = false;
 
     // Which optional extensions this editor needs. Read ONCE here (setup-once, like
     // placeholder/nodeSpecs). When none is needed the editor is constructed right now,
@@ -620,29 +634,49 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
       }
       _props.onReady?.(editor);
     };
+
+    // A failed optional-extension chunk (a real-world CDN/network blip) must NOT sink
+    // the whole editor — each import() is caught INDIVIDUALLY so one rejection can't
+    // reject the shared Promise.all (which would otherwise leave the `.then()` below
+    // never firing: no editor, no `ready`, no error, permanently — an unhandled
+    // rejection that just evaporates). A caught failure is reported (console.error +
+    // the `error` event, mirroring RecaptchaV3/Captcha/MapLibre/PdfViewer/Waveform's
+    // `$emit('error', ...)` convention) and resolves `null` — construct() already
+    // treats a `null` mod exactly like "this extension wasn't needed" (see the
+    // `floatingMod ? floatingMod.FloatingMenu : null` guards below), so the editor
+    // still constructs, just degraded (missing that one extension) instead of never
+    // constructing at all.
+    const onOptionalExtensionFailed = (name: any) => (err: any) => {
+      if (!disposed) {
+        console.error(`[@rozie-ui/tiptap] optional extension "${name}" failed to load — constructing without it.`, err);
+        _props.onError?.({
+          extension: name,
+          error: err
+        });
+      }
+      return null;
+    };
     if (needsFloating || needsImage || needsCount) {
-      Promise.all([needsFloating ? import('@tiptap/extension-floating-menu') : null, needsImage ? import('@tiptap/extension-image') : null, needsCount ? import('@tiptap/extension-character-count') : null]).then((mods: any) => {
+      Promise.all([needsFloating ? import('@tiptap/extension-floating-menu').catch(onOptionalExtensionFailed('floatingMenu')) : null, needsImage ? import('@tiptap/extension-image').catch(onOptionalExtensionFailed('image')) : null, needsCount ? import('@tiptap/extension-character-count').catch(onOptionalExtensionFailed('count')) : null]).then((mods: any) => {
         if (!disposed) construct(mods[0], mods[1], mods[2]);
       });
     } else {
       construct(null, null, null);
     }
-  })() as unknown;
-    if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => {
-    disposed = true;
-    toolbarDispose?.();
-    toolbarDispose = null;
-    bubbleMenuDispose?.();
-    bubbleMenuDispose = null;
-    floatingMenuDispose?.();
-    floatingMenuDispose = null;
-    linkEditorHandle?.dispose();
-    linkEditorHandle = null;
-    linkEditorEl = null;
-    linkInputEl = null;
-    editor?.destroy();
-  });
+      disposed = true;
+      toolbarDispose?.();
+      toolbarDispose = null;
+      bubbleMenuDispose?.();
+      bubbleMenuDispose = null;
+      floatingMenuDispose?.();
+      floatingMenuDispose = null;
+      linkEditorHandle?.dispose();
+      linkEditorHandle = null;
+      linkEditorEl = null;
+      linkInputEl = null;
+      editor?.destroy();
+    });
   });
   createEffect(on(() => (() => html())(), (v) => untrack(() => ((v: any) => {
     if (!editor) return;
@@ -663,12 +697,6 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
   // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
   // declaration trap (the Chart.js canvasEl/canvasNode lesson).
   let editor: any = null;
-
-  // Set by the mount cleanup. When a conditional extension is being loaded, the editor
-  // is constructed after the import() settles — by then the component may already be
-  // gone, and constructing into a detached element would leak an Editor.
-  // COMPONENT-scope for the Solid cleanup-hoist reason documented at toolbarDispose.
-  let disposed = false;
 
   // The raw HTML string the editor currently reflects. Compared against in the
   // $props.html reconciler so the watcher's mount-time fire is a no-op: the
@@ -1327,9 +1355,19 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
   // setContent routes through the SAME suppress-echo bookkeeping as $watch(html):
   // update lastHtml first, set with emitUpdate:false (no onUpdate bounce), then
   // reflect into the model so a programmatic set keeps the bound state in sync.
+  //
+  // Pre-construction (`!editor`) is the async lazy-extension gap (maxLength /
+  // uploadImage / #floatingMenu delay construction behind a dynamic import()) — a
+  // write here must NOT be dropped. construct() always reads `$props.html` FRESH
+  // (`lastHtml = $props.html` is the first thing it does — see $onMount), so
+  // writing the MODEL now is enough: the editor constructs with this value once it
+  // exists, instead of the caller's write silently vanishing into the gap.
   function setContent(next: any) {
-    if (!editor) return;
     const v = next ?? '';
+    if (!editor) {
+      setHtml(v);
+      return;
+    }
     if (v === lastHtml) return;
     lastHtml = v;
     editor.commands.setContent(v, {
@@ -1341,7 +1379,14 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     refreshLink();
   }
   function clearContent() {
-    if (!editor) return;
+    if (!editor) {
+      // Same pre-construction reasoning as setContent — TipTap/ProseMirror's
+      // canonical empty-document HTML (StarterKit's default paragraph node), so
+      // construct() seeds the SAME state `editor.commands.clearContent()` would
+      // have produced had the editor already existed.
+      setHtml('<p></p>');
+      return;
+    }
     editor.commands.clearContent();
     lastHtml = editor.getHTML();
     setHtml(lastHtml);
