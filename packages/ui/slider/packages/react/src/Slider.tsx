@@ -127,8 +127,26 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
     return p;
   }
 
+  // The number of decimal places a finite number is written with (e.g. 0.1 -> 1,
+  // 5 -> 0, -1.25 -> 2). A plain string-based heuristic — every `step`/`min` a
+  // slider author passes is a simple decimal literal, never exponential
+  // notation, so this is exact for the values this component actually sees.
+  function decimalPlaces(n: any) {
+    if (!Number.isFinite(n)) return 0;
+    const s = String(n);
+    const i = s.indexOf('.');
+    return i === -1 ? 0 : s.length - i - 1;
+  }
+
   // Clamp a raw number into [min,max] and quantize to `step` (guarding against a
   // non-finite or zero step). Returns a finite number bounded by the scale.
+  //
+  // `$props.min + steps * step` is exact math but NOT exact floating point: e.g.
+  // step=0.1, steps=3 -> 0.30000000000000004 (binary floats can't represent
+  // 0.1 precisely). Round the result to the step's (and min's) own decimal
+  // precision — scaling by 10^places rather than `toFixed` so the model value
+  // and `aria-valuetext` both report the clean decimal a consumer configured,
+  // not a float artifact one ULP off.
   function clampStep(raw: any) {
     if (!Number.isFinite(raw)) return props.min;
     let v = raw;
@@ -138,6 +156,11 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
     if (Number.isFinite(step) && step > 0) {
       const steps = Math.round((v - props.min) / step);
       v = props.min + steps * step;
+      const places = Math.max(decimalPlaces(step), decimalPlaces(props.min));
+      if (places > 0) {
+        const factor = Math.pow(10, places);
+        v = Math.round(v * factor) / factor;
+      }
       if (v < props.min) v = props.min;
       if (v > props.max) v = props.max;
     }

@@ -28,6 +28,25 @@ export function RangeDemo() {
   const [range, setRange] = createSignal<[number, number]>([20, 80]);
   return <Slider value={range()} onValueChange={setRange} range min={0} max={100} ariaLabel="Price range" />;
 }
+
+// Custom tick labels + bubble content via the scoped-slot render props —
+// markSlot receives { value, label, position } per mark, bubbleSlot { value }.
+export function MarksDemo() {
+  const [value, setValue] = createSignal<number>(25);
+  return (
+    <Slider
+      value={value()}
+      onValueChange={setValue}
+      min={0}
+      max={100}
+      marks={[0, 25, 50, 75, 100]}
+      ariaLabel="Volume"
+      showValue
+      markSlot={(m) => <strong>{m.label}</strong>}
+      bubbleSlot={(b) => <>{b.value}%</>}
+    />
+  );
+}
 ```
 
 ## Theming

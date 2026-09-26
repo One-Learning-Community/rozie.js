@@ -1,0 +1,95 @@
+<!--
+  SliderFloatStepDemo — VR behavioral cell for @rozie-ui/slider's float-`step`
+  rounding fix. `min=0`, `step=0.1`: three commits via the exposed `increment()`
+  handle land on the third step — exact math is `0 + 3 * 0.1`, which in IEEE-754
+  binary floating point is `0.30000000000000004`, NOT `0.3`. Pre-fix, `clampStep`
+  wrote that raw float straight into the model, so both the two-way `value` and
+  `aria-valuetext` (via `:formatValue="(v) => String(v)"`, which turns the FLOAT
+  ARTIFACT into a visible string) leaked the ULP-off value. Post-fix, `clampStep`
+  rounds the result to the step's own decimal precision (1 place here), so both
+  read back a clean `0.3`.
+
+  `increment()` (not native pointer drag or keyboard, which route through the
+  SAME `clampStep` but are harder to drive deterministically x6 targets) is the
+  `$expose` handle already used by slider.spec.ts's imperative-handle coverage —
+  reusing it here keeps this demo tiny and target-uniform.
+
+  ONE increment per click (not three calls in one handler): a model write is
+  ASYNC on React-shaped targets (ROZ138 — `$data` must never be re-read after a
+  write in the SAME synchronous handler), so three `increment()` calls back to
+  back would all read the SAME stale `value` and each compute `0 + 1*step`
+  instead of accumulating. The spec clicks this button three times, polling the
+  readout between clicks so each click's write has landed before the next.
+-->
+<rozie name="SliderFloatStepDemo">
+
+<components>
+{
+  Slider: '../../packages/ui/slider/src/Slider.rozie',
+}
+</components>
+
+<data>
+{
+  value: 0,
+}
+</data>
+
+<script>
+const incrementOnce = () => {
+  $refs.slider.increment()
+}
+const formatValue = (v) => String(v)
+</script>
+
+<template>
+<div class="slider-float-step-demo">
+  <h3>Slider — float step rounding</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="increment-1" @click="incrementOnce()">+1 step (0.1)</button>
+    <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
+  </div>
+
+  <Slider
+    ref="slider"
+    r-model:value="$data.value"
+    :min="0"
+    :max="1"
+    :step="0.1"
+    ariaLabel="Float step"
+    :formatValue="formatValue"
+  />
+</div>
+</template>
+
+<style>
+.slider-float-step-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 320px;
+}
+.slider-float-step-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout {
+  font-weight: 600;
+  min-width: 10ch;
+}
+</style>
+
+</rozie>

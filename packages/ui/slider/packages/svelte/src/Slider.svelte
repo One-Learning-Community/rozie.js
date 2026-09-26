@@ -99,8 +99,25 @@ const pct = (v: any) => {
   if (p > 100) return 100;
   return p;
 };
+// The number of decimal places a finite number is written with (e.g. 0.1 -> 1,
+// 5 -> 0, -1.25 -> 2). A plain string-based heuristic — every `step`/`min` a
+// slider author passes is a simple decimal literal, never exponential
+// notation, so this is exact for the values this component actually sees.
+const decimalPlaces = (n: any) => {
+  if (!Number.isFinite(n)) return 0;
+  const s = String(n);
+  const i = s.indexOf('.');
+  return i === -1 ? 0 : s.length - i - 1;
+};
 // Clamp a raw number into [min,max] and quantize to `step` (guarding against a
 // non-finite or zero step). Returns a finite number bounded by the scale.
+//
+// `$props.min + steps * step` is exact math but NOT exact floating point: e.g.
+// step=0.1, steps=3 -> 0.30000000000000004 (binary floats can't represent
+// 0.1 precisely). Round the result to the step's (and min's) own decimal
+// precision — scaling by 10^places rather than `toFixed` so the model value
+// and `aria-valuetext` both report the clean decimal a consumer configured,
+// not a float artifact one ULP off.
 const clampStep = (raw: any) => {
   if (!Number.isFinite(raw)) return min;
   let v = raw;
@@ -110,6 +127,11 @@ const clampStep = (raw: any) => {
   if (Number.isFinite(step$local) && step$local > 0) {
     const steps = Math.round((v - min) / step$local);
     v = min + steps * step$local;
+    const places = Math.max(decimalPlaces(step$local), decimalPlaces(min));
+    if (places > 0) {
+      const factor = Math.pow(10, places);
+      v = Math.round(v * factor) / factor;
+    }
     if (v < min) v = min;
     if (v > max) v = max;
   }

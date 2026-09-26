@@ -734,6 +734,11 @@ export const EXAMPLES = [
   'SliderRange',
   'SliderVertical',
   'SliderMarks',
+  // SliderFloatStep — the clampStep float-rounding regression guard
+  // (min=0, step=0.1; three `increment()` calls land on the FP-artifact-prone
+  // third step). Loader resolves to examples/demos/SliderFloatStepDemo.rozie.
+  // Self-contained; behavioral-only; NOT in matrix.spec.ts EXAMPLES.
+  'SliderFloatStep',
   // @rozie-ui pure-Rozie families (NO engine) — otp/dialog/combobox/toast. The
   // four BEHAVIORAL cells (loaders → examples/demos/{Otp,Dialog,Combobox,Toaster}-
   // BehaviorDemo.rozie, each importing packages/ui/<family>/src/<Component>.rozie).
@@ -747,6 +752,12 @@ export const EXAMPLES = [
   // EXAMPLES (no pixel baseline).
   'OtpBehavior',
   'DialogBehavior',
+  // DialogNestedScrollLock — the ref-counted <html> scroll-lock regression
+  // guard (an OUTER Dialog containing an INNER Dialog). Loader resolves to
+  // examples/demos/DialogNestedScrollLockDemo.rozie. Self-contained (own
+  // <data>, no parent-supplied props). Behavioral-only; NOT in matrix.spec.ts
+  // EXAMPLES (no pixel baseline). See dialog.spec.ts's sibling scroll-lock test.
+  'DialogNestedScrollLock',
   'ComboboxBehavior',
   'ToasterBehavior',
   // combobox-native-groups — the BEHAVIORAL cell (loader → examples/demos/
@@ -1654,12 +1665,14 @@ export const LIT_TAGS: Record<Example, string> = {
   SliderRange: 'rozie-slider-range',
   SliderVertical: 'rozie-slider-vertical',
   SliderMarks: 'rozie-slider-marks',
+  SliderFloatStep: 'rozie-slider-float-step',
   // @rozie-ui otp/dialog/combobox/toast — '-demo' appended on Lit → tags
   // 'rozie-otp-behavior-demo' etc. The wrapper components are name="Otp"/"Dialog"/
   // "Combobox"/"Toaster" → kebab bases 'rozie-otp'/'rozie-dialog'/'rozie-combobox'/
   // 'rozie-toaster' (toast's component is Toaster). Behavioral-only, no screenshot.
   OtpBehavior: 'rozie-otp-behavior',
   DialogBehavior: 'rozie-dialog-behavior',
+  DialogNestedScrollLock: 'rozie-dialog-nested-scroll-lock',
   ComboboxBehavior: 'rozie-combobox-behavior',
   ToasterBehavior: 'rozie-toaster-behavior',
   // combobox-native-groups — '-demo' appended on Lit → tag
@@ -2209,11 +2222,13 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   SliderRange: {},
   SliderVertical: {},
   SliderMarks: {},
+  SliderFloatStep: {},
   // @rozie-ui otp/dialog/combobox/toast — every *BehaviorDemo is self-contained: it
   // seeds its own state in <data> and binds r-model / drives the $expose handle
   // internally (not parent-supplied), so no MODEL_PROPS entry. No parent props.
   OtpBehavior: {},
   DialogBehavior: {},
+  DialogNestedScrollLock: {},
   ComboboxBehavior: {},
   ToasterBehavior: {},
   // combobox-native-groups — ComboboxGroupsDemo is self-contained: it seeds its
