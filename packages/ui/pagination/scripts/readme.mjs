@@ -197,6 +197,26 @@ export function Demo() {
       onChange={(e) => console.log('page:', e.page)}
     />
   );
+}
+
+// Custom page-button content via the itemSlot scoped-slot render prop
+// ({ page, selected, goto }). The sibling scoped slots follow the same
+// pattern: prevControlSlot, nextControlSlot, ellipsisSlot.
+export function CustomItemDemo() {
+  const [page, setPage] = createSignal(1);
+  return (
+    <Pagination
+      modelValue={page()}
+      onModelValueChange={setPage}
+      total={195}
+      pageSize={10}
+      itemSlot={(item) => (
+        <button type="button" aria-current={item.selected ? 'page' : undefined} onClick={item.goto}>
+          {item.page}
+        </button>
+      )}
+    />
+  );
 }`,
   },
   lit: {

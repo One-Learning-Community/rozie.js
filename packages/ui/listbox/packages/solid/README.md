@@ -33,7 +33,8 @@ export function Demo() {
       placeholder="Pick a fruit…"
       // Custom option render via the optionSlot prop (Solid's scoped slots
       // are props, not children); the ctx fields are plain values, not
-      // signal accessors.
+      // signal accessors. Sibling scoped slots follow the same pattern:
+      // selectedSlot ({ selected, value }) and emptySlot ({ query }).
       optionSlot={({ option, selected }) => <span classList={{ selected }}>{option.label}</span>}
     />
   );

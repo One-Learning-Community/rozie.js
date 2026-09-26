@@ -157,6 +157,18 @@ export function Demo() {
       onChange={(e) => console.log('switch:', e.checked)}
     />
   );
+}
+
+// Custom track/thumb content via the default SCOPED slot ({ checked, toggle }):
+// pass a CHILDREN FUNCTION instead of a plain child — Solid distinguishes the
+// two by \`typeof children === 'function'\`.
+export function CustomTrackDemo() {
+  const [on, setOn] = createSignal(false);
+  return (
+    <Switch modelValue={on()} onModelValueChange={setOn} ariaLabel="Wi-Fi">
+      {(s) => <span classList={{ on: s.checked }}>{s.checked ? 'On' : 'Off'}</span>}
+    </Switch>
+  );
 }`,
   },
   lit: {
