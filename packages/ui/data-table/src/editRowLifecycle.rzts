@@ -79,6 +79,13 @@ const beginRowEdit = (row) => {
   // redundant at HEAD; kept for the same reason as Layer 4 — it is a mutation entry point,
   // and the natural call site for a future #rowActions "Edit" drop-in button.
   if (rowIndexIsGrouped(rowIndex)) return
+  // Debug 260926-dtl-edit-guard: a LAZY PLACEHOLDER row (a row not loaded yet, virtual+manual+
+  // rowCount) has nothing to edit — beginEdit (editCellLifecycle.rzts) already carries this
+  // guard for single-cell entry; this full-row twin was missing it, so the public editRow()
+  // verb (and, redundantly with isActiveCellEditable's own placeholder check, Shift+F2) could
+  // seed a row editor from a placeholder's undefined fields and commit through the same
+  // sourceIndexOfRow fallback bug applyGridToRange's placeholder skip closes.
+  if (rowIsLazyPlaceholder(($data.rows || [])[rowIndex])) return
   const editable = editableColumnsForRow(rowIndex)
   if (editable.length === 0) return
   // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).

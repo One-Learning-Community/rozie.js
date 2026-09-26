@@ -1,0 +1,98 @@
+<!--
+  DataTableLazyEditDemo.rozie — debug 260926-dtl-edit-guard.
+
+  A DEDICATED sibling of DataTableLazyDemo.rozie (kept separate rather than mutating that
+  shared fixture — data-table-lazy.spec.ts asserts EXACT rendered-row bounds against it, and
+  turning on interactionMode='grid' here would PIN the active cell's row into the virtualizer's
+  window (virtualization.rzts pinnedEditIndex — "B-06 widens this ... to the ACTIVE row in grid
+  mode"), which is correct grid behavior but would spuriously widen that unrelated spec's
+  rendered-row assertions).
+
+  Same virtual+manual+rowCount=10000 sparse-data shape (only rows 0-49 loaded at mount), but
+  `name` is editable and interactionMode='grid' (range selection + fill handle are unconditional
+  in grid mode) so data-table-lazy-edit-guard.spec.ts can drive clipboard paste/cut/clear/
+  fill-drag and Shift+F2/editRow() over a range spanning unloaded placeholder rows — every one
+  of those must exclude placeholder cells from the write, from `cell-edit-commit`, and from the
+  N-of-M announce (they must never appear in the model-readout hole either).
+-->
+<rozie name="DataTableLazyEditDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: Array.from({ length: 50 }, (_, i) => ({ id: 'r' + i, name: 'Row ' + i })),
+  commitCount: 0,
+  lastCommit: '',
+  rangeReadout: '',
+  editRowIdx: 0,
+}
+</data>
+
+<script>
+const rowIdOf = (row) => row.id
+// cell-edit-commit — a visible per-cell log/count so a spec can assert NO commit ever
+// targets a placeholder row.
+const onCellEditCommit = (payload) => {
+  $data.lastCommit = payload ? payload.rowId + ':' + payload.columnId + '=' + String(payload.newValue) : ''
+  $data.commitCount = $data.commitCount + 1
+}
+// @range-change — "r,c" of the moving focus corner (mirrors DataTableGridClipboardDemo), so a
+// spec building a Shift+Arrow range can poll for the React-async setState to flush before
+// dispatching Delete/Ctrl+X/Ctrl+V/a fill-drag over it.
+const onRangeChange = (payload) => {
+  const f = payload ? payload.focus : null
+  $data.rangeReadout = f ? f.rowIndex + ',' + f.colIndex : ''
+}
+// editRow(i) — drive the public full-row-edit verb directly at an arbitrary (possibly
+// unloaded/placeholder) absolute row index, off the live $refs handle.
+const callEditRow = () => {
+  const api = $refs.dt
+  if (api && api.editRow) api.editRow($data.editRowIdx)
+}
+</script>
+
+<template>
+<div class="dt-lazy-edit-demo">
+  <input type="number" data-testid="edit-row-idx" r-model="$data.editRowIdx" />
+  <button type="button" data-testid="edit-row-btn" @click="callEditRow()">editRow(idx)</button>
+  <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+  <span class="readout" data-testid="last-commit">{{ $data.lastCommit }}</span>
+  <span class="readout" data-testid="range-readout">{{ $data.rangeReadout }}</span>
+  <pre class="model" data-testid="model-readout">{{ JSON.stringify($data.rows.slice(40, 70)) }}</pre>
+  <section data-testid="lazy-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      r-model:data="$data.rows"
+      virtual
+      manual
+      :rowCount="10000"
+      maxHeight="320px"
+      :estimateRowHeight="40"
+      selectionMode="multiple"
+      :getRowId="rowIdOf"
+      @cell-edit-commit="onCellEditCommit($event)"
+      @range-change="onRangeChange($event)"
+    >
+      <Column field="name" header="Name" :editable="true" editor="text" />
+    </DataTable>
+  </section>
+</div>
+</template>
+
+<style>
+.dt-lazy-edit-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 460px;
+}
+</style>
+
+</rozie>

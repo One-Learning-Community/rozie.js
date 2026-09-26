@@ -822,6 +822,11 @@ export const EXAMPLES = [
   'DataTableRowActivate',
   // quick 260925-dtl part 2 — virtual lazy loading (sparse data + rowCount + visible-range-change).
   'DataTableLazy',
+  // Debug 260926-dtl-edit-guard — a DEDICATED sibling of DataTableLazy with an editable column
+  // + interactionMode='grid' (loader -> examples/demos/DataTableLazyEditDemo.rozie), kept
+  // separate so turning on grid mode's active-cell row-pin never widens DataTableLazy's own
+  // exact rendered-row-bounds assertions (data-table-lazy.spec.ts).
+  'DataTableLazyEdit',
   'DataTableColumnMgmt',
   'DataTableSticky',
   // Phase 49 (data-table grid interaction mode) WAVE-0 FOCUS PROBE — the
@@ -1691,6 +1696,7 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableRowId: 'rozie-data-table-row-id',
   DataTableRowActivate: 'rozie-data-table-row-activate',
   DataTableLazy: 'rozie-data-table-lazy',
+  DataTableLazyEdit: 'rozie-data-table-lazy-edit',
   DataTableColumnMgmt: 'rozie-data-table-column-mgmt',
   DataTableSticky: 'rozie-data-table-sticky',
   // Phase 49 grid-probe — '-demo' appended on Lit → 'rozie-data-table-grid-probe-demo'
@@ -2232,6 +2238,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DataTableRowId: {},
   DataTableRowActivate: {},
   DataTableLazy: {},
+  DataTableLazyEdit: {},
   DataTableColumnMgmt: {},
   DataTableSticky: {},
   // Phase 49 grid-probe — self-contained ($data only: interactionMode='grid' +

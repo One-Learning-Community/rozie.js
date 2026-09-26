@@ -153,15 +153,25 @@ const applyGridToRange = (grid, originRow, originCol, verb) => {
     // it to this single funnel, so guarding the four callers individually would be four
     // chances to miss one.
     const rowGrouped = rowIndexIsGrouped(r)
+    // Debug 260926-dtl-edit-guard: a LAZY PLACEHOLDER row (virtual+manual+rowCount, a row not
+    // loaded yet) has no real underlying record — rowOriginalAt(r) returns the placeholder
+    // sentinel ({__rdtLazyPlaceholder:true,index:i}, virtualization.rzts), which is never IN
+    // currentData() (only the consumer's own array is), so sourceIndexOfRow's data.indexOf(...)
+    // is always -1 and falls back to the VISIBLE index — either a no-op write with a FABRICATED
+    // cell-edit-commit, or, inside a sparse hole, the hole gets clobbered with a partial row via
+    // replaceRowValue. Hoisted per-ROW exactly like rowGrouped above (the SAME single placement
+    // closes pasteRange/cutRange/clearActiveRange/fillRange all at once).
+    const rowPlaceholder = rowIsLazyPlaceholder(($data.rows || [])[r])
     const cols = grid[gr] || []
     for (let gc = 0; gc < cols.length; gc++) {
       const c = originCol + gc
       if (c > maxCol) break
-      // A group-row cell still counts toward `total` — it is a skipped TARGET, exactly like
-      // a non-editable or validator-rejected cell — so the "N of M cells pasted" / "no cells
-      // pasted" announce keeps its existing semantics (never silently under-reports M).
+      // A group-row / placeholder-row cell still counts toward `total` — it is a skipped
+      // TARGET, exactly like a non-editable or validator-rejected cell — so the "N of M cells
+      // pasted" / "no cells pasted" announce keeps its existing semantics (never silently
+      // under-reports M).
       total = total + 1
-      if (rowGrouped) continue
+      if (rowGrouped || rowPlaceholder) continue
       const colId = columnIdAt(r, c)
       if (colId == null || !columnEditable(colId)) continue
       const rowObj = rowOriginalAt(r)
