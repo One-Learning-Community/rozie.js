@@ -1,6 +1,16 @@
 import type { JSX } from 'solid-js';
 import { children, createEffect, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal, mergeListeners, pickListeners, rozieAttr } from '@rozie/runtime-solid';
+import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock';
+
+// ---- native reconcile ---------------------------------------------------
+// Lock/unlock <html> scroll (no-op when the opt-out is set or pre-DOM). The
+// actual lock/unlock is REF-COUNTED (./internal/scrollLock) across every
+// Dialog instance sharing this leaf's module — a naive per-instance toggle
+// unlocks scrolling the moment ANY dialog closes, even while an OUTER dialog
+// is still open (nested/stacked dialogs). This wrapper only decides WHETHER
+// this instance participates (the opt-out); the shared helper decides WHEN
+// the DOM actually changes.
 
 __rozieInjectStyle('Dialog-2a679072', `@media (prefers-reduced-motion: no-preference) {
   .rozie-dialog[data-rozie-s-2a679072] {
@@ -110,12 +120,16 @@ export default function Dialog(_props: DialogProps): JSX.Element {
   let panelElRef: HTMLElement | null = null;
 
   // ---- native reconcile ---------------------------------------------------
-  // Lock/unlock <html> scroll (no-op when disabled or pre-DOM).
+  // Lock/unlock <html> scroll (no-op when the opt-out is set or pre-DOM). The
+  // actual lock/unlock is REF-COUNTED (./internal/scrollLock) across every
+  // Dialog instance sharing this leaf's module — a naive per-instance toggle
+  // unlocks scrolling the moment ANY dialog closes, even while an OUTER dialog
+  // is still open (nested/stacked dialogs). This wrapper only decides WHETHER
+  // this instance participates (the opt-out); the shared helper decides WHEN
+  // the DOM actually changes.
   function applyScrollLock(lock: any) {
     if (local.disableScrollLock) return;
-    if (typeof document === 'undefined') return;
-    const root = document.documentElement;
-    if (root) root.style.overflow = lock ? 'hidden' : '';
+    applySharedScrollLock(lock);
   }
 
   // Reconcile the native <dialog> to the desired open state. Guarded on the

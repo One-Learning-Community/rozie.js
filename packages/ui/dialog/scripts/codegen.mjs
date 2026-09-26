@@ -17,22 +17,28 @@
  * rename the component or the element to silence it: building on the real
  * `<dialog>` (top-layer, `::backdrop`, native focus-trap) is the whole point.
  *
- * This is a pure-Rozie family with NO third-party vanilla engine, so there is no
- * `src/internal/` helper to vendor. Instead it vendors the `src/themes/` design-
- * token presets (base / shadcn / material / bootstrap) into each leaf so
- * consumers can `import '@rozie-ui/dialog-<fw>/themes/X.css'`.
+ * This is a pure-Rozie family with NO third-party vanilla engine, but it DOES
+ * have one piece of non-reactive, module-scope logic — the ref-counted
+ * `<html>` scroll lock (nested/stacked dialogs must not unlock scrolling until
+ * the OUTERMOST one closes) — extracted to `src/internal/scrollLock.ts` and
+ * unit-tested, same convention as the resizable family's `resizeMath.ts`.
+ * codegen vendors `src/internal/` (excluding `*.test.ts`) into every leaf, and
+ * also vendors the `src/themes/` design-token presets (base / shadcn /
+ * material / bootstrap) into each leaf so consumers can
+ * `import '@rozie-ui/dialog-<fw>/themes/X.css'`.
  *
  * Steps:
  *   1. read src/Dialog.rozie
  *   2. parse() + lowerToIR() ONCE → ir (props/slots/emits/expose) for docs tables
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
  *        (React only: also write Dialog.css + Dialog.d.ts)
- *   4. copy src/themes/ → each leaf src/themes/
- *   5. render each leaf README from the IR + the hand-kept event/handle manifests
- *   6. ENFORCE validateDocsPropsTable against docs/components/dialog.md
+ *   4. copy src/internal/ → each leaf src/internal/ (excluding *.test.ts)
+ *   5. copy src/themes/ → each leaf src/themes/
+ *   6. render each leaf README from the IR + the hand-kept event/handle manifests
+ *   7. ENFORCE validateDocsPropsTable against docs/components/dialog.md
  *      (THROWS on drift of the IR-derivable structural columns — prop name,
  *      type, default — but NEVER rewrites the hand-authored prose)
- *   7. ENFORCE validateDocsSurfaceNames — every emitted event / exposed handle
+ *   8. ENFORCE validateDocsSurfaceNames — every emitted event / exposed handle
  *      name must appear backticked in the docs page(s) (../../docs-surface-guard.mjs)
  *
  * The Vue leaf is dual-packaged (compiled dist/index.mjs + raw ./source) via a
@@ -67,6 +73,17 @@ function leafPkgName(dir) {
   const pkgPath = resolve(ROOT, 'packages', dir, 'package.json');
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
   return pkg.name;
+}
+
+/** Copy src/internal/ → leaf src/internal/, excluding any *.test.ts. */
+function copyInternal(leafSrc) {
+  const src = resolve(ROOT, 'src/internal');
+  if (!existsSync(src))
+    throw new Error('codegen: src/internal/ not found (the scrollLock helper must exist)');
+  cpSync(src, resolve(leafSrc, 'internal'), {
+    recursive: true,
+    filter: (from) => !from.endsWith('.test.ts'),
+  });
 }
 
 /** Copy src/themes/ → leaf src/themes/ (the design-token presets). */
@@ -151,24 +168,27 @@ function main() {
       if (r.types) writeFileSync(resolve(leafSrc, 'Dialog.d.ts'), r.types);
     }
 
-    // (4) vendor the design-token presets.
+    // (4) vendor the unit-tested internal helper.
+    copyInternal(leafSrc);
+
+    // (5) vendor the design-token presets.
     copyThemes(leafSrc, leafPkgName(cfg.dir));
 
-    // (5) README from the single IR parse.
+    // (6) README from the single IR parse.
     const pkgName = leafPkgName(cfg.dir);
     const readme = renderReadme(target, ir, eventManifest, pkgName, handleManifest);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
-    // (5b) Vendor the repo LICENSE into each published leaf.
+    // (6b) Vendor the repo LICENSE into each published leaf.
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
     console.log(
-      `codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ themes/)`,
+      `codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ internal/ + themes/)`,
     );
   }
 
-  // (6) ENFORCE docs props-table validation.
+  // (7) ENFORCE docs props-table validation.
   const docsPath = resolve(REPO_ROOT, 'docs/components/dialog.md');
   if (!existsSync(docsPath)) {
     throw new Error(
@@ -189,10 +209,10 @@ function main() {
     `codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (ENFORCING; throws on drift)`,
   );
 
-  // (7) ENFORCE docs events/handle name-presence (see ../../docs-surface-guard.mjs).
+  // (8) ENFORCE docs events/handle name-presence (see ../../docs-surface-guard.mjs).
   validateDocsSurfaceNames(ir, 'dialog', REPO_ROOT);
 
-  console.log('codegen: done — 6 targets emitted, themes vendored, 6 READMEs rendered.');
+  console.log('codegen: done — 6 targets emitted, internal + themes vendored, 6 READMEs rendered.');
 }
 
 main();

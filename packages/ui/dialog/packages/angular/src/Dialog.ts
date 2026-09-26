@@ -3,6 +3,17 @@ import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
 
+import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock';
+
+// ---- native reconcile ---------------------------------------------------
+// Lock/unlock <html> scroll (no-op when the opt-out is set or pre-DOM). The
+// actual lock/unlock is REF-COUNTED (./internal/scrollLock) across every
+// Dialog instance sharing this leaf's module — a naive per-instance toggle
+// unlocks scrolling the moment ANY dialog closes, even while an OUTER dialog
+// is still open (nested/stacked dialogs). This wrapper only decides WHETHER
+// this instance participates (the opt-out); the shared helper decides WHEN
+// the DOM actually changes.
+
 interface DefaultCtx {}
 
 @Component({
@@ -135,13 +146,9 @@ export class Dialog {
     this.sync(this.open());
   }
 
-  // ---- native reconcile ---------------------------------------------------
-  // Lock/unlock <html> scroll (no-op when disabled or pre-DOM).
   applyScrollLock = (lock: any) => {
     if (this.disableScrollLock()) return;
-    if (typeof document === 'undefined') return;
-    const root = document.documentElement;
-    if (root) root.style.overflow = lock ? 'hidden' : '';
+    applySharedScrollLock(lock);
   };
   // Reconcile the native <dialog> to the desired open state. Guarded on the
   // native `el.open` flag (showModal throws if already open; close is a no-op when
