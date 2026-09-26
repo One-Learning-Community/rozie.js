@@ -254,6 +254,8 @@ export const EXAMPLES = [
   // bullet-list command on all 6 + the $expose handle undo/getHTML on the 5
   // ref-resolving targets). Deliberately NOT in matrix.spec.ts EXAMPLES.
   'TipTapBehavior',
+  // quick 260925-r41 — TipTap `ready` event, sync + lazy-extension construction paths.
+  'TipTapReady',
   // Phase 33 (reactive-portal-slots) — the reactive nodeView portal slot proving
   // cells. TipTapNodeView is the BEHAVIORAL cell (loader →
   // examples/demos/TipTapNodeViewDemo.rozie, which fills the `nodeView` REACTIVE
@@ -1494,6 +1496,7 @@ export const LIT_TAGS: Record<Example, string> = {
   // TipTapScreenshotDemo / TipTapBehaviorDemo.
   TipTapScreenshot: 'rozie-tip-tap-screenshot',
   TipTapBehavior: 'rozie-tip-tap-behavior',
+  TipTapReady: 'rozie-tip-tap-ready',
   // Phase 33 — the lit entry appends '-demo' → tags
   // 'rozie-tip-tap-node-view-demo' / 'rozie-tip-tap-node-view-screenshot-demo' =
   // kebab of TipTapNodeViewDemo / TipTapNodeViewScreenshotDemo.
@@ -1996,6 +1999,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // out state in <data>. No parent props needed.
   TipTapScreenshot: {},
   TipTapBehavior: {},
+  TipTapReady: {},
   // Phase 33 — both node-view demos are self-contained: each seeds its own
   // fixed/seed doc (with the custom nodes) in <data>/<script> and fills the
   // nodeView slot. No parent props needed.

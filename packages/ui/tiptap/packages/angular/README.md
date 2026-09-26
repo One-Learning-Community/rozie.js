@@ -8,7 +8,7 @@ Idiomatic **angular** `TipTap` — a cross-framework rich-text editor component 
 npm i @rozie-ui/tiptap-angular
 ```
 
-Peer dependencies: the `@tiptap/core` + `@tiptap/starter-kit` engine (`^3`) + `@angular/core + @angular/common + @angular/forms`. Install them alongside this package.
+Peer dependencies: `@tiptap/core`, `@tiptap/starter-kit`, `@tiptap/extensions` and `@tiptap/extension-bubble-menu` (all `^3`) + `@angular/core + @angular/common + @angular/forms`. Install them alongside this package. Optional, loaded only when used: `@tiptap/extension-character-count` (`maxLength` / `#count`), `@tiptap/extension-image` (`uploadImage`) and `@tiptap/extension-floating-menu` (the `floatingMenu` slot).
 
 Also installed: `@rozie/runtime-angular` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
 
@@ -85,6 +85,7 @@ The accessor contract: only real user interaction dirties the control — progra
 | `selectionUpdate` | The selection (caret/range) moved. |
 | `focus` | The editor gained focus. |
 | `blur` | The editor lost focus. |
+| `ready` |  |
 
 ## Imperative handle
 

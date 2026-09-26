@@ -1,0 +1,65 @@
+<!--
+  TipTapReadyDemo.rozie — behavioral cell for TipTap's `ready` event (quick 260925-r41).
+
+  Reported from dogfooding (oinbox): a consumer can't tell when focusEditor() will work,
+  so it waited two animation frames and focused the [contenteditable] by hand. `ready`
+  fires once the editor exists, with the live Editor as its payload.
+
+  Two editors, one per construction path:
+    - `plain` uses no conditional feature, so it is constructed synchronously at mount;
+    - `counted` sets maxLength, so its CharacterCount extension is loaded with a dynamic
+      import() first and the editor is constructed a tick later.
+  Each records its ready payload; `counted` focuses its editor FROM the handler — the exact
+  consumer need — through the payload, not a component ref (Angular's ref is the host).
+-->
+
+<rozie name="TipTapReadyDemo">
+
+<components>
+{
+  TipTap: '../../packages/ui/tiptap/src/TipTap.rozie',
+}
+</components>
+
+<data>
+{
+  plainHtml: '<p>Plain</p>',
+  countedHtml: '<p>Counted</p>',
+  plainReady: 'waiting',
+  countedReady: 'waiting',
+}
+</data>
+
+<script>
+const onPlainReady = (editor) => {
+  $data.plainReady = editor && typeof editor.getHTML === 'function' ? 'ready' : 'no editor'
+}
+const onCountedReady = (editor) => {
+  if (!editor || typeof editor.getHTML !== 'function') {
+    $data.countedReady = 'no editor'
+    return
+  }
+  editor.commands.focus('end')
+  $data.countedReady = 'ready'
+}
+</script>
+
+<template>
+<div class="tiptap-ready-demo">
+  <div data-testid="plain"><TipTap r-model:html="$data.plainHtml" @ready="onPlainReady" /></div>
+  <div data-testid="counted"><TipTap r-model:html="$data.countedHtml" :maxLength="50" @ready="onCountedReady" /></div>
+  <pre data-testid="plain-ready">{{ $data.plainReady }}</pre>
+  <pre data-testid="counted-ready">{{ $data.countedReady }}</pre>
+</div>
+</template>
+
+<style>
+.tiptap-ready-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+</style>
+
+</rozie>

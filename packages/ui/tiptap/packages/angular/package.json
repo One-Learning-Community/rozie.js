@@ -69,7 +69,7 @@
       "optional": false
     },
     "@tiptap/extension-bubble-menu": {
-      "optional": true
+      "optional": false
     },
     "@tiptap/extension-character-count": {
       "optional": true

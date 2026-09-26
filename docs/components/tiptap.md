@@ -19,17 +19,19 @@ The full source for `TipTap.rozie` lives in the [`@rozie-ui/tiptap` package](htt
 | `@rozie-ui/tiptap-solid` | `npm i @rozie-ui/tiptap-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/packages/solid/README.md) |
 | `@rozie-ui/tiptap-lit` | `npm i @rozie-ui/tiptap-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/packages/lit/README.md) |
 
-Each package carries the **three `@tiptap/*` engine peers** — `@tiptap/core`, `@tiptap/starter-kit`, and `@tiptap/extensions` (it supplies the bundled `Placeholder`; all `^3`) — plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). Install the engine peers alongside the framework package:
+Each package carries **four required `@tiptap/*` peers** — `@tiptap/core`, `@tiptap/starter-kit`, `@tiptap/extensions` (it supplies the bundled `Placeholder`), and `@tiptap/extension-bubble-menu` (the built-in link editor is a bubble menu on every editor); all `^3` — plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). Install the engine peers alongside the framework package:
 
 ```bash
-npm i @rozie-ui/tiptap-react @tiptap/core @tiptap/starter-kit @tiptap/extensions
+npm i @rozie-ui/tiptap-react @tiptap/core @tiptap/starter-kit @tiptap/extensions @tiptap/extension-bubble-menu
 ```
+
+Three more peers are **optional** and loaded only when you use their feature: `@tiptap/extension-character-count` (`maxLength` or the `#count` slot), `@tiptap/extension-image` (`uploadImage`) and `@tiptap/extension-floating-menu` (the `floatingMenu` slot). Install one only if you use it; an editor that uses one is constructed a tick later, once the extension has loaded — wait for the `ready` event before calling the handle.
 
 TipTap is built from ProseMirror, which is framework-agnostic — the official wrappers exist only to glue `onUpdate` to component state and forward extensions. Rozie's wrapper does that plus a **controlled two-way `html` binding** (with an echo-guard), a **batteries-included toolbar** (or bring your own via the `toolbar` slot), a full **imperative command handle**, and two consumer-extensibility passthroughs (`editorProps` for ProseMirror, `extensions` for extra TipTap extensions composed onto StarterKit).
 
 ## Quick start
 
-The two-way value is `html` — the editor's document as an **HTML string**. Typing writes the new HTML back through the two-way path (TipTap's `onUpdate`), and a consumer write reflects into the live document (echo-guarded so a programmatic set doesn't reset the selection). The wrapper also emits `update` / `selectionUpdate` / `focus` / `blur` events.
+The two-way value is `html` — the editor's document as an **HTML string**. Typing writes the new HTML back through the two-way path (TipTap's `onUpdate`), and a consumer write reflects into the live document (echo-guarded so a programmatic set doesn't reset the selection). The wrapper also emits `ready` / `update` / `selectionUpdate` / `focus` / `blur` events.
 
 ### React
 
@@ -149,6 +151,7 @@ el.addEventListener('html-change', (e) => {
 
 | Event | Payload | Description |
 | --- | --- | --- |
+| `ready` | `Editor` | The editor exists — the live TipTap `Editor` instance. Fires once per mount. Handle verbs (`focusEditor()`, `setContent()`, …) work from here on; with an optional extension in use (`maxLength`, `uploadImage`, the `floatingMenu` slot) construction waits for its import, so this is the moment to act rather than a fixed delay. |
 | `update` | `string` | The document changed — the new HTML string. (Also the channel that drives the two-way `html` model.) |
 | `selectionUpdate` | — | The selection (caret / range) moved. |
 | `focus` | — | The editor gained focus. |
@@ -330,7 +333,7 @@ On every target the wrapper's `$portals.toolbar(node, { editor })` closure mount
 
 ### Bubble & floating menu slots
 
-The `bubbleMenu` and `floatingMenu` slots are **selection-anchored menus** over TipTap's Floating-UI menu extensions (`@tiptap/extension-bubble-menu` / `@tiptap/extension-floating-menu`). They use the **same mount-once portal shape** as `toolbar` and receive the live `editor` — but the menu's host element is created by the wrapper and positioned by Floating UI, so you only supply the menu fragment. By default the **bubble menu** appears on a non-empty text selection and the **floating menu** on an empty line. Each menu extension is added **only when its slot is filled** (zero overhead otherwise), and the two extension peers are declared optional on every leaf package — install them only if you use the slots.
+The `bubbleMenu` and `floatingMenu` slots are **selection-anchored menus** over TipTap's Floating-UI menu extensions (`@tiptap/extension-bubble-menu` / `@tiptap/extension-floating-menu`). They use the **same mount-once portal shape** as `toolbar` and receive the live `editor` — but the menu's host element is created by the wrapper and positioned by Floating UI, so you only supply the menu fragment. By default the **bubble menu** appears on a non-empty text selection and the **floating menu** on an empty line. Each menu extension is added **only when its slot is filled** (zero overhead otherwise). `@tiptap/extension-bubble-menu` is a required peer — the built-in link editor uses it on every editor — while `@tiptap/extension-floating-menu` is optional and loaded only when the `floatingMenu` slot is filled.
 
 The fill API mirrors `toolbar` exactly — `renderBubbleMenu` / `renderFloatingMenu` render props (React/Solid), `#bubbleMenu` / `#floatingMenu` scoped slots (Vue) / snippets (Svelte) / `<ng-template>` content children (Angular), or `bubbleMenu` / `floatingMenu` properties on the Lit element:
 

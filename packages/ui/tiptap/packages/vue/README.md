@@ -8,7 +8,7 @@ Idiomatic **vue** `TipTap` — a cross-framework rich-text editor component comp
 npm i @rozie-ui/tiptap-vue
 ```
 
-Peer dependencies: the `@tiptap/core` + `@tiptap/starter-kit` engine (`^3`) + `vue`. Install them alongside this package.
+Peer dependencies: `@tiptap/core`, `@tiptap/starter-kit`, `@tiptap/extensions` and `@tiptap/extension-bubble-menu` (all `^3`) + `vue`. Install them alongside this package. Optional, loaded only when used: `@tiptap/extension-character-count` (`maxLength` / `#count`), `@tiptap/extension-image` (`uploadImage`) and `@tiptap/extension-floating-menu` (the `floatingMenu` slot).
 
 ## Usage
 
@@ -52,6 +52,7 @@ const html = ref('<p>Hello <strong>world</strong></p>');
 | `selectionUpdate` | The selection (caret/range) moved. |
 | `focus` | The editor gained focus. |
 | `blur` | The editor lost focus. |
+| `ready` |  |
 
 ## Imperative handle
 

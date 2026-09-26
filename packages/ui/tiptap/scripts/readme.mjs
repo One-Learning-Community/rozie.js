@@ -293,8 +293,11 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   lines.push('```');
   lines.push('');
   lines.push(
-    `Peer dependencies: the \`@tiptap/core\` + \`@tiptap/starter-kit\` engine (\`^3\`) + ` +
-      `\`${FRAMEWORK_PEER_LABEL[target]}\`. Install them alongside this package.`,
+    `Peer dependencies: \`@tiptap/core\`, \`@tiptap/starter-kit\`, \`@tiptap/extensions\` and ` +
+      `\`@tiptap/extension-bubble-menu\` (all \`^3\`) + \`${FRAMEWORK_PEER_LABEL[target]}\`. ` +
+      `Install them alongside this package. Optional, loaded only when used: ` +
+      `\`@tiptap/extension-character-count\` (\`maxLength\` / \`#count\`), \`@tiptap/extension-image\` ` +
+      `(\`uploadImage\`) and \`@tiptap/extension-floating-menu\` (the \`floatingMenu\` slot).`,
   );
   lines.push('');
 

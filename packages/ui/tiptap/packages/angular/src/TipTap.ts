@@ -12,21 +12,17 @@ import { Placeholder } from '@tiptap/extensions';
 // — verified against the installed dist .d.ts — and are `.configure({ element })`
 // Extensions that own Floating-UI positioning and append the host element to the
 // editor's parent automatically (no manual document insertion needed).
+//
+// BubbleMenu is imported statically and is a REQUIRED peer: the built-in link editor
+// is a BubbleMenu surface mounted on every editor. The three extensions below are
+// OPTIONAL peers and are loaded with a dynamic import() only when their feature is
+// used (see $onMount) — a static import would make every consumer install them
+// whatever `peerDependenciesMeta` says (packages/ui/tiptap/tests/lazy-extensions.test.ts):
+//   - @tiptap/extension-floating-menu   → the `floatingMenu` slot is filled
+//   - @tiptap/extension-image           → `uploadImage` is set (named export `Image`)
+//   - @tiptap/extension-character-count → `maxLength` is set or the `count` slot is filled
+// Each is version-pinned in lockstep with @tiptap/core and read by its named export.
 import { BubbleMenu } from '@tiptap/extension-bubble-menu';
-import { FloatingMenu } from '@tiptap/extension-floating-menu';
-// Image node extension (ask D). Not part of StarterKit. Version-pinned in
-// lockstep with @tiptap/core (3.23.5). Named export `Image` — verified against
-// the installed dist `.d.ts` (also carries a default export; we use the named
-// form to match the BubbleMenu/FloatingMenu import style). Gated on
-// $props.uploadImage — an absent hook registers NO Image extension.
-import { Image } from '@tiptap/extension-image';
-// Character/word count storage extension (D-01/D-02). SEPARATE package, not part
-// of StarterKit, version-pinned in lockstep with core (3.23.5). Named export
-// `CharacterCount` — verified against the installed dist `.d.ts` (re-exported
-// from `@tiptap/extensions`, matching Placeholder's home package; also carries a
-// default export, but the named form matches this file's import style). Gated on
-// $props.maxLength / the `count` slot — an unfilled gate registers NO extension.
-import { CharacterCount } from '@tiptap/extension-character-count';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
@@ -342,6 +338,7 @@ export class TipTap {
   selectionUpdate = output<void>();
   focus = output<void>();
   blur = output<void>();
+  ready = output<unknown>();
   @ContentChild('count', { read: TemplateRef }) countTpl?: TemplateRef<CountCtx>;
   @ContentChild('toolbar', { read: TemplateRef }) toolbarTpl?: TemplateRef<ToolbarCtx>;
   @ContentChild('bubbleMenu', { read: TemplateRef }) bubbleMenuTpl?: TemplateRef<BubbleMenuCtx>;
@@ -476,330 +473,278 @@ export class TipTap {
   }
 
   ngAfterViewInit() {
-    const __nodeSpecs = this.nodeSpecs();
-    const __placeholder = this.placeholder();
-    const __bubbleMenuShouldShow = this.bubbleMenuShouldShow();
-    const __uploadImage = this.uploadImage();
-    const __maxLength = this.maxLength();
-    const __extensions = this.extensions();
-    const __editorClass = this.editorClass();
-    this.lastHtml = this.html();
+    this.disposed = false;
 
-    // Register the reactive node-view nodes ONLY when the consumer fills the
-    // `nodeView` slot AND supplies one or more `nodeSpecs` (D-05 — BOTH halves
-    // required). A stock <TipTap> with no nodeSpecs (or an unfilled slot) adds
-    // NO custom nodes — zero overhead, no consumer-node-shaped parse rules
-    // registered. $props.nodeSpecs is read ONCE here (setup-once — NOT a
-    // $watch); `$portals.nodeView` is read directly inside `makeNodeView`'s
-    // top-level closure, not threaded through this call.
-    // Register the reactive node-view nodes ONLY when the consumer fills the
-    // `nodeView` slot AND supplies one or more `nodeSpecs` (D-05 — BOTH halves
-    // required). A stock <TipTap> with no nodeSpecs (or an unfilled slot) adds
-    // NO custom nodes — zero overhead, no consumer-node-shaped parse rules
-    // registered. $props.nodeSpecs is read ONCE here (setup-once — NOT a
-    // $watch); `$portals.nodeView` is read directly inside `makeNodeView`'s
-    // top-level closure, not threaded through this call.
-    const nodeViewExtensions = (this.nodeViewTpl ?? this.__rozieFillMap()['nodeView'] ?? this.templates()?.['nodeView']) && __nodeSpecs.length ? this.makeNodeViewExtensions(__nodeSpecs) : [];
+    // Which optional extensions this editor needs. Read ONCE here (setup-once, like
+    // placeholder/nodeSpecs). When none is needed the editor is constructed right now,
+    // synchronously; otherwise after their import() settles. Either way `ready` fires
+    // with the live Editor once it exists — the signal a consumer waits on before
+    // focusEditor() or any other verb.
+    // Which optional extensions this editor needs. Read ONCE here (setup-once, like
+    // placeholder/nodeSpecs). When none is needed the editor is constructed right now,
+    // synchronously; otherwise after their import() settles. Either way `ready` fires
+    // with the live Editor once it exists — the signal a consumer waits on before
+    // focusEditor() or any other verb.
+    const needsFloating = !!(this.floatingMenuTpl ?? this.__rozieFillMap()['floatingMenu'] ?? this.templates()?.['floatingMenu']);
+    const needsImage = !!this.uploadImage();
+    const needsCount = this.maxLength() != null || !!(this.countTpl ?? this.__rozieFillMap()['count'] ?? this.templates()?.['count']);
+    const construct = (floatingMod: any, imageMod: any, countMod: any) => {
+      const __nodeSpecs = this.nodeSpecs();
+      const __placeholder = this.placeholder();
+      const __bubbleMenuShouldShow = this.bubbleMenuShouldShow();
+      const __maxLength = this.maxLength();
+      const __extensions = this.extensions();
+      const __editorClass = this.editorClass();
+      const FloatingMenu = floatingMod ? floatingMod.FloatingMenu : null;
+      const Image = imageMod ? imageMod.Image : null;
+      const CharacterCount = countMod ? countMod.CharacterCount : null;
+      this.lastHtml = this.html();
 
-    // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
-    // (setup-once, like content/editable/autofocus — no reactivity required). The
-    // Placeholder extension (@tiptap/extensions, version-matched to StarterKit)
-    // adds class `is-editor-empty` + a `data-placeholder` attribute to the first
-    // empty node; the `::before` rule in the `:root { }` engine-DOM escape hatch
-    // (in the style block) paints the ghost text. Empty placeholder = no extension.
-    // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
-    // (setup-once, like content/editable/autofocus — no reactivity required). The
-    // Placeholder extension (@tiptap/extensions, version-matched to StarterKit)
-    // adds class `is-editor-empty` + a `data-placeholder` attribute to the first
-    // empty node; the `::before` rule in the `:root { }` engine-DOM escape hatch
-    // (in the style block) paints the ghost text. Empty placeholder = no extension.
-    const placeholderExtensions = __placeholder ? [Placeholder.configure({
-      placeholder: __placeholder
-    })] : [];
+      // Register the reactive node-view nodes ONLY when the consumer fills the
+      // `nodeView` slot AND supplies one or more `nodeSpecs` (D-05 — BOTH halves
+      // required). A stock <TipTap> with no nodeSpecs (or an unfilled slot) adds
+      // NO custom nodes — zero overhead, no consumer-node-shaped parse rules
+      // registered. $props.nodeSpecs is read ONCE here (setup-once — NOT a
+      // $watch); `$portals.nodeView` is read directly inside `makeNodeView`'s
+      // top-level closure, not threaded through this call.
+      const nodeViewExtensions = (this.nodeViewTpl ?? this.__rozieFillMap()['nodeView'] ?? this.templates()?.['nodeView']) && __nodeSpecs.length ? this.makeNodeViewExtensions(__nodeSpecs) : [];
 
-    // Selection-anchored menu extensions (G2). Built BEFORE `new Editor` because the
-    // Floating-UI menu extension needs its host `element` at construction time. Each
-    // menu's host element is created imperatively (the nodeView discipline — the
-    // engine owns positioning; the consumer fragment is portalled in AFTER mount).
-    // An unfilled slot adds NOTHING (zero overhead, no $portals reference fired).
-    //
-    // The host elements are created up front (when filled) so they're captured into
-    // the component-scope `bubbleMenuEl`/`floatingMenuEl` for the post-construction
-    // portal mount; the extension list is then assembled by conditional SPREAD (NOT
-    // `const x = []; x.push(…)`), which under the strict-typecheck'd bundled leaves
-    // infers `any[]` — a bare `const x = []` would infer `never[]` and reject
-    // `.push(Extension)` (the placeholderExtensions/nodeViewExtensions discipline).
-    // Selection-anchored menu extensions (G2). Built BEFORE `new Editor` because the
-    // Floating-UI menu extension needs its host `element` at construction time. Each
-    // menu's host element is created imperatively (the nodeView discipline — the
-    // engine owns positioning; the consumer fragment is portalled in AFTER mount).
-    // An unfilled slot adds NOTHING (zero overhead, no $portals reference fired).
-    //
-    // The host elements are created up front (when filled) so they're captured into
-    // the component-scope `bubbleMenuEl`/`floatingMenuEl` for the post-construction
-    // portal mount; the extension list is then assembled by conditional SPREAD (NOT
-    // `const x = []; x.push(…)`), which under the strict-typecheck'd bundled leaves
-    // infers `any[]` — a bare `const x = []` would infer `never[]` and reject
-    // `.push(Extension)` (the placeholderExtensions/nodeViewExtensions discipline).
-    if ((this.bubbleMenuTpl ?? this.__rozieFillMap()['bubbleMenu'] ?? this.templates()?.['bubbleMenu'])) {
-      this.bubbleMenuEl = document.createElement('div');
-      this.bubbleMenuEl.className = 'rozie-tiptap-bubble-menu';
-    }
-    if ((this.floatingMenuTpl ?? this.__rozieFillMap()['floatingMenu'] ?? this.templates()?.['floatingMenu'])) {
-      this.floatingMenuEl = document.createElement('div');
-      this.floatingMenuEl.className = 'rozie-tiptap-floating-menu';
-    }
-    // Link editor (#2) host — a dedicated bubble-menu surface, orthogonal to the
-    // general `bubbleMenu` slot. Created imperatively (bubbleMenuEl discipline).
-    // ALWAYS created (not gated on editable at mount): editability is a REACTIVE prop
-    // ($watch(editable) → setEditable), so SHOWING is gated on `editor.isEditable` in
-    // the link-editor shouldShow below — a live check that follows a runtime toggle.
-    // This closes both directions of the mount-time-gate bug: a doc mounted readonly
-    // that later becomes editable gets a working link editor, and a doc toggled TO
-    // readonly can no longer be link-edited (isEditable false → never shows, so no
-    // Apply/Remove on a read-only document).
-    // Link editor (#2) host — a dedicated bubble-menu surface, orthogonal to the
-    // general `bubbleMenu` slot. Created imperatively (bubbleMenuEl discipline).
-    // ALWAYS created (not gated on editable at mount): editability is a REACTIVE prop
-    // ($watch(editable) → setEditable), so SHOWING is gated on `editor.isEditable` in
-    // the link-editor shouldShow below — a live check that follows a runtime toggle.
-    // This closes both directions of the mount-time-gate bug: a doc mounted readonly
-    // that later becomes editable gets a working link editor, and a doc toggled TO
-    // readonly can no longer be link-edited (isEditable false → never shows, so no
-    // Apply/Remove on a read-only document).
-    this.linkEditorEl = document.createElement('div');
-    this.linkEditorEl.className = 'rozie-tiptap-link-editor';
-    // Each BubbleMenu instance REQUIRES a unique pluginKey (REQ-41) so the two
-    // Floating-UI plugins (the general bubbleMenu + the link editor) don't collide.
-    // The general bubbleMenu's `shouldShow` is the consumer-controllable predicate
-    // ($props.bubbleMenuShouldShow, #4) when provided, else the extension default
-    // (non-empty text selection). The link editor's shouldShow is link-aware: show
-    // on a link (edit) OR when the toolbar Link button set openFlag (create) — NARROW
-    // by design so it never fires on a bare selection and collide with the general one.
-    // Each BubbleMenu instance REQUIRES a unique pluginKey (REQ-41) so the two
-    // Floating-UI plugins (the general bubbleMenu + the link editor) don't collide.
-    // The general bubbleMenu's `shouldShow` is the consumer-controllable predicate
-    // ($props.bubbleMenuShouldShow, #4) when provided, else the extension default
-    // (non-empty text selection). The link editor's shouldShow is link-aware: show
-    // on a link (edit) OR when the toolbar Link button set openFlag (create) — NARROW
-    // by design so it never fires on a bare selection and collide with the general one.
-    const menuExtensions = [...(this.bubbleMenuEl ? [BubbleMenu.configure({
-      pluginKey: 'rozieBubbleMenu',
-      element: this.bubbleMenuEl,
-      ...(__bubbleMenuShouldShow ? {
-        shouldShow: __bubbleMenuShouldShow
-      } : {})
-    })] : []), ...(this.floatingMenuEl ? [FloatingMenu.configure({
-      element: this.floatingMenuEl
-    })] : []), ...(this.linkEditorEl ? [BubbleMenu.configure({
-      pluginKey: 'rozieLinkEditor',
-      element: this.linkEditorEl,
-      // `editor.isEditable` gates the whole surface reactively (readonly ⇒ never
-      // shows). NARROW otherwise: show on a link (edit) OR when the toolbar Link
-      // button set openFlag (create) — never on a bare selection.
-      shouldShow: ({
-        editor
-      }: any) => editor.isEditable && (editor.isActive('link') || this.openFlag)
-    })] : [])];
+      // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
+      // (setup-once, like content/editable/autofocus — no reactivity required). The
+      // Placeholder extension (@tiptap/extensions, version-matched to StarterKit)
+      // adds class `is-editor-empty` + a `data-placeholder` attribute to the first
+      // empty node; the `::before` rule in the `:root { }` engine-DOM escape hatch
+      // (in the style block) paints the ghost text. Empty placeholder = no extension.
+      const placeholderExtensions = __placeholder ? [Placeholder.configure({
+        placeholder: __placeholder
+      })] : [];
 
-    // Image-upload hook (ask D). Setup-once, gated on $props.uploadImage — read
-    // ONCE here (not a $watch — mirrors autofocus/placeholder/nodeSpecs). When
-    // absent: no Image extension, no paste/drop handlers (zero overhead, the
-    // unfilled-slot discipline). Conditional SPREAD (not `const x = []; x.push`)
-    // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
-    // Image-upload hook (ask D). Setup-once, gated on $props.uploadImage — read
-    // ONCE here (not a $watch — mirrors autofocus/placeholder/nodeSpecs). When
-    // absent: no Image extension, no paste/drop handlers (zero overhead, the
-    // unfilled-slot discipline). Conditional SPREAD (not `const x = []; x.push`)
-    // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
-    const imageExtensions = __uploadImage ? [Image] : [];
+      // Selection-anchored menu extensions (G2). Built BEFORE `new Editor` because the
+      // Floating-UI menu extension needs its host `element` at construction time. Each
+      // menu's host element is created imperatively (the nodeView discipline — the
+      // engine owns positioning; the consumer fragment is portalled in AFTER mount).
+      // An unfilled slot adds NOTHING (zero overhead, no $portals reference fired).
+      //
+      // The host elements are created up front (when filled) so they're captured into
+      // the component-scope `bubbleMenuEl`/`floatingMenuEl` for the post-construction
+      // portal mount; the extension list is then assembled by conditional SPREAD (NOT
+      // `const x = []; x.push(…)`), which under the strict-typecheck'd bundled leaves
+      // infers `any[]` — a bare `const x = []` would infer `never[]` and reject
+      // `.push(Extension)` (the placeholderExtensions/nodeViewExtensions discipline).
+      if ((this.bubbleMenuTpl ?? this.__rozieFillMap()['bubbleMenu'] ?? this.templates()?.['bubbleMenu'])) {
+        this.bubbleMenuEl = document.createElement('div');
+        this.bubbleMenuEl.className = 'rozie-tiptap-bubble-menu';
+      }
+      if ((this.floatingMenuTpl ?? this.__rozieFillMap()['floatingMenu'] ?? this.templates()?.['floatingMenu'])) {
+        this.floatingMenuEl = document.createElement('div');
+        this.floatingMenuEl.className = 'rozie-tiptap-floating-menu';
+      }
+      // Link editor (#2) host — a dedicated bubble-menu surface, orthogonal to the
+      // general `bubbleMenu` slot. Created imperatively (bubbleMenuEl discipline).
+      // ALWAYS created (not gated on editable at mount): editability is a REACTIVE prop
+      // ($watch(editable) → setEditable), so SHOWING is gated on `editor.isEditable` in
+      // the link-editor shouldShow below — a live check that follows a runtime toggle.
+      // This closes both directions of the mount-time-gate bug: a doc mounted readonly
+      // that later becomes editable gets a working link editor, and a doc toggled TO
+      // readonly can no longer be link-edited (isEditable false → never shows, so no
+      // Apply/Remove on a read-only document).
+      this.linkEditorEl = document.createElement('div');
+      this.linkEditorEl.className = 'rozie-tiptap-link-editor';
+      // Each BubbleMenu instance REQUIRES a unique pluginKey (REQ-41) so the two
+      // Floating-UI plugins (the general bubbleMenu + the link editor) don't collide.
+      // The general bubbleMenu's `shouldShow` is the consumer-controllable predicate
+      // ($props.bubbleMenuShouldShow, #4) when provided, else the extension default
+      // (non-empty text selection). The link editor's shouldShow is link-aware: show
+      // on a link (edit) OR when the toolbar Link button set openFlag (create) — NARROW
+      // by design so it never fires on a bare selection and collide with the general one.
+      const menuExtensions = [...(this.bubbleMenuEl ? [BubbleMenu.configure({
+        pluginKey: 'rozieBubbleMenu',
+        element: this.bubbleMenuEl,
+        ...(__bubbleMenuShouldShow ? {
+          shouldShow: __bubbleMenuShouldShow
+        } : {})
+      })] : []), ...(this.floatingMenuEl && FloatingMenu ? [FloatingMenu.configure({
+        element: this.floatingMenuEl
+      })] : []), ...(this.linkEditorEl ? [BubbleMenu.configure({
+        pluginKey: 'rozieLinkEditor',
+        element: this.linkEditorEl,
+        // `editor.isEditable` gates the whole surface reactively (readonly ⇒ never
+        // shows). NARROW otherwise: show on a link (edit) OR when the toolbar Link
+        // button set openFlag (create) — never on a bare selection.
+        shouldShow: ({
+          editor
+        }: any) => editor.isEditable && (editor.isActive('link') || this.openFlag)
+      })] : [])];
 
-    // Character/word count (D-01..D-03). Gated on maxLength being set OR the
-    // `count` slot being filled — a stock <TipTap> with neither registers NO
-    // CharacterCount extension (zero overhead, no VR drift). `limit` is ONLY
-    // configured when BOTH enforceMaxLength is true AND maxLength is set (hard
-    // cap); otherwise CharacterCount tracks with no limit (soft — overflow
-    // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
-    // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
-    // never[]-inference reason as placeholderExtensions/imageExtensions.
-    // Character/word count (D-01..D-03). Gated on maxLength being set OR the
-    // `count` slot being filled — a stock <TipTap> with neither registers NO
-    // CharacterCount extension (zero overhead, no VR drift). `limit` is ONLY
-    // configured when BOTH enforceMaxLength is true AND maxLength is set (hard
-    // cap); otherwise CharacterCount tracks with no limit (soft — overflow
-    // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
-    // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
-    // never[]-inference reason as placeholderExtensions/imageExtensions.
-    const needsCount = __maxLength != null || (this.countTpl ?? this.__rozieFillMap()['count'] ?? this.templates()?.['count']);
-    const characterCountExtensions = needsCount ? [CharacterCount.configure(this.enforceMaxLength() && __maxLength != null ? {
-      limit: __maxLength
-    } : {})] : [];
+      // Image-upload hook (ask D). Setup-once, gated on $props.uploadImage — read
+      // ONCE here (not a $watch — mirrors autofocus/placeholder/nodeSpecs). When
+      // absent: no Image extension, no paste/drop handlers (zero overhead, the
+      // unfilled-slot discipline). Conditional SPREAD (not `const x = []; x.push`)
+      // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
+      const imageExtensions = Image ? [Image] : [];
 
-    // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
-    // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
-    // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
-    // functions declared above (see their doc comment for why they live at the
-    // top level rather than as closures nested in this ternary).
-    // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
-    // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
-    // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
-    // functions declared above (see their doc comment for why they live at the
-    // top level rather than as closures nested in this ternary).
-    const uploadHandlers = __uploadImage ? {
-      handlePaste: this.handlePaste,
-      handleDrop: this.handleDrop
-    } : {};
-    this.editor = new Editor({
-      element: this.editorEl()!.nativeElement,
-      content: this.html(),
-      editable: this.editable(),
-      autofocus: this.autofocus(),
-      // StarterKit first (config-disabled per the collision scan below); the
-      // Placeholder ext next; the reactive node-view nodes next; consumer
-      // extensions LAST so they win (TipTap applies later-registered extensions
-      // over earlier ones for the same node/mark) — and the whole array is
-      // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
-      // of the config-level auto-disable (D-02), which is what actually silences
-      // StarterKit's internal same-named extension (e.g. its bundled `Link`).
-      extensions: this.dedupeExtensionsByName([StarterKit.configure(this.buildStarterKitConfig(this.starterKit(), __extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...__extensions]),
-      editorProps: {
-        attributes: {
-          'aria-label': this.ariaLabel(),
-          ...(__editorClass ? {
-            class: __editorClass
-          } : {}),
-          ...(__placeholder ? {
-            'data-placeholder': __placeholder,
-            'aria-placeholder': __placeholder
-          } : {})
+      // Character/word count (D-01..D-03). Gated on maxLength being set OR the
+      // `count` slot being filled — a stock <TipTap> with neither registers NO
+      // CharacterCount extension (zero overhead, no VR drift). `limit` is ONLY
+      // configured when BOTH enforceMaxLength is true AND maxLength is set (hard
+      // cap); otherwise CharacterCount tracks with no limit (soft — overflow
+      // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
+      // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
+      // never[]-inference reason as placeholderExtensions/imageExtensions.
+      const characterCountExtensions = CharacterCount ? [CharacterCount.configure(this.enforceMaxLength() && __maxLength != null ? {
+        limit: __maxLength
+      } : {})] : [];
+
+      // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
+      // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
+      // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
+      // functions declared above (see their doc comment for why they live at the
+      // top level rather than as closures nested in this ternary).
+      const uploadHandlers = this.uploadImage() ? {
+        handlePaste: this.handlePaste,
+        handleDrop: this.handleDrop
+      } : {};
+      this.editor = new Editor({
+        element: this.editorEl()!.nativeElement,
+        content: this.html(),
+        editable: this.editable(),
+        autofocus: this.autofocus(),
+        // StarterKit first (config-disabled per the collision scan below); the
+        // Placeholder ext next; the reactive node-view nodes next; consumer
+        // extensions LAST so they win (TipTap applies later-registered extensions
+        // over earlier ones for the same node/mark) — and the whole array is
+        // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
+        // of the config-level auto-disable (D-02), which is what actually silences
+        // StarterKit's internal same-named extension (e.g. its bundled `Link`).
+        extensions: this.dedupeExtensionsByName([StarterKit.configure(this.buildStarterKitConfig(this.starterKit(), __extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...__extensions]),
+        editorProps: {
+          attributes: {
+            'aria-label': this.ariaLabel(),
+            ...(__editorClass ? {
+              class: __editorClass
+            } : {}),
+            ...(__placeholder ? {
+              'data-placeholder': __placeholder,
+              'aria-placeholder': __placeholder
+            } : {})
+          },
+          // uploadImage paste/drop fallbacks (D-04) — spread BEFORE the consumer's
+          // own editorProps so a consumer-supplied handlePaste/handleDrop wins.
+          // `{}` (no-op) when $props.uploadImage is unset.
+          ...uploadHandlers,
+          // Consumer editorProps spread LAST — full ProseMirror editorProps control
+          // (handleKeyDown, handlePaste, a custom `attributes`, …) wins.
+          ...this.editorProps()
         },
-        // uploadImage paste/drop fallbacks (D-04) — spread BEFORE the consumer's
-        // own editorProps so a consumer-supplied handlePaste/handleDrop wins.
-        // `{}` (no-op) when $props.uploadImage is unset.
-        ...uploadHandlers,
-        // Consumer editorProps spread LAST — full ProseMirror editorProps control
-        // (handleKeyDown, handlePaste, a custom `attributes`, …) wins.
-        ...this.editorProps()
-      },
-      onUpdate: ({
-        editor
-      }: any) => {
-        const next = editor.getHTML();
-        this.lastHtml = next;
-        // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
-        if (next !== this.html()) this.html.set(next), this.__rozieCvaOnChange(next);
-        this.refreshCount();
-        this.refreshLink();
-        this.update.emit(next);
-      },
-      onSelectionUpdate: () => {
-        this.refreshActive();
-        this.refreshLink();
-        this.selectionUpdate.emit();
-      },
-      onFocus: () => this.focus.emit(),
-      onBlur: ({
-        event
-      }: any) => {
-        // Clear the create-mode latch when focus truly leaves the editor + its link
-        // surface — but NOT when it moves INTO the link editor host (clicking the URL
-        // input blurs the editor; the buttons are already covered by their keepFocus
-        // mousedown). Without this, openFlag stays true after the user dismisses the
-        // create affordance by clicking away, so the editor spuriously re-surfaces on
-        // the next unrelated selection.
-        const to = event && event.relatedTarget;
-        if (!(to instanceof Node && this.linkEditorEl && this.linkEditorEl.contains(to))) this.openFlag = false;
-        this.blur.emit();
+        onUpdate: ({
+          editor
+        }: any) => {
+          const next = editor.getHTML();
+          this.lastHtml = next;
+          // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
+          if (next !== this.html()) this.html.set(next), this.__rozieCvaOnChange(next);
+          this.refreshCount();
+          this.refreshLink();
+          this.update.emit(next);
+        },
+        onSelectionUpdate: () => {
+          this.refreshActive();
+          this.refreshLink();
+          this.selectionUpdate.emit();
+        },
+        onFocus: () => this.focus.emit(),
+        onBlur: ({
+          event
+        }: any) => {
+          // Clear the create-mode latch when focus truly leaves the editor + its link
+          // surface — but NOT when it moves INTO the link editor host (clicking the URL
+          // input blurs the editor; the buttons are already covered by their keepFocus
+          // mousedown). Without this, openFlag stays true after the user dismisses the
+          // create affordance by clicking away, so the editor spuriously re-surfaces on
+          // the next unrelated selection.
+          const to = event && event.relatedTarget;
+          if (!(to instanceof Node && this.linkEditorEl && this.linkEditorEl.contains(to))) this.openFlag = false;
+          this.blur.emit();
+        }
+      });
+      this.refreshActive();
+      this.refreshCount();
+      this.refreshLink();
+
+      // `toolbar` portal slot — when the consumer fills it, mount their toolbar
+      // fragment into the engine-adjacent host node, handing them the live editor
+      // (their buttons call editor.chain().focus()…run()). $portals.toolbar is
+      // referenced ONLY here inside $onMount (the per-target portal helper is scoped
+      // to the mount lifecycle — a top-level reference would fail the bundled-leaf
+      // strict typecheck, the FullCalendar/CodeMirror pattern). The host div is
+      // r-if-gated on $slots.toolbar so $refs.toolbarEl exists exactly when filled.
+      if ((this.toolbarTpl ?? this.__rozieFillMap()['toolbar'] ?? this.templates()?.['toolbar']) && this.toolbarEl()?.nativeElement) {
+        this.toolbarDispose = this.portals.toolbar(this.toolbarEl()!.nativeElement, {
+          editor: this.editor
+        });
       }
-    });
-    this.refreshActive();
-    this.refreshCount();
-    this.refreshLink();
 
-    // `toolbar` portal slot — when the consumer fills it, mount their toolbar
-    // fragment into the engine-adjacent host node, handing them the live editor
-    // (their buttons call editor.chain().focus()…run()). $portals.toolbar is
-    // referenced ONLY here inside $onMount (the per-target portal helper is scoped
-    // to the mount lifecycle — a top-level reference would fail the bundled-leaf
-    // strict typecheck, the FullCalendar/CodeMirror pattern). The host div is
-    // r-if-gated on $slots.toolbar so $refs.toolbarEl exists exactly when filled.
-    // `toolbar` portal slot — when the consumer fills it, mount their toolbar
-    // fragment into the engine-adjacent host node, handing them the live editor
-    // (their buttons call editor.chain().focus()…run()). $portals.toolbar is
-    // referenced ONLY here inside $onMount (the per-target portal helper is scoped
-    // to the mount lifecycle — a top-level reference would fail the bundled-leaf
-    // strict typecheck, the FullCalendar/CodeMirror pattern). The host div is
-    // r-if-gated on $slots.toolbar so $refs.toolbarEl exists exactly when filled.
-    if ((this.toolbarTpl ?? this.__rozieFillMap()['toolbar'] ?? this.templates()?.['toolbar']) && this.toolbarEl()?.nativeElement) {
-      this.toolbarDispose = this.portals.toolbar(this.toolbarEl()!.nativeElement, {
-        editor: this.editor
-      });
-    }
-
-    // `bubbleMenu` / `floatingMenu` portal slots — mount the consumer's menu
-    // fragment into the engine-owned (imperatively-created) host element handed to
-    // the Floating-UI menu extension, with the live editor in scope (their buttons
-    // call editor.chain().focus()…run()). Like toolbar/nodeView, $portals.bubbleMenu
-    // / $portals.floatingMenu are referenced ONLY inside $onMount (the bundled-leaf
-    // strict-typecheck discipline). The element is created above only when the slot
-    // is filled, so each portal fires exactly when its slot exists.
-    // `bubbleMenu` / `floatingMenu` portal slots — mount the consumer's menu
-    // fragment into the engine-owned (imperatively-created) host element handed to
-    // the Floating-UI menu extension, with the live editor in scope (their buttons
-    // call editor.chain().focus()…run()). Like toolbar/nodeView, $portals.bubbleMenu
-    // / $portals.floatingMenu are referenced ONLY inside $onMount (the bundled-leaf
-    // strict-typecheck discipline). The element is created above only when the slot
-    // is filled, so each portal fires exactly when its slot exists.
-    if (this.bubbleMenuEl) {
-      this.bubbleMenuDispose = this.portals.bubbleMenu(this.bubbleMenuEl, {
-        editor: this.editor
-      });
-    }
-    if (this.floatingMenuEl) {
-      this.floatingMenuDispose = this.portals.floatingMenu(this.floatingMenuEl, {
-        editor: this.editor
-      });
-    }
-
-    // Link editor (#2) — mount the surface into its engine-managed host. When the
-    // consumer fills `#linkEditor`, the REACTIVE portal renders their fragment
-    // (re-rendered in place by refreshLink()'s handle.update() — Spike 016 proved
-    // this survives the bubble-menu extension's detach-reattach). Otherwise the
-    // component's own default form is built imperatively into the same host.
-    // $portals.linkEditor is referenced ONLY here inside $onMount (portal discipline).
-    // Link editor (#2) — mount the surface into its engine-managed host. When the
-    // consumer fills `#linkEditor`, the REACTIVE portal renders their fragment
-    // (re-rendered in place by refreshLink()'s handle.update() — Spike 016 proved
-    // this survives the bubble-menu extension's detach-reattach). Otherwise the
-    // component's own default form is built imperatively into the same host.
-    // $portals.linkEditor is referenced ONLY here inside $onMount (portal discipline).
-    if (this.linkEditorEl) {
-      if ((this.linkEditorTpl ?? this.__rozieFillMap()['linkEditor'] ?? this.templates()?.['linkEditor'])) {
-        // Read the initial link attrs straight off the live editor (NOT
-        // `$data.linkState`, written by the refreshLink() call above in this
-        // same tick) — the same React stale-read avoidance as buildLinkScope's
-        // other call site.
-        const initialLinkAttrs = this.editor.getAttributes('link');
-        this.linkEditorHandle = this.portals.linkEditor(this.linkEditorEl, this.buildLinkScope(initialLinkAttrs.href || '', initialLinkAttrs));
-      } else {
-        this.buildDefaultLinkEditor(this.linkEditorEl);
-        // Prefill correction (D-04): the refreshLink() call above (right after
-        // `new Editor(...)`) already latched lastLinkKey — linkInputEl didn't
-        // exist yet at that point, so every LATER refreshLink() for the same
-        // link early-returns, leaving the just-created input empty even when the
-        // caret starts inside a link. Seed it directly from the LIVE editor
-        // (`editor.getAttributes('link')`), NOT `$data.linkState` — reading a
-        // $data key immediately after refreshLink() just wrote it hits the
-        // React setState-is-async stale-read trap (the same write-then-read-in-
-        // one-handler class ROZ138 warns about elsewhere in this file), since
-        // $data.linkState was written by the refreshLink() call directly above.
-        // `editor` is a plain instance handle, not reactive state, so reading it
-        // straight off the engine is synchronous and target-uniform. A no-link
-        // mount leaves this the empty string (unchanged).
-        if (this.linkInputEl) this.linkInputEl.value = this.editor.getAttributes('link').href || '';
+      // `bubbleMenu` / `floatingMenu` portal slots — mount the consumer's menu
+      // fragment into the engine-owned (imperatively-created) host element handed to
+      // the Floating-UI menu extension, with the live editor in scope (their buttons
+      // call editor.chain().focus()…run()). Like toolbar/nodeView, $portals.bubbleMenu
+      // / $portals.floatingMenu are referenced ONLY inside $onMount (the bundled-leaf
+      // strict-typecheck discipline). The element is created above only when the slot
+      // is filled, so each portal fires exactly when its slot exists.
+      if (this.bubbleMenuEl) {
+        this.bubbleMenuDispose = this.portals.bubbleMenu(this.bubbleMenuEl, {
+          editor: this.editor
+        });
       }
+      if (this.floatingMenuEl) {
+        this.floatingMenuDispose = this.portals.floatingMenu(this.floatingMenuEl, {
+          editor: this.editor
+        });
+      }
+
+      // Link editor (#2) — mount the surface into its engine-managed host. When the
+      // consumer fills `#linkEditor`, the REACTIVE portal renders their fragment
+      // (re-rendered in place by refreshLink()'s handle.update() — Spike 016 proved
+      // this survives the bubble-menu extension's detach-reattach). Otherwise the
+      // component's own default form is built imperatively into the same host.
+      // $portals.linkEditor is referenced ONLY here inside $onMount (portal discipline).
+      if (this.linkEditorEl) {
+        if ((this.linkEditorTpl ?? this.__rozieFillMap()['linkEditor'] ?? this.templates()?.['linkEditor'])) {
+          // Read the initial link attrs straight off the live editor (NOT
+          // `$data.linkState`, written by the refreshLink() call above in this
+          // same tick) — the same React stale-read avoidance as buildLinkScope's
+          // other call site.
+          const initialLinkAttrs = this.editor.getAttributes('link');
+          this.linkEditorHandle = this.portals.linkEditor(this.linkEditorEl, this.buildLinkScope(initialLinkAttrs.href || '', initialLinkAttrs));
+        } else {
+          this.buildDefaultLinkEditor(this.linkEditorEl);
+          // Prefill correction (D-04): the refreshLink() call above (right after
+          // `new Editor(...)`) already latched lastLinkKey — linkInputEl didn't
+          // exist yet at that point, so every LATER refreshLink() for the same
+          // link early-returns, leaving the just-created input empty even when the
+          // caret starts inside a link. Seed it directly from the LIVE editor
+          // (`editor.getAttributes('link')`), NOT `$data.linkState` — reading a
+          // $data key immediately after refreshLink() just wrote it hits the
+          // React setState-is-async stale-read trap (the same write-then-read-in-
+          // one-handler class ROZ138 warns about elsewhere in this file), since
+          // $data.linkState was written by the refreshLink() call directly above.
+          // `editor` is a plain instance handle, not reactive state, so reading it
+          // straight off the engine is synchronous and target-uniform. A no-link
+          // mount leaves this the empty string (unchanged).
+          if (this.linkInputEl) this.linkInputEl.value = this.editor.getAttributes('link').href || '';
+        }
+      }
+      this.ready.emit(this.editor);
+    };
+    if (needsFloating || needsImage || needsCount) {
+      Promise.all([needsFloating ? import('@tiptap/extension-floating-menu') : null, needsImage ? import('@tiptap/extension-image') : null, needsCount ? import('@tiptap/extension-character-count') : null]).then((mods: any) => {
+        if (!this.disposed) construct(mods[0], mods[1], mods[2]);
+      });
+    } else {
+      construct(null, null, null);
     }
     this.__rozieDestroyRef.onDestroy(() => {
+      this.disposed = true;
       this.toolbarDispose?.();
       this.toolbarDispose = null;
       this.bubbleMenuDispose?.();
@@ -819,6 +764,11 @@ export class TipTap {
   }
 
   editor: any = null;
+  // Set by the mount cleanup. When a conditional extension is being loaded, the editor
+  // is constructed after the import() settles — by then the component may already be
+  // gone, and constructing into a detached element would leak an Editor.
+  // COMPONENT-scope for the Solid cleanup-hoist reason documented at toolbarDispose.
+  disposed = false;
   // The raw HTML string the editor currently reflects. Compared against in the
   // $props.html reconciler so the watcher's mount-time fire is a no-op: the
   // editor is created with `content: $props.html`, so right after mount the bound

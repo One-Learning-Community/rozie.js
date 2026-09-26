@@ -162,6 +162,10 @@
                 "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
               },
               {
+                "name": "ready",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
                 "name": "update:html",
                 "description": "Emitted with the updated `html` value; powers `v-model:html`.",
                 "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"

@@ -437,6 +437,12 @@
               }
             },
             {
+              "name": "ready",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
               "name": "html-change",
               "type": {
                 "text": "CustomEvent"
