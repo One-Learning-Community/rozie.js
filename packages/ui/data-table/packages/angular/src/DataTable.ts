@@ -1143,6 +1143,10 @@ export class DataTable {
    */
   expanded = model<(Record<string, any> | boolean) | null>(null);
   /**
+   * Row identity `(originalRow, index, parentRow?) => string | number` — the key `rowSelection`, `expanded` and the per-row caches use. Default null → table-core keys rows by position (`"0"`, `"1"`, … and `"0.1"` for sub-rows), so inserting or removing rows above a selected or expanded row moves that state onto whatever row now sits at its index. Supply it whenever rows can be added or removed while state is held (server push, live lists); the result is coerced to a string.
+   */
+  getRowId = input<((...args: any[]) => any) | null>(null);
+  /**
    * Table-level child-row accessor `(originalRow, index) => TData[] | undefined` that drives nested sub-rows. When supplied (with `expandable`), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the `#detail` scoped slot is the expand mode.
    */
   getSubRows = input<((...args: any[]) => any) | null>(null);
@@ -1452,6 +1456,9 @@ export class DataTable {
       // default `!!subRows.length` rule applies (only parents with children expand).
       getExpandedRowModel: getExpandedRowModel(),
       getSubRows: (__getSubRows || undefined) as any,
+      // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
+      // other row-model fns.
+      getRowId: this.rowIdOption(),
       getRowCanExpand: this.expandable() === true && __getSubRows == null ? () => true : undefined,
       onExpandedChange: this.onExpandedChangeCb,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
@@ -3904,6 +3911,15 @@ export class DataTable {
     }
     return '';
   };
+  // The table-core `getRowId` option (quick 260925-rew). Without it table-core keys
+  // rowSelection / expanded by position, so a row inserted above a selected one moves the
+  // selection onto another row. The prop is captured into a local so the null check narrows
+  // inside the arrow (TS2721 on the Vue leaf otherwise), and String() because table-core
+  // compares ids as strings.
+  rowIdOption = () => {
+    const f = this.getRowId();
+    return f ? (originalRow: any, index: any, parent: any) => String(f(originalRow, index, parent)) : undefined;
+  };
   // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
   // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
   reFeed = () => {
@@ -3932,6 +3948,9 @@ export class DataTable {
       // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
       getExpandedRowModel: getExpandedRowModel(),
       getSubRows: (this.getSubRows() || undefined) as any,
+      // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
+      // other row-model fns.
+      getRowId: this.rowIdOption(),
       getRowCanExpand: this.expandable() === true && this.getSubRows() == null ? () => true : undefined,
       onExpandedChange: this.onExpandedChangeCb,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a

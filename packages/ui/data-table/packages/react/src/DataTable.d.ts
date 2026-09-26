@@ -66,6 +66,10 @@ export interface DataTableProps {
   defaultExpanded?: (Record<string, unknown> | boolean) | null;
   onExpandedChange?: (next: (Record<string, unknown> | boolean) | null) => void;
   /**
+   * Row identity `(originalRow, index, parentRow?) => string | number` — the key `rowSelection`, `expanded` and the per-row caches use. Default null → table-core keys rows by position (`"0"`, `"1"`, … and `"0.1"` for sub-rows), so inserting or removing rows above a selected or expanded row moves that state onto whatever row now sits at its index. Supply it whenever rows can be added or removed while state is held (server push, live lists); the result is coerced to a string.
+   */
+  getRowId?: ((...args: any[]) => any) | null;
+  /**
    * Table-level child-row accessor `(originalRow, index) => TData[] | undefined` that drives nested sub-rows. When supplied (with `expandable`), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the `#detail` scoped slot is the expand mode.
    */
   getSubRows?: ((...args: any[]) => any) | null;

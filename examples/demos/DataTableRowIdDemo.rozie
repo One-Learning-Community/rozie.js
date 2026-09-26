@@ -1,0 +1,69 @@
+<!--
+  DataTableRowIdDemo.rozie — `getRowId` keys selection and expansion to the ROW, not its
+  position (quick 260925-rid, oinbox dogfooding).
+
+  Without it, table-core keys rowSelection / expanded by row INDEX, so a row inserted at the
+  top (a push-delivered email thread) silently moves a checked selection — and an open
+  detail row — onto a different row. Seeds select + expand Bravo by its own id `b`; the
+  "Insert at top" button prepends Zulu. Bravo must stay the selected, expanded row.
+-->
+<rozie name="DataTableRowIdDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 'a', name: 'Alpha' },
+    { id: 'b', name: 'Bravo' },
+    { id: 'c', name: 'Charlie' },
+  ],
+  sel: { b: true },
+  exp: { b: true },
+}
+</data>
+
+<script>
+const rowIdOf = (row) => row.id
+const insertTop = () => {
+  $data.rows = [{ id: 'z', name: 'Zulu' }].concat($data.rows)
+}
+</script>
+
+<template>
+<div class="dt-demo">
+  <button type="button" data-testid="insert-top" @click="insertTop()">Insert at top</button>
+  <span class="readout" data-testid="readout-selected">{{ Object.keys($data.sel).filter((k) => $data.sel[k]).join(',') }}</span>
+  <section data-testid="rowid-table">
+    <DataTable
+      :data="$data.rows"
+      selectionMode="multiple"
+      expandable
+      :getRowId="rowIdOf"
+      r-model:rowSelection="$data.sel"
+      r-model:expanded="$data.exp"
+    >
+      <Column field="name" header="Name" />
+      <template #detail="{ row }">
+        <span data-testid="detail">detail {{ row.name }}</span>
+      </template>
+    </DataTable>
+  </section>
+</div>
+</template>
+
+<style>
+.dt-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 460px;
+}
+</style>
+
+</rozie>

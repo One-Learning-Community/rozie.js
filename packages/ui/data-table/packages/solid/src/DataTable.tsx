@@ -515,6 +515,10 @@ interface DataTableProps {
   defaultExpanded?: (Record<string, any> | boolean) | null;
   onExpandedChange?: (expanded: (Record<string, any> | boolean) | null) => void;
   /**
+   * Row identity `(originalRow, index, parentRow?) => string | number` — the key `rowSelection`, `expanded` and the per-row caches use. Default null → table-core keys rows by position (`"0"`, `"1"`, … and `"0.1"` for sub-rows), so inserting or removing rows above a selected or expanded row moves that state onto whatever row now sits at its index. Supply it whenever rows can be added or removed while state is held (server push, live lists); the result is coerced to a string.
+   */
+  getRowId?: ((...args: any[]) => any) | null;
+  /**
    * Table-level child-row accessor `(originalRow, index) => TData[] | undefined` that drives nested sub-rows. When supplied (with `expandable`), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the `#detail` scoped slot is the expand mode.
    */
   getSubRows?: ((...args: any[]) => any) | null;
@@ -661,8 +665,8 @@ export interface DataTableHandle {
 }
 
 export default function DataTable(_props: DataTableProps): JSX.Element {
-  const _merged = mergeProps({ columns: (() => [])() as any[], selectionMode: 'none', manual: false, rowCount: null, pageCount: null, expandable: false, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, virtual: false, estimateRowHeight: 40, autoMeasure: false, maxHeight: '' }, _props);
-  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'rowCount', 'pageCount', 'expandable', 'expanded', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'singleClickEdit', 'undoable', 'undoLimit', 'virtual', 'estimateRowHeight', 'autoMeasure', 'maxHeight', 'children', 'ref', 'onSortChange', 'onExpandChange', 'onGroupChange', 'onFilterChange', 'onPageChange', 'onSelectionChange', 'onVisibilityChange', 'onResizeChange', 'onReorderChange', 'onPinChange', 'onHistoryChange', 'onActivecellChange', 'onRangeChange', 'onCellEditCommit', 'onRowEditCommit']);
+  const _merged = mergeProps({ columns: (() => [])() as any[], selectionMode: 'none', manual: false, rowCount: null, pageCount: null, expandable: false, getRowId: null, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, virtual: false, estimateRowHeight: 40, autoMeasure: false, maxHeight: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'rowCount', 'pageCount', 'expandable', 'expanded', 'getRowId', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'singleClickEdit', 'undoable', 'undoLimit', 'virtual', 'estimateRowHeight', 'autoMeasure', 'maxHeight', 'children', 'ref', 'onSortChange', 'onExpandChange', 'onGroupChange', 'onFilterChange', 'onPageChange', 'onSelectionChange', 'onVisibilityChange', 'onResizeChange', 'onReorderChange', 'onPinChange', 'onHistoryChange', 'onActivecellChange', 'onRangeChange', 'onCellEditCommit', 'onRowEditCommit']);
   const resolved = () => local.children;
   onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory }); });
 
@@ -772,6 +776,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // default `!!subRows.length` rule applies (only parents with children expand).
       getExpandedRowModel: getExpandedRowModel(),
       getSubRows: (local.getSubRows || undefined) as any,
+      // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
+      // other row-model fns.
+      getRowId: rowIdOption(),
       getRowCanExpand: local.expandable === true && local.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
@@ -3339,6 +3346,16 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     }
     return '';
   }
+
+  // The table-core `getRowId` option (quick 260925-rew). Without it table-core keys
+  // rowSelection / expanded by position, so a row inserted above a selected one moves the
+  // selection onto another row. The prop is captured into a local so the null check narrows
+  // inside the arrow (TS2721 on the Vue leaf otherwise), and String() because table-core
+  // compares ids as strings.
+  function rowIdOption() {
+    const f = local.getRowId;
+    return f ? (originalRow: any, index: any, parent: any) => String(f(originalRow, index, parent)) : undefined;
+  }
   // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
   // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
   function reFeed() {
@@ -3367,6 +3384,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
       getExpandedRowModel: getExpandedRowModel(),
       getSubRows: (local.getSubRows || undefined) as any,
+      // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
+      // other row-model fns.
+      getRowId: rowIdOption(),
       getRowCanExpand: local.expandable === true && local.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a

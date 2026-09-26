@@ -124,6 +124,10 @@ interface DataTableProps {
   defaultExpanded?: (Record<string, any> | boolean) | null;
   onExpandedChange?: (expanded: (Record<string, any> | boolean) | null) => void;
   /**
+   * Row identity `(originalRow, index, parentRow?) => string | number` — the key `rowSelection`, `expanded` and the per-row caches use. Default null → table-core keys rows by position (`"0"`, `"1"`, … and `"0.1"` for sub-rows), so inserting or removing rows above a selected or expanded row moves that state onto whatever row now sits at its index. Supply it whenever rows can be added or removed while state is held (server push, live lists); the result is coerced to a string.
+   */
+  getRowId?: ((...args: any[]) => any) | null;
+  /**
    * Table-level child-row accessor `(originalRow, index) => TData[] | undefined` that drives nested sub-rows. When supplied (with `expandable`), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the `#detail` scoped slot is the expand mode.
    */
   getSubRows?: ((...args: any[]) => any) | null;
@@ -270,7 +274,7 @@ export interface DataTableHandle {
 const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable(_props: DataTableProps, ref): JSX.Element {
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const __defaultColumns = useState(() => (() => [])())[0];
-  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'rowCount' | 'pageCount' | 'expandable' | 'getSubRows' | 'groupable' | 'stickyHeader' | 'interactionMode' | 'singleClickEdit' | 'undoable' | 'undoLimit' | 'virtual' | 'estimateRowHeight' | 'autoMeasure' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; rowCount: (number) | null; pageCount: (number) | null; expandable: boolean; getSubRows: ((...args: any[]) => any) | null; groupable: boolean; stickyHeader: boolean; interactionMode: string; singleClickEdit: boolean; undoable: boolean; undoLimit: number; virtual: boolean | string; estimateRowHeight: number; autoMeasure: boolean; maxHeight: string } = {
+  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'rowCount' | 'pageCount' | 'expandable' | 'getRowId' | 'getSubRows' | 'groupable' | 'stickyHeader' | 'interactionMode' | 'singleClickEdit' | 'undoable' | 'undoLimit' | 'virtual' | 'estimateRowHeight' | 'autoMeasure' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; rowCount: (number) | null; pageCount: (number) | null; expandable: boolean; getRowId: ((...args: any[]) => any) | null; getSubRows: ((...args: any[]) => any) | null; groupable: boolean; stickyHeader: boolean; interactionMode: string; singleClickEdit: boolean; undoable: boolean; undoLimit: number; virtual: boolean | string; estimateRowHeight: number; autoMeasure: boolean; maxHeight: string } = {
     ..._props,
     columns: _props.columns ?? __defaultColumns,
     selectionMode: _props.selectionMode ?? 'none',
@@ -278,6 +282,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     rowCount: _props.rowCount ?? null,
     pageCount: _props.pageCount ?? null,
     expandable: _props.expandable ?? false,
+    getRowId: _props.getRowId ?? null,
     getSubRows: _props.getSubRows ?? null,
     groupable: _props.groupable ?? false,
     stickyHeader: _props.stickyHeader ?? false,
@@ -2604,6 +2609,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     return '';
   }
+
+  // The table-core `getRowId` option (quick 260925-rew). Without it table-core keys
+  // rowSelection / expanded by position, so a row inserted above a selected one moves the
+  // selection onto another row. The prop is captured into a local so the null check narrows
+  // inside the arrow (TS2721 on the Vue leaf otherwise), and String() because table-core
+  // compares ids as strings.
+  const rowIdOption = useCallback(() => {
+    const f = props.getRowId;
+    return f ? (originalRow: any, index: any, parent: any) => String(f(originalRow, index, parent)) : undefined;
+  }, [props.getRowId]);
   // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
   // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
   const reFeed = useCallback(() => {
@@ -2632,6 +2647,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
       getExpandedRowModel: getExpandedRowModel(),
       getSubRows: (props.getSubRows || undefined) as any,
+      // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
+      // other row-model fns.
+      getRowId: rowIdOption(),
       getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
@@ -2669,7 +2687,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       onColumnSizingInfoChange: onColumnSizingInfoChangeCb
     }));
     if (refreshRowModel.current) refreshRowModel.current();
-  }, [currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.pageCount, props.rowCount, props.selectionMode, tableColumns]);
+  }, [currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.pageCount, props.rowCount, props.selectionMode, rowIdOption, tableColumns]);
   // LIT (+ any fine-grained target whose effect-tracked watch does NOT observe the plain
   // `data` PROPERTY): the re-feed $watch reads `(this.data||[]).length` inside a
   // preact-signals effect, but `data` is a Lit @property (not a signal) so the effect
@@ -7606,6 +7624,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   _onSortingChangeCbRef.current = onSortingChangeCb;
   const _remeasureColumnWindowRef = useRef(remeasureColumnWindow);
   _remeasureColumnWindowRef.current = remeasureColumnWindow;
+  const _rowIdOptionRef = useRef(rowIdOption);
+  _rowIdOptionRef.current = rowIdOption;
   const _rowsWindowedRef = useRef(rowsWindowed);
   _rowsWindowedRef.current = rowsWindowed;
   const _seedColumnPinningRef = useRef(seedColumnPinning);
@@ -7671,6 +7691,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // default `!!subRows.length` rule applies (only parents with children expand).
       getExpandedRowModel: getExpandedRowModel(),
       getSubRows: (_getSubRowsRef.current || undefined) as any,
+      // Row identity (quick 260925-rew) — see rowIdOption(). Re-passed on re-feed like the
+      // other row-model fns.
+      getRowId: _rowIdOptionRef.current(),
       getRowCanExpand: _expandableRef.current === true && _getSubRowsRef.current == null ? () => true : undefined,
       onExpandedChange: _onExpandedChangeCbStable,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
