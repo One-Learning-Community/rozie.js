@@ -1,10 +1,9 @@
 import { defineConfig } from 'tsdown';
+import { solidLeafConfig } from '../../../solid-leaf-build.mjs';
 
-export default defineConfig({
+// Two builds (compiled JS + a `solid`-condition JSX build) — see packages/ui/solid-leaf-build.mjs.
+export default defineConfig(solidLeafConfig({
   entry: ['src/index.ts'],
-  format: ['esm', 'cjs'],
-  dts: true,
-  clean: true,
   // The generated barrel re-exports the primary component (`LexicalEditor`) as both
   // `default` and named, plus the plugin/toolbar named exports — opt into rolldown
   // 'named' export mode so the mix is unambiguous.
@@ -30,4 +29,4 @@ export default defineConfig({
     '@lexical/utils',
     /^@lexical\//,
   ],
-});
+}));

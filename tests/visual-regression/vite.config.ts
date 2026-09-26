@@ -270,30 +270,12 @@ async function frameworkPlugins(target: Target) {
     }
     case 'solid': {
       const { default: solid } = await import('vite-plugin-solid');
-      // Published `@rozie-ui/*-solid` leaves ship Solid JSX in their `dist/*.mjs`
-      // (Solid can't pre-compile to a framework-agnostic dist — the consumer's
-      // solid plugin transforms it). vite-plugin-solid's transform gate only
-      // matches `*.[mc]?[tj]sx`, so JSX inside a `.mjs` dependency is passed to
-      // rolldown untransformed → "JSX syntax is disabled" PARSE_ERROR. Every
-      // Option-A composite that imports a published solid leaf hits this
-      // (command-palette→combobox, data-table→popover). Add `.mjs` to the watched
-      // extensions and SCOPE `include` to the cell sources + the `@rozie-ui/*-solid`
-      // leaves so unrelated `node_modules/*.mjs` are left untouched.
-      // pnpm resolves the published leaf to its WORKSPACE realpath
-      // (`packages/ui/<family>/packages/solid/dist/index.mjs`), not a
-      // `node_modules/@rozie-ui/*` path — so the include must match that shape
-      // (the node_modules form is kept as a defensive fallback for non-symlinked
-      // installs).
-      return [
-        solid({
-          extensions: ['.mjs'],
-          include: [
-            /\.[mc]?[jt]sx$/,
-            /\/packages\/ui\/[^/]+\/packages\/solid\/dist\//,
-            /node_modules\/@rozie-ui\/[^/]+-solid\/dist\//,
-          ],
-        }),
-      ];
+      // DEFAULT config on purpose. The published `@rozie-ui/*-solid` leaves ship compiled JS
+      // under `import` and a JSX build under the `solid` condition, which this plugin resolves
+      // and compiles itself. (This block used to widen `extensions`/`include` to transform JSX
+      // shipped inside `dist/*.mjs` — a workaround that hid that the leaves were unbuildable for
+      // every real consumer; see tests/integration/solid-published-leaves.)
+      return [solid()];
     }
     case 'angular': {
       const { default: angular } = await import('@analogjs/vite-plugin-angular');

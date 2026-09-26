@@ -1,10 +1,9 @@
 import { defineConfig } from 'tsdown';
+import { solidLeafConfig } from '../../../solid-leaf-build.mjs';
 
-export default defineConfig({
+// Two builds (compiled JS + a `solid`-condition JSX build) — see packages/ui/solid-leaf-build.mjs.
+export default defineConfig(solidLeafConfig({
   entry: ['src/index.ts'],
-  format: ['esm', 'cjs'],
-  dts: true,
-  clean: true,
   // The generated barrel re-exports the named component AND its default; opt
   // into rolldown 'named' export mode so that mix is unambiguous.
   outputOptions(options) {
@@ -14,4 +13,4 @@ export default defineConfig({
     'solid-js',
     '@rozie/runtime-solid',
   ],
-});
+}));

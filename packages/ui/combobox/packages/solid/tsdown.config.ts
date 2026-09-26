@@ -1,10 +1,9 @@
 import { defineConfig } from 'tsdown';
+import { solidLeafConfig } from '../../../solid-leaf-build.mjs';
 
-export default defineConfig({
+// Two builds (compiled JS + a `solid`-condition JSX build) — see packages/ui/solid-leaf-build.mjs.
+export default defineConfig(solidLeafConfig({
   entry: ['src/index.ts'],
-  format: ['esm', 'cjs'],
-  dts: true,
-  clean: true,
   // The generated barrel re-exports both the named component (`Combobox`) and its
   // `default`. Opt into rolldown 'named' export mode so the mix is unambiguous
   // (the default lands on `exports.default` for CJS consumers).
@@ -20,4 +19,4 @@ export default defineConfig({
   // (and inlining would double-load the primitive's own module-scope state
   // alongside any copy the consumer's app separately imports).
   external: ['solid-js', '@rozie/runtime-solid', '@rozie-ui/popover-solid'],
-});
+}));

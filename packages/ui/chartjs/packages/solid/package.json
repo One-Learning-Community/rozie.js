@@ -31,51 +31,61 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
+      "solid": "./dist/source/index.jsx",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     },
     "./auto": {
       "types": "./dist/auto.d.mts",
+      "solid": "./dist/source/auto.jsx",
       "import": "./dist/auto.mjs",
       "require": "./dist/auto.cjs"
     },
     "./line": {
       "types": "./dist/Line.d.mts",
+      "solid": "./dist/source/Line.jsx",
       "import": "./dist/Line.mjs",
       "require": "./dist/Line.cjs"
     },
     "./bar": {
       "types": "./dist/Bar.d.mts",
+      "solid": "./dist/source/Bar.jsx",
       "import": "./dist/Bar.mjs",
       "require": "./dist/Bar.cjs"
     },
     "./pie": {
       "types": "./dist/Pie.d.mts",
+      "solid": "./dist/source/Pie.jsx",
       "import": "./dist/Pie.mjs",
       "require": "./dist/Pie.cjs"
     },
     "./doughnut": {
       "types": "./dist/Doughnut.d.mts",
+      "solid": "./dist/source/Doughnut.jsx",
       "import": "./dist/Doughnut.mjs",
       "require": "./dist/Doughnut.cjs"
     },
     "./polar-area": {
       "types": "./dist/PolarArea.d.mts",
+      "solid": "./dist/source/PolarArea.jsx",
       "import": "./dist/PolarArea.mjs",
       "require": "./dist/PolarArea.cjs"
     },
     "./radar": {
       "types": "./dist/Radar.d.mts",
+      "solid": "./dist/source/Radar.jsx",
       "import": "./dist/Radar.mjs",
       "require": "./dist/Radar.cjs"
     },
     "./scatter": {
       "types": "./dist/Scatter.d.mts",
+      "solid": "./dist/source/Scatter.jsx",
       "import": "./dist/Scatter.mjs",
       "require": "./dist/Scatter.cjs"
     },
     "./bubble": {
       "types": "./dist/Bubble.d.mts",
+      "solid": "./dist/source/Bubble.jsx",
       "import": "./dist/Bubble.mjs",
       "require": "./dist/Bubble.cjs"
     }
@@ -105,5 +115,10 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/preset-typescript": "^7.28.5",
+    "babel-preset-solid": "~1.8.22"
   }
 }

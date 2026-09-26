@@ -1,0 +1,32 @@
+// One import per published @rozie-ui Solid leaf, exactly as a consumer app writes it.
+import * as L0 from '@rozie-ui/captcha-solid';
+import * as L1 from '@rozie-ui/chartjs-solid';
+import * as L2 from '@rozie-ui/codemirror-solid';
+import * as L3 from '@rozie-ui/combobox-solid';
+import * as L4 from '@rozie-ui/command-palette-solid';
+import * as L5 from '@rozie-ui/cropper-solid';
+import * as L6 from '@rozie-ui/data-table-solid';
+import * as L7 from '@rozie-ui/date-picker-solid';
+import * as L8 from '@rozie-ui/dialog-solid';
+import * as L9 from '@rozie-ui/embla-solid';
+import * as L10 from '@rozie-ui/flatpickr-solid';
+import * as L11 from '@rozie-ui/fullcalendar-solid';
+import * as L12 from '@rozie-ui/lexical-solid';
+import * as L13 from '@rozie-ui/listbox-solid';
+import * as L14 from '@rozie-ui/maplibre-solid';
+import * as L15 from '@rozie-ui/number-field-solid';
+import * as L16 from '@rozie-ui/otp-solid';
+import * as L17 from '@rozie-ui/pagination-solid';
+import * as L18 from '@rozie-ui/pdf-solid';
+import * as L19 from '@rozie-ui/popover-solid';
+import * as L20 from '@rozie-ui/resizable-solid';
+import * as L21 from '@rozie-ui/rete-solid';
+import * as L22 from '@rozie-ui/slider-solid';
+import * as L23 from '@rozie-ui/sortable-list-solid';
+import * as L24 from '@rozie-ui/switch-solid';
+import * as L25 from '@rozie-ui/tags-solid';
+import * as L26 from '@rozie-ui/tiptap-solid';
+import * as L27 from '@rozie-ui/toast-solid';
+import * as L28 from '@rozie-ui/wavesurfer-solid';
+
+export const leaves = [L0, L1, L2, L3, L4, L5, L6, L7, L8, L9, L10, L11, L12, L13, L14, L15, L16, L17, L18, L19, L20, L21, L22, L23, L24, L25, L26, L27, L28];

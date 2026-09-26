@@ -1802,6 +1802,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/captcha/packages/svelte:
     dependencies:
@@ -1940,6 +1950,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/chartjs/packages/svelte:
     dependencies:
@@ -2312,6 +2332,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/codemirror/packages/svelte:
     dependencies:
@@ -2611,9 +2641,18 @@ importers:
         specifier: ^1.8
         version: 1.9.12
     devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
       '@rozie-ui/combobox':
         specifier: workspace:*
         version: link:../..
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/combobox/packages/svelte:
     dependencies:
@@ -2821,9 +2860,18 @@ importers:
         specifier: ^1.8
         version: 1.9.12
     devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
       '@rozie-ui/command-palette':
         specifier: workspace:*
         version: link:../..
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/command-palette/packages/svelte:
     dependencies:
@@ -2981,6 +3029,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/cropper/packages/svelte:
     dependencies:
@@ -3185,6 +3243,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/data-table/packages/svelte:
     dependencies:
@@ -3339,6 +3407,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/date-picker/packages/svelte:
     dependencies:
@@ -3469,6 +3547,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/dialog/packages/svelte:
     dependencies:
@@ -3632,6 +3720,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/embla/packages/svelte:
     dependencies:
@@ -3785,6 +3883,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/flatpickr/packages/svelte:
     dependencies:
@@ -3977,6 +4085,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/fullcalendar/packages/svelte:
     dependencies:
@@ -4249,9 +4367,18 @@ importers:
         specifier: ^1.8
         version: 1.9.12
     devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
       '@rozie-ui/lexical':
         specifier: workspace:*
         version: link:../..
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/lexical/packages/svelte:
     dependencies:
@@ -4439,6 +4566,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/listbox/packages/svelte:
     dependencies:
@@ -4593,6 +4730,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/maplibre/packages/svelte:
     dependencies:
@@ -4725,6 +4872,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/number-field/packages/svelte:
     dependencies:
@@ -4858,6 +5015,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/otp/packages/svelte:
     dependencies:
@@ -4988,6 +5155,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/pagination/packages/svelte:
     dependencies:
@@ -5133,6 +5310,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/pdf/packages/svelte:
     dependencies:
@@ -5279,9 +5466,18 @@ importers:
         specifier: ^1.8
         version: 1.9.12
     devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
       '@floating-ui/dom':
         specifier: ^1.7.2
         version: 1.7.6
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/popover/packages/svelte:
     dependencies:
@@ -5418,6 +5614,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/resizable/packages/svelte:
     dependencies:
@@ -5656,6 +5862,16 @@ importers:
       web-worker:
         specifier: ^1.2.0
         version: 1.5.0
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/rete/packages/svelte:
     dependencies:
@@ -5828,6 +6044,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/slider/packages/svelte:
     dependencies:
@@ -5982,6 +6208,16 @@ importers:
       sortablejs:
         specifier: ^1.15
         version: 1.15.7
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/sortable-list/packages/svelte:
     dependencies:
@@ -6117,6 +6353,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/switch/packages/svelte:
     dependencies:
@@ -6250,6 +6496,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/tags/packages/svelte:
     dependencies:
@@ -6485,6 +6741,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/tiptap/packages/svelte:
     dependencies:
@@ -6665,6 +6931,16 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/toast/packages/svelte:
     dependencies:
@@ -6810,6 +7086,16 @@ importers:
       wavesurfer.js:
         specifier: ^7
         version: 7.12.8
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/preset-typescript':
+        specifier: ^7.28.5
+        version: 7.28.5(@babel/core@7.29.0)
+      babel-preset-solid:
+        specifier: ~1.8.22
+        version: 1.8.22(@babel/core@7.29.0)
 
   packages/ui/wavesurfer/packages/svelte:
     dependencies:
@@ -6961,7 +7247,7 @@ importers:
     dependencies:
       '@analogjs/vite-plugin-angular':
         specifier: ~2.5.1
-        version: 2.5.1(58e94ae18d8d16a136cfa08aa996904f)
+        version: 2.5.1(61ec6fd4aa62c598201f0d377e218661)
       '@angular/common':
         specifier: ^19.0.0
         version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.14.10))(rxjs@7.8.2)
@@ -7148,7 +7434,7 @@ importers:
     dependencies:
       '@analogjs/vite-plugin-angular':
         specifier: ~2.5.1
-        version: 2.5.1(0007586ad59c0fe1a6489c190ed6e30a)
+        version: 2.5.1(56155438af3bd646e6f0d23ab91e3633)
       '@angular/common':
         specifier: ^19.0.0
         version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.14.10))(rxjs@7.8.2)
@@ -7200,7 +7486,7 @@ importers:
     dependencies:
       '@analogjs/vite-plugin-angular':
         specifier: ~2.5.1
-        version: 2.5.1(0007586ad59c0fe1a6489c190ed6e30a)
+        version: 2.5.1(56155438af3bd646e6f0d23ab91e3633)
       '@angular-devkit/build-angular':
         specifier: ^19.0.0
         version: 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(typescript@5.6.3)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
@@ -7241,6 +7527,115 @@ importers:
       vitest:
         specifier: ^4.1.5
         version: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
+
+  tests/integration/solid-published-leaves:
+    dependencies:
+      '@rozie-ui/captcha-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/captcha/packages/solid
+      '@rozie-ui/chartjs-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/chartjs/packages/solid
+      '@rozie-ui/codemirror-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/codemirror/packages/solid
+      '@rozie-ui/combobox-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/combobox/packages/solid
+      '@rozie-ui/command-palette-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/command-palette/packages/solid
+      '@rozie-ui/cropper-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/cropper/packages/solid
+      '@rozie-ui/data-table-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/data-table/packages/solid
+      '@rozie-ui/date-picker-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/date-picker/packages/solid
+      '@rozie-ui/dialog-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/dialog/packages/solid
+      '@rozie-ui/embla-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/embla/packages/solid
+      '@rozie-ui/flatpickr-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/flatpickr/packages/solid
+      '@rozie-ui/fullcalendar-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/fullcalendar/packages/solid
+      '@rozie-ui/lexical-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/lexical/packages/solid
+      '@rozie-ui/listbox-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/listbox/packages/solid
+      '@rozie-ui/maplibre-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/maplibre/packages/solid
+      '@rozie-ui/number-field-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/number-field/packages/solid
+      '@rozie-ui/otp-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/otp/packages/solid
+      '@rozie-ui/pagination-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/pagination/packages/solid
+      '@rozie-ui/pdf-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/pdf/packages/solid
+      '@rozie-ui/popover-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/popover/packages/solid
+      '@rozie-ui/resizable-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/resizable/packages/solid
+      '@rozie-ui/rete-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/rete/packages/solid
+      '@rozie-ui/slider-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/slider/packages/solid
+      '@rozie-ui/sortable-list-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/sortable-list/packages/solid
+      '@rozie-ui/switch-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/switch/packages/solid
+      '@rozie-ui/tags-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/tags/packages/solid
+      '@rozie-ui/tiptap-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/tiptap/packages/solid
+      '@rozie-ui/toast-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/toast/packages/solid
+      '@rozie-ui/wavesurfer-solid':
+        specifier: workspace:*
+        version: link:../../../packages/ui/wavesurfer/packages/solid
+      solid-js:
+        specifier: ^1.9.12
+        version: 1.9.12
+    devDependencies:
+      oxc-parser:
+        specifier: ^0.121.0
+        version: 0.121.0(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
+      solid-js-peer-floor:
+        specifier: npm:solid-js@1.8.0
+        version: solid-js@1.8.0
+      vite:
+        specifier: 8.1.0
+        version: 8.1.0(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(@testing-library/jest-dom@6.9.1)(solid-js@1.9.12)(vite@8.1.0(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
+      vitest:
+        specifier: ^4
+        version: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.1.0(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
 
   tests/lit-lint:
     dependencies:
@@ -7963,7 +8358,7 @@ importers:
     devDependencies:
       '@analogjs/vite-plugin-angular':
         specifier: ~2.5.1
-        version: 2.5.1(1d143d07e9de45edcedf609c026c8a91)
+        version: 2.5.1(080a0a23a25ef8aa02570ecc17e709fa)
       '@angular-devkit/build-angular':
         specifier: ^19.0.0
         version: 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(typescript@5.6.3)(vite@8.1.0(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
@@ -13089,6 +13484,11 @@ packages:
       '@babel/core': ^7.12.0
       webpack: '>=5'
 
+  babel-plugin-jsx-dom-expressions@0.38.5:
+    resolution: {integrity: sha512-JfjHYKOKGwoiOYQ56Oo8gbZPb9wNMpPuEEUhSCjMpnuHM9K21HFIUBm83TZPB40Av4caCIW4Tfjzpkp/MtFpMw==}
+    peerDependencies:
+      '@babel/core': ^7.20.12
+
   babel-plugin-jsx-dom-expressions@0.40.6:
     resolution: {integrity: sha512-v3P1MW46Lm7VMpAkq0QfyzLWWkC8fh+0aE5Km4msIgDx5kjenHU0pF2s+4/NH8CQn/kla6+Hvws+2AF7bfV5qQ==}
     peerDependencies:
@@ -13118,6 +13518,11 @@ packages:
     resolution: {integrity: sha512-M762rNHfSF1EV3SLtnCJXFoQbbIIz0OyRwnCmV0KPC7qosSfCO0QLTSuJX3ayAebubhE6oYBAYPrBA5ljowaZg==}
     peerDependencies:
       '@babel/core': ^7.4.0 || ^8.0.0-0 <8.0.0
+
+  babel-preset-solid@1.8.22:
+    resolution: {integrity: sha512-nKwisb//lZsiRF2NErlRP64zVTJqa1OSZiDnSl0YbcTiCZoMt52CY2Pg+9fsYAPtjYMT7RHBmzU41pxK6hFOcg==}
+    peerDependencies:
+      '@babel/core': ^7.0.0
 
   babel-preset-solid@1.9.12:
     resolution: {integrity: sha512-LLqnuKVDlKpyBlMPcH6qEvs/wmS9a+NczppxJ3ryS/c0O5IiSFOIBQi9GzyiGDSbcJpx4Gr87jyFTos1MyEuWg==}
@@ -16376,6 +16781,10 @@ packages:
     peerDependencies:
       seroval: ^1.0
 
+  seroval@0.10.4:
+    resolution: {integrity: sha512-TdaE9JkoATjKu+vjwllieX8zWyBTUVxbgWDnOsDJFfmKbM7vLSukuCXuD3pO3kkCtX4daywOW8ps2VCdPhS8/w==}
+    engines: {node: '>=10'}
+
   seroval@1.5.4:
     resolution: {integrity: sha512-46uFvgrXTVxZcUorgSSRZ4y+ieqLLQRMlG4bnCZKW3qI6BZm7Rg4ntMW4p1mILEEBZWrFlcpp0AyIIlM6jD9iw==}
     engines: {node: '>=10'}
@@ -16473,6 +16882,9 @@ packages:
 
   sockjs@0.3.24:
     resolution: {integrity: sha512-GJgLTZ7vYb/JtPSSZ10hsOYIvEYsjbNU+zPdIHcUaWVNUEPivzxku31865sSSud0Da0W4lEeOPlmw93zLQchuQ==}
+
+  solid-js@1.8.0:
+    resolution: {integrity: sha512-SYVRIUPwCW8K56/add1Yf7xYMOipDUcxGHIxzieRNu9tieqJpaygqcGdJOGXtrMBHSHyVEC7cSp9jz1cNZTFLA==}
 
   solid-js@1.9.12:
     resolution: {integrity: sha512-QzKaSJq2/iDrWR1As6MHZQ8fQkdOBf8GReYb7L5iKwMGceg7HxDcaOHk0at66tNgn9U2U7dXo8ZZpLIAmGMzgw==}
@@ -17061,6 +17473,9 @@ packages:
     deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
+  validate-html-nesting@1.2.4:
+    resolution: {integrity: sha512-doQi7e8EJ2OWneSG1aZpJluS6A49aZM0+EICXWKm1i6WvqTLmq0tpUcImc4KTWG50mORO0C4YDBtOCSYvElftw==}
+
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
@@ -17621,25 +18036,7 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
 
-  '@analogjs/vite-plugin-angular@2.5.1(0007586ad59c0fe1a6489c190ed6e30a)':
-    dependencies:
-      '@angular/compiler': 19.2.22
-      '@angular/compiler-cli': 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
-      magic-string: 0.30.21
-      obug: 2.1.1
-      oxc-parser: 0.121.0(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
-      tinyglobby: 0.2.16
-      ts-morph: 21.0.1
-      typescript: 5.6.3
-    optionalDependencies:
-      '@angular-devkit/build-angular': 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(typescript@5.6.3)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
-      '@angular/build': 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(postcss@8.5.16)(terser@5.46.2)(typescript@5.6.3)
-      vite: 6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2)
-    transitivePeerDependencies:
-      - '@emnapi/core'
-      - '@emnapi/runtime'
-
-  '@analogjs/vite-plugin-angular@2.5.1(1d143d07e9de45edcedf609c026c8a91)':
+  '@analogjs/vite-plugin-angular@2.5.1(080a0a23a25ef8aa02570ecc17e709fa)':
     dependencies:
       '@angular/compiler': 19.2.22
       '@angular/compiler-cli': 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
@@ -17675,7 +18072,25 @@ snapshots:
       - '@emnapi/core'
       - '@emnapi/runtime'
 
-  '@analogjs/vite-plugin-angular@2.5.1(58e94ae18d8d16a136cfa08aa996904f)':
+  '@analogjs/vite-plugin-angular@2.5.1(56155438af3bd646e6f0d23ab91e3633)':
+    dependencies:
+      '@angular/compiler': 19.2.22
+      '@angular/compiler-cli': 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
+      magic-string: 0.30.21
+      obug: 2.1.1
+      oxc-parser: 0.121.0(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
+      tinyglobby: 0.2.16
+      ts-morph: 21.0.1
+      typescript: 5.6.3
+    optionalDependencies:
+      '@angular-devkit/build-angular': 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(typescript@5.6.3)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
+      '@angular/build': 19.2.26(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(@angular/compiler@19.2.22)(@types/node@22.19.17)(chokidar@4.0.3)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(ng-packagr@19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3))(postcss@8.5.16)(terser@5.46.2)(typescript@5.6.3)
+      vite: 6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2)
+    transitivePeerDependencies:
+      - '@emnapi/core'
+      - '@emnapi/runtime'
+
+  '@analogjs/vite-plugin-angular@2.5.1(61ec6fd4aa62c598201f0d377e218661)':
     dependencies:
       '@angular/compiler': 19.2.22
       '@angular/compiler-cli': 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
@@ -24056,6 +24471,15 @@ snapshots:
       schema-utils: 4.3.3
       webpack: 5.105.0(esbuild@0.28.0)
 
+  babel-plugin-jsx-dom-expressions@0.38.5(@babel/core@7.29.0):
+    dependencies:
+      '@babel/core': 7.29.0
+      '@babel/helper-module-imports': 7.18.6
+      '@babel/plugin-syntax-jsx': 7.28.6(@babel/core@7.29.0)
+      '@babel/types': 7.29.0
+      html-entities: 2.3.3
+      validate-html-nesting: 1.2.4
+
   babel-plugin-jsx-dom-expressions@0.40.6(@babel/core@7.29.0):
     dependencies:
       '@babel/core': 7.29.0
@@ -24120,6 +24544,11 @@ snapshots:
       '@babel/helper-define-polyfill-provider': 0.6.8(@babel/core@7.29.0)
     transitivePeerDependencies:
       - supports-color
+
+  babel-preset-solid@1.8.22(@babel/core@7.29.0):
+    dependencies:
+      '@babel/core': 7.29.0
+      babel-plugin-jsx-dom-expressions: 0.38.5(@babel/core@7.29.0)
 
   babel-preset-solid@1.9.12(@babel/core@7.29.0)(solid-js@1.9.12):
     dependencies:
@@ -27914,6 +28343,8 @@ snapshots:
     dependencies:
       seroval: 1.5.4
 
+  seroval@0.10.4: {}
+
   seroval@1.5.4: {}
 
   serve-index@1.9.2:
@@ -28062,6 +28493,11 @@ snapshots:
       faye-websocket: 0.11.4
       uuid: 8.3.2
       websocket-driver: 0.7.4
+
+  solid-js@1.8.0:
+    dependencies:
+      csstype: 3.2.3
+      seroval: 0.10.4
 
   solid-js@1.9.12:
     dependencies:
@@ -28645,6 +29081,8 @@ snapshots:
   utils-merge@1.0.1: {}
 
   uuid@8.3.2: {}
+
+  validate-html-nesting@1.2.4: {}
 
   vary@1.1.2: {}
 

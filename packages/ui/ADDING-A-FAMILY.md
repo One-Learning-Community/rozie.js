@@ -48,6 +48,8 @@ Every leaf: `version "0.1.0"`, `files: ["dist","src"]`, a `"."` export (compiled
 | Leaf | Build tool | `"."` → | `"./source"` → | Notes |
 | --- | --- | --- | --- | --- |
 | react / solid / lit | `tsdown` | `dist/index.{mjs,cjs,d.mts}` | `src/<Name>.{tsx,ts}` | `tsdown.config.ts` externals = framework + `@rozie/runtime-<fw>` (+ engine, + `/\.css$/`+`copy` **only if** the `.rozie` has a `<style>`). |
+
+**Solid leaves build twice** — wrap the options in `solidLeafConfig({...})` from `packages/ui/solid-leaf-build.mjs` (keep `entry`/`external` literal) and declare its three devDeps (`@babel/core`, `@babel/preset-typescript`, `babel-preset-solid ~1.8.22`). `import`/`require` get babel-preset-solid-compiled JS; the `solid` export condition points at `./dist/source/<entry>.jsx` (JSX kept for vite-plugin-solid / SolidStart to compile for SSR). Every `exports` entry needs `"solid"` after `types` — `tests/integration/solid-published-leaves` fails a leaf that ships JSX under `import`, lacks the condition, or imports a `solid-js/web` helper missing from the 1.8 peer floor.
 | vue | Vite lib + `vue-tsc` | `dist/index.mjs` + `dist/index.d.ts` | `src/<Name>.vue` | `vite.config.ts` (plugin-vue + css-injected-by-js); `tsconfig.json` drives `vue-tsc --declaration --emitDeclarationOnly`. |
 | svelte | `@sveltejs/package` | `dist/<Name>.svelte` + `.svelte.d.ts` | `src/<Name>.svelte` | `svelte.config.js` (`vitePreprocess()`) **and a local `tsconfig.json`** — see gotchas. |
 | angular | `ng-packagr` | `dist/fesm2022/*.mjs` + `dist/index.d.ts` | `src/<Name>.ts` | `ng-package.json` + `tsconfig.lib.json` (`compilationMode: "partial"`); `src/index.ts` = `export * from './<Name>'`. Wire the outer `.` export to the FESM paths after the first build. |

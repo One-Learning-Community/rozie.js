@@ -1,10 +1,9 @@
 import { defineConfig } from 'tsdown';
+import { solidLeafConfig } from '../../../solid-leaf-build.mjs';
 
-export default defineConfig({
+// Two builds (compiled JS + a `solid`-condition JSX build) — see packages/ui/solid-leaf-build.mjs.
+export default defineConfig(solidLeafConfig({
   entry: ['src/index.ts'],
-  format: ['esm', 'cjs'],
-  dts: true,
-  clean: true,
   // The generated barrel re-exports both the named component (`TipTap`) and its
   // `default` — opt into rolldown 'named' export mode (silences MIXED_EXPORTS).
   outputOptions(options) {
@@ -19,4 +18,4 @@ export default defineConfig({
     '@tiptap/extension-image',
     '@tiptap/extension-character-count',
   ],
-});
+}));

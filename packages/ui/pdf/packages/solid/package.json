@@ -33,6 +33,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
+      "solid": "./dist/source/index.jsx",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     }
@@ -63,5 +64,10 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/preset-typescript": "^7.28.5",
+    "babel-preset-solid": "~1.8.22"
+  }
 }

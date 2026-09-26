@@ -33,6 +33,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
+      "solid": "./dist/source/index.jsx",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     },
@@ -60,7 +61,10 @@
     }
   },
   "devDependencies": {
-    "@floating-ui/dom": "^1.7.2"
+    "@floating-ui/dom": "^1.7.2",
+    "@babel/core": "^7.29.0",
+    "@babel/preset-typescript": "^7.28.5",
+    "babel-preset-solid": "~1.8.22"
   },
   "scripts": {
     "build": "tsdown",

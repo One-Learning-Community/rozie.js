@@ -46,6 +46,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { withSolidCondition } from '../../solid-leaf-build.mjs';
 import { buildCustomElementsManifest } from './cem.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -289,6 +290,8 @@ function patchLeafLangPackaging(dir, cfg) {
         : dir === 'lit'
           ? ['./dist/index.mjs', './dist/index.cjs']
           : false;
+    // The Solid leaf also ships a JSX build under the `solid` condition (solid-leaf-build.mjs).
+    if (dir === 'solid') pkg.exports = withSolidCondition(pkg.exports);
   } else {
     // Source-shipped leaves (vue/svelte/angular): the subpath resolves straight
     // to the committed source module. The three source leaves carry no

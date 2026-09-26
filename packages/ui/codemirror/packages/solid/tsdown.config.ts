@@ -1,10 +1,9 @@
 import { defineConfig } from 'tsdown';
+import { solidLeafConfig } from '../../../solid-leaf-build.mjs';
 
-export default defineConfig({
+// Two builds (compiled JS + a `solid`-condition JSX build) — see packages/ui/solid-leaf-build.mjs.
+export default defineConfig(solidLeafConfig({
   entry: ['src/index.ts', 'src/languages.ts'],
-  format: ['esm', 'cjs'],
-  dts: true,
-  clean: true,
   // The generated barrel re-exports both the named component (`CodeMirror`)
   // and its `default`. Opt into rolldown 'named' export mode explicitly so that
   // mix is unambiguous (silences MIXED_EXPORTS; the default lands on
@@ -31,4 +30,4 @@ export default defineConfig({
     '@codemirror/lang-html',
     '@codemirror/theme-one-dark',
   ],
-});
+}));

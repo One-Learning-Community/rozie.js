@@ -120,6 +120,15 @@ jobs:
           pnpm exec vitest run --root packages/core
           pnpm exec vitest run --root packages/unplugin
 
+      # Every published @rozie-ui/*-solid leaf must build in a consumer with NO special
+      # config: default vite-plugin-solid, no Solid plugin at all, and SSR via the `solid`
+      # condition — plus its compiled helpers must exist at the solid-js 1.8 peer floor.
+      # Its `test` task builds the 29 leaves through turbo's ^build, so the producer
+      # filter above stays unchanged. Runs once here, not per cell: the peer-floor check
+      # covers the 1.8 axis statically.
+      - name: Published Solid leaves build in a plain consumer
+        run: pnpm turbo run test --filter=@rozie/integration-solid-published-leaves
+
       # ONLY the producer saves. Consumers are restore-only, which is what fixes
       # the `Unable to reserve cache ... another job may be creating this cache`
       # that 4 of the 5 React jobs hit when every cell wrote the same key.
