@@ -46,7 +46,10 @@
     "dist",
     "src"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ],
   "dependencies": {
     "@rozie/runtime-vue": "workspace:^"
   },

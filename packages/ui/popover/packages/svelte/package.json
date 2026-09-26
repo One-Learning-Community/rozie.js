@@ -67,7 +67,10 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ],
   "devDependencies": {
     "@floating-ui/dom": "^1.7.2",
     "@sveltejs/package": "^2",

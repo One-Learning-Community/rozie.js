@@ -68,7 +68,10 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ],
   "devDependencies": {
     "@sveltejs/package": "^2",
     "@sveltejs/vite-plugin-svelte": "^5",

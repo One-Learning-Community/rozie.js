@@ -65,7 +65,10 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ],
   "devDependencies": {
     "embla-carousel": "^8.6",
     "embla-carousel-autoplay": "^8.6",

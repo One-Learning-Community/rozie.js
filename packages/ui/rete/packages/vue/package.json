@@ -91,7 +91,10 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ],
   "devDependencies": {
     "rete": "^2",
     "rete-area-plugin": "^2",

@@ -90,7 +90,10 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ],
   "module": "./dist/fesm2022/rozie-ui-rete-angular.mjs",
   "types": "./dist/index.d.ts",
   "dependencies": {

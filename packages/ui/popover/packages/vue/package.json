@@ -67,7 +67,10 @@
     "./themes/*": "./src/themes/*",
     "./rozie-manifest.json": "./rozie-manifest.json"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ],
   "devDependencies": {
     "@floating-ui/dom": "^1.7.2",
     "@vitejs/plugin-vue": "^6",
