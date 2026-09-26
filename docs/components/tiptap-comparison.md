@@ -1,5 +1,5 @@
 ---
-surface_hash: 3858339832a2
+surface_hash: 2b945a24714a
 ---
 
 # TipTap libraries comparison
@@ -49,7 +49,7 @@ The gap is widest for Lit, which has no wrapper at all, and Solid, whose wrapper
 ## Where Rozie wins today
 
 - **First-class packages everywhere** — including the two the ecosystem underserves: Lit (zero existing wrapper) and Solid (thin, no node views, stalling). A Solid dev today hand-rolls node views and all menu UI; a Lit dev hand-rolls everything.
-- **The same editor everywhere.** One `<TipTap>` to learn, document, and migrate across your stack: the same props, the same `update`/`selectionUpdate`/`focus`/`blur` events, the same slots, the same command handle on every target, versus a different wrapper API (hook return, ref, store, directive input) per framework.
+- **The same editor everywhere.** One `<TipTap>` to learn, document, and migrate across your stack: the same props, the same `ready`/`update`/`selectionUpdate`/`focus`/`blur` events, the same slots, the same command handle on every target, versus a different wrapper API (hook return, ref, store, directive input) per framework.
 - **Controlled two-way `html`** out of the box, with a shared echo-guard: the thing every React/Vue/Svelte consumer reimplements by hand. On Angular it doubles as a `ControlValueAccessor`, so reactive forms bind directly.
 - **A batteries-included toolbar** (Bold / Italic / H1 / H2 / Bullet / Underline / Ordered list / Link with live active-state, plus Undo/Redo) and a `toolbar` portal slot that hands your replacement UI the live editor. Neither official wrapper ships any toolbar.
 - **A built-in link editor.** Clicking a link (or the toolbar Link button, or calling `openLinkEditor()`) surfaces an edit/create form in a bubble-menu surface; the reactive `linkEditor` slot swaps in your own form with `{ editor, href, attrs, setLink, unsetLink, close }` in scope. On React, TipTap's CLI-copied UI Components now include an official Link Popover (source files you then own and maintain); every other wrapper leaves link UI entirely to you, and none ships it as a built-in feature of the component itself.
