@@ -219,6 +219,7 @@ interface DataTableProps {
   onPinChange?: (...args: any[]) => void;
   onHistoryChange?: (...args: any[]) => void;
   onActivecellChange?: (...args: any[]) => void;
+  onRowActivate?: (...args: any[]) => void;
   onRangeChange?: (...args: any[]) => void;
   onCellEditCommit?: (...args: any[]) => void;
   onRowEditCommit?: (...args: any[]) => void;
@@ -4050,6 +4051,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // Enter/F2 → enter interaction mode: focus the active cell's FIRST interactive control
   // (D-07 — uniform for header sort buttons and body controls; Enter does NOT sort directly).
   // No-op (stay in navigation mode) if the cell has no focusable control.
+  // True when the active cell holds its own focusable controls (a link, a button, a drop-in
+  // widget). Enter then ENTERS them (enterControl) rather than activating the row (row-activate).
+  function activeCellHasControls() {
+    return focusables(currentCellEl()).length > 0;
+  }
   function enterControl() {
     const cellEl = currentCellEl();
     const list = focusables(cellEl);
@@ -4433,6 +4439,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // rAF poll must not steal focus back after the user has already ArrowDown'd to another row.
       recoverGridFocus(String(grpRow), grpCol, null, true);
       return;
+    }
+    // ── row-activate (quick 260925-dtl): Enter on a NON-editable body cell with no controls of
+    // its own opens the row (a list-style "open this item"). Reached only after every edit-entry
+    // and group-toggle branch above has declined; a cell WITH controls keeps entering them.
+    else if (key === 'Enter' && !activeIsHeader && !activeCellHasControls()) {
+      e.preventDefault();
+      activateRowAt(activeRow, 'keyboard');
+      return;
     } else if (key === 'Enter' || key === 'F2') {
       e.preventDefault();
       enterControl();
@@ -4464,7 +4478,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         isHeader: false
       });
     }
-  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, bodyRowCount, clearActiveRange, clearRange, clipboardActiveAllowed, clipboardReadAvailable, clipboardWriteAvailable, copyRange, currentCellEl, cutRange, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoRowEdge, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, onToggleExpand, pasteRange, props.selectionMode, props.undoable, rangeAnchor, rangeFocusCol, rangeFocusRow, recoverGridFocus, redo, rowIsGrouped, rowIsSelected, rows, selectActiveColumn, selectAllBody, toAbsRow, toggleActiveBooleanCell, undo, visibleColCount]);
+  }, [_rozieProp_onActivecellChange, activateRowAt, activeCellColumnId, activeCellHasControls, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, bodyRowCount, clearActiveRange, clearRange, clipboardActiveAllowed, clipboardReadAvailable, clipboardWriteAvailable, copyRange, currentCellEl, cutRange, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoRowEdge, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, onToggleExpand, pasteRange, props.selectionMode, props.undoable, rangeAnchor, rangeFocusCol, rangeFocusRow, recoverGridFocus, redo, rowIsGrouped, rowIsSelected, rows, selectActiveColumn, selectAllBody, toAbsRow, toggleActiveBooleanCell, undo, visibleColCount]);
   // WR-03: integrate mouse-click + programmatic focus with the roving model. A click on a
   // tabindex="-1" cell (or focus arriving any way other than the keyboard nav path) moves
   // DOM focus there but does NOT run onGridKeyDown — so activeRow/activeColIndex would stay
@@ -4648,7 +4662,51 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // editor). A plain click on an EDITABLE body cell opens its editor via the SAME beginEdit funnel;
   // shift+click (range extend) and non-editable cells are unaffected. Same closest/parse/header-skip
   // /finite guards as onGridDblClick. isGrid()-gated so 'table' mode never runs it.
+  // ── row-activate (quick 260925-dtl, oinbox dogfooding) ─────────────────────────────────────
+  // `row-activate { row, index, trigger }`: `row` = the original data object, `index` = its
+  // position in the rendered model ($data.rows — page-relative, or the full model when virtual).
+  // Group-header rows never activate; detail rows carry no data-row so a click there never
+  // resolves a row.
+  function activateRowAt(index: any, trigger: any) {
+    const row = (rows || [])[index];
+    if (!row || rowIsGrouped(row)) return;
+    props.onRowActivate && props.onRowActivate({
+      row: row.original,
+      index,
+      trigger
+    });
+  }
+
+  // Controls a click must not activate THROUGH — the selection checkbox, the expander, links,
+  // drop-in widgets and an open editor. Matched only INSIDE the clicked cell, so a host page that
+  // happens to wrap the table in one of these does not silence every row.
+  const ROW_ACTIVATE_CONTROLS = useMemo(() => 'input, button, a[href], select, textarea, label, summary, [contenteditable=""], [contenteditable="true"], [role="button"], [role="checkbox"], [role="link"], [data-editing-cell]', []);
+  // Both interaction modes: a plain click on a body data cell, outside any control. Not a
+  // modified click (shift/ctrl/meta are selection gestures), not the end of a drag-select, and
+  // not a singleClickEdit gesture on an editable grid cell (that click opens the editor instead).
+  function maybeActivateRowFromClick(e: any) {
+    if (!e || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (rangeDragMoved.current) return;
+    const tgt = e.target;
+    if (!tgt || !tgt.closest) return;
+    const cellEl = tgt.closest('[data-row]');
+    if (!cellEl) return;
+    const control = tgt.closest(ROW_ACTIVATE_CONTROLS);
+    if (control && cellEl.contains(control)) return;
+    const rowAttr = cellEl.getAttribute('data-row');
+    if (rowAttr == null || rowAttr === '__header') return;
+    const index = parseInt(rowAttr, 10);
+    if (!Number.isFinite(index)) return;
+    if (isGrid() && props.singleClickEdit) {
+      const colAttr = cellEl.getAttribute('data-col-index');
+      const col = colAttr == null ? NaN : parseInt(colAttr, 10);
+      const colId = Number.isFinite(col) ? columnIdAt(index, col) : null;
+      if (colId != null && columnEditable(colId)) return;
+    }
+    activateRowAt(index, 'click');
+  }
   const onGridClick = useCallback((e: any) => {
+    maybeActivateRowFromClick(e);
     if (!isGrid() || !e) return;
     if (!props.singleClickEdit) return;
     if (e.shiftKey) return;
@@ -4673,7 +4731,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (editingRow === row && editingCol === col) return;
     const colId = columnIdAt(row, col);
     if (colId != null && columnEditable(colId)) beginEdit(row, col, null);
-  }, [beginEdit, columnEditable, columnIdAt, editingCol, editingRow, isGrid, props.singleClickEdit]);
+  }, [beginEdit, columnEditable, columnIdAt, editingCol, editingRow, isGrid, maybeActivateRowFromClick, props.singleClickEdit]);
   // WR-02: reset the interaction-mode flag when focus leaves the active cell's subtree.
   // Without this, activeInControl could stick `true` — a mouse click OUTSIDE the cell, or
   // the focused inner control being removed from the DOM — leaving onGridKeyDown wedged in

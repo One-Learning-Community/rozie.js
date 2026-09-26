@@ -161,6 +161,7 @@ export interface DataTableProps {
   onPinChange?: (...args: unknown[]) => void;
   onHistoryChange?: (...args: unknown[]) => void;
   onActivecellChange?: (...args: unknown[]) => void;
+  onRowActivate?: (...args: unknown[]) => void;
   onRangeChange?: (...args: unknown[]) => void;
   onCellEditCommit?: (...args: unknown[]) => void;
   onRowEditCommit?: (...args: unknown[]) => void;

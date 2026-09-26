@@ -387,6 +387,7 @@ const emit = defineEmits<{
   'pin-change': [...args: any[]];
   'history-change': [...args: any[]];
   'activecell-change': [...args: any[]];
+  'row-activate': [...args: any[]];
   'range-change': [...args: any[]];
   'cell-edit-commit': [...args: any[]];
   'row-edit-commit': [...args: any[]];
@@ -3929,6 +3930,9 @@ const currentCellEl = () => {
 // Enter/F2 → enter interaction mode: focus the active cell's FIRST interactive control
 // (D-07 — uniform for header sort buttons and body controls; Enter does NOT sort directly).
 // No-op (stay in navigation mode) if the cell has no focusable control.
+// True when the active cell holds its own focusable controls (a link, a button, a drop-in
+// widget). Enter then ENTERS them (enterControl) rather than activating the row (row-activate).
+const activeCellHasControls = () => focusables(currentCellEl()).length > 0;
 const enterControl = () => {
   const cellEl = currentCellEl();
   const list = focusables(cellEl);
@@ -4310,6 +4314,14 @@ const onGridKeyDown = (e: any) => {
     // rAF poll must not steal focus back after the user has already ArrowDown'd to another row.
     recoverGridFocus(String(grpRow), grpCol, null, true);
     return;
+  }
+  // ── row-activate (quick 260925-dtl): Enter on a NON-editable body cell with no controls of
+  // its own opens the row (a list-style "open this item"). Reached only after every edit-entry
+  // and group-toggle branch above has declined; a cell WITH controls keeps entering them.
+  else if (key === 'Enter' && !activeIsHeader.value && !activeCellHasControls()) {
+    e.preventDefault();
+    activateRowAt(activeRow.value, 'keyboard');
+    return;
   } else if (key === 'Enter' || key === 'F2') {
     e.preventDefault();
     enterControl();
@@ -4525,7 +4537,50 @@ const onGridDblClick = (e: any) => {
 // editor). A plain click on an EDITABLE body cell opens its editor via the SAME beginEdit funnel;
 // shift+click (range extend) and non-editable cells are unaffected. Same closest/parse/header-skip
 // /finite guards as onGridDblClick. isGrid()-gated so 'table' mode never runs it.
+// ── row-activate (quick 260925-dtl, oinbox dogfooding) ─────────────────────────────────────
+// `row-activate { row, index, trigger }`: `row` = the original data object, `index` = its
+// position in the rendered model ($data.rows — page-relative, or the full model when virtual).
+// Group-header rows never activate; detail rows carry no data-row so a click there never
+// resolves a row.
+const activateRowAt = (index: any, trigger: any) => {
+  const row = (rows.value || [])[index];
+  if (!row || rowIsGrouped(row)) return;
+  emit('row-activate', {
+    row: row.original,
+    index,
+    trigger
+  });
+};
+// Controls a click must not activate THROUGH — the selection checkbox, the expander, links,
+// drop-in widgets and an open editor. Matched only INSIDE the clicked cell, so a host page that
+// happens to wrap the table in one of these does not silence every row.
+const ROW_ACTIVATE_CONTROLS = 'input, button, a[href], select, textarea, label, summary, [contenteditable=""], [contenteditable="true"], [role="button"], [role="checkbox"], [role="link"], [data-editing-cell]';
+// Both interaction modes: a plain click on a body data cell, outside any control. Not a
+// modified click (shift/ctrl/meta are selection gestures), not the end of a drag-select, and
+// not a singleClickEdit gesture on an editable grid cell (that click opens the editor instead).
+const maybeActivateRowFromClick = (e: any) => {
+  if (!e || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (rangeDragMoved) return;
+  const tgt = e.target;
+  if (!tgt || !tgt.closest) return;
+  const cellEl = tgt.closest('[data-row]');
+  if (!cellEl) return;
+  const control = tgt.closest(ROW_ACTIVATE_CONTROLS);
+  if (control && cellEl.contains(control)) return;
+  const rowAttr = cellEl.getAttribute('data-row');
+  if (rowAttr == null || rowAttr === '__header') return;
+  const index = parseInt(rowAttr, 10);
+  if (!Number.isFinite(index)) return;
+  if (isGrid() && props.singleClickEdit) {
+    const colAttr = cellEl.getAttribute('data-col-index');
+    const col = colAttr == null ? NaN : parseInt(colAttr, 10);
+    const colId = Number.isFinite(col) ? columnIdAt(index, col) : null;
+    if (colId != null && columnEditable(colId)) return;
+  }
+  activateRowAt(index, 'click');
+};
 const onGridClick = (e: any) => {
+  maybeActivateRowFromClick(e);
   if (!isGrid() || !e) return;
   if (!props.singleClickEdit) return;
   if (e.shiftKey) return;

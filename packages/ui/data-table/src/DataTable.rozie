@@ -1663,7 +1663,7 @@ $provide('data-table:columns', {
 
 import { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage, cut } from './exposeStateVerbs.rzts'
 
-import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, headerLeafStart, pageRowOffset, toAbsRow, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, bodyAriaRowIndex, visibleColCount, gridAriaColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
+import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, headerLeafStart, pageRowOffset, toAbsRow, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, bodyAriaRowIndex, visibleColCount, gridAriaColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, activeCellHasControls, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
 
 import { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell } from './gridKeydownHandlers.rzts'
 

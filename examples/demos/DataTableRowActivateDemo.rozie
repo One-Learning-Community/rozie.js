@@ -1,0 +1,75 @@
+<!--
+  DataTableRowActivateDemo.rozie — `row-activate` (quick 260925-dtl, oinbox dogfooding: no row
+  activation event for list-style use, e.g. opening an email thread).
+
+  A: table mode with selection checkboxes + an expander — a click on the row activates it; a
+     click on the checkbox or the expander does not (they are controls).
+  B: grid mode with an editable Qty column — a click activates; Enter on a non-editable cell
+     activates with trigger 'keyboard'; Enter on the editable cell still begins the edit.
+-->
+<rozie name="DataTableRowActivateDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 'a', name: 'Alpha', qty: 1 },
+    { id: 'b', name: 'Bravo', qty: 2 },
+    { id: 'c', name: 'Charlie', qty: 3 },
+  ],
+  lastA: '',
+  countA: 0,
+  lastB: '',
+  countB: 0,
+}
+</data>
+
+<script>
+const onActA = (p) => {
+  $data.lastA = p.trigger + ':' + p.row.name + ':' + p.index
+  $data.countA = $data.countA + 1
+}
+const onActB = (p) => {
+  $data.lastB = p.trigger + ':' + p.row.name + ':' + p.index
+  $data.countB = $data.countB + 1
+}
+</script>
+
+<template>
+<div class="dt-demo">
+  <section data-testid="table-a">
+    <DataTable :data="$data.rows" selectionMode="multiple" expandable @row-activate="onActA">
+      <Column field="name" header="Name" />
+      <template #detail="{ row }"><span>detail {{ row.name }}</span></template>
+    </DataTable>
+  </section>
+  <span class="readout" data-testid="last-a">{{ $data.lastA }}</span>
+  <span class="readout" data-testid="count-a">{{ $data.countA }}</span>
+
+  <section data-testid="table-b">
+    <DataTable :data="$data.rows" interactionMode="grid" @row-activate="onActB">
+      <Column field="name" header="Name" />
+      <Column field="qty" header="Qty" :editable="true" />
+    </DataTable>
+  </section>
+  <span class="readout" data-testid="last-b">{{ $data.lastB }}</span>
+  <span class="readout" data-testid="count-b">{{ $data.countB }}</span>
+</div>
+</template>
+
+<style>
+.dt-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 460px;
+}
+</style>
+
+</rozie>

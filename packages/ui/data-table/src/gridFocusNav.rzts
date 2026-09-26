@@ -539,6 +539,10 @@ const currentCellEl = () => {
 // Enter/F2 → enter interaction mode: focus the active cell's FIRST interactive control
 // (D-07 — uniform for header sort buttons and body controls; Enter does NOT sort directly).
 // No-op (stay in navigation mode) if the cell has no focusable control.
+// True when the active cell holds its own focusable controls (a link, a button, a drop-in
+// widget). Enter then ENTERS them (enterControl) rather than activating the row (row-activate).
+const activeCellHasControls = () => focusables(currentCellEl()).length > 0
+
 const enterControl = () => {
   const cellEl = currentCellEl()
   const list = focusables(cellEl)
@@ -562,4 +566,4 @@ const cycleWithinCell = (cellEl, forward) => {
   list[i].focus()
 }
 
-export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, headerLeafStart, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, ariaPageOffset, bodyAriaRowIndex, visibleColCount, gridAriaColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }
+export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, headerLeafStart, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, ariaPageOffset, bodyAriaRowIndex, visibleColCount, gridAriaColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, activeCellHasControls, enterControl, cycleWithinCell }
