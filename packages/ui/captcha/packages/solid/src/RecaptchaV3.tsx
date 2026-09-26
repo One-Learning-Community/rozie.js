@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
-import { createControllableSignal } from '@rozie/runtime-solid';
+import { createControllableSignal, parseInlineStyle } from '@rozie/runtime-solid';
 // The v3 api.js loader (inject-once-per-sitekey singleton + ready-gate + token
 // execute) lives in a vendored internal module so its branchy logic is
 // unit-tested independent of any framework (see internal/loadRecaptchaV3.test.ts).
@@ -114,7 +114,7 @@ export default function RecaptchaV3(_props: RecaptchaV3Props): JSX.Element {
 
   return (
     <>
-    <div style={{ display: "none" }} {...attrs} class={"rozie-recaptcha-v3" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-9148a0b0="" />
+    <div {...attrs} class={"rozie-recaptcha-v3" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} style={parseInlineStyle([{ display: "none" }, ((attrs as unknown as Record<string, unknown>).style as string | JSX.CSSProperties | undefined)])} data-rozie-s-9148a0b0="" />
     </>
   );
 }

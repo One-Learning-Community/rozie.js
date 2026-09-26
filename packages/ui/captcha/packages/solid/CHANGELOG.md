@@ -4,6 +4,7 @@
 
 ### Patch Changes
 
+- Fixed: the hidden reCAPTCHA v3 container's inline `display: none` now merges with any consumer-supplied `style` (via `parseInlineStyle`) instead of silently discarding it, bringing this leaf in line with the other five targets.
 - 57607be: **Fixed: published Solid leaves now ship compiled JavaScript for `import`/`require`, with JSX
   kept only under the `solid` export condition.**
 
