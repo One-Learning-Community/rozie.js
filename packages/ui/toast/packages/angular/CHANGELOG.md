@@ -1,50 +1,5 @@
 # @rozie-ui/toast-angular
 
-## 0.2.0
-
-### Minor Changes
-
-- Fixed: the `themes/*.css` design-token bridge files' example `import` line named the wrong package (`@rozie-ui/<family>-react`) on every non-React target — copied byte-for-byte from one canonical source. It now names `@rozie-ui/toast-angular`, this package's own.
-- Fixed two pre-release defects in the `action`/`data` API above before its first publish:
-  - An action's `onClick` that threw an error used to leave its toast stuck forever (the
-    dismiss never ran). `runAction` now dismisses with reason `'action'` in a `finally` block —
-    the dismiss always happens, and the error itself still propagates (never silently
-    swallowed).
-  - The auto-dismiss timer now pauses on keyboard focus, not just pointer hover: tabbing to a
-    toast's action (or close) button pauses it with the same exact-remainder precision as
-    hover, so a keyboard user reading or acting on a toast never loses it to the timeout
-    mid-interaction (WCAG 2.2.1). Hover-pause and focus-pause compose — leaving one does not
-    resume the timer while the other is still active — and this is unconditional, not gated by
-    `disablePauseOnHover`.
-
-- 57607be: A toast can now carry an action and pass-through data, from a dogfooding report: `show()`
-  whitelisted `id`/`message`/`type`/`duration` and silently dropped everything else, so an "Undo"
-  toast previously needed the `#toast` slot plus a side map from toast id to action.
-  - `show({ action: { label, onClick } })` renders an action button in the default toast;
-    clicking it calls `onClick({ id, data })` and dismisses with a new dismiss reason, `'action'`.
-    An action with no `onClick` function is dropped — no dead button ships.
-  - `show({ data })` carries any payload through untouched, available in the `#toast` slot's scope
-    (`toast.data`), the `dismissed` payload, and the action callback.
-  - `patch(id, { action, data })` can update both, so a promise-toast can gain its "Undo" action
-    once it resolves.
-  - The action button inherits the toast's own colour, matching every type variant. No new public
-    theming token yet.
-
-  Purely additive: `dismissed` can now also report reason `'action'`; existing consumers of
-  `show()`/`patch()` are unaffected.
-
-  **Theming — design-system bridges now yield to an ancestor's own tokens, and apply correctly on
-  Lit.** Same fix as every other themed family in this release — see the `@rozie-ui/data-table`
-  changeset in this release for the full description of the bridge-scoping defect and its fix.
-
-  **Solid packaging.** `@rozie-ui/toast-solid` ships the same compiled-JS-by-default,
-  JSX-under-the-`solid`-condition packaging shape as every other published Solid leaf this release
-  — see the dedicated Solid packaging changeset for the full description. No API change.
-
-### Patch Changes
-
-- @rozie/runtime-angular@0.7.5
-
 ## 0.1.7
 
 ### Patch Changes
