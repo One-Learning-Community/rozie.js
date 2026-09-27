@@ -1,11 +1,15 @@
 // Vitest config for @rozie-ui/tags.
 //
-// One test surface:
+// Two test surfaces:
 //   • tests/surface.test.ts — the Tags.rozie compile()/lowerToIR surface gate
 //     (the same contract scripts/compile-tags-check.mjs checks), so a drift in
 //     the 8-prop / 1-model / 2-emit / 0-slot / 2-expose surface or a new
 //     compile() error fails the test gate under `turbo run test`, not just the
 //     standalone script.
+//   • tests/dark-palette-drift.test.ts — the OS-dark guard-selector and
+//     8-token palette union-of-keys structural drift guard across the three
+//     hand-maintained dark copies (SFC + themes/base.css ×2), reading emitted
+//     leaf output (260927-a2w).
 //
 // The gate is pure @rozie/core (parse / lowerToIR / compile) — no DOM, no
 // component mount — so the default node environment is enough.
