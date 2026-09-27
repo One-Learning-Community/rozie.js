@@ -22,6 +22,47 @@
   network request and asserts BOTH that `error` fires with `{ extension: 'count', error }`
   AND that the editor still constructs WITHOUT that extension (degrade, not a permanently
   uncreated editor) — see TipTap.rozie's $onMount comment for the fix.
+
+  Autofocus-timing cell (quick 260927-a2u): a THIRD editor, `auto`, sets the declarative
+  `:autofocus="true"` prop and does NOT call any focus command itself — the whole point is
+  observing TipTap's OWN autofocus, unlike `counted`, which proves the IMPERATIVE path
+  (`editor.commands.focus('end')` called directly from its `ready` handler, bypassing
+  TipTap's autofocus machinery entirely).
+
+  Two DISTINCT signals are recorded, and this split is load-bearing — a global
+  `document.activeElement` poll (the first thing tried) CANNOT prove this reliably, for a
+  reason discovered only by measuring with instrumented `requestAnimationFrame`/`.focus()`
+  patches (`page.addInitScript`, one animation frame, ~40ms after navigation, on both
+  react and vue): TipTap's `focus` command (`@tiptap/core` `src/commands/focus.ts`) ITSELF
+  defers the actual `view.focus()` DOM call through `requestAnimationFrame` inside
+  `delayedFocus()` — a SECOND deferral layered on top of `Editor.mount()`'s own
+  `window.setTimeout(fn, 0)` that schedules the declarative `autofocus` command in the
+  first place. Measured: `auto`'s autofocus DOES call `.focus()` on its own contenteditable
+  (its `mount()` macrotask fires first, since `auto` needs no lazy extension) — but
+  `counted`'s handler-triggered `editor.commands.focus('end')` (fired a few ms later, once
+  its CharacterCount dynamic import() settles) schedules its OWN `requestAnimationFrame`
+  that lands in the SAME animation frame, and rAF callbacks run in scheduling order — so
+  `counted`'s later-scheduled callback fires SECOND within that frame and steals final
+  document focus back, sub-millisecond after `auto` transiently held it. No
+  `expect.poll` (100ms-scale sampling) can ever observe that transient state — which is
+  why the two signals below are event-driven, not poll-driven:
+    - `autoFocusedSync` — read `editor.isFocused` SYNCHRONOUSLY inside `onAutoReady`,
+      the instant `ready` fires. Always `false`: proves `ready` fires strictly BEFORE
+      the deferred `setTimeout(0)` autofocus command has run at all (the plan's core
+      claim — confirmed, not just plausible).
+    - `autoFocusedEver` — set by a `@focus` listener (TipTap's own pre-existing `focus`
+      event, `onFocus: () => $emit('focus')` in TipTap.rozie) the first time the `auto`
+      editor's contenteditable genuinely receives DOM focus. Event listeners can't miss a
+      transient state the way a poll can, so this reliably proves autofocus DID engage —
+      even though, per the mechanism above, `counted` immediately reclaims final page
+      focus and `auto`'s OWN contenteditable does not end up holding document focus by
+      the time a test can observe it.
+  Net finding for the todo: `ready` becoming `'ready'` does not mean declarative
+  `autofocus` has landed — it fires strictly before the FIRST of two deferral layers even
+  runs — and the reverse question ("does it eventually land?") has a strictly weaker
+  answer than expected: autofocus DOES fire, but only transiently, and is not guaranteed
+  to still hold document focus even one frame later if any other editor on the page also
+  requests focus around the same time (this demo's own `counted` cell reliably does).
 -->
 
 <rozie name="TipTapReadyDemo">
@@ -36,11 +77,16 @@
 {
   plainHtml: '<p>Plain</p>',
   countedHtml: '<p>Counted</p>',
+  autoHtml: '<p>Auto</p>',
   plainReady: 'waiting',
   countedReady: 'waiting',
+  autoReady: 'waiting',
   plainReadyCount: 0,
   countedReadyCount: 0,
+  autoReadyCount: 0,
   countedError: '(none)',
+  autoFocusedSync: 'unknown',
+  autoFocusedEver: 'no',
 }
 </data>
 
@@ -62,17 +108,43 @@ const onCountedReady = (editor) => {
 const onCountedError = (payload) => {
   $data.countedError = payload && payload.extension ? payload.extension : 'error-no-context'
 }
+// Deliberately does NOT call any focus command — this cell observes TipTap's OWN
+// declarative `autofocus` prop, not an imperative override of it (see header comment).
+const onAutoReady = (editor) => {
+  if (!editor || typeof editor.getHTML !== 'function') {
+    $data.autoReady = 'no editor'
+    $data.autoReadyCount = $data.autoReadyCount + 1
+    return
+  }
+  // Read SYNCHRONOUSLY, in the same tick `ready` fires — before TipTap's own deferred
+  // `setTimeout(0)` autofocus command (Editor.mount()) has had a chance to run. Expected
+  // 'no' — see header comment for the measured mechanism.
+  $data.autoFocusedSync = editor.isFocused ? 'yes' : 'no'
+  $data.autoReady = 'ready'
+  $data.autoReadyCount = $data.autoReadyCount + 1
+}
+// TipTap's own pre-existing `focus` event (onFocus: () => $emit('focus')) — fires the
+// moment the `auto` editor's contenteditable genuinely receives DOM focus, regardless of
+// whether that focus is later reclaimed by another editor on the page (see header comment).
+const onAutoFocus = () => {
+  $data.autoFocusedEver = 'yes'
+}
 </script>
 
 <template>
 <div class="tiptap-ready-demo">
   <div data-testid="plain"><TipTap r-model:html="$data.plainHtml" @ready="onPlainReady" /></div>
   <div data-testid="counted"><TipTap r-model:html="$data.countedHtml" :maxLength="50" @ready="onCountedReady" @error="onCountedError" /></div>
+  <div data-testid="auto"><TipTap r-model:html="$data.autoHtml" :autofocus="true" @ready="onAutoReady" @focus="onAutoFocus" /></div>
   <pre data-testid="plain-ready">{{ $data.plainReady }}</pre>
   <pre data-testid="counted-ready">{{ $data.countedReady }}</pre>
+  <pre data-testid="auto-ready">{{ $data.autoReady }}</pre>
   <pre data-testid="plain-ready-count">{{ $data.plainReadyCount }}</pre>
   <pre data-testid="counted-ready-count">{{ $data.countedReadyCount }}</pre>
+  <pre data-testid="auto-ready-count">{{ $data.autoReadyCount }}</pre>
   <pre data-testid="counted-error">{{ $data.countedError }}</pre>
+  <pre data-testid="auto-focused-sync">{{ $data.autoFocusedSync }}</pre>
+  <pre data-testid="auto-focused-ever">{{ $data.autoFocusedEver }}</pre>
 </div>
 </template>
 
