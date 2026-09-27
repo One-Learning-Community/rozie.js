@@ -1546,6 +1546,7 @@ uri-js
 util-deprecate
 utils-merge
 uuid
+validate-html-nesting
 vary
 vfile
 vfile-location
