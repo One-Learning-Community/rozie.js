@@ -340,7 +340,7 @@ const normAction = (a) => (a && typeof a.onClick === 'function'
   ? { label: a.label != null ? String(a.label) : '', onClick: a.onClick }
   : null)
 
-const show = (input) => {
+const show = (input?: { message?: string; type?: 'info' | 'success' | 'error' | 'warning' | 'loading'; duration?: number; id?: string | number; action?: { label?: string; onClick: (ctx: { id: string; data: unknown }) => void }; data?: unknown }): string => {
   const t = input || {}
   let id
   if (t.id != null) {
@@ -440,13 +440,13 @@ const runAction = (t) => {
   }
 }
 
-const dismiss = (id) => {
+const dismiss = (id: string): void => {
   dismissBegin(id, 'api')
 }
 
 // clear() is bulk: immediate full teardown, NO per-toast exit animation and
 // NO emit (documented — see docs/components/toast.md).
-const clear = () => {
+const clear = (): void => {
   teardownTimers()
   $data.toasts = []
 }
@@ -457,7 +457,7 @@ const clear = () => {
 // mutation). Returns whether the id existed. A `duration` key clears+restarts
 // the timer (0 → sticky/no-arm; positive → arm); any other key leaves a
 // running timer untouched.
-const patch = (id, changes) => {
+const patch = (id: string, changes?: { message?: string; type?: 'info' | 'success' | 'error' | 'warning' | 'loading'; duration?: number; action?: { label?: string; onClick: (ctx: { id: string; data: unknown }) => void }; data?: unknown }): boolean => {
   const c = changes || {}
   let existed = false
   const next = $data.toasts.map((t) => {
@@ -513,7 +513,7 @@ const settlePromise = (id, type, messageOrFn, value) => {
 // the SAME entry to success/error on settle (the auto-dismiss timer starts AT
 // SETTLE, via patch's duration-key restart). Never returns/derives a new
 // promise — `p`'s own .then/.catch still fire for the consumer untouched.
-const promise = (p, opts) => {
+const promise = (p: Promise<unknown>, opts?: { loading?: string; success?: string | ((value: unknown) => string); error?: string | ((err: unknown) => string) }): string => {
   const o = opts || {}
   const id = show({ type: 'loading', duration: 0, message: o.loading })
   if (p && typeof p.then === 'function') {
@@ -694,6 +694,12 @@ $onUnmount(() => {
   teardownTimers()
 })
 
+// show/dismiss/clear/patch/promise above carry their action/data-aware TS
+// signatures FULLY INLINE (object/union literals), never a named `type`/
+// `interface` alias — synthesizeHandleType (packages/core) re-prints only the
+// annotation's own TS nodes into the react/solid standalone declaration
+// output, never a sibling declaration, so a named alias would dangle
+// unresolved there. Do not "clean up" this duplication into an alias.
 $expose({ show, dismiss, clear, patch, promise })
 </script>
 
