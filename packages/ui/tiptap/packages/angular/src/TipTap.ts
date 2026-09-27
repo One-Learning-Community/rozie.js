@@ -130,21 +130,21 @@ interface ReactivePortalHandle {
   styles: [`
     :host(rozie-tip-tap) { display: contents; }
     .rozie-tiptap {
-      border: var(--rozie-tiptap-border, 1px solid rgba(0, 0, 0, 0.15));
+      border: var(--rozie-tiptap-border, var(--rtt-border, 1px solid rgba(0, 0, 0, 0.15)));
       border-radius: var(--rozie-tiptap-radius, 6px);
       overflow: hidden;
-      background: var(--rozie-tiptap-bg, white);
+      background: var(--rozie-tiptap-bg, var(--rtt-bg, white));
     }
     .rozie-tiptap.is-readonly {
-      background: var(--rozie-tiptap-readonly-bg, #fafafa);
+      background: var(--rozie-tiptap-readonly-bg, var(--rtt-readonly-bg, #fafafa));
     }
     .rozie-tiptap-toolbar {
       display: flex;
       align-items: center;
       gap: var(--rozie-tiptap-toolbar-gap, 0.125rem);
       padding: var(--rozie-tiptap-toolbar-padding, 0.25rem 0.375rem);
-      border-bottom: var(--rozie-tiptap-toolbar-border, 1px solid rgba(0, 0, 0, 0.08));
-      background: var(--rozie-tiptap-toolbar-bg, #f5f5f7);
+      border-bottom: var(--rozie-tiptap-toolbar-border, var(--rtt-toolbar-border, 1px solid rgba(0, 0, 0, 0.08)));
+      background: var(--rozie-tiptap-toolbar-bg, var(--rtt-toolbar-bg, #f5f5f7));
     }
     .rozie-tiptap-toolbar button {
       padding: var(--rozie-tiptap-button-padding, 0.25rem 0.5rem);
@@ -155,20 +155,20 @@ interface ReactivePortalHandle {
       font: inherit;
       font-size: var(--rozie-tiptap-button-font-size, 0.8125rem);
       min-width: var(--rozie-tiptap-button-min-width, 1.75rem);
-      color: var(--rozie-tiptap-button-color, rgba(0, 0, 0, 0.65));
+      color: var(--rozie-tiptap-button-color, var(--rtt-button-color, rgba(0, 0, 0, 0.65)));
     }
     .rozie-tiptap-toolbar button:hover {
-      background: var(--rozie-tiptap-button-hover-bg, rgba(0, 0, 0, 0.06));
+      background: var(--rozie-tiptap-button-hover-bg, var(--rtt-button-hover-bg, rgba(0, 0, 0, 0.06)));
     }
     .rozie-tiptap-toolbar button.active {
-      background: var(--rozie-tiptap-button-active-bg, #1a1a1a);
-      color: var(--rozie-tiptap-button-active-color, white);
-      border-color: var(--rozie-tiptap-button-active-border-color, #1a1a1a);
+      background: var(--rozie-tiptap-button-active-bg, var(--rtt-button-active-bg, #1a1a1a));
+      color: var(--rozie-tiptap-button-active-color, var(--rtt-button-active-color, white));
+      border-color: var(--rozie-tiptap-button-active-border-color, var(--rtt-button-active-border-color, #1a1a1a));
     }
     .rozie-tiptap-toolbar .sep {
       width: var(--rozie-tiptap-toolbar-sep-width, 1px);
       height: var(--rozie-tiptap-toolbar-sep-height, 1rem);
-      background: var(--rozie-tiptap-toolbar-sep-bg, rgba(0, 0, 0, 0.1));
+      background: var(--rozie-tiptap-toolbar-sep-bg, var(--rtt-toolbar-sep-bg, rgba(0, 0, 0, 0.1)));
       margin: var(--rozie-tiptap-toolbar-sep-margin, 0 0.25rem);
     }
     .rozie-tiptap-content {
@@ -186,17 +186,36 @@ interface ReactivePortalHandle {
       display: flex;
       justify-content: flex-end;
       padding: var(--rozie-tiptap-count-padding, 0.25rem 0.625rem);
-      border-top: var(--rozie-tiptap-count-border, 1px solid rgba(0, 0, 0, 0.08));
+      border-top: var(--rozie-tiptap-count-border, var(--rtt-count-border, 1px solid rgba(0, 0, 0, 0.08)));
       font-size: var(--rozie-tiptap-count-font-size, 0.75rem);
-      color: var(--rozie-tiptap-count-color, rgba(0, 0, 0, 0.5));
+      color: var(--rozie-tiptap-count-color, var(--rtt-count-color, rgba(0, 0, 0, 0.5)));
     }
     .rozie-tiptap-count-value.over {
-      color: var(--rozie-tiptap-count-over-color, #c0392b);
+      color: var(--rozie-tiptap-count-over-color, var(--rtt-count-over-color, #c0392b));
     }
 
+    @media (prefers-color-scheme: dark) {
+        ::ng-deep :where(:root:not(.light):not([data-theme="light"])) {
+          --rtt-bg: #1e293b;
+          --rtt-toolbar-bg: #0f172a;
+          --rtt-button-color: #cbd5e1;
+          --rtt-readonly-bg: #0f172a;
+          --rtt-border: 1px solid rgba(255, 255, 255, 0.14);
+          --rtt-toolbar-border: 1px solid rgba(255, 255, 255, 0.1);
+          --rtt-button-hover-bg: rgba(255, 255, 255, 0.08);
+          --rtt-button-active-bg: #1e3a8a;
+          --rtt-button-active-color: #bfdbfe;
+          --rtt-button-active-border-color: #1e3a8a;
+          --rtt-toolbar-sep-bg: rgba(255, 255, 255, 0.12);
+          --rtt-count-border: 1px solid rgba(255, 255, 255, 0.1);
+          --rtt-count-color: rgba(255, 255, 255, 0.5);
+          --rtt-count-over-color: #f87171;
+          --rtt-placeholder-color: rgba(255, 255, 255, 0.35);
+        }
+      }
     ::ng-deep .rozie-tiptap-content .is-editor-empty:first-child::before {
         content: attr(data-placeholder);
-        color: var(--rozie-tiptap-placeholder-color, rgba(0, 0, 0, 0.4));
+        color: var(--rozie-tiptap-placeholder-color, var(--rtt-placeholder-color, rgba(0, 0, 0, 0.4)));
         float: left;
         height: 0;
         pointer-events: none;

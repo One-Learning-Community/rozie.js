@@ -1,6 +1,25 @@
+@media (prefers-color-scheme: dark) {
+    :where(:root:not(.light):not([data-theme="light"])) {
+      --rtt-bg: #1e293b;
+      --rtt-toolbar-bg: #0f172a;
+      --rtt-button-color: #cbd5e1;
+      --rtt-readonly-bg: #0f172a;
+      --rtt-border: 1px solid rgba(255, 255, 255, 0.14);
+      --rtt-toolbar-border: 1px solid rgba(255, 255, 255, 0.1);
+      --rtt-button-hover-bg: rgba(255, 255, 255, 0.08);
+      --rtt-button-active-bg: #1e3a8a;
+      --rtt-button-active-color: #bfdbfe;
+      --rtt-button-active-border-color: #1e3a8a;
+      --rtt-toolbar-sep-bg: rgba(255, 255, 255, 0.12);
+      --rtt-count-border: 1px solid rgba(255, 255, 255, 0.1);
+      --rtt-count-color: rgba(255, 255, 255, 0.5);
+      --rtt-count-over-color: #f87171;
+      --rtt-placeholder-color: rgba(255, 255, 255, 0.35);
+    }
+  }
 .rozie-tiptap-content .is-editor-empty:first-child::before {
     content: attr(data-placeholder);
-    color: var(--rozie-tiptap-placeholder-color, rgba(0, 0, 0, 0.4));
+    color: var(--rozie-tiptap-placeholder-color, var(--rtt-placeholder-color, rgba(0, 0, 0, 0.4)));
     float: left;
     height: 0;
     pointer-events: none;
