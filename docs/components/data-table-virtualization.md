@@ -87,6 +87,10 @@ horizontal-spacer `scrollWidth` under-report, and grouped-header width divergenc
 `tests/visual-regression/specs/data-table-grid-column-virtual.spec.ts` is now enforced on all six
 targets with no exclusions.
 
+## Scrolling to a row programmatically
+
+Windowing means an off-window row has no DOM node yet, so scrolling to it needs the virtualizer, not `scrollIntoView`. Use the imperative handle's [`scrollToRow(index, options?)`](/components/data-table-api#imperative-handle) — it forwards TanStack virtual-core's own `{ align?, behavior? }` `ScrollToOptions` straight to `virtualizer.scrollToIndex`, and is independent of grid-mode focus (it never moves the roving active cell or fires `activecell-change`). [`getScrollElement()`](/components/data-table-api#imperative-handle) returns the `rdt-scroll` DOM node itself, for a consumer that needs to read scroll position directly rather than reach into the internal class selector. Both are safe no-ops/`null` on a non-`virtual` table.
+
 ## Per-framework code
 
 The per-target consumption snippet is the [virtualized rows snippet](/components/data-table-usage#virtualized-rows-windowing) on the usage page; the [live demo](/components/data-table-demo) runs the real Vue package over 50,000 windowed rows.
