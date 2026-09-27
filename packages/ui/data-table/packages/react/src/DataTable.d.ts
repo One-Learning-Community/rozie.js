@@ -203,6 +203,8 @@ export interface DataTableHandle {
   focusCell: (...args: any[]) => any;
   getActiveCell: (...args: any[]) => any;
   clearActiveCell: (...args: any[]) => any;
+  scrollToRow(index: any, options?: { align?: 'start' | 'center' | 'end' | 'auto'; behavior?: 'auto' | 'smooth' | 'instant'; }): void;
+  getScrollElement(): any;
   getRowIndexRelativeToPage: (...args: any[]) => any;
   editCell: (...args: any[]) => any;
   commitEditing: (...args: any[]) => any;

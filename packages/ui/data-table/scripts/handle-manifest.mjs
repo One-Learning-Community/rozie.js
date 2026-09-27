@@ -58,6 +58,10 @@ export const handleManifest = {
     'Return the current active-cell position — `getActiveCell()` → `{ rowIndex, colIndex, isHeader }`. For a body cell `rowIndex` is the ABSOLUTE display-order index (matching `focusCell` / `activecell-change`) and `isHeader` is `false`; for a header-active cell `rowIndex` is `null` and `isHeader` is `true` (integers only — no row data, no DOM node).',
   clearActiveCell:
     'Reset the roving active-cell position to the entry cell and exit interaction mode — `clearActiveCell()`. The next Tab-in re-enters at the entry cell. (Named `clearActiveCell`, not `clear`: distinct from the listbox `clear` selection verb.)',
+  scrollToRow:
+    "Scroll a row into view on a `virtual` table — `scrollToRow(index, options?)` where `options` mirrors TanStack virtual-core's own `ScrollToOptions` (`{ align?: 'start'|'center'|'end'|'auto', behavior?: 'auto'|'smooth'|'instant' }`) and is forwarded UNCHANGED to `virtualizer.scrollToIndex`. INDEPENDENT of grid-mode focus: never moves the roving active cell and never fires `activecell-change`, callable in either `interactionMode`. `index` is coerced to an integer (never range-clamped here — virtual-core's own `scrollToIndex` already clamps to `[0, options.count-1]`). A no-op when rows are not windowed (`virtual` off, or `'columns'`-only).",
+  getScrollElement:
+    "Return the scroll-container DOM node the row and column virtualizer(s) observe — `getScrollElement()` → `HTMLElement | null`. The supported replacement for reaching into the internal `.rdt-scroll` class selector. Returns `null` when nothing is windowed.",
   getRowIndexRelativeToPage:
     'Convert an ABSOLUTE display-order row index (the `focusCell` / `getActiveCell` / `activecell-change` space) to the PAGE-RELATIVE index — `getRowIndexRelativeToPage(absRow?)` → `number`. With no argument it converts the current active cell (`abs - pageIndex*pageSize`). In virtual mode (no pagination) it returns the absolute index unchanged. Mirrors MUI `getRowIndexRelativeToVisibleRows`. (Named `getRowIndexRelativeToPage`: collision-clean against the verb/event/prop and Lit ROZ137 reserved sets.)',
   editCell:

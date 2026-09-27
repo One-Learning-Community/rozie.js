@@ -918,7 +918,7 @@ let refreshRowModel = null
 
 import { onSortingChangeCb, onExpandedChangeCb, onGroupingChangeCb, onGlobalFilterChangeCb, onColumnFiltersChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onColumnVisibilityChangeCb, onColumnSizingChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingInfoChangeCb } from './stateChangeCallbacks.rzts'
 
-import { windowSource, scheduleRemeasure, teardownRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn, lazyRowsActive, isLazyPlaceholder, rowIsLazyPlaceholder, feedData, emitVisibleRangeIfChanged, LAZY_PLACEHOLDER_ROW_ID_PREFIX, migratePlaceholderSizeCache } from './virtualization.rzts'
+import { windowSource, scheduleRemeasure, teardownRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow, resolveVirtual, rowsWindowed, colsWindowed, isWindowed, columnCount, columnSize, forcedColumns, windowedCells, autoMeasureOn, lazyRowsActive, isLazyPlaceholder, rowIsLazyPlaceholder, feedData, emitVisibleRangeIfChanged, LAZY_PLACEHOLDER_ROW_ID_PREFIX, migratePlaceholderSizeCache, scrollToRow, getScrollElement } from './virtualization.rzts'
 import { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow, columnVirtualizerOptions, windowedColIndices, colPadLeft, colPadRight, colIsOutsideWindow, refineRowEstimate, teardownColRtlWatch, bumpWindowVer } from '@rozie-ui/headless-core/windowing.rzts'
 
 // afterRowRemeasure (Phase 87 87-07, D-15): a mutable-`let` indirection so
@@ -1964,6 +1964,8 @@ $expose({
   focusCell,
   getActiveCell,
   clearActiveCell,
+  scrollToRow,
+  getScrollElement,
   getRowIndexRelativeToPage,
   editCell,
   commitEditing,

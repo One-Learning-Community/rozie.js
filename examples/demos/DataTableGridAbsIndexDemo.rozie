@@ -60,6 +60,10 @@
   getActiveResult: '',
   // getRowIndexRelativeToPage() readout — the page-relative converter result.
   relIndexResult: '',
+  // quick 260927-a2r negative case (paginated / non-virtual): scrollToRow/getScrollElement
+  // must be safe no-ops here — rowsWindowed() is false. Readout mirrors the windowed demo's
+  // convention ('null' when getScrollElement resolves nothing).
+  scrollElementReadout: '',
 }
 </data>
 
@@ -106,6 +110,21 @@ const callSortScore = (): void => {
   const api = $refs.dt
   if (api && api.sortColumn) api.sortColumn('score', true)
 }
+
+// quick 260927-a2r negative case: this table is paginated (non-virtual), so both verbs must
+// be safe no-ops — scrollToRow must not throw, getScrollElement must return null.
+const callScrollToRowFar = (): void => {
+  const api = $refs.dt
+  if (api && api.scrollToRow) api.scrollToRow(7, { align: 'start' })
+}
+
+const callGetScrollElement = (): void => {
+  const api = $refs.dt
+  if (api && api.getScrollElement) {
+    const el = api.getScrollElement()
+    $data.scrollElementReadout = el ? el.className : 'null'
+  }
+}
 </script>
 
 <template>
@@ -117,6 +136,8 @@ const callSortScore = (): void => {
     <button type="button" data-testid="call-getactivecell" @click="callGetActiveCell">getActiveCell()</button>
     <button type="button" data-testid="call-relindex" @click="callRelIndex">getRowIndexRelativeToPage()</button>
     <button type="button" data-testid="call-sort-score" @click="callSortScore">sort score desc</button>
+    <button type="button" data-testid="call-scrolltorow-far" @click="callScrollToRowFar">scrollToRow(7)</button>
+    <button type="button" data-testid="call-getscrollelement" @click="callGetScrollElement">getScrollElement()</button>
   </div>
   <div class="controls">
     <span class="label">activecell:</span>
@@ -127,6 +148,8 @@ const callSortScore = (): void => {
     <span class="readout" data-testid="getactivecell-readout">{{ $data.getActiveResult }}</span>
     <span class="label">relIndex:</span>
     <span class="readout" data-testid="relindex-readout">{{ $data.relIndexResult }}</span>
+    <span class="label">getScrollElement:</span>
+    <span class="readout" data-testid="scrollelement-readout">{{ $data.scrollElementReadout }}</span>
   </div>
 
   <div data-testid="grid-table">

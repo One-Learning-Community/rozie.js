@@ -1943,6 +1943,33 @@ const emitVisibleRangeIfChanged = () => {
     end
   });
 };
+// scrollToRow(index, options?) — quick 260927-a2r (oinbox dogfooding): plain scroll-into-view
+// for a windowed row, forwarding TanStack virtual-core's own ScrollToOptions ({ align?,
+// behavior? }) UNCHANGED to virtualizer.scrollToIndex — the SAME call focusActiveCell's D-12
+// off-window scroll-then-focus path (gridFocusNav.rzts) already drives, exposed here as a
+// standalone public verb rather than invented plumbing. INDEPENDENT of grid-mode focus
+// (feedback_no_false_equivalent_options / the todo's own open question): never reads or
+// writes $data.activeRow/activeColIndex, never emits activecell-change, and is callable in
+// EITHER interactionMode ('table' or 'grid') — a scroll, not a focus move. No-op when rows
+// are not windowed or the row virtualizer has not been constructed yet — mirrors the
+// isGrid()-gated no-op precedent on focusCell/clearActiveCell (gridActiveCellVerbs.rzts) for
+// the identical reason: the capability this verb drives isn't active. `index` is coerced
+// (T-260927A2R-01) — never range-clamped here: virtual-core's own scrollToIndex already
+// clamps to [0, options.count-1] internally (verified in @tanstack/virtual-core source).
+const scrollToRow = (index: any, options?: {
+  align?: 'start' | 'center' | 'end' | 'auto';
+  behavior?: 'auto' | 'smooth' | 'instant';
+}): void => {
+  if (!rowsWindowed() || !virtualizer) return;
+  virtualizer.scrollToIndex(Math.trunc(Number(index)) || 0, options || undefined);
+};
+// getScrollElement() — quick 260927-a2r: returns the DOM node the row AND column
+// virtualizer(s) observe/scroll (the `.rdt-scroll` div captured post-mount in
+// DataTable.rozie's own $onMount, D-03) — the supported replacement for a consumer reaching
+// into the internal `.rdt-scroll` class selector. Returns null when nothing is windowed:
+// gridScrollEl is only ever assigned inside the isWindowed() guard, so no extra gate is
+// needed here beyond that natural null.
+const getScrollElement = (): any => gridScrollEl;
 // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
 // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
 // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -8049,7 +8076,7 @@ watch(() => [sorting.value, columnFilters.value, globalFilter.value, sortingDefa
   if (msg) liveAnnounce.value = msg;
 }, { flush: 'post' });
 
-defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory });
+defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, scrollToRow, getScrollElement, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory });
 </script>
 
 <style scoped>

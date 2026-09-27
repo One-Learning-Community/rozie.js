@@ -666,6 +666,8 @@ export interface DataTableHandle {
   focusCell: (...args: any[]) => any;
   getActiveCell: (...args: any[]) => any;
   clearActiveCell: (...args: any[]) => any;
+  scrollToRow(index: any, options?: { align?: 'start' | 'center' | 'end' | 'auto'; behavior?: 'auto' | 'smooth' | 'instant'; }): void;
+  getScrollElement(): any;
   getRowIndexRelativeToPage: (...args: any[]) => any;
   editCell: (...args: any[]) => any;
   commitEditing: (...args: any[]) => any;
@@ -683,7 +685,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   const _merged = mergeProps({ columns: (() => [])() as any[], selectionMode: 'none', manual: false, rowCount: null, pageCount: null, expandable: false, getRowId: null, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, virtual: false, estimateRowHeight: 40, autoMeasure: false, maxHeight: '' }, _props);
   const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'rowCount', 'pageCount', 'expandable', 'expanded', 'getRowId', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'singleClickEdit', 'undoable', 'undoLimit', 'virtual', 'estimateRowHeight', 'autoMeasure', 'maxHeight', 'children', 'ref', 'onSortChange', 'onExpandChange', 'onGroupChange', 'onFilterChange', 'onPageChange', 'onSelectionChange', 'onVisibilityChange', 'onResizeChange', 'onReorderChange', 'onPinChange', 'onHistoryChange', 'onVisibleRangeChange', 'onActivecellChange', 'onRowActivate', 'onRangeChange', 'onCellEditCommit', 'onRowEditCommit']);
   const resolved = () => local.children;
-  onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory }); });
+  onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, scrollToRow, getScrollElement, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory }); });
 
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const [data, setData] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'data', []);
@@ -2697,6 +2699,37 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       start,
       end
     });
+  }
+
+  // scrollToRow(index, options?) — quick 260927-a2r (oinbox dogfooding): plain scroll-into-view
+  // for a windowed row, forwarding TanStack virtual-core's own ScrollToOptions ({ align?,
+  // behavior? }) UNCHANGED to virtualizer.scrollToIndex — the SAME call focusActiveCell's D-12
+  // off-window scroll-then-focus path (gridFocusNav.rzts) already drives, exposed here as a
+  // standalone public verb rather than invented plumbing. INDEPENDENT of grid-mode focus
+  // (feedback_no_false_equivalent_options / the todo's own open question): never reads or
+  // writes $data.activeRow/activeColIndex, never emits activecell-change, and is callable in
+  // EITHER interactionMode ('table' or 'grid') — a scroll, not a focus move. No-op when rows
+  // are not windowed or the row virtualizer has not been constructed yet — mirrors the
+  // isGrid()-gated no-op precedent on focusCell/clearActiveCell (gridActiveCellVerbs.rzts) for
+  // the identical reason: the capability this verb drives isn't active. `index` is coerced
+  // (T-260927A2R-01) — never range-clamped here: virtual-core's own scrollToIndex already
+  // clamps to [0, options.count-1] internally (verified in @tanstack/virtual-core source).
+  function scrollToRow(index: any, options?: {
+    align?: 'start' | 'center' | 'end' | 'auto';
+    behavior?: 'auto' | 'smooth' | 'instant';
+  }): void {
+    if (!rowsWindowed() || !virtualizer) return;
+    virtualizer.scrollToIndex(Math.trunc(Number(index)) || 0, options || undefined);
+  }
+
+  // getScrollElement() — quick 260927-a2r: returns the DOM node the row AND column
+  // virtualizer(s) observe/scroll (the `.rdt-scroll` div captured post-mount in
+  // DataTable.rozie's own $onMount, D-03) — the supported replacement for a consumer reaching
+  // into the internal `.rdt-scroll` class selector. Returns null when nothing is windowed:
+  // gridScrollEl is only ever assigned inside the isWindowed() guard, so no extra gate is
+  // needed here beyond that natural null.
+  function getScrollElement(): any {
+    return gridScrollEl;
   }
 
   // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══

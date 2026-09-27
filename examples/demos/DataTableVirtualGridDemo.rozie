@@ -53,6 +53,9 @@
   lastActiveCell: '',
   // Result of an explicit getActiveCell() handle call (REQ-5 read verb).
   getActiveResult: '',
+  // quick 260927-a2r: readout of getScrollElement() — the resolved element's className, or
+  // 'null' when nothing is windowed (mirrors the getActiveResult readout convention above).
+  scrollElementReadout: '',
 }
 </data>
 
@@ -91,6 +94,22 @@ const callGetActiveCell = (): void => {
     $data.getActiveResult = r ? r.rowIndex + ',' + r.colIndex : ''
   }
 }
+
+// quick 260927-a2r: scrollToRow is a PLAIN scroll — deliberately never calls focusCell, to
+// prove the independence-from-focus contract (the spec asserts document.activeElement does
+// not move after this click).
+const callScrollToRowFar = (): void => {
+  const api = $refs.dt
+  if (api && api.scrollToRow) api.scrollToRow(4000, { align: 'start' })
+}
+
+const callGetScrollElement = (): void => {
+  const api = $refs.dt
+  if (api && api.getScrollElement) {
+    const el = api.getScrollElement()
+    $data.scrollElementReadout = el ? el.className : 'null'
+  }
+}
 </script>
 
 <template>
@@ -100,12 +119,16 @@ const callGetActiveCell = (): void => {
   <div class="controls">
     <button type="button" data-testid="call-focuscell-far" @click="callFocusFar">focusCell(4000,1)</button>
     <button type="button" data-testid="call-getactivecell" @click="callGetActiveCell">getActiveCell()</button>
+    <button type="button" data-testid="call-scrolltorow-far" @click="callScrollToRowFar">scrollToRow(4000)</button>
+    <button type="button" data-testid="call-getscrollelement" @click="callGetScrollElement">getScrollElement()</button>
     <span class="label">rows:</span>
     <span class="readout" data-testid="row-count">{{ $data.rowCount }}</span>
     <span class="label">activecell-change:</span>
     <span class="readout" data-testid="activecell-readout">{{ $data.lastActiveCell }}</span>
     <span class="label">getActiveCell:</span>
     <span class="readout" data-testid="getactivecell-readout">{{ $data.getActiveResult }}</span>
+    <span class="label">getScrollElement:</span>
+    <span class="readout" data-testid="scrollelement-readout">{{ $data.scrollElementReadout }}</span>
   </div>
 
   <!-- GRID interaction mode + row windowing. role=grid/gridcell + roving tabindex over a
