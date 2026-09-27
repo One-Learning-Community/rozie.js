@@ -183,7 +183,10 @@ const FAMILIES: Family[] = [
     owned: ['--rozie-slider-fill-start', '--rozie-slider-fill-end'],
   },
   { family: 'switch', litTag: 'rozie-switch', example: 'SwitchBehavior', root: '.rozie-switch', derived: {} },
-  { family: 'tags', litTag: 'rozie-tags', example: 'TagsBehavior', root: '.rozie-tags', derived: {} },
+  {
+    family: 'tags', litTag: 'rozie-tags', example: 'TagsBehavior', root: '.rozie-tags', derived: {},
+    dark: ['--rozie-tags-bg', '#1e293b'],
+  },
   {
     family: 'toast', litTag: 'rozie-toaster',
     example: 'ToasterScreenshot',
