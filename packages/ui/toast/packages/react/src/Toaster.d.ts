@@ -37,11 +37,11 @@ export interface ToasterProps {
 }
 
 export interface ToasterHandle {
-  show: (...args: any[]) => any;
-  dismiss: (...args: any[]) => any;
-  clear: (...args: any[]) => any;
-  patch: (...args: any[]) => any;
-  promise: (...args: any[]) => any;
+  show(input?: { message?: string; type?: 'info' | 'success' | 'error' | 'warning' | 'loading'; duration?: number; id?: string | number; action?: { label?: string; onClick: (ctx: { id: string; data: unknown; }) => void; }; data?: unknown; }): string;
+  dismiss(id: string): void;
+  clear(): void;
+  patch(id: string, changes?: { message?: string; type?: 'info' | 'success' | 'error' | 'warning' | 'loading'; duration?: number; action?: { label?: string; onClick: (ctx: { id: string; data: unknown; }) => void; }; data?: unknown; }): boolean;
+  promise(p: Promise<unknown>, opts?: { loading?: string; success?: string | ((value: unknown) => string); error?: string | ((err: unknown) => string); }): string;
 }
 
 declare const Toaster: React.ForwardRefExoticComponent<ToasterProps & React.RefAttributes<ToasterHandle>>;

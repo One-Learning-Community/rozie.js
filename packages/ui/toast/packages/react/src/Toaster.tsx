@@ -40,11 +40,11 @@ interface ToasterProps {
 }
 
 export interface ToasterHandle {
-  show: (...args: any[]) => any;
-  dismiss: (...args: any[]) => any;
-  clear: (...args: any[]) => any;
-  patch: (...args: any[]) => any;
-  promise: (...args: any[]) => any;
+  show(input?: { message?: string; type?: 'info' | 'success' | 'error' | 'warning' | 'loading'; duration?: number; id?: string | number; action?: { label?: string; onClick: (ctx: { id: string; data: unknown; }) => void; }; data?: unknown; }): string;
+  dismiss(id: string): void;
+  clear(): void;
+  patch(id: string, changes?: { message?: string; type?: 'info' | 'success' | 'error' | 'warning' | 'loading'; duration?: number; action?: { label?: string; onClick: (ctx: { id: string; data: unknown; }) => void; }; data?: unknown; }): boolean;
+  promise(p: Promise<unknown>, opts?: { loading?: string; success?: string | ((value: unknown) => string); error?: string | ((err: unknown) => string); }): string;
 }
 
 const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props: ToasterProps, ref): JSX.Element {
@@ -228,7 +228,20 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       onClick: a.onClick
     } : null;
   }
-  function show(input: any) {
+  function show(input?: {
+    message?: string;
+    type?: 'info' | 'success' | 'error' | 'warning' | 'loading';
+    duration?: number;
+    id?: string | number;
+    action?: {
+      label?: string;
+      onClick: (ctx: {
+        id: string;
+        data: unknown;
+      }) => void;
+    };
+    data?: unknown;
+  }): string {
     const t = input || {};
     let id;
     if (t.id != null) {
@@ -337,13 +350,13 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       dismissBegin(t.id, 'action');
     }
   }, [dismissBegin]);
-  function dismiss(id: any) {
+  function dismiss(id: string): void {
     dismissBegin(id, 'api');
   }
 
   // clear() is bulk: immediate full teardown, NO per-toast exit animation and
   // NO emit (documented — see docs/components/toast.md).
-  function clear() {
+  function clear(): void {
     teardownTimers();
     setToasts([]);
   }
@@ -354,7 +367,19 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   // mutation). Returns whether the id existed. A `duration` key clears+restarts
   // the timer (0 → sticky/no-arm; positive → arm); any other key leaves a
   // running timer untouched.
-  function patch(id: any, changes: any) {
+  function patch(id: string, changes?: {
+    message?: string;
+    type?: 'info' | 'success' | 'error' | 'warning' | 'loading';
+    duration?: number;
+    action?: {
+      label?: string;
+      onClick: (ctx: {
+        id: string;
+        data: unknown;
+      }) => void;
+    };
+    data?: unknown;
+  }): boolean {
     const c = changes || {};
     let existed = false;
     const next = toasts.map((t: any) => {
@@ -420,7 +445,11 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   // the SAME entry to success/error on settle (the auto-dismiss timer starts AT
   // SETTLE, via patch's duration-key restart). Never returns/derives a new
   // promise — `p`'s own .then/.catch still fire for the consumer untouched.
-  function promise(p: any, opts: any) {
+  function promise(p: Promise<unknown>, opts?: {
+    loading?: string;
+    success?: string | ((value: unknown) => string);
+    error?: string | ((err: unknown) => string);
+  }): string {
     const o = opts || {};
     const id = show({
       type: 'loading',

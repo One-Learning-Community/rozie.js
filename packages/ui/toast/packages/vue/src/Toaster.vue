@@ -214,7 +214,20 @@ const normAction = (a: any) => a && typeof a.onClick === 'function' ? {
   label: a.label != null ? String(a.label) : '',
   onClick: a.onClick
 } : null;
-const show = (input: any) => {
+const show = (input?: {
+  message?: string;
+  type?: 'info' | 'success' | 'error' | 'warning' | 'loading';
+  duration?: number;
+  id?: string | number;
+  action?: {
+    label?: string;
+    onClick: (ctx: {
+      id: string;
+      data: unknown;
+    }) => void;
+  };
+  data?: unknown;
+}): string => {
   const t = input || {};
   let id;
   if (t.id != null) {
@@ -321,12 +334,12 @@ const runAction = (t: any) => {
     dismissBegin(t.id, 'action');
   }
 };
-const dismiss = (id: any) => {
+const dismiss = (id: string): void => {
   dismissBegin(id, 'api');
 };
 // clear() is bulk: immediate full teardown, NO per-toast exit animation and
 // NO emit (documented — see docs/components/toast.md).
-const clear = () => {
+const clear = (): void => {
   teardownTimers();
   toasts.value = [];
 };
@@ -336,7 +349,19 @@ const clear = () => {
 // mutation). Returns whether the id existed. A `duration` key clears+restarts
 // the timer (0 → sticky/no-arm; positive → arm); any other key leaves a
 // running timer untouched.
-const patch = (id: any, changes: any) => {
+const patch = (id: string, changes?: {
+  message?: string;
+  type?: 'info' | 'success' | 'error' | 'warning' | 'loading';
+  duration?: number;
+  action?: {
+    label?: string;
+    onClick: (ctx: {
+      id: string;
+      data: unknown;
+    }) => void;
+  };
+  data?: unknown;
+}): boolean => {
   const c = changes || {};
   let existed = false;
   const next = toasts.value.map((t: any) => {
@@ -400,7 +425,11 @@ const settlePromise = (id: any, type: any, messageOrFn: any, value: any) => {
 // the SAME entry to success/error on settle (the auto-dismiss timer starts AT
 // SETTLE, via patch's duration-key restart). Never returns/derives a new
 // promise — `p`'s own .then/.catch still fire for the consumer untouched.
-const promise = (p: any, opts: any) => {
+const promise = (p: Promise<unknown>, opts?: {
+  loading?: string;
+  success?: string | ((value: unknown) => string);
+  error?: string | ((err: unknown) => string);
+}): string => {
   const o = opts || {};
   const id = show({
     type: 'loading',

@@ -452,7 +452,20 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   onClick: a.onClick
 } : null;
 
-  show = (input: any) => {
+  show = (input?: {
+  message?: string;
+  type?: 'info' | 'success' | 'error' | 'warning' | 'loading';
+  duration?: number;
+  id?: string | number;
+  action?: {
+    label?: string;
+    onClick: (ctx: {
+      id: string;
+      data: unknown;
+    }) => void;
+  };
+  data?: unknown;
+}): string => {
   const t = input || {};
   let id;
   if (t.id != null) {
@@ -568,13 +581,13 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   }
 };
 
-  dismiss = (id: any) => {
+  dismiss = (id: string): void => {
   this.dismissBegin(id, 'api');
 };
 
   // clear() is bulk: immediate full teardown, NO per-toast exit animation and
   // NO emit (documented — see docs/components/toast.md).
-  clear = () => {
+  clear = (): void => {
   this.teardownTimers();
   this._toasts.value = [];
 };
@@ -585,7 +598,19 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   // mutation). Returns whether the id existed. A `duration` key clears+restarts
   // the timer (0 → sticky/no-arm; positive → arm); any other key leaves a
   // running timer untouched.
-  patch = (id: any, changes: any) => {
+  patch = (id: string, changes?: {
+  message?: string;
+  type?: 'info' | 'success' | 'error' | 'warning' | 'loading';
+  duration?: number;
+  action?: {
+    label?: string;
+    onClick: (ctx: {
+      id: string;
+      data: unknown;
+    }) => void;
+  };
+  data?: unknown;
+}): boolean => {
   const c = changes || {};
   let existed = false;
   const next = this._toasts.value.map((t: any) => {
@@ -651,7 +676,11 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   // the SAME entry to success/error on settle (the auto-dismiss timer starts AT
   // SETTLE, via patch's duration-key restart). Never returns/derives a new
   // promise — `p`'s own .then/.catch still fire for the consumer untouched.
-  promise = (p: any, opts: any) => {
+  promise = (p: Promise<unknown>, opts?: {
+  loading?: string;
+  success?: string | ((value: unknown) => string);
+  error?: string | ((err: unknown) => string);
+}): string => {
   const o = opts || {};
   const id = this.show({
     type: 'loading',
