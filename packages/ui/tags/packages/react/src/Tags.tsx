@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from '
 import type { ReactNode } from 'react';
 import { clsx, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './Tags.css';
+import './Tags.global.css';
 
 interface TagCtx { tag: any; index: any; remove: any; }
 

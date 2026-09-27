@@ -131,6 +131,19 @@ interface TagCtx {
       opacity: var(--rozie-tags-disabled-opacity, var(--rtg-disabled-opacity, 0.6));
       background: var(--rozie-tags-disabled-bg, var(--rtg-disabled-bg, rgba(0, 0, 0, 0.04)));
     }
+
+    @media (prefers-color-scheme: dark) {
+        ::ng-deep :where(:root:not(.light):not([data-theme="light"])) {
+          --rtg-bg: #1e293b;
+          --rtg-border-color: rgba(255, 255, 255, 0.16);
+          --rtg-accent: #60a5fa;
+          --rtg-focus-ring-color: rgba(96, 165, 250, 0.35);
+          --rtg-chip-bg: rgba(96, 165, 250, 0.22);
+          --rtg-remove-hover-bg: rgba(255, 255, 255, 0.14);
+          --rtg-placeholder-color: rgba(255, 255, 255, 0.45);
+          --rtg-disabled-bg: rgba(255, 255, 255, 0.06);
+        }
+      }
   `],
   providers: [
     {

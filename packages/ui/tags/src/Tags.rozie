@@ -371,6 +371,11 @@ $expose({ clear, focus })
   yet is completely re-skinnable by setting tokens at any ancestor scope. The
   shipped themes/*.css presets map these tokens onto shadcn/Radix, Material 3,
   Bootstrap 5.
+
+  The trailing `:root {}` block below ships a zero-import, OS-driven dark
+  default via the same escape hatch proven on `@rozie-ui/rete`'s FlowCanvas —
+  `themes/base.css` adds the app-toggled `.dark` / `[data-theme="dark"]`
+  strategy on top of it.
 */
 .rozie-tags {
   display: inline-flex;
@@ -461,6 +466,32 @@ $expose({ clear, focus })
   cursor: not-allowed;
   opacity: var(--rozie-tags-disabled-opacity, var(--rtg-disabled-opacity, 0.6));
   background: var(--rozie-tags-disabled-bg, var(--rtg-disabled-bg, rgba(0, 0, 0, 0.04)));
+}
+
+/*
+ * OS-driven dark. Zero-import: applies the same dark palette as
+ * themes/base.css's `.dark` class strategy whenever the operating system
+ * requests a dark scheme — UNLESS the app explicitly opted into light via a
+ * `.light` / `[data-theme="light"]` root class. Declared on the private
+ * `--rtg-*` names only (never `--rozie-tags-*`, which would shadow an
+ * ancestor's override) and never on `.rozie-tags` itself (an element's own
+ * declaration always beats an inherited one). `:root` MUST wrap `@media`
+ * here, not the reverse — a bare top-level `@media`/`:root` rule gets
+ * scope-attributed by scopeCss() and compiles to silently dead CSS.
+ */
+:root {
+  @media (prefers-color-scheme: dark) {
+    :where(:root:not(.light):not([data-theme="light"])) {
+      --rtg-bg: #1e293b;
+      --rtg-border-color: rgba(255, 255, 255, 0.16);
+      --rtg-accent: #60a5fa;
+      --rtg-focus-ring-color: rgba(96, 165, 250, 0.35);
+      --rtg-chip-bg: rgba(96, 165, 250, 0.22);
+      --rtg-remove-hover-bg: rgba(255, 255, 255, 0.14);
+      --rtg-placeholder-color: rgba(255, 255, 255, 0.45);
+      --rtg-disabled-bg: rgba(255, 255, 255, 0.06);
+    }
+  }
 }
 </style>
 

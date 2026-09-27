@@ -18,7 +18,7 @@
  *   1. read src/Tags.rozie
  *   2. parse() + lowerToIR() ONCE → ir (props/slots/emits/expose) for docs tables
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
- *        (React only: also write Tags.css + Tags.d.ts)
+ *        (React only: also write Tags.css + Tags.global.css + Tags.d.ts)
  *   4. copy src/themes/ → each leaf src/themes/
  *   5. render each leaf README from the IR + the hand-kept event/handle manifests
  *   6. ENFORCE validateDocsPropsTable against docs/components/tags-api.md
@@ -33,7 +33,7 @@
  * its src/Tags.vue + themes + README (it never cleans the leaf src, so the
  * committed barrel survives).
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
@@ -138,9 +138,18 @@ function main() {
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 
-    // React-only sidecars.
+    // React-only sidecars. The `if (r.css)` / `if (r.types)` guards handle
+    // absence; the global-css branch mirrors @rozie-ui/rete's codegen — writes
+    // the unscoped `:root {}` escape-hatch sidecar when present, and removes
+    // a stale one (from a prior build) when the component carries no such rule.
     if (target === 'react') {
       if (r.css) writeFileSync(resolve(leafSrc, 'Tags.css'), r.css);
+      const globalCssPath = resolve(leafSrc, 'Tags.global.css');
+      if (r.globalCss) {
+        writeFileSync(globalCssPath, r.globalCss);
+      } else if (existsSync(globalCssPath)) {
+        rmSync(globalCssPath);
+      }
       if (r.types) writeFileSync(resolve(leafSrc, 'Tags.d.ts'), r.types);
     }
 
@@ -155,7 +164,7 @@ function main() {
     // (5b) Vendor the repo LICENSE into each published leaf.
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
-    const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
+    const sidecars = target === 'react' ? ' (+ .css + .global.css + .d.ts)' : '';
     console.log(
       `codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ themes/)`,
     );
