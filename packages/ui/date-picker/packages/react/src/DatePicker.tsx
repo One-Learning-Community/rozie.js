@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { clsx, rozieAttr, rozieDisplay, useControllableState, useKeynav } from '@rozie/runtime-react';
 import './DatePicker.css';
@@ -7,6 +7,10 @@ import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, dayLabel, isD
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
 // fresh (a date picker open across midnight should follow the wall clock).
+
+type DaySettleRootEl = HTMLElement & {
+  __rozieDaySettleRaf?: number;
+};
 
 interface HeaderCtx { label: any; prev: any; next: any; disabled: any; openMonths: any; openYears: any; closeDrill: any; viewMode: any; }
 
@@ -371,16 +375,21 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   // ROVING_DAY_NONE sentinel first, then the real value one animation frame
   // later.
   //
-  // EVERY write to $data.activeDay below is deferred one animation frame,
+  // EVERY write to $data.activeDay below is settled through `settleActiveDay()`
+  // (its own doc comment has the full mechanism) rather than written directly,
   // even in the plain (not-same-value) case — found empirically via 77-08's
   // real-DOM Docker VR run: a synchronous write from a real click handler
   // (not a mount effect, and with a CORRECTLY fresh-computed `next` value —
   // this is NOT the closure-staleness class of bug the viewIsoOverride
   // parameters above fix) still silently failed to reach the template on one
-  // target. A single rAF deferral committed correctly every time on every
-  // target, with no observable flicker (never a retry loop, and still never
-  // queries the DOM or calls .focus() itself — the primitive's own effect
-  // keeps owning that once it sees activeDay actually move).
+  // target, so SOME defer is unavoidable here. [Fix 260926] A single fixed
+  // rAF deferral (the original 77-09 shape) was NOT always enough on its own —
+  // see `settleActiveDay`'s doc comment for the measured Angular commit-lag
+  // race this replaces it with. `seedActiveDay` itself still never queries the
+  // DOM or calls .focus() — the primitive's own effect keeps owning that once
+  // it sees activeDay actually move; only `settleActiveDay` (called at the
+  // bottom of this function) reads `$refs.root`, and only to decide WHEN to
+  // write, never to apply focus itself.
   // [77-09 fix] Resolves the CURRENT day-grid position, safe to call even
   // while a settle is mid-flight (`$data.activeDay === ROVING_DAY_NONE`).
   // `$data.activeDay` is authoritative WHENEVER it holds a real value — this
@@ -396,8 +405,96 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   function currentActiveDay() {
     return activeDay === ROVING_DAY_NONE ? activeDayReal : activeDay;
   }
+
+  // [Fix 260926, date-picker-keyboard.spec.ts:318, angular-only, ~1-in-5]
+  // Lands $data.activeDay's REAL value outcome-keyed instead of after a fixed
+  // frame count — the exact class virtualization.rzts's remeasureWindow() (N-05,
+  // quick 260923-rrr) already fixes for data-table: never trust "N frames went
+  // by" when the actual question is "has the framework committed the DOM this
+  // write depends on yet."
+  //
+  // The original 77-09 shape (`requestAnimationFrame(() => { $data.activeDay =
+  // next })`, ONE fixed frame) plus the r-keynav grid primitive's own SEPARATE
+  // one-shot rAF retry (packages/runtime/*/src/*.ts + Angular's inline
+  // `__rozieKeynavSyncActive`, all six targets, shared architecture — NOT an
+  // Angular-only mechanism) together give at most two chances to find the
+  // landing cell in the DOM. A real Playwright + rAF probe (2026-09-26,
+  // zz-probe-datepicker-pagedown.spec.ts) caught the mechanism live: paging
+  // tears down the old month's day-cell DOM nodes (dropping focus to <body> for
+  // one frame) and creates the new ones; on Angular specifically this swap
+  // occasionally — measured 11/50, repeated PageUp/PageDown — lands one frame
+  // later than that two-chance budget covers. Once BOTH chances miss, nothing
+  // ever retries again: `activeElementInfo` stays null forever (a permanent
+  // stall the failing spec's own 10s poll times out on), not a slow-but-
+  // eventually-correct render.
+  //
+  // `settleActiveDay` closes the gap by checking the OUTCOME every frame,
+  // bounded (`DAY_SETTLE_MAX_FRAMES`, mirroring `REMEASURE_MAX_FRAMES`'s exact
+  // precedent) — not by guessing a bigger fixed frame count, which would just
+  // move the race rather than close it. Checking "a cell with this flat index
+  // exists" is NOT sufficient by itself: every rendered month has the SAME
+  // 42-cells-per-panel index range (buildMonthGrid.ts), so the OLD, about-to-be
+  // -replaced cell always matches on index alone. Comparing its `data-day`
+  // against `expectedIso` — computed from the fresh buildMonthGrid() call with
+  // NO DOM involvement — is what actually distinguishes "the new month landed"
+  // from "a stale sibling happens to share this index." `$refs.root` is read
+  // only from this event-handler-reachable call path (seedActiveDay/onDayPage),
+  // never $computed/$watch-getter/template position — ROZ123-safe (see this
+  // file's own top-of-file FOCUS doc comment) — and `settleActiveDay` itself
+  // still never calls `.focus()` or applies anything to the DOM: it only decides
+  // WHEN to write `$data.activeDay`, exactly like the fixed-rAF defer it
+  // replaces did. `expectedIso === undefined` (no cell at all — e.g. every day
+  // disabled) writes through immediately, since no cell will ever "land".
+  //
+  // [Fix 260926, part 2 — concurrent chains] A bounded multi-frame retry can
+  // still be IN FLIGHT when the next press/nav fires a NEW seedActiveDay/
+  // onDayPage call before the previous one's chain has landed (confirmed live
+  // via a console-instrumented Playwright run: two independent chains — one
+  // hunting for the month a stale press swung to, one for the newest press's
+  // month — interleaved their rAF callbacks and each wrote `$data.activeDay`
+  // once it (independently) decided IT had landed, so the OLDER chain's write
+  // could land AFTER the newer one's and silently win with stale content). This
+  // is the exact stale-pass-stomp hazard 260802-hla's original scheduleFocus
+  // needed consume-on-land for (see that quick task's SUMMARY.md) — a `$data`
+  // field can't serve as that guard here, though: reading `$data.x` from
+  // INSIDE an already-scheduled rAF callback observes whichever render's
+  // CLOSURE created that callback, not the live value (the same staleness
+  // class documented throughout this file for React) — a chain's own
+  // recursive `settleActiveDay` reference is fixed at the moment it was first
+  // invoked and never re-resolves to a newer render. `$refs.root`, by
+  // contrast, dereferences to a STABLE ref object every target keeps live —
+  // exactly why `$onMount`/event-handler `$refs` reads are ROZ123-safe — so a
+  // throwaway bookkeeping property stashed directly on that DOM node (never
+  // $data) is readable, live, from ANY chain regardless of which render
+  // spawned it. A fresh call (`attempt === 0`) cancels whatever rAF the
+  // PREVIOUS chain left outstanding before doing anything else, so at most one
+  // chain is ever in flight — mirrors the `rafId`-cancellation idiom already
+  // used throughout this codebase (Angular's `__rozieKeynavRafId`,
+  // virtualization.rzts's `remeasureRaf`).
+  const DAY_SETTLE_MAX_FRAMES = useMemo(() => 10, []);
+  function settleActiveDay(next: number, expectedIso: string | undefined, attempt: number = 0) {
+    const root$local = root.current as DaySettleRootEl | undefined;
+    if (attempt === 0 && root$local && root$local.__rozieDaySettleRaf !== undefined) {
+      if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(root$local.__rozieDaySettleRaf);
+      root$local.__rozieDaySettleRaf = undefined;
+    }
+    if (next === ROVING_DAY_NONE || expectedIso === undefined || typeof requestAnimationFrame !== 'function') {
+      setActiveDay(next);
+      return;
+    }
+    const cell = root$local ? root$local.querySelector<HTMLElement>(`[data-rozie-keynav-item="${next}"]`) : null;
+    const landed = cell !== null && cell.getAttribute('data-day') === expectedIso;
+    if (landed || attempt >= DAY_SETTLE_MAX_FRAMES) {
+      if (root$local) root$local.__rozieDaySettleRaf = undefined;
+      setActiveDay(next);
+      return;
+    }
+    const rafId = requestAnimationFrame(() => settleActiveDay(next, expectedIso, attempt + 1));
+    if (root$local) root$local.__rozieDaySettleRaf = rafId;
+  }
   const seedActiveDay = useCallback((viewIsoOverride?: string, assumeDaysView?: boolean) => {
-    const next = resolveRovingDayIndex(allDayCells(viewIsoOverride, assumeDaysView), rovingDayInput(viewIsoOverride));
+    const cells = allDayCells(viewIsoOverride, assumeDaysView);
+    const next = resolveRovingDayIndex(cells, rovingDayInput(viewIsoOverride));
     if (next === currentActiveDay()) {
       setActiveDay(ROVING_DAY_NONE);
     }
@@ -405,10 +502,8 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     // bookkeeping, never read for DOM focus/UI, so it must always reflect the
     // latest INTENDED target the instant it's known, not one frame later.
     setActiveDayReal(next);
-    requestAnimationFrame(() => {
-      setActiveDay(next);
-    });
-  }, [allDayCells, currentActiveDay, rovingDayInput]);
+    settleActiveDay(next, cells[next]?.iso);
+  }, [allDayCells, currentActiveDay, rovingDayInput, settleActiveDay]);
   // The localized month-year heading. NAMED `monthHeading`, NOT `label` — a bare
   // `label` helper becomes a class field on the Lit custom element and a `title`
   // would collide with the inherited HTMLElement.title; `monthHeading` is clear.
@@ -699,17 +794,21 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   // Reuses addMonths — the family's existing month arithmetic (T-77-08-03: one
   // month per event, no unbounded loop) — no new date math.
   //
-  // `allDayCells()` is called AFTER the $data.viewIso write, but ONLY its
-  // `.length` is read below — SAFE despite React's async setState (unlike
-  // onMonthCommit/onYearCommit's `i`-parameter fix, 77-07 Task 3): every panel
-  // is unconditionally 42 cells, so the flat array's length is `numberOfMonths
-  // * 42` regardless of WHICH month $data.viewIso currently names — nothing
-  // here depends on the just-written value actually having landed yet.
+  // `allDayCells(nextViewIso)` is called AFTER the $data.viewIso write, WITH
+  // the fresh value passed explicitly (staleness fix, see seedActiveDay's own
+  // doc comment; and see `onDayPage`'s own doc comment below for why this
+  // function specifically needs it, unlike the `.length`-only read this
+  // comment used to describe before `settleActiveDay` needed `nextCells[next]
+  // ?.iso` too — a bare `allDayCells()` call would have been safe for `.length`
+  // alone: every panel is unconditionally 42 cells, so the flat array's length
+  // is `numberOfMonths * 42` regardless of WHICH month $data.viewIso currently
+  // names — but is NOT safe once anything ISO-shaped is read from it).
   //
-  // [77-09 fix] EVERY write below settles through the ROVING_DAY_NONE sentinel
-  // first, then the real landing index one animation frame later — the SAME
-  // safety net seedActiveDay uses (see its own doc comment) and for the SAME
-  // reason: a page/boundary event always tears down and recreates the day-cell
+  // [77-09 fix, refined 260926 — see settleActiveDay's own doc comment] EVERY
+  // write below settles through the ROVING_DAY_NONE sentinel first, then the
+  // real landing index through settleActiveDay's outcome-keyed, bounded retry —
+  // the SAME safety net seedActiveDay uses (see its own doc comment) and for the
+  // SAME reason: a page/boundary event always tears down and recreates the day-cell
   // DOM nodes (fresh content-based :key per week/panel for the new month) even
   // when the computed landing INDEX happens to repeat the value activeDay
   // already held (which the fixed 'pageup'/'pagedown' math above now does by
@@ -728,8 +827,8 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   // [77-09 fix, real-DOM regression] The landing-index math below reads
   // `currentActiveDay()` (the sentinel-safe resolver), NOT `$data.activeDay`
   // directly. `activeDay` transiently sits at ROVING_DAY_NONE between the
-  // synchronous settle-write below and the rAF-deferred real-value write one
-  // frame later — a real hazard under RAPID REPEATED presses (PageDown held
+  // synchronous settle-write below and settleActiveDay's real-value write,
+  // one or more frames later — a real hazard under RAPID REPEATED presses (PageDown held
   // down; OS key-repeat comfortably outpaces a single animation frame): a
   // second onDayPage call landing inside that transient window would read the
   // SENTINEL as "the current position," permanently corrupting every
@@ -742,18 +841,37 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   // the sentinel) correctly visible here too, rather than a stale shadow from
   // whenever the day grid was last paged.
   const onDayPage = useCallback((detail: any) => {
-    setViewIso(addMonths(viewMonthGrid(), detail.direction));
-    const nextCells = allDayCells();
+    // [Fix 260926, part 3 — React staleness] `nextCells` MUST be computed
+    // against the FRESH month, not a bare `allDayCells()` read of `$data.viewIso`
+    // — the doc comment above this function already established that a bare
+    // call is safe ONLY because the original code read nothing but
+    // `nextCells.length` from it (every month has the same 42-cells-per-panel
+    // shape, so length never depends on WHICH month `$data.viewIso` currently
+    // names). `settleActiveDay`'s `expectedIso` needs `nextCells[next]?.iso`,
+    // which DOES depend on the month — reading it via a bare `allDayCells()`
+    // call is the closure-staleness bug this file's `viewIsoOverride` parameter
+    // exists to prevent (see `seedActiveDay`'s doc comment): on React, `$data.
+    // viewIso` read back in the SAME synchronous call that just wrote it
+    // observes the PRE-write value, so `nextCells` silently stayed on the OLD
+    // month and `expectedIso` was the day just left, never the one being paged
+    // to — `settleActiveDay` then compared the DOM against an iso it could
+    // never actually see land, and (once the concurrency fix above closed the
+    // other gap) settled by exhausting `DAY_SETTLE_MAX_FRAMES` writing the
+    // WRONG value's semantics forever, permanently starving `.focus()` of a
+    // navigation it could ever recognize. Confirmed via console probe
+    // (2026-09-26): `onDayPage` fired correctly, but its own `settleActiveDay`
+    // call always reported the iso just left, 100% of the time, on React only.
+    const nextViewIso = addMonths(viewMonthGrid(), detail.direction);
+    setViewIso(nextViewIso);
+    const nextCells = allDayCells(nextViewIso);
     const current = currentActiveDay();
     const next = detail.reason === 'boundary' ? detail.direction > 0 ? 0 : nextCells.length - 1 : Math.min(current, nextCells.length - 1);
     if (next === current) {
       setActiveDay(ROVING_DAY_NONE);
     }
     setActiveDayReal(next);
-    requestAnimationFrame(() => {
-      setActiveDay(next);
-    });
-  }, [allDayCells, currentActiveDay, viewMonthGrid]);
+    settleActiveDay(next, nextCells[next]?.iso);
+  }, [allDayCells, currentActiveDay, settleActiveDay, viewMonthGrid]);
   // The native `disabled` attribute is gone from the month/year drill buttons
   // (D-3 — focusable-but-inert, matching the day cells), so selectMonth/
   // selectYear must gate on the cell's own `disabled` flag themselves — today the
@@ -919,10 +1037,13 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   // seedActiveDay() call site.
   // focus() — resolve + set $data.activeDay through the SAME roving-tabindex
   // chain the tab stop uses (seedActiveDay/resolveRovingDayIndex), so this
-  // handle can never disagree with keyboard Tab — multi-month aware. It does
-  // NOT query the DOM itself; the r-keynav grid controller lands DOM focus once
-  // the value changes (77-08). DELIBERATELY overrides HTMLElement.focus on Lit
-  // (ROZ137 warn, accepted).
+  // handle can never disagree with keyboard Tab — multi-month aware. It never
+  // applies focus itself; the r-keynav grid controller lands DOM focus once the
+  // value changes (77-08). It DOES read `$refs.root` indirectly, through
+  // seedActiveDay's own settleActiveDay call (260926 fix) — only to decide WHEN
+  // to write $data.activeDay, never to call .focus()/apply anything itself; see
+  // settleActiveDay's doc comment. DELIBERATELY overrides HTMLElement.focus on
+  // Lit (ROZ137 warn, accepted).
   function focus() {
     seedActiveDay();
   }
