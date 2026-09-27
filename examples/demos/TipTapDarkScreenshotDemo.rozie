@@ -1,0 +1,83 @@
+<!--
+  TipTapDarkScreenshotDemo.rozie — the DARK pixel cell for the TipTap wrapper.
+  Closes the 2026-09-27 dark-default gap
+  (.planning/todos/pending/2026-09-27-tiptap-default-theme-is-light-only.md).
+
+  WHY IT EXISTS: TipTap now ships dark mode as a ZERO-IMPORT, OS-driven default — a
+  `:root { @media (prefers-color-scheme: dark) { :where(...) { ... } } }` block that
+  redefines 15 `--rozie-tiptap-*` tokens on the private `--rtt-*` names
+  (TipTap.rozie, the block immediately after `.rozie-tiptap-count-value.over`). It had
+  NO pixel guard at all: every VR cell (matrix included) runs under the default LIGHT
+  colour scheme, so a broken dark block would have rendered green across the whole
+  suite. The structural half of the coverage is `dark-mode-guard.test.ts`; this demo
+  is the pixel half.
+
+  A SEPARATE BASELINE: this cell writes `__screenshots__/TipTapDarkScreenshot.png`.
+  `TipTapScreenshot.png` — the shared light-mode baseline — is UNTOUCHED and must
+  never be regenerated or bootstrap-listed on account of this demo. The cell lives in
+  its own `tiptap-dark.spec.ts` rather than matrix.spec.ts, because the matrix runs
+  every cell under the default colour scheme and has no per-example media hook.
+
+  STRUCTURAL TWIN of TipTapScreenshotDemo: the SAME fixed rich-HTML doc (heading,
+  bold/italic marks, sub-heading, bullet list), the same `autofocus="false"` +
+  `caret-color: transparent` belt-and-suspenders, so the dark frame is the light
+  frame's exact structural twin and any future diff between the two baselines is
+  purely a colour diff.
+
+  THE ONE DELIBERATE DIFFERENCE from TipTapScreenshotDemo: that demo hardcodes LIGHT
+  demo chrome (`color: #1a1a1a`), which under dark would paint near-black text on a
+  dark page background. This demo carries its OWN
+  `@media (prefers-color-scheme: dark)` block for its wrapper text/background, so the
+  captured frame reads as a genuine dark render rather than a dark editor wrapped in
+  light-mode chrome bolted on.
+-->
+
+<rozie name="TipTapDarkScreenshotDemo">
+
+<components>
+{
+  TipTap: '../../packages/ui/tiptap/src/TipTap.rozie',
+}
+</components>
+
+<script>
+// The SAME fixed, deterministic rich document as TipTapScreenshotDemo — never a
+// live timestamp or random content — so the dark frame is the light frame's
+// structural twin and any diff is purely a colour diff.
+const FIXED_HTML = '<h1>Release notes</h1><p>This build ships <strong>rich text</strong> with <em>emphasis</em>, headings, and lists — rendered identically across six frameworks from one Rozie source.</p><h2>Highlights</h2><ul><li>Two-way <strong>html</strong> binding</li><li>A 14-verb command handle</li><li>A toolbar portal slot</li></ul>'
+
+// Belt-and-suspenders caret neutralization — even an accidental focus cannot
+// paint a blinking caret into the capture. autofocus stays false; the cell is
+// never clicked.
+const stableEditorProps = { attributes: { style: 'caret-color: transparent' } }
+</script>
+
+<template>
+<div class="tiptap-screenshot-demo-dark">
+  <TipTap
+    :html="FIXED_HTML"
+    :autofocus="false"
+    :editorProps="stableEditorProps"
+  />
+</div>
+</template>
+
+<style>
+.tiptap-screenshot-demo-dark {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+
+/* The demo's OWN chrome follows the OS colour scheme, so the captured frame is a
+   real dark render rather than a dark editor wrapped in light-mode chrome. */
+@media (prefers-color-scheme: dark) {
+  .tiptap-screenshot-demo-dark {
+    color: #e2e8f0;
+    background: #0b1120;
+  }
+}
+</style>
+
+</rozie>

@@ -256,6 +256,17 @@ export const EXAMPLES = [
   'TipTapBehavior',
   // quick 260925-r41 — TipTap `ready` event, sync + lazy-extension construction paths.
   'TipTapReady',
+  // 260927-a2v — TipTapDarkScreenshot is the debut OS-dark PIXEL cell (loader →
+  // examples/demos/TipTapDarkScreenshotDemo.rozie), closing 2026-09-27's
+  // dark-default gap. The same fixed rich-HTML doc as TipTapScreenshotDemo, with
+  // the demo's OWN `@media (prefers-color-scheme: dark)` chrome, captured under
+  // `emulateMedia({ colorScheme: 'dark' })`. Owned by the NEW
+  // specs/tiptap-dark.spec.ts — deliberately NOT matrix.spec.ts, which runs every
+  // cell under the default light scheme and has no per-example media hook. It
+  // writes its OWN baseline (__screenshots__/TipTapDarkScreenshot.png); the shared
+  // light TipTapScreenshot.png baseline is untouched. Auto-fixme until the
+  // Linux-Docker PNG lands.
+  'TipTapDarkScreenshot',
   // quick 260926 — TipTap async-construction model-write race (audit follow-up).
   // Loader → examples/demos/TipTapAsyncModelRaceDemo.rozie. Built for all 6 targets
   // but NOT a screenshot cell — covered by tiptap-async-model-race.spec.ts.
@@ -1523,6 +1534,9 @@ export const LIT_TAGS: Record<Example, string> = {
   TipTapScreenshot: 'rozie-tip-tap-screenshot',
   TipTapBehavior: 'rozie-tip-tap-behavior',
   TipTapReady: 'rozie-tip-tap-ready',
+  // 260927-a2v dark pixel cell — '-demo' appended by the entry →
+  // 'rozie-tip-tap-dark-screenshot-demo' = kebab of TipTapDarkScreenshotDemo.
+  TipTapDarkScreenshot: 'rozie-tip-tap-dark-screenshot',
   TipTapAsyncModelRace: 'rozie-tip-tap-async-model-race',
   // Phase 33 — the lit entry appends '-demo' → tags
   // 'rozie-tip-tap-node-view-demo' / 'rozie-tip-tap-node-view-screenshot-demo' =
@@ -2041,6 +2055,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   TipTapScreenshot: {},
   TipTapBehavior: {},
   TipTapReady: {},
+  // 260927-a2v — TipTapDarkScreenshotDemo is self-contained (hardcodes its fixed
+  // rich doc in <script>, same as TipTapScreenshot). No parent props.
+  TipTapDarkScreenshot: {},
   // quick 260926 — self-contained: seeds its own html + calls the child's
   // setContent() handle from its own $onMount. No parent props needed.
   TipTapAsyncModelRace: {},
