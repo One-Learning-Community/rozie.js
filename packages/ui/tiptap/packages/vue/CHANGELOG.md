@@ -1,5 +1,11 @@
 # @rozie-ui/tiptap-vue
 
+## 0.5.1
+
+### Patch Changes
+
+- Regenerate the JetBrains `web-types.json` IDE sidecar so its embedded `version` field stays in lockstep with the package version (was still 0.4.0 after the 0.5.0 dark-mode-default release). No runtime or type-surface change — IDE-completion metadata only.
+
 ## 0.5.0
 
 ### Minor Changes
