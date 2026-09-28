@@ -1,5 +1,15 @@
 # @rozie-ui/tiptap-react
 
+## 0.5.0
+
+### Minor Changes
+
+- TipTap now ships an OS-driven dark-mode default for its editor chrome, matching the mechanism already shipped for `@rozie-ui/rete`.
+
+  Previously, `@rozie-ui/tiptap`'s default toolbar/editor colors were light-only — a consumer on a `prefers-color-scheme: dark` system with no import at all got a bright white editor surface on a dark page. `TipTap.rozie` now carries a zero-import `@media (prefers-color-scheme: dark)` default on 15 color-bearing tokens (background, toolbar background, button colors and states, borders, toolbar separator, character-count colors, placeholder), declared on private `--rtt-*` names so a public `--rozie-tiptap-*` override anywhere still wins. An app that explicitly opts into light via `.light` / `[data-theme="light"]` keeps the light look under OS dark. The link-editor floating surface is intentionally excluded — its dark styling is by original design, not new.
+
+  No public API changes: all new values are private `--rtt-*` wiring — no `--rozie-tiptap-*` token was added, renamed, or removed, so an existing consumer override of any `--rozie-tiptap-*` token keeps winning in both light and dark, exactly as before.
+
 ## 0.4.0
 
 ### Minor Changes
