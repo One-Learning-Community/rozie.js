@@ -495,7 +495,11 @@ for (const fam of FAMILIES) {
       };
 
       runner(`[${fam.family}] the dark palette is still the default [${target}]`, async ({ page }) => {
-        expect(darkNames.length).toBeGreaterThan(10);
+        // Sanity floor against a trivially-incomplete palette, not a per-family token-count
+        // target: rete/FlowCanvas ships 39, tags ships a real, deliberately-scoped 8 (measured
+        // via this same redeclared() helper against each family's base.css) — 5 is comfortably
+        // below both while still catching an accidental one- or two-token wiring.
+        expect(darkNames.length).toBeGreaterThan(5);
         await openAs(page, { scheme: 'dark', base: false });
         expect((await resolveAll(page, [probe]))[probe], 'OS dark, nothing imported').toBe(darkValue);
         await openAs(page, { scheme: 'dark', base: true });

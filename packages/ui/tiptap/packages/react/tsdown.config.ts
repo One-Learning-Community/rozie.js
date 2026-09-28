@@ -12,14 +12,15 @@ export default defineConfig({
   outputOptions(options) {
     return { ...options, exports: 'named' };
   },
-  // The generated React component does a side-effect `import './TipTap.css'`
+  // The generated React component does side-effect CSS imports: `./TipTap.css`
   // (plain attribute-scoped CSS — `[data-rozie-s-HASH]` is the sole isolation
-  // layer). tsdown's css-guard refuses to process ANY `.css` import without the
-  // optional `@tsdown/css` plugin (not a repo dep). Mark the relative CSS import
-  // EXTERNAL so tsdown leaves the `./TipTap.css` specifier verbatim, then `copy`
-  // the CSS file into `dist/` so the relative import resolves at the consumer's
-  // own bundler. The leaf also ships `src` in `files`, so the source-side import
-  // resolves.
+  // layer) AND `./TipTap.global.css` (the `:root` OS-dark escape-hatch styles).
+  // tsdown's css-guard refuses to process ANY `.css` import without the
+  // optional `@tsdown/css` plugin (not a repo dep). Mark the relative CSS
+  // imports EXTERNAL so tsdown leaves the specifiers verbatim, then `copy`
+  // both CSS files into `dist/` so the relative imports resolve at the
+  // consumer's own bundler. The leaf also ships `src` in `files`, so the
+  // source-side import resolves.
   external: [
     'react',
     'react-dom',
@@ -31,5 +32,8 @@ export default defineConfig({
     '@tiptap/extension-character-count',
     /\.css$/,
   ],
-  copy: [{ from: 'src/TipTap.css', to: 'dist', flatten: true }],
+  copy: [
+    { from: 'src/TipTap.css', to: 'dist', flatten: true },
+    { from: 'src/TipTap.global.css', to: 'dist', flatten: true },
+  ],
 });
