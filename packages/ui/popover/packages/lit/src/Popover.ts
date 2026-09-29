@@ -186,7 +186,7 @@ private __rozieFirstUpdateDone = false;
     document.addEventListener('keydown', _lh0, undefined);
     this._disconnectCleanups.push(() => document.removeEventListener('keydown', _lh0, undefined));
 
-    const _u1 = attachOutsideClickListener([() => this._refAnchorEl, () => this._refFloatingEl], ($event) => {  ((this.dismiss) as (...args: any[]) => any)($event); }, () => (this.open && !this.disableDismiss));
+    const _u1 = attachOutsideClickListener([() => this._refAnchorEl, () => this._refFloatingEl], ($event) => {  ((this.dismissOutside) as (...args: any[]) => any)($event); }, () => (this.open && !this.disableDismiss));
     this._disconnectCleanups.push(_u1);
 
     {
@@ -496,10 +496,32 @@ private __rozieFirstUpdateDone = false;
   this.requestOpen(false);
 };
 
-  // Dismissal handler — method reference for the <listeners> block (an inline
-  // handler referencing $event leaks into React's useEffect deps → TS2552; every
-  // corpus <listener> uses a method-ref + modifiers).
+  // Dismissal handlers — method references for the <listeners> block. A method-ref
+  // `<listener>` handler receives the DOM event on all 6 targets (260929-mn8 DD-8:
+  // callable handlers are invoked with the event; inline statements run with
+  // `$event` in scope), so dismissOutside can inspect the click.
+  //
+  // `dismiss` serves Escape and closes unconditionally: an Escape keydown whose
+  // target is a focused EXTERNAL trigger (the `reference` element) must still close,
+  // so Escape must NOT apply the inside check below.
   dismiss = () => {
+  this.requestOpen(false);
+};
+
+  // Click-outside (260929-lyc DD-5). The `.outside(anchorEl, floatingEl)` modifier
+  // already excludes the built-in anchor wrapper + the panel; an Element `reference`
+  // is ALSO inside, so a click on it is left to the consumer's own toggle (which then
+  // closes the panel instead of dismiss-then-reopen). `composedPath()` is checked
+  // first — it is load-bearing for shadow-DOM (Lit) consumers, where a document-level
+  // listener sees the click retargeted to the outermost host. A virtual element
+  // (no `nodeType`) adds no inside region.
+  dismissOutside = (event: any) => {
+  let referenceEl: any = null;
+  referenceEl = this.reference;
+  if (referenceEl && referenceEl.nodeType === 1 && event) {
+    if (typeof event.composedPath === 'function' && event.composedPath().includes(referenceEl)) return;
+    if (event.target && referenceEl.contains(event.target)) return;
+  }
   this.requestOpen(false);
 };
 

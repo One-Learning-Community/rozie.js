@@ -19,7 +19,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *     internal `.rozie-popover-anchor` wrapper plays no part);
  *   - POP-REF-2: repointing `reference` to the virtual element WHILE OPEN
  *     repositions the panel at that rect (autoUpdate restarted);
- *   - outside click dismisses.
+ *   - outside click dismisses;
+ *   - POP-REF-3: while open with an Element reference, a click on that element is
+ *     NOT an outside click, so the consumer's toggle on it CLOSES the panel
+ *     (instead of dismiss-then-reopen); with a VIRTUAL reference only the anchor
+ *     wrapper + panel are inside, so a click elsewhere dismisses;
+ *   - no uncaught page errors throughout.
  *
  * Per `feedback_vr_linux_baselines`: DOM-geometry/behavioral assertions only — no
  * `toHaveScreenshot`, so there are no PNG baselines.
@@ -53,6 +58,8 @@ for (const target of TARGETS) {
   runner(`popover reference [${target}]: positions against an external element and a virtual element`, async ({
     page,
   }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (err) => pageErrors.push(String(err)));
     await page.goto(`/?example=PopoverReference&target=${target}`);
     await expect(page.getByTestId('rozie-mount')).toBeVisible();
 
@@ -103,5 +110,23 @@ for (const target of TARGETS) {
     await heading.click();
     await expect(panel).toHaveCount(0, { timeout: 10_000 });
     await expect(value).toHaveText('closed');
+
+    // ---- 6. POP-REF-3: consumer toggle on the referenced Element CLOSES ----
+    await external.click();
+    await expect(panel).toBeVisible({ timeout: 10_000 });
+    await external.click();
+    await expect(panel).toHaveCount(0, { timeout: 10_000 });
+    await expect(value).toHaveText('closed');
+
+    // ---- 7. a VIRTUAL reference adds no inside region: an outside click dismisses ----
+    await external.click();
+    await expect(panel).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId('move-to-point').click();
+    await expect(panel).toBeVisible();
+    await heading.click();
+    await expect(panel).toHaveCount(0, { timeout: 10_000 });
+    await expect(value).toHaveText('closed');
+
+    expect(pageErrors).toEqual([]);
   });
 }
