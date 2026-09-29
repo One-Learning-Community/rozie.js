@@ -141,6 +141,10 @@ interface PopoverProps {
    * Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Off by default; existing `trigger="manual"` consumers relying on real click-outside dismissal are unaffected unless they opt in.
    */
   disableDismiss?: boolean;
+  /**
+   * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded` / `aria-controls`), typically with `trigger='manual'` and a two-way-bound `open`. Pass a stable value — a new object on every render restarts tracking.
+   */
+  reference?: (Element | Record<string, any>) | null;
   onChange?: (...args: unknown[]) => void;
   anchorSlot?: (ctx: AnchorSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
@@ -157,8 +161,8 @@ export interface PopoverHandle {
 }
 
 export default function Popover(_props: PopoverProps): JSX.Element {
-  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false, matchWidth: false, disableDismiss: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss', 'children', 'ref', 'onChange']);
+  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false, matchWidth: false, disableDismiss: false, reference: null }, _props);
+  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss', 'reference', 'children', 'ref', 'onChange']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ show, hide, toggle, reposition }); });
 
@@ -217,6 +221,14 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   })()), { defer: true }));
   createEffect(on(() => (() => local.strategy)(), (v) => untrack(() => (() => {
     if (open()) position();
+  })()), { defer: true }));
+  createEffect(on(() => (() => local.reference)(), (v) => untrack(() => (() => {
+    if (local.disabled) return;
+    if (stopAutoUpdate) {
+      startTracking();
+    } else if (local.keepMounted && floatingNode) {
+      position();
+    }
   })()), { defer: true }));
   let anchorElRef: HTMLElement | null = null;
   let floatingElRef: HTMLElement | null = null;
@@ -309,7 +321,13 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   // (the cropper `let cfg = null` constructor-args idiom).
   function position() {
     if (local.disablePositioning) return;
-    if (!anchorNode || !floatingNode) return;
+    // The Floating UI reference: the `reference` prop (external Element or virtual
+    // element) when set, else the built-in anchor wrapper (260929-lyc DD-3). A
+    // function-local null-let so typeNeutralize makes it `any` in every leaf — the
+    // union prop type never trips strict leaf tsc against `ReferenceElement`.
+    let referenceEl: any = null;
+    referenceEl = local.reference || anchorNode;
+    if (!referenceEl || !floatingNode) return;
     const middleware = buildMiddleware({
       offset: offsetMiddleware,
       flip,
@@ -345,7 +363,7 @@ export default function Popover(_props: PopoverProps): JSX.Element {
       strategy: local.strategy,
       middleware
     };
-    computePosition(anchorNode, floatingNode, opts).then((result: any) => {
+    computePosition(referenceEl, floatingNode, opts).then((result: any) => {
       applyPosition(result.x, result.y, result.middlewareData);
     });
   }
@@ -355,12 +373,17 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   // resize/ancestor-layout changes and returns its own teardown.
   function startTracking() {
     if (local.disablePositioning) return;
-    if (!anchorNode || !floatingNode) return;
+    // Same reference resolution as position() (DD-3). autoUpdate accepts a virtual
+    // element: it unwraps it to its optional `contextElement` for ancestor/resize
+    // observation (skipped when absent) and still runs the initial update.
+    let referenceEl: any = null;
+    referenceEl = local.reference || anchorNode;
+    if (!referenceEl || !floatingNode) return;
     if (stopAutoUpdate) {
       stopAutoUpdate();
       stopAutoUpdate = null;
     }
-    stopAutoUpdate = autoUpdate(anchorNode, floatingNode, position);
+    stopAutoUpdate = autoUpdate(referenceEl, floatingNode, position);
   }
   function stopTracking() {
     if (stopAutoUpdate) {

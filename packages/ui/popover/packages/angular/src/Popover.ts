@@ -183,6 +183,10 @@ export class Popover {
    * Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Off by default; existing `trigger="manual"` consumers relying on real click-outside dismissal are unaffected unless they opt in.
    */
   disableDismiss = input<boolean>(false);
+  /**
+   * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded` / `aria-controls`), typically with `trigger='manual'` and a two-way-bound `open`. Pass a stable value — a new object on every render restarts tracking.
+   */
+  reference = input<(Element | Record<string, any>) | null>(null);
   anchorEl = viewChild<ElementRef<HTMLDivElement>>('anchorEl');
   floatingEl = viewChild<ElementRef<HTMLDivElement>>('floatingEl');
   arrowEl = viewChild<ElementRef<HTMLDivElement>>('arrowEl');
@@ -208,6 +212,7 @@ export class Popover {
   private __rozieWatchInitial_3 = true;
   private __rozieWatchInitial_4 = true;
   private __rozieWatchInitial_5 = true;
+  private __rozieWatchInitial_6 = true;
 
   constructor() {
       const renderer = inject(Renderer2);
@@ -259,6 +264,14 @@ export class Popover {
     })(); }); });
     effect(() => { const __watchVal = (() => this.strategy())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => {
       if (this.open()) this.position();
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.reference())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => {
+      if ((this.disabled() || this.__rozieCvaDisabled())) return;
+      if (this.stopAutoUpdate) {
+        this.startTracking();
+      } else if (this.keepMounted() && this.floatingNode) {
+        this.position();
+      }
     })(); }); });
   }
 
@@ -357,7 +370,13 @@ export class Popover {
   position = () => {
     const __strategy = this.strategy();
     if (this.disablePositioning()) return;
-    if (!this.anchorNode || !this.floatingNode) return;
+    // The Floating UI reference: the `reference` prop (external Element or virtual
+    // element) when set, else the built-in anchor wrapper (260929-lyc DD-3). A
+    // function-local null-let so typeNeutralize makes it `any` in every leaf — the
+    // union prop type never trips strict leaf tsc against `ReferenceElement`.
+    let referenceEl: any = null;
+    referenceEl = this.reference() || this.anchorNode;
+    if (!referenceEl || !this.floatingNode) return;
     const middleware = buildMiddleware({
       offset: offsetMiddleware,
       flip,
@@ -393,7 +412,7 @@ export class Popover {
       strategy: __strategy,
       middleware
     };
-    computePosition(this.anchorNode, this.floatingNode, opts).then((result: any) => {
+    computePosition(referenceEl, this.floatingNode, opts).then((result: any) => {
       this.applyPosition(result.x, result.y, result.middlewareData);
     });
   };
@@ -402,12 +421,17 @@ export class Popover {
   // resize/ancestor-layout changes and returns its own teardown.
   startTracking = () => {
     if (this.disablePositioning()) return;
-    if (!this.anchorNode || !this.floatingNode) return;
+    // Same reference resolution as position() (DD-3). autoUpdate accepts a virtual
+    // element: it unwraps it to its optional `contextElement` for ancestor/resize
+    // observation (skipped when absent) and still runs the initial update.
+    let referenceEl: any = null;
+    referenceEl = this.reference() || this.anchorNode;
+    if (!referenceEl || !this.floatingNode) return;
     if (this.stopAutoUpdate) {
       this.stopAutoUpdate();
       this.stopAutoUpdate = null;
     }
-    this.stopAutoUpdate = autoUpdate(this.anchorNode, this.floatingNode, this.position);
+    this.stopAutoUpdate = autoUpdate(referenceEl, this.floatingNode, this.position);
   };
   stopTracking = () => {
     if (this.stopAutoUpdate) {

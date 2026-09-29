@@ -1,0 +1,116 @@
+<!--
+  PopoverReferenceDemo — VR behavioral cell for the @rozie-ui/popover `reference`
+  prop (260929-lyc). Drives a `trigger="manual"` Popover whose built-in anchor slot
+  is left EMPTY: the panel is positioned against an EXTERNAL element this demo owns
+  (the `external-anchor` button, standing in for e.g. a calendar event element a
+  third-party component renders) and then against a Floating UI VIRTUAL element (an
+  object with `getBoundingClientRect()` returning a fixed viewport point).
+
+  The external button is a CONSUMER toggle: clicking it sets the reference and flips
+  the two-way `open` model. Clicking it again while open must CLOSE the panel (the
+  referenced element counts as inside for click-outside dismissal). The
+  `move-to-point` button lives INSIDE the panel, so clicking it repoints the
+  reference without dismissing — proving the live reference reconcile. A virtual
+  reference adds no inside region, so an outside click then dismisses.
+
+  See popover-reference.spec.ts. Behavioral-only (DOM-geometry assertions, no PNG).
+-->
+<rozie name="PopoverReferenceDemo">
+
+<components>
+{
+  Popover: '../../packages/ui/popover/src/Popover.rozie',
+}
+</components>
+
+<data>
+{
+  panelOpen: false,
+  referenceTarget: null,
+}
+</data>
+
+<script>
+// The external element, captured in $onMount ($refs are only safe there, ROZ123).
+let extBoxNode = null
+
+// A Floating UI virtual element: a zero-size point at viewport (640, 420).
+const pointReference = {
+  getBoundingClientRect: () => ({
+    x: 640,
+    y: 420,
+    left: 640,
+    top: 420,
+    right: 640,
+    bottom: 420,
+    width: 0,
+    height: 0,
+  }),
+}
+
+$onMount(() => {
+  extBoxNode = $refs.extBox
+})
+
+const onExternalClick = () => {
+  $data.referenceTarget = extBoxNode
+  $data.panelOpen = !$data.panelOpen
+}
+const moveToPoint = () => {
+  $data.referenceTarget = pointReference
+}
+const valueText = () => ($data.panelOpen ? 'open' : 'closed')
+</script>
+
+<template>
+<div class="popover-reference-demo">
+  <h3>Popover external reference</h3>
+
+  <div class="controls">
+    <span class="readout" data-testid="readout-value">{{ valueText() }}</span>
+  </div>
+
+  <div class="external-row">
+    <button type="button" class="external-box" ref="extBox" data-testid="external-anchor" @click="onExternalClick()">External target</button>
+  </div>
+
+  <!-- The `anchor` slot is deliberately left EMPTY: the panel positions against
+       `reference`, and the built-in anchor wrapper still renders (zero-content). -->
+  <Popover
+    r-model:open="$data.panelOpen"
+    trigger="manual"
+    placement="bottom"
+    :offset="8"
+    :reference="$data.referenceTarget"
+  >
+    <div class="popover-body" data-testid="popover-content">
+      Floating content
+      <button type="button" data-testid="move-to-point" @click="moveToPoint()">Move to point</button>
+    </div>
+  </Popover>
+</div>
+</template>
+
+<style>
+.popover-reference-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+}
+.popover-reference-demo .controls {
+  margin-bottom: 1rem;
+}
+.popover-reference-demo .external-row {
+  padding-left: 420px;
+}
+.popover-reference-demo .external-box {
+  display: block;
+  width: 160px;
+  height: 48px;
+}
+.popover-body {
+  font-size: 0.9rem;
+}
+</style>
+
+</rozie>

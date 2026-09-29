@@ -150,6 +150,10 @@ export default class Popover extends SignalWatcher(LitElement) {
    * Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Off by default; existing `trigger="manual"` consumers relying on real click-outside dismissal are unaffected unless they opt in.
    */
   @property({ type: Boolean, reflect: true }) disableDismiss: boolean = false;
+  /**
+   * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded` / `aria-controls`), typically with `trigger='manual'` and a two-way-bound `open`. Pass a stable value — a new object on every render restarts tracking.
+   */
+  @property({ type: Object }) reference: Element | any = null;
   @query('[data-rozie-ref="anchorEl"]') private _refAnchorEl!: HTMLElement;
   @query('[data-rozie-ref="floatingEl"]') private _refFloatingEl!: HTMLElement;
   @query('[data-rozie-ref="arrowEl"]') private _refArrowEl!: HTMLElement;
@@ -274,6 +278,14 @@ private __rozieFirstUpdateDone = false;
     if (this.__rozieFirstUpdateDone && (changedProperties.has('strategy'))) { const __watchVal = (() => this.strategy)(); (() => {
       if (this.open) this.position();
     })(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('reference'))) { const __watchVal = (() => this.reference)(); (() => {
+      if (this.disabled) return;
+      if (this.stopAutoUpdate) {
+        this.startTracking();
+      } else if (this.keepMounted && this.floatingNode) {
+        this.position();
+      }
+    })(); }
     this.__rozieFirstUpdateDone = true;
   }
 
@@ -386,7 +398,13 @@ private __rozieFirstUpdateDone = false;
   // (the cropper `let cfg = null` constructor-args idiom).
   position = () => {
   if (this.disablePositioning) return;
-  if (!this.anchorNode || !this.floatingNode) return;
+  // The Floating UI reference: the `reference` prop (external Element or virtual
+  // element) when set, else the built-in anchor wrapper (260929-lyc DD-3). A
+  // function-local null-let so typeNeutralize makes it `any` in every leaf — the
+  // union prop type never trips strict leaf tsc against `ReferenceElement`.
+  let referenceEl: any = null;
+  referenceEl = this.reference || this.anchorNode;
+  if (!referenceEl || !this.floatingNode) return;
   const middleware = buildMiddleware({
     offset: offsetMiddleware,
     flip,
@@ -422,7 +440,7 @@ private __rozieFirstUpdateDone = false;
     strategy: this.strategy,
     middleware
   };
-  computePosition(this.anchorNode, this.floatingNode, opts).then((result: any) => {
+  computePosition(referenceEl, this.floatingNode, opts).then((result: any) => {
     this.applyPosition(result.x, result.y, result.middlewareData);
   });
 };
@@ -432,12 +450,17 @@ private __rozieFirstUpdateDone = false;
   // resize/ancestor-layout changes and returns its own teardown.
   startTracking = () => {
   if (this.disablePositioning) return;
-  if (!this.anchorNode || !this.floatingNode) return;
+  // Same reference resolution as position() (DD-3). autoUpdate accepts a virtual
+  // element: it unwraps it to its optional `contextElement` for ancestor/resize
+  // observation (skipped when absent) and still runs the initial update.
+  let referenceEl: any = null;
+  referenceEl = this.reference || this.anchorNode;
+  if (!referenceEl || !this.floatingNode) return;
   if (this.stopAutoUpdate) {
     this.stopAutoUpdate();
     this.stopAutoUpdate = null;
   }
-  this.stopAutoUpdate = autoUpdate(this.anchorNode, this.floatingNode, this.position);
+  this.stopAutoUpdate = autoUpdate(referenceEl, this.floatingNode, this.position);
 };
 
   stopTracking = () => {
@@ -545,7 +568,7 @@ private __rozieFirstUpdateDone = false;
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disable-positioning', 'disablepositioning', 'keep-mounted', 'keepmounted', 'match-width', 'matchwidth', 'disable-dismiss', 'disabledismiss']);
+    const __skip = new Set<string>(['data-rozie-ref', 'open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disable-positioning', 'disablepositioning', 'keep-mounted', 'keepmounted', 'match-width', 'matchwidth', 'disable-dismiss', 'disabledismiss', 'reference']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

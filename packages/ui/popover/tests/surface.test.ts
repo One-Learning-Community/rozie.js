@@ -32,7 +32,8 @@ const EXPECT = {
   // via the `size` middleware). Phase 86-07 (D-24, regression fix): +
   // disableDismiss (veto Popover's own Escape/click-outside dismissal for a
   // composing component that drives `open` itself).
-  props: ['open', 'placement', 'strategy', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss'],
+  // 260929-lyc (DD-1): + reference
+  props: ['open', 'placement', 'strategy', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss', 'reference'],
   models: ['open'],
   emits: ['change'],
   slots: ['', 'anchor'] as string[],
@@ -56,7 +57,7 @@ describe('Popover.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (14 props)', () => {
+  it('props surface matches the contract', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -105,6 +106,15 @@ describe('Popover.rozie surface gate', () => {
     const errs = r.diagnostics.filter((d) => d.severity === 'error');
     expect(errs).toEqual([]);
     expect(r.code.length).toBeGreaterThan(0);
+  });
+
+  // 260929-lyc (DD-3): the Floating UI reference resolves `reference || anchorNode`
+  // in BOTH position() (computePosition) and startTracking() (autoUpdate) on every
+  // target — the prop / signal / `this.` member spellings all match.
+  it.each(TARGETS)('resolves the Floating UI reference from `reference || anchorNode` (%s)', (target) => {
+    const { code } = compile(source, { target, filename: FILENAME });
+    const hits = code.match(/reference(?:\(\))?\s*\|\|\s*(?:this\.)?anchorNode/g) ?? [];
+    expect(hits.length).toBeGreaterThanOrEqual(2);
   });
 
   // IN-03 contract lock: the floating panel is a `dialog` (and thus emits

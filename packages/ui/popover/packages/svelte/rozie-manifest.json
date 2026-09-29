@@ -91,6 +91,12 @@
       "isModel": false,
       "required": false,
       "type": "Boolean"
+    },
+    {
+      "name": "reference",
+      "isModel": false,
+      "required": false,
+      "type": "Element | Object"
     }
   ],
   "slots": [

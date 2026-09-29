@@ -24,6 +24,12 @@ import { requiredPeerNote } from '../../required-peer-note.mjs';
 export function renderPropType(typeAnnotation) {
   if (!typeAnnotation) return 'any';
   if (typeAnnotation.kind === 'identifier') return typeAnnotation.name;
+  // A `type: [Element, Object]` array decl lowers to a union — render each member
+  // and join with ` | ` (e.g. `Element | Object`, matching the docs table's
+  // `Element \| Object` union cell). Ported from sortable-list (260929-lyc).
+  if (typeAnnotation.kind === 'union' && Array.isArray(typeAnnotation.members)) {
+    return typeAnnotation.members.map(renderPropType).join(' | ');
+  }
   if (typeAnnotation.kind === 'literal') {
     return typeAnnotation.value === null ? 'any' : String(typeAnnotation.value);
   }
@@ -359,7 +365,10 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('| Name | Type | Default | Two-way (model) | Required | Description |');
   lines.push('| --- | --- | --- | :---: | :---: | --- |');
   for (const p of ir.props) {
-    const type = renderPropType(p.typeAnnotation);
+    // Escape pipes for the GFM table cell — a union type (`Element | Object`)
+    // carries literal `|` that must be `\|` so it is not parsed as a column
+    // delimiter (matches the docs/components/popover.md convention).
+    const type = renderPropType(p.typeAnnotation).replace(/\|/g, '\\|');
     const def = renderPropDefault(p.defaultValue);
     const model = p.isModel ? '✓' : '';
     const required = p.required ? '✓' : '';
@@ -467,7 +476,13 @@ export function validateDocsPropsTable(ir, docsMarkdown) {
     const irType = renderPropType(p.typeAnnotation);
     const docType = stripCode(doc.type);
     const docTypeTokens = docType.split('|').map((t) => t.trim());
-    if (!docTypeTokens.includes(irType)) {
+    // The IR type may itself be a union (`Element | Object`) — every source
+    // member must be present in the docs cell (subset check). The docs may also
+    // WIDEN a single-token IR type; a single irType is accepted when it appears as
+    // one of the docs union members.
+    const irTypeTokens = irType.split('|').map((t) => t.trim());
+    const everyMemberDocumented = irTypeTokens.every((t) => docTypeTokens.includes(t));
+    if (!everyMemberDocumented) {
       errors.push(`prop "${p.name}": type drift — source \`${irType}\`, docs \`${docType}\``);
     }
     const irDef = renderPropDefault(p.defaultValue);

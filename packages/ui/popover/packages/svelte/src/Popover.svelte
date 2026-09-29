@@ -65,6 +65,10 @@ interface Props {
    * Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Off by default; existing `trigger="manual"` consumers relying on real click-outside dismissal are unaffected unless they opt in.
    */
   disableDismiss?: boolean;
+  /**
+   * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded` / `aria-controls`), typically with `trigger='manual'` and a two-way-bound `open`. Pass a stable value — a new object on every render restarts tracking.
+   */
+  reference?: (Element | any) | null;
   anchor?: Snippet<[{ open: any; toggle: any; show: any; hide: any }]>;
   children?: Snippet;
   snippets?: Record<string, any>;
@@ -88,6 +92,7 @@ let {
   keepMounted = false,
   matchWidth = false,
   disableDismiss = false,
+  reference = null,
   anchor: __anchorProp,
   children: __childrenProp,
   snippets,
@@ -195,7 +200,13 @@ const applyPosition = (x: any, y: any, middlewareData: any) => {
 // (the cropper `let cfg = null` constructor-args idiom).
 const position = () => {
   if (disablePositioning) return;
-  if (!anchorNode || !floatingNode) return;
+  // The Floating UI reference: the `reference` prop (external Element or virtual
+  // element) when set, else the built-in anchor wrapper (260929-lyc DD-3). A
+  // function-local null-let so typeNeutralize makes it `any` in every leaf — the
+  // union prop type never trips strict leaf tsc against `ReferenceElement`.
+  let referenceEl: any = null;
+  referenceEl = reference || anchorNode;
+  if (!referenceEl || !floatingNode) return;
   const middleware = buildMiddleware({
     offset: offsetMiddleware,
     flip,
@@ -231,7 +242,7 @@ const position = () => {
     strategy: strategy,
     middleware
   };
-  computePosition(anchorNode, floatingNode, opts).then((result: any) => {
+  computePosition(referenceEl, floatingNode, opts).then((result: any) => {
     applyPosition(result.x, result.y, result.middlewareData);
   });
 };
@@ -240,12 +251,17 @@ const position = () => {
 // resize/ancestor-layout changes and returns its own teardown.
 const startTracking = () => {
   if (disablePositioning) return;
-  if (!anchorNode || !floatingNode) return;
+  // Same reference resolution as position() (DD-3). autoUpdate accepts a virtual
+  // element: it unwraps it to its optional `contextElement` for ancestor/resize
+  // observation (skipped when absent) and still runs the initial update.
+  let referenceEl: any = null;
+  referenceEl = reference || anchorNode;
+  if (!referenceEl || !floatingNode) return;
   if (stopAutoUpdate) {
     stopAutoUpdate();
     stopAutoUpdate = null;
   }
-  stopAutoUpdate = autoUpdate(anchorNode, floatingNode, position);
+  stopAutoUpdate = autoUpdate(referenceEl, floatingNode, position);
 };
 const stopTracking = () => {
   if (stopAutoUpdate) {
@@ -375,6 +391,15 @@ $effect(() => { (() => disableShift)(); untrack(() => { if (__rozieWatchInitial_
 let __rozieWatchInitial_5 = true;
 $effect(() => { (() => strategy)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } (() => {
   if (open) position();
+})(); }); });
+let __rozieWatchInitial_6 = true;
+$effect(() => { (() => reference)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } (() => {
+  if (disabled) return;
+  if (stopAutoUpdate) {
+    startTracking();
+  } else if (keepMounted && floatingNode) {
+    position();
+  }
 })(); }); });
 
 $effect(() => {

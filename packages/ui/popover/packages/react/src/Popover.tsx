@@ -96,6 +96,10 @@ interface PopoverProps {
    * Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Off by default; existing `trigger="manual"` consumers relying on real click-outside dismissal are unaffected unless they opt in.
    */
   disableDismiss?: boolean;
+  /**
+   * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded` / `aria-controls`), typically with `trigger='manual'` and a two-way-bound `open`. Pass a stable value — a new object on every render restarts tracking.
+   */
+  reference?: (Element | Record<string, any>) | null;
   onChange?: (...args: any[]) => void;
   renderAnchor?: (ctx: AnchorCtx) => ReactNode;
   children?: ReactNode;
@@ -110,7 +114,7 @@ export interface PopoverHandle {
 }
 
 const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props: PopoverProps, ref): JSX.Element {
-  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean; keepMounted: boolean; matchWidth: boolean; disableDismiss: boolean } = {
+  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'reference'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean; keepMounted: boolean; matchWidth: boolean; disableDismiss: boolean; reference: (Element | Record<string, any>) | null } = {
     ..._props,
     placement: _props.placement ?? 'bottom',
     trigger: _props.trigger ?? 'click',
@@ -126,10 +130,11 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     keepMounted: _props.keepMounted ?? false,
     matchWidth: _props.matchWidth ?? false,
     disableDismiss: _props.disableDismiss ?? false,
+    reference: _props.reference ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, matchWidth, disableDismiss, defaultValue, onOpenChange, defaultOpen, onChange, ...rest } = _props as PopoverProps & Record<string, unknown>;
-    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void matchWidth; void disableDismiss; void defaultValue; void onOpenChange; void defaultOpen; void onChange;
+    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, matchWidth, disableDismiss, reference, defaultValue, onOpenChange, defaultOpen, onChange, ...rest } = _props as PopoverProps & Record<string, unknown>;
+    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void matchWidth; void disableDismiss; void reference; void defaultValue; void onOpenChange; void defaultOpen; void onChange;
     return rest;
   })();
   const anchorNode = useRef<any>(null);
@@ -157,6 +162,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   const _watch3First = useRef(true);
   const _watch4First = useRef(true);
   const _watch5First = useRef(true);
+  const _watch6First = useRef(true);
 
   // null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
   //   anchorNode/floatingNode/arrowNode hold the resolved ref ELEMENTS (read ONLY in
@@ -240,7 +246,13 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   // (the cropper `let cfg = null` constructor-args idiom).
   const position = useCallback(() => {
     if (props.disablePositioning) return;
-    if (!anchorNode.current || !floatingNode.current) return;
+    // The Floating UI reference: the `reference` prop (external Element or virtual
+    // element) when set, else the built-in anchor wrapper (260929-lyc DD-3). A
+    // function-local null-let so typeNeutralize makes it `any` in every leaf — the
+    // union prop type never trips strict leaf tsc against `ReferenceElement`.
+    let referenceEl: any = null;
+    referenceEl = props.reference || anchorNode.current;
+    if (!referenceEl || !floatingNode.current) return;
     const middleware = buildMiddleware({
       offset: offsetMiddleware,
       flip,
@@ -276,22 +288,27 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       strategy: props.strategy,
       middleware
     };
-    computePosition(anchorNode.current, floatingNode.current, opts).then((result: any) => {
+    computePosition(referenceEl, floatingNode.current, opts).then((result: any) => {
       applyPosition(result.x, result.y, result.middlewareData);
     });
-  }, [applyPosition, props.arrow, props.disableFlip, props.disablePositioning, props.disableShift, props.matchWidth, props.offset, props.placement, props.strategy]);
+  }, [applyPosition, props.arrow, props.disableFlip, props.disablePositioning, props.disableShift, props.matchWidth, props.offset, props.placement, props.reference, props.strategy]);
   // Start autoUpdate (idempotent — stop any prior subscription first) and do an
   // initial position. Floating UI's autoUpdate keeps the position fresh on scroll/
   // resize/ancestor-layout changes and returns its own teardown.
   const startTracking = useCallback(() => {
     if (props.disablePositioning) return;
-    if (!anchorNode.current || !floatingNode.current) return;
+    // Same reference resolution as position() (DD-3). autoUpdate accepts a virtual
+    // element: it unwraps it to its optional `contextElement` for ancestor/resize
+    // observation (skipped when absent) and still runs the initial update.
+    let referenceEl: any = null;
+    referenceEl = props.reference || anchorNode.current;
+    if (!referenceEl || !floatingNode.current) return;
     if (stopAutoUpdate.current) {
       stopAutoUpdate.current();
       stopAutoUpdate.current = null;
     }
-    stopAutoUpdate.current = autoUpdate(anchorNode.current, floatingNode.current, position);
-  }, [position, props.disablePositioning]);
+    stopAutoUpdate.current = autoUpdate(referenceEl, floatingNode.current, position);
+  }, [position, props.disablePositioning, props.reference]);
   const stopTracking = useCallback(() => {
     if (stopAutoUpdate.current) {
       stopAutoUpdate.current();
@@ -432,6 +449,15 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     if (_watch5First.current) { _watch5First.current = false; return; }
     if (open) position();
   }, [props.strategy]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch6First.current) { _watch6First.current = false; return; }
+    if (props.disabled) return;
+    if (stopAutoUpdate.current) {
+      startTracking();
+    } else if (props.keepMounted && floatingNode.current) {
+      position();
+    }
+  }, [props.reference]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!(open && !props.disableDismiss)) return;

@@ -1237,6 +1237,8 @@ export const EXAMPLES = [
   // (vite.config.ts + tsconfig.app.json + build-cells.mjs).
   'SwitchBehavior',
   'PopoverBehavior',
+  // 260929-lyc — Popover `reference` prop cell (external Element + virtual element).
+  'PopoverReference',
   // @rozie-ui/switch + popover SCREENSHOT cells (loaders →
   // examples/demos/{Switch,Popover}ScreenshotDemo.rozie). SwitchScreenshot renders
   // INLINE (3 fixed states: on/off/disabled) → standard mount-clipped matrix cell
@@ -1834,6 +1836,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // (the wrapper components are name="<Name>Demo").
   SwitchBehavior: 'rozie-switch-behavior',
   PopoverBehavior: 'rozie-popover-behavior',
+  // 260929-lyc — Popover `reference` prop cell.
+  PopoverReference: 'rozie-popover-reference',
   SwitchScreenshot: 'rozie-switch-screenshot',
   PopoverScreenshot: 'rozie-popover-screenshot',
   // @rozie-ui/date-picker + resizable + command-palette — '-demo' appended on Lit →
@@ -2360,6 +2364,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // the FlowCanvas/MapLibre self-binding precedent).
   SwitchBehavior: {},
   PopoverBehavior: {},
+  // 260929-lyc — self-contained (seeds its own open + reference state).
+  PopoverReference: {},
   SwitchScreenshot: {},
   PopoverScreenshot: {},
   // @rozie-ui/date-picker + resizable + command-palette — all six demos are
