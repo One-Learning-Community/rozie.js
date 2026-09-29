@@ -1062,7 +1062,7 @@ $effect(() => {
   const handler = ($event: MouseEvent) => {
     const target = $event.target as Node;
     if (controlEl?.contains(target) || listEl?.contains(target)) return;
-    close();
+    ((close) as (...args: any[]) => any)($event);
   };
   let attached = false;
   let cancelled = false;

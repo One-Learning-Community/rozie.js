@@ -27,7 +27,7 @@ function doubled() {
 
 watchEffect((onCleanup) => {
   const handler = ($event: KeyboardEvent) => {
-    (() => { value.value += 1; })($event);
+    ((() => { value.value += 1; }) as (...args: any[]) => any)($event);
   };
   document.addEventListener('keydown', handler);
   onCleanup(() => document.removeEventListener('keydown', handler));

@@ -124,7 +124,7 @@ export class Modal {
         if (!(this.open() && this.closeOnEscape())) return;
         const handler = ($event: KeyboardEvent) => {
           if ($event.key !== 'Escape') return;
-          this._close();
+          ((this._close) as (...args: any[]) => any)($event);
         };
         const unlisten = renderer.listen('document', 'keydown', handler);
         onCleanup(unlisten);

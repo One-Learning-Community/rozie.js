@@ -26,7 +26,7 @@ function doubled() {
 
 $effect(() => {
   const handler = ($event: KeyboardEvent) => {
-    (() => { value += 1; })($event);
+    ((() => { value += 1; }) as (...args: any[]) => any)($event);
   };
   document.addEventListener('keydown', handler);
   return () => document.removeEventListener('keydown', handler);

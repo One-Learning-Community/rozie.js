@@ -25,7 +25,6 @@
  * @experimental — shape may change before v1.0
  */
 
-import * as bt from '@babel/types';
 import type {
   Diagnostic,
   IRComponent,
@@ -35,7 +34,7 @@ import type {
   ModifierArg,
   ModifierRegistry,
 } from '@rozie/core';
-import { isEventModifier, RozieErrorCode } from '@rozie/core';
+import { classifyListenerHandler, isEventModifier, RozieErrorCode } from '@rozie/core';
 import type {
   LitDecoratorImportCollector,
   LitImportCollector,
@@ -225,20 +224,6 @@ export function eventTypeFor(event: string): string {
   return 'Event';
 }
 
-/**
- * WR-03 fix: mirror emitTemplate.ts's AST-based isHandlerLike check.
- * Arrow functions and function expressions passed by reference are function-like
- * and can be called as `(handler)($event)`. Inline expressions (count++, etc.)
- * must be emitted as statement form `handler;` without the call wrapper.
- */
-function isHandlerLike(expr: bt.Expression): boolean {
-  if (bt.isArrowFunctionExpression(expr)) return true;
-  if (bt.isFunctionExpression(expr)) return true;
-  if (bt.isIdentifier(expr)) return true;
-  if (bt.isMemberExpression(expr)) return true; // `this.fn`
-  return false;
-}
-
 function emitOneListener(
   listener: Listener,
   ir: IRComponent,
@@ -260,7 +245,9 @@ function emitOneListener(
   // WR-03 fix: use AST-based detection to distinguish function-like handlers
   // from inline expressions. Inline expressions (e.g. `count++`) must be
   // emitted as statements (`count++;`) not calls (`(count++)($event)` — TypeError).
-  const isFnLike = isHandlerLike(listener.handler);
+  // quick 260929-mn8 (DD-8): this Lit contract is now the shared
+  // `classifyListenerHandler` in @rozie/core, applied by all 6 emitters.
+  const isFnLike = classifyListenerHandler(listener.handler) === 'callable';
   const userCall = isFnLike
     ? `((${handlerExpr}) as (...args: any[]) => any)($event);`
     : `${handlerExpr};`;
@@ -309,10 +296,16 @@ function emitOneListener(
     case 'C': {
       // .debounce / .throttle → inline IIFE
       const ms = extractNumberArg(cls.wrapperArgs) || 100;
+      // quick 260929-mn8 (DD-8): `userCall` — a callable is cast-called with
+      // `$event` (unchanged); a STATEMENT runs inline, since `$event` is
+      // already bound by the returned closure (previously it was call-wrapped:
+      // `((stmt) as …)($event)` → TypeError). `$event` carries the per-event
+      // type (as on the other 5 targets) so a typed statement handler
+      // (`onWheel($event)` with `WheelEvent`) typechecks.
       const wrapped =
         cls.wrapper === 'debounce'
-          ? `(() => { let t: ReturnType<typeof setTimeout> | undefined; return ($event: Event) => { ${guardLines.join(' ')} if (t) clearTimeout(t); t = setTimeout(() => { ((${handlerExpr}) as (...args: any[]) => any)($event); }, ${ms}); }; })()`
-          : `(() => { let last = 0; return ($event: Event) => { ${guardLines.join(' ')} const now = Date.now(); if (now - last < ${ms}) return; last = now; ((${handlerExpr}) as (...args: any[]) => any)($event); }; })()`;
+          ? `(() => { let t: ReturnType<typeof setTimeout> | undefined; return ($event: ${evtType}) => { ${guardLines.join(' ')} if (t) clearTimeout(t); t = setTimeout(() => { ${userCall} }, ${ms}); }; })()`
+          : `(() => { let last = 0; return ($event: ${evtType}) => { ${guardLines.join(' ')} const now = Date.now(); if (now - last < ${ms}) return; last = now; ${userCall} }; })()`;
       const target = targetExpression(listener.target);
       const lines = [
         `const ${handlerVar} = ${wrapped};`,

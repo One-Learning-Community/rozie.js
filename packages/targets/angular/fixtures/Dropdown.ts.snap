@@ -87,7 +87,7 @@ export class Dropdown {
         const handler = ($event: MouseEvent) => {
           const target = $event.target as Node;
           if (this.triggerEl()?.nativeElement?.contains(target) || this.panelEl()?.nativeElement?.contains(target)) return;
-          this.close();
+          ((this.close) as (...args: any[]) => any)($event);
         };
         const unlisten = renderer.listen('document', 'click', handler);
         onCleanup(unlisten);
@@ -97,7 +97,7 @@ export class Dropdown {
         if (!(this.open() && this.closeOnEscape())) return;
         const handler = ($event: KeyboardEvent) => {
           if ($event.key !== 'Escape') return;
-          this.close();
+          ((this.close) as (...args: any[]) => any)($event);
         };
         const unlisten = renderer.listen('document', 'keydown', handler);
         onCleanup(unlisten);

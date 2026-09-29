@@ -41,6 +41,15 @@ export type {
 // Angular/Lit). Returns '' for a docless prop (SC-5 byte-identity gate).
 // @experimental — shape may change before v1.0
 export { buildPropJsdoc, hasPropJsdoc } from './codegen/buildPropJsdoc.js';
+// quick 260929-mn8 (DD-8) — the shared `<listeners>` handler-shape classifier.
+// Every target emitter imports it from this barrel so a method name / function
+// expression is invoked WITH the DOM event and any other expression runs as a
+// statement with `$event` in scope — identically on all 6 targets.
+// @experimental — shape may change before v1.0
+export {
+  classifyListenerHandler,
+  type ListenerHandlerShape,
+} from './codegen/classifyListenerHandler.js';
 // Phase 59 (SC-1/SC-4) — the shared per-prop Markdown-table-cell renderer +
 // the family-agnostic props-table generator. The single anti-drift source
 // consumed by every family README props table (readme.mjs) AND the docs-site

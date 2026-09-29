@@ -216,7 +216,7 @@ export class Popover {
         if (!(this.open() && !this.disableDismiss())) return;
         const handler = ($event: KeyboardEvent) => {
           if ($event.key !== 'Escape') return;
-          this.dismiss();
+          ((this.dismiss) as (...args: any[]) => any)($event);
         };
         const unlisten = renderer.listen('document', 'keydown', handler);
         onCleanup(unlisten);
@@ -227,7 +227,7 @@ export class Popover {
         const handler = ($event: MouseEvent) => {
           const target = $event.target as Node;
           if (this.anchorEl()?.nativeElement?.contains(target) || this.floatingEl()?.nativeElement?.contains(target)) return;
-          this.dismiss();
+          ((this.dismiss) as (...args: any[]) => any)($event);
         };
         const unlisten = renderer.listen('document', 'click', handler);
         onCleanup(unlisten);

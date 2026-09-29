@@ -46,7 +46,7 @@ import type {
   ModifierRegistry,
   VueEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier, RozieErrorCode } from '@rozie/core';
+import { classifyListenerHandler, isEventModifier, RozieErrorCode } from '@rozie/core';
 import { RuntimeVueImportCollector, VueImportCollector } from '../rewrite/collectVueImports.js';
 import { rewriteScriptExpression } from '../rewrite/rewriteListenerExpression.js';
 import { emitOutsideClickCall } from './emitListenerCollapsedOutsideClick.js';
@@ -336,22 +336,24 @@ function renderListener(
   const optsObj = renderListenerOptions(listenerOptsForCalls);
   const removeOptsObj = renderRemoveListenerOptions(listenerOptsForCalls);
 
-  // Whether the user-handler is a bare Identifier — if so, calling it as
-  // `handler()` (no event arg) matches the user's source (Dropdown's
-  // `close` is `() => { $props.open = false }`). For non-Identifier shapes
-  // we pass `(e)` defensively. The Identifier check uses a regex on the
-  // already-rewritten code (post .value suffix application).
-  const handlerIsBareIdentifier = /^[A-Za-z_$][\w$]*$/.test(userHandlerCode);
+  // quick 260929-mn8 (DD-8) — classify the IR handler AST (shared core
+  // contract): a callable (method name / member ref / function expression) is
+  // invoked WITH the DOM event; anything else is a statement that runs with
+  // `$event` in scope (never called as a function, never evaluated eagerly).
+  const handlerShape = classifyListenerHandler(listener.handler);
 
   // Class C: wrap with helper at script-level + reference wrap name in
   // addEventListener. The wrap arg is the original handler invocation
   // (`reposition` — the Identifier itself), the wrap name replaces the
-  // handler in addEventListener.
+  // handler in addEventListener. A STATEMENT handler is first normalized to
+  // `($event: EvtType) => { stmt; }` so it is not evaluated eagerly at setup.
   if (classification.kind === 'C') {
     runtimeImports.use(classification.helperName);
     const wrapName = makeWrapName(classification.helperName, userHandlerCode, wrapCounter);
     const wrapArgsList = classification.helperArgs.map(renderModifierArg).join(', ');
-    const wrapDecl = `const ${wrapName} = ${classification.helperName}(${userHandlerCode}${wrapArgsList ? ', ' + wrapArgsList : ''});`;
+    const wrapTarget =
+      handlerShape === 'callable' ? userHandlerCode : `($event: ${evtType}) => { ${userHandlerCode}; }`;
+    const wrapDecl = `const ${wrapName} = ${classification.helperName}(${wrapTarget}${wrapArgsList ? ', ' + wrapArgsList : ''});`;
 
     // Build add/remove call WITHOUT trailing `;` so we can wrap inside
     // onCleanup(() => removeCall) without a stray `;` inside the arrow.
@@ -369,13 +371,14 @@ function renderListener(
   }
 
   // Class A: pure-native + optional listenerOptions. Emit a watchEffect with
-  // an inner `handler = (e) => { guards; userHandler(e); }` then add/remove.
-  // For Identifier handlers, call as `handlerName();` (no `e` arg) to match
-  // the user's zero-arg shape (RESEARCH Code Example 2 line 960). For
-  // non-Identifier handlers, call `(e)` defensively.
-  const handlerInvoke = handlerIsBareIdentifier
-    ? `${userHandlerCode}();`
-    : `(${userHandlerCode})($event);`;
+  // an inner `handler = ($event) => { guards; … }` then add/remove.
+  // quick 260929-mn8 (DD-8): a callable is invoked WITH the event through the
+  // permissive cast (a zero-arg method still typechecks); a statement runs
+  // as-is with `$event` in scope.
+  const handlerInvoke =
+    handlerShape === 'callable'
+      ? `((${userHandlerCode}) as (...args: any[]) => any)($event);`
+      : `${userHandlerCode};`;
   const handlerDecl = `  const handler = ($event: ${evtType}) => {\n${guardLines}    ${handlerInvoke}\n  };`;
   const addCallNoSemi = `${targetExpr}.addEventListener('${listener.event}', handler${optsObj})`;
   const removeCallNoSemi = `${targetExpr}.removeEventListener('${listener.event}', handler${removeOptsObj})`;

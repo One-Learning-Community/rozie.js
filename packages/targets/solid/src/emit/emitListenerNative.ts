@@ -34,7 +34,7 @@ import type {
   ModifierRegistry,
   SolidEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier, RozieErrorCode } from '@rozie/core';
+import { classifyListenerHandler, isEventModifier, RozieErrorCode } from '@rozie/core';
 import type {
   RuntimeSolidImportCollector,
   SolidImportCollector,
@@ -46,7 +46,7 @@ export interface EmitListenerNativeResult {
   diagnostics: Diagnostic[];
 }
 
-function eventTypeFor(event: string): string {
+export function eventTypeFor(event: string): string {
   if (
     event === 'click' ||
     event === 'mousedown' ||
@@ -201,13 +201,16 @@ export function emitListenerNative(
     }
   } else {
     const userHandlerCode = rewriteTemplateExpression(listener.handler, ir);
-    const handlerIsBareIdentifier = /^[A-Za-z_$][\w$]*$/.test(userHandlerCode);
-    // Bare identifier handlers (e.g. `close`) are called without the event
-    // argument so that TypeScript does not complain when the handler type is
-    // `() => void` (TS2554: Expected 0 arguments but got 1). Inline expressions
-    // (e.g. arrow functions already declared with an `e` param) receive `e`
-    // to preserve the intended semantics.
-    const invocation = handlerIsBareIdentifier ? `${userHandlerCode}();` : `(${userHandlerCode});`;
+    // quick 260929-mn8 (DD-8) — shared core contract, classified on the IR
+    // AST: a callable (method name / member ref / function expression) is
+    // invoked WITH the event through a permissive cast (a zero-arg `() => void`
+    // method still typechecks — no TS2554); previously a bare identifier
+    // dropped the event and a function expression was a no-op statement.
+    // Anything else runs as a statement with `$event` in scope.
+    const invocation =
+      classifyListenerHandler(listener.handler) === 'callable'
+        ? `((${userHandlerCode}) as ((...args: any[]) => any))($event);`
+        : `${userHandlerCode};`;
     handlerDecl = `  const ${handlerName} = ($event: ${evtType}) => {\n${guardBody}    ${invocation}\n  };\n`;
     handlerRef = handlerName;
   }

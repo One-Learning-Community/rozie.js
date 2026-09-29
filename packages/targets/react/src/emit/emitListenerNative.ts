@@ -34,7 +34,7 @@ import type {
   ModifierRegistry,
   ReactEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier, RozieErrorCode } from '@rozie/core';
+import { classifyListenerHandler, isEventModifier, RozieErrorCode } from '@rozie/core';
 import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
@@ -48,7 +48,7 @@ export interface EmitListenerNativeResult {
 }
 
 /** Map common DOM events to their TypeScript event constructor names. */
-function eventTypeFor(event: string): string {
+export function eventTypeFor(event: string): string {
   if (
     event === 'click' ||
     event === 'mousedown' ||
@@ -241,11 +241,17 @@ export function emitListenerNative(
     // (Modal's `close: useCallback(() => {...}, [])`) accept the synthetic
     // event arg without TS2554. The inner handler arrow always passes `($event)`
     // even for bare-identifier 0-arg handlers.
+    //
+    // quick 260929-mn8 (DD-8) — shared core contract, classified on the IR
+    // AST: EVERY callable (method name / member ref / function expression) is
+    // invoked with the event through that cast (previously a function
+    // expression was emitted as a no-op `(e => fn(e));` statement); anything
+    // else runs as a statement with `$event` in scope.
     const userHandlerCode = rewriteTemplateExpression(listener.handler, ir);
-    const handlerIsBareIdentifier = /^[A-Za-z_$][\w$]*$/.test(userHandlerCode);
-    const invocation = handlerIsBareIdentifier
-      ? `((${userHandlerCode}) as ((...args: any[]) => any))($event);`
-      : `(${userHandlerCode});`;
+    const invocation =
+      classifyListenerHandler(listener.handler) === 'callable'
+        ? `((${userHandlerCode}) as ((...args: any[]) => any))($event);`
+        : `${userHandlerCode};`;
     handlerDecl = `  const ${handlerName} = ($event: ${evtType}) => {\n${guardBody}    ${invocation}\n  };\n`;
     handlerRef = handlerName;
   }

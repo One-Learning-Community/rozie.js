@@ -25,13 +25,13 @@
  * @experimental — shape may change before v1.0
  */
 import type { Diagnostic, IRComponent, Listener, ModifierArg, ModifierRegistry } from '@rozie/core';
-import { RozieErrorCode } from '@rozie/core';
+import { classifyListenerHandler, RozieErrorCode } from '@rozie/core';
 import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { emitListenerNative } from './emitListenerNative.js';
+import { emitListenerNative, eventTypeFor } from './emitListenerNative.js';
 import { renderDepArray } from './renderDepArray.js';
 
 export interface EmitListenerWrapResult {
@@ -100,7 +100,16 @@ export function emitListenerWrap(
   // because the wrapper closure captures the same reactive values the user
   // handler reads.
   const depsLiteral = renderDepArray(listener.deps, ir);
-  const scriptInjection = `const ${wrapName} = ${helperName}(${userHandlerCode}, ${depsLiteral}${wrapArgsList ? ', ' + wrapArgsList : ''});`;
+  //
+  // quick 260929-mn8 (DD-8) — shared core contract, classified on the IR AST:
+  // a STATEMENT handler (`onTick($event)`) is normalized to a typed `$event`
+  // arrow before wrapping; passing it raw evaluated it eagerly at render
+  // (ReferenceError on `$event`). Callables are wrapped unchanged.
+  const wrapTarget =
+    classifyListenerHandler(listener.handler) === 'callable'
+      ? userHandlerCode
+      : `($event: ${eventTypeFor(listener.event)}) => { ${userHandlerCode}; }`;
+  const scriptInjection = `const ${wrapName} = ${helperName}(${wrapTarget}, ${depsLiteral}${wrapArgsList ? ', ' + wrapArgsList : ''});`;
 
   // Now build the useEffect via emitListenerNative with the wrapper name.
   // The native emitter handles inlineGuards + listenerOptions + when guard.

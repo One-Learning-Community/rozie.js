@@ -82,7 +82,10 @@ describe('emitListeners — Dropdown end-to-end', () => {
     const { code } = emitListeners(dropdown.listeners, dropdown, registry);
     expect(code).toContain('useOutsideClick(');
     expect(code).toContain('[triggerElRef, panelElRef]');
-    expect(code).toContain('() => close()');
+    // quick 260929-mn8 (DD-8): a method-name handler is invoked WITH the
+    // MouseEvent (previously `() => close()` dropped it).
+    expect(code).toContain('($event) => ((close) as (...args: any[]) => any)($event)');
+    expect(code).not.toContain('() => close()');
     expect(code).toMatch(/\(\) => open\.value && props\.closeOnOutsideClick/);
   });
 

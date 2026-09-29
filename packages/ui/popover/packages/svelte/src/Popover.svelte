@@ -381,7 +381,7 @@ $effect(() => {
   if (!(open && !disableDismiss)) return;
   const handler = ($event: KeyboardEvent) => {
     if ($event.key !== 'Escape') return;
-    dismiss();
+    ((dismiss) as (...args: any[]) => any)($event);
   };
   document.addEventListener('keydown', handler);
   return () => document.removeEventListener('keydown', handler);
@@ -392,7 +392,7 @@ $effect(() => {
   const handler = ($event: MouseEvent) => {
     const target = $event.target as Node;
     if (anchorEl?.contains(target) || floatingEl?.contains(target)) return;
-    dismiss();
+    ((dismiss) as (...args: any[]) => any)($event);
   };
   let attached = false;
   let cancelled = false;

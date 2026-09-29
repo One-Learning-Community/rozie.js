@@ -78,7 +78,7 @@ $effect(() => {
   const handler = ($event: MouseEvent) => {
     const target = $event.target as Node;
     if (triggerEl?.contains(target) || panelEl?.contains(target)) return;
-    close();
+    ((close) as (...args: any[]) => any)($event);
   };
   let attached = false;
   let cancelled = false;
@@ -98,7 +98,7 @@ $effect(() => {
   if (!(open && closeOnEscape)) return;
   const handler = ($event: KeyboardEvent) => {
     if ($event.key !== 'Escape') return;
-    close();
+    ((close) as (...args: any[]) => any)($event);
   };
   document.addEventListener('keydown', handler);
   return () => document.removeEventListener('keydown', handler);

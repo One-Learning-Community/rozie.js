@@ -24,6 +24,7 @@
  * @experimental — shape may change before v1.0
  */
 import type { IRComponent, Listener, ModifierArg } from '@rozie/core';
+import { classifyListenerHandler } from '@rozie/core';
 import { rewriteScriptExpression } from '../rewrite/rewriteListenerExpression.js';
 
 /**
@@ -75,21 +76,25 @@ export function emitOutsideClickCall(
     refsArrayCode = `[${idents.join(', ')}]`;
   }
 
-  // Wrap the handler. If the handler is an Identifier, render `() => name()`
-  // for a stable closure that matches RESEARCH Code Example 2 exactly. For
-  // arrow / fn / other Expression handlers, render the rewritten expression
-  // verbatim — Vue accepts any callable.
+  // Wrap the handler (quick 260929-mn8, DD-8 — shared core contract). A
+  // callable (method name / member ref / function expression) is invoked WITH
+  // the MouseEvent through a late-bound forwarding arrow + permissive cast; a
+  // statement runs as a statement with `$event` bound by the arrow param.
   const handlerCode = rewriteScriptExpression(listener.handler, ir);
+  const callbackCode =
+    classifyListenerHandler(listener.handler) === 'callable'
+      ? `($event) => ((${handlerCode}) as (...args: any[]) => any)($event)`
+      : `($event) => { ${handlerCode}; }`;
 
   // Build the whenSignal arg. listener.when is Expression | null.
   let whenArgCode: string;
   if (listener.when === null) {
     // Omit when arg entirely — useOutsideClick treats undefined as "always fire".
-    return `useOutsideClick(\n  ${refsArrayCode},\n  () => ${handlerCode}(),\n);`;
+    return `useOutsideClick(\n  ${refsArrayCode},\n  ${callbackCode},\n);`;
   } else {
     const whenCode = rewriteScriptExpression(listener.when, ir);
     whenArgCode = `() => ${whenCode}`;
   }
 
-  return `useOutsideClick(\n  ${refsArrayCode},\n  () => ${handlerCode}(),\n  ${whenArgCode},\n);`;
+  return `useOutsideClick(\n  ${refsArrayCode},\n  ${callbackCode},\n  ${whenArgCode},\n);`;
 }

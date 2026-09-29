@@ -53,6 +53,9 @@ describe('Angular <listeners>-body inline WRITES lower to signal .set()', () => 
     let out!: string;
     expect(() => { out = compile(src); }).not.toThrow();
     expect(out).toContain('this.open.set(false)');
+    // quick 260929-mn8 (DD-8): an inline statement runs AS a statement —
+    // never call-wrapped as `(stmt)($event)` (runtime TypeError).
+    expect(out).not.toContain(')($event)');
     // No raw signal-getter LHS, no leftover sigils.
     expect(out).not.toContain('this.open() =');
     expect(out).not.toContain('$model');
@@ -76,6 +79,9 @@ describe('Angular <listeners>-body inline WRITES lower to signal .set()', () => 
     let out!: string;
     expect(() => { out = compile(src); }).not.toThrow();
     expect(out).toContain('this.n.set(this.n() + 1)');
+    // quick 260929-mn8 (DD-8): an inline statement runs AS a statement —
+    // never call-wrapped as `(stmt)($event)` (runtime TypeError).
+    expect(out).not.toContain(')($event)');
     expect(out).not.toContain('this.n() =');
     expect(out).not.toContain('$data.n');
   });
@@ -97,6 +103,9 @@ describe('Angular <listeners>-body inline WRITES lower to signal .set()', () => 
     let out!: string;
     expect(() => { out = compile(src); }).not.toThrow();
     expect(out).toContain('this.n.set(this.n() + 1)');
+    // quick 260929-mn8 (DD-8): an inline statement runs AS a statement —
+    // never call-wrapped as `(stmt)($event)` (runtime TypeError).
+    expect(out).not.toContain(')($event)');
     expect(out).not.toContain('$data.n');
   });
 
@@ -117,6 +126,9 @@ describe('Angular <listeners>-body inline WRITES lower to signal .set()', () => 
     let out!: string;
     expect(() => { out = compile(src); }).not.toThrow();
     expect(out).toContain('this.count.set(this.count() - 1)');
+    // quick 260929-mn8 (DD-8): an inline statement runs AS a statement —
+    // never call-wrapped as `(stmt)($event)` (runtime TypeError).
+    expect(out).not.toContain(')($event)');
     expect(out).not.toContain('$model');
   });
 
@@ -137,6 +149,9 @@ describe('Angular <listeners>-body inline WRITES lower to signal .set()', () => 
     let out!: string;
     expect(() => { out = compile(src); }).not.toThrow();
     expect(out).toContain('this.count.set(this.count() + 2)');
+    // quick 260929-mn8 (DD-8): an inline statement runs AS a statement —
+    // never call-wrapped as `(stmt)($event)` (runtime TypeError).
+    expect(out).not.toContain(')($event)');
     expect(out).not.toContain('$model');
   });
 

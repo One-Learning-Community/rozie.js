@@ -48,7 +48,7 @@ import type {
   ModifierPipelineEntry,
   ModifierRegistry,
 } from '@rozie/core';
-import { isEventModifier, RozieErrorCode } from '@rozie/core';
+import { classifyListenerHandler, isEventModifier, RozieErrorCode } from '@rozie/core';
 import { rewriteListenerExpression } from '../rewrite/rewriteListenerExpression.js';
 
 export interface AngularListenerInjection {
@@ -290,6 +290,19 @@ function renderListener(
   // `()` before building the invocation so we get `this.X()` not `this.X()()`.
   const handlerRef = userHandlerCode.replace(/\(\)$/, '');
 
+  // quick 260929-mn8 (DD-8) — shared core contract, classified on the IR AST:
+  // a callable (method name / member ref / function expression) is invoked
+  // WITH the DOM event through a permissive cast (a zero-arg method still
+  // typechecks); anything else is a statement that runs with `$event` in
+  // scope — never called as a function, never evaluated eagerly. The
+  // bare-identifier path keeps the WR-04 `handlerRef` derivation above.
+  const handlerShape = classifyListenerHandler(listener.handler);
+  const callableCode = handlerIsBareIdentifier ? handlerRef : userHandlerCode;
+  const invocation =
+    handlerShape === 'callable'
+      ? `        ((${callableCode}) as (...args: any[]) => any)($event);`
+      : `        ${userHandlerCode};`;
+
   const whenGuard =
     listener.when === null
       ? ''
@@ -314,9 +327,6 @@ function renderListener(
         ? classification.nativeKeyGuards.map((g) => `        ${g}`).join('\n') + '\n'
         : '';
 
-    const invocation = handlerIsBareIdentifier
-      ? `        ${handlerRef}();`
-      : `        (${userHandlerCode})($event);`;
 
     return [
       `effect((onCleanup) => {`,
@@ -333,10 +343,17 @@ function renderListener(
     const wrapName = makeWrapName(classification.helperName, userHandlerCode, wrapCounter);
     const argList = classification.helperArgs.map(renderModifierArg);
     const ms = argList[0] ?? '0';
+    // quick 260929-mn8 (DD-8): a STATEMENT handler is normalized to a typed
+    // `$event` arrow before wrapping, so the IIFE forwards the event into it
+    // instead of calling the statement's RESULT. Callables are unchanged.
+    const wrapped =
+      handlerShape === 'callable'
+        ? userHandlerCode
+        : `(($event: ${evtType}) => { ${userHandlerCode}; })`;
     const decl =
       classification.helperName === 'debounce'
-        ? buildDebounceIIFE(wrapName, userHandlerCode, ms)
-        : buildThrottleIIFE(wrapName, userHandlerCode, ms);
+        ? buildDebounceIIFE(wrapName, wrapped, ms)
+        : buildThrottleIIFE(wrapName, wrapped, ms);
     fieldInitializers.push({ name: wrapName, decl });
 
     return [
@@ -352,9 +369,6 @@ function renderListener(
     classification.nativeKeyGuards.length > 0
       ? classification.nativeKeyGuards.map((g) => `        ${g}`).join('\n') + '\n'
       : '';
-  const invocation = handlerIsBareIdentifier
-    ? `        ${handlerRef}();`
-    : `        (${userHandlerCode})($event);`;
 
   return [
     `effect((onCleanup) => {`,

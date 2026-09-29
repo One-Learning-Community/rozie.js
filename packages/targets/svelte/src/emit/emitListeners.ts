@@ -42,7 +42,7 @@ import type {
   ModifierRegistry,
   SvelteEmissionDescriptor,
 } from '@rozie/core';
-import { isEventModifier, RozieErrorCode } from '@rozie/core';
+import { classifyListenerHandler, isEventModifier, RozieErrorCode } from '@rozie/core';
 import { rewriteListenerExpression } from '../rewrite/rewriteListenerExpression.js';
 import type { SvelteScriptInjection } from './emitScript.js';
 
@@ -299,7 +299,16 @@ function renderListener(
   const evtType = eventTypeFor(listener.event);
   const targetExpr = renderTargetExpr(listener.target, diagnostics, listener.sourceLoc);
   const userHandlerCode = rewriteListenerExpression(listener.handler, ir);
-  const handlerIsBareIdentifier = /^[A-Za-z_$][\w$]*$/.test(userHandlerCode);
+  // quick 260929-mn8 (DD-8) — shared core contract, classified on the IR AST:
+  // a callable (method name / member ref / function expression) is invoked
+  // WITH the DOM event through a permissive cast (a zero-arg method still
+  // typechecks); anything else is a statement that runs with `$event` in
+  // scope — never called as a function, never evaluated eagerly.
+  const handlerShape = classifyListenerHandler(listener.handler);
+  const invocation =
+    handlerShape === 'callable'
+      ? `    ((${userHandlerCode}) as (...args: any[]) => any)($event);`
+      : `    ${userHandlerCode};`;
 
   const whenGuard =
     listener.when === null
@@ -325,9 +334,6 @@ function renderListener(
         ? classification.nativeKeyGuards.map((g) => `    ${g}`).join('\n') + '\n'
         : '';
 
-    const invocation = handlerIsBareIdentifier
-      ? `    ${userHandlerCode}();`
-      : `    (${userHandlerCode})($event);`;
     const optsObj = renderOptionsSuffix(classification.listenerOpts);
     const removeOptsObj = renderOptionsSuffix(classification.listenerOpts, true);
 
@@ -380,10 +386,17 @@ function renderListener(
     const wrapName = makeWrapName(classification.helperName, userHandlerCode, wrapCounter);
     const argList = classification.helperArgs.map(renderModifierArg);
     const ms = argList[0] ?? '0';
+    // quick 260929-mn8 (DD-8): a STATEMENT handler is normalized to a typed
+    // `$event` arrow before wrapping, so the IIFE forwards the event into it
+    // instead of calling the statement's RESULT. Callables are unchanged.
+    const wrapped =
+      handlerShape === 'callable'
+        ? userHandlerCode
+        : `(($event: ${evtType}) => { ${userHandlerCode}; })`;
     const decl =
       classification.helperName === 'debounce'
-        ? buildDebounceIIFE(wrapName, userHandlerCode, ms)
-        : buildThrottleIIFE(wrapName, userHandlerCode, ms);
+        ? buildDebounceIIFE(wrapName, wrapped, ms)
+        : buildThrottleIIFE(wrapName, wrapped, ms);
     scriptInjections.push({
       name: wrapName,
       decl,
@@ -408,9 +421,6 @@ function renderListener(
     classification.nativeKeyGuards.length > 0
       ? classification.nativeKeyGuards.map((g) => `    ${g}`).join('\n') + '\n'
       : '';
-  const invocation = handlerIsBareIdentifier
-    ? `    ${userHandlerCode}();`
-    : `    (${userHandlerCode})($event);`;
   const optsObj = renderOptionsSuffix(classification.listenerOpts);
   const removeOptsObj = renderOptionsSuffix(classification.listenerOpts, true);
 

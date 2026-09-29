@@ -62,6 +62,9 @@ export default defineConfig({
       // is an ALLOWLIST: an unlisted `.test.ts` is silently uncollected while
       // the suite still reports green.
       'roz207-coherence.test.ts',
+      // quick 260929-mn8 (DD-8) — <listeners> handler-shape parity matrix
+      // (callable vs statement × plain/.outside/.debounce × 6 targets).
+      'listener-handler-shapes.test.ts',
       '**/*.test.tsx',
     ],
     testTimeout: 30000,

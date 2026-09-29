@@ -76,7 +76,7 @@ watchEffect((onCleanup) => {
   if (!(open.value && props.closeOnEscape)) return;
   const handler = ($event: KeyboardEvent) => {
     if ($event.key !== 'Escape') return;
-    close();
+    ((close) as (...args: any[]) => any)($event);
   };
   document.addEventListener('keydown', handler);
   onCleanup(() => document.removeEventListener('keydown', handler));

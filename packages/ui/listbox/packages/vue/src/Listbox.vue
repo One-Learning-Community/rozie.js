@@ -1077,7 +1077,7 @@ defineExpose({ open, close, toggle, clear, focusControl });
 
 useOutsideClick(
   [controlElRef, listElRef],
-  () => close(),
+  ($event) => ((close) as (...args: any[]) => any)($event),
   () => open$local.value,
 );
 </script>

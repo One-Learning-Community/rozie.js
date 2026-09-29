@@ -95,7 +95,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
     if (!(open() && local.closeOnEscape)) return;
     const _rozieHandler = ($event: KeyboardEvent) => {
       if ($event.key !== 'Escape') return;
-      close();
+      ((close) as ((...args: any[]) => any))($event);
     };
     document.addEventListener('keydown', _rozieHandler);
     onCleanup(() => document.removeEventListener('keydown', _rozieHandler));

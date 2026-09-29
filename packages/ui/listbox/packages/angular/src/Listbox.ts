@@ -321,7 +321,7 @@ export class Listbox {
         const handler = ($event: MouseEvent) => {
           const target = $event.target as Node;
           if (this.controlEl()?.nativeElement?.contains(target) || this.listEl()?.nativeElement?.contains(target)) return;
-          this.close();
+          ((this.close) as (...args: any[]) => any)($event);
         };
         const unlisten = renderer.listen('document', 'click', handler);
         onCleanup(unlisten);

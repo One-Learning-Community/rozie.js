@@ -18,13 +18,13 @@
  * @experimental — shape may change before v1.0
  */
 import type { Diagnostic, IRComponent, Listener, ModifierArg, ModifierRegistry } from '@rozie/core';
-import { RozieErrorCode } from '@rozie/core';
+import { classifyListenerHandler, RozieErrorCode } from '@rozie/core';
 import type {
   RuntimeSolidImportCollector,
   SolidImportCollector,
 } from '../rewrite/collectSolidImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { emitListenerNative } from './emitListenerNative.js';
+import { emitListenerNative, eventTypeFor } from './emitListenerNative.js';
 
 export interface EmitListenerWrapResult {
   scriptInjection: string;
@@ -89,7 +89,16 @@ export function emitListenerWrap(
 
   // Solid: createDebouncedHandler/createThrottledHandler do NOT take deps arrays.
   // Signature: createDebouncedHandler(fn, ms) → wrapped handler function.
-  const scriptInjection = `const ${wrapName} = ${helperName}(${userHandlerCode}${wrapArgsList ? ', ' + wrapArgsList : ''});`;
+  //
+  // quick 260929-mn8 (DD-8) — shared core contract, classified on the IR AST:
+  // a STATEMENT handler (`onTick($event)`) is normalized to a typed `$event`
+  // arrow before wrapping; passing it raw evaluated it eagerly at setup
+  // (ReferenceError on `$event`). Callables are wrapped unchanged.
+  const wrapTarget =
+    classifyListenerHandler(listener.handler) === 'callable'
+      ? userHandlerCode
+      : `($event: ${eventTypeFor(listener.event)}) => { ${userHandlerCode}; }`;
+  const scriptInjection = `const ${wrapName} = ${helperName}(${wrapTarget}${wrapArgsList ? ', ' + wrapArgsList : ''});`;
 
   if (helperName !== 'createDebouncedHandler' && helperName !== 'createThrottledHandler') {
     diagnostics.push({

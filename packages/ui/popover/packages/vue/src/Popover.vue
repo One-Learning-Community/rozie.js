@@ -375,7 +375,7 @@ watchEffect((onCleanup) => {
   if (!(open.value && !props.disableDismiss)) return;
   const handler = ($event: KeyboardEvent) => {
     if ($event.key !== 'Escape') return;
-    dismiss();
+    ((dismiss) as (...args: any[]) => any)($event);
   };
   document.addEventListener('keydown', handler);
   onCleanup(() => document.removeEventListener('keydown', handler));
@@ -383,7 +383,7 @@ watchEffect((onCleanup) => {
 
 useOutsideClick(
   [anchorElRef, floatingElRef],
-  () => dismiss(),
+  ($event) => ((dismiss) as (...args: any[]) => any)($event),
   () => open.value && !props.disableDismiss,
 );
 </script>

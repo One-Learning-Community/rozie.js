@@ -15,7 +15,7 @@
  * @experimental — shape may change before v1.0
  */
 import type { Diagnostic, IRComponent, Listener, ModifierArg } from '@rozie/core';
-import { RozieErrorCode } from '@rozie/core';
+import { classifyListenerHandler, RozieErrorCode } from '@rozie/core';
 import type { RuntimeReactImportCollector } from '../rewrite/collectReactImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
@@ -93,10 +93,19 @@ export function emitListenerOutsideClick(
   // Render handler. For Identifier handlers we pass by identity; for arrow /
   // call expressions we wrap them in `($event) => { ... }` (Pitfall 5: useOutsideClick
   // signature expects `($event: MouseEvent) => void`).
+  //
+  // quick 260929-mn8 (DD-8) — shared core contract, classified on the IR AST:
+  // a bare identifier keeps the identity pass (the runtime forwards the
+  // event); any OTHER callable (function expression / member ref) is invoked
+  // with the event through a permissive cast (previously a function expression
+  // was a no-op statement); anything else runs as a statement with `$event`
+  // bound by the arrow param.
   const handlerCode = rewriteTemplateExpression(listener.handler, ir);
   const handlerExpr = /^[A-Za-z_$][\w$]*$/.test(handlerCode)
     ? handlerCode
-    : `($event) => { ${handlerCode}; }`;
+    : classifyListenerHandler(listener.handler) === 'callable'
+      ? `($event) => { ((${handlerCode}) as (...args: any[]) => any)($event); }`
+      : `($event) => { ${handlerCode}; }`;
 
   // Render `when` predicate as `() => when` arrow (or undefined).
   // Per RESEARCH Pattern 10 Class B + D-42 Vue analog, the helper re-evaluates

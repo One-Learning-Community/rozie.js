@@ -32,7 +32,7 @@ export class ModelSigil {
       effect((onCleanup) => {
         if (!(this.value() > 0)) return;
         const handler = ($event: KeyboardEvent) => {
-          (() => {})($event);
+          ((() => {}) as (...args: any[]) => any)($event);
         };
         const unlisten = renderer.listen('document', 'keydown', handler);
         onCleanup(unlisten);

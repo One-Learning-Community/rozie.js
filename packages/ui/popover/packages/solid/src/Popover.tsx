@@ -445,7 +445,7 @@ export default function Popover(_props: PopoverProps): JSX.Element {
     if (!(open() && !local.disableDismiss)) return;
     const _rozieHandler = ($event: KeyboardEvent) => {
       if ($event.key !== 'Escape') return;
-      dismiss();
+      ((dismiss) as ((...args: any[]) => any))($event);
     };
     document.addEventListener('keydown', _rozieHandler);
     onCleanup(() => document.removeEventListener('keydown', _rozieHandler));
