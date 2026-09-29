@@ -87,7 +87,7 @@ interface NoEventsContentCtx {
 })
 export class FullCalendar {
   /**
-   * The event objects rendered on the calendar. Each event is normalized: a missing `title` falls back to `Event <id>`, and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
+   * The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
    */
   events = input<any[]>((() => [])());
   /**
@@ -109,9 +109,9 @@ export class FullCalendar {
    */
   selectable = input<boolean>(true);
   /**
-   * Calendar height in pixels. Runtime-updatable via `setOption`.
+   * The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. This curated prop wins over `options.height` because curated keys are applied after the `:options` spread, so size the calendar through `height` itself. Runtime-updatable via `setOption`.
    */
-  height = input<number>(480);
+  height = input<string | number>(480);
   /**
    * Fallback event color stamped onto events that omit their own `color`.
    */
@@ -371,7 +371,7 @@ export class FullCalendar {
     effect(() => { const __watchVal = (() => this.weekends())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } ((v: any) => this.instance?.setOption('weekends', v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.editable())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } ((v: any) => this.instance?.setOption('editable', v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.selectable())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => this.instance?.setOption('selectable', v))(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.height())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => this.instance?.setOption('height', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.height())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => this.instance?.setOption('height', this.normalizeHeight(v)))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.locale())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } ((v: any) => this.instance?.setOption('locale', v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.firstDay())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } ((v: any) => this.instance?.setOption('firstDay', v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.slotDuration())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } ((v: any) => this.instance?.setOption('slotDuration', v))(__watchVal); }); });
@@ -404,7 +404,7 @@ export class FullCalendar {
       weekends: this.weekends(),
       editable: this.editable(),
       selectable: this.selectable(),
-      height: this.height(),
+      height: this.normalizeHeight(this.height()),
       locale: this.locale(),
       firstDay: this.firstDay(),
       slotDuration: this.slotDuration(),
@@ -421,7 +421,8 @@ export class FullCalendar {
             start: info.event.start,
             end: info.event.end
           },
-          jsEvent: info.jsEvent
+          jsEvent: info.jsEvent,
+          el: info.el
         });
       },
       dateClick: (info: any) => {
@@ -478,7 +479,8 @@ export class FullCalendar {
             start: info.event.start,
             end: info.event.end
           },
-          jsEvent: info.jsEvent
+          jsEvent: info.jsEvent,
+          el: info.el
         });
       },
       eventMouseLeave: (info: any) => {
@@ -489,7 +491,8 @@ export class FullCalendar {
             start: info.event.start,
             end: info.event.end
           },
-          jsEvent: info.jsEvent
+          jsEvent: info.jsEvent,
+          el: info.el
         });
       },
       unselect: (info: any) => {
@@ -709,13 +712,22 @@ export class FullCalendar {
   instance: any = null;
   suppressViewSync = false;
   PLUGINS = [dayGridPlugin, timeGridPlugin, interactionPlugin];
+  // A purely numeric string height ('600') means pixels. Needed because a static
+  // Vue/Angular/Lit attribute arrives as a string, and Lit's String converter (see
+  // the height prop) would otherwise regress `height="600"`, which the old Number
+  // converter turned into 600. Anything else ('auto', '100%', '32rem', a number)
+  // passes through unchanged.
+  normalizeHeight = (h: any) => {
+    if (typeof h === 'string' && /^\d+(\.\d+)?$/.test(h.trim())) return Number(h);
+    return h;
+  };
   normalizeEvent = (e: any) => {
-    // Object spread + template-literal default — common reconcile shape:
-    // pass user props through, but stamp a sensible title fallback and
-    // honor the wrapper's defaultColor only when the event omits one.
+    // Object spread — common reconcile shape: pass user props through, normalize
+    // the title to a string WITHOUT inventing text (internal ids must never
+    // render), and honor the wrapper's defaultColor only when the event omits one.
     return {
       ...e,
-      title: e.title || `Event ${e.id ?? '(no id)'}`,
+      title: e.title || '',
       color: e.color || this.defaultColor()
     };
   };

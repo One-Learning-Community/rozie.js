@@ -6,7 +6,7 @@ import { onMount, untrack } from 'svelte';
 
 interface Props {
   /**
-   * The event objects rendered on the calendar. Each event is normalized: a missing `title` falls back to `Event <id>`, and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
+   * The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
    */
   events?: any[];
   /**
@@ -28,9 +28,9 @@ interface Props {
    */
   selectable?: boolean;
   /**
-   * Calendar height in pixels. Runtime-updatable via `setOption`.
+   * The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. This curated prop wins over `options.height` because curated keys are applied after the `:options` spread, so size the calendar through `height` itself. Runtime-updatable via `setOption`.
    */
-  height?: number;
+  height?: string | number;
   /**
    * Fallback event color stamped onto events that omit their own `color`.
    */
@@ -297,13 +297,22 @@ import interactionPlugin from '@fullcalendar/interaction';
 let instance: any = null;
 let suppressViewSync = false;
 const PLUGINS = [dayGridPlugin, timeGridPlugin, interactionPlugin];
+// A purely numeric string height ('600') means pixels. Needed because a static
+// Vue/Angular/Lit attribute arrives as a string, and Lit's String converter (see
+// the height prop) would otherwise regress `height="600"`, which the old Number
+// converter turned into 600. Anything else ('auto', '100%', '32rem', a number)
+// passes through unchanged.
+const normalizeHeight = (h: any) => {
+  if (typeof h === 'string' && /^\d+(\.\d+)?$/.test(h.trim())) return Number(h);
+  return h;
+};
 const normalizeEvent = (e: any) => {
-  // Object spread + template-literal default — common reconcile shape:
-  // pass user props through, but stamp a sensible title fallback and
-  // honor the wrapper's defaultColor only when the event omits one.
+  // Object spread — common reconcile shape: pass user props through, normalize
+  // the title to a string WITHOUT inventing text (internal ids must never
+  // render), and honor the wrapper's defaultColor only when the event omits one.
   return {
     ...e,
-    title: e.title || `Event ${e.id ?? '(no id)'}`,
+    title: e.title || '',
     color: e.color || defaultColor
   };
 };
@@ -395,7 +404,7 @@ onMount(() => {
     weekends: weekends,
     editable: editable,
     selectable: selectable,
-    height: height,
+    height: normalizeHeight(height),
     locale: locale,
     firstDay: firstDay,
     slotDuration: slotDuration,
@@ -412,7 +421,8 @@ onMount(() => {
           start: info.event.start,
           end: info.event.end
         },
-        jsEvent: info.jsEvent
+        jsEvent: info.jsEvent,
+        el: info.el
       });
     },
     dateClick: (info: any) => {
@@ -469,7 +479,8 @@ onMount(() => {
           start: info.event.start,
           end: info.event.end
         },
-        jsEvent: info.jsEvent
+        jsEvent: info.jsEvent,
+        el: info.el
       });
     },
     eventMouseLeave: (info: any) => {
@@ -480,7 +491,8 @@ onMount(() => {
           start: info.event.start,
           end: info.event.end
         },
-        jsEvent: info.jsEvent
+        jsEvent: info.jsEvent,
+        el: info.el
       });
     },
     unselect: (info: any) => {
@@ -688,7 +700,7 @@ $effect(() => { const __watchVal = (() => editable)(); untrack(() => { if (__roz
 let __rozieWatchInitial_4 = true;
 $effect(() => { const __watchVal = (() => selectable)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => instance?.setOption('selectable', v))(__watchVal); }); });
 let __rozieWatchInitial_5 = true;
-$effect(() => { const __watchVal = (() => height)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => instance?.setOption('height', v))(__watchVal); }); });
+$effect(() => { const __watchVal = (() => height)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => instance?.setOption('height', normalizeHeight(v)))(__watchVal); }); });
 let __rozieWatchInitial_6 = true;
 $effect(() => { const __watchVal = (() => locale)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } ((v: any) => instance?.setOption('locale', v))(__watchVal); }); });
 let __rozieWatchInitial_7 = true;

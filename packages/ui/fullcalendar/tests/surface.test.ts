@@ -120,3 +120,44 @@ describe('FullCalendar.rozie surface gate', () => {
     expect(r.code.length).toBeGreaterThan(0);
   });
 });
+
+describe('FullCalendar.rozie consumer-feedback contract (260929-lya)', () => {
+  const { ast } = parse(source, { filename: FILENAME });
+  const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
+  const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const;
+  const compileFor = (target: (typeof TARGETS)[number]) =>
+    compile(source, {
+      target,
+      filename: FILENAME,
+      ...(target === 'angular' ? { angular: { cva: false } } : {}),
+    }).code;
+
+  it('height is a [String, Number] union in that order (Lit converter keys on the first member)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const height = (ir.props as any[]).find((p) => p.name === 'height');
+    expect(height.typeAnnotation.kind).toBe('union');
+    expect(height.typeAnnotation.members.map((m: { name: string }) => m.name)).toEqual([
+      'String',
+      'Number',
+    ]);
+  });
+
+  it.each(TARGETS)('compile(%s) forwards el on eventClick/eventMouseEnter/eventMouseLeave (3x)', (target) => {
+    const code = compileFor(target);
+    expect((code.match(/\bel:\s*info\.el\b/g) ?? []).length).toBe(3);
+  });
+
+  it.each(TARGETS)('compile(%s) untitled-event fallback is an empty string, not id-derived', (target) => {
+    const code = compileFor(target);
+    expect(code).toMatch(/title:\s*e\.title\s*\|\|\s*(''|"")/);
+    expect(code).not.toContain('Event ${');
+  });
+
+  it('compile(lit) height uses the String attribute converter', () => {
+    expect(compileFor('lit')).toMatch(/@property\(\{\s*type:\s*String\s*\}\)\s*height\b/);
+  });
+
+  it.each(TARGETS)('compile(%s) wires normalizeHeight', (target) => {
+    expect(compileFor(target)).toContain('normalizeHeight');
+  });
+});

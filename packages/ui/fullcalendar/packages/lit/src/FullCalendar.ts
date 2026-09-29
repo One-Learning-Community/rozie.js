@@ -58,7 +58,7 @@ export default class FullCalendar extends SignalWatcher(LitElement) {
 `;
 
   /**
-   * The event objects rendered on the calendar. Each event is normalized: a missing `title` falls back to `Event <id>`, and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
+   * The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
    */
   @property({ type: Array }) events: any[] = [];
   /**
@@ -81,9 +81,9 @@ export default class FullCalendar extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true }) selectable: boolean = true;
   /**
-   * Calendar height in pixels. Runtime-updatable via `setOption`.
+   * The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. This curated prop wins over `options.height` because curated keys are applied after the `:options` spread, so size the calendar through `height` itself. Runtime-updatable via `setOption`.
    */
-  @property({ type: Number, reflect: true }) height: number = 480;
+  @property({ type: String }) height: string | number = 480;
   /**
    * Fallback event color stamped onto events that omit their own `color`.
    */
@@ -450,7 +450,7 @@ private portals = {
       weekends: this.weekends,
       editable: this.editable,
       selectable: this.selectable,
-      height: this.height,
+      height: this.normalizeHeight(this.height),
       locale: this.locale,
       firstDay: this.firstDay,
       slotDuration: this.slotDuration,
@@ -468,7 +468,8 @@ private portals = {
               start: info.event.start,
               end: info.event.end
             },
-            jsEvent: info.jsEvent
+            jsEvent: info.jsEvent,
+            el: info.el
           },
           bubbles: true,
           composed: true
@@ -549,7 +550,8 @@ private portals = {
               start: info.event.start,
               end: info.event.end
             },
-            jsEvent: info.jsEvent
+            jsEvent: info.jsEvent,
+            el: info.el
           },
           bubbles: true,
           composed: true
@@ -564,7 +566,8 @@ private portals = {
               start: info.event.start,
               end: info.event.end
             },
-            jsEvent: info.jsEvent
+            jsEvent: info.jsEvent,
+            el: info.el
           },
           bubbles: true,
           composed: true
@@ -800,7 +803,7 @@ private portals = {
     if (this.__rozieFirstUpdateDone && (changedProperties.has('weekends'))) { const __watchVal = (() => this.weekends)(); ((v: any) => this.instance?.setOption('weekends', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('editable'))) { const __watchVal = (() => this.editable)(); ((v: any) => this.instance?.setOption('editable', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('selectable'))) { const __watchVal = (() => this.selectable)(); ((v: any) => this.instance?.setOption('selectable', v))(__watchVal); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('height'))) { const __watchVal = (() => this.height)(); ((v: any) => this.instance?.setOption('height', v))(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('height'))) { const __watchVal = (() => this.height)(); ((v: any) => this.instance?.setOption('height', this.normalizeHeight(v)))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('locale'))) { const __watchVal = (() => this.locale)(); ((v: any) => this.instance?.setOption('locale', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('firstDay'))) { const __watchVal = (() => this.firstDay)(); ((v: any) => this.instance?.setOption('firstDay', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('slotDuration'))) { const __watchVal = (() => this.slotDuration)(); ((v: any) => this.instance?.setOption('slotDuration', v))(__watchVal); }
@@ -853,13 +856,23 @@ private portals = {
 
   PLUGINS = [dayGridPlugin, timeGridPlugin, interactionPlugin];
 
+  // A purely numeric string height ('600') means pixels. Needed because a static
+  // Vue/Angular/Lit attribute arrives as a string, and Lit's String converter (see
+  // the height prop) would otherwise regress `height="600"`, which the old Number
+  // converter turned into 600. Anything else ('auto', '100%', '32rem', a number)
+  // passes through unchanged.
+  normalizeHeight = (h: any) => {
+  if (typeof h === 'string' && /^\d+(\.\d+)?$/.test(h.trim())) return Number(h);
+  return h;
+};
+
   normalizeEvent = (e: any) => {
-  // Object spread + template-literal default — common reconcile shape:
-  // pass user props through, but stamp a sensible title fallback and
-  // honor the wrapper's defaultColor only when the event omits one.
+  // Object spread — common reconcile shape: pass user props through, normalize
+  // the title to a string WITHOUT inventing text (internal ids must never
+  // render), and honor the wrapper's defaultColor only when the event omits one.
   return {
     ...e,
-    title: e.title || `Event ${e.id ?? '(no id)'}`,
+    title: e.title || '',
     color: e.color || this.defaultColor
   };
 };

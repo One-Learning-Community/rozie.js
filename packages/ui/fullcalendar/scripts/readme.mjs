@@ -23,6 +23,11 @@ import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 export function renderPropType(typeAnnotation) {
   if (!typeAnnotation) return 'unknown';
   if (typeAnnotation.kind === 'identifier') return typeAnnotation.name;
+  // A `type: [String, Number]` array decl lowers to a union — render each member
+  // and join with ` | ` (e.g. `String | Number` for `height`).
+  if (typeAnnotation.kind === 'union' && Array.isArray(typeAnnotation.members)) {
+    return typeAnnotation.members.map(renderPropType).join(' | ');
+  }
   if (typeAnnotation.kind === 'literal') return String(typeAnnotation.value);
   if (typeAnnotation.name) return typeAnnotation.name;
   if (typeAnnotation.value !== undefined) return String(typeAnnotation.value);
@@ -318,7 +323,10 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('| Name | Type | Default | Two-way (model) | Required |');
   lines.push('| --- | --- | --- | :---: | :---: |');
   for (const p of ir.props) {
-    const type = renderPropType(p.typeAnnotation);
+    // Escape pipes for the GFM table cell — a union type (`String | Number`)
+    // carries a literal `|` that must be `\|` so it is not parsed as a column
+    // delimiter (matches the docs/components/fullcalendar.md convention).
+    const type = renderPropType(p.typeAnnotation).replace(/\|/g, '\\|');
     const def = renderPropDefault(p.defaultValue);
     const model = p.isModel ? '✓' : '';
     const required = p.required ? '✓' : '';
@@ -444,7 +452,10 @@ export function validateDocsPropsTable(ir, docsMarkdown) {
     const irType = renderPropType(p.typeAnnotation);
     const docType = stripCode(doc.type);
     const docTypeTokens = docType.split('|').map((t) => t.trim());
-    if (!docTypeTokens.includes(irType)) {
+    // The IR type may itself be a union (`String | Number`) — every source member
+    // must be present in the docs cell (subset check).
+    const irTypeTokens = irType.split('|').map((t) => t.trim());
+    if (!irTypeTokens.every((t) => docTypeTokens.includes(t))) {
       errors.push(`prop "${p.name}": type drift — source \`${irType}\`, docs \`${docType}\``);
     }
     const irDef = renderPropDefault(p.defaultValue);

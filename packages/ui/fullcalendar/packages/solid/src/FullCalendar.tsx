@@ -34,7 +34,7 @@ interface NoEventsContentSlotCtx { arg: any; }
 
 interface FullCalendarProps {
   /**
-   * The event objects rendered on the calendar. Each event is normalized: a missing `title` falls back to `Event <id>`, and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
+   * The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
    */
   events?: any[];
   /**
@@ -58,9 +58,9 @@ interface FullCalendarProps {
    */
   selectable?: boolean;
   /**
-   * Calendar height in pixels. Runtime-updatable via `setOption`.
+   * The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. This curated prop wins over `options.height` because curated keys are applied after the `:options` spread, so size the calendar through `height` itself. Runtime-updatable via `setOption`.
    */
-  height?: number;
+  height?: string | number;
   /**
    * Fallback event color stamped onto events that omit their own `color`.
    */
@@ -291,7 +291,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
       weekends: local.weekends,
       editable: local.editable,
       selectable: local.selectable,
-      height: local.height,
+      height: normalizeHeight(local.height),
       locale: local.locale,
       firstDay: local.firstDay,
       slotDuration: local.slotDuration,
@@ -308,7 +308,8 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
             start: info.event.start,
             end: info.event.end
           },
-          jsEvent: info.jsEvent
+          jsEvent: info.jsEvent,
+          el: info.el
         });
       },
       dateClick: (info: any) => {
@@ -365,7 +366,8 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
             start: info.event.start,
             end: info.event.end
           },
-          jsEvent: info.jsEvent
+          jsEvent: info.jsEvent,
+          el: info.el
         });
       },
       eventMouseLeave: (info: any) => {
@@ -376,7 +378,8 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
             start: info.event.start,
             end: info.event.end
           },
-          jsEvent: info.jsEvent
+          jsEvent: info.jsEvent,
+          el: info.el
         });
       },
       unselect: (info: any) => {
@@ -579,7 +582,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
   createEffect(on(() => (() => local.weekends)(), (v) => untrack(() => ((v: any) => instance?.setOption('weekends', v))(v)), { defer: true }));
   createEffect(on(() => (() => local.editable)(), (v) => untrack(() => ((v: any) => instance?.setOption('editable', v))(v)), { defer: true }));
   createEffect(on(() => (() => local.selectable)(), (v) => untrack(() => ((v: any) => instance?.setOption('selectable', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.height)(), (v) => untrack(() => ((v: any) => instance?.setOption('height', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.height)(), (v) => untrack(() => ((v: any) => instance?.setOption('height', normalizeHeight(v)))(v)), { defer: true }));
   createEffect(on(() => (() => local.locale)(), (v) => untrack(() => ((v: any) => instance?.setOption('locale', v))(v)), { defer: true }));
   createEffect(on(() => (() => local.firstDay)(), (v) => untrack(() => ((v: any) => instance?.setOption('firstDay', v))(v)), { defer: true }));
   createEffect(on(() => (() => local.slotDuration)(), (v) => untrack(() => ((v: any) => instance?.setOption('slotDuration', v))(v)), { defer: true }));
@@ -594,13 +597,23 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
   let instance: any = null;
   let suppressViewSync = false;
   const PLUGINS = [dayGridPlugin, timeGridPlugin, interactionPlugin];
+
+  // A purely numeric string height ('600') means pixels. Needed because a static
+  // Vue/Angular/Lit attribute arrives as a string, and Lit's String converter (see
+  // the height prop) would otherwise regress `height="600"`, which the old Number
+  // converter turned into 600. Anything else ('auto', '100%', '32rem', a number)
+  // passes through unchanged.
+  function normalizeHeight(h: any) {
+    if (typeof h === 'string' && /^\d+(\.\d+)?$/.test(h.trim())) return Number(h);
+    return h;
+  }
   function normalizeEvent(e: any) {
-    // Object spread + template-literal default — common reconcile shape:
-    // pass user props through, but stamp a sensible title fallback and
-    // honor the wrapper's defaultColor only when the event omits one.
+    // Object spread — common reconcile shape: pass user props through, normalize
+    // the title to a string WITHOUT inventing text (internal ids must never
+    // render), and honor the wrapper's defaultColor only when the event omits one.
     return {
       ...e,
-      title: e.title || `Event ${e.id ?? '(no id)'}`,
+      title: e.title || '',
       color: e.color || local.defaultColor
     };
   }

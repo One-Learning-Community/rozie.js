@@ -144,12 +144,12 @@ el.addEventListener('event-click', (e) => {
 
 | Name | Type | Default | Two-way (model) | Description |
 | --- | --- | --- | :---: | --- |
-| `events` | `Array` | `[]` | | The event objects rendered on the calendar. Each event is normalized: a missing `title` falls back to `Event <id>`, and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`. |
+| `events` | `Array` | `[]` | | The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`. |
 | `view` | `String` | `"dayGridMonth"` | ✓ | The two-way active view name (`'dayGridMonth'`, `'timeGridWeek'`, `'timeGridDay'`, …). The calendar's own toolbar writes back through the two-way path; a consumer write calls `changeView`. |
 | `weekends` | `Boolean` | `true` | | Show Saturday/Sunday columns. Runtime-updatable via `setOption`. |
 | `editable` | `Boolean` | `true` | | Allow events to be dragged and resized. Runtime-updatable. |
 | `selectable` | `Boolean` | `true` | | Allow date/time-range selection by click-drag. Runtime-updatable. |
-| `height` | `Number` | `480` | | Calendar height in pixels. Runtime-updatable. |
+| `height` | `String \| Number` | `480` | | The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. This curated prop wins over `options.height` (curated keys are applied after the `:options` spread), so size the calendar through `height` itself. Runtime-updatable. |
 | `defaultColor` | `String` | `"#3b82f6"` | | Fallback event color stamped onto events that omit their own `color`. |
 | `locale` | `String` | `"en"` | | FullCalendar locale code. Runtime-updatable. An object locale is an untyped runtime escape hatch — pass it through `setOption` via the handle if needed. |
 | `firstDay` | `Number` | `0` | | First day of the week (`0` = Sunday … `1` = Monday). Runtime-updatable. |

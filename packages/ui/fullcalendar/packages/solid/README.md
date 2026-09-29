@@ -41,7 +41,7 @@ export function Demo() {
 | `weekends` | `Boolean` | `true` |  |  |
 | `editable` | `Boolean` | `true` |  |  |
 | `selectable` | `Boolean` | `true` |  |  |
-| `height` | `Number` | `480` |  |  |
+| `height` | `String \| Number` | `480` |  |  |
 | `defaultColor` | `String` | `"#3b82f6"` |  |  |
 | `locale` | `String` | `"en"` |  |  |
 | `firstDay` | `Number` | `0` |  |  |

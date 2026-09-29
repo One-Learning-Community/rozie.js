@@ -29,8 +29,8 @@
       $script (event title formatting)
     - Multi-plugin import shape — @fullcalendar/core + per-view plugins
       via separate default imports
-    - Structured-payload $emit: eventClick forwards { event, jsEvent,
-      view } — heavier payload shape than prior examples
+    - Structured-payload $emit: eventClick forwards { event, jsEvent, el } —
+      heavier payload shape than prior examples
     - Rich $expose imperative handle: getApi + 7 navigation/mutation verbs
 -->
 
@@ -43,7 +43,7 @@
     default: () => [],
     docs: {
       description:
-        'The event objects rendered on the calendar. Each event is normalized: a missing `title` falls back to `Event <id>`, and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.',
+        'The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.',
     },
   },
   view: {
@@ -80,12 +80,16 @@
         'Allow date/time-range selection by click-drag. Runtime-updatable via `setOption`.',
     },
   },
+  // String FIRST on purpose: the Lit emitter keys its @property attribute
+  // converter on the first union member, so [String, Number] keeps a
+  // `height="auto"` attribute from coercing to NaN (normalizeHeight below
+  // turns a purely numeric string back into pixels).
   height: {
-    type: Number,
+    type: [String, Number],
     default: 480,
     docs: {
       description:
-        'Calendar height in pixels. Runtime-updatable via `setOption`.',
+        "The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. This curated prop wins over `options.height` because curated keys are applied after the `:options` spread, so size the calendar through `height` itself. Runtime-updatable via `setOption`.",
     },
   },
   defaultColor: {
@@ -162,13 +166,23 @@ let suppressViewSync = false
 
 const PLUGINS = [dayGridPlugin, timeGridPlugin, interactionPlugin]
 
+// A purely numeric string height ('600') means pixels. Needed because a static
+// Vue/Angular/Lit attribute arrives as a string, and Lit's String converter (see
+// the height prop) would otherwise regress `height="600"`, which the old Number
+// converter turned into 600. Anything else ('auto', '100%', '32rem', a number)
+// passes through unchanged.
+const normalizeHeight = (h) => {
+  if (typeof h === 'string' && /^\d+(\.\d+)?$/.test(h.trim())) return Number(h)
+  return h
+}
+
 const normalizeEvent = (e) => {
-  // Object spread + template-literal default — common reconcile shape:
-  // pass user props through, but stamp a sensible title fallback and
-  // honor the wrapper's defaultColor only when the event omits one.
+  // Object spread — common reconcile shape: pass user props through, normalize
+  // the title to a string WITHOUT inventing text (internal ids must never
+  // render), and honor the wrapper's defaultColor only when the event omits one.
   return {
     ...e,
-    title: e.title || `Event ${e.id ?? '(no id)'}`,
+    title: e.title || '',
     color: e.color || $props.defaultColor,
   }
 }
@@ -193,7 +207,7 @@ $onMount(() => {
     weekends:      $props.weekends,
     editable:      $props.editable,
     selectable:    $props.selectable,
-    height:        $props.height,
+    height:        normalizeHeight($props.height),
     locale:        $props.locale,
     firstDay:      $props.firstDay,
     slotDuration:  $props.slotDuration,
@@ -206,6 +220,7 @@ $onMount(() => {
       $emit('eventClick', {
         event:   { id: info.event.id, title: info.event.title, start: info.event.start, end: info.event.end },
         jsEvent: info.jsEvent,
+        el:      info.el,
       })
     },
     dateClick: (info) => {
@@ -234,12 +249,14 @@ $onMount(() => {
       $emit('eventMouseEnter', {
         event:   { id: info.event.id, title: info.event.title, start: info.event.start, end: info.event.end },
         jsEvent: info.jsEvent,
+        el:      info.el,
       })
     },
     eventMouseLeave: (info) => {
       $emit('eventMouseLeave', {
         event:   { id: info.event.id, title: info.event.title, start: info.event.start, end: info.event.end },
         jsEvent: info.jsEvent,
+        el:      info.el,
       })
     },
     unselect: (info) => {
@@ -383,7 +400,7 @@ $watch(() => $props.view, (v) => {
 $watch(() => $props.weekends,   (v) => instance?.setOption('weekends',   v))
 $watch(() => $props.editable,   (v) => instance?.setOption('editable',   v))
 $watch(() => $props.selectable, (v) => instance?.setOption('selectable', v))
-$watch(() => $props.height,     (v) => instance?.setOption('height',     v))
+$watch(() => $props.height,     (v) => instance?.setOption('height',     normalizeHeight(v)))
 $watch(() => $props.locale,        (v) => instance?.setOption('locale',        v))
 $watch(() => $props.firstDay,      (v) => instance?.setOption('firstDay',      v))
 $watch(() => $props.slotDuration,  (v) => instance?.setOption('slotDuration',  v))

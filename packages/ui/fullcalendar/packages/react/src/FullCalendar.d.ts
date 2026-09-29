@@ -4,7 +4,7 @@ import type * as React from 'react';
 
 export interface FullCalendarProps {
   /**
-   * The event objects rendered on the calendar. Each event is normalized: a missing `title` falls back to `Event <id>`, and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
+   * The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
    */
   events?: unknown[];
   /**
@@ -28,9 +28,9 @@ export interface FullCalendarProps {
    */
   selectable?: boolean;
   /**
-   * Calendar height in pixels. Runtime-updatable via `setOption`.
+   * The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. This curated prop wins over `options.height` because curated keys are applied after the `:options` spread, so size the calendar through `height` itself. Runtime-updatable via `setOption`.
    */
-  height?: number;
+  height?: string | number;
   /**
    * Fallback event color stamped onto events that omit their own `color`.
    */

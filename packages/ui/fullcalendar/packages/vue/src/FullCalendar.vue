@@ -23,7 +23,7 @@ import { Fragment, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch }
 const props = withDefaults(
   defineProps<{
     /**
-     * The event objects rendered on the calendar. Each event is normalized: a missing `title` falls back to `Event <id>`, and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
+     * The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
      */
     events?: any[];
     /**
@@ -39,9 +39,9 @@ const props = withDefaults(
      */
     selectable?: boolean;
     /**
-     * Calendar height in pixels. Runtime-updatable via `setOption`.
+     * The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. This curated prop wins over `options.height` because curated keys are applied after the `:options` spread, so size the calendar through `height` itself. Runtime-updatable via `setOption`.
      */
-    height?: number;
+    height?: string | number;
     /**
      * Fallback event color stamped onto events that omit their own `color`.
      */
@@ -281,13 +281,22 @@ import interactionPlugin from '@fullcalendar/interaction';
 let instance: any = null;
 let suppressViewSync = false;
 const PLUGINS = [dayGridPlugin, timeGridPlugin, interactionPlugin];
+// A purely numeric string height ('600') means pixels. Needed because a static
+// Vue/Angular/Lit attribute arrives as a string, and Lit's String converter (see
+// the height prop) would otherwise regress `height="600"`, which the old Number
+// converter turned into 600. Anything else ('auto', '100%', '32rem', a number)
+// passes through unchanged.
+const normalizeHeight = (h: any) => {
+  if (typeof h === 'string' && /^\d+(\.\d+)?$/.test(h.trim())) return Number(h);
+  return h;
+};
 const normalizeEvent = (e: any) => {
-  // Object spread + template-literal default — common reconcile shape:
-  // pass user props through, but stamp a sensible title fallback and
-  // honor the wrapper's defaultColor only when the event omits one.
+  // Object spread — common reconcile shape: pass user props through, normalize
+  // the title to a string WITHOUT inventing text (internal ids must never
+  // render), and honor the wrapper's defaultColor only when the event omits one.
   return {
     ...e,
-    title: e.title || `Event ${e.id ?? '(no id)'}`,
+    title: e.title || '',
     color: e.color || props.defaultColor
   };
 };
@@ -380,7 +389,7 @@ onMounted(() => {
     weekends: props.weekends,
     editable: props.editable,
     selectable: props.selectable,
-    height: props.height,
+    height: normalizeHeight(props.height),
     locale: props.locale,
     firstDay: props.firstDay,
     slotDuration: props.slotDuration,
@@ -397,7 +406,8 @@ onMounted(() => {
           start: info.event.start,
           end: info.event.end
         },
-        jsEvent: info.jsEvent
+        jsEvent: info.jsEvent,
+        el: info.el
       });
     },
     dateClick: (info: any) => {
@@ -454,7 +464,8 @@ onMounted(() => {
           start: info.event.start,
           end: info.event.end
         },
-        jsEvent: info.jsEvent
+        jsEvent: info.jsEvent,
+        el: info.el
       });
     },
     eventMouseLeave: (info: any) => {
@@ -465,7 +476,8 @@ onMounted(() => {
           start: info.event.start,
           end: info.event.end
         },
-        jsEvent: info.jsEvent
+        jsEvent: info.jsEvent,
+        el: info.el
       });
     },
     unselect: (info: any) => {
@@ -668,7 +680,7 @@ watch(() => view.value, (v: any) => {
 watch(() => props.weekends, (v: any) => instance?.setOption('weekends', v), { flush: 'post' });
 watch(() => props.editable, (v: any) => instance?.setOption('editable', v), { flush: 'post' });
 watch(() => props.selectable, (v: any) => instance?.setOption('selectable', v), { flush: 'post' });
-watch(() => props.height, (v: any) => instance?.setOption('height', v), { flush: 'post' });
+watch(() => props.height, (v: any) => instance?.setOption('height', normalizeHeight(v)), { flush: 'post' });
 watch(() => props.locale, (v: any) => instance?.setOption('locale', v), { flush: 'post' });
 watch(() => props.firstDay, (v: any) => instance?.setOption('firstDay', v), { flush: 'post' });
 watch(() => props.slotDuration, (v: any) => instance?.setOption('slotDuration', v), { flush: 'post' });
