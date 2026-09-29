@@ -25,7 +25,7 @@ export function Demo() {
       view={view}
       onViewChange={setView}
       events={events}
-      onEventClick={(e) => console.log(e.event, e.view)}
+      onEventClick={(e) => console.log(e.event, e.el)}
     />
   );
 }
@@ -41,7 +41,7 @@ const events = ref([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
 </script>
 
 <template>
-  <FullCalendar v-model:view="view" :events="events" @eventClick="(e) => console.log(e.event, e.view)" />
+  <FullCalendar v-model:view="view" :events="events" @eventClick="(e) => console.log(e.event, e.el)" />
 </template>
 ```
 
@@ -53,7 +53,7 @@ const events = ref([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
   let events = $state([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
 </script>
 
-<FullCalendar bind:view {events} oneventClick={(e) => console.log(e.event, e.view)} />
+<FullCalendar bind:view {events} oneventClick={(e) => console.log(e.event, e.el)} />
 ```
 
 ```ts [Angular]
@@ -71,8 +71,8 @@ import { FullCalendar } from '@rozie-ui/fullcalendar-angular';
 export class DemoComponent {
   view = 'dayGridMonth';
   events = [{ id: '1', title: 'Kickoff', start: '2026-06-04' }];
-  onEventClick(e: { event: unknown; view: unknown }) {
-    console.log(e.event, e.view);
+  onEventClick(e: { event: unknown; el: HTMLElement }) {
+    console.log(e.event, e.el);
   }
 }
 ```
@@ -89,7 +89,7 @@ export function Demo() {
       view={view()}
       onViewChange={setView}
       events={events()}
-      onEventClick={(e) => console.log(e.event, e.view)}
+      onEventClick={(e) => console.log(e.event, e.el)}
     />
   );
 }
@@ -107,7 +107,7 @@ el.addEventListener('view-change', (e) => {
   el.view = e.detail;
 });
 el.addEventListener('event-click', (e) => {
-  console.log(e.detail.event, e.detail.view);
+  console.log(e.detail.event, e.detail.el);
 });
 ```
 

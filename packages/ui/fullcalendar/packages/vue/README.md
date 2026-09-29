@@ -22,7 +22,7 @@ const events = ref([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
 </script>
 
 <template>
-  <FullCalendar v-model:view="view" :events="events" @eventClick="(e) => console.log(e.event, e.view)" />
+  <FullCalendar v-model:view="view" :events="events" @eventClick="(e) => console.log(e.event, e.el)" />
 </template>
 ```
 
@@ -48,16 +48,16 @@ const events = ref([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
 
 | Event | Description |
 | --- | --- |
-| `eventClick` | Fired when a calendar event is clicked. Payload `{ event: { id, title, start, end }, jsEvent, view }`. |
-| `dateClick` | Fired when an empty date/time cell is clicked. Payload `{ date, dateStr, allDay, view }`. |
+| `eventClick` | Fired when a calendar event is clicked. Payload `{ event: { id, title, start, end }, jsEvent, el }`. `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip). |
+| `dateClick` | Fired when an empty date/time cell is clicked. Payload `{ date, dateStr, allDay }`. |
 | `eventDrop` | Fired after an event is dragged to a new date/time. Payload `{ event: { id, title, start, end }, delta }`. |
 | `select` | Fired when a date/time range is selected by drag (requires `selectable`). Payload `{ start, end, startStr, endStr, allDay }`. |
 | `eventResize` | Fired after an event is resized by dragging its edge (requires `editable`). Payload `{ event: { id, title, start, end }, startDelta, endDelta }`. |
 | `datesSet` | Fired whenever the visible date range changes (navigation or view switch). Payload `{ start, end, view }` where `view` is the active view type string. |
-| `eventMouseEnter` | Fired when the pointer enters a calendar event. Payload `{ event: { id, title, start, end }, jsEvent }` (mirrors `eventClick`). |
-| `eventMouseLeave` | Fired when the pointer leaves a calendar event. Payload `{ event: { id, title, start, end }, jsEvent }` (mirrors `eventMouseEnter`). |
+| `eventMouseEnter` | Fired when the pointer enters a calendar event. Payload `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventClick`). |
+| `eventMouseLeave` | Fired when the pointer leaves a calendar event. Payload `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventMouseEnter`). |
 | `unselect` | Fired when a previously selected date/time range is cleared. Payload `{ jsEvent }`. |
-| `loading` | Fired when the calendar begins or finishes loading events (e.g. from an event source). Payload `{ isLoading }` boolean. |
+| `loading` | Fired when the calendar begins or finishes loading events. Payload `{ isLoading }` boolean. It fires only while FullCalendar fetches an event source itself (a URL/JSON feed or a function source); with only the `events` array bound it never fires (see Gotchas). |
 | `eventsSet` | Fired after the set of rendered events changes. Payload `{ events: [{ id, title, start, end }, …] }` — the normalized current event set, for persistence/sync consumers. |
 
 ## Imperative handle
@@ -109,3 +109,11 @@ const cal = ref();          // template ref
 | allDayContent | arg |
 | slotLaneContent | arg |
 | noEventsContent | arg |
+
+## Gotchas
+
+**Events are keyboard-focusable.** Whenever an `eventClick` handler is registered, FullCalendar makes every event interactive (`tabindex="0"`, Enter/Space activation). This wrapper always registers one, because it powers the `eventClick` event. FullCalendar checks the `eventInteractive` option before it checks for handlers, so opt out with `:options="{ eventInteractive: false }"`. A per-event `interactive: false` also works when the global option is unset.
+
+**`loading` fires only for fetched sources.** It reflects event sources FullCalendar fetches itself (a URL/JSON feed or a function source). The `events` prop is always an in-memory array reconciled synchronously, so with `events` alone `loading` never fires; track your own fetch state instead. For FullCalendar-managed fetching, pass sources through `options` as `eventSources`: `:options="{ eventSources: [{ url: '/api/events' }] }"`.
+
+**`noEventsContent` needs a list view.** The slot renders only in list views, and the baked-in daygrid/timegrid/interaction plugins provide none. Recipe: `npm i @fullcalendar/list`, `import listPlugin from '@fullcalendar/list'`, pass `:options="{ plugins: [listPlugin] }"` (the `plugins` key merges with the baked-in defaults), and set `view` to `listWeek`, `listDay` or `listMonth`. The slot then renders when the list is empty.

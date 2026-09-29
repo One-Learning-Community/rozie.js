@@ -162,16 +162,16 @@ el.addEventListener('event-click', (e) => {
 
 | Event | Description |
 | --- | --- |
-| `eventClick` | An event was clicked. Payload: `{ event: { id, title, start, end }, jsEvent }`. |
+| `eventClick` | An event was clicked. Payload: `{ event: { id, title, start, end }, jsEvent, el }`. `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip). |
 | `dateClick` | A date/cell was clicked. Payload: `{ date, dateStr, allDay }`. |
 | `eventDrop` | An event was dragged to a new date. Payload: `{ event: { id, title, start, end }, delta }`. |
 | `select` | A date/time range was selected. Payload: `{ start, end, startStr, endStr, allDay }`. |
 | `eventResize` | An event was resized. Payload: `{ event: { id, title, start, end }, startDelta, endDelta }`. |
 | `datesSet` | The visible date range changed (navigation or view switch). Payload: `{ start, end, view }`. |
-| `eventMouseEnter` | The pointer entered a calendar event. Payload: `{ event: { id, title, start, end }, jsEvent }` (mirrors `eventClick`). |
-| `eventMouseLeave` | The pointer left a calendar event. Payload: `{ event: { id, title, start, end }, jsEvent }` (mirrors `eventMouseEnter`). |
+| `eventMouseEnter` | The pointer entered a calendar event. Payload: `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventClick`). |
+| `eventMouseLeave` | The pointer left a calendar event. Payload: `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventMouseEnter`). |
 | `unselect` | A previously selected date/time range was cleared. Payload: `{ jsEvent }`. |
-| `loading` | The calendar began or finished loading events (e.g. from an event source). Payload: `{ isLoading }` boolean. |
+| `loading` | The calendar began or finished loading events (e.g. from an event source). Payload: `{ isLoading }` boolean. It fires only while FullCalendar fetches an event source itself; with only the `events` array bound it never fires — see [`loading` fires only for fetched sources](#loading-fires-only-for-fetched-sources). |
 | `eventsSet` | The set of rendered events changed. Payload: `{ events: [{ id, title, start, end }, …] }` — the normalized current event set, for persistence/sync consumers. |
 
 ### Imperative handle
@@ -457,7 +457,7 @@ const view = ref('dayGridMonth');
 
 ### Reconciling events at runtime
 
-Changing the `:events` array reconciles the live calendar without remounting — the wrapper runs FullCalendar's supported `removeAllEvents` + `addEvent` loop, normalizing each event (title/color fallbacks) on the way in. Just bind a reactive array and push/replace it:
+Changing the `:events` array reconciles the live calendar without remounting — the wrapper runs FullCalendar's supported `removeAllEvents` + `addEvent` loop, normalizing each event on the way in (a missing `color` inherits `defaultColor`; a missing `title` stays empty — the wrapper never invents one from the event id). Just bind a reactive array and push/replace it:
 
 ```vue
 <FullCalendar :events="events" v-model:view="view" />
@@ -490,6 +490,18 @@ The two-way `view` prop is guarded against the cross-framework "infinite update 
 ### Custom event content is not reactive after mount
 
 Per the v1 portal-slot constraint, the `event` slot re-renders only when FullCalendar re-invokes `eventContent` (i.e. when the event data changes). This matches the engine's own behavior — it is not a limitation specific to the wrapper.
+
+### Events are keyboard-focusable
+
+Whenever an `eventClick` handler is registered, FullCalendar makes every event interactive (`tabindex="0"`, Enter/Space activation). The wrapper always registers one, because it powers the `eventClick` event. FullCalendar checks the `eventInteractive` option before it checks for handlers, so opt out through the passthrough: `:options="{ eventInteractive: false }"`. A per-event `interactive: false` also works when the global option is unset.
+
+### `loading` fires only for fetched sources
+
+`loading` reflects event sources FullCalendar fetches itself (a URL/JSON feed or a function source). The `events` prop is always an in-memory array reconciled synchronously, so with `events` alone `loading` never fires — track your own fetch state instead. For FullCalendar-managed fetching, pass sources through `options` as `eventSources`: `:options="{ eventSources: [{ url: '/api/events' }] }"`.
+
+### `noEventsContent` needs a list view
+
+The `noEventsContent` slot renders only in list views, and the baked-in daygrid/timegrid/interaction plugins provide none. Engage `@fullcalendar/list` and set `view` to `listWeek` / `listDay` / `listMonth` — see the worked example in [Adding plugins](#adding-plugins).
 
 ## Cross-references
 

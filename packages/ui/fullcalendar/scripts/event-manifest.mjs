@@ -10,13 +10,16 @@
  * KEYS MUST stay in lockstep with `ir.emits`: codegen.mjs asserts every
  * emitted event name has an entry here and throws if one is missing.
  *
- * Payload shapes are PINNED by REQ-27-3 (do not improvise).
+ * Payload shapes are PINNED by REQ-27-3 (do not improvise). 260929-lya added `el`
+ * (the event's DOM element) to eventClick / eventMouseEnter / eventMouseLeave.
+ * eventClick and dateClick have never carried a `view` key; earlier prose that
+ * claimed one was wrong and has been corrected.
  */
 export const eventManifest = {
   eventClick:
-    'Fired when a calendar event is clicked. Payload `{ event: { id, title, start, end }, jsEvent, view }`.',
+    'Fired when a calendar event is clicked. Payload `{ event: { id, title, start, end }, jsEvent, el }`. `el` is the clicked event\'s DOM element (use it as the anchor for a popover or tooltip).',
   dateClick:
-    'Fired when an empty date/time cell is clicked. Payload `{ date, dateStr, allDay, view }`.',
+    'Fired when an empty date/time cell is clicked. Payload `{ date, dateStr, allDay }`.',
   eventDrop:
     'Fired after an event is dragged to a new date/time. Payload `{ event: { id, title, start, end }, delta }`.',
   select:
@@ -26,13 +29,13 @@ export const eventManifest = {
   datesSet:
     'Fired whenever the visible date range changes (navigation or view switch). Payload `{ start, end, view }` where `view` is the active view type string.',
   eventMouseEnter:
-    'Fired when the pointer enters a calendar event. Payload `{ event: { id, title, start, end }, jsEvent }` (mirrors `eventClick`).',
+    'Fired when the pointer enters a calendar event. Payload `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventClick`).',
   eventMouseLeave:
-    'Fired when the pointer leaves a calendar event. Payload `{ event: { id, title, start, end }, jsEvent }` (mirrors `eventMouseEnter`).',
+    'Fired when the pointer leaves a calendar event. Payload `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventMouseEnter`).',
   unselect:
     'Fired when a previously selected date/time range is cleared. Payload `{ jsEvent }`.',
   loading:
-    'Fired when the calendar begins or finishes loading events (e.g. from an event source). Payload `{ isLoading }` boolean.',
+    'Fired when the calendar begins or finishes loading events. Payload `{ isLoading }` boolean. It fires only while FullCalendar fetches an event source itself (a URL/JSON feed or a function source); with only the `events` array bound it never fires (see Gotchas).',
   eventsSet:
     'Fired after the set of rendered events changes. Payload `{ events: [{ id, title, start, end }, …] }` — the normalized current event set, for persistence/sync consumers.',
 };

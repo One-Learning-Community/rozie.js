@@ -79,7 +79,8 @@ function slotParams(slot) {
 // Per-framework consumer usage snippets (idiomatic; short + correct).
 //
 // The two-way model prop is `view` (the active view name STRING). Events are
-// bound via `:events`; `@eventClick` surfaces the structured payload. FullCalendar
+// bound via `:events`; `@eventClick` surfaces the structured payload
+// `{ event, jsEvent, el }` (there is NO `view` key — see event-manifest). FullCalendar
 // v6 AUTO-INJECTS its CSS — there is NO manual stylesheet import (the load-bearing
 // divergence from flatpickr).
 // ---------------------------------------------------------------------------
@@ -98,7 +99,7 @@ export function Demo() {
       view={view}
       onViewChange={setView}
       events={events}
-      onEventClick={(e) => console.log(e.event, e.view)}
+      onEventClick={(e) => console.log(e.event, e.el)}
     />
   );
 }`,
@@ -114,7 +115,7 @@ const events = ref([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
 </script>
 
 <template>
-  <FullCalendar v-model:view="view" :events="events" @eventClick="(e) => console.log(e.event, e.view)" />
+  <FullCalendar v-model:view="view" :events="events" @eventClick="(e) => console.log(e.event, e.el)" />
 </template>`,
   },
   svelte: {
@@ -126,7 +127,7 @@ const events = ref([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
   let events = $state([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
 </script>
 
-<FullCalendar bind:view {events} oneventClick={(e) => console.log(e.event, e.view)} />`,
+<FullCalendar bind:view {events} oneventClick={(e) => console.log(e.event, e.el)} />`,
   },
   angular: {
     lang: 'ts',
@@ -144,8 +145,8 @@ import { FullCalendar } from '@rozie-ui/fullcalendar-angular';
 export class DemoComponent {
   view = 'dayGridMonth';
   events = [{ id: '1', title: 'Kickoff', start: '2026-06-04' }];
-  onEventClick(e: { event: unknown; view: unknown }) {
-    console.log(e.event, e.view);
+  onEventClick(e: { event: unknown; el: HTMLElement }) {
+    console.log(e.event, e.el);
   }
 }`,
   },
@@ -162,7 +163,7 @@ export function Demo() {
       view={view()}
       onViewChange={setView}
       events={events()}
-      onEventClick={(e) => console.log(e.event, e.view)}
+      onEventClick={(e) => console.log(e.event, e.el)}
     />
   );
 }`,
@@ -180,9 +181,20 @@ el.addEventListener('view-change', (e) => {
   el.view = e.detail;
 });
 el.addEventListener('event-click', (e) => {
-  console.log(e.detail.event, e.detail.view);
+  console.log(e.detail.event, e.detail.el);
 });`,
   },
+};
+
+// Per-target idiomatic `options` binding for the Gotchas snippets. Each takes an
+// object-literal string and yields the target's binding form.
+export const OPTIONS_BINDING = {
+  react: (obj) => `options={${obj}}`,
+  solid: (obj) => `options={${obj}}`,
+  svelte: (obj) => `options={${obj}}`,
+  vue: (obj) => `:options="${obj}"`,
+  angular: (obj) => `[options]="${obj}"`,
+  lit: (obj) => `el.options = ${obj};`,
 };
 
 const FRAMEWORK_PEER_LABEL = {
@@ -397,6 +409,39 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
     }
     lines.push('');
   }
+
+  // Gotchas — three engine behaviors consumers trip over (260929-lya).
+  const bind = OPTIONS_BINDING[target];
+  if (!bind) throw new Error(`renderReadme: no options binding for target "${target}"`);
+  lines.push('## Gotchas');
+  lines.push('');
+  lines.push(
+    '**Events are keyboard-focusable.** Whenever an `eventClick` handler is registered, ' +
+      'FullCalendar makes every event interactive (`tabindex="0"`, Enter/Space activation). ' +
+      'This wrapper always registers one, because it powers the `eventClick` event. ' +
+      'FullCalendar checks the `eventInteractive` option before it checks for handlers, so ' +
+      'opt out with `' + bind('{ eventInteractive: false }') + '`. ' +
+      'A per-event `interactive: false` also works when the global option is unset.',
+  );
+  lines.push('');
+  lines.push(
+    '**`loading` fires only for fetched sources.** It reflects event sources FullCalendar ' +
+      'fetches itself (a URL/JSON feed or a function source). The `events` prop is always an ' +
+      'in-memory array reconciled synchronously, so with `events` alone `loading` never fires; ' +
+      'track your own fetch state instead. For FullCalendar-managed fetching, pass sources ' +
+      "through `options` as `eventSources`: `" +
+      bind("{ eventSources: [{ url: '/api/events' }] }") + '`.',
+  );
+  lines.push('');
+  lines.push(
+    '**`noEventsContent` needs a list view.** The slot renders only in list views, and the ' +
+      'baked-in daygrid/timegrid/interaction plugins provide none. Recipe: `npm i @fullcalendar/list`, ' +
+      "`import listPlugin from '@fullcalendar/list'`, pass `" +
+      bind('{ plugins: [listPlugin] }') +
+      '` (the `plugins` key merges with the baked-in defaults), and set `view` to `listWeek`, ' +
+      '`listDay` or `listMonth`. The slot then renders when the list is empty.',
+  );
+  lines.push('');
 
   return lines.join('\n');
 }
