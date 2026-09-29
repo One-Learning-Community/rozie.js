@@ -204,6 +204,10 @@ for (const target of TARGETS) {
       await expect(mount.getByTestId('state-last-detail')).toContainText('id=', {
         timeout: 10_000,
       });
+      // 260929-lya FC-FB-3: the eventMouseEnter payload carries `el`, the event's DOM element.
+      await expect(mount.getByTestId('state-last-detail')).toContainText('el=element', {
+        timeout: 10_000,
+      });
     }
 
     // ---- noEventsContent slot — list-view + zero events (the 10th slot) ----

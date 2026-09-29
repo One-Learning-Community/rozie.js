@@ -108,7 +108,7 @@ const record = (type, detail) => {
   $data.lastEvent = type
   $data.lastDetail = detail
 }
-const onEventMouseEnter = (info) => record('eventMouseEnter', `${info?.event?.title ?? '?'} (id=${info?.event?.id ?? '?'})`)
+const onEventMouseEnter = (info) => record('eventMouseEnter', `${info?.event?.title ?? '?'} (id=${info?.event?.id ?? '?'}) el=${info?.el?.nodeType === 1 ? 'element' : 'none'}`)
 const onEventMouseLeave = (info) => record('eventMouseLeave', `${info?.event?.title ?? '?'}`)
 const onUnselect        = (info) => record('unselect', `jsEvent=${info?.jsEvent ? 'yes' : 'no'}`)
 const onLoading         = (info) => record('loading', `isLoading=${info?.isLoading}`)
