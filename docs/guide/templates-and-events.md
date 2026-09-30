@@ -121,6 +121,11 @@ Document-level and window-level listeners belong outside the markup, so Rozie gi
 </listeners>
 ```
 
+**Handler forms.** A `<listener>` handler is one of three shapes, and each one behaves the same on all six targets, whether the listener is plain, `.outside`, or `.debounce`/`.throttle`:
+
+- A **method name** (`="close"`) or a **function expression** (`="(e) => onKey(e)"`) is *called* with the DOM event. `close(event)` receives the `MouseEvent`/`KeyboardEvent` that fired the listener. A method that takes no parameters simply ignores it.
+- **Any other expression** (`="onKey($event)"`, `="$props.open && close()"`) runs as an **inline statement** with `$event` in scope. It is never called as a function, and under `.debounce`/`.throttle` it runs when the wrapped handler fires, not eagerly when the listener is set up.
+
 **`r-if` is conditional attach, not conditional render.** On a `<listener>`, `r-if` means "subscribed while the condition holds." When it flips false the listener is removed; when it flips true again it is re-attached. This is distinct from `r-if` inside a `<template>`, which mounts/unmounts DOM. (It is also why `<listener>` only lives in `<listeners>` — a `<listener>` in a `<template>` is a compile error.) No `addEventListener` / `removeEventListener` boilerplate, no missed teardown on unmount. This single block in `Dropdown.rozie` collapses roughly 30 lines of per-framework wiring that would otherwise be written once per target.
 
 ::: tip `:target` today accepts `window` / `document`; `$refs` targets are planned

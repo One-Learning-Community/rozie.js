@@ -2533,7 +2533,7 @@ importers:
   packages/ui/combobox/packages/angular:
     dependencies:
       '@rozie-ui/popover-angular':
-        specifier: ^0.2.0
+        specifier: ^0.2.0 || ^0.3.0
         version: link:../../../popover/packages/angular
       '@rozie/runtime-angular':
         specifier: workspace:^
@@ -2579,7 +2579,7 @@ importers:
         specifier: ^1.3.0
         version: 1.14.2
       '@rozie-ui/popover-lit':
-        specifier: ^0.2.0
+        specifier: ^0.2.0 || ^0.3.0
         version: link:../../../popover/packages/lit
       '@rozie/runtime-lit':
         specifier: workspace:^
@@ -2598,7 +2598,7 @@ importers:
   packages/ui/combobox/packages/react:
     dependencies:
       '@rozie-ui/popover-react':
-        specifier: ^0.2.0
+        specifier: ^0.2.0 || ^0.3.0
         version: link:../../../popover/packages/react
       '@rozie/runtime-react':
         specifier: workspace:^
@@ -2626,7 +2626,7 @@ importers:
   packages/ui/combobox/packages/solid:
     dependencies:
       '@rozie-ui/popover-solid':
-        specifier: ^0.2.0
+        specifier: ^0.2.0 || ^0.3.0
         version: link:../../../popover/packages/solid
       '@rozie/runtime-solid':
         specifier: workspace:^
@@ -2657,7 +2657,7 @@ importers:
   packages/ui/combobox/packages/svelte:
     dependencies:
       '@rozie-ui/popover-svelte':
-        specifier: ^0.2.0
+        specifier: ^0.2.0 || ^0.3.0
         version: link:../../../popover/packages/svelte
       '@rozie/runtime-svelte':
         specifier: workspace:^
@@ -2688,7 +2688,7 @@ importers:
   packages/ui/combobox/packages/vue:
     dependencies:
       '@rozie-ui/popover-vue':
-        specifier: ^0.2.0
+        specifier: ^0.2.0 || ^0.3.0
         version: link:../../../popover/packages/vue
       '@rozie/runtime-vue':
         specifier: workspace:^
@@ -3131,7 +3131,7 @@ importers:
   packages/ui/data-table/packages/angular:
     dependencies:
       '@rozie-ui/popover-angular':
-        specifier: ^0.1.0 || ^0.2.0
+        specifier: ^0.1.0 || ^0.2.0 || ^0.3.0
         version: link:../../../popover/packages/angular
       '@rozie/runtime-angular':
         specifier: workspace:^
@@ -3180,7 +3180,7 @@ importers:
         specifier: ^1.3.0
         version: 1.14.2
       '@rozie-ui/popover-lit':
-        specifier: ^0.1.0 || ^0.2.0
+        specifier: ^0.1.0 || ^0.2.0 || ^0.3.0
         version: link:../../../popover/packages/lit
       '@rozie/runtime-lit':
         specifier: workspace:^
@@ -3198,7 +3198,7 @@ importers:
   packages/ui/data-table/packages/react:
     dependencies:
       '@rozie-ui/popover-react':
-        specifier: ^0.1.0 || ^0.2.0
+        specifier: ^0.1.0 || ^0.2.0 || ^0.3.0
         version: link:../../../popover/packages/react
       '@rozie/runtime-react':
         specifier: workspace:^
@@ -3226,7 +3226,7 @@ importers:
   packages/ui/data-table/packages/solid:
     dependencies:
       '@rozie-ui/popover-solid':
-        specifier: ^0.1.0 || ^0.2.0
+        specifier: ^0.1.0 || ^0.2.0 || ^0.3.0
         version: link:../../../popover/packages/solid
       '@rozie/runtime-solid':
         specifier: workspace:^
@@ -3257,7 +3257,7 @@ importers:
   packages/ui/data-table/packages/svelte:
     dependencies:
       '@rozie-ui/popover-svelte':
-        specifier: ^0.1.0 || ^0.2.0
+        specifier: ^0.1.0 || ^0.2.0 || ^0.3.0
         version: link:../../../popover/packages/svelte
       '@rozie/runtime-svelte':
         specifier: workspace:^
@@ -3288,7 +3288,7 @@ importers:
   packages/ui/data-table/packages/vue:
     dependencies:
       '@rozie-ui/popover-vue':
-        specifier: ^0.1.0 || ^0.2.0
+        specifier: ^0.1.0 || ^0.2.0 || ^0.3.0
         version: link:../../../popover/packages/vue
       '@rozie/runtime-vue':
         specifier: workspace:^

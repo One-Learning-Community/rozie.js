@@ -92,6 +92,55 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `toggle` | Flip the open state (no-op when `disabled`). Emits `change`. |
 | `reposition` | Recompute the floating position immediately (`computePosition`). **Named `reposition`, not `update`**, because `update` is a reserved Lit `ReactiveElement` lifecycle method. |
 
+## External and virtual reference elements
+
+By default `Popover` positions its content against the built-in anchor wrapper, which holds whatever you project into the `anchor` slot. When the element the panel should point at is owned by **another** component (for example an event element rendered by a calendar library), pass it through the `reference` prop instead. You no longer need a `position: fixed` stand-in sized to the element's rect. Pair it with `trigger="manual"` and a two-way-bound `open`, because your own element drives the gesture:
+
+```rozie
+<data>
+{
+  open: false,
+  target: null,
+}
+</data>
+
+<script>
+// e.g. from a calendar's eventClick callback: the element the library rendered
+const onEventClick = (info) => {
+  $data.target = info.el
+  $data.open = !$data.open
+}
+</script>
+
+<template>
+  <Popover r-model:open="$data.open" trigger="manual" placement="bottom" :reference="$data.target">
+    <div class="event-details">…</div>
+  </Popover>
+</template>
+```
+
+`reference` also accepts a Floating UI [virtual element](https://floating-ui.com/docs/virtual-elements): any object with a `getBoundingClientRect()` method, plus an optional `contextElement` for scroll and resize tracking. Use one to open the panel at a pointer position:
+
+```rozie
+<script>
+const openAtPointer = (event) => {
+  const x = event.clientX
+  const y = event.clientY
+  $data.target = {
+    getBoundingClientRect: () => ({ x, y, left: x, top: y, right: x, bottom: y, width: 0, height: 0 }),
+  }
+  $data.open = true
+}
+</script>
+```
+
+Behavior notes:
+
+- The reference is measured and tracked with Floating UI's `autoUpdate`, and changing `reference` while open repositions the panel against the new one. Pass a **stable** value: a new object on every render restarts tracking.
+- A click on (or inside) a referenced **Element** does not count as an outside click, so a toggle on that element closes the panel instead of dismissing and reopening it. A **virtual** element adds no inside region: only the anchor wrapper and the panel count as inside, and any other click dismisses. Escape dismisses in both cases.
+- The `anchor` slot may stay empty. The (zero-content) anchor wrapper still renders.
+- `null` (the default) restores the built-in anchor. `Popover` behaves exactly as it did before the prop existed.
+
 ## Theming
 
 Every value the component renders is a `--rozie-popover-*` CSS custom property with a built-in fallback, so it works with **zero configuration** yet is completely re-skinnable. Override tokens at any ancestor scope (`:root`, `.dark`, a wrapper, or the `.rozie-popover` element — custom properties inherit through `display:contents`):
@@ -111,3 +160,5 @@ The complete token table and the design-system bridges live on the [dedicated th
 ## Accessibility
 
 The floating element carries `role="tooltip"` when `trigger` is `hover`/`focus`. A `click` popover is **non-modal and role-neutral by default** — it advertises no `role` and no `aria-modal`, so the slot content owns its own ARIA role (e.g. a `role="menu"`); this keeps a dismissable, non-modal layer from falsely telling assistive tech that sibling content is inert. Opt into `modal` to make it a real modal dialog (`role="dialog"` + `aria-modal="true"`) — Popover ships **no focus trap** (it stays a minimal, headless primitive), so when you set `modal` you must supply your own focus containment for the claim to hold. The anchor carries `aria-haspopup="dialog"` and `aria-expanded` (stringified, never dropped on `false`) whenever `trigger` is a real gesture (`click`/`hover`/`focus`); under `trigger="manual"` neither attribute is rendered, since a composing component driving `open` itself owns its own ARIA claim. In tooltip mode the anchor also gains `aria-describedby` pointing at the open content. Project an interactive, focusable element (e.g. a `<button>`) into the `anchor` slot so the keyboard story works; Escape dismisses while open.
+
+With `reference`, the element you position against is yours, and so is its ARIA. Under `trigger="manual"`, Popover's internal anchor wrapper claims no popup (no `aria-haspopup` / `aria-expanded`). Put `aria-haspopup`, `aria-expanded` and `aria-controls` on your own trigger element and keep them in sync with the `open` state you bind.

@@ -1,6 +1,6 @@
 ---
 title: Popover — comparison
-surface_hash: a774bc38b672
+surface_hash: 63d30dd1ebb9
 ---
 
 # Popover — how it compares
@@ -16,7 +16,7 @@ Floating UI ships first-class bindings for some frameworks and nothing for other
 | Official / well-maintained binding | `@floating-ui/react` (full) | Floating Vue (community) | — | — | `solid-floating-ui` (thin) | — |
 | `@rozie-ui/popover` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-`@floating-ui/react` is excellent and far deeper than this primitive (focus management, interactions, the full hook toolkit). If you are React-only and need that depth, use it directly. `@rozie-ui/popover` instead gives **the same engine, the same API, on every framework** — the value is parity across a multi-framework design system, not out-depthing the React-specific package.
+`@floating-ui/react` is excellent and far deeper than this primitive (focus management, interactions, the full hook toolkit). If you are React-only and need that depth, use it directly. `@rozie-ui/popover` instead gives **the same engine, the same API, on every framework** — the value is parity across a multi-framework design system, not out-depthing the React-specific package. Like Floating UI's own bindings, it can position against an element another component owns, or against a [virtual element](https://floating-ui.com/docs/virtual-elements) such as a pointer position, through the [`reference`](/components/popover#external-and-virtual-reference-elements) prop.
 
 ## vs Radix Popover / Headless UI
 

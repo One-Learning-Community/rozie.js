@@ -54,7 +54,7 @@
   "peerDependencies": {
     "solid-js": "^1.8",
     "@tanstack/virtual-core": "^3",
-    "@rozie-ui/popover-solid": "^0.2.0"
+    "@rozie-ui/popover-solid": "^0.2.0 || ^0.3.0"
   },
   "peerDependenciesMeta": {
     "solid-js": {
