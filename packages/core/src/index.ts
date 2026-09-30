@@ -72,9 +72,22 @@ export type { RenderPropsInterfaceOptions } from './codegen/renderPropsInterface
 // @experimental — shape may change before v1.0
 export {
   inferParamType,
+  renderEmitHandlerType,
   renderPropsInterface,
   renderPropType,
 } from './codegen/renderPropsInterface.js';
+// Typed public surface P1 (spec §4.2) — shared type seams consumed by every
+// target: the `<types>` prelude printer, and the `$expose` signature builders
+// (Svelte overload / Lit method overload / Angular + Svelte annotation).
+// @experimental — shape may change before v1.0
+export { renderTypesBlock, typesExportedNames } from './codegen/renderTypesBlock.js';
+export {
+  exposeSignatureAnnotation,
+  exposeSignatureMethodOverload,
+  exposeSignatureOverload,
+} from './codegen/exposeSignatures.js';
+export { lowerSlotParamType } from './codegen/slotParamTypeLowering.js';
+export { synthesizeHandleType } from './codegen/synthesizeHandleType.js';
 // Typed public surface (spec §4.1) — the single authored-type printer consumed
 // by `<emits>` payload, `:param-types` values, and `$expose` signatures.
 // @experimental — shape may change before v1.0

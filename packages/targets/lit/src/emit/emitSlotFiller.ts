@@ -531,7 +531,7 @@ function buildScopeFnText(filler: SlotFillerDecl, ctx: EmitSlotFillerCtx): strin
   // names against producer.SlotDecl.params for ROZ947.
   const scopeTypeStr =
     filler.params.length > 0
-      ? slotScopeTypeObject(filler.params, filler.paramTypes)
+      ? slotScopeTypeObject(filler.params, filler.paramTypes, filler.paramTypesAuthored === true)
       : 'unknown';
 
   const paramSig = `scope: ${scopeTypeStr}`;

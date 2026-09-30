@@ -137,7 +137,7 @@ export function toPascalCase(eventName: string): string {
 function buildFamilyFnType(slot: SlotDecl): string {
   if (slot.params.length === 0) return '() => JSX.Element';
   const paramFields = slot.params
-    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])}`)
+    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)}`)
     .join('; ');
   return `(ctx: { ${paramFields} }) => JSX.Element`;
 }

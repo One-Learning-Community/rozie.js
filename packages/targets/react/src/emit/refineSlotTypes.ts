@@ -83,7 +83,7 @@ export function isDynamicOnlySlot(slot: SlotDecl): boolean {
 function buildFamilyFnType(slot: SlotDecl, slotChildrenType: string): string {
   if (slot.params.length === 0) return `() => ${slotChildrenType}`;
   const paramFields = slot.params
-    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])}`)
+    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)}`)
     .join('; ');
   return `(params: { ${paramFields} }) => ${slotChildrenType}`;
 }
@@ -208,7 +208,7 @@ export function refineSlotTypes(slot: SlotDecl): RefinedSlotType {
     // bugfix. Function-type notation in a union MUST be parenthesised
     // (TS1385: `ReactNode | (ctx: X) => ReactNode` is a parse error).
     const paramFields = slot.params
-      .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`)
+      .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)};`)
       .join(' ');
     const ctxInterface = `interface ChildrenCtx { ${paramFields} }`;
     return {
@@ -246,7 +246,7 @@ export function refineSlotTypes(slot: SlotDecl): RefinedSlotType {
     };
   }
   const paramFields = slot.params
-    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`)
+    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)};`)
     .join(' ');
   const ctxName = pascal + 'Ctx';
   const ctxInterface = `interface ${ctxName} { ${paramFields} }`;

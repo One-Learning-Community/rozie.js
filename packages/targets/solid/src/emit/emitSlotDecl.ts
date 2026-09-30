@@ -88,7 +88,7 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
         // Emit a standalone interface for the ctx (deduplicated).
         if (!seenInterfaces.has(ctxName)) {
           const paramFields = slot.params
-            .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`)
+            .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)};`)
             .join(' ');
           ctxInterfaces.push(`interface ${ctxName} { ${paramFields} }`);
           seenInterfaces.add(ctxName);

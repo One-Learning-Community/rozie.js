@@ -76,7 +76,7 @@ function renderSlotKey(slotName: string): string {
 function buildFamilyValueType(s: SlotDecl): string {
   if (s.params.length === 0) return '() => any';
   const paramFields = s.params
-    .map((p, i) => `${p.name}: ${lowerSlotParamType(s.paramTypes?.[i])}`)
+    .map((p, i) => `${p.name}: ${lowerSlotParamType(s.paramTypes?.[i], s.paramTypesAuthored === true)}`)
     .join('; ');
   return `(props: { ${paramFields} }) => any`;
 }
@@ -121,7 +121,7 @@ export function buildSlotTypeBlock(slots: SlotDecl[]): string {
     const slotName = s.name === '' ? 'default' : s.name;
     const key = renderSlotKey(slotName);
     const paramFields = s.params
-      .map((p, i) => `${p.name}: ${lowerSlotParamType(s.paramTypes?.[i])}`)
+      .map((p, i) => `${p.name}: ${lowerSlotParamType(s.paramTypes?.[i], s.paramTypesAuthored === true)}`)
       .join('; ');
     // Match Plan 02 stub format: two-space indent, semicolon-terminated.
     lines.push(`  ${key}(props: { ${paramFields} }): any;`);

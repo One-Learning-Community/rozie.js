@@ -35,8 +35,13 @@ describe('$expose signatures', () => {
         { target, filename: 'Probe.rozie', sourceMap: false },
       );
       expect(diagnostics.filter((d) => d.severity === 'error'), target).toEqual([]);
-      expect(code, target).not.toContain('() => Calendar | null');
-      expect(code, target).not.toContain('(d: DateInput) => void');
+      // Typed-surface P1 (Task 8): the signature now legitimately appears as a
+      // TYPE (handle interface members). What must never leak is the
+      // compile-time signature STRING as a runtime value (a quoted literal).
+      for (const q of [`'`, `"`]) {
+        expect(code, target).not.toContain(`${q}() => Calendar | null${q}`);
+        expect(code, target).not.toContain(`${q}(d: DateInput) => void${q}`);
+      }
       expect(code, target).not.toContain('$expose(');
     }
   });

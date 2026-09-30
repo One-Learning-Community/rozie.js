@@ -28,7 +28,8 @@
  */
 import * as t from '@babel/types';
 import _generate from '@babel/generator';
-import type { IRComponent } from '../ir/types.js';
+import type { ExposedMethod, IRComponent } from '../ir/types.js';
+import { printTSType } from './renderAuthoredType.js';
 import {
   collectExposedFunctionsByName,
   type FnLike,
@@ -143,10 +144,18 @@ function hasAuthorReturnType(fn: FnLike): boolean {
 
 /**
  * Render one method member line for the interface body.
+ *   signature → `name: <$expose signature>;` (typed-surface P1)
  *   typed   → `name(<params>): <ret>;`
  *   untyped → `name: (...args: any[]) => any;`
  */
-function renderMember(name: string, fn: FnLike | undefined): string {
+function renderMember(method: ExposedMethod, fn: FnLike | undefined): string {
+  const name = method.name;
+  // Typed public surface P1 — an `$expose` compile-time signature (second
+  // argument) wins over the implementation's own shape: it is the author's
+  // declared public contract, and the implementation may be untyped JS.
+  if (method.signature !== undefined) {
+    return `  ${name}: ${printTSType(method.signature)};`;
+  }
   if (fn && hasAuthorReturnType(fn)) {
     const params = fn.params.map((p) => renderParam(p)).join(', ');
     // Generate the inner TSType (not the TSTypeAnnotation wrapper — @babel/
@@ -173,7 +182,7 @@ export function synthesizeHandleType(
   const fnsByName = collectExposedFunctionsByName(ir);
 
   const members = ir.expose.map((method) =>
-    renderMember(method.name, fnsByName.get(method.name)),
+    renderMember(method, fnsByName.get(method.name)),
   );
 
   return `interface ${interfaceName} {\n${members.join('\n')}\n}`;

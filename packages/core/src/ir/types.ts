@@ -347,6 +347,15 @@ export interface SlotDecl {
   defaultContent: TemplateNode | null;
   params: ParamDecl[];
   paramTypes?: TSType[];
+  /**
+   * `true` when `paramTypes` was populated from an authored `<slot
+   * :param-types>` declaration — every slot-param type lowering then prints the
+   * entries verbatim (`lowerSlotParamType(t, true)`). Absent otherwise
+   * (additive-field discipline: never an explicit `false`/`undefined`).
+   *
+   * @experimental — added in typed-surface P1
+   */
+  paramTypesAuthored?: true;
   presence: 'always' | 'conditional';
   nestedSlots: SlotDecl[];
   sourceLoc: SourceLoc;
@@ -515,6 +524,13 @@ export interface SlotFillerDecl {
   params: ParamDecl[];
   /** Threaded from producer SlotDecl.paramTypes via IR cache; undefined when unresolved. */
   paramTypes?: TSType[];
+  /**
+   * Threaded from producer `SlotDecl.paramTypesAuthored` alongside
+   * `paramTypes`; absent when the producer's types were not authored.
+   *
+   * @experimental — added in typed-surface P1
+   */
+  paramTypesAuthored?: true;
   /** Fill body — recursive TemplateNode tree the consumer wrote inside the directive. */
   body: TemplateNode[];
   sourceLoc: SourceLoc;

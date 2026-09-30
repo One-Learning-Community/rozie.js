@@ -75,6 +75,7 @@
  *
  * @experimental — shape may change before v1.0
  */
+import * as t from '@babel/types';
 import type { IRComponent, SlotDecl, TemplateNode } from './types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
@@ -573,9 +574,27 @@ export function threadParamTypes(
       filler.producerPropCollision =
         filler.name !== '' && producerPropNames.has(filler.name);
 
-      // R4 — thread producer paramTypes onto consumer.
+      // R4 — thread producer paramTypes onto consumer, RE-ALIGNED to the
+      // filler's own params by NAME. `SlotDecl.paramTypes` is index-aligned to
+      // the PRODUCER's `params`; a consumer may destructure a subset or a
+      // reordering (`#row="{ tone }"`), and every consumer of
+      // `SlotFillerDecl.paramTypes` indexes it by the FILLER param's position.
+      // Typed public surface P1: once authored `:param-types` flow here, a
+      // positional copy would hand `tone` the type of the producer's first
+      // param. A filler param the producer does not declare (ROZ947, below)
+      // gets the `any` floor.
       if (matchingSlot.paramTypes !== undefined) {
-        filler.paramTypes = matchingSlot.paramTypes;
+        const producerTypes = matchingSlot.paramTypes;
+        filler.paramTypes = filler.params.map((fp) => {
+          const idx = matchingSlot.params.findIndex((p) => p.name === fp.name);
+          const ty = idx >= 0 ? producerTypes[idx] : undefined;
+          return ty ?? t.tsAnyKeyword();
+        });
+        if (matchingSlot.paramTypesAuthored === true) {
+          filler.paramTypesAuthored = true;
+        } else {
+          delete filler.paramTypesAuthored;
+        }
       }
 
       // D-09 / ROZ947 — validate consumer scoped-param names against producer

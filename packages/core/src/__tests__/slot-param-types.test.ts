@@ -48,7 +48,11 @@ describe(':param-types', () => {
       expect(code.length).toBeGreaterThan(0);
       expect(code).not.toContain('param-types');
       expect(code).not.toContain('paramTypes');
-      expect(code).not.toContain('ZzzUniqueRow');
+      // Typed-surface P1 (Task 8): the authored type now legitimately appears in
+      // TYPE positions (slot ctx interfaces). What must never leak is the
+      // compile-time type STRING as a runtime value (a quoted literal).
+      expect(code).not.toContain(`'ZzzUniqueRow[]'`);
+      expect(code).not.toContain(`"ZzzUniqueRow[]"`);
     },
   );
 });

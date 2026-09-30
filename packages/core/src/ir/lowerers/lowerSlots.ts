@@ -550,7 +550,10 @@ function visit(
       const paramTypesAttr = findBindingAttr(node, 'param-types');
       if (paramTypesAttr) {
         const paramTypes = lowerParamTypes(paramTypesAttr, params.map((p) => p.name), diagnostics);
-        if (paramTypes) decl.paramTypes = paramTypes;
+        if (paramTypes) {
+          decl.paramTypes = paramTypes;
+          decl.paramTypesAuthored = true;
+        }
       }
       if (dynamicNameExpr !== undefined) {
         decl.dynamicNameExpr = dynamicNameExpr;

@@ -33,6 +33,7 @@
 import * as t from '@babel/types';
 import type { TSType } from '@babel/types';
 import type { ParamDecl } from '../ir/types.js';
+import { printTSType } from './renderAuthoredType.js';
 
 /**
  * Lower a single `paramTypes` entry to its TS surface string.
@@ -44,13 +45,21 @@ import type { ParamDecl } from '../ir/types.js';
  *     this project already converged on for function-valued props
  *     (`renderPropsInterface.ts`'s `renderPropType`'s `Function`/`'function'`
  *     cases; `project_function_prop_type_lowering_gap`, CLOSED).
+ *   - `authored === true` (typed public surface P1 — the entry came from a
+ *     `<slot :param-types>` declaration) — the type printed verbatim via
+ *     `printTSType`, whatever its shape.
  *   - Any other declared `TSType` shape — also the `'any'` floor for now;
  *     widening to lower additional shapes (string/number/boolean/etc.) is a
  *     future increment, not required by D-13's function-vs-any/unknown
  *     question.
  */
-export function lowerSlotParamType(tsType: TSType | undefined): string {
+export function lowerSlotParamType(tsType: TSType | undefined, authored = false): string {
   if (tsType === undefined) return 'any';
+  // Typed public surface P1 — an AUTHORED type (`<slot :param-types>`, flagged
+  // by `SlotDecl.paramTypesAuthored` / `SlotFillerDecl.paramTypesAuthored`) is
+  // printed verbatim through the single authored-type printer. Unauthored
+  // (e.g. manifest-threaded) entries keep the pre-P1 floors byte-identically.
+  if (authored) return printTSType(tsType);
   if (t.isTSFunctionType(tsType)) return '(...args: any[]) => any';
   return 'any';
 }
@@ -64,9 +73,10 @@ export function lowerSlotParamType(tsType: TSType | undefined): string {
 export function buildSlotParamFields(
   params: readonly ParamDecl[],
   paramTypes: readonly TSType[] | undefined,
+  authored = false,
 ): { name: string; type: string }[] {
   return params.map((p, i) => ({
     name: p.name,
-    type: lowerSlotParamType(paramTypes?.[i]),
+    type: lowerSlotParamType(paramTypes?.[i], authored),
   }));
 }

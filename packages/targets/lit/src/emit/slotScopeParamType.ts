@@ -48,8 +48,12 @@ import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLo
  * targets: a declared function type lowers to variadic-any; an absent or
  * any other `paramTypes` entry falls to the `any` floor (never `unknown`).
  */
-export function slotScopeParamType(paramTypes: TSType[] | undefined, index: number): string {
-  return lowerSlotParamType(paramTypes?.[index]);
+export function slotScopeParamType(
+  paramTypes: TSType[] | undefined,
+  index: number,
+  authored = false,
+): string {
+  return lowerSlotParamType(paramTypes?.[index], authored);
 }
 
 /**
@@ -59,9 +63,13 @@ export function slotScopeParamType(paramTypes: TSType[] | undefined, index: numb
  * `unknown`-based formatting (`; `-joined, single space inside braces) so
  * non-scope emit stays byte-identical.
  */
-export function slotScopeTypeObject(params: ParamDecl[], paramTypes: TSType[] | undefined): string {
+export function slotScopeTypeObject(
+  params: ParamDecl[],
+  paramTypes: TSType[] | undefined,
+  authored = false,
+): string {
   return `{ ${params
-    .map((p, i) => `${p.name}: ${slotScopeParamType(paramTypes, i)}`)
+    .map((p, i) => `${p.name}: ${slotScopeParamType(paramTypes, i, authored)}`)
     .join('; ')} }`;
 }
 
@@ -94,7 +102,7 @@ export function buildRozieSlotsRecordType(slots: SlotDecl[]): string {
   for (const s of slots) {
     if (s.dynamicNameExpr !== undefined) continue;
     if (s.name === '' || isSlotNameIdentifier(s.name)) continue;
-    const scopeType = slotScopeTypeObject(s.params, s.paramTypes);
+    const scopeType = slotScopeTypeObject(s.params, s.paramTypes, s.paramTypesAuthored === true);
     members.push(`'${escapeSingleQuotedKey(s.name)}'?: (scope: ${scopeType}) => unknown;`);
   }
   for (const s of dynamicSlots) {
@@ -102,7 +110,7 @@ export function buildRozieSlotsRecordType(slots: SlotDecl[]): string {
     const key = `\`${s.namePrefix}\${string}\``;
     if (seenKeys.has(key)) continue;
     seenKeys.add(key);
-    const scopeType = slotScopeTypeObject(s.params, s.paramTypes);
+    const scopeType = slotScopeTypeObject(s.params, s.paramTypes, s.paramTypesAuthored === true);
     members.push(`[key: ${key}]: (scope: ${scopeType}) => unknown;`);
   }
   if (members.length === 0) return GENERIC;

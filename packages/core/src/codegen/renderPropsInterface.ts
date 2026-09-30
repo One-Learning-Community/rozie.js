@@ -29,13 +29,31 @@
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
-import type { IRComponent, PropTypeAnnotation, ParamDecl, SlotDecl } from '../ir/types.js';
+import type { EmitDecl, IRComponent, PropTypeAnnotation, ParamDecl, SlotDecl } from '../ir/types.js';
 import type { CompileTarget } from '../compile.js';
 import { buildPropJsdoc } from './buildPropJsdoc.js';
 import { isSlotNameIdentifier } from './slotNameIdentifier.js';
 import { lowerSlotParamType } from './slotParamTypeLowering.js';
 import { renderRecordKey } from './escapeSingleQuotedKey.js';
 import { renderHtmlAttrsExtends, type HtmlAttrsTarget } from './htmlAttrsExtends.js';
+import { printTSType } from './renderAuthoredType.js';
+import { renderTypesBlock } from './renderTypesBlock.js';
+
+/**
+ * Typed public surface P1 (spec §4.2) — the ONE handler-type renderer for an
+ * emit, shared by every target's props/handler surface:
+ *   - `undefined` (no `<emits>` block, or the name is not declared) ⇒ the
+ *     untyped floor `(...args: any[]) => void` (byte-identical to pre-P1);
+ *   - a declared no-payload event (`payload === null`) ⇒ `() => void`;
+ *   - otherwise ⇒ `(payload: <authored type>) => void`.
+ *
+ * @experimental — added in typed-surface P1
+ */
+export function renderEmitHandlerType(decl: EmitDecl | undefined): string {
+  if (decl === undefined) return '(...args: any[]) => void';
+  if (decl.payload === null) return '() => void';
+  return `(payload: ${printTSType(decl.payload)}) => void`;
+}
 
 /**
  * Options controlling the shared props-interface body rendering.
@@ -73,6 +91,17 @@ export interface RenderPropsInterfaceOptions {
    * attributes natively.
    */
   htmlAttrs?: HtmlAttrsTarget;
+  /**
+   * Typed public surface P1 — when set and the component has a `<types>`
+   * block, the rendered text is prefixed with the `<types>` statements
+   * (`renderTypesBlock`) plus a blank line, so the SIDECAR `.d.ts` /
+   * `.d.rozie.ts` declares every name an authored payload / slot type refers
+   * to. Only the sidecar renderers pass it; the inline emitters place `<types>`
+   * themselves. Omitted (or no `<types>`) ⇒ byte-identical output.
+   *
+   * @experimental — added in typed-surface P1
+   */
+  includeTypesBlock?: boolean;
 }
 
 /**
@@ -174,7 +203,9 @@ export function renderPropsInterface(
     const handlerName = `on${eventPascal}`;
     if (emittedHandlers.has(handlerName)) continue;
     emittedHandlers.add(handlerName);
-    lines.push(`  ${handlerName}?: (...args: any[]) => void;`);
+    lines.push(
+      `  ${handlerName}?: ${renderEmitHandlerType(ir.emitDecls?.find((d) => d.name === e))};`,
+    );
   }
 
   // Slots per D-84 + D-86. The slot-children type token is the per-target
@@ -252,8 +283,14 @@ export function renderPropsInterface(
         lines.push(`  ${renderName}?: () => ${slotChildrenType};`);
       }
     } else {
+      // Typed public surface P1 — authored `:param-types` win; otherwise the
+      // D-86 best-effort inference, byte-identical to pre-P1.
       const paramFields = slot.params
-        .map((p) => `${p.name}: ${inferParamType(p, ir)}`)
+        .map((p, i) =>
+          slot.paramTypesAuthored === true
+            ? `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], true)}`
+            : `${p.name}: ${inferParamType(p, ir)}`,
+        )
         .join('; ');
       const sig = `(params: { ${paramFields} }) => ${slotChildrenType}`;
       if (isDefault) {
@@ -294,7 +331,11 @@ export function renderPropsInterface(
     const ext = renderHtmlAttrsExtends(ir, opts.htmlAttrs, lines.slice(1, -1));
     if (ext !== '') lines[0] = `export interface ${ir.name}Props${generics}${ext} {`;
   }
-  return lines.join('\n');
+  const body = lines.join('\n');
+  if (opts.includeTypesBlock === true && ir.types !== null) {
+    return `${renderTypesBlock(ir)}\n\n${body}`;
+  }
+  return body;
 }
 
 /**
@@ -305,7 +346,10 @@ export function renderPropsInterface(
 function buildFamilyFnType(slot: SlotDecl, slotChildrenType: string): string {
   if (slot.params.length === 0) return `() => ${slotChildrenType}`;
   const paramFields = slot.params
-    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])}`)
+    .map(
+      (p, i) =>
+        `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)}`,
+    )
     .join('; ');
   return `(params: { ${paramFields} }) => ${slotChildrenType}`;
 }

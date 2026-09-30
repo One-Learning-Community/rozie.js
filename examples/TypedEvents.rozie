@@ -1,0 +1,68 @@
+<!--
+  TypedEvents.rozie — typed public surface phase 1 shared fixture (spec §3).
+  Plain-JS <script> (the JS-author path). <types> declares the payload + a slot
+  param type; <emits> types `ping` (payload), `reset` (no payload), `select`
+  (Lit DOM-event-name collision, Review Focus #2) and `row-open` (kebab name).
+  `row` slot is typed via :param-types; $expose types getCount/bump/jump (jump
+  is a rest-arg forwarder, Review Focus #3) and leaves `clear` untyped.
+-->
+<rozie name="TypedEvents">
+
+<types>
+export type Count = number
+export interface PingPayload { count: Count; label: string }
+</types>
+
+<emits>
+{
+  ping:       { payload: 'PingPayload', docs: { description: 'Fired on every bump with the running count.' } },
+  reset:      { docs: { description: 'Fired when the count is cleared.' } },
+  select:     { payload: 'number', docs: { description: 'Fired with the selected count.' } },
+  'row-open': { payload: '{ index: number }' },
+}
+</emits>
+
+<props>
+{
+  tone: { type: String, default: 'info' },
+}
+</props>
+
+<data>
+{
+  count: 0,
+}
+</data>
+
+<script>
+function bump() {
+  const next = $data.count + 1
+  $data.count = next
+  $emit('ping', { count: next, label: $props.tone })
+}
+function clear() {
+  $data.count = 0
+  $emit('reset')
+}
+function getCount() {
+  return $data.count
+}
+function jump(...a) {
+  $data.count = a.length
+}
+$expose(
+  { bump, clear, getCount, jump },
+  { getCount: '() => number', bump: '() => void', jump: '(to: number) => void' },
+)
+</script>
+
+<template>
+  <div class="typed-events">
+    <button class="bump" @click="bump()">+</button>
+    <button class="clear" @click="clear()" @dblclick="$emit('select', $data.count)">reset</button>
+    <button class="open" @click="$emit('row-open', { index: $data.count })">open</button>
+    <slot name="row" :count="$data.count" :tone="$props.tone" :param-types="{ count: 'Count', tone: 'string' }" />
+  </div>
+</template>
+
+</rozie>

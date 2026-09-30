@@ -160,11 +160,11 @@ export function buildSlotCtx(slot: SlotDecl): SlotCtxRendered {
   // through the shared `lowerSlotParamType` helper instead of a hardcoded
   // `any`.
   const implicitProps = slot.params
-    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])}`)
+    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)}`)
     .join('; ');
   paramFields.push(`  $implicit: { ${implicitProps} };`);
   for (const [i, p] of slot.params.entries()) {
-    paramFields.push(`  ${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`);
+    paramFields.push(`  ${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)};`);
   }
 
   const interfaceDecl = `interface ${ctxName} {\n${paramFields.join('\n')}\n}`;
@@ -283,11 +283,11 @@ export function buildFamilyCtxDecls(slots: SlotDecl[]): string[] {
     }
     const paramFields: string[] = [];
     const implicitProps = slot.params
-      .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])}`)
+      .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)}`)
       .join('; ');
     paramFields.push(`  $implicit: { ${implicitProps} };`);
     for (const [i, p] of slot.params.entries()) {
-      paramFields.push(`  ${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`);
+      paramFields.push(`  ${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)};`);
     }
     out.push(`interface ${ctxName} {\n${paramFields.join('\n')}\n}`);
   }
