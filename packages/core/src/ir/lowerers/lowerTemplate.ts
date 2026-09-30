@@ -1063,6 +1063,7 @@ function lowerBareElement(
         // doesn't reach the per-target template emitter as a normal scoped
         // binding. Non-portal slots and other bindings are passed through.
         if (attr.name === 'params') continue;
+        if (attr.name === 'param-types') continue;
         const expr = tryParseExpression(attr.value);
         if (expr) {
           args.push({

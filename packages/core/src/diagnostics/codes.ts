@@ -661,6 +661,8 @@ export const RozieErrorCode = {
   // Typed public surface (spec 2026-09-29) — ROZ151..ROZ156.
   EMIT_UNDECLARED: 'ROZ151', // error — <emits> is present and a $emit('x') (in <script>, <template> or <listeners>) names an event it does not declare; <emits> is the complete list.
   EMIT_DECLARED_UNUSED: 'ROZ152', // warning — <emits> declares an event that no $emit call ever fires.
+  SLOT_PARAM_TYPES_UNKNOWN_KEY: 'ROZ153', // error — a <slot :param-types> key is not a param the slot passes (via :params or a scoped attribute).
+  SLOT_PARAM_TYPES_INVALID: 'ROZ154', // error — <slot :param-types> must be an object literal whose values are string literals holding TypeScript types, e.g. :param-types="{ row: 'Row<T>', index: 'number' }".
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // error — SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)

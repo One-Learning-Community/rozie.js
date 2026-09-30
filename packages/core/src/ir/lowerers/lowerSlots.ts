@@ -35,6 +35,7 @@ import type {
 import type { SlotDecl, ParamDecl } from '../types.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
+import { parseAuthoredType } from '../../codegen/renderAuthoredType.js';
 
 /**
  * Determine whether `expr` references `$slots.<targetSlotName>` anywhere
@@ -109,6 +110,8 @@ function collectParamsFromSlotElement(slot: TemplateElement, isPortal: boolean):
     // through normal authoring; see slotDynamicName.test.ts for the
     // reachability proof this task's Task 2 companion requires.
     if (attr.name === 'name') continue;
+    // Typed-surface — `:param-types` is a compile-time type declaration, never a slot param.
+    if (attr.name === 'param-types') continue;
     // Portal slots use `:params="['arg', ...]"` as a TYPE DECLARATION for
     // the scope-key names, not as a normal scoped-slot binding source —
     // strip it here so it doesn't reach the consumer-facing scoped-slot
@@ -215,6 +218,76 @@ function determinePresence(
  * separately from `collectParamsFromSlotElement`'s param-collection pass,
  * which now skips it entirely (Phase 79 R1).
  */
+/**
+ * Typed-surface — lower `<slot :param-types="{ row: 'Row[]' }">` to an
+ * index-aligned TSType[] (omitted params are `any`). Returns undefined (after
+ * pushing a diagnostic) when the attribute is unusable.
+ */
+function lowerParamTypes(
+  attr: TemplateAttr,
+  paramNames: string[],
+  diagnostics: Diagnostic[],
+): t.TSType[] | undefined {
+  const invalid = (why: string): undefined => {
+    diagnostics.push({
+      code: RozieErrorCode.SLOT_PARAM_TYPES_INVALID,
+      severity: 'error',
+      message: `<slot :param-types> ${why}`,
+      loc: attr.loc,
+      hint: `Use an object literal of string literals, e.g. :param-types="{ row: 'Row<T>', index: 'number' }".`,
+    });
+    return undefined;
+  };
+  let expr: t.Expression;
+  try {
+    expr = parseExpression(attr.value as string, { plugins: ['typescript'] });
+  } catch {
+    return invalid('is not a valid expression.');
+  }
+  if (!t.isObjectExpression(expr)) return invalid('must be an object literal.');
+  const typed = new Map<string, t.TSType>();
+  const unknown: string[] = [];
+  for (const prop of expr.properties) {
+    if (!t.isObjectProperty(prop) || prop.computed) {
+      return invalid('must contain only plain `key: \'type\'` entries (no spread, methods or computed keys).');
+    }
+    let key: string;
+    if (t.isIdentifier(prop.key)) key = prop.key.name;
+    else if (t.isStringLiteral(prop.key)) key = prop.key.value;
+    else return invalid('keys must be identifiers or string literals.');
+    if (!t.isStringLiteral(prop.value)) {
+      return invalid(`value for "${key}" must be a string literal holding a TypeScript type.`);
+    }
+    const parsed = parseAuthoredType(prop.value.value);
+    if ('error' in parsed) {
+      diagnostics.push({
+        code: RozieErrorCode.INVALID_AUTHORED_TYPE,
+        severity: 'error',
+        message: `<slot :param-types> type for "${key}" is not a valid TypeScript type: ${parsed.error}`,
+        loc: attr.loc,
+      });
+      continue;
+    }
+    if (!paramNames.includes(key)) {
+      unknown.push(key);
+      continue;
+    }
+    typed.set(key, parsed.type);
+  }
+  for (const key of unknown) {
+    diagnostics.push({
+      code: RozieErrorCode.SLOT_PARAM_TYPES_UNKNOWN_KEY,
+      severity: 'error',
+      message: `<slot :param-types> key "${key}" is not a param this slot passes.`,
+      loc: attr.loc,
+      hint: paramNames.length
+        ? `Valid params: ${paramNames.join(', ')}.`
+        : 'This slot passes no params.',
+    });
+  }
+  return paramNames.map((n) => typed.get(n) ?? t.tsAnyKeyword());
+}
+
 function findBindingAttr(slot: TemplateElement, attrName: string): TemplateAttr | null {
   for (const a of slot.attributes) {
     if (a.kind === 'binding' && a.name === attrName && a.value !== null) return a;
@@ -474,6 +547,11 @@ function visit(
       // Additive-field discipline (matches inLoop/isPortal/isReactive below):
       // assigned only when set, never as explicit `undefined`, so a
       // static-only-name component's SlotDecl carries no new keys (AC-1).
+      const paramTypesAttr = findBindingAttr(node, 'param-types');
+      if (paramTypesAttr) {
+        const paramTypes = lowerParamTypes(paramTypesAttr, params.map((p) => p.name), diagnostics);
+        if (paramTypes) decl.paramTypes = paramTypes;
+      }
       if (dynamicNameExpr !== undefined) {
         decl.dynamicNameExpr = dynamicNameExpr;
       }

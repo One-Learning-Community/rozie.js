@@ -42,6 +42,7 @@ function collectSlotParams(el: TemplateElement): SlotParamDecl[] {
   for (const attr of el.attributes) {
     if (attr.kind !== 'binding') continue;
     if (attr.value === null) continue;
+    if (attr.name === 'param-types') continue;
     params.push({
       name: attr.name,
       valueExpressionRaw: attr.value,
