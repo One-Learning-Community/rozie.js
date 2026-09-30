@@ -192,6 +192,11 @@ function applyTheme(t) { console.log(t); }
     expect(extractAttrBody(tag, 'onChange')).toMatch(/setTheme/);
   });
 
+  // Typed-surface P3 review fix — this and the two capture cases below wrap
+  // the <select> in a root <div>: the r-model / same-event collision logic
+  // under test is independent of root attr+listener fallthrough, which (since
+  // the React R6 all-fire fix) routes a ROOT element's local @events through
+  // `{...mergeListeners(…, pickListeners(attrs))}` instead of bare JSX props.
   it('non-colliding case stays untouched: r-model + @click (different event) emits both onChange and onClick separately', () => {
     const ir = lowerInline(`
 <rozie name="Plain2">
@@ -200,9 +205,11 @@ function applyTheme(t) { console.log(t); }
 function onSelectClick() { console.log('clicked'); }
 </script>
 <template>
+<div>
 <select data-testid="ctl-theme" r-model="$data.theme" @click="onSelectClick()">
   <option value="base">base</option>
 </select>
+</div>
 </template>
 </rozie>
 `);
@@ -233,10 +240,12 @@ function onSelectClick() { console.log('clicked'); }
 function applyTheme(t) { console.log(t); }
 </script>
 <template>
+<div>
 <select data-testid="ctl-theme" r-model="$data.theme" @change.capture="applyTheme($data.theme)">
   <option value="base">base</option>
   <option value="material">material</option>
 </select>
+</div>
 </template>
 </rozie>
 `);
@@ -267,10 +276,12 @@ function applyTheme(t) { console.log(t); }
 function trackChange(t) { console.log('track', t); }
 </script>
 <template>
+<div>
 <select data-testid="ctl-theme" r-model="$data.theme" @change="applyTheme($data.theme)" @change.capture="trackChange($data.theme)">
   <option value="base">base</option>
   <option value="material">material</option>
 </select>
+</div>
 </template>
 </rozie>
 `);

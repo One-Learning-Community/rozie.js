@@ -39,6 +39,18 @@ const CONTENT_OWNED_KEYS: Readonly<Record<HtmlAttrsTarget, readonly string[]>> =
   svelte: ['children'],
 };
 
+/**
+ * The attribute type of a root `tag` on `target` — element-specific for a
+ * standard HTML tag, the generic `HTMLAttributes<HTMLElement>` otherwise.
+ * Shared by the props-interface `extends` clause and React's typed R6
+ * all-fire merge partial, so both name the same element surface.
+ *
+ * @experimental — shape may change before v1.0
+ */
+export function renderHtmlAttrsBaseType(target: HtmlAttrsTarget, tag: string): string {
+  return attrsBaseType(target, tag.toLowerCase());
+}
+
 function attrsBaseType(target: HtmlAttrsTarget, tag: string): string {
   const known = HTML_INTRINSIC_TAGS.has(tag);
   switch (target) {

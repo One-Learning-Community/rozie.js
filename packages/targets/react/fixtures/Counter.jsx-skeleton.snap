@@ -1,5 +1,5 @@
 <>
-<div {...attrs} className={clsx(clsx("counter", { hovering: hovering }), (attrs.className as string | undefined))} onMouseEnter={($event) => { setHovering(true); }} onMouseLeave={($event) => { setHovering(false); }}>
+<div {...attrs} className={clsx(clsx("counter", { hovering: hovering }), (attrs.className as string | undefined))} {...mergeListeners({ onMouseEnter: ($event) => { setHovering(true); }, onMouseLeave: ($event) => { setHovering(false); } } satisfies import('react').ComponentPropsWithoutRef<'div'> & Record<string, unknown>, pickListeners(attrs))}>
   <button disabled={!canDecrement} aria-label="Decrement" onClick={decrement}>−</button>
   <span className={"value"}>{value}</span>
   <button disabled={!canIncrement} aria-label="Increment" onClick={increment}>+</button>

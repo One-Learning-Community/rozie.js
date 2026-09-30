@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { clsx, rozieAttr, rozieContext } from '@rozie/runtime-react';
+import { clsx, mergeListeners, pickListeners, rozieAttr, rozieContext } from '@rozie/runtime-react';
 import './Tab.css';
 
 interface TabProps extends Omit<import('react').ComponentPropsWithoutRef<'button'>, 'label' | 'index' | 'children' | 'dangerouslySetInnerHTML'> {
@@ -22,7 +22,7 @@ export default function Tab(_props: TabProps): JSX.Element {
 
   return (
     <>
-    <button data-tab="" type="button" role="tab" data-active={rozieAttr(tabs && tabs.active === props.index)} {...attrs} className={clsx(clsx("tab", { "is-active": tabs && tabs.active === props.index }), (attrs.className as string | undefined))} onClick={($event) => { tabs && tabs.setActive(props.index); }} data-rozie-s-18645a16="">
+    <button data-tab="" type="button" role="tab" data-active={rozieAttr(tabs && tabs.active === props.index)} {...attrs} className={clsx(clsx("tab", { "is-active": tabs && tabs.active === props.index }), (attrs.className as string | undefined))} {...mergeListeners({ onClick: ($event) => { tabs && tabs.setActive(props.index); } } satisfies import('react').ComponentPropsWithoutRef<'button'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-18645a16="">
       {props.label}
     </button>
     </>

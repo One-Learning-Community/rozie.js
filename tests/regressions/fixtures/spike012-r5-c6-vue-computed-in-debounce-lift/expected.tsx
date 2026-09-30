@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useDebouncedCallback } from '@rozie/runtime-react';
+import { mergeListeners, pickListeners, useDebouncedCallback } from '@rozie/runtime-react';
 
 interface ComputedInDebounceLiftProps extends Omit<import('react').ComponentPropsWithoutRef<'input'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
@@ -12,7 +12,7 @@ export default function ComputedInDebounceLift(props: ComputedInDebounceLiftProp
 
   return (
     <>
-    <input {...attrs} onInput={_rozieDebouncedHandler0} data-rozie-s-e598eaaa="" />
+    <input {...attrs} {...mergeListeners({ onInput: _rozieDebouncedHandler0 } satisfies import('react').ComponentPropsWithoutRef<'input'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-e598eaaa="" />
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { clsx, parseInlineStyle, rozieAttr, rozieDisplay } from '@rozie/runtime-react';
+import { clsx, mergeListeners, parseInlineStyle, pickListeners, rozieAttr, rozieDisplay } from '@rozie/runtime-react';
 import './Toaster.css';
 
 interface ToastCtx { toast: any; dismiss: any; }
@@ -648,7 +648,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
 
   return (
     <>
-    <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} className={clsx(clsx("rozie-toaster", 'rozie-toaster--' + props.position + (props.stacked ? ' rozie-toaster--stacked' : '')), (attrs.className as string | undefined))} onMouseEnter={($event) => { onMouseEnter(); }} onMouseLeave={($event) => { onMouseLeave(); }} onFocus={($event) => { onFocusIn(); }} onBlur={($event) => { onFocusOut($event); }} data-rozie-s-12d4265c="">
+    <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} className={clsx(clsx("rozie-toaster", 'rozie-toaster--' + props.position + (props.stacked ? ' rozie-toaster--stacked' : '')), (attrs.className as string | undefined))} {...mergeListeners({ onMouseEnter: ($event) => { onMouseEnter(); }, onMouseLeave: ($event) => { onMouseLeave(); }, onFocus: ($event) => { onFocusIn(); }, onBlur: ($event) => { onFocusOut($event); } } satisfies import('react').ComponentPropsWithoutRef<'div'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-12d4265c="">
       
       {toasts.map((t, ti) => <div key={t.id} className={clsx("rozie-toast", 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))} style={parseInlineStyle(toastStyle(t, ti))} role="status" aria-live={rozieAttr(liveFor(t.type))} onAnimationEnd={($event) => { t.exiting && removeToast(t.id); }} onPointerDown={($event) => { onToastPointerDown(t, $event); }} onPointerMove={($event) => { onToastPointerMove(t, $event); }} onPointerUp={($event) => { onToastPointerUp(t, $event); }} onPointerCancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c="">
         {(props.renderToast ?? props.slots?.['toast']) ? ((props.renderToast ?? props.slots?.['toast']) as Function)({ toast: t, dismiss }) : <>{!!(t.type === 'loading') && <span className={"rozie-toast-spinner"} aria-hidden="true" data-rozie-s-12d4265c="" />}<span className={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t.message)}</span>{!!(t.action) && <button type="button" className={"rozie-toast-action"} onClick={($event) => { runAction(t); }} data-rozie-s-12d4265c="">{rozieDisplay(t.action.label)}</button>}<button type="button" className={"rozie-toast-close"} aria-label="Dismiss" onClick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}

@@ -43,7 +43,7 @@ import type {
   IRTemplateNode as TemplateNode,
   TemplateStaticTextIR,
 } from '@rozie/core';
-import { RozieErrorCode } from '@rozie/core';
+import { RozieErrorCode, renderHtmlAttrsBaseType } from '@rozie/core';
 import { jsxBoundaryText } from '../../../../core/src/emit/jsxBoundaryWhitespace.js';
 import type {
   ReactImportCollector,
@@ -880,16 +880,14 @@ function hasDynamicListenerSpread(node: TemplateElementIR): boolean {
  * rest bucket, attrs + listeners alike. Returns the unchanged list when no
  * collapse is needed.
  *
- * KNOWN LIMITATION — when an element carries `$attrs` + `$listeners` AND
- * local `@event` handlers, dropping the listener-spread side means the
- * per-key dispatcher merge (emitElementEvents) no longer captures the
- * consumer's onClick (which lives inside attrs). The trailing `{...attrs}`
- * spread then overrides the local `@click` with the consumer's onClick
- * (last-wins). This is a known regression from the R6 listener all-fire
- * intent for the narrow attrs-auto+listeners-auto+local-event case, but
- * is the lesser-of-two-evils trade vs the className-clobber bug. A future
- * fix could inline `attrs.onClick?.($event)` into the local event dispatcher
- * to restore all-fire without re-spreading attrs.
+ * R6 all-fire for the attrs+listeners+local-`@event` case — dropping the
+ * listener-spread side used to leave the local `onClick={…}` AFTER
+ * `{...attrs}`, so JSX last-wins silently dropped the consumer's `onClick`
+ * (typed-surface phase 3 review finding). `emitElementListeners` now routes
+ * that case through `{...mergeListeners(<events>, pickListeners(attrs))}`:
+ * `pickListeners` hands the merge ONLY the function-valued `on[A-Z]*` keys,
+ * so `attrs.className` / `attrs.style` never re-enter the trailing spread
+ * (no className clobber) — the React port of the Solid fix (0cff671ed).
  */
 function isBareListenersSpread(spread: ListenerSpreadIR): boolean {
   return t.isIdentifier(spread.expression, { name: '$listeners' });
@@ -964,17 +962,25 @@ function emitElementListeners(
   const node = dedupListenersAgainstAttrs(origNode);
   const hasEvents = node.events.length > 0;
   const hasSpreads = node.listenerSpreads.length > 0;
+  // The bare `$listeners` spread the dedup dropped (it rides inside `attrs`).
+  // When the element ALSO binds local `@event`s, the consumer's listener keys
+  // must still all-fire alongside them (R6): force the runtime-merge path and
+  // feed it `pickListeners(attrs)` — listener keys only, so the merged
+  // className/style computed earlier is never re-applied.
+  const droppedBareListeners =
+    node !== origNode ? origNode.listenerSpreads.find(isBareListenersSpread) : undefined;
+  const mergeDroppedListeners = droppedBareListeners !== undefined && hasEvents;
 
   if (!hasEvents && !hasSpreads) {
     return { eventsJsx: '', extraSpreads: [] };
   }
 
   // No spreads → classic events-only path.
-  if (!hasSpreads) {
+  if (!hasSpreads && !mergeDroppedListeners) {
     return { eventsJsx: emitElementEvents(node, ctx), extraSpreads: [] };
   }
 
-  const dynamic = hasDynamicListenerSpread(node);
+  const dynamic = mergeDroppedListeners || hasDynamicListenerSpread(node);
 
   // CASE: all-literal merge — synthesize virtual Listeners from each
   // literal-key entry, run the existing per-key dispatcher merge. Bare
@@ -1072,7 +1078,20 @@ function emitElementListeners(
   // handlers in source order across spreads.
   const mergeArgs: string[] = [];
   if (eventsPartialEntries.length > 0) {
-    mergeArgs.push(`{ ${eventsPartialEntries.join(', ')} }`);
+    // In the forced all-fire merge (local @events + dropped bare `$listeners`,
+    // typed-surface P3 review fix) the handlers used to be JSX props on the
+    // element and got their `$event` type contextually. An object-literal
+    // merge partial has no contextual type, so `satisfies <element props>`
+    // restores exactly that typing (no implicit-any `$event` under a strict
+    // consumer tsconfig). The element surface is the SAME one the props
+    // interface extends (`renderHtmlAttrsBaseType`), `& Record<string,
+    // unknown>` so a custom-event key never trips an excess-property check.
+    const partial = `{ ${eventsPartialEntries.join(', ')} }`;
+    mergeArgs.push(
+      mergeDroppedListeners
+        ? `${partial} satisfies ${renderHtmlAttrsBaseType('react', node.tagName)} & Record<string, unknown>`
+        : partial,
+    );
   }
   const attrCtx: import('./emitTemplateAttribute.js').EmitAttrCtx = {
     ir: ctx.ir,
@@ -1080,6 +1099,10 @@ function emitElementListeners(
   };
   for (const spread of node.listenerSpreads) {
     mergeArgs.push(emitListenerSpreadAsMergePartial(spread, attrCtx));
+  }
+  if (mergeDroppedListeners) {
+    ctx.collectors.runtime.add('pickListeners');
+    mergeArgs.push(`pickListeners(${emitListenerSpreadAsMergePartial(droppedBareListeners!, attrCtx)})`);
   }
 
   // 4. Single mergeListeners runtime helper call.

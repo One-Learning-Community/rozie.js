@@ -1,6 +1,6 @@
 import { Fragment, forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { clsx, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
+import { clsx, mergeListeners, pickListeners, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './Pagination.css';
 import { paginationItems } from './internal/paginationItems';
 
@@ -245,7 +245,7 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
 
   return (
     <>
-    <nav ref={nav} aria-label={props.ariaLabel} {...attrs} className={clsx(clsx("rozie-pagination", { "rozie-pagination--disabled": props.disabled }), (attrs.className as string | undefined))} onKeyDown={($event) => { onControlKeydown($event); }} data-rozie-s-de247ae2="">
+    <nav ref={nav} aria-label={props.ariaLabel} {...attrs} className={clsx(clsx("rozie-pagination", { "rozie-pagination--disabled": props.disabled }), (attrs.className as string | undefined))} {...mergeListeners({ onKeyDown: ($event) => { onControlKeydown($event); } } satisfies import('react').ComponentPropsWithoutRef<'nav'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-de247ae2="">
       
       {(props.renderPrevControl ?? props.slots?.['prevControl']) ? ((props.renderPrevControl ?? props.slots?.['prevControl']) as Function)({ disabled: !canPrev() || props.disabled, goto: goPrev, page: currentPage() - 1 }) : <button type="button" className={"rozie-pagination-control rozie-pagination-prev"} data-page-control="" tabIndex={tabIndexFor(true)} disabled={!canPrev() || props.disabled} aria-disabled={!!(!canPrev() || props.disabled)} aria-label="Previous page" onClick={goPrev} data-rozie-s-de247ae2="">‹</button>}
 

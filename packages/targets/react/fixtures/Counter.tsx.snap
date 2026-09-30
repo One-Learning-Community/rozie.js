@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { clsx, useControllableState } from '@rozie/runtime-react';
+import { clsx, mergeListeners, pickListeners, useControllableState } from '@rozie/runtime-react';
 import './Counter.css';
 
 interface CounterProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'step' | 'min' | 'max' | 'children' | 'dangerouslySetInnerHTML'> {
@@ -42,7 +42,7 @@ export default function Counter(_props: CounterProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} className={clsx(clsx("counter", { hovering: hovering }), (attrs.className as string | undefined))} onMouseEnter={($event) => { setHovering(true); }} onMouseLeave={($event) => { setHovering(false); }} data-rozie-s-c72e01d0="">
+    <div {...attrs} className={clsx(clsx("counter", { hovering: hovering }), (attrs.className as string | undefined))} {...mergeListeners({ onMouseEnter: ($event) => { setHovering(true); }, onMouseLeave: ($event) => { setHovering(false); } } satisfies import('react').ComponentPropsWithoutRef<'div'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-c72e01d0="">
       <button disabled={!canDecrement} aria-label="Decrement" onClick={decrement} data-rozie-s-c72e01d0="">−</button>
       <span className={"value"} data-rozie-s-c72e01d0="">{value}</span>
       <button disabled={!canIncrement} aria-label="Increment" onClick={increment} data-rozie-s-c72e01d0="">+</button>

@@ -81,6 +81,7 @@ export {
 export type { HtmlAttrsTarget } from './codegen/htmlAttrsExtends.js';
 export {
   collectInterfaceMemberNames,
+  renderHtmlAttrsBaseType,
   renderHtmlAttrsExtends,
 } from './codegen/htmlAttrsExtends.js';
 export type { CompileOptions, CompileResult, CompileTarget } from './compile.js';

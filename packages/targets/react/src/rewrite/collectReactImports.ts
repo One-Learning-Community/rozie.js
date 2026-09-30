@@ -115,6 +115,9 @@ export type RuntimeReactImport =
   | 'normalizeComponentAttrs'
   | 'normalizeListeners'
   | 'mergeListeners'
+  // Typed-surface P3 review fix — filters `attrs` to listener keys for the R6
+  // all-fire merge on an auto-fallthrough root with its own @events.
+  | 'pickListeners'
   | 'isEnter'
   | 'isEscape'
   | 'isTab'

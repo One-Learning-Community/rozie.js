@@ -8,16 +8,13 @@
 // .snap and .compiled.tsx and fails if they diverge. If that test fails after
 // an emitter change, audit this file against the new .snap and update by hand.
 import { useMemo, useState } from 'react';
-// After Phase 15 follow-up Bug B, the React emitter drops the
-// auto-synthesized bare-`$listeners` listenerSpread whenever a bare-`$attrs`
-// attribute-spread is already present on the same element (both lower to the
-// same `attrs` identifier in React; the `$attrs` spread already carries the
-// whole splitProps rest bucket, listeners included). Counter has @-event
-// handlers on its root <div>, so the merge-path no longer routes through
-// `mergeListeners` — local events emit individually after `{...attrs}` and
-// the `mergeListeners` import is no longer collected. Mirror that here to
-// keep the compiled-fixtures-drift gate green.
-import { clsx, useControllableState } from '@rozie/runtime-react';
+// Typed-surface P3 review fix (React R6 all-fire): Counter has @-event
+// handlers on its auto-fallthrough root <div>, so the emitter routes them
+// through `{...mergeListeners(<local>, pickListeners(attrs))}` — a consumer's
+// onMouseEnter/onMouseLeave fires alongside the component's own. This
+// hand-tuned module takes no pass-through props, so `attrs` is empty here;
+// the shape (and the runtime imports the drift gate compares) mirrors the snap.
+import { clsx, mergeListeners, pickListeners, useControllableState } from '@rozie/runtime-react';
 
 const styles: Record<string, string> = new Proxy({}, { get: (_t, k) => String(k) });
 
@@ -50,11 +47,15 @@ export default function Counter(props: CounterProps): JSX.Element {
     if (canDecrement) setValue((prev) => prev - step);
   };
 
+  const attrs: Record<string, unknown> = {};
+
   return (
     <div
       className={clsx(styles.counter, { [styles.hovering]: hovering })}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
+      {...mergeListeners(
+        { onMouseEnter: () => setHovering(true), onMouseLeave: () => setHovering(false) },
+        pickListeners(attrs),
+      )}
     >
       <button
         disabled={!canDecrement}

@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { clsx, rozieAttr, useControllableState } from '@rozie/runtime-react';
+import { clsx, mergeListeners, pickListeners, rozieAttr, useControllableState } from '@rozie/runtime-react';
 import './Dialog.css';
 import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock';
 
@@ -164,7 +164,7 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
 
   return (
     <>
-    <dialog aria-label={rozieAttr(props.ariaLabel)} aria-labelledby={rozieAttr(props.ariaLabelledby)} {...attrs} className={clsx("rozie-dialog", (attrs.className as string | undefined))} onCancel={($event) => { onCancel($event); }} onClick={($event) => { onClick($event); }} data-rozie-s-2a679072="">
+    <dialog aria-label={rozieAttr(props.ariaLabel)} aria-labelledby={rozieAttr(props.ariaLabelledby)} {...attrs} className={clsx("rozie-dialog", (attrs.className as string | undefined))} {...mergeListeners({ onCancel: ($event) => { onCancel($event); }, onClick: ($event) => { onClick($event); } } satisfies import('react').ComponentPropsWithoutRef<'dialog'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-2a679072="">
       
       <div className={"rozie-dialog-panel"} ref={panelEl} data-rozie-s-2a679072="">
         {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}

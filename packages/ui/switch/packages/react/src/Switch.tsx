@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { clsx, rozieAttr, useControllableState } from '@rozie/runtime-react';
+import { clsx, mergeListeners, pickListeners, rozieAttr, useControllableState } from '@rozie/runtime-react';
 import './Switch.css';
 
 interface ChildrenCtx { checked: any; toggle: any; }
@@ -122,7 +122,7 @@ const Switch = forwardRef<SwitchHandle, SwitchProps>(function Switch(_props: Swi
 
   return (
     <>
-    <button ref={control} type="button" role="switch" tabIndex={controlTabindex()} disabled={!!props.disabled} aria-checked={!!modelValue} aria-disabled={!!props.disabled} aria-readonly={!!props.readonly} aria-label={rozieAttr(props.ariaLabel)} {...attrs} className={clsx(clsx("rozie-switch", { "rozie-switch--checked": isChecked(), "rozie-switch--disabled": props.disabled }), (attrs.className as string | undefined))} onClick={($event) => { onClick(); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-5a76e232="">
+    <button ref={control} type="button" role="switch" tabIndex={controlTabindex()} disabled={!!props.disabled} aria-checked={!!modelValue} aria-disabled={!!props.disabled} aria-readonly={!!props.readonly} aria-label={rozieAttr(props.ariaLabel)} {...attrs} className={clsx(clsx("rozie-switch", { "rozie-switch--checked": isChecked(), "rozie-switch--disabled": props.disabled }), (attrs.className as string | undefined))} {...mergeListeners({ onClick: ($event) => { onClick(); }, onKeyDown: ($event) => { onKeydown($event); } } satisfies import('react').ComponentPropsWithoutRef<'button'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-5a76e232="">
       {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ checked: isChecked(), toggle }) : ((props.children ?? props.slots?.['']) ?? <span className={"rozie-switch-track"} data-rozie-s-5a76e232="">
           <span className={"rozie-switch-thumb"} data-rozie-s-5a76e232="" />
         </span>)}
