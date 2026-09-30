@@ -37,6 +37,21 @@ type Variant = 'a' | 'b'
 
 See `examples/typed/PropsCustomType.rozie` for a worked reference covering both a string-literal union alias and a custom `interface` flowing into prop-type position across all six targets.
 
+### Union types and Lit HTML attributes
+
+An array `type:` such as `[Number, String]` declares a union. On React, Vue, Svelte, Angular and Solid a union only shapes the prop's TypeScript type — the prop always receives a real JS value from a binding.
+
+Lit is different: a Lit custom element can also receive a prop as an HTML attribute string (`<my-calendar height="600">`). So the Lit emitter picks the attribute conversion from the **whole** union, never from its first member, and the member order means nothing:
+
+| Union contains | HTML attribute becomes |
+|---|---|
+| exactly `Boolean` and `String` | `'true'` / `'false'` / a bare attribute → a boolean; any other string stays a string |
+| `Number` and `String` (no `Boolean`) | a finite numeric string (`'600'`) → a number; any other string (`'auto'`, `'100%'`) stays a string |
+| `String`, but neither `Number` nor `Boolean` (e.g. `[Object, String]`) | the string, unchanged |
+| no `String` (e.g. `[Element, Object]`) | the first member's conversion — such props are meant to be set as properties |
+
+Removing the attribute gives `null` (`false` for the Boolean/String row). `model: true` props follow the same rules, except that removing the attribute restores the prop's default. A property binding (`.height=${600}` in a Lit template, or any framework binding that sets the DOM property) never passes through a converter — the value arrives exactly as bound.
+
 ### One HTML rule survives: escape a literal `</script>`
 
 Block bodies are real JS (or CSS), but the `.rozie` file itself is still HTML-shaped — and Rozie keeps HTML's one parsing rule about that: **a block ends at the first literal close sequence of its own tag**, even when that sequence sits inside a JS string or comment. This is exactly how `<script>` behaves in plain HTML, in `.vue` SFCs, and in `.svelte` files.

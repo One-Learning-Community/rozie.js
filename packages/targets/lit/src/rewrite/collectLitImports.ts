@@ -238,7 +238,15 @@ export type RuntimeLitImport =
    * component with no `$computed` (or with only bailed computeds) keeps a
    * byte-identical `@rozie/runtime-lit` import line.
    */
-  | 'rozieMemo';
+  | 'rozieMemo'
+  /**
+   * Quick 260930-814 — `rozieNumberOrStringAttr`, the Lit attribute converter
+   * for a Number+String union prop, shipped from `@rozie/runtime-lit`. Added by
+   * `emitScript.ts` ONLY when at least one prop (model or non-model) classifies
+   * as `number-string` under `classifyUnionAttr`, so every other component's
+   * `@rozie/runtime-lit` import line stays byte-identical.
+   */
+  | 'rozieNumberOrStringAttr';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();

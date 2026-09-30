@@ -160,7 +160,15 @@ function renderType(t: PropTypeAnnotation): string {
     }
   }
   if (t.kind === 'union') {
-    // Lit @property accepts one type token; pick the first.
+    // Lit @property accepts one type token. The union's attribute conversion is
+    // decided ORDER-INDEPENDENTLY by `classifyUnionAttr()` (quick 260930-814):
+    // a String-plus-complex union reads the attribute as a string in any member
+    // order. The boolean-string and number-string rows never reach here — their
+    // callers branch on the classifier first and emit a custom converter. Every
+    // other union (no String member, e.g. `[Element, Object]` /
+    // `[Object, Boolean]`) is the fallback row: first member, exactly as before —
+    // complex members are property-only, so the token is inert for them.
+    if (classifyUnionAttr(t) === 'string') return 'String';
     if (t.members.length > 0) return renderType(t.members[0]!);
   }
   return 'Object';
@@ -365,19 +373,20 @@ function isPrimitiveType(ann: PropTypeAnnotation): boolean {
 }
 
 /**
- * Phase 87 87-04 (Rule 1 fix — found via data-table's `virtual` D-01 case, but the SAME
- * pre-existing gap affects CommandPalette.rozie's `appendTo`, the only two `[Boolean, String]`
- * union props in the repo). `renderType()` above picks the union's FIRST member as the single
- * `@property({ type: ... })` token Lit accepts — for `[Boolean, String]` that is `Boolean`,
- * whose DEFAULT `fromAttribute` converter is `(value) => value !== null`: any non-null STATIC
- * attribute value (e.g. a bare `virtual="columns"` template attribute, which is how a
- * non-colon-prefixed literal prop compiles for Lit) collapses to `true`, silently discarding
- * the string. Every OTHER target reads a real JS value here (Vue/Svelte/Solid/React/Angular
- * bindings never round-trip through an HTML string attribute for a non-primitive-shaped prop),
- * so this is Lit-only — a genuine emitter parity gap, not a per-framework workaround site
- * (`feedback_emitter_owns_parity`). `isBooleanStringUnion()` detects the shape so
- * `emitNonModelProp()` can swap in a CUSTOM converter instead of the bare `type: Boolean`
- * shorthand.
+ * The `boolean-string` row of `classifyUnionAttr()` below — a union of exactly
+ * Boolean and String, in either order.
+ *
+ * History — Phase 87 87-04 (Rule 1 fix, found via data-table's `virtual` D-01 case; the SAME
+ * gap affected CommandPalette.rozie's `appendTo`): `renderType()` used to pick the union's
+ * FIRST member as the single `@property({ type: ... })` token Lit accepts — for
+ * `[Boolean, String]` that is `Boolean`, whose DEFAULT `fromAttribute` converter is
+ * `(value) => value !== null`: any non-null STATIC attribute value (e.g. a bare
+ * `virtual="columns"` template attribute, which is how a non-colon-prefixed literal prop
+ * compiles for Lit) collapsed to `true`, silently discarding the string. Every OTHER target
+ * reads a real JS value here (Vue/Svelte/Solid/React/Angular bindings never round-trip through
+ * an HTML string attribute for a non-primitive-shaped prop), so this is Lit-only — a genuine
+ * emitter parity gap, not a per-framework workaround site (`feedback_emitter_owns_parity`).
+ * Both `emitNonModelProp()` and `emitModelProp()` swap in `BOOLEAN_STRING_CONVERTER` for it.
  */
 function isBooleanStringUnion(t: PropTypeAnnotation): boolean {
   if (t.kind !== 'union') return false;
@@ -386,6 +395,47 @@ function isBooleanStringUnion(t: PropTypeAnnotation): boolean {
     names.length === 2 && names.includes('Boolean') && names.includes('String')
   );
 }
+
+/**
+ * Quick 260930-814 — the attribute-conversion class of a union prop on Lit,
+ * decided from the union's member SET (identifier names only), never from its
+ * member ORDER. The single decision point shared by `emitNonModelProp()`,
+ * `emitModelProp()`, `renderType()` and the `rozieNumberOrStringAttr` runtime
+ * import gate in `emitScript()`:
+ *
+ * - `'boolean-string'` — exactly Boolean + String (`isBooleanStringUnion`):
+ *   `BOOLEAN_STRING_CONVERTER`.
+ * - `'number-string'` — contains Number AND String, no Boolean (extra complex
+ *   members allowed): `{ fromAttribute: rozieNumberOrStringAttr }` — a finite
+ *   numeric attribute becomes a number, any other string passes through.
+ * - `'string'` — contains String, neither Number nor Boolean: `type: String`
+ *   in any order (Object-first used to JSON.parse a CSS string to `null`).
+ * - `null` — not a union, or the fallback row (no String member, or a 3+-member
+ *   union mixing Boolean with String): the pre-existing first-member token.
+ */
+type UnionAttrKind = 'boolean-string' | 'number-string' | 'string';
+
+function classifyUnionAttr(ann: PropTypeAnnotation): UnionAttrKind | null {
+  if (ann.kind !== 'union') return null;
+  if (isBooleanStringUnion(ann)) return 'boolean-string';
+  const names = new Set(
+    ann.members.flatMap((m) => (m.kind === 'identifier' ? [m.name] : [])),
+  );
+  if (!names.has('String') || names.has('Boolean')) return null;
+  return names.has('Number') ? 'number-string' : 'string';
+}
+
+/**
+ * Phase 87 87-04 — the `[Boolean, String]` attribute converter. `'true'`/`'false'`/a
+ * bare-presence empty string resolve to real booleans (the HTML boolean-attribute convention
+ * `resolveVirtual()`-style consumers already expect from a truthy check); every other string
+ * passes through UNCHANGED. Byte-identical to the text emitted inline before 260930-814.
+ */
+const BOOLEAN_STRING_CONVERTER =
+  "{ fromAttribute: (v: string | null) => (v === null ? false : v === 'true' ? true : v === 'false' ? false : v === '' ? true : v) }";
+
+/** Quick 260930-814 — the Number+String union attribute converter (`@rozie/runtime-lit`). */
+const NUMBER_STRING_CONVERTER = '{ fromAttribute: rozieNumberOrStringAttr }';
 
 function renderExpression(expr: t.Expression): string {
   return generate(expr, GEN_OPTS).code;
@@ -490,16 +540,18 @@ function emitNonModelProp(prop: PropDecl): string {
   // prop → byte-identical, SC-5). The builder's trailing newline joins the
   // block directly onto the field line.
   const jsdoc = buildPropJsdoc(prop, 'lit', '  ');
-  // Phase 87 87-04 (Rule 1 fix — see isBooleanStringUnion()'s comment): a
-  // [Boolean, String] union needs a CUSTOM fromAttribute converter, not Lit's
-  // built-in `type: Boolean` (which discards any non-null string value). `'true'`/
-  // `'false'`/a bare-presence empty string still resolve to real booleans (the HTML
-  // boolean-attribute convention `resolveVirtual()`-style consumers already expect
-  // from a truthy check); every other string passes through UNCHANGED.
-  if (isBooleanStringUnion(prop.typeAnnotation)) {
-    const converter =
-      "{ fromAttribute: (v: string | null) => (v === null ? false : v === 'true' ? true : v === 'false' ? false : v === '' ? true : v) }";
-    return `${jsdoc}  @property({ converter: ${converter} }) ${prop.name}${fieldSuffix};`;
+  // Phase 87 87-04 / quick 260930-814 — see classifyUnionAttr(): a
+  // [Boolean, String] union and a Number+String union each need a CUSTOM
+  // fromAttribute converter, not Lit's built-in first-member `type:` token
+  // (`type: Boolean` discards any non-null string; `type: Number` turns `'auto'`
+  // into NaN; `type: String` never yields a number). No reflect — a union is
+  // never `isPrimitiveType`.
+  const unionKind = classifyUnionAttr(prop.typeAnnotation);
+  if (unionKind === 'boolean-string') {
+    return `${jsdoc}  @property({ converter: ${BOOLEAN_STRING_CONVERTER} }) ${prop.name}${fieldSuffix};`;
+  }
+  if (unionKind === 'number-string') {
+    return `${jsdoc}  @property({ converter: ${NUMBER_STRING_CONVERTER} }) ${prop.name}${fieldSuffix};`;
   }
   return `${jsdoc}  @property({ type: ${litType}${reflectField} }) ${prop.name}${fieldSuffix};`;
 }
@@ -536,8 +588,20 @@ function emitModelProp(prop: PropDecl, componentName: string): ModelPropEmit {
   // of a model prop, gated on `prop.docs` (returns '' → byte-identical, SC-5).
   // The builder's trailing newline joins the block onto the first field line.
   const jsdoc = buildPropJsdoc(prop, 'lit', '  ');
+  // Quick 260930-814 — the attribute mirror and the attributeChangedCallback
+  // coerce branch on the SAME order-independent classifier as the non-model
+  // path, so a model union converts an HTML attribute exactly like a non-model
+  // one (model `[Number, String]` used to coerce `'auto'` to NaN; model
+  // `[Boolean, String]` used to collapse every string to `true`).
+  const unionKind = classifyUnionAttr(prop.typeAnnotation);
+  const attrOptions =
+    unionKind === 'number-string'
+      ? `converter: ${NUMBER_STRING_CONVERTER}`
+      : unionKind === 'boolean-string'
+        ? `converter: ${BOOLEAN_STRING_CONVERTER}`
+        : `type: ${litType}${reflectField}`;
   const fieldDecl = [
-    `${jsdoc}  @property({ type: ${litType}${reflectField}, attribute: '${attrName}' }) _${prop.name}_attr${attrFieldSuffix};`,
+    `${jsdoc}  @property({ ${attrOptions}, attribute: '${attrName}' }) _${prop.name}_attr${attrFieldSuffix};`,
     `  private _${prop.name}Controllable = createLitControllableProperty<${tsType}>({ host: this, eventName: '${eventName}', defaultValue: ${defaultStr}, initialControlledValue: undefined });`,
   ].join('\n');
 
@@ -545,11 +609,15 @@ function emitModelProp(prop: PropDecl, componentName: string): ModelPropEmit {
 
   // attributeChangedCallback body — when attribute changes, push to controllable.
   const coerce =
-    litType === 'Number'
-      ? `value === null ? ${defaultStr} : Number(value)`
-      : litType === 'Boolean'
-        ? `value !== null`
-        : `value as unknown as ${tsType}`;
+    unionKind === 'number-string'
+      ? `value === null ? ${defaultStr} : rozieNumberOrStringAttr(value)`
+      : unionKind === 'boolean-string'
+        ? `value === null ? ${defaultStr} : value === 'true' ? true : value === 'false' ? false : value === '' ? true : value`
+        : litType === 'Number'
+          ? `value === null ? ${defaultStr} : Number(value)`
+          : litType === 'Boolean'
+            ? `value !== null`
+            : `value as unknown as ${tsType}`;
   const attrCallback = `if (name === '${attrName}') this._${prop.name}Controllable.notifyAttributeChange(${coerce});`;
 
   void componentName;
@@ -1411,6 +1479,13 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
   // Track model props — need controllable helper + dispatch.
   const modelProps = ir.props.filter((p) => p.isModel);
   if (modelProps.length > 0) opts.runtime.add('createLitControllableProperty');
+  // Quick 260930-814 — register the `rozieNumberOrStringAttr` converter import
+  // ONLY when some prop (model OR non-model — both paths emit it through the
+  // same classifier) is a Number+String union, so every other component's
+  // `@rozie/runtime-lit` import line stays byte-identical.
+  if (ir.props.some((p) => classifyUnionAttr(p.typeAnnotation) === 'number-string')) {
+    opts.runtime.add('rozieNumberOrStringAttr');
+  }
 
   // 1. Field declarations.
   const fieldLines: string[] = [];

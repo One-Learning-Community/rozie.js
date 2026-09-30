@@ -132,13 +132,13 @@ describe('FullCalendar.rozie consumer-feedback contract (260929-lya)', () => {
       ...(target === 'angular' ? { angular: { cva: false } } : {}),
     }).code;
 
-  it('height is a [String, Number] union in that order (Lit converter keys on the first member)', () => {
+  it('height is a Number+String union (member order is irrelevant — 260930-814)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const height = (ir.props as any[]).find((p) => p.name === 'height');
     expect(height.typeAnnotation.kind).toBe('union');
-    expect(height.typeAnnotation.members.map((m: { name: string }) => m.name)).toEqual([
-      'String',
+    expect(height.typeAnnotation.members.map((m: { name: string }) => m.name).sort()).toEqual([
       'Number',
+      'String',
     ]);
   });
 
@@ -153,8 +153,13 @@ describe('FullCalendar.rozie consumer-feedback contract (260929-lya)', () => {
     expect(code).not.toContain('Event ${');
   });
 
-  it('compile(lit) height uses the String attribute converter', () => {
-    expect(compileFor('lit')).toMatch(/@property\(\{\s*type:\s*String\s*\}\)\s*height\b/);
+  it('compile(lit) height uses the Number+String union attribute converter (260930-814)', () => {
+    const code = compileFor('lit');
+    expect(code).toMatch(
+      /@property\(\{\s*converter:\s*\{\s*fromAttribute:\s*rozieNumberOrStringAttr\s*\}\s*\}\)\s*height\b/,
+    );
+    const runtimeImport = code.split('\n').find((l) => l.includes("from '@rozie/runtime-lit'")) ?? '';
+    expect(runtimeImport).toMatch(/\brozieNumberOrStringAttr\b/);
   });
 
   it.each(TARGETS)('compile(%s) wires normalizeHeight', (target) => {

@@ -1,6 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
+import { rozieNumberOrStringAttr } from '@rozie/runtime-lit';
 import { ContextConsumer, createContext } from '@lit/context';
 
 const __rozieCtx_data_table_columns = createContext(Symbol.for("rozie:data-table:columns"));
@@ -40,7 +41,7 @@ export default class Column extends SignalWatcher(LitElement) {
   /**
    * Optional fixed/initial column width, applied as the column's starting size — a px number (`120`) or a px string (`'120px'`). Column sizing is numeric px, so other CSS lengths (`'12rem'`, `'20%'`, `'auto'`) have no px value to apply and are ignored; the column keeps the default width. An interactive resize overrides this.
    */
-  @property({ type: String }) width: string | number = '';
+  @property({ converter: { fromAttribute: rozieNumberOrStringAttr } }) width: string | number = '';
   /**
    * Reserved per-column metadata flagging participation in the expand affordance. The expander chevron is its own auto-injected leading column on `<DataTable expandable>`, so this is forward-compat metadata, not the toggle host. Default `false`.
    */

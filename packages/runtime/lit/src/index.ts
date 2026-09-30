@@ -53,6 +53,7 @@ export {
 } from './reconcileAfterDomMutation.js';
 export { rozieDisplay } from './rozieDisplay.js';
 export { rozieAttr } from './rozieAttr.js';
+export { rozieNumberOrStringAttr } from './rozieNumberOrStringAttr.js';
 export { rozieClass } from './rozieClass.js';
 export { rozieStyle } from './rozieStyle.js';
 export { rozieMemo } from './rozieMemo.js';

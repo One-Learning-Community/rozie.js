@@ -80,10 +80,11 @@
         'Allow date/time-range selection by click-drag. Runtime-updatable via `setOption`.',
     },
   },
-  // String FIRST on purpose: the Lit emitter keys its @property attribute
-  // converter on the first union member, so [String, Number] keeps a
-  // `height="auto"` attribute from coercing to NaN (normalizeHeight below
-  // turns a purely numeric string back into pixels).
+  // The Lit emitter converts a Number+String union attribute
+  // order-independently (quick 260930-814): `height="600"` arrives as the
+  // number 600 and `height="auto"` as the string 'auto'. normalizeHeight
+  // below still turns a purely numeric string into pixels for the targets
+  // that pass a static attribute through as a string.
   height: {
     type: [String, Number],
     default: 480,

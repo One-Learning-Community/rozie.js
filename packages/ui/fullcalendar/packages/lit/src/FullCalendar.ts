@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
-import { adoptDocumentStyles, createLitControllableProperty } from '@rozie/runtime-lit';
+import { adoptDocumentStyles, createLitControllableProperty, rozieNumberOrStringAttr } from '@rozie/runtime-lit';
 import { Calendar } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -83,7 +83,7 @@ export default class FullCalendar extends SignalWatcher(LitElement) {
   /**
    * The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. This curated prop wins over `options.height` because curated keys are applied after the `:options` spread, so size the calendar through `height` itself. Runtime-updatable via `setOption`.
    */
-  @property({ type: String }) height: string | number = 480;
+  @property({ converter: { fromAttribute: rozieNumberOrStringAttr } }) height: string | number = 480;
   /**
    * Fallback event color stamped onto events that omit their own `color`.
    */
