@@ -3,7 +3,7 @@ import { createSignal, splitProps } from 'solid-js';
 import { rozieDisplay } from '@rozie/runtime-solid';
 import DynamicSlots from './DynamicSlots';
 
-interface DynamicSlotsConsumerProps {}
+interface DynamicSlotsConsumerProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function DynamicSlotsConsumer(_props: DynamicSlotsConsumerProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

@@ -63,7 +63,7 @@ __rozieInjectStyle('Dialog-2a679072', `@media (prefers-reduced-motion: no-prefer
   font: var(--rozie-dialog-font, inherit);
 }`);
 
-interface DialogProps {
+interface DialogProps extends Omit<import('solid-js').ComponentProps<'dialog'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'disableBackdropClose' | 'disableEscapeClose' | 'disableScrollLock' | 'ariaLabel' | 'ariaLabelledby' | 'onClose' | 'children' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.
    * @example

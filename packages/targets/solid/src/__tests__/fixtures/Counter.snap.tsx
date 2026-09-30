@@ -8,7 +8,7 @@ __rozieInjectStyle('Counter-c72e01d0', `.counter[data-rozie-s-c72e01d0] { displa
 button[data-rozie-s-c72e01d0] { padding: 0.25rem 0.5rem; }
 button[data-rozie-s-c72e01d0]:disabled { opacity: 0.4; cursor: not-allowed; }`);
 
-interface CounterProps {
+interface CounterProps extends Omit<import('solid-js').ComponentProps<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'step' | 'min' | 'max' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   value?: number;
   defaultValue?: number;
   onValueChange?: (value: number) => void;

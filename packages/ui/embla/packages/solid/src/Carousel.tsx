@@ -83,7 +83,7 @@ interface SlideSlotCtx { slide: any; index: any; }
 
 interface ThumbSlotCtx { slide: any; index: any; }
 
-interface CarouselProps {
+interface CarouselProps extends Omit<import('solid-js').ComponentProps<'div'>, 'slides' | 'loop' | 'align' | 'axis' | 'slidesToScroll' | 'dragFree' | 'draggable' | 'containScroll' | 'startIndex' | 'skipSnaps' | 'duration' | 'direction' | 'autoplay' | 'autoplayDelay' | 'dots' | 'arrows' | 'thumbnails' | 'plugins' | 'options' | 'selectedIndex' | 'defaultSelectedIndex' | 'onSelectedIndexChange' | 'onSelect' | 'onSettle' | 'onReInit' | 'onPointerDown' | 'slideSlot' | 'children' | 'thumbSlot' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * Slide data for config-array mode (mode a): Rozie renders one `.rozie-embla__slide` per item, optionally via the scoped `slide` slot for custom markup. Optional — leave it unset and use the default slot (mode b) to drop slide DOM directly.
    * @example

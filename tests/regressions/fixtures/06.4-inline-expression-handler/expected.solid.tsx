@@ -4,7 +4,7 @@ import { __rozieInjectStyle, mergeListeners, pickListeners } from '@rozie/runtim
 
 __rozieInjectStyle('InlineExprHandler-8ec7623e', `.backdrop[data-rozie-s-8ec7623e] { position: fixed; inset: 0; }`);
 
-interface InlineExprHandlerProps {
+interface InlineExprHandlerProps extends Omit<import('solid-js').ComponentProps<'div'>, 'closeOnBackdrop' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   closeOnBackdrop?: boolean;
 }
 

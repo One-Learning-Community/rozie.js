@@ -43,7 +43,7 @@ __rozieInjectStyle('BadgeGridStyledScss-44801268', `.badge[data-rozie-s-44801268
   gap: 12px;
 }`);
 
-interface BadgeGridStyledScssProps {
+interface BadgeGridStyledScssProps extends Omit<import('solid-js').ComponentProps<'div'>, 'badges' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   badges?: any[];
 }
 

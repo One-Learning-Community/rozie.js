@@ -89,7 +89,7 @@ __rozieInjectStyle('Resizable-8330bc5a', `.rozie-resizable[data-rozie-s-8330bc5a
   opacity: var(--rozie-resizable-disabled-opacity, var(--rrz-disabled-opacity, 0.55));
 }`);
 
-interface ResizableProps {
+interface ResizableProps extends Omit<import('solid-js').ComponentProps<'div'>, 'size' | 'defaultSize' | 'onSizeChange' | 'direction' | 'min' | 'max' | 'disabled' | 'ariaLabel' | 'onResize' | 'startSlot' | 'handleSlot' | 'endSlot' | 'slots' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The first (`start`) panel's size as a percent of the container along the split axis (its width when `direction="horizontal"`, its height when `"vertical"`). Two-way via `r-model:size`. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so the splitter position **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Every commit (drag, keyboard, or a programmatic `applySize`) is clamped to `[min, max]` and written back.
    * @example

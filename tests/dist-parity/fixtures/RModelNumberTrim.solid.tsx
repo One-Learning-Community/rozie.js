@@ -5,7 +5,7 @@ import { __rozieInjectStyle } from '@rozie/runtime-solid';
 __rozieInjectStyle('RModelNumberTrim-dfdb7742', `.rmodel-number-trim[data-rozie-s-dfdb7742] { display: inline-flex; flex-direction: column; gap: 0.25rem; }
 .echo[data-rozie-s-dfdb7742] { color: rgba(0, 0, 0, 0.55); font-size: 0.85em; }`);
 
-interface RModelNumberTrimProps {}
+interface RModelNumberTrimProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function RModelNumberTrim(_props: RModelNumberTrimProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createSignal, splitProps } from 'solid-js';
 import { createDebouncedHandler, createThrottledHandler } from '@rozie/runtime-solid';
 
-interface DebounceInlineCallProps {}
+interface DebounceInlineCallProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function DebounceInlineCall(_props: DebounceInlineCallProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

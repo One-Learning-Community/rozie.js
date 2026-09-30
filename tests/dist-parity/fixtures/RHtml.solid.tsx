@@ -4,7 +4,7 @@ import { __rozieInjectStyle } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('RHtml-09a5f2a6', `.rhtml[data-rozie-s-09a5f2a6] { font: 1rem/1.4 system-ui; }`);
 
-interface RHtmlProps {
+interface RHtmlProps extends Omit<import('solid-js').ComponentProps<'div'>, 'content' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   content?: string;
 }
 

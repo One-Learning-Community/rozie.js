@@ -44,7 +44,7 @@ __rozieInjectStyle('Otp-8267d52a', `.rozie-otp[data-rozie-s-8267d52a] {
   background: var(--rozie-otp-disabled-bg, var(--rot-disabled-bg, rgba(0, 0, 0, 0.04)));
 }`);
 
-interface OtpProps {
+interface OtpProps extends Omit<import('solid-js').ComponentProps<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'length' | 'type' | 'mask' | 'autoFocus' | 'disabled' | 'placeholder' | 'ariaLabel' | 'onChange' | 'onComplete' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The assembled one-time code (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so an Otp **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Always a contiguous string of `0..length` characters; Otp writes the new code back on every edit (type, paste, backspace).
    * @example

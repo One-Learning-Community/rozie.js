@@ -8,7 +8,7 @@ __rozieInjectStyle('ElementPlusSlotFallthrough-986e3472', `.epsf-root[data-rozie
   border: 1px solid #ddd;
 }`);
 
-interface ElementPlusSlotFallthroughProps {
+interface ElementPlusSlotFallthroughProps extends Omit<import('solid-js').ComponentProps<'div'>, 'variant' | 'headerSlot' | 'children' | 'footerSlot' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   variant?: string;
   headerSlot?: JSX.Element;
   // D-131: default slot resolved via children() at body top

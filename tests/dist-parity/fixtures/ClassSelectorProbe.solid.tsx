@@ -13,7 +13,7 @@ __rozieInjectStyle('ClassSelectorProbe-899140be', `.panel[data-rozie-s-899140be]
   color: rgba(0, 0, 0, 0.35);
 }`);
 
-interface ClassSelectorProbeProps {}
+interface ClassSelectorProbeProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function ClassSelectorProbe(_props: ClassSelectorProbeProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

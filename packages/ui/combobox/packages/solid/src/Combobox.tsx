@@ -215,7 +215,7 @@ interface GroupHeadingSlotCtx { group: any; }
 
 interface GroupMoreSlotCtx { group: any; hidden: any; expand: any; }
 
-interface ComboboxProps {
+interface ComboboxProps extends Omit<import('solid-js').ComponentProps<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'multiple' | 'creatable' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'onCreate' | 'onChange' | 'onSearch' | 'chipSlot' | 'optionSlot' | 'emptySlot' | 'createSlot' | 'groupHeadingSlot' | 'groupMoreSlot' | 'slots' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The selected option's value (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a combobox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `null` when nothing is selected.
    * @example

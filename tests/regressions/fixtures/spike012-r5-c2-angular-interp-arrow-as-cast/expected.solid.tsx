@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { createSignal, splitProps } from 'solid-js';
 
-interface InterpArrowAsCastProps {}
+interface InterpArrowAsCastProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function InterpArrowAsCast(_props: InterpArrowAsCastProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

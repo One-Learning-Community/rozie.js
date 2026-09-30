@@ -78,6 +78,9 @@ export function emitSolidTypes(ir: IRComponent, opts: EmitSolidTypesOptions = {}
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'JSX.Element',
       target: 'solid',
+      // Typed public surface phase 3 — mirror the inline interface's
+      // `extends Omit<ComponentProps<tag>, …>` in the public sidecar.
+      htmlAttrs: 'solid',
     }),
   );
   lines.push('');

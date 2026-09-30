@@ -51,7 +51,7 @@ __rozieInjectStyle('Switch-5a76e232', `.rozie-switch[data-rozie-s-5a76e232] {
   transform: translateX(var(--rozie-switch-thumb-travel, var(--rsw-thumb-travel, calc(2.75rem - 1.5rem))));
 }`);
 
-interface SwitchProps {
+interface SwitchProps extends Omit<import('solid-js').ComponentProps<'button'>, 'modelValue' | 'defaultModelValue' | 'onModelValueChange' | 'disabled' | 'readonly' | 'ariaLabel' | 'onChange' | 'children' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The on/off state of the switch (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a switch **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `true` is the checked/on state; reflected as `aria-checked`.
    * @example

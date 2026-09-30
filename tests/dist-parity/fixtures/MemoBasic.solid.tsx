@@ -8,7 +8,7 @@ __rozieInjectStyle('MemoBasic-fcb74b54', `.probe[data-rozie-s-fcb74b54] {
   padding: 0.5rem;
 }`);
 
-interface MemoBasicProps {
+interface MemoBasicProps extends Omit<import('solid-js').ComponentProps<'div'>, 'items' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   items?: any[];
 }
 

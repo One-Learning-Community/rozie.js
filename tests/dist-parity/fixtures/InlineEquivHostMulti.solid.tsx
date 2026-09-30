@@ -4,7 +4,7 @@ import { rozieDisplay } from '@rozie/runtime-solid';
 import { clampB } from './partial-helpers.js';
 import { clampD } from './wr01-helpers.js';
 
-interface InlineEquivHostMultiProps {
+interface InlineEquivHostMultiProps extends Omit<import('solid-js').ComponentProps<'div'>, 'base' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   base?: number;
 }
 

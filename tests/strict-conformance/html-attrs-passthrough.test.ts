@@ -46,6 +46,31 @@ export const badTitle = <AttrsButton title="x" />;
 export const badChildren = <AttrsButton>kids</AttrsButton>;
 `;
 
+const SOLID_CONSUMER = `import AttrsButton from './AttrsButton';
+
+export const ok = (
+  <AttrsButton
+    label="x"
+    title={3}
+    class="c"
+    style={{ color: 'red' }}
+    id="i"
+    aria-label="l"
+    data-test="t"
+    disabled
+    type="button"
+    onClick={(e) => e.currentTarget.blur()}
+    onPress={() => {}}
+  />
+);
+// @ts-expect-error — not a <button> attribute
+export const badHref = <AttrsButton href="/x" />;
+// @ts-expect-error — own \`title: number\` wins over HTML \`title: string\`
+export const badTitle = <AttrsButton title="x" />;
+// @ts-expect-error — no default slot: children stay rejected
+export const badChildren = <AttrsButton>kids</AttrsButton>;
+`;
+
 describe('HTML-ATTRS-PASSTHROUGH — strict consumer (typed-surface P3)', () => {
   it('react', () => {
     const { code, diagnostics } = compile(FIXTURE, {
@@ -58,6 +83,20 @@ describe('HTML-ATTRS-PASSTHROUGH — strict consumer (typed-surface P3)', () => 
       target: 'react',
       files: { 'AttrsButton.tsx': code, 'Consumer.tsx': REACT_CONSUMER },
       nodeModulesFrom: 'packages/ui/combobox/packages/react',
+    });
+    expect(totalErrors(inventory), raw).toBe(0);
+  });
+  it('solid', () => {
+    const { code, diagnostics } = compile(FIXTURE, {
+      target: 'solid',
+      filename: 'AttrsButton.rozie',
+      sourceMap: false,
+    });
+    expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    const { raw, inventory } = typecheckCompiled({
+      target: 'solid',
+      files: { 'AttrsButton.tsx': code, 'Consumer.tsx': SOLID_CONSUMER },
+      nodeModulesFrom: 'packages/ui/combobox/packages/solid',
     });
     expect(totalErrors(inventory), raw).toBe(0);
   });

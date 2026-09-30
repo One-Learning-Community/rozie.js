@@ -13,7 +13,7 @@ interface InternalShape {
 
 type Mode = 'idle' | 'busy';
 
-interface TsPassthroughProps {
+interface TsPassthroughProps extends Omit<import('solid-js').ComponentProps<'button'>, 'label' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   label?: string;
 }
 
@@ -49,7 +49,7 @@ exports[`Solid ts-passthrough — untyped emit byte-identity anchor > untyped em
 import { mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
 import { mergeListeners, pickListeners, rozieDisplay } from '@rozie/runtime-solid';
 
-interface TsPassthroughProps {
+interface TsPassthroughProps extends Omit<import('solid-js').ComponentProps<'button'>, 'label' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   label?: string;
 }
 

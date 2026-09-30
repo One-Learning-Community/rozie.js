@@ -19,7 +19,7 @@ __rozieInjectStyle('ThemedButton-7914ecaa', `.btn[data-rozie-s-7914ecaa] {
   cursor: not-allowed;
 }`);
 
-interface ThemedButtonProps {
+interface ThemedButtonProps extends Omit<import('solid-js').ComponentProps<'button'>, 'label' | 'variant' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   label?: string;
   variant?: string;
 }

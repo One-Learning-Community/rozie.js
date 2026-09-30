@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { splitProps } from 'solid-js';
 import { createControllableSignal } from '@rozie/runtime-solid';
 
-interface RModelNumberModelPropProps {
+interface RModelNumberModelPropProps extends Omit<import('solid-js').ComponentProps<'div'>, 'quantity' | 'defaultQuantity' | 'onQuantityChange' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   quantity?: number;
   defaultQuantity?: number;
   onQuantityChange?: (quantity: number) => void;

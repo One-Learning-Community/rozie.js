@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { mergeProps, splitProps } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
 
-interface LoopMustacheKeyedSlotRforProps {
+interface LoopMustacheKeyedSlotRforProps extends Omit<import('solid-js').ComponentProps<'div'>, 'rows' | 'slots' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   rows?: any[];
   slots?: { [key: string]: ((...args: any[]) => JSX.Element) | undefined; };
 }

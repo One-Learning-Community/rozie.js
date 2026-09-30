@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createSignal, splitProps } from 'solid-js';
 import { rozieAttr, rozieDisplay } from '@rozie/runtime-solid';
 
-interface ObjectInterpProps {}
+interface ObjectInterpProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function ObjectInterp(_props: ObjectInterpProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

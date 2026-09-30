@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { createSignal, splitProps } from 'solid-js';
 
-interface EventParamMergeProps {}
+interface EventParamMergeProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function EventParamMerge(_props: EventParamMergeProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

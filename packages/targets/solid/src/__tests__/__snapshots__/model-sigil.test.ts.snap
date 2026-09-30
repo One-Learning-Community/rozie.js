@@ -5,7 +5,7 @@ exports[`Solid $model producer-side two-way-write sigil > emitted model fixture 
 import { splitProps } from 'solid-js';
 import { createControllableSignal, mergeListeners, pickListeners } from '@rozie/runtime-solid';
 
-interface ModelSigilProps {
+interface ModelSigilProps extends Omit<import('solid-js').ComponentProps<'button'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   value?: number;
   defaultValue?: number;
   onValueChange?: (value: number) => void;

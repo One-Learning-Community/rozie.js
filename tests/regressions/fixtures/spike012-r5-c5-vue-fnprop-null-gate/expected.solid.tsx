@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { createSignal, mergeProps, splitProps } from 'solid-js';
 
-interface FnPropNullGateProps {
+interface FnPropNullGateProps extends Omit<import('solid-js').ComponentProps<'div'>, 'onSave' | 'onCancel' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   onSave?: (...args: any[]) => any;
   onCancel?: ((...args: any[]) => any) | null;
 }

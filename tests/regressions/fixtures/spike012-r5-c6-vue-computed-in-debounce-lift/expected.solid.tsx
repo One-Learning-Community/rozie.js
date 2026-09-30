@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createMemo, createSignal, splitProps } from 'solid-js';
 import { createDebouncedHandler, mergeListeners, pickListeners } from '@rozie/runtime-solid';
 
-interface ComputedInDebounceLiftProps {}
+interface ComputedInDebounceLiftProps extends Omit<import('solid-js').ComponentProps<'input'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function ComputedInDebounceLift(_props: ComputedInDebounceLiftProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

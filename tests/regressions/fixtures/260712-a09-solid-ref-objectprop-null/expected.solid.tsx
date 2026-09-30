@@ -4,7 +4,7 @@ import { __rozieInjectStyle } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('SolidRefObjectPropNull-fa7fb7c9', `.solid-ref-objectprop-null[data-rozie-s-fa7fb7c9] { display: block; }`);
 
-interface SolidRefObjectPropNullProps {
+interface SolidRefObjectPropNullProps extends Omit<import('solid-js').ComponentProps<'div'>, 'options' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   options?: Record<string, any>;
 }
 

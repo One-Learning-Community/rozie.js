@@ -6,7 +6,7 @@ __rozieInjectStyle('ThemeProvider-00821bac', `.theme-provider[data-rozie-s-00821
   display: block;
 }`);
 
-interface ThemeProviderProps {
+interface ThemeProviderProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

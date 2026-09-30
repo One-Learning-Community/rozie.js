@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createSignal, mergeProps, splitProps } from 'solid-js';
 import { parseInlineStyle } from '@rozie/runtime-solid';
 
-interface StyleDoubleSemicolonProps {
+interface StyleDoubleSemicolonProps extends Omit<import('solid-js').ComponentProps<'div'>, 'colId' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   colId?: string;
 }
 

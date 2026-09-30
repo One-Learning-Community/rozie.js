@@ -4,7 +4,7 @@ import { __rozieInjectStyle } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('OnMountMountLocalCleanup-c1a25008', `.ticks[data-rozie-s-c1a25008] { font-variant-numeric: tabular-nums; }`);
 
-interface OnMountMountLocalCleanupProps {
+interface OnMountMountLocalCleanupProps extends Omit<import('solid-js').ComponentProps<'div'>, 'label' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   label?: string;
 }
 

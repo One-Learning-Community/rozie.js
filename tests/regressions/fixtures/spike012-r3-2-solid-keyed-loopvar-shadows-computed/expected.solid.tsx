@@ -3,7 +3,7 @@ import { createMemo, createSignal, splitProps } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
 import { rozieDisplay } from '@rozie/runtime-solid';
 
-interface KeyedLoopVarShadowsComputedProps {}
+interface KeyedLoopVarShadowsComputedProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function KeyedLoopVarShadowsComputed(_props: KeyedLoopVarShadowsComputedProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

@@ -78,7 +78,7 @@ interface ItemSlotCtx { page: any; selected: any; goto: any; }
 
 interface NextControlSlotCtx { disabled: any; goto: any; page: any; }
 
-interface PaginationProps {
+interface PaginationProps extends Omit<import('solid-js').ComponentProps<'nav'>, 'modelValue' | 'defaultModelValue' | 'onModelValueChange' | 'totalPages' | 'total' | 'pageSize' | 'siblingCount' | 'boundaryCount' | 'disabled' | 'ariaLabel' | 'onChange' | 'prevControlSlot' | 'ellipsisSlot' | 'itemSlot' | 'nextControlSlot' | 'slots' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The 1-based current page (two-way model). Clamped into `[1, totalPages]`. Bind it with `r-model:modelValue` / `v-model:modelValue` / `modelValue` + `onModelValueChange`; it is also the Angular ControlValueAccessor control value.
    */

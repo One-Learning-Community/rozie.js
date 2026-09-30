@@ -6,7 +6,7 @@ __rozieInjectStyle('UpdateExpressionProbe-0fceff7a', `.probe[data-rozie-s-0fceff
 .count[data-rozie-s-0fceff7a], .value[data-rozie-s-0fceff7a] { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
 button[data-rozie-s-0fceff7a] { padding: 0.25rem 0.5rem; }`);
 
-interface UpdateExpressionProbeProps {
+interface UpdateExpressionProbeProps extends Omit<import('solid-js').ComponentProps<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   value?: number;
   defaultValue?: number;
   onValueChange?: (value: number) => void;

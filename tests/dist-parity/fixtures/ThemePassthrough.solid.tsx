@@ -9,7 +9,7 @@ __rozieInjectStyle('ThemePassthrough-515c25a2', `.theme-passthrough[data-rozie-s
   border-radius: 6px;
 }`);
 
-interface ThemePassthroughProps {
+interface ThemePassthroughProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

@@ -42,7 +42,7 @@ __rozieInjectStyle('PortalListStyledScss-860cc87e', `.rozie-portal-list[data-roz
 
 interface ItemSlotCtx { item: any; }
 
-interface PortalListStyledScssProps {
+interface PortalListStyledScssProps extends Omit<import('solid-js').ComponentProps<'div'>, 'items' | 'itemSlot' | 'slots' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   items?: any[];
   itemSlot?: (ctx: ItemSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

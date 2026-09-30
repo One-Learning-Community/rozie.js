@@ -444,7 +444,8 @@ describe('Solid r-keynav emitter — multi-root, grid, page, explicit index (Pla
         "import { createSignal, mergeProps, splitProps } from 'solid-js';\n" +
         "import { Key } from '@solid-primitives/keyed';\n" +
         "import { createKeynav, rozieDisplay } from '@rozie/runtime-solid';\n\n" +
-        'interface KeynavMenuProps {\n' +
+        // Typed public surface phase 3 — single-<div>-root, attr-inheriting.
+        "interface KeynavMenuProps extends Omit<import('solid-js').ComponentProps<'div'>, 'items' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {\n" +
         '  items?: any[];\n' +
         '}\n\n' +
         'export default function KeynavMenu(_props: KeynavMenuProps): JSX.Element {\n' +

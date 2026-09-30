@@ -70,7 +70,7 @@ __rozieInjectStyle('LexicalEditor-f679124a', `.rozie-lexical[data-rozie-s-f67912
     font-size: var(--rozie-lexical-mention-font-size, 0.875rem);
   }`);
 
-interface LexicalEditorProps {
+interface LexicalEditorProps extends Omit<import('solid-js').ComponentProps<'div'>, 'nodes' | 'namespace' | 'ariaLabel' | 'theme' | 'children' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   /**
    * Extra Lexical node classes to register at editor creation. Lexical requires every node class to be declared up front, so consumer node extensions are passed here and composed after the built-in RichText/List/Link + `@mention` `MentionNode` set (the reference DecoratorNode is registered by the shell itself; these consumer nodes are composed last so they win).
    */

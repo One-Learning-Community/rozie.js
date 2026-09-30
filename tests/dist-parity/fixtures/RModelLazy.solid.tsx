@@ -5,7 +5,7 @@ import { __rozieInjectStyle } from '@rozie/runtime-solid';
 __rozieInjectStyle('RModelLazy-34fe9f5a', `.rmodel-lazy[data-rozie-s-34fe9f5a] { display: inline-flex; flex-direction: column; gap: 0.25rem; }
 .echo[data-rozie-s-34fe9f5a] { color: rgba(0, 0, 0, 0.55); font-size: 0.85em; }`);
 
-interface RModelLazyProps {}
+interface RModelLazyProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function RModelLazy(_props: RModelLazyProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

@@ -108,7 +108,7 @@ __rozieInjectStyle('Tags-64848f8e', `.rozie-tags[data-rozie-s-64848f8e] {
 
 interface TagSlotCtx { tag: any; index: any; remove: any; }
 
-interface TagsProps {
+interface TagsProps extends Omit<import('solid-js').ComponentProps<'div'>, 'modelValue' | 'defaultModelValue' | 'onModelValueChange' | 'delimiters' | 'allowDuplicates' | 'max' | 'disabled' | 'readonly' | 'validate' | 'placeholder' | 'ariaLabel' | 'onChange' | 'onAdd' | 'onRemove' | 'tagSlot' | 'slots' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The committed tokens — `model: true`, so a commit/remove/paste writes a **fresh** array back through `r-model:modelValue` (uncontrolled fallback `[]`). Because it is the sole model prop, the Angular output is a `ControlValueAccessor` (`[formControl]` / `[(ngModel)]` bind directly).
    * @example

@@ -19,7 +19,7 @@ __rozieInjectStyle('EngineDomEscape-701c687a', `.rozie-engine-host[data-rozie-s-
     overflow: auto;
   }`);
 
-interface EngineDomEscapeProps {}
+interface EngineDomEscapeProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function EngineDomEscape(_props: EngineDomEscapeProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

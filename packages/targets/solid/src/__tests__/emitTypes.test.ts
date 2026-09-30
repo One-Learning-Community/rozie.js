@@ -42,7 +42,11 @@ function load(name: string): IRComponent {
 describe('emitSolidTypes — Phase 22 Plan 22-03', () => {
   it('Test 1: Counter — shared props body (model triplet) + Solid default export', () => {
     const out = emitSolidTypes(load('Counter'));
-    expect(out).toContain(`export interface CounterProps {`);
+    // Typed public surface phase 3 — Counter is a single-<div>-root,
+    // attr-inheriting component, so its interface extends the div's attrs.
+    expect(out).toContain(
+      `export interface CounterProps extends Omit<import('solid-js').ComponentProps<'div'>, `,
+    );
     expect(out).toContain(`value?: number;`);
     expect(out).toContain(`defaultValue?: number;`);
     expect(out).toContain(`onValueChange?: (next: number) => void;`);
@@ -72,5 +76,28 @@ describe('emitSolidTypes — Phase 22 Plan 22-03', () => {
     expect(out).toContain(`import('solid-js').Component<CounterProps>`);
     expect(out).not.toContain('DefineComponent');
     expect(out).not.toContain('ForwardRefExoticComponent');
+  });
+});
+
+describe('emitSolidTypes — typed public surface phase 3 (pass-through HTML attrs)', () => {
+  function loadFixture(): IRComponent {
+    const src = readFileSync(resolve(REPO_ROOT, 'tests/fixtures/typed-surface/AttrsButton.rozie'), 'utf8');
+    const parsed = parse(src, { filename: 'AttrsButton.rozie' });
+    if (!parsed.ast) throw new Error('parse failed for AttrsButton');
+    const lowered = lowerToIR(parsed.ast, { modifierRegistry: createDefaultRegistry() });
+    if (!lowered.ir) throw new Error('lower failed for AttrsButton');
+    return lowered.ir;
+  }
+
+  it('a single-<button>-root attr-inheriting component extends ComponentProps<button>', () => {
+    expect(emitSolidTypes(loadFixture())).toContain(
+      "export interface AttrsButtonProps extends Omit<import('solid-js').ComponentProps<'button'>, 'label' | 'title' | 'onPress' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {",
+    );
+  });
+
+  it('inherit-attrs="false" (ThemedButtonManual) keeps the plain interface header', () => {
+    expect(emitSolidTypes(load('ThemedButtonManual'))).toContain(
+      'export interface ThemedButtonManualProps {',
+    );
   });
 });

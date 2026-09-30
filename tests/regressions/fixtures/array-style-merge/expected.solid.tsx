@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { mergeProps, splitProps } from 'solid-js';
 import { parseInlineStyle } from '@rozie/runtime-solid';
 
-interface ArrayStyleMergeProps {
+interface ArrayStyleMergeProps extends Omit<import('solid-js').ComponentProps<'div'>, 'base' | 's' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   base?: Record<string, any>;
   s?: string;
 }

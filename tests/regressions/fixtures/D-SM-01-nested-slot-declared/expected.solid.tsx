@@ -4,7 +4,7 @@ import { __rozieInjectStyle } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('NestedSlotDeclared-3bc5be6c', `.outer[data-rozie-s-3bc5be6c] { display: block; }`);
 
-interface NestedSlotDeclaredProps {
+interface NestedSlotDeclaredProps extends Omit<import('solid-js').ComponentProps<'div'>, 'wrapperSlot' | 'innerSlot' | 'slots' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   wrapperSlot?: JSX.Element;
   innerSlot?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

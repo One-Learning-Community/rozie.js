@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createMemo, createSignal, splitProps } from 'solid-js';
 import { createControllableSignal } from '@rozie/runtime-solid';
 
-interface ModelParamShadowProps {
+interface ModelParamShadowProps extends Omit<import('solid-js').ComponentProps<'div'>, 'token' | 'defaultToken' | 'onTokenChange' | 'onVerify' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   token?: string;
   defaultToken?: string;
   onTokenChange?: (token: string) => void;

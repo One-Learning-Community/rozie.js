@@ -11,7 +11,7 @@ interface EngineOptions {
 
 __rozieInjectStyle('SolidNullWidenedPropObjectLiteral-a4efe4c5', `.solid-null-widened-prop[data-rozie-s-a4efe4c5] { display: block; }`);
 
-interface SolidNullWidenedPropObjectLiteralProps {
+interface SolidNullWidenedPropObjectLiteralProps extends Omit<import('solid-js').ComponentProps<'div'>, 'handle' | 'label' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   handle?: (string) | null;
   label?: (string) | null;
 }

@@ -12,7 +12,7 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
 
 interface HeaderSlotCtx { remaining: any; total: any; }
 
-interface TodoListProps {
+interface TodoListProps extends Omit<import('solid-js').ComponentProps<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'title' | 'onAdd' | 'onToggle' | 'onRemove' | 'headerSlot' | 'children' | 'emptySlot' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   items?: any[];
   defaultItems?: any[];
   onItemsChange?: (items: any[]) => void;

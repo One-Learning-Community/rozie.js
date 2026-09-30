@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { splitProps, useContext } from 'solid-js';
 import { rozieContext, rozieDisplay } from '@rozie/runtime-solid';
 
-interface InjectAsCastProps {}
+interface InjectAsCastProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function InjectAsCast(_props: InjectAsCastProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

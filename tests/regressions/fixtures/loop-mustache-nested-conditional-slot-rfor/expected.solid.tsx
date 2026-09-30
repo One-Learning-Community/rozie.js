@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { For, Show, mergeProps, splitProps } from 'solid-js';
 
-interface LoopMustacheNestedConditionalSlotRforProps {
+interface LoopMustacheNestedConditionalSlotRforProps extends Omit<import('solid-js').ComponentProps<'div'>, 'items' | 'slots' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   items?: any[];
   slots?: { [key: string]: ((...args: any[]) => JSX.Element) | undefined; };
 }

@@ -4,7 +4,7 @@ import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-sol
 
 __rozieInjectStyle('SolidControllableNullDefault-bacc2ac5', `.solid-controllable-null-default[data-rozie-s-bacc2ac5] { display: block; }`);
 
-interface SolidControllableNullDefaultProps {
+interface SolidControllableNullDefaultProps extends Omit<import('solid-js').ComponentProps<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   value?: (number) | null;
   defaultValue?: (number) | null;
   onValueChange?: (value: (number) | null) => void;

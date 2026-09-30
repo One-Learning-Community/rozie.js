@@ -7,7 +7,7 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
 .clear-btn[data-rozie-s-8bbc4a60] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
 .hint[data-rozie-s-8bbc4a60] { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }`);
 
-interface SearchInputProps {
+interface SearchInputProps extends Omit<import('solid-js').ComponentProps<'div'>, 'placeholder' | 'minLength' | 'autofocus' | 'onSearch' | 'onClear' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   placeholder?: string;
   minLength?: number;
   autofocus?: boolean;

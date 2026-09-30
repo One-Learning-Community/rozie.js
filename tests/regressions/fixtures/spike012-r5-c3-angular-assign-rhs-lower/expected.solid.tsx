@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createSignal, splitProps } from 'solid-js';
 import { createControllableSignal, createDebouncedHandler } from '@rozie/runtime-solid';
 
-interface Spike012R5C3Props {
+interface Spike012R5C3Props extends Omit<import('solid-js').ComponentProps<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;

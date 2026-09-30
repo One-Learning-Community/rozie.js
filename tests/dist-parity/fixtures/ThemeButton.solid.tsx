@@ -10,7 +10,7 @@ __rozieInjectStyle('ThemeButton-9f40a7ea', `.theme-button[data-rozie-s-9f40a7ea]
   cursor: pointer;
 }`);
 
-interface ThemeButtonProps {}
+interface ThemeButtonProps extends Omit<import('solid-js').ComponentProps<'button'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function ThemeButton(_props: ThemeButtonProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

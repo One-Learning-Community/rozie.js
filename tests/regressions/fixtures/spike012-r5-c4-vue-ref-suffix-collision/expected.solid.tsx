@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { createSignal, onMount, splitProps } from 'solid-js';
 
-interface RefSuffixCollisionProps {}
+interface RefSuffixCollisionProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function RefSuffixCollision(_props: RefSuffixCollisionProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

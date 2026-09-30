@@ -6,7 +6,7 @@ __rozieInjectStyle('PropDocs-727424de', `.prop-docs[data-rozie-s-727424de] { dis
 .label[data-rozie-s-727424de] { font-weight: 600; }
 .count[data-rozie-s-727424de] { font-variant-numeric: tabular-nums; }`);
 
-interface PropDocsProps {
+interface PropDocsProps extends Omit<import('solid-js').ComponentProps<'div'>, 'label' | 'count' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   /**
    * The visible text label for the control.
    * @deprecated Use `text` instead — `label` is retained only for back-compat.

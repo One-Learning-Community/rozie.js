@@ -16,7 +16,7 @@ __rozieInjectStyle('Tab-18645a16', `.tab[data-rozie-s-18645a16] {
   border-color: #2563eb;
 }`);
 
-interface TabProps {
+interface TabProps extends Omit<import('solid-js').ComponentProps<'button'>, 'label' | 'index' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   label?: string;
   index?: number;
 }

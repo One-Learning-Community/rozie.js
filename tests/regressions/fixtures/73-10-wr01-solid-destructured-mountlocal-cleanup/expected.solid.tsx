@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { createSignal, onCleanup, onMount, splitProps } from 'solid-js';
 
-interface DestructuredMountLocalCleanupProps {}
+interface DestructuredMountLocalCleanupProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function DestructuredMountLocalCleanup(_props: DestructuredMountLocalCleanupProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

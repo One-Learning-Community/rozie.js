@@ -16,7 +16,7 @@
  */
 import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation, SlotDecl } from '@rozie/core';
-import { buildPropJsdoc } from '@rozie/core';
+import { buildPropJsdoc, renderHtmlAttrsExtends } from '@rozie/core';
 // WR-05 fix (79-REVIEW-FIX): was a local copy of this exact one-line
 // escaping predicate — consolidated into core; see that module's doc
 // comment for why (drift risk on shared, security-relevant escaping logic).
@@ -265,9 +265,15 @@ export function emitPropsInterface(
     fields.push(`  ${exposeRefField}`);
   }
 
+  // Typed public surface phase 3 (spec §5) — when attribute auto-fallthrough
+  // fires, the consumer's undeclared attrs land on the root via the splitProps
+  // rest spread; extend that root's Solid attribute type so the public contract
+  // matches (own members omitted, so they win on a collision). '' ⇒ byte-identical.
+  const htmlAttrsExtends = renderHtmlAttrsExtends(ir, 'solid', fields);
+
   if (fields.length === 0) {
-    return `interface ${ir.name}Props {}`;
+    return `interface ${ir.name}Props${htmlAttrsExtends} {}`;
   }
 
-  return `interface ${ir.name}Props {\n${fields.join('\n')}\n}`;
+  return `interface ${ir.name}Props${htmlAttrsExtends} {\n${fields.join('\n')}\n}`;
 }

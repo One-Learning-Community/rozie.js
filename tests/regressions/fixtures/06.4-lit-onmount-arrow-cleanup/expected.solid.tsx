@@ -4,7 +4,7 @@ import { __rozieInjectStyle } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('OnMountArrowCleanup-722b58d1', `.ticker[data-rozie-s-722b58d1] { font-variant-numeric: tabular-nums; }`);
 
-interface OnMountArrowCleanupProps {}
+interface OnMountArrowCleanupProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function OnMountArrowCleanup(_props: OnMountArrowCleanupProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

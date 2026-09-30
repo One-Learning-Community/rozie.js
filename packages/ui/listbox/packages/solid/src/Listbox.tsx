@@ -116,7 +116,7 @@ interface OptionSlotCtx { option: any; index: any; active: any; selected: any; d
 
 interface EmptySlotCtx { query: any; }
 
-interface ListboxProps {
+interface ListboxProps extends Omit<import('solid-js').ComponentProps<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'id' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'selectedSlot' | 'optionSlot' | 'emptySlot' | 'slots' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`.
    */

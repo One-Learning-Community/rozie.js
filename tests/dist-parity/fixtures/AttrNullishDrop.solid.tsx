@@ -3,7 +3,7 @@ import { createSignal, mergeProps, splitProps } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
 import { rozieAttr, rozieDisplay } from '@rozie/runtime-solid';
 
-interface AttrNullishDropProps {
+interface AttrNullishDropProps extends Omit<import('solid-js').ComponentProps<'div'>, 'maybeNullProp' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   maybeNullProp?: (string) | null;
 }
 

@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createMemo, splitProps } from 'solid-js';
 import { createControllableSignal, rozieDisplay } from '@rozie/runtime-solid';
 
-interface PolyGuardInComputedProps {
+interface PolyGuardInComputedProps extends Omit<import('solid-js').ComponentProps<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   value?: string | Record<string, any>;
   defaultValue?: string | Record<string, any>;
   onValueChange?: (value: string | Record<string, any>) => void;

@@ -7,7 +7,7 @@ __rozieInjectStyle('CloneProbe-67c332fe', `.probe[data-rozie-s-67c332fe] {
   padding: 0.5rem;
 }`);
 
-interface CloneProbeProps {}
+interface CloneProbeProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function CloneProbe(_props: CloneProbeProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

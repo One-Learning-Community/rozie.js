@@ -13,7 +13,7 @@ __rozieInjectStyle('PartCard-1462f7ea', `.card-body[data-rozie-s-1462f7ea] {
   font-weight: 600;
 }`);
 
-interface PartCardProps {
+interface PartCardProps extends Omit<import('solid-js').ComponentProps<'div'>, 'title' | 'children' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   title?: string;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;

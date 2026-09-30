@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { children, onCleanup, onMount, splitProps } from 'solid-js';
 import DummyEngine from 'dummy-engine';
 
-interface SpikeImportElProps {
+interface SpikeImportElProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

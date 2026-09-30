@@ -7,7 +7,7 @@ __rozieInjectStyle('TreeNode-a7176a6e', `.tree-node[data-rozie-s-a7176a6e] { fon
 .tree-node__label[data-rozie-s-a7176a6e] { display: inline-block; }
 .tree-node__children[data-rozie-s-a7176a6e] { list-style: none; margin: 0.25rem 0 0 0; padding-left: 1rem; border-left: 1px dashed currentColor; }`);
 
-interface TreeNodeProps {
+interface TreeNodeProps extends Omit<import('solid-js').ComponentProps<'div'>, 'node' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   node?: Record<string, any>;
 }
 

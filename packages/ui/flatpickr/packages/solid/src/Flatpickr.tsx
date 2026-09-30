@@ -16,7 +16,7 @@ __rozieInjectStyle('Flatpickr-159070d4', `.rozie-flatpickr[data-rozie-s-159070d4
   outline-offset: -1px;
 }`);
 
-interface FlatpickrProps {
+interface FlatpickrProps extends Omit<import('solid-js').ComponentProps<'input'>, 'date' | 'defaultDate' | 'onDateChange' | 'mode' | 'dateFormat' | 'altInput' | 'altFormat' | 'enableTime' | 'enableSeconds' | 'time24hr' | 'noCalendar' | 'minDate' | 'maxDate' | 'placeholder' | 'disabled' | 'commitOn' | 'options' | 'name' | 'inline' | 'staticPosition' | 'position' | 'appendTo' | 'showMonths' | 'weekNumbers' | 'monthSelectorType' | 'prevArrow' | 'nextArrow' | 'allowInput' | 'disable' | 'enable' | 'locale' | 'firstDayOfWeek' | 'parseDate' | 'formatDate' | 'plugins' | 'onChange' | 'onReady' | 'onOpen' | 'onClose' | 'onMonthChange' | 'onYearChange' | 'onValueUpdate' | 'onDayCreate' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The two-way value (`r-model:date`) — the **formatted string** flatpickr produces, not a `Date`. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Consumers that need the parsed `Date[]` read them off the `change` event payload instead.
    * @example

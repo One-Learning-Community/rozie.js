@@ -15,7 +15,7 @@ __rozieInjectStyle('ThemedButtonConsumer-14b8cbaa', `.themed-button-consumer[dat
   font-weight: 600;
 }`);
 
-interface ThemedButtonConsumerProps {}
+interface ThemedButtonConsumerProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function ThemedButtonConsumer(_props: ThemedButtonConsumerProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

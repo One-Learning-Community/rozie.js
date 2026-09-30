@@ -19,7 +19,7 @@ __rozieInjectStyle('Waveform-0b6fbb3a', `.rozie-waveform[data-rozie-s-0b6fbb3a] 
   width: 100%;
 }`);
 
-interface WaveformProps {
+interface WaveformProps extends Omit<import('solid-js').ComponentProps<'div'>, 'src' | 'peaks' | 'duration' | 'height' | 'waveColor' | 'progressColor' | 'cursorColor' | 'cursorWidth' | 'barWidth' | 'barGap' | 'barRadius' | 'minPxPerSec' | 'volume' | 'playbackRate' | 'autoplay' | 'normalizeAmplitude' | 'hideScrollbar' | 'disableInteraction' | 'disableDragToSeek' | 'timeline' | 'hover' | 'hoverColor' | 'regions' | 'defaultRegions' | 'onRegionsChange' | 'dragToCreateRegions' | 'regionColor' | 'options' | 'currentTime' | 'defaultCurrentTime' | 'onCurrentTimeChange' | 'onRegionCreated' | 'onRegionUpdated' | 'onRegionRemoved' | 'onRegionClicked' | 'onRegionIn' | 'onRegionOut' | 'onReady' | 'onPlaying' | 'onPaused' | 'onFinished' | 'onTimeupdate' | 'onSeeking' | 'onInteraction' | 'onLoading' | 'onError' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The audio URL the waveform loads. Bound at construction and reconciled at runtime — changing it calls the engine `load(url)`.
    * @example

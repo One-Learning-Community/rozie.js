@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createSignal, splitProps } from 'solid-js';
 import { rozieContext } from '@rozie/runtime-solid';
 
-interface ProvideAsCastProps {
+interface ProvideAsCastProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

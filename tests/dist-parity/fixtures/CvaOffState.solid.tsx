@@ -6,7 +6,7 @@ __rozieInjectStyle('CvaOffState-a2873aa8', `.cva-off-state[data-rozie-s-a2873aa8
 input[data-rozie-s-a2873aa8] { padding: 0.25rem 0.5rem; }
 .echo[data-rozie-s-a2873aa8] { color: rgba(0, 0, 0, 0.6); }`);
 
-interface CvaOffStateProps {
+interface CvaOffStateProps extends Omit<import('solid-js').ComponentProps<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;

@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { For, createMemo, createSignal, splitProps } from 'solid-js';
 import { rozieDisplay } from '@rozie/runtime-solid';
 
-interface LoopVarShadowsComputedProps {}
+interface LoopVarShadowsComputedProps extends Omit<import('solid-js').ComponentProps<'ul'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function LoopVarShadowsComputed(_props: LoopVarShadowsComputedProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

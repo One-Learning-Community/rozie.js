@@ -6,7 +6,7 @@ __rozieInjectStyle('ExposeProbe-dd2b93b0', `.expose-probe[data-rozie-s-dd2b93b0]
 input[data-rozie-s-dd2b93b0] { padding: 0.25rem 0.5rem; }
 .echo[data-rozie-s-dd2b93b0] { font-variant-numeric: tabular-nums; color: rgba(0, 0, 0, 0.6); }`);
 
-interface ExposeProbeProps {
+interface ExposeProbeProps extends Omit<import('solid-js').ComponentProps<'div'>, 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   ref?: (h: ExposeProbeHandle) => void;
 }
 

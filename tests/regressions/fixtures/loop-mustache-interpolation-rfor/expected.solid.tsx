@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { For, mergeProps, splitProps } from 'solid-js';
 import { rozieDisplay } from '@rozie/runtime-solid';
 
-interface LoopMustacheInterpolationRforProps {
+interface LoopMustacheInterpolationRforProps extends Omit<import('solid-js').ComponentProps<'div'>, 'items' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   items?: any[];
 }
 

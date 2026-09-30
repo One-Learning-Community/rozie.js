@@ -8,7 +8,7 @@ __rozieInjectStyle('PartCardConsumer-7f4fb92a', `.part-card-consumer[data-rozie-
   padding: 0.5rem;
 }`);
 
-interface PartCardConsumerProps {}
+interface PartCardConsumerProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function PartCardConsumer(_props: PartCardConsumerProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

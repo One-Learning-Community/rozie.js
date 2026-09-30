@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { Show, children, mergeProps, splitProps } from 'solid-js';
 
-interface SlotConditionalSlotInElseifChainProps {
+interface SlotConditionalSlotInElseifChainProps extends Omit<import('solid-js').ComponentProps<'div'>, 'mode' | 'children' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   mode?: number;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;

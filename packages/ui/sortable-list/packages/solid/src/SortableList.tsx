@@ -23,7 +23,7 @@ __rozieInjectStyle('SortableList-0af24eae', `.rozie-sortable-wrap[data-rozie-s-0
   border: 0;
 }`);
 
-interface SortableListProps {
+interface SortableListProps extends Omit<import('solid-js').ComponentProps<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'itemStyle' | 'onChange' | 'onAdd' | 'onRemove' | 'onStart' | 'onEnd' | 'headerSlot' | 'children' | 'footerSlot' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.
    * @example

@@ -6,7 +6,7 @@ import CardHeader from './CardHeader';
 __rozieInjectStyle('Card-a88c221e', `.card[data-rozie-s-a88c221e] { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
 .card__body[data-rozie-s-a88c221e] { padding: 1rem; }`);
 
-interface CardProps {
+interface CardProps extends Omit<import('solid-js').ComponentProps<'article'>, 'title' | 'onClose' | 'children' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   title?: string;
   onClose?: ((...args: any[]) => any) | null;
   // D-131: default slot resolved via children() at body top

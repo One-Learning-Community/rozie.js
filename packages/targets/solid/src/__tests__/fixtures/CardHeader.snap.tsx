@@ -6,7 +6,7 @@ __rozieInjectStyle('CardHeader-f3e60f5a', `.card-header[data-rozie-s-f3e60f5a] {
 .card-header__title[data-rozie-s-f3e60f5a] { margin: 0; font-size: 1rem; font-weight: 600; }
 .card-header__close[data-rozie-s-f3e60f5a] { background: none; border: 0; cursor: pointer; font-size: 1.25rem; padding: 0; line-height: 1; }`);
 
-interface CardHeaderProps {
+interface CardHeaderProps extends Omit<import('solid-js').ComponentProps<'header'>, 'title' | 'onClose' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   title?: string;
   onClose?: ((...args: any[]) => any) | null;
 }

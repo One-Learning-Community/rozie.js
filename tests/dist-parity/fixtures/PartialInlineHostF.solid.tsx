@@ -3,7 +3,7 @@ import { createMemo, mergeProps, splitProps } from 'solid-js';
 import { rozieDisplay } from '@rozie/runtime-solid';
 import { clamp } from './partial-helpers.js';
 
-interface PartialInlineHostFProps {
+interface PartialInlineHostFProps extends Omit<import('solid-js').ComponentProps<'div'>, 'base' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   base?: number;
 }
 

@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { Show, mergeProps, splitProps } from 'solid-js';
 
-interface SlotConditionalNamedSlotRIfProps {
+interface SlotConditionalNamedSlotRIfProps extends Omit<import('solid-js').ComponentProps<'div'>, 'show' | 'headerSlot' | 'slots' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   show?: boolean;
   headerSlot?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

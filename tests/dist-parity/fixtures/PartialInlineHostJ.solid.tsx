@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { mergeProps, onMount, splitProps } from 'solid-js';
 import { rozieDisplay } from '@rozie/runtime-solid';
 
-interface PartialInlineHostJProps {
+interface PartialInlineHostJProps extends Omit<import('solid-js').ComponentProps<'div'>, 'base' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   base?: number;
 }
 

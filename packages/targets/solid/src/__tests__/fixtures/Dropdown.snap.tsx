@@ -17,7 +17,7 @@ __rozieInjectStyle('Dropdown-6d6bd882', `.dropdown[data-rozie-s-6d6bd882] { posi
 
 interface TriggerSlotCtx { open: any; toggle: any; }
 
-interface DropdownProps {
+interface DropdownProps extends Omit<import('solid-js').ComponentProps<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'closeOnOutsideClick' | 'closeOnEscape' | 'triggerSlot' | 'children' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;

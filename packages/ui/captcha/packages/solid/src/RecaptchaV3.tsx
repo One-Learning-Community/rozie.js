@@ -15,7 +15,7 @@ import { loadRecaptchaV3, execute as v3Execute } from './internal/loadRecaptchaV
 // (contrast Captcha.rozie's `disposed`, which IS $onMount-local — its
 // exposed handle functions don't read it).
 
-interface RecaptchaV3Props {
+interface RecaptchaV3Props extends Omit<import('solid-js').ComponentProps<'div'>, 'sitekey' | 'action' | 'token' | 'defaultToken' | 'onTokenChange' | 'executeOnMount' | 'onError' | 'onVerify' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * Required. The public reCAPTCHA v3 site key from your Google admin console.
    */

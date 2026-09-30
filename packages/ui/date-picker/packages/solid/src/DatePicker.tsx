@@ -324,7 +324,7 @@ interface FooterSlotCtx { today: any; clear: any; todayIso: any; }
 
 interface PresetsSlotCtx { presets: any; apply: any; }
 
-interface DatePickerProps {
+interface DatePickerProps extends Omit<import('solid-js').ComponentProps<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'selectionMode' | 'min' | 'max' | 'disabledDates' | 'weekStartsOn' | 'disabled' | 'locale' | 'labels' | 'presetRanges' | 'monthYearNav' | 'numberOfMonths' | 'showFooter' | 'disabledDaysOfWeek' | 'isDateDisabled' | 'onChange' | 'onRangeComplete' | 'headerSlot' | 'footerSlot' | 'presetsSlot' | 'slots' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The selected value (two-way `r-model`). **Polymorphic** on `selectionMode`: in `single` mode an ISO `YYYY-MM-DD` string (`""` = nothing selected); in `range` mode a `{ start, end }` object of ISO endpoints (`""` = an unset endpoint). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a DatePicker **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Selecting a day writes the new value back and emits `change`. **Lit caveat (range mode):** the object form must be delivered via a *property* binding (`.value=${obj}` / `r-model`), never a string `value="..."` attribute — the same rule already in force for `disabledDates`.
    * @example

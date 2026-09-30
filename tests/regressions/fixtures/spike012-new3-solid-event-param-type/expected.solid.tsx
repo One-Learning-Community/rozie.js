@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { createSignal, splitProps } from 'solid-js';
 
-interface SolidEventParamTypeProps {}
+interface SolidEventParamTypeProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function SolidEventParamType(_props: SolidEventParamTypeProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

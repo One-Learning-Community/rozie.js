@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createSignal, splitProps } from 'solid-js';
 import { rozieDisplay } from '@rozie/runtime-solid';
 
-interface TemplateAsCastProps {}
+interface TemplateAsCastProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function TemplateAsCast(_props: TemplateAsCastProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

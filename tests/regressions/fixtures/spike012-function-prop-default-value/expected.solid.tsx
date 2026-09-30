@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createSignal, mergeProps, splitProps } from 'solid-js';
 import { createDebouncedHandler } from '@rozie/runtime-solid';
 
-interface FunctionPropDefaultValueProps {
+interface FunctionPropDefaultValueProps extends Omit<import('solid-js').ComponentProps<'div'>, 'onPick' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   onPick?: (...args: any[]) => any;
 }
 

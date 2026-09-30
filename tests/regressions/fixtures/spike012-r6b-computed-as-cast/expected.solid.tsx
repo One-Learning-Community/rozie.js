@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createMemo, mergeProps, splitProps } from 'solid-js';
 import { rozieDisplay } from '@rozie/runtime-solid';
 
-interface ComputedAsCastProps {
+interface ComputedAsCastProps extends Omit<import('solid-js').ComponentProps<'div'>, 'raw' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   raw?: string;
 }
 

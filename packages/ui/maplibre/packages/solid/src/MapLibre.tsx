@@ -26,7 +26,7 @@ interface PopupSlotCtx { popup: any; index: any; }
 
 interface ControlSlotCtx { map: any; }
 
-interface MapLibreProps {
+interface MapLibreProps extends Omit<import('solid-js').ComponentProps<'div'>, 'center' | 'defaultCenter' | 'onCenterChange' | 'zoom' | 'defaultZoom' | 'onZoomChange' | 'bearing' | 'defaultBearing' | 'onBearingChange' | 'pitch' | 'defaultPitch' | 'onPitchChange' | 'mapStyle' | 'minZoom' | 'maxZoom' | 'maxBounds' | 'bounds' | 'fitBoundsOptions' | 'dragPan' | 'dragRotate' | 'scrollZoom' | 'doubleClickZoom' | 'boxZoom' | 'keyboard' | 'touchZoomRotate' | 'touchPitch' | 'markers' | 'popups' | 'sources' | 'layers' | 'interactiveLayerIds' | 'controls' | 'options' | 'onMouseenter' | 'onMouseleave' | 'onLoad' | 'onIdle' | 'onMove' | 'onRotate' | 'onDragstart' | 'onDrag' | 'onDragend' | 'onClick' | 'onDblclick' | 'onContextmenu' | 'onMousemove' | 'onError' | 'onStyledata' | 'onSourcedata' | 'onMoveend' | 'onZoomend' | 'onRotateend' | 'onPitchend' | 'children' | 'markerSlot' | 'popupSlot' | 'controlSlot' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The map center as `[lng, lat]` — **longitude first** (MapLibre's convention, not Leaflet's `[lat, lng]`). Two-way: panning the map writes the new center back through the model path (echo-guarded), and a consumer write `easeTo`s the live map. The `moveend` echo reads `getCenter()` as `[lng, lat]`.
    * @example

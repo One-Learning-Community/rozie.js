@@ -5,7 +5,7 @@ import { clamp } from './partial-helpers.js';
 
 /* between-statement: a transitive non-exported helper pulled in as the closure of usedName */
 
-interface InlineEquivHostCProps {
+interface InlineEquivHostCProps extends Omit<import('solid-js').ComponentProps<'div'>, 'base' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   base?: number;
 }
 

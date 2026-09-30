@@ -4,7 +4,7 @@ import { __rozieInjectStyle, createControllableSignal, mergeListeners, pickListe
 
 __rozieInjectStyle('ControllableNoProps-141c4000', `.bump[data-rozie-s-141c4000] { font-variant-numeric: tabular-nums; }`);
 
-interface ControllableNoPropsProps {
+interface ControllableNoPropsProps extends Omit<import('solid-js').ComponentProps<'button'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   value?: number;
   defaultValue?: number;
   onValueChange?: (value: number) => void;

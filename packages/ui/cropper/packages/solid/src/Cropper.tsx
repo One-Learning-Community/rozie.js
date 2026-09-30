@@ -23,7 +23,7 @@ __rozieInjectStyle('Cropper-cddf3b42', `.rozie-cropper[data-rozie-s-cddf3b42] {
   max-width: 100%;
 }`);
 
-interface CropperProps {
+interface CropperProps extends Omit<import('solid-js').ComponentProps<'div'>, 'src' | 'data' | 'defaultData' | 'onDataChange' | 'aspectRatio' | 'viewMode' | 'dragMode' | 'disabled' | 'guides' | 'center' | 'background' | 'movable' | 'rotatable' | 'scalable' | 'zoomable' | 'zoomOnWheel' | 'cropBoxMovable' | 'cropBoxResizable' | 'autoCrop' | 'autoCropArea' | 'responsive' | 'preview' | 'options' | 'onReady' | 'onCropstart' | 'onCropmove' | 'onCropend' | 'onCrop' | 'onZoom' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The image URL the cropper attaches to. Bound onto the `<img>` and reconciled at runtime — changing it calls the engine `replace(url)`.
    * @example

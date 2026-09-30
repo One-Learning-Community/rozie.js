@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createSignal, mergeProps, splitProps } from 'solid-js';
 import { rozieClass } from '@rozie/runtime-solid';
 
-interface ClassNormShapesProps {
+interface ClassNormShapesProps extends Omit<import('solid-js').ComponentProps<'div'>, 'variant' | 'arr' | 'flags' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   variant?: string;
   arr?: any[];
   flags?: Record<string, any>;

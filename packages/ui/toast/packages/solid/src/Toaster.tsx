@@ -171,7 +171,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 
 interface ToastSlotCtx { toast: any; dismiss: any; }
 
-interface ToasterProps {
+interface ToasterProps extends Omit<import('solid-js').ComponentProps<'div'>, 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe' | 'stacked' | 'onDismissed' | 'toastSlot' | 'slots' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * Which corner the toast stack renders in: `'top-left'`, `'top-right'`, `'top-center'`, `'bottom-left'`, `'bottom-right'`, or `'bottom-center'`. Drives the fixed-position layout and the stack direction.
    */

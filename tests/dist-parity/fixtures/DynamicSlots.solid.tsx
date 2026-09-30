@@ -5,7 +5,7 @@ import { rozieDisplay } from '@rozie/runtime-solid';
 
 interface HeaderCellSlotCtx { title: any; }
 
-interface DynamicSlotsProps {
+interface DynamicSlotsProps extends Omit<import('solid-js').ComponentProps<'div'>, 'columns' | 'row' | 'total' | 'heading' | 'headerCellSlot' | 'slots' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   columns?: any[];
   row?: Record<string, any>;
   total?: number;

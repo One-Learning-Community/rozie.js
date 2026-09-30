@@ -8,7 +8,7 @@ __rozieInjectStyle('Tabs-97e2d32a', `.tabs[data-rozie-s-97e2d32a] {
   font-family: system-ui, -apple-system, sans-serif;
 }`);
 
-interface TabsProps {
+interface TabsProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

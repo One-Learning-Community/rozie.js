@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { Show, children, mergeProps, splitProps } from 'solid-js';
 
-interface SlotConditionalSlotRIfElementRElseProps {
+interface SlotConditionalSlotRIfElementRElseProps extends Omit<import('solid-js').ComponentProps<'div'>, 'show' | 'children' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   show?: boolean;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;

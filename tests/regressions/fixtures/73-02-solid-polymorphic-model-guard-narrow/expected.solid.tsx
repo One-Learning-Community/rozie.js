@@ -4,7 +4,7 @@ import { __rozieInjectStyle, createControllableSignal, rozieDisplay } from '@roz
 
 __rozieInjectStyle('PolymorphicModelGuardNarrow-afea58c3', `.selected[data-rozie-s-afea58c3] { font-variant-numeric: tabular-nums; }`);
 
-interface PolymorphicModelGuardNarrowProps {
+interface PolymorphicModelGuardNarrowProps extends Omit<import('solid-js').ComponentProps<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   value?: string | Record<string, any>;
   defaultValue?: string | Record<string, any>;
   onValueChange?: (value: string | Record<string, any>) => void;

@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { mergeProps, splitProps } from 'solid-js';
 import { parseInlineStyle } from '@rozie/runtime-solid';
 
-interface StyleNormShapesProps {
+interface StyleNormShapesProps extends Omit<import('solid-js').ComponentProps<'div'>, 's' | 'obj' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   s?: string;
   obj?: Record<string, any>;
 }

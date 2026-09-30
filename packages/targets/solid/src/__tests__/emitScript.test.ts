@@ -467,7 +467,11 @@ describe('emitSolid — $expose callback ref prop (Phase 21 Plan 05, REQ-8/REQ-1
 
   it('byte-identity: a non-$expose Solid source emits unchanged (no ref push, no onMount-ref, no Handle interface)', () => {
     const code = compileExposeSolid(NO_EXPOSE_SOURCE, 'ExposeProbe.rozie');
-    expect(code).not.toContain("'ref'");
+    // Typed public surface phase 3 — the props header's `extends Omit<…>`
+    // clause legitimately lists `'ref'` (content-owned key); the no-push
+    // contract is about the BODY, so check everything after the interface.
+    const body = code.slice(code.indexOf('export default function'));
+    expect(body).not.toContain("'ref'");
     expect(code).not.toContain('local.ref');
     expect(code).not.toContain('ExposeProbeHandle');
     expect(code).not.toContain('ref?:');

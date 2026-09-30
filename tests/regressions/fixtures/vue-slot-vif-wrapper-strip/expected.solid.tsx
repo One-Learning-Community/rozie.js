@@ -4,7 +4,7 @@ import { __rozieInjectStyle } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('PresenceSlotFallback-224e77e7', `.panel[data-rozie-s-224e77e7] { border: 1px solid rgba(0, 0, 0, 0.1); }`);
 
-interface PresenceSlotFallbackProps {
+interface PresenceSlotFallbackProps extends Omit<import('solid-js').ComponentProps<'section'>, 'title' | 'headerSlot' | 'children' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   title?: string;
   headerSlot?: JSX.Element;
   // D-131: default slot resolved via children() at body top

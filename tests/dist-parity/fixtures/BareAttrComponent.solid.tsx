@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { splitProps } from 'solid-js';
 import BareAttrChild from './BareAttrChild';
 
-interface BareAttrComponentProps {}
+interface BareAttrComponentProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function BareAttrComponent(_props: BareAttrComponentProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

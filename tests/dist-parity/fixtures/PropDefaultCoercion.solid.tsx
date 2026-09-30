@@ -13,7 +13,7 @@ __rozieInjectStyle('PropDefaultCoercion-109e595c', `.pdc[data-rozie-s-109e595c] 
   margin: 0;
 }`);
 
-interface PropDefaultCoercionProps {
+interface PropDefaultCoercionProps extends Omit<import('solid-js').ComponentProps<'div'>, 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   a?: (Record<string, any>) | null;
   b?: number;
   c?: string;

@@ -4,7 +4,7 @@ import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-sol
 
 __rozieInjectStyle('CheckboxRModel-5898a126', `.toggle[data-rozie-s-5898a126] { display: inline-flex; gap: 0.25rem; align-items: center; }`);
 
-interface CheckboxRModelProps {
+interface CheckboxRModelProps extends Omit<import('solid-js').ComponentProps<'label'>, 'checked' | 'defaultChecked' | 'onCheckedChange' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   checked?: boolean;
   defaultChecked?: boolean;
   onCheckedChange?: (checked: boolean) => void;

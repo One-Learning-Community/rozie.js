@@ -3,7 +3,7 @@ import { createMemo, mergeProps, splitProps } from 'solid-js';
 import { rozieDisplay } from '@rozie/runtime-solid';
 import { clampD } from './wr01-helpers.js';
 
-interface InlineEquivHostDProps {
+interface InlineEquivHostDProps extends Omit<import('solid-js').ComponentProps<'div'>, 'base' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   base?: number;
 }
 

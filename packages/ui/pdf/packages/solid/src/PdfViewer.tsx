@@ -52,7 +52,7 @@ __rozieInjectStyle('PdfViewer-3c863364', `.rozie-pdf[data-rozie-s-3c863364] {
     border-radius: 2px;
   }`);
 
-interface PdfViewerProps {
+interface PdfViewerProps extends Omit<import('solid-js').ComponentProps<'div'>, 'src' | 'page' | 'defaultPage' | 'onPageChange' | 'scale' | 'rotation' | 'workerSrc' | 'standardFontDataUrl' | 'renderAllPages' | 'textLayer' | 'password' | 'query' | 'autoFit' | 'options' | 'onPagerendered' | 'onError' | 'onPagesrendered' | 'onPasswordrequest' | 'onProgress' | 'onLoad' | 'onPagechange' | 'onFindresult' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The PDF source — a URL string, a `data:` base64 URL, or binary data (`ArrayBuffer` / `Uint8Array`). Changing it tears down the previous document (via its loading task) and loads the new one; `undefined` renders an empty viewer.
    * @example

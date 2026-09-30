@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { mergeProps, splitProps } from 'solid-js';
 
-interface BareAttrChildProps {
+interface BareAttrChildProps extends Omit<import('solid-js').ComponentProps<'div'>, 'combobox' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   combobox?: boolean;
 }
 

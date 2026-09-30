@@ -33,6 +33,13 @@ function lowerInline(rozie: string): IRComponent {
   return lowered.ir;
 }
 
+/** The `splitProps(…, [keys])` line — where a `'children'` key would be split. */
+function splitPropsLine(code: string): string {
+  const line = code.split('\n').find((l) => l.includes('splitProps('));
+  if (line === undefined) throw new Error('no splitProps(...) line in emitted Solid code');
+  return line;
+}
+
 describe('emitSolid — a dynamic-name slot does NOT count as the genuine default slot for hasDefaultSlot (D-131)', () => {
   it("a producer with ONLY a dynamic-name slot (no genuine default slot) does NOT split 'children' or emit the children() accessor", () => {
     const ir = lowerInline(`
@@ -44,7 +51,10 @@ describe('emitSolid — a dynamic-name slot does NOT count as the genuine defaul
 </rozie>
 `);
     const { code } = emitSolid(ir, { filename: 'OnlyDynamic.rozie' });
-    expect(code).not.toContain("'children'");
+    // Scope to the splitProps key list: since typed-surface phase 3 the props
+    // interface header legitimately carries `'children'` in its
+    // `extends Omit<ComponentProps<'div'>, … | 'children' | …>` clause.
+    expect(splitPropsLine(code)).not.toContain("'children'");
     expect(code).not.toContain('children(() => local.children)');
     expect(code).not.toMatch(/^import \{[^}]*\bchildren\b[^}]*\} from 'solid-js';/m);
   });
@@ -62,7 +72,7 @@ describe('emitSolid — a dynamic-name slot does NOT count as the genuine defaul
 </rozie>
 `);
     const { code } = emitSolid(ir, { filename: 'DynamicPlusDefault.rozie' });
-    expect(code).toContain("'children'");
+    expect(splitPropsLine(code)).toContain("'children'");
     expect(code).toContain('children(() => local.children)');
   });
 });

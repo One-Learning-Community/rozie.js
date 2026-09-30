@@ -3,7 +3,7 @@ import { createSignal, splitProps } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
 import { rozieDisplay } from '@rozie/runtime-solid';
 
-interface EventLoopVarShadowProps {}
+interface EventLoopVarShadowProps extends Omit<import('solid-js').ComponentProps<'ul'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function EventLoopVarShadow(_props: EventLoopVarShadowProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);

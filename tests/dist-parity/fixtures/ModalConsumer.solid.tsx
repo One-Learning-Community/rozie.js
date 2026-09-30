@@ -8,7 +8,7 @@ __rozieInjectStyle('ModalConsumer-5d081d3a', `.modal-consumer[data-rozie-s-5d081
 .close[data-rozie-s-5d081d3a] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
 .dynamic-fill[data-rozie-s-5d081d3a] { font-weight: bold; }`);
 
-interface ModalConsumerProps {
+interface ModalConsumerProps extends Omit<import('solid-js').ComponentProps<'div'>, 'title' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   title?: string;
 }
 

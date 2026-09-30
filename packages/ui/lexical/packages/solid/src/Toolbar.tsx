@@ -41,7 +41,7 @@ __rozieInjectStyle('Toolbar-cf3602a2', `.rozie-lexical-toolbar[data-rozie-s-cf36
   border-color: #1a1a1a;
 }`);
 
-interface ToolbarProps {}
+interface ToolbarProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {}
 
 export default function Toolbar(_props: ToolbarProps): JSX.Element {
   const [local, attrs] = splitProps(_props, [] as []);
