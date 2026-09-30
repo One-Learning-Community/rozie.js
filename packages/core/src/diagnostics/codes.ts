@@ -74,6 +74,10 @@ export const RozieErrorCode = {
   // block-parse cluster.
   INVALID_PROP_DOCS_SHAPE: 'ROZ018', // warning — a <props> `docs:` key is malformed (non-object, wrong-typed description/deprecated/example, or unknown sub-key); the bad docs/sub-key is dropped and no JSDoc is emitted. Shape: docs: { description?: string, deprecated?: true | string, example?: string }.
 
+  // Typed public surface (spec 2026-09-29) — ROZ019..ROZ023 continue the
+  // ROZ010-029 declarative-block band.
+  INVALID_AUTHORED_TYPE: 'ROZ022', // error — an author-written type string (an <emits> payload, a :param-types value, or an $expose signature) is not a single valid TypeScript type.
+
   // ---- Script parse (Plan 03) — ROZ030..ROZ049 ----
   SCRIPT_PARSE_ERROR: 'ROZ030', // error — recoverable <script> syntax error(s) Babel collected under errorRecovery (one diagnostic per lifted error).
   SCRIPT_UNRECOVERABLE: 'ROZ031', // error — the <script> block failed to parse at all (Babel threw); caught and collected, not re-thrown.

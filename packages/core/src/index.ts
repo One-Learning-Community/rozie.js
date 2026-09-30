@@ -75,6 +75,14 @@ export {
   renderPropsInterface,
   renderPropType,
 } from './codegen/renderPropsInterface.js';
+// Typed public surface (spec §4.1) — the single authored-type printer consumed
+// by `<emits>` payload, `:param-types` values, and `$expose` signatures.
+// @experimental — shape may change before v1.0
+export type { AuthoredTypeResult } from './codegen/renderAuthoredType.js';
+export {
+  parseAuthoredType,
+  printTSType,
+} from './codegen/renderAuthoredType.js';
 // Typed public surface phase 3 — the `extends Omit<<root attrs>, …>` clause the
 // React/Solid/Svelte props interfaces gain when attributes fall through.
 // @experimental — shape may change before v1.0
