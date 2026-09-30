@@ -107,7 +107,8 @@ describe('SVELTE-ATTRS-SURFACE — pass-through HTML attrs (typed-surface P3)', 
   });
 
   it.each([
-    ['href (not a <button> attribute)', '<AttrsButton href="/x" />', /href/],
+    // Match the excess-property diagnostic itself, not any output mentioning href.
+    ['href (not a <button> attribute)', '<AttrsButton href="/x" />', /'"href"' does not exist in type/],
     ['title="x" (own `title: number` wins)', '<AttrsButton title="x" />', /not assignable to type 'number'/],
   ])('negative: inline consumer passing %s fails svelte-check', (_label, usage, pattern) => {
     const consumer = `<script lang="ts">\n  import AttrsButton from './AttrsButton.svelte';\n</script>\n\n${usage}\n`;

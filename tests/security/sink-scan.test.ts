@@ -158,7 +158,9 @@ interface Violation {
  * them out on such header lines only — a quoted key anywhere else, or an
  * unquoted sink on the same line, is still scanned.
  */
-const OMIT_HEADER_RE = /^(?:export )?interface \w*Props(?:<[^>]*>)? extends Omit</;
+// Lazy `.*?` (not `<[^>]*>`) so a generic parameter list with a nested `>`
+// (`<T extends Record<string, unknown>>`) still reaches ` extends Omit<`.
+const OMIT_HEADER_RE = /^(?:export )?interface \w*Props\b.*? extends Omit</;
 function stripTypeOnlyOmitKeys(text: string): string {
   return text
     .split('\n')
@@ -274,6 +276,12 @@ describe('Battery 1 — emit-escaping sink-scan (SPEC req 5, D-01/D-02)', () => 
     const solidHeader =
       "export interface CounterProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {";
     expect(scanText(solidHeader, 'solid', 'Counter', 'Counter.solid.tsx')).toHaveLength(0);
+  });
+
+  it('typed-surface P3: the Omit exclusion is recognised on a GENERIC props header with a nested `>`', () => {
+    const header =
+      "export interface SelectProps<T extends Record<string, unknown>> extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'children' | 'dangerouslySetInnerHTML'> {";
+    expect(scanText(header, 'react', 'Select', 'Select.d.ts')).toHaveLength(0);
   });
 
   it('NEGATIVE self-test: a real sink elsewhere in a file whose header carries the Omit exclusion still FAILS', () => {

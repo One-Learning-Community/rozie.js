@@ -44,6 +44,25 @@ describe('collectInterfaceMemberNames', () => {
     ];
     expect(collectInterfaceMemberNames(lines)).toEqual(['label', 'aria-x', 'onPress', 'slots', 'id']);
   });
+  it('locks in multi-line member types: only the 2-space-indented top-level keys are collected', () => {
+    // A future emitter reformat that spreads a record-typed member (React
+    // `slots?:`, Svelte `snippets?:`) over several lines must not leak its
+    // nested keys into the Omit list, nor lose the top-level key.
+    const lines = [
+      '  slots?: {',
+      "    'cell-status'?: ((params: { row: any }) => JSX.Element) | undefined;",
+      '    [key: `row-${string}`]: (() => JSX.Element) | undefined;',
+      '  };',
+      '  snippets?: Record<',
+      '    string,',
+      '    any',
+      '  >;',
+      '  onPress?: (',
+      '    value: number,',
+      '  ) => void;',
+    ];
+    expect(collectInterfaceMemberNames(lines)).toEqual(['slots', 'snippets', 'onPress']);
+  });
   it('unescapes a quoted key', () => {
     expect(collectInterfaceMemberNames(["  'it\\'s'?: string;"])).toEqual(["it's"]);
   });
