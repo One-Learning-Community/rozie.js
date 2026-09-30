@@ -141,6 +141,7 @@ export function emitReactTypes(ir: IRComponent, opts: EmitReactTypesOptions = {}
       // Typed public surface phase 3 — mirror the inline interface's
       // `extends Omit<ComponentPropsWithoutRef<tag>, …>` in the public sidecar.
       htmlAttrs: 'react',
+      includeTypesBlock: true,
     }),
   );
   lines.push('');

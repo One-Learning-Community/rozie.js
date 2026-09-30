@@ -34,6 +34,8 @@ const ZERO_LOC = { start: 0, end: 0 };
 export function makeSelectIR(): IRComponent {
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name: 'Select',
     props: [
       {

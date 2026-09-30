@@ -22,7 +22,7 @@
  */
 import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation } from '@rozie/core';
-import { buildPropJsdoc, renderHtmlAttrsExtends } from '@rozie/core';
+import { buildPropJsdoc, renderEmitHandlerType, renderHtmlAttrsExtends } from '@rozie/core';
 import { buildSlotsRecordType } from './refineSlotTypes.js';
 
 /**
@@ -158,7 +158,9 @@ export function emitPropsInterface(ir: IRComponent, slotPropFields?: string[]): 
   for (const e of ir.emits) {
     const eventPascal = toPascalCase(e);
     if (eventPascal.length === 0) continue;
-    fields.push(`  on${eventPascal}?: (...args: any[]) => void;`);
+    fields.push(
+      `  on${eventPascal}?: ${renderEmitHandlerType(ir.emitDecls?.find((d) => d.name === e))};`,
+    );
   }
 
   // Slots — Plan 04-03 fills slotPropFields via emitSlotDecl(ir).

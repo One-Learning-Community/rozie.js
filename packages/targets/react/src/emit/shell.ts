@@ -57,6 +57,8 @@ export interface ShellParts {
    * Empty/undefined for an untyped `<script>`.
    */
   hoistedTypeDecls?: string[];
+  /** Typed-surface P1 — rendered `<types>` block, placed at module top after `hoistedTypeDecls`. '' / undefined when absent. */
+  typesBlock?: string;
   /** `import styles from './Foo.module.css';` or null (Plan 04-05 wires) */
   cssModuleImport: string | null;
   /** `import './Foo.global.css';` or null (Plan 04-05 wires) */
@@ -261,6 +263,11 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     }
   }
 
+  if (parts.typesBlock) {
+    moduleParts.push(parts.typesBlock);
+    moduleParts.push('\n\n');
+  }
+
   // Slot-context interfaces — Plan 04-03 — BEFORE the props interface.
   if (parts.ctxInterfaces && parts.ctxInterfaces.length > 0) {
     for (const iface of parts.ctxInterfaces) {
@@ -448,6 +455,11 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
       ms.append(decl);
       ms.append('\n\n');
     }
+  }
+
+  if (parts.typesBlock) {
+    ms.append(parts.typesBlock);
+    ms.append('\n\n');
   }
 
   if (parts.ctxInterfaces && parts.ctxInterfaces.length > 0) {
