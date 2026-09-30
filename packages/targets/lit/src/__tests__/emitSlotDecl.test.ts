@@ -71,6 +71,8 @@ describe('emitSlotDecl — D-LIT-14 correction', () => {
     const result = emitSlotDecl(
       {
         type: 'IRComponent',
+        types: null,
+        emitDecls: null,
         name: 'FullCalendar',
         props: [
           {
@@ -130,6 +132,8 @@ describe('emitSlotDecl — D-LIT-14 correction', () => {
     const result = emitSlotDecl(
       {
         type: 'IRComponent',
+        types: null,
+        emitDecls: null,
         name: 'FullCalendar',
         props: [],
         state: [],
@@ -174,6 +178,8 @@ describe('emitSlotDecl — D-LIT-14 correction', () => {
     const result = emitSlotDecl(
       {
         type: 'IRComponent',
+        types: null,
+        emitDecls: null,
         name: 'X',
         props: [],
         state: [],
@@ -287,6 +293,8 @@ describe('pre-seed lines (Phase 07.3.1 D-LIT-15)', () => {
     const result = emitSlotDecl(
       {
         type: 'IRComponent',
+        types: null,
+        emitDecls: null,
         name: 'X',
         props: [],
         state: [],

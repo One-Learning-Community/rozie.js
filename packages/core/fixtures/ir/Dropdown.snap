@@ -267,6 +267,8 @@
     }
   ],
   "emits": [],
+  "types": null,
+  "emitDecls": null,
   "expose": [
     {
       "type": "ExposedMethod",

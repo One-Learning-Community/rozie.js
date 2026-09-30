@@ -24,6 +24,8 @@
   "refs": [],
   "slots": [],
   "emits": [],
+  "types": null,
+  "emitDecls": null,
   "expose": [],
   "provides": [],
   "injects": [],

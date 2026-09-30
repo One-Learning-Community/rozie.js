@@ -18,6 +18,7 @@ import type { PropsAST } from '../../ast/blocks/PropsAST.js';
 import type { BindingsTable, PropDeclEntry } from '../../semantic/types.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
+import type { SourceLoc } from '../../ast/types.js';
 import type { PropDecl, PropDocs, PropTypeAnnotation } from '../types.js';
 
 /**
@@ -123,14 +124,27 @@ function findPropDocs(entry: PropDeclEntry, diagnostics: Diagnostic[]): PropDocs
   // IN-02). `docsExpression` is null exactly when no `docs:` key is present.
   const docsValue = entry.docsExpression;
   if (docsValue === null) return null; // no docs key — the inert control path (Test D)
+  return parsePublicDocs(docsValue, `Prop '${entry.name}'`, entry.sourceLoc, RozieErrorCode.INVALID_PROP_DOCS_SHAPE, diagnostics);
+}
 
+/**
+ * Shared `docs:` shape parser for `<props>` (ROZ018) and `<emits>` (ROZ023).
+ * `ownerLabel` is the message subject (e.g. `Prop 'x'`).
+ */
+export function parsePublicDocs(
+  docsValue: t.Expression,
+  ownerLabel: string,
+  loc: SourceLoc,
+  shapeCode: Diagnostic['code'],
+  diagnostics: Diagnostic[],
+): PropDocs | null {
   if (!t.isObjectExpression(docsValue)) {
     // `docs: 42` / `docs: 'x'` etc. — not an object literal (Test C).
     diagnostics.push({
-      code: RozieErrorCode.INVALID_PROP_DOCS_SHAPE,
+      code: shapeCode,
       severity: 'warning',
-      message: `Prop '${entry.name}' has a malformed 'docs:' value — it must be an object literal of the form { description?: string, deprecated?: true | string, example?: string }. The docs have been dropped (no JSDoc will be emitted).`,
-      loc: entry.sourceLoc,
+      message: `${ownerLabel} has a malformed 'docs:' value — it must be an object literal of the form { description?: string, deprecated?: true | string, example?: string }. The docs have been dropped (no JSDoc will be emitted).`,
+      loc,
       hint: "Use docs: { description: '...', deprecated: true | '...', example: '...' }.",
     });
     return null;
@@ -140,10 +154,10 @@ function findPropDocs(entry: PropDeclEntry, diagnostics: Diagnostic[]): PropDocs
   for (const member of docsValue.properties) {
     if (!t.isObjectProperty(member) || member.computed) {
       diagnostics.push({
-        code: RozieErrorCode.INVALID_PROP_DOCS_SHAPE,
+        code: shapeCode,
         severity: 'warning',
-        message: `Prop '${entry.name}' has a malformed 'docs:' entry (a spread, computed key, or method) — it has been dropped.`,
-        loc: entry.sourceLoc,
+        message: `${ownerLabel} has a malformed 'docs:' entry (a spread, computed key, or method) — it has been dropped.`,
+        loc,
         hint: "Allowed docs sub-keys: description (string), deprecated (true | string), example (string).",
       });
       continue;
@@ -155,10 +169,10 @@ function findPropDocs(entry: PropDeclEntry, diagnostics: Diagnostic[]): PropDocs
       null;
     if (keyName === null || !ALLOWED_DOCS_KEYS.has(keyName)) {
       diagnostics.push({
-        code: RozieErrorCode.INVALID_PROP_DOCS_SHAPE,
+        code: shapeCode,
         severity: 'warning',
-        message: `Prop '${entry.name}' has an unknown 'docs:' sub-key '${keyName ?? '<computed>'}' — it has been dropped. Allowed sub-keys: description, deprecated, example.`,
-        loc: entry.sourceLoc,
+        message: `${ownerLabel} has an unknown 'docs:' sub-key '${keyName ?? '<computed>'}' — it has been dropped. Allowed sub-keys: description, deprecated, example.`,
+        loc,
         hint: "Allowed docs sub-keys: description (string), deprecated (true | string), example (string).",
       });
       continue;
@@ -169,10 +183,10 @@ function findPropDocs(entry: PropDeclEntry, diagnostics: Diagnostic[]): PropDocs
         docs[keyName] = v.value;
       } else {
         diagnostics.push({
-          code: RozieErrorCode.INVALID_PROP_DOCS_SHAPE,
+          code: shapeCode,
           severity: 'warning',
-          message: `Prop '${entry.name}' has a non-string 'docs.${keyName}' — it must be a string literal. The '${keyName}' sub-key has been dropped.`,
-          loc: entry.sourceLoc,
+          message: `${ownerLabel} has a non-string 'docs.${keyName}' — it must be a string literal. The '${keyName}' sub-key has been dropped.`,
+          loc,
           hint: `Use docs: { ${keyName}: '...' }.`,
         });
       }
@@ -184,10 +198,10 @@ function findPropDocs(entry: PropDeclEntry, diagnostics: Diagnostic[]): PropDocs
         docs.deprecated = v.value;
       } else {
         diagnostics.push({
-          code: RozieErrorCode.INVALID_PROP_DOCS_SHAPE,
+          code: shapeCode,
           severity: 'warning',
-          message: `Prop '${entry.name}' has a malformed 'docs.deprecated' — it must be the boolean 'true' or a string message. The 'deprecated' sub-key has been dropped.`,
-          loc: entry.sourceLoc,
+          message: `${ownerLabel} has a malformed 'docs.deprecated' — it must be the boolean 'true' or a string message. The 'deprecated' sub-key has been dropped.`,
+          loc,
           hint: "Use docs: { deprecated: true } or docs: { deprecated: 'Use X instead.' }.",
         });
       }

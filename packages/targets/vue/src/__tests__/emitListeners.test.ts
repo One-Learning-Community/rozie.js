@@ -50,6 +50,8 @@ const LOC = { start: 0, end: 0 };
 function emptyIR(): IRComponent {
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name: 'Test',
     props: [],
     state: [],

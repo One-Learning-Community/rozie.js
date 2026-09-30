@@ -88,6 +88,8 @@ $onMount(helper);
     const program = babelParse(src, { sourceType: 'module' });
     const syntheticIR: IRComponent = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synth',
       props: [],
       state: [],
@@ -154,6 +156,8 @@ $onMount(setup);
     const program = babelParse(src, { sourceType: 'module' });
     const syntheticIR: IRComponent = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synth',
       props: [],
       state: [],
@@ -221,6 +225,8 @@ $onMount(setup);
     const program = babelParse(src, { sourceType: 'module' });
     const syntheticIR: IRComponent = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synth',
       props: [],
       state: [],
@@ -275,6 +281,8 @@ $onMount(helperB);
     const program = babelParse(src, { sourceType: 'module' });
     const syntheticIR: IRComponent = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synth',
       props: [],
       state: [],
@@ -349,6 +357,8 @@ const keyFor = (item) => {
     };
     const syntheticIR: IRComponent = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synth',
       props: [],
       state: [],
@@ -392,6 +402,8 @@ const keyFor = (item) => {
     const program = babelParse(src, { sourceType: 'module' });
     const syntheticIR: IRComponent = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synth',
       props: [],
       state: [],
@@ -458,6 +470,8 @@ const bump = () => {
     };
     const syntheticIR: IRComponent = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synth',
       props: [],
       state: [],
@@ -512,6 +526,8 @@ const bump = () => {
     };
     const syntheticIR: IRComponent = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synth',
       props: [],
       state: [],

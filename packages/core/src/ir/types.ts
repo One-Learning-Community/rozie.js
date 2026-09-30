@@ -62,7 +62,26 @@ export interface IRComponent {
   computed: ComputedDecl[];
   refs: RefDecl[];
   slots: SlotDecl[];
+  /**
+   * Emit names. When `emitDecls !== null` this equals `emitDecls.map(d => d.name)`
+   * in declaration order; otherwise it is the inferred set (script + template +
+   * listeners) exactly as before.
+   */
   emits: string[];
+  /**
+   * The validated `<types>` block (type-only statements in source order), or
+   * `null` when the component has none.
+   *
+   * @experimental — added in typed-surface P1
+   */
+  types: TypesBlockIR | null;
+  /**
+   * Declared `<emits>` entries in declaration order; `null` ⇒ no `<emits>`
+   * block (names inferred, payloads `any`).
+   *
+   * @experimental — added in typed-surface P1
+   */
+  emitDecls: EmitDecl[] | null;
   /**
    * Phase 21 — `$expose({...})` method names in source order; `[]` when no
    * `$expose` call. NOT deduped via Set — `{ name, sourceLoc }` objects survive
@@ -1497,3 +1516,18 @@ export interface StyleSection {
 // Re-export IRNodeId so consumers of this module get the full IR-relevant id
 // surface from one import.
 export type { IRNodeId } from '../reactivity/ReactiveDepGraph.js';
+
+/** @experimental — added in typed-surface P1 */
+export interface TypesBlockIR {
+  statements: import('@babel/types').Statement[]; // validated, source order
+  exportedNames: string[]; // names re-exported from each leaf entry
+  sourceLoc: SourceLoc;
+}
+
+/** @experimental — added in typed-surface P1 */
+export interface EmitDecl {
+  name: string;
+  payload: import('@babel/types').TSType | null; // null ⇒ no-argument event
+  docs: PropDocs | null;
+  sourceLoc: SourceLoc;
+}

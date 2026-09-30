@@ -27,6 +27,8 @@ function lowerInline(rozie: string): IRComponent {
 
 const STUB_IR: IRComponent = {
   type: 'IRComponent',
+  types: null,
+  emitDecls: null,
   name: 'Stub',
   props: [],
   state: [],

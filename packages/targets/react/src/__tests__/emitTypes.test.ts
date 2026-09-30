@@ -37,6 +37,8 @@ function load(name: string): { ir: IRComponent; src: string } {
 function emptyIR(name: string): IRComponent {
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name,
     props: [],
     state: [],

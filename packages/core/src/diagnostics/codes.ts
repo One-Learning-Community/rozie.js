@@ -78,7 +78,9 @@ export const RozieErrorCode = {
   // ROZ010-029 declarative-block band.
   TYPES_BLOCK_DISALLOWED_STATEMENT: 'ROZ019', // error — the <types> block holds a statement that is not type-only (runtime code, a value import, enum, declare const, …); only `import type`, interface, type, and export of those are allowed, so hoisting <types> into every target can never change runtime behaviour.
   TYPES_BLOCK_PARSE_ERROR: 'ROZ020', // error — the <types> block is not valid TypeScript.
+  INVALID_EMIT_DECL: 'ROZ021', // error — an <emits> entry is not `{}` / `{ payload?: '<TS type>', docs?: {...} }`, or uses a computed/spread key or an unknown sub-key.
   INVALID_AUTHORED_TYPE: 'ROZ022', // error — an author-written type string (an <emits> payload, a :param-types value, or an $expose signature) is not a single valid TypeScript type.
+  INVALID_EMIT_DOCS_SHAPE: 'ROZ023', // warning — an <emits> `docs:` is malformed (same shape as <props> docs: { description?, deprecated?, example? }); the bad docs/sub-key is dropped.
 
   // ---- Script parse (Plan 03) — ROZ030..ROZ049 ----
   SCRIPT_PARSE_ERROR: 'ROZ030', // error — recoverable <script> syntax error(s) Babel collected under errorRecovery (one diagnostic per lifted error).
@@ -655,6 +657,10 @@ export const RozieErrorCode = {
   // every setup-once statement runs on Angular, library-wide, for a pattern
   // the shipped corpus does not use. See setupOncePropReadValidator.ts.
   SETUP_ONCE_PROP_READ: 'ROZ150', // warning (suppressible) — setup-once <script> code (no enclosing function) reads $props.<x>/$model.<x>; on Angular (and Lit, for a top-level declaration initializer) that runs before consumer-bound inputs arrive, so it sees the default. Read it through a derived function (`const xValue = () => $props.x`) instead.
+
+  // Typed public surface (spec 2026-09-29) — ROZ151..ROZ156.
+  EMIT_UNDECLARED: 'ROZ151', // error — <emits> is present and a $emit('x') (in <script>, <template> or <listeners>) names an event it does not declare; <emits> is the complete list.
+  EMIT_DECLARED_UNUSED: 'ROZ152', // warning — <emits> declares an event that no $emit call ever fires.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // error — SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)

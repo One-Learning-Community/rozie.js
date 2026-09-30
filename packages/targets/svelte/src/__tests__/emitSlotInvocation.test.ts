@@ -24,6 +24,8 @@ import { emitSlotInvocation } from '../emit/emitSlotInvocation.js';
 function makeCtx(slots: SlotDecl[] = []): EmitSlotInvocationCtx {
   const ir = {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name: 'TestComponent',
     props: [],
     state: [],

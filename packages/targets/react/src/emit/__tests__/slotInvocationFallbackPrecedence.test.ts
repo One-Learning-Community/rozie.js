@@ -194,6 +194,8 @@ const MATCH_SRC = `<rozie name="SlotFamilyFallbackMatchProbe">
 function emptyIR(name: string): IRComponent {
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name,
     props: [],
     state: [],

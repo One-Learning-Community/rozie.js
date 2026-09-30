@@ -312,6 +312,8 @@
     "search",
     "clear"
   ],
+  "types": null,
+  "emitDecls": null,
   "expose": [],
   "provides": [],
   "injects": [],

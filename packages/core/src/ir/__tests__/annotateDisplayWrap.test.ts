@@ -81,6 +81,8 @@ function makeIR(opts: {
 
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name: 'Test',
     props: opts.props ?? [],
     state: opts.state ?? [],

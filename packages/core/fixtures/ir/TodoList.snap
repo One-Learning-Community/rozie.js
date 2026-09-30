@@ -755,6 +755,8 @@
     "toggle",
     "remove"
   ],
+  "types": null,
+  "emitDecls": null,
   "expose": [],
   "provides": [],
   "injects": [],

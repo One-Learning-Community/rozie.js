@@ -31,6 +31,8 @@ function makeIR(overrides: Partial<IRComponent> = {}): IRComponent {
   // present as empty arrays so TypeScript narrows correctly.
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name: 'TestComponent',
     props: [],
     state: [],

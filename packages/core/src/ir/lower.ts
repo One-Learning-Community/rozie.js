@@ -32,6 +32,7 @@ import type { IRComponent, RefDecl, SetupBody, StyleSection } from './types.js';
 import { analyzeAST } from '../semantic/analyze.js';
 import { buildReactiveDepGraph } from '../reactivity/buildDepGraph.js';
 import { lowerProps } from './lowerers/lowerProps.js';
+import { lowerTypesBlock, lowerEmitsBlock, validateEmitCompleteness } from './lowerers/lowerTypesAndEmits.js';
 import { lowerData } from './lowerers/lowerData.js';
 import { lowerScript } from './lowerers/lowerScript.js';
 import { lowerListeners } from './lowerers/lowerListeners.js';
@@ -233,6 +234,10 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
 
   const styles = ast.style ? lowerStyles(ast.style) : emptyStyles();
 
+  const types = lowerTypesBlock(ast.types);
+  const emitDecls = lowerEmitsBlock(ast.emits, diagnostics);
+  validateEmitCompleteness(emitDecls, bindings.emits, ast.emits?.loc, diagnostics);
+
   const ir: IRComponent = {
     type: 'IRComponent',
     name: ast.name,
@@ -246,7 +251,10 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     // adds the <template> and <listeners> names (quick 260929-ua4). The Set is
     // already deduped in first-seen order, and it is filled even when the
     // component has no <script> block.
-    emits: [...bindings.emits],
+    emits: emitDecls !== null ? emitDecls.map((d) => d.name) : [...bindings.emits],
+    // Typed public surface (P1) — null when the block is absent.
+    types,
+    emitDecls,
     // Phase 21 — $expose({...}) method names in source order; [] when no
     // $expose call. NOT Set-deduped (per-name sourceLoc + source order must
     // survive); every emitter branches on expose.length === 0 (D-02).

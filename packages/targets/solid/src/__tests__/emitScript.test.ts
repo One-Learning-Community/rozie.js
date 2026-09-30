@@ -29,6 +29,8 @@ function buildMinimalIR(overrides: Partial<IRComponent> = {}): IRComponent {
   const scriptProgram = t.file(t.program([]));
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name: 'Counter',
     props: [],
     state: [

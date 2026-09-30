@@ -250,6 +250,8 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
       slots: IRComponent['slots'];
     } = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synthetic',
       props: [],
       state: [
@@ -295,6 +297,8 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
       slots: IRComponent['slots'];
     } = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synthetic',
       props: [],
       state: [
@@ -338,6 +342,8 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
       slots: IRComponent['slots'];
     } = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synthetic',
       props: [],
       state: [],
@@ -386,6 +392,8 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
       slots: IRComponent['slots'];
     } = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synthetic',
       props: [],
       state: [],
@@ -417,6 +425,8 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
       slots: IRComponent['slots'];
     } = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synthetic',
       props: [],
       state: [],
@@ -446,6 +456,8 @@ describe('rewriteRozieIdentifiers (React) — $clone', () => {
   ): IRComponent {
     return {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synthetic',
       props: [],
       state: [],

@@ -21,6 +21,8 @@ import type { IRComponent, ParamDecl } from '../src/ir/types.js';
 function emptyIR(name: string): IRComponent {
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name,
     props: [],
     state: [],

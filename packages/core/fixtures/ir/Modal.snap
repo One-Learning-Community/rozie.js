@@ -323,6 +323,8 @@
   "emits": [
     "close"
   ],
+  "types": null,
+  "emitDecls": null,
   "expose": [],
   "provides": [],
   "injects": [],

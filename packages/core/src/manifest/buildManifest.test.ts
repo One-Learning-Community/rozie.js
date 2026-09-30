@@ -109,6 +109,8 @@ describe('buildManifest', () => {
     const numberType = t.tsNumberKeyword();
     const ir = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'ParamTypesProbe',
       props: [],
       slots: [

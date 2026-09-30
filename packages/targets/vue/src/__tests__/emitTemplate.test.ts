@@ -50,6 +50,8 @@ function lowerExample(name: string): IRComponent {
 function emptyIR(): IRComponent {
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name: 'Test',
     props: [],
     state: [],

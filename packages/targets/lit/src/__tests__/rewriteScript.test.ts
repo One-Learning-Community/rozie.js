@@ -55,6 +55,8 @@ function buildIR(overrides: Partial<IRComponent> = {}): IRComponent {
   const scriptProgram = t.file(t.program([]));
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name: 'TestComponent',
     props: [],
     state: [],

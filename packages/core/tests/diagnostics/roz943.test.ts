@@ -100,6 +100,8 @@ function buildSyntheticWrapperIR(): IRComponent {
   };
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name: 'Wrapper',
     props: [],
     state: [],

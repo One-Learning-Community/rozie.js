@@ -89,6 +89,8 @@ function mkSlot(name: string, isPortal = false): SlotDecl {
 function buildIR(overrides: Partial<IRComponent> = {}): IRComponent {
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name: 'TestComp',
     props: [],
     state: [],

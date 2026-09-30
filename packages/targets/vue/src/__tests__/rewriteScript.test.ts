@@ -107,6 +107,8 @@ describe('rewriteRozieIdentifiers', () => {
       refs: IRComponent['refs'];
     } = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synthetic',
       props: [],
       state: [
@@ -154,6 +156,8 @@ describe('rewriteRozieIdentifiers', () => {
       refs: IRComponent['refs'];
     } = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synthetic',
       props: [],
       state: [
@@ -213,6 +217,8 @@ const y = $props.value + 2;
       refs: IRComponent['refs'];
     } = {
       type: 'IRComponent',
+      types: null,
+      emitDecls: null,
       name: 'Synth',
       props: [
         {
@@ -281,6 +287,8 @@ const y = $props.value + 2;
 function buildIR(overrides: Partial<IRComponent> = {}): IRComponent {
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name: 'TestComponent',
     props: [],
     state: [],

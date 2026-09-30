@@ -33,6 +33,8 @@ function lowerExample(name: string): IRComponent {
 function buildMinimalIR(overrides: Partial<IRComponent> = {}): IRComponent {
   return {
     type: 'IRComponent',
+    types: null,
+    emitDecls: null,
     name: 'Wrapper',
     props: [],
     state: [],
