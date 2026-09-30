@@ -133,7 +133,8 @@ export function extractChildPublicNames(childCode: string, target: Target): Chil
     case 'solid': {
       const body = matchInterfaceBody(
         childCode,
-        /interface \w+Props\s*\{([\s\S]*?)\n\}/,
+        // Typed public surface phase 3 — tolerate an `extends Omit<…>` clause.
+        /interface \w+Props\b[^{]*\{([\s\S]*?)\n\}/,
         `${target} Props interface`,
       );
       const names = [...body.matchAll(/(on[A-Za-z0-9]+)\?:/g)].map((m) => m[1]!);
@@ -149,7 +150,8 @@ export function extractChildPublicNames(childCode: string, target: Target): Chil
     case 'svelte': {
       const body = matchInterfaceBody(
         childCode,
-        /interface Props\s*\{([\s\S]*?)\n\}/,
+        // Typed public surface phase 3 — tolerate an `extends Omit<…>` clause.
+        /interface Props\b[^{]*\{([\s\S]*?)\n\}/,
         'svelte Props interface',
       );
       const names = [...body.matchAll(/(on[a-z0-9]+)\?:/g)].map((m) => m[1]!);

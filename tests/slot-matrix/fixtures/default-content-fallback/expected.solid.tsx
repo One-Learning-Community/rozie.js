@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { splitProps } from 'solid-js';
 
-interface DefaultContentFallbackFixtureProps {
+interface DefaultContentFallbackFixtureProps extends Omit<import('solid-js').ComponentProps<'div'>, 'statusSlot' | 'slots' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   statusSlot?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
 }

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface NestedSlotsFixtureProps {
+interface NestedSlotsFixtureProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'renderWrapper' | 'renderInner' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   renderWrapper?: () => ReactNode;
   renderInner?: () => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;

@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { splitProps } from 'solid-js';
 
-interface NamedSlotsFixtureProps {
+interface NamedSlotsFixtureProps extends Omit<import('solid-js').ComponentProps<'div'>, 'headerSlot' | 'footerSlot' | 'slots' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   headerSlot?: JSX.Element;
   footerSlot?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

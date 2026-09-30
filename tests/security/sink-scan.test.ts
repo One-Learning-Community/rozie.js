@@ -149,6 +149,28 @@ interface Violation {
 }
 
 /**
+ * Typed public surface phase 3 — a single-root attr-inheriting component's
+ * React/Solid props interface header is
+ *   `interface XProps extends Omit<<root attrs>, … | 'dangerouslySetInnerHTML'>`
+ *   `interface XProps extends Omit<<root attrs>, … | 'innerHTML' | …>`
+ * Those quoted keys are TYPE-LEVEL exclusions: they REMOVE the sink from the
+ * props a consumer may pass through to the root (a hardening, not a sink). Blank
+ * them out on such header lines only — a quoted key anywhere else, or an
+ * unquoted sink on the same line, is still scanned.
+ */
+const OMIT_HEADER_RE = /^(?:export )?interface \w*Props(?:<[^>]*>)? extends Omit</;
+function stripTypeOnlyOmitKeys(text: string): string {
+  return text
+    .split('\n')
+    .map((line) =>
+      OMIT_HEADER_RE.test(line)
+        ? line.replace(/'(?:dangerouslySetInnerHTML|innerHTML)'/g, "''")
+        : line,
+    )
+    .join('\n');
+}
+
+/**
  * Scan a single file's text for out-of-allowlist sink hits. Exported shape so
  * the negative self-test can run it over a spliced string. `target`/
  * `fixtureName` are passed in (derived from the real filename, or synthesized
@@ -161,6 +183,7 @@ function scanText(
   filename: string,
 ): Violation[] {
   const violations: Violation[] = [];
+  text = stripTypeOnlyOmitKeys(text);
   const lines = text.split('\n');
   for (const pattern of SINK_PATTERNS) {
     if (!text.includes(pattern)) continue;
@@ -241,6 +264,24 @@ describe('Battery 1 — emit-escaping sink-scan (SPEC req 5, D-01/D-02)', () => 
     // Both `dangerouslySetInnerHTML` and its `innerHTML` substring are hits,
     // neither allowlisted for react/Counter.
     expect(violations.length).toBeGreaterThan(0);
+    expect(violations.some((v) => v.pattern === 'dangerouslySetInnerHTML')).toBe(true);
+  });
+
+  it('typed-surface P3: a quoted sink key inside a props-header Omit<…> is a type-level exclusion, not a sink', () => {
+    const header =
+      "interface CounterProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'children' | 'dangerouslySetInnerHTML'> {";
+    expect(scanText(header, 'react', 'Counter', 'Counter.tsx')).toHaveLength(0);
+    const solidHeader =
+      "export interface CounterProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {";
+    expect(scanText(solidHeader, 'solid', 'Counter', 'Counter.solid.tsx')).toHaveLength(0);
+  });
+
+  it('NEGATIVE self-test: a real sink elsewhere in a file whose header carries the Omit exclusion still FAILS', () => {
+    const counter = readFileSync(resolve(FIXTURES_DIR, 'Counter.tsx'), 'utf8');
+    expect(counter).toMatch(/extends Omit<[^\n]*'dangerouslySetInnerHTML'/); // premise: header carries it
+    const tampered = counter.replace('<span', '<span dangerouslySetInnerHTML={{ __html: props.value }}');
+    expect(tampered).not.toBe(counter);
+    const violations = scanText(tampered, 'react', 'Counter', 'Counter.tsx');
     expect(violations.some((v) => v.pattern === 'dangerouslySetInnerHTML')).toBe(true);
   });
 

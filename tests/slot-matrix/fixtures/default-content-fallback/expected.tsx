@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface DefaultContentFallbackFixtureProps {
+interface DefaultContentFallbackFixtureProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'renderStatus' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   renderStatus?: () => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }

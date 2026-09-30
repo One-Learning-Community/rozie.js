@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { children, splitProps } from 'solid-js';
 
-interface DefaultSlotFixtureProps {
+interface DefaultSlotFixtureProps extends Omit<import('solid-js').ComponentProps<'div'>, 'children' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

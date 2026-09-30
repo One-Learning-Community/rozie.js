@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { splitProps } from 'solid-js';
 
-interface NestedSlotsFixtureProps {
+interface NestedSlotsFixtureProps extends Omit<import('solid-js').ComponentProps<'div'>, 'wrapperSlot' | 'innerSlot' | 'slots' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   wrapperSlot?: JSX.Element;
   innerSlot?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

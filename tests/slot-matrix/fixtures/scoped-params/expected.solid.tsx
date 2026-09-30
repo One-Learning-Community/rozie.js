@@ -3,7 +3,7 @@ import { mergeProps, splitProps } from 'solid-js';
 
 interface ItemSlotCtx { value: any; }
 
-interface ScopedParamsFixtureProps {
+interface ScopedParamsFixtureProps extends Omit<import('solid-js').ComponentProps<'div'>, 'label' | 'itemSlot' | 'slots' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   label?: string;
   itemSlot?: (ctx: ItemSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

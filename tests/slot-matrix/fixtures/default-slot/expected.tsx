@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface DefaultSlotFixtureProps {
+interface DefaultSlotFixtureProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }

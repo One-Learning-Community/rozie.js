@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface PresenceCheckFixtureProps {
+interface PresenceCheckFixtureProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'renderAside' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   renderAside?: () => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }

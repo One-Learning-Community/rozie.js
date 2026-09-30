@@ -3,7 +3,7 @@ import { clsx } from '@rozie/runtime-react';
 
 interface ItemCtx { value: any; }
 
-interface ScopedParamsFixtureProps {
+interface ScopedParamsFixtureProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'label' | 'renderItem' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   label?: string;
   renderItem?: (ctx: ItemCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;

@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { Show, splitProps } from 'solid-js';
 
-interface PresenceCheckFixtureProps {
+interface PresenceCheckFixtureProps extends Omit<import('solid-js').ComponentProps<'div'>, 'asideSlot' | 'slots' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   asideSlot?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
 }
