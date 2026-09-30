@@ -182,6 +182,24 @@ function extractWatchFromExpression(expr: t.Expression): WatchEntry | null {
  * are skipped here (the validator emits ROZ116/ROZ117). `__proto__` /
  * `constructor` / `prototype` keys are filtered (FORBIDDEN_EXPOSE_KEYS).
  */
+function collectExposeSignatures(
+  expr: t.Expression,
+  bindings: BindingsTable,
+): void {
+  const call = unwrapTsCast(expr);
+  if (!t.isCallExpression(call)) return;
+  const second = call.arguments[1];
+  if (!second || !t.isObjectExpression(second)) return;
+  for (const prop of second.properties) {
+    if (!t.isObjectProperty(prop) || prop.computed) continue;
+    let name: string | null = null;
+    if (t.isIdentifier(prop.key)) name = prop.key.name;
+    else if (t.isStringLiteral(prop.key)) name = prop.key.value;
+    if (name === null || !t.isStringLiteral(prop.value)) continue;
+    bindings.exposeSignatures.set(name, { node: prop.value });
+  }
+}
+
 function extractExposeFromExpression(
   expr: t.Expression,
 ): ExposedMethodEntry[] | null {
@@ -320,6 +338,7 @@ export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): 
       const exposed = extractExposeFromExpression(stmt.expression);
       if (exposed && bindings.expose.length === 0) {
         bindings.expose.push(...exposed);
+        collectExposeSignatures(stmt.expression, bindings);
       }
 
       // Phase 36: top-level `$provide('key', value)` statement. Unlike single-

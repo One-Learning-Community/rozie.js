@@ -46,6 +46,7 @@
  *
  * @experimental — shape may change before v1.0
  */
+import { unwrapTsCast } from '../ast/unwrapTsCast.js';
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
 import { readFileSync } from 'node:fs';
@@ -485,8 +486,10 @@ function blockFirstEmitLine(firstNode: t.Node): number {
  * keep doing so. Never throws.
  */
 function isStrippedSigilDirective(stmt: t.Statement): boolean {
-  if (t.isExpressionStatement(stmt) && t.isCallExpression(stmt.expression)) {
-    const callee = stmt.expression.callee;
+  // Unwrap TS cast wrappers so `($expose({...}) as void)` is still recognised.
+  const directive = t.isExpressionStatement(stmt) ? unwrapTsCast(stmt.expression) : null;
+  if (t.isExpressionStatement(stmt) && t.isCallExpression(directive)) {
+    const callee = directive.callee;
     if (t.isIdentifier(callee)) {
       return (
         callee.name === '$onMount' ||

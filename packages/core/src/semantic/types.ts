@@ -23,6 +23,7 @@ import type {
   ArrowFunctionExpression,
   FunctionExpression,
   CallExpression,
+  StringLiteral,
 } from '@babel/types';
 import type { SourceLoc } from '../ast/types.js';
 
@@ -239,6 +240,15 @@ export interface BindingsTable {
    * not collected.
    */
   emits: Set<string>;
+  /**
+   * Typed public surface — `$expose({...}, { verb: '<fn type>' })` second
+   * argument: verb name -> the StringLiteral node holding its compile-time
+   * signature. Canonical first top-level call only. Malformed shapes are left
+   * to the validator (ROZ155/156). Empty when no second argument.
+   *
+   * @experimental — added in typed-surface P1
+   */
+  exposeSignatures: Map<string, { node: StringLiteral }>;
   /**
    * Phase 21 — extracted `$expose({...})` key names from the canonical
    * top-level call, in source order. `[]` when no `$expose` call.

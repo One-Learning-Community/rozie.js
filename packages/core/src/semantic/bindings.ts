@@ -40,6 +40,7 @@ export function createEmptyBindings(): BindingsTable {
     slots: new Map(),
     computeds: new Map(),
     emits: new Set(),
+    exposeSignatures: new Map(),
     expose: [],
     exposeCalls: [],
     provides: [],

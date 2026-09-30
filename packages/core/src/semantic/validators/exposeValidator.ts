@@ -42,6 +42,7 @@ import * as t from '@babel/types';
 import type { RozieAST, SourceLoc } from '../../ast/types.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
+import { parseAuthoredType } from '../../codegen/renderAuthoredType.js';
 import { locFromBabel } from '../../diagnostics/locFromBabel.js';
 import type { BindingsTable } from '../types.js';
 
@@ -287,5 +288,89 @@ export function runExposeValidator(
       loc: locFromNode(prop),
       hint: `Rename the exposed method so it does not match ${surface} (e.g. ${suggestions}).`,
     });
+  }
+
+  validateExposeSignatures(canonical.call, bindings, diagnostics);
+}
+
+/**
+ * Typed public surface (P1) — validate the compile-time `$expose` second
+ * argument: `{ verb: '<TS function type>' }`. ROZ156 for any malformed shape,
+ * ROZ155 for a key that is not an exposed verb, ROZ022 for an unparsable type
+ * string. Never throws.
+ */
+function validateExposeSignatures(
+  call: t.CallExpression,
+  bindings: BindingsTable,
+  diagnostics: Diagnostic[],
+): void {
+  const second = call.arguments[1];
+  if (!second) return;
+  const example = "e.g. $expose({ gotoDate }, { gotoDate: '(date: DateInput) => void' })";
+  if (!t.isObjectExpression(second)) {
+    diagnostics.push({
+      code: RozieErrorCode.EXPOSE_SIGNATURES_INVALID,
+      severity: 'error',
+      message: `The $expose(...) second argument must be an object literal of string-literal function types, ${example}.`,
+      loc: locFromNode(second),
+      hint: 'It is compile-time only: map each exposed verb to a string holding its TypeScript function type.',
+    });
+    return;
+  }
+  const verbs = bindings.expose.map((e) => e.name);
+  for (const prop of second.properties) {
+    if (!t.isObjectProperty(prop) || prop.computed) {
+      diagnostics.push({
+        code: RozieErrorCode.EXPOSE_SIGNATURES_INVALID,
+        severity: 'error',
+        message: `The $expose(...) signatures object does not support spread, methods or computed keys, ${example}.`,
+        loc: locFromNode(prop),
+        hint: 'Use plain identifier or string keys with string-literal values.',
+      });
+      continue;
+    }
+    let name: string | null = null;
+    if (t.isIdentifier(prop.key)) name = prop.key.name;
+    else if (t.isStringLiteral(prop.key)) name = prop.key.value;
+    if (name === null || !t.isStringLiteral(prop.value)) {
+      diagnostics.push({
+        code: RozieErrorCode.EXPOSE_SIGNATURES_INVALID,
+        severity: 'error',
+        message: `Each $expose(...) signature must be a string literal holding a TypeScript function type, ${example}.`,
+        loc: locFromNode(prop),
+        hint: 'Write the type as a quoted string, e.g. \'(date: DateInput) => void\'.',
+      });
+      continue;
+    }
+    if (!verbs.includes(name)) {
+      diagnostics.push({
+        code: RozieErrorCode.EXPOSE_SIGNATURE_UNKNOWN_VERB,
+        severity: 'error',
+        message: `$expose signature key '${name}' is not an exposed verb. Exposed verbs: ${verbs.length ? verbs.join(', ') : '(none)'}.`,
+        loc: locFromNode(prop),
+        hint: 'Key each signature by a name listed in the first $expose({ ... }) argument.',
+      });
+      continue;
+    }
+    const parsed = parseAuthoredType(prop.value.value);
+    if ('error' in parsed) {
+      diagnostics.push({
+        code: RozieErrorCode.INVALID_AUTHORED_TYPE,
+        severity: 'error',
+        message: `Invalid TypeScript type for $expose signature '${name}': ${parsed.error}`,
+        loc: locFromNode(prop.value),
+        hint: "Write a single TypeScript function type, e.g. '(date: DateInput) => void'.",
+      });
+      continue;
+    }
+    if (!t.isTSFunctionType(parsed.type)) {
+      diagnostics.push({
+        code: RozieErrorCode.EXPOSE_SIGNATURES_INVALID,
+        severity: 'error',
+        message: `$expose signature '${name}' must be a function type such as \`(date: DateInput) => void\`.`,
+        loc: locFromNode(prop.value),
+        hint: "Use an arrow-style function type string, e.g. '(date: DateInput) => void'.",
+      });
+    }
   }
 }

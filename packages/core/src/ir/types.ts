@@ -40,6 +40,7 @@ import type {
   Identifier,
   Pattern,
   RestElement,
+  TSFunctionType,
 } from '@babel/types';
 import type { SourceLoc } from '../ast/types.js';
 import type {
@@ -659,6 +660,15 @@ export interface ExposedMethod {
   type: 'ExposedMethod';
   name: string;
   sourceLoc: SourceLoc;
+  /**
+   * Compile-time function type from the `$expose` second argument
+   * (`$expose({ verb }, { verb: '(a: A) => R' })`). Set only for verbs listed
+   * there; untyped verbs stay `(...args: any[]) => any`. Never emitted into a
+   * runtime module.
+   *
+   * @experimental — added in typed-surface P1
+   */
+  signature?: TSFunctionType;
 }
 
 /**

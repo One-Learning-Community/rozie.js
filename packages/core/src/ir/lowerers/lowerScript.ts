@@ -34,6 +34,7 @@ import type {
   ProvideDecl,
   InjectDecl,
 } from '../types.js';
+import { parseAuthoredType } from '../../codegen/renderAuthoredType.js';
 import { lowerContext } from './lowerContext.js';
 
 export interface LowerScriptResult {
@@ -306,11 +307,23 @@ export function lowerScript(
 
   // 4. expose — Phase 21. Map the collected $expose names (source order; NOT
   // Set-deduped — per-name sourceLoc must survive) into ExposedMethod IR nodes.
-  const expose: ExposedMethod[] = bindings.expose.map((e) => ({
-    type: 'ExposedMethod',
-    name: e.name,
-    sourceLoc: e.sourceLoc,
-  }));
+  const expose: ExposedMethod[] = bindings.expose.map((e) => {
+    const m: ExposedMethod = {
+      type: 'ExposedMethod',
+      name: e.name,
+      sourceLoc: e.sourceLoc,
+    };
+    const sig = bindings.exposeSignatures.get(e.name);
+    if (sig) {
+      // Malformed strings / non-function types were already diagnosed by the
+      // validator (ROZ022/ROZ156); only a valid function type is carried.
+      const parsed = parseAuthoredType(sig.node.value);
+      if (!('error' in parsed) && t.isTSFunctionType(parsed.type)) {
+        m.signature = parsed.type;
+      }
+    }
+    return m;
+  });
 
   // 5. provides / injects — Phase 36. Thin lowerer READS the collected
   // bindings.provides / bindings.injects (populated by collectScriptDecls) and

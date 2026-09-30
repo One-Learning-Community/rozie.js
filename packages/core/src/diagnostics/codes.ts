@@ -663,6 +663,8 @@ export const RozieErrorCode = {
   EMIT_DECLARED_UNUSED: 'ROZ152', // warning — <emits> declares an event that no $emit call ever fires.
   SLOT_PARAM_TYPES_UNKNOWN_KEY: 'ROZ153', // error — a <slot :param-types> key is not a param the slot passes (via :params or a scoped attribute).
   SLOT_PARAM_TYPES_INVALID: 'ROZ154', // error — <slot :param-types> must be an object literal whose values are string literals holding TypeScript types, e.g. :param-types="{ row: 'Row<T>', index: 'number' }".
+  EXPOSE_SIGNATURE_UNKNOWN_VERB: 'ROZ155', // error — an $expose signature key (second argument) names a verb that the first argument does not expose.
+  EXPOSE_SIGNATURES_INVALID: 'ROZ156', // error — the $expose second argument must be an object literal mapping exposed verbs to string-literal TypeScript function types, e.g. $expose({ gotoDate }, { gotoDate: '(date: DateInput) => void' }); it is compile-time only.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // error — SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
