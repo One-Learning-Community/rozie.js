@@ -144,3 +144,13 @@ const counterAttrs = h(Counter, {
   'data-test': 'counter',
 });
 void counterAttrs;
+
+// ---- Typed public surface phase 1 — typed emits / <types> / handle --------
+// `onPing` payload is `PingPayload` (a `<types>` name living in the module
+// `<script lang="ts">` block); `onReset` is no-payload. A bad payload field is
+// a type error.
+import TypedEvents from './fixtures/TypedEvents.vue';
+const typedOk = h(TypedEvents, { onPing: (p) => p.count.toFixed(), onReset: () => {} });
+// @ts-expect-error — payload has no 'nope'
+const typedBad = h(TypedEvents, { onPing: (p) => p.nope });
+void typedOk; void typedBad;

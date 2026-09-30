@@ -110,6 +110,12 @@ export interface ShellParts {
    * BOTH this and `inheritAttrs` are exactly `false`.
    */
   inheritListeners?: boolean;
+  /**
+   * Typed public surface P1: body of the separate module `<script lang="ts">`
+   * block (`<types>` + exported handle type), emitted BEFORE `<script setup>`.
+   * Empty/absent ⇒ no module block (byte-identical for non-opt-in components).
+   */
+  moduleScript?: string;
 }
 
 /**
@@ -199,6 +205,13 @@ function buildScriptPrelude(parts: ShellParts): string {
   return lines.join('\n') + '\n\n';
 }
 
+/** `<script lang="ts">…</script>` + blank line, or '' when nothing to emit. */
+function moduleScriptFraming(moduleScript: string | undefined): string {
+  return moduleScript !== undefined && moduleScript.length > 0
+    ? `<script lang="ts">\n${moduleScript}\n</script>\n\n`
+    : '';
+}
+
 export function buildShell(parts: ShellParts): BuildShellResult {
   const blocks = parts.blockOffsets;
 
@@ -226,6 +239,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   // dist-parity path (Pitfall 5) — explicitly out of scope.
   const scriptOpenFraming = `<script setup lang="ts"${genericAttr}>\n`;
   const scriptCloseFraming = '\n</script>\n';
+  const moduleScriptBlock = moduleScriptFraming(parts.moduleScript);
 
   // STEP 1: per-block overwrites at .rozie byte offsets.
   // Each block's source range gets replaced by its emitted-target framing.
@@ -266,7 +280,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   ms.overwrite(
     blocks.script.loc.start,
     blocks.script.loc.end,
-    `\n${scriptOpenFraming}${scriptPrelude}${parts.script}${scriptCloseFraming}`,
+    `\n${moduleScriptBlock}${scriptOpenFraming}${scriptPrelude}${parts.script}${scriptCloseFraming}`,
   );
 
   // D-128 sourcemap anchor: when the <components> block is present, use it
@@ -387,6 +401,7 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   const scriptGeneric = parts.scriptGeneric ?? null;
   const genericAttr =
     scriptGeneric !== null && scriptGeneric.length > 0 ? ` generic="${scriptGeneric}"` : '';
+  ms.append(moduleScriptFraming(parts.moduleScript));
   ms.append(`<script setup lang="ts"${genericAttr}>\n`);
   // Phase 06.2 P2: composition prelude (component imports + defineOptions).
   const scriptPrelude = buildScriptPrelude(parts);

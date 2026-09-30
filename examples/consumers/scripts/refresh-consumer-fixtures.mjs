@@ -74,6 +74,9 @@ function makeSelectIR() {
     emits: [],
     // Phase 21 — IRComponent.expose is always present ([] when no $expose).
     expose: [],
+    // Typed public surface P1 — always present on a lowered IR (null = unauthored).
+    types: null,
+    emitDecls: null,
     lifecycle: [],
     listeners: [],
     setupBody: {
@@ -110,6 +113,7 @@ const EXAMPLE_INPUTS = [
   resolve(ROOT, 'examples/Dropdown.rozie'),
   resolve(ROOT, 'examples/TodoList.rozie'),
   resolve(ROOT, 'examples/Modal.rozie'),
+  resolve(ROOT, 'examples/TypedEvents.rozie'),
 ];
 
 // Stems this script actually regenerates: every EXAMPLE_INPUTS basename plus

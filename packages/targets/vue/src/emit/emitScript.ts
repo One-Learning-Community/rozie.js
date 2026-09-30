@@ -51,7 +51,7 @@ import type {
   PropDecl,
   PropTypeAnnotation,
 } from '@rozie/core';
-import { buildPropJsdoc, hasPropJsdoc } from '@rozie/core';
+import { buildPropJsdoc, hasPropJsdoc, printTSType } from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
@@ -747,9 +747,21 @@ function emitDefineEmitsCall(ir: IRComponent): string {
   // string-literal property keys. Plain identifier characters (letters,
   // digits, underscore, leading-non-digit) pass through unquoted to keep
   // simple cases readable.
+  // Typed public surface P1: when `<emits>` is authored (ir.emitDecls !== null)
+  // each event carries its authored payload (`[payload: P]`) or no args (`[]`).
+  // Otherwise the legacy `[...args: any[]]` line is kept byte-identical.
+  const declByName = new Map((ir.emitDecls ?? []).map((d) => [d.name, d]));
   const lines = ir.emits
     .map((e) => {
       const key = /^[A-Za-z_$][\w$]*$/.test(e) ? e : `'${e}'`;
+      if (ir.emitDecls !== null && ir.emitDecls !== undefined) {
+        const decl = declByName.get(e);
+        if (decl !== undefined) {
+          return decl.payload === null
+            ? `  ${key}: [];`
+            : `  ${key}: [payload: ${printTSType(decl.payload)}];`;
+        }
+      }
       return `  ${key}: [...args: any[]];`;
     })
     .join('\n');
@@ -767,6 +779,11 @@ function emitDefineEmitsCall(ir: IRComponent): string {
 function emitDefineExposeCall(ir: IRComponent): string {
   if (ir.expose.length === 0) return '';
   const names = ir.expose.map((e) => e.name).join(', ');
+  // Typed public surface P1: an `$expose` signature exists ⇒ cast to the
+  // exported `<Name>Handle` (declared in the module `<script lang="ts">`).
+  if (ir.expose.some((e) => e.signature !== undefined)) {
+    return `defineExpose({ ${names} } as ${ir.name}Handle);`;
+  }
   return `defineExpose({ ${names} });`;
 }
 

@@ -88,6 +88,7 @@ export function emitVueTypes(ir: IRComponent, opts: EmitVueTypesOptions = {}): s
       // sidecar declares no slot fields / `slots` record.
       slotSurface: { fields: [] },
       target: 'vue',
+      includeTypesBlock: true,
     }),
   );
   lines.push('');

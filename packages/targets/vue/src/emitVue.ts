@@ -42,6 +42,7 @@ import { emitStyle } from './emit/emitStyle.js';
 import { emitTemplate } from './emit/emitTemplate.js';
 import type { ScriptInjection } from './emit/emitTemplateEvent.js';
 import { buildShell } from './emit/shell.js';
+import { buildVueModuleScript } from './emit/moduleScript.js';
 import {
   collectVueTopLevelBindingNames,
   deconflictVueRefSuffix,
@@ -475,6 +476,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     // opt-out into the single defineOptions({ ... }) macro.
     inheritAttrs: ir.inheritAttrs,
     inheritListeners: ir.inheritListeners,
+    moduleScript: buildVueModuleScript(ir),
   });
 
   const code = ms.toString();
