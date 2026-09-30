@@ -108,3 +108,17 @@ void counterAttrs;
 // @ts-expect-error — `href` is not a <div> attribute (was accepted by the old index signature)
 const counterBadHref: CounterProps = { value: 0, href: '/x' };
 void counterBadHref;
+
+// ---- Typed public surface phase 1 — typed emits / <types> / handle --------
+// `onping` payload is `PingPayload` (a `<types>` name exported from the module
+// `<script module>` block); `onreset` is no-payload. A bad payload field is a
+// type error.
+import TypedEvents, { type PingPayload, type Count } from './fixtures/TypedEvents.svelte';
+type TE = ComponentProps<typeof TypedEvents>;
+const te: TE = { onping: (p) => p.count.toFixed(), onreset: () => {} };
+// @ts-expect-error — payload has no 'nope'
+const teBad: TE = { onping: (p) => p.nope };
+// @ts-expect-error — `reset` has no payload, so a handler requiring an argument is rejected
+const teBadReset: TE = { onreset: (x: number) => x };
+const tePayload: PingPayload = { count: 1 satisfies Count, label: 'x' };
+void [te, teBad, teBadReset, tePayload];

@@ -103,9 +103,10 @@ describe('Svelte — typed public surface phase 3 (pass-through HTML attrs)', ()
     if (!parsed.ast) throw new Error('parse failed for AttrsButton');
     const lowered = lowerToIR(parsed.ast, { modifierRegistry: createDefaultRegistry() });
     if (!lowered.ir) throw new Error('lower failed for AttrsButton');
-    // The shared sidecar renderer names emits `on<Pascal>` on every target.
+    // The sidecar names emits with Svelte's all-lowercase callback convention
+    // (`onpress`), matching the compiled module (typed-surface P1, Task 12).
     expect(emitSvelteTypes(lowered.ir)).toContain(
-      "export interface AttrsButtonProps extends Omit<import('svelte/elements').SvelteHTMLElements['button'], 'label' | 'title' | 'onPress' | 'children'> {",
+      "export interface AttrsButtonProps extends Omit<import('svelte/elements').SvelteHTMLElements['button'], 'label' | 'title' | 'onpress' | 'children'> {",
     );
   });
 

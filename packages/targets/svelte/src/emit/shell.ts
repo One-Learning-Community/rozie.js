@@ -49,6 +49,12 @@ export interface ShellParts {
    */
   scriptMap?: EncodedSourceMap | null;
   /**
+   * Typed public surface P1: body of a `<script module lang="ts">` block
+   * (`<types>`) emitted BEFORE the instance script. Empty/absent => no module
+   * block (byte-identical for non-opt-in components).
+   */
+  moduleScript?: string;
+  /**
    * Phase 06.2 P2 (D-118 + updated D-117 self-import idiom): synthesized
    * component-import lines for the `<script>` block. One line per
    * IRComponent.components entry PLUS an additional line for the self-ref
@@ -101,6 +107,13 @@ export interface BuildShellResult {
   scriptMap: EncodedSourceMap | null;
 }
 
+/** `<script module lang="ts">...</script>`, or '' when nothing to emit. */
+function moduleFraming(body: string | undefined): string {
+  return body !== undefined && body.length > 0
+    ? `<script module lang="ts">\n${body}\n</script>\n`
+    : '';
+}
+
 export function buildShell(parts: ShellParts): BuildShellResult {
   const blocks = parts.blockOffsets;
 
@@ -122,6 +135,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   // dist-parity path (Pitfall 5) — explicitly out of scope.
   const scriptOpenFraming = '<script lang="ts">\n';
   const scriptCloseFraming = '\n</script>\n';
+  const moduleBlock = moduleFraming(parts.moduleScript);
 
   // STEP 1: per-block overwrites at .rozie byte offsets.
   // Source layout for the 5 reference Svelte examples: <props> <data?>
@@ -137,7 +151,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   ms.overwrite(
     blocks.script.loc.start,
     blocks.script.loc.end,
-    `${scriptOpenFraming}${scriptPrelude}${parts.script}${scriptCloseFraming}`,
+    `${moduleBlock}${scriptOpenFraming}${scriptPrelude}${parts.script}${scriptCloseFraming}`,
   );
 
   // Svelte's top-level markup has no `<template>` wrapper — overwrite the
@@ -212,6 +226,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
  */
 function buildShellLegacy(parts: ShellParts): BuildShellResult {
   const ms = new MagicString('');
+  ms.append(moduleFraming(parts.moduleScript));
   ms.append('<script lang="ts">\n');
   // Phase 06.2 P2 (D-117/D-118): component-import lines go top-of-script.
   const compImports = parts.componentImportsBlock ?? '';

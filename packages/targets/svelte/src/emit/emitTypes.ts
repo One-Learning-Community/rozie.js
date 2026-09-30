@@ -44,6 +44,7 @@
  */
 import type { IRComponent } from '@rozie/core';
 import { renderPropsInterface } from '@rozie/core';
+import { svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 import { buildSlotTypeFields, snippetsRecordLine } from './refineSlotTypes.js';
 // `synthesizeHandleType` is not yet in the `@rozie/core` barrel — import it
 // relatively as React's emitTypes.ts does.
@@ -93,6 +94,8 @@ export function emitSvelteTypes(ir: IRComponent, opts: EmitSvelteTypesOptions = 
         ...(snippetsRecordLine(ir.slots) !== undefined ? { recordLine: snippetsRecordLine(ir.slots)! } : {}),
       },
       target: 'svelte',
+      includeTypesBlock: true,
+      emitHandlerName: svelteCallbackPropName,
       // Typed public surface phase 3 — mirror the inline Props interface's
       // `extends Omit<SvelteHTMLElements[tag], …>` in the public sidecar.
       htmlAttrs: 'svelte',

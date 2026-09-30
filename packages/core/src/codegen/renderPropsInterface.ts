@@ -103,6 +103,12 @@ export interface RenderPropsInterfaceOptions {
    */
   includeTypesBlock?: boolean;
   /**
+   * Per-target callback-prop naming for `<emits>` handlers. Omitted => the
+   * shared React-shaped `on<PascalEvent>`. Svelte passes its all-lowercase
+   * `svelteCallbackPropName` so the sidecar names match the compiled module.
+   */
+  emitHandlerName?: (event: string) => string;
+  /**
    * The target's slot surface as its COMPILED MODULE declares it: the slot
    * prop field lines (already indented) and, optionally, the dynamic-slot
    * record line (e.g. Svelte `  snippets?: ...;`). When provided it REPLACES
@@ -211,7 +217,7 @@ export function renderPropsInterface(
   for (const e of ir.emits) {
     const eventPascal = toPascalCase(e);
     if (eventPascal.length === 0) continue;
-    const handlerName = `on${eventPascal}`;
+    const handlerName = opts.emitHandlerName ? opts.emitHandlerName(e) : `on${eventPascal}`;
     if (emittedHandlers.has(handlerName)) continue;
     emittedHandlers.add(handlerName);
     lines.push(

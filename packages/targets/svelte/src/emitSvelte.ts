@@ -32,7 +32,7 @@ import type {
   ModifierRegistry,
   IRTemplateNode as TemplateNode,
 } from '@rozie/core';
-import { createDefaultRegistry } from '@rozie/core';
+import { createDefaultRegistry, renderTypesBlock } from '@rozie/core';
 import { computeScopeHash } from '../../../core/src/codegen/portalCss.js';
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
 import {
@@ -274,6 +274,7 @@ export function emitSvelte(ir: IRComponent, opts: EmitSvelteOptions = {}): EmitS
     scriptMap,
     preambleSectionLines,
     componentImportsBlock,
+    moduleScript: renderTypesBlock(ir),
   });
 
   const code = ms.toString();

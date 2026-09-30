@@ -41,7 +41,14 @@ import type {
   PropDecl,
   PropTypeAnnotation,
 } from '@rozie/core';
-import { buildPropJsdoc, renderHtmlAttrsExtends, resolveAttrsFallthroughRoot } from '@rozie/core';
+import {
+  buildPropJsdoc,
+  exposeSignatureAnnotation,
+  exposeSignatureOverload,
+  renderEmitHandlerType,
+  renderHtmlAttrsExtends,
+  resolveAttrsFallthroughRoot,
+} from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { isMutableLiteralFactoryDefault } from '../../../../core/src/codegen/propDefaultFactory.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
@@ -689,7 +696,7 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   // $emit-lowering use the same helper to stay in lockstep.
   for (const e of ir.emits) {
     const onName = svelteCallbackPropName(e);
-    lines.push(`  ${onName}?: (...args: any[]) => void;`);
+    lines.push(`  ${onName}?: ${renderEmitHandlerType(ir.emitDecls?.find((d) => d.name === e))};`);
   }
 
   // Synthesized `on<key>change` callback for each re-exposed model prop (a
@@ -1503,6 +1510,7 @@ function emitResidualScriptBody(
   clonedProgram: t.File,
   consumedLifecycleIndices: Set<number>,
   exposeNames: Set<string>,
+  exposeSignatures: Map<string, t.TSFunctionType> = new Map(),
 ): { code: string; stmts: t.Statement[] } {
   const stmts: t.Statement[] = [];
   const body = clonedProgram.program.body;
@@ -1603,6 +1611,38 @@ function emitResidualScriptBody(
   const code = stmts
     .map((s) => {
       if (exposeNames.size > 0 && isExposedTopLevelDecl(s, exposeNames)) {
+        // Typed public surface P1: an authored `$expose` signature becomes the
+        // public TS overload (emitted immediately before the implementation
+        // `export function`); for an arrow/function-valued const it becomes the
+        // declarator's type annotation. The implementation's params are already
+        // `any`, so an untyped rest-arg implementation stays overload-compatible.
+        let overloadCode = '';
+        if (t.isFunctionDeclaration(s) && s.id) {
+          const sig = exposeSignatures.get(s.id.name);
+          if (!sig && exposeSignatures.size > 0) {
+            // Opt-in component: an untyped verb keeps the documented
+            // `(...args: any[]) => any` handle shape instead of inferring the
+            // implementation's (possibly zero-arg) signature.
+            overloadCode =
+              genCode(
+                t.exportNamedDeclaration(
+                  exposeSignatureOverload(
+                    s.id.name,
+                    untypedVerbSignature(),
+                  ),
+                ),
+              ) + '\n';
+          }
+          if (sig) overloadCode = genCode(t.exportNamedDeclaration(exposeSignatureOverload(s.id.name, sig))) + '\n';
+        } else if (t.isVariableDeclaration(s)) {
+          const d = s.declarations[0]!;
+          if (t.isIdentifier(d.id)) {
+            const sig =
+              exposeSignatures.get(d.id.name) ??
+              (exposeSignatures.size > 0 ? untypedVerbSignature() : undefined);
+            if (sig) d.id.typeAnnotation = exposeSignatureAnnotation(sig);
+          }
+        }
         // Emit the instance export at the AST level rather than string-prepending
         // `export ` to `genCode(s)`. A bare `export ${generated}` orphans the
         // keyword when the declaration carries LEADING COMMENTS: @babel/generator
@@ -1614,12 +1654,19 @@ function emitResidualScriptBody(
         const exportDecl = t.exportNamedDeclaration(s as t.Declaration);
         exportDecl.leadingComments = s.leadingComments ?? null;
         s.leadingComments = null;
-        return genCode(exportDecl);
+        return overloadCode + genCode(exportDecl);
       }
       return genCode(s);
     })
     .join('\n');
   return { code, stmts };
+}
+
+/** `(...args: any[]) => any` — the handle shape of an untyped `$expose` verb. */
+function untypedVerbSignature(): t.TSFunctionType {
+  const rest = t.restElement(t.identifier('args'));
+  rest.typeAnnotation = t.tsTypeAnnotation(t.tsArrayType(t.tsAnyKeyword()));
+  return t.tsFunctionType(null, [rest], t.tsTypeAnnotation(t.tsAnyKeyword()));
 }
 
 /**
@@ -1766,6 +1813,9 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
     cloned,
     consumedIndices,
     exposeNames,
+    new Map(
+      ir.expose.flatMap((e) => (e.signature !== undefined ? [[e.name, e.signature] as const] : [])),
+    ),
   );
 
   // Bug B fix (260519 linechart-watch-recreate) — assemble the `'svelte'`
