@@ -17,6 +17,8 @@ __rozieInjectStyle('Dropdown-6d6bd882', `.dropdown[data-rozie-s-6d6bd882] { posi
 
 interface TriggerSlotCtx { open: any; toggle: any; }
 
+interface DefaultSlotCtx { close: any; }
+
 interface DropdownProps extends Omit<import('solid-js').ComponentProps<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'closeOnOutsideClick' | 'closeOnEscape' | 'triggerSlot' | 'children' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
   open?: boolean;
   defaultOpen?: boolean;
@@ -25,7 +27,7 @@ interface DropdownProps extends Omit<import('solid-js').ComponentProps<'div'>, '
   closeOnEscape?: boolean;
   triggerSlot?: (ctx: TriggerSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
-  children?: JSX.Element;
+  children?: JSX.Element | ((ctx: DefaultSlotCtx) => JSX.Element);
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: DropdownHandle) => void;
 }
@@ -38,7 +40,7 @@ export interface DropdownHandle {
 export default function Dropdown(_props: DropdownProps): JSX.Element {
   const _merged = mergeProps({ closeOnOutsideClick: true, closeOnEscape: true }, _props);
   const [local, attrs] = splitProps(_merged, ['open', 'closeOnOutsideClick', 'closeOnEscape', 'children', 'ref']);
-  const resolved = children(() => local.children);
+  const resolved = children(() => local.children as JSX.Element);
   onMount(() => { local.ref?.({ toggle, close }); });
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);

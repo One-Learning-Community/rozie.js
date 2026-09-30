@@ -57,6 +57,7 @@ import { portalSlotMergeName } from './portalSlotMergeName.js';
 import {
   buildSlotTypeFields,
   buildSnippetsRecordType,
+  snippetsRecordLine,
   distinctSlotsByName,
   renderRecordKey,
 } from './refineSlotTypes.js';
@@ -667,13 +668,12 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   // "Expected 1 arguments, but got 0" at every `{@render X?.()}` callsite for
   // zero-param slots (Card.children, TodoList.empty). Dynamic-name snippets
   // are inherently untyped — the fill expression is computed at runtime.
-  if (ir.slots.length > 0) {
-    // Phase 79 Plan 05 (R12/D-03) — a record-only (non-identifier) slot gets
-    // a quoted-literal-keyed member on this type; a component with no
-    // record-only slots keeps the pre-phase generic shape byte-identical
-    // (AC-22).
-    lines.push(`  snippets?: ${buildSnippetsRecordType(ir.slots)};`);
-  }
+  // Phase 79 Plan 05 (R12/D-03) — a record-only (non-identifier) slot gets
+  // a quoted-literal-keyed member on this type; a component with no
+  // record-only slots keeps the pre-phase generic shape byte-identical
+  // (AC-22). Shared with the sidecar via `snippetsRecordLine`.
+  const snippetsLine = snippetsRecordLine(ir.slots);
+  if (snippetsLine !== undefined) lines.push(snippetsLine);
 
   // Emit callback-prop declarations: $emit('search', x) was rewritten to
   // onsearch?.(x) by rewriteScript; the corresponding `onsearch?` prop must

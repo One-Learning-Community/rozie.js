@@ -91,6 +91,12 @@ export interface SolidShellParts {
    * immediately after `splitPropsCall` (D-131 default slot accessor).
    */
   hasDefaultSlot?: boolean;
+  /**
+   * The default slot declares params, so `local.children` is typed
+   * `JSX.Element | ((ctx) => JSX.Element)`. The `children()` helper wants
+   * `JSX.Element`, hence the cast in its thunk.
+   */
+  scopedDefaultSlot?: boolean;
   /** Body of the function above the `return ( <JSX> );`. */
   script: string;
   /**
@@ -308,7 +314,9 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
     moduleParts.push(
       (parts.providerOpen?.length ?? 0) > 0
         ? '  const resolved = () => local.children;\n'
-        : '  const resolved = children(() => local.children);\n',
+        : parts.scopedDefaultSlot
+          ? '  const resolved = children(() => local.children as JSX.Element);\n'
+          : '  const resolved = children(() => local.children);\n',
     );
   }
 
@@ -476,7 +484,9 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
     ms.append(
       (parts.providerOpen?.length ?? 0) > 0
         ? '  const resolved = () => local.children;\n'
-        : '  const resolved = children(() => local.children);\n',
+        : parts.scopedDefaultSlot
+          ? '  const resolved = children(() => local.children as JSX.Element);\n'
+          : '  const resolved = children(() => local.children);\n',
     );
   }
 

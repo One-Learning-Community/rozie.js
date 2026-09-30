@@ -152,6 +152,11 @@ function buildFamilyFnType(slot: SlotDecl): string {
  * index access).
  */
 /** Escape a single-quoted string-literal key body (T-79-07 — mirrors every per-target copy). */
+/** The `slots?:` prop line (module + sidecar share this); undefined when no slots. */
+export function slotsRecordLine(ir: IRComponent): string | undefined {
+  return ir.slots.length > 0 ? `  slots?: ${buildSlotsRecordType(ir.slots)};` : undefined;
+}
+
 export function buildSlotsRecordType(slots: SlotDecl[]): string {
   const dynamicSlots = slots.filter((s) => s.dynamicNameExpr !== undefined);
   if (dynamicSlots.length === 0) {
@@ -257,9 +262,8 @@ export function emitPropsInterface(
   // has nothing to merge against and the dynamic-name fill is silently dropped.
   // Gated on `ir.slots.length > 0` so non-slotted components stay byte-identical
   // (D-05). Per-slot merge happens in emitSlotInvocation.ts.
-  if (ir.slots.length > 0) {
-    fields.push(`  slots?: ${buildSlotsRecordType(ir.slots)};`);
-  }
+  const slotsLine = slotsRecordLine(ir);
+  if (slotsLine !== undefined) fields.push(slotsLine);
 
   // Phase 21 ($expose, D-05) — the typed callback `ref` prop, emitted last.
   // Only present when ir.expose is non-empty (caller passes the field then).

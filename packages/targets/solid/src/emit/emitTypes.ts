@@ -31,8 +31,9 @@
  * Slot idiom decision (Solid): Solid slot props are children-returning thunks
  * whose return type is `JSX.Element`. The slot-children token is `'JSX.Element'`
  * (the example token in the LOCKED CONTRACT). The inline `import('solid-js')`
- * default-export form keeps the sidecar header import-free; `JSX` resolves from
- * the consumer's Solid JSX namespace (ambient) at typecheck time.
+ * default-export form avoids a value import; when the component declares slots
+ * the sidecar adds `import type { JSX } from 'solid-js'` so `JSX.Element`
+ * resolves (an unresolved `JSX` would degrade slot props to `any`).
  *
  * NO do-not-edit header / source-hash is prepended here — the Wave-3 sidecar
  * WRITER owns that.
@@ -42,7 +43,7 @@
 import type { IRComponent } from '@rozie/core';
 import { renderPropsInterface } from '@rozie/core';
 import { emitSlotDecl } from './emitSlotDecl.js';
-import { buildSlotsRecordType } from './emitPropsInterface.js';
+import { slotsRecordLine } from './emitPropsInterface.js';
 // `synthesizeHandleType` is not yet in the `@rozie/core` barrel — import it
 // relatively as React's emitTypes.ts does.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
@@ -92,8 +93,9 @@ export function emitSolidTypes(ir: IRComponent, opts: EmitSolidTypesOptions = {}
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'JSX.Element',
       slotSurface: {
-        fields: slotDecl.fields,
-        ...(ir.slots.length > 0 ? { recordLine: `  slots?: ${buildSlotsRecordType(ir.slots)};` } : {}),
+        // Internal `// D-131 ...` comments are not public-sidecar content.
+        fields: slotDecl.fields.filter((l) => !l.trimStart().startsWith('//')),
+        ...(slotsRecordLine(ir) !== undefined ? { recordLine: slotsRecordLine(ir)! } : {}),
       },
       target: 'solid',
       // Typed public surface phase 3 — mirror the inline interface's

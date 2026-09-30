@@ -30,6 +30,8 @@ footer[data-rozie-s-fc45feb2] { border-top: 1px solid rgba(0, 0, 0, 0.08); justi
 
 interface HeaderSlotCtx { close: any; }
 
+interface DefaultSlotCtx { close: any; }
+
 interface FooterSlotCtx { close: any; }
 
 interface ModalProps {
@@ -43,7 +45,7 @@ interface ModalProps {
   onClose?: (...args: any[]) => void;
   headerSlot?: (ctx: HeaderSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
-  children?: JSX.Element;
+  children?: JSX.Element | ((ctx: DefaultSlotCtx) => JSX.Element);
   footerSlot?: (ctx: FooterSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
 }
@@ -51,7 +53,7 @@ interface ModalProps {
 export default function Modal(_props: ModalProps): JSX.Element {
   const _merged = mergeProps({ closeOnEscape: true, closeOnBackdrop: true, lockBodyScroll: true, title: '' }, _props);
   const [local, attrs] = splitProps(_merged, ['open', 'closeOnEscape', 'closeOnBackdrop', 'lockBodyScroll', 'title', 'children', 'onClose']);
-  const resolved = children(() => local.children);
+  const resolved = children(() => local.children as JSX.Element);
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
   onMount(() => {

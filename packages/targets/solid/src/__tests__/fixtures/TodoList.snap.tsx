@@ -12,6 +12,8 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
 
 interface HeaderSlotCtx { remaining: any; total: any; }
 
+interface DefaultSlotCtx { item: any; toggle: any; remove: any; }
+
 interface TodoListProps extends Omit<import('solid-js').ComponentProps<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'title' | 'onAdd' | 'onToggle' | 'onRemove' | 'headerSlot' | 'children' | 'emptySlot' | 'slots' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   items?: any[];
   defaultItems?: any[];
@@ -22,7 +24,7 @@ interface TodoListProps extends Omit<import('solid-js').ComponentProps<'div'>, '
   onRemove?: (...args: any[]) => void;
   headerSlot?: (ctx: HeaderSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
-  children?: JSX.Element;
+  children?: JSX.Element | ((ctx: DefaultSlotCtx) => JSX.Element);
   emptySlot?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
 }
@@ -30,7 +32,7 @@ interface TodoListProps extends Omit<import('solid-js').ComponentProps<'div'>, '
 export default function TodoList(_props: TodoListProps): JSX.Element {
   const _merged = mergeProps({ title: 'Todo' }, _props);
   const [local, attrs] = splitProps(_merged, ['items', 'title', 'children', 'onAdd', 'onToggle', 'onRemove']);
-  const resolved = children(() => local.children);
+  const resolved = children(() => local.children as JSX.Element);
 
   const [items, setItems] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'items', (() => [])());
   const [draft, setDraft] = createSignal('');

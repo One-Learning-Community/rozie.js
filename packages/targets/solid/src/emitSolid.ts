@@ -352,6 +352,9 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     splitPropsCall,
     listenersDecl,
     hasDefaultSlot,
+    // First genuine default slot wins (same rule as emitSlotDecl's dedup).
+    scopedDefaultSlot:
+      ((ir.slots ?? []).find((s) => s.name === '' && s.dynamicNameExpr === undefined)?.params.length ?? 0) > 0,
     handleInterface,
     exposeOnMount,
     script,

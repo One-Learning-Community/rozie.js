@@ -23,6 +23,8 @@ __rozieInjectStyle('SortableList-0af24eae', `.rozie-sortable-wrap[data-rozie-s-0
   border: 0;
 }`);
 
+interface DefaultSlotCtx { item: any; index: any; }
+
 interface SortableListProps extends Omit<import('solid-js').ComponentProps<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'itemStyle' | 'onChange' | 'onAdd' | 'onRemove' | 'onStart' | 'onEnd' | 'headerSlot' | 'children' | 'footerSlot' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.
@@ -115,7 +117,7 @@ interface SortableListProps extends Omit<import('solid-js').ComponentProps<'div'
   onEnd?: (...args: any[]) => void;
   headerSlot?: JSX.Element;
   // D-131: default slot resolved via children() at body top
-  children?: JSX.Element;
+  children?: JSX.Element | ((ctx: DefaultSlotCtx) => JSX.Element);
   footerSlot?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: SortableListHandle) => void;
@@ -131,7 +133,7 @@ export interface SortableListHandle {
 export default function SortableList(_props: SortableListProps): JSX.Element {
   const _merged = mergeProps({ itemKey: null, handle: null, group: null, animation: 150, disabled: false, disableKeyboard: false, options: (() => ({}))() as Record<string, any>, labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '', itemStyle: null }, _props);
   const [local, attrs] = splitProps(_merged, ['items', 'itemKey', 'handle', 'group', 'animation', 'disabled', 'disableKeyboard', 'options', 'labelFor', 'ghostClass', 'chosenClass', 'dragClass', 'filter', 'easing', 'forceFallback', 'swapThreshold', 'cloneable', 'listClass', 'itemClass', 'itemStyle', 'children', 'ref', 'onChange', 'onAdd', 'onRemove', 'onStart', 'onEnd']);
-  const resolved = children(() => local.children);
+  const resolved = children(() => local.children as JSX.Element);
   onMount(() => { local.ref?.({ getInstance, toArray, sort, option }); });
 
   const [items, setItems] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'items', (() => [])());

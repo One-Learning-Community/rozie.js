@@ -74,7 +74,21 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
       // Default slot → children (D-131): Solid's children() accessor reads this.
       // Comment per plan instruction Step H.
       fields.push(`  // D-131: default slot resolved via children() at body top`);
-      fields.push(`  children?: JSX.Element;`);
+      if (slot.params && slot.params.length > 0) {
+        // Scoped default slot (`<slot :close="close" />`): the runtime calls
+        // children as a function with the ctx, so a function child is accepted
+        // alongside plain JSX.
+        if (!seenInterfaces.has('DefaultSlotCtx')) {
+          const paramFields = slot.params
+            .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)};`)
+            .join(' ');
+          ctxInterfaces.push(`interface DefaultSlotCtx { ${paramFields} }`);
+          seenInterfaces.add('DefaultSlotCtx');
+        }
+        fields.push(`  children?: JSX.Element | ((ctx: DefaultSlotCtx) => JSX.Element);`);
+      } else {
+        fields.push(`  children?: JSX.Element;`);
+      }
     } else if (!isSlotNameIdentifier(slot.name)) {
     } else {
       const hasCtx = slot.params && slot.params.length > 0;

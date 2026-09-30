@@ -51,6 +51,8 @@ __rozieInjectStyle('Switch-5a76e232', `.rozie-switch[data-rozie-s-5a76e232] {
   transform: translateX(var(--rozie-switch-thumb-travel, var(--rsw-thumb-travel, calc(2.75rem - 1.5rem))));
 }`);
 
+interface DefaultSlotCtx { checked: any; toggle: any; }
+
 interface SwitchProps extends Omit<import('solid-js').ComponentProps<'button'>, 'modelValue' | 'defaultModelValue' | 'onModelValueChange' | 'disabled' | 'readonly' | 'ariaLabel' | 'onChange' | 'children' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The on/off state of the switch (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a switch **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `true` is the checked/on state; reflected as `aria-checked`.
@@ -74,7 +76,7 @@ interface SwitchProps extends Omit<import('solid-js').ComponentProps<'button'>, 
   ariaLabel?: (string) | null;
   onChange?: (...args: any[]) => void;
   // D-131: default slot resolved via children() at body top
-  children?: JSX.Element;
+  children?: JSX.Element | ((ctx: DefaultSlotCtx) => JSX.Element);
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: SwitchHandle) => void;
 }
@@ -87,7 +89,7 @@ export interface SwitchHandle {
 export default function Switch(_props: SwitchProps): JSX.Element {
   const _merged = mergeProps({ disabled: false, readonly: false, ariaLabel: null }, _props);
   const [local, attrs] = splitProps(_merged, ['modelValue', 'disabled', 'readonly', 'ariaLabel', 'children', 'ref', 'onChange']);
-  const resolved = children(() => local.children);
+  const resolved = children(() => local.children as JSX.Element);
   onMount(() => { local.ref?.({ focus, toggle }); });
 
   const [modelValue, setModelValue] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'modelValue', false);
