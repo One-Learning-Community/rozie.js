@@ -48,6 +48,7 @@ import {
   renderEmitHandlerType,
   renderHtmlAttrsExtends,
   resolveAttrsFallthroughRoot,
+  untypedExposeSignature,
 } from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { isMutableLiteralFactoryDefault } from '../../../../core/src/codegen/propDefaultFactory.js';
@@ -1618,28 +1619,20 @@ function emitResidualScriptBody(
         // `any`, so an untyped rest-arg implementation stays overload-compatible.
         let overloadCode = '';
         if (t.isFunctionDeclaration(s) && s.id) {
-          const sig = exposeSignatures.get(s.id.name);
-          if (!sig && exposeSignatures.size > 0) {
-            // Opt-in component: an untyped verb keeps the documented
-            // `(...args: any[]) => any` handle shape instead of inferring the
-            // implementation's (possibly zero-arg) signature.
+          // Untyped verbs of an opt-in component keep `(...args: any[]) => any`.
+          const sig =
+            exposeSignatures.get(s.id.name) ??
+            (exposeSignatures.size > 0 ? untypedExposeSignature() : undefined);
+          if (sig) {
             overloadCode =
-              genCode(
-                t.exportNamedDeclaration(
-                  exposeSignatureOverload(
-                    s.id.name,
-                    untypedVerbSignature(),
-                  ),
-                ),
-              ) + '\n';
+              genCode(t.exportNamedDeclaration(exposeSignatureOverload(s.id.name, sig))) + '\n';
           }
-          if (sig) overloadCode = genCode(t.exportNamedDeclaration(exposeSignatureOverload(s.id.name, sig))) + '\n';
         } else if (t.isVariableDeclaration(s)) {
           const d = s.declarations[0]!;
           if (t.isIdentifier(d.id)) {
             const sig =
               exposeSignatures.get(d.id.name) ??
-              (exposeSignatures.size > 0 ? untypedVerbSignature() : undefined);
+              (exposeSignatures.size > 0 ? untypedExposeSignature() : undefined);
             if (sig) d.id.typeAnnotation = exposeSignatureAnnotation(sig);
           }
         }
@@ -1660,13 +1653,6 @@ function emitResidualScriptBody(
     })
     .join('\n');
   return { code, stmts };
-}
-
-/** `(...args: any[]) => any` — the handle shape of an untyped `$expose` verb. */
-function untypedVerbSignature(): t.TSFunctionType {
-  const rest = t.restElement(t.identifier('args'));
-  rest.typeAnnotation = t.tsTypeAnnotation(t.tsArrayType(t.tsAnyKeyword()));
-  return t.tsFunctionType(null, [rest], t.tsTypeAnnotation(t.tsAnyKeyword()));
 }
 
 /**

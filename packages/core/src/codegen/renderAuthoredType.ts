@@ -26,6 +26,18 @@ export function printTSType(type: t.TSType): string {
   return generate(type).code;
 }
 
+/**
+ * Re-indent a multi-line printed authored type so its continuation lines sit
+ * one nesting level (2 spaces) deeper, as required when the type is placed
+ * into an interface member / object-type field. Single-line types are
+ * returned unchanged. The ONE shared helper for field placement.
+ *
+ * @experimental
+ */
+export function indentContinuation(printed: string): string {
+  return printed.replace(/\n/g, '\n  ');
+}
+
 /** @experimental */
 export function parseAuthoredType(src: string): AuthoredTypeResult | { error: string } {
   if (src.trim() === '') return { error: 'empty type string' };

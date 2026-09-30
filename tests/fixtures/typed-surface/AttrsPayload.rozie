@@ -1,0 +1,31 @@
+<!--
+  AttrsPayload.rozie — attr-inheriting single-<button> root whose `<emits>`
+  payload is an object type with a field named like a real HTML attribute
+  (`title`). The field is NOT a top-level prop, so `title` must stay a
+  pass-through attribute (not appear in the `Omit<…>` list).
+-->
+<rozie name="AttrsPayload">
+
+<emits>
+{
+  press: { payload: '{ title: string }' },
+}
+</emits>
+
+<props>
+{
+  label: { type: String, default: 'Go' },
+}
+</props>
+
+<script>
+function fire() {
+  $emit('press', { title: $props.label })
+}
+</script>
+
+<template>
+  <button class="attrs-payload" @click="fire()">{{ $props.label }}</button>
+</template>
+
+</rozie>

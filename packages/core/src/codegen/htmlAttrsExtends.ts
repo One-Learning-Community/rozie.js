@@ -86,7 +86,22 @@ const MEMBER_RE = /^ {2}(?:readonly )?(?:'((?:[^'\\]|\\.)*)'|"([^"]*)"|([A-Za-z_
 export function collectInterfaceMemberNames(fieldLines: readonly string[]): string[] {
   const names: string[] = [];
   for (const entry of fieldLines) {
+    // Brace/paren/bracket depth across the entry's lines: only a depth-0 line
+    // can declare a top-level member, so a nested object-type field (e.g. an
+    // `<emits>` payload `{ title: string }`) is never mistaken for one, however
+    // it is indented. JSDoc lines are skipped for depth counting.
+    let depth = 0;
     for (const line of entry.split('\n')) {
+      const isComment = /^\s*(?:\/\*|\*)/.test(line);
+      const atDepth0 = depth === 0;
+      if (!isComment) {
+        const code = line.replace(/'(?:[^'\\]|\\.)*'|"[^"]*"|`[^`]*`/g, '');
+        for (const ch of code) {
+          if (ch === '{' || ch === '(' || ch === '[') depth++;
+          else if (ch === '}' || ch === ')' || ch === ']') depth--;
+        }
+      }
+      if (!atDepth0) continue;
       const m = MEMBER_RE.exec(line);
       if (m === null) continue;
       names.push(m[1] !== undefined ? m[1].replace(/\\(.)/g, '$1') : (m[2] ?? m[3]!));

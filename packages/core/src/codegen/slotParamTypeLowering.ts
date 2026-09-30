@@ -33,7 +33,7 @@
 import * as t from '@babel/types';
 import type { TSType } from '@babel/types';
 import type { ParamDecl } from '../ir/types.js';
-import { printTSType } from './renderAuthoredType.js';
+import { indentContinuation, printTSType } from './renderAuthoredType.js';
 
 /**
  * Lower a single `paramTypes` entry to its TS surface string.
@@ -59,7 +59,7 @@ export function lowerSlotParamType(tsType: TSType | undefined, authored = false)
   // by `SlotDecl.paramTypesAuthored` / `SlotFillerDecl.paramTypesAuthored`) is
   // printed verbatim through the single authored-type printer. Unauthored
   // (e.g. manifest-threaded) entries keep the pre-P1 floors byte-identically.
-  if (authored) return printTSType(tsType);
+  if (authored) return indentContinuation(printTSType(tsType));
   if (t.isTSFunctionType(tsType)) return '(...args: any[]) => any';
   return 'any';
 }

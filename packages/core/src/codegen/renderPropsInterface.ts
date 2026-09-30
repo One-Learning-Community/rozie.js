@@ -36,7 +36,7 @@ import { isSlotNameIdentifier } from './slotNameIdentifier.js';
 import { lowerSlotParamType } from './slotParamTypeLowering.js';
 import { renderRecordKey } from './escapeSingleQuotedKey.js';
 import { renderHtmlAttrsExtends, type HtmlAttrsTarget } from './htmlAttrsExtends.js';
-import { printTSType } from './renderAuthoredType.js';
+import { indentContinuation, printTSType } from './renderAuthoredType.js';
 import { renderTypesBlock } from './renderTypesBlock.js';
 
 /**
@@ -52,7 +52,7 @@ import { renderTypesBlock } from './renderTypesBlock.js';
 export function renderEmitHandlerType(decl: EmitDecl | undefined): string {
   if (decl === undefined) return '(...args: any[]) => void';
   if (decl.payload === null) return '() => void';
-  return `(payload: ${printTSType(decl.payload)}) => void`;
+  return `(payload: ${indentContinuation(printTSType(decl.payload))}) => void`;
 }
 
 /**

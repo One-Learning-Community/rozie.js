@@ -78,4 +78,33 @@ describe('REACT-TYPED-SURFACE-SIDECAR — .d.ts consumer sees the typed public s
       rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it('object-payload field named like an HTML attribute does not steal the attribute (AttrsPayload)', () => {
+    const src = readFileSync(resolve(ROOT, 'tests/fixtures/typed-surface/AttrsPayload.rozie'), 'utf8');
+    const { ast } = parse(src, { filename: 'AttrsPayload.rozie' });
+    if (!ast) throw new Error('parse() null');
+    const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
+    if (!ir) throw new Error('lowerToIR() null');
+    const dts = emitReactTypes(ir);
+    expect(dts).not.toMatch(/Omit<[^>]*'title'/);
+    const consumer = `import AttrsPayload from './AttrsPayload';
+export const a = <AttrsPayload title="x" label="l" onPress={(p) => p.title.toUpperCase()} />;
+// @ts-expect-error — payload has no 'nope'
+export const b = <AttrsPayload onPress={(p) => p.nope} />;
+`;
+    const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-react-attrs-payload-'));
+    try {
+      writeFileSync(join(tmpDir, 'AttrsPayload.d.ts'), dts, 'utf8');
+      writeFileSync(join(tmpDir, 'Consumer.tsx'), consumer, 'utf8');
+      copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
+      try {
+        execFileSync(resolve(HERE, 'node_modules/.bin/tsc'), ['--noEmit', '-p', 'tsconfig.json'], { cwd: tmpDir, stdio: 'pipe' });
+      } catch (err) {
+        throw new Error('tsc failed:\n' + ((err as { stdout?: Buffer }).stdout?.toString() ?? ''));
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });

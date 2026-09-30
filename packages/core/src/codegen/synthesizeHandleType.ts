@@ -44,6 +44,19 @@ const generate: GenerateFn =
 
 const UNTYPED_METHOD = '(...args: any[]) => any';
 
+/**
+ * AST form of the untyped-verb handle shape `(...args: any[]) => any` — the
+ * one definition targets use when they must annotate/overload an untyped
+ * `$expose` verb (Svelte).
+ *
+ * @experimental — added in typed-surface P1
+ */
+export function untypedExposeSignature(): t.TSFunctionType {
+  const rest = t.restElement(t.identifier('args'));
+  rest.typeAnnotation = t.tsTypeAnnotation(t.tsArrayType(t.tsAnyKeyword()));
+  return t.tsFunctionType(null, [rest], t.tsTypeAnnotation(t.tsAnyKeyword()));
+}
+
 /** Generate the TS source for a node fragment (type annotation inner type). */
 function gen(node: t.Node): string {
   return generate(node, { concise: true }).code;

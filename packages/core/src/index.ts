@@ -87,7 +87,7 @@ export {
   exposeSignatureOverload,
 } from './codegen/exposeSignatures.js';
 export { lowerSlotParamType } from './codegen/slotParamTypeLowering.js';
-export { synthesizeHandleType } from './codegen/synthesizeHandleType.js';
+export { synthesizeHandleType, untypedExposeSignature } from './codegen/synthesizeHandleType.js';
 // Typed public surface (spec §4.1) — the single authored-type printer consumed
 // by `<emits>` payload, `:param-types` values, and `$expose` signatures.
 // @experimental — shape may change before v1.0

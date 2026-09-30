@@ -8,14 +8,14 @@ export interface PingPayload {
   label: string;
 }
 
-export interface TypedEventsProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'tone' | 'onPing' | 'onReset' | 'onSelect' | 'onRowOpen' | 'index' | 'renderRow' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
+export interface TypedEventsProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'tone' | 'onPing' | 'onReset' | 'onSelect' | 'onRowOpen' | 'renderRow' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   tone?: string;
   onPing?: (payload: PingPayload) => void;
   onReset?: () => void;
   onSelect?: (payload: number) => void;
   onRowOpen?: (payload: {
-  index: number;
-}) => void;
+    index: number;
+  }) => void;
   renderRow?: (params: { count: Count; tone: string }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

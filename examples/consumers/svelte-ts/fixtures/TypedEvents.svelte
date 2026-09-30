@@ -10,7 +10,7 @@ import { applyListeners } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 
-interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'tone' | 'row' | 'snippets' | 'onping' | 'onreset' | 'onselect' | 'onrowopen' | 'index' | 'children'> {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'tone' | 'row' | 'snippets' | 'onping' | 'onreset' | 'onselect' | 'onrowopen' | 'children'> {
   tone?: string;
   row?: Snippet<[{ count: Count; tone: string }]>;
   snippets?: Record<string, any>;
@@ -18,8 +18,8 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   onreset?: () => void;
   onselect?: (payload: number) => void;
   onrowopen?: (payload: {
-  index: number;
-}) => void;
+    index: number;
+  }) => void;
 }
 
 let {
