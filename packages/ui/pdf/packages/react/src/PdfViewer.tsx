@@ -3,7 +3,7 @@ import { clsx, useControllableState } from '@rozie/runtime-react';
 import './PdfViewer.css';
 import './PdfViewer.global.css';
 
-interface PdfViewerProps {
+interface PdfViewerProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'src' | 'page' | 'defaultPage' | 'onPageChange' | 'scale' | 'rotation' | 'workerSrc' | 'standardFontDataUrl' | 'renderAllPages' | 'textLayer' | 'password' | 'query' | 'autoFit' | 'options' | 'onPagerendered' | 'onError' | 'onPagesrendered' | 'onPasswordrequest' | 'onProgress' | 'onLoad' | 'onPagechange' | 'onFindresult' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The PDF source — a URL string, a `data:` base64 URL, or binary data (`ArrayBuffer` / `Uint8Array`). Changing it tears down the previous document (via its loading task) and loads the new one; `undefined` renders an empty viewer.
    * @example

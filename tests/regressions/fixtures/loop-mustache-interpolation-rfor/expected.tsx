@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 
-interface LoopMustacheInterpolationRforProps {
+interface LoopMustacheInterpolationRforProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'children' | 'dangerouslySetInnerHTML'> {
   items?: any[];
 }
 

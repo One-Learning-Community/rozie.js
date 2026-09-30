@@ -4,7 +4,7 @@ import { clamp } from './partial-helpers.js';
 
 /* between-statement: a transitive non-exported helper pulled in as the closure of usedName */
 
-interface PartialInlineHostCProps {
+interface PartialInlineHostCProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'base' | 'children' | 'dangerouslySetInnerHTML'> {
   base?: number;
 }
 

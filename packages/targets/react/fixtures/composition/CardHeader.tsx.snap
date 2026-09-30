@@ -1,6 +1,6 @@
 import { clsx } from '@rozie/runtime-react';
 
-interface CardHeaderProps {
+interface CardHeaderProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'title' | 'children' | 'dangerouslySetInnerHTML'> {
   title?: string;
 }
 

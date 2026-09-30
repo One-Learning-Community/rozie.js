@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface RefExposeVerbShadowProps {}
+interface RefExposeVerbShadowProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export interface RefExposeVerbShadowHandle {
   box(): void;

@@ -7,7 +7,7 @@ interface HeaderCtx { remaining: any; total: any; }
 
 interface ChildrenCtx { item: any; toggle: any; remove: any; }
 
-interface TodoListProps {
+interface TodoListProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'title' | 'onAdd' | 'onToggle' | 'onRemove' | 'renderHeader' | 'children' | 'renderEmpty' | 'slots' | 'dangerouslySetInnerHTML'> {
   items?: any[];
   defaultItems?: any[];
   onItemsChange?: (items: any[]) => void;

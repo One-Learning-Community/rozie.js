@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 import './InlineExprHandler.css';
 
-interface InlineExprHandlerProps {
+interface InlineExprHandlerProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'closeOnBackdrop' | 'children' | 'dangerouslySetInnerHTML'> {
   closeOnBackdrop?: boolean;
 }
 

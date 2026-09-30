@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { clsx, rozieAttr } from '@rozie/runtime-react';
 import './ClassSelectorProbe.css';
 
-interface ClassSelectorProbeProps {}
+interface ClassSelectorProbeProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function ClassSelectorProbe(props: ClassSelectorProbeProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

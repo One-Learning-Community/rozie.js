@@ -1,6 +1,6 @@
 import { rozieDisplay } from '@rozie/runtime-react';
 
-interface TreeNodeProps {}
+interface TreeNodeProps extends Omit<import('react').ComponentPropsWithoutRef<'li'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function TreeNode(props: TreeNodeProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

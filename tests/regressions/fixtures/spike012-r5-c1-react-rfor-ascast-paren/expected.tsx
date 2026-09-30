@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 
-interface RforAsCastParenProps {}
+interface RforAsCastParenProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function RforAsCastParen(props: RforAsCastParenProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

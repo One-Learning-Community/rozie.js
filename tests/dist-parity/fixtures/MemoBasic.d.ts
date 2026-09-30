@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface MemoBasicProps {
+export interface MemoBasicProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'children' | 'dangerouslySetInnerHTML'> {
   items?: unknown[];
 }
 

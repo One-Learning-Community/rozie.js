@@ -3,7 +3,7 @@ import { clsx } from '@rozie/runtime-react';
 import './Card.css';
 import CardHeader from './CardHeader';
 
-interface CardProps {
+interface CardProps extends Omit<import('react').ComponentPropsWithoutRef<'article'>, 'title' | 'onClose' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   title?: string;
   onClose?: ((...args: any[]) => any) | null;
   children?: ReactNode;

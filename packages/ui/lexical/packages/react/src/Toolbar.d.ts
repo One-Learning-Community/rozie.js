@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface ToolbarProps {
+export interface ToolbarProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {
 }
 
 declare function Toolbar(props: ToolbarProps): JSX.Element;

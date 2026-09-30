@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface UpdateExpressionProbeProps {
+export interface UpdateExpressionProbeProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'dangerouslySetInnerHTML'> {
   value?: number;
   defaultValue?: number;
   onValueChange?: (next: number) => void;

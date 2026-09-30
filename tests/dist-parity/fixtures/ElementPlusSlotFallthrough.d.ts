@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface ElementPlusSlotFallthroughProps {
+export interface ElementPlusSlotFallthroughProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'variant' | 'renderHeader' | 'children' | 'renderFooter' | 'slots' | 'dangerouslySetInnerHTML'> {
   variant?: string;
   renderHeader?: () => ReactNode;
   children?: ReactNode;

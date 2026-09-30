@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface TabProps {
+export interface TabProps extends Omit<import('react').ComponentPropsWithoutRef<'button'>, 'label' | 'index' | 'children' | 'dangerouslySetInnerHTML'> {
   label?: string;
   index?: number;
 }

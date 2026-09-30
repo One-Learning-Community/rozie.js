@@ -22,7 +22,7 @@
  */
 import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation } from '@rozie/core';
-import { buildPropJsdoc } from '@rozie/core';
+import { buildPropJsdoc, renderHtmlAttrsExtends } from '@rozie/core';
 import { buildSlotsRecordType } from './refineSlotTypes.js';
 
 /**
@@ -206,9 +206,15 @@ export function emitPropsInterface(ir: IRComponent, slotPropFields?: string[]): 
     fields.push(`  slots?: ${buildSlotsRecordType(ir.slots, "import('react').ReactNode")};`);
   }
 
+  // Typed public surface phase 3 (spec §5) — when attribute auto-fallthrough
+  // fires, the consumer's undeclared attrs land on the root at runtime; extend
+  // that root's React attribute type so the public contract matches (own
+  // members omitted, so they win on a collision). '' ⇒ byte-identical.
+  const htmlAttrsExtends = renderHtmlAttrsExtends(ir, 'react', fields);
+
   if (fields.length === 0) {
-    return `interface ${ir.name}Props {}`;
+    return `interface ${ir.name}Props${htmlAttrsExtends} {}`;
   }
 
-  return `interface ${ir.name}Props {\n${fields.join('\n')}\n}`;
+  return `interface ${ir.name}Props${htmlAttrsExtends} {\n${fields.join('\n')}\n}`;
 }

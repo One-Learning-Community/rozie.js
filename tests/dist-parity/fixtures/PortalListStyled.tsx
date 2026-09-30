@@ -7,7 +7,7 @@ import './PortalListStyled.css';
 
 interface ItemCtx { item: any; }
 
-interface PortalListStyledProps {
+interface PortalListStyledProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'renderItem' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   items?: any[];
   renderItem?: (ctx: ItemCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;

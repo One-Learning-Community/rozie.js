@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface SearchInputProps {
+export interface SearchInputProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'placeholder' | 'minLength' | 'autofocus' | 'onSearch' | 'onClear' | 'children' | 'dangerouslySetInnerHTML'> {
   placeholder?: string;
   minLength?: number;
   autofocus?: boolean;

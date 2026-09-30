@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 import { clampH } from './partial-helpers.js';
 
-interface PartialInlineHostHProps {
+interface PartialInlineHostHProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'base' | 'children' | 'dangerouslySetInnerHTML'> {
   base?: number;
 }
 

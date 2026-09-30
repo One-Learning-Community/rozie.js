@@ -1,7 +1,7 @@
 import { clsx, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './PolymorphicModelGuardNarrow.css';
 
-interface PolymorphicModelGuardNarrowProps {
+interface PolymorphicModelGuardNarrowProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'dangerouslySetInnerHTML'> {
   value?: string | Record<string, any>;
   defaultValue?: string | Record<string, any>;
   onValueChange?: (value: string | Record<string, any>) => void;

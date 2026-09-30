@@ -10,7 +10,7 @@ import { loadCaptchaApi } from './internal/loadCaptchaApi';
 // `api`/`widgetId` MUST be top-level — reset()/execute()/getResponse() (the
 // $expose'd imperative handle, callable any time) read them outside $onMount.
 
-interface CaptchaProps {
+interface CaptchaProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'provider' | 'sitekey' | 'token' | 'defaultToken' | 'onTokenChange' | 'theme' | 'size' | 'tabindex' | 'options' | 'onVerify' | 'onExpire' | 'onError' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * Which widget to render: `recaptcha` (Google reCAPTCHA v2), `hcaptcha`, `turnstile` (Cloudflare), or `friendly` (Friendly Captcha). The first three share a near-identical explicit-render API; Friendly Captcha rides an internal `adapt()` bridge onto the same surface. Construction-time — re-key the component to switch it live.
    */

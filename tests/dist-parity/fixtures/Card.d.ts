@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface CardProps {
+export interface CardProps extends Omit<import('react').ComponentPropsWithoutRef<'article'>, 'title' | 'onClose' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   title?: string;
   onClose?: ((...args: any[]) => any) | null;
   children?: ReactNode;

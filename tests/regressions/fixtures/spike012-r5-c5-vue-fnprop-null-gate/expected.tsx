@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface FnPropNullGateProps {
+interface FnPropNullGateProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'onSave' | 'onCancel' | 'children' | 'dangerouslySetInnerHTML'> {
   onSave?: (...args: any[]) => any;
   onCancel?: ((...args: any[]) => any) | null;
 }

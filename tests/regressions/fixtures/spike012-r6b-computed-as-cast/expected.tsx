@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 
-interface ComputedAsCastProps {
+interface ComputedAsCastProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'raw' | 'children' | 'dangerouslySetInnerHTML'> {
   raw?: string;
 }
 

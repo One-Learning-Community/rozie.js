@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface RefEmitDedupProps {
+interface RefEmitDedupProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'onSave' | 'children' | 'dangerouslySetInnerHTML'> {
   onSave?: (...args: any[]) => void;
 }
 

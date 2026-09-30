@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 import './OnMountArrowCleanup.css';
 
-interface OnMountArrowCleanupProps {}
+interface OnMountArrowCleanupProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function OnMountArrowCleanup(props: OnMountArrowCleanupProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

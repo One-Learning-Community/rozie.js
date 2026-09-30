@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface TreeNodeProps {
+export interface TreeNodeProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'node' | 'children' | 'dangerouslySetInnerHTML'> {
   node?: Record<string, unknown>;
 }
 

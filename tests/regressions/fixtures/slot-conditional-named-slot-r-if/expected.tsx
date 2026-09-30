@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface SlotConditionalNamedSlotRIfProps {
+interface SlotConditionalNamedSlotRIfProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'show' | 'renderHeader' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   show?: boolean;
   renderHeader?: () => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;

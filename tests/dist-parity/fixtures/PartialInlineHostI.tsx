@@ -1,6 +1,6 @@
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 
-interface PartialInlineHostIProps {
+interface PartialInlineHostIProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'base' | 'children' | 'dangerouslySetInnerHTML'> {
   base?: number;
 }
 

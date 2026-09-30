@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface InlineEquivHostDProps {
+export interface InlineEquivHostDProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'base' | 'children' | 'dangerouslySetInnerHTML'> {
   base?: number;
 }
 

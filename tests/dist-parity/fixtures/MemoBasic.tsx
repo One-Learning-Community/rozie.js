@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 import './MemoBasic.css';
 
-interface MemoBasicProps {
+interface MemoBasicProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'children' | 'dangerouslySetInnerHTML'> {
   items?: any[];
 }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { clsx, useDebouncedCallback, useThrottledCallback } from '@rozie/runtime-react';
 
-interface DebounceInlineCallProps {}
+interface DebounceInlineCallProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function DebounceInlineCall(props: DebounceInlineCallProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

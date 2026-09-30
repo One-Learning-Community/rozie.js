@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface ThemePassthroughProps {
+export interface ThemePassthroughProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   children?: ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

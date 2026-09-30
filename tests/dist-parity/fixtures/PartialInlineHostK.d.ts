@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface PartialInlineHostKProps {
+export interface PartialInlineHostKProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'base' | 'children' | 'dangerouslySetInnerHTML'> {
   base?: number;
 }
 

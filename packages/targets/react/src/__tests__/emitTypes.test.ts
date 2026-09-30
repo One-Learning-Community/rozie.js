@@ -78,7 +78,11 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
     const { ir } = load('Counter');
     const out = emitReactTypes(ir);
     expect(out.startsWith(`import type { ReactNode } from 'react';`)).toBe(true);
-    expect(out).toContain(`export interface CounterProps {`);
+    // Typed public surface phase 3 — Counter is a single-<div>-root,
+    // attr-inheriting component, so its interface extends the div's attrs.
+    expect(out).toContain(
+      `export interface CounterProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, `,
+    );
   });
 
   it('Test 2: Counter — model:true triplet (value/defaultValue/onValueChange)', () => {
@@ -418,5 +422,31 @@ describe('emitReactTypes — D-85 React full generic preservation (Plan 06-02 Ta
       name: 'T',
     });
     expect(ir.props[1]?.isModel).toBe(true);
+  });
+});
+
+describe('emitReactTypes — typed public surface phase 3 (pass-through HTML attrs)', () => {
+  it('a single-<button>-root attr-inheriting component extends ComponentPropsWithoutRef<button>', () => {
+    const src = readFileSync(resolve(REPO_ROOT, 'tests/fixtures/typed-surface/AttrsButton.rozie'), 'utf8');
+    const parsed = parse(src, { filename: 'AttrsButton.rozie' });
+    if (!parsed.ast) throw new Error('parse failed for AttrsButton');
+    const lowered = lowerToIR(parsed.ast, { modifierRegistry: createDefaultRegistry() });
+    if (!lowered.ir) throw new Error('lower failed for AttrsButton');
+    expect(emitReactTypes(lowered.ir)).toContain(
+      "export interface AttrsButtonProps extends Omit<import('react').ComponentPropsWithoutRef<'button'>, 'label' | 'title' | 'onPress' | 'children' | 'dangerouslySetInnerHTML'> {",
+    );
+  });
+
+  it('inherit-attrs="false" (ThemedButtonManual) keeps the plain interface header', () => {
+    const { ir } = load('ThemedButtonManual');
+    expect(emitReactTypes(ir)).toContain('export interface ThemedButtonManualProps {');
+  });
+
+  it('the inline .tsx interface carries the same clause', () => {
+    const src = readFileSync(resolve(REPO_ROOT, 'tests/fixtures/typed-surface/AttrsButton.rozie'), 'utf8');
+    const { code } = compile(src, { target: 'react', filename: 'AttrsButton.rozie', sourceMap: false });
+    expect(code).toContain(
+      "interface AttrsButtonProps extends Omit<import('react').ComponentPropsWithoutRef<'button'>, 'label' | 'title' | 'onPress' | 'children' | 'dangerouslySetInnerHTML'> {",
+    );
   });
 });

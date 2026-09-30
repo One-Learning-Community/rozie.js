@@ -25,7 +25,7 @@ const styles: Record<string, string> = new Proxy({}, { get: (_t, k) => String(k)
 interface TriggerCtx { open: any; toggle: any; }
 interface ChildrenCtx { close: any; }
 
-interface DropdownProps {
+interface DropdownProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'closeOnOutsideClick' | 'closeOnEscape' | 'renderTrigger' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;

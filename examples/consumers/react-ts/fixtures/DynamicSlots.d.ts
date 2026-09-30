@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface DynamicSlotsProps {
+export interface DynamicSlotsProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'row' | 'total' | 'cellKey' | 'freeSlotName' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   row?: Record<string, unknown>;
   total?: number;
   cellKey?: string;

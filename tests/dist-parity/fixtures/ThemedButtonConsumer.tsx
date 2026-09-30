@@ -6,7 +6,7 @@ import ThemedButtonManual from './ThemedButtonManual';
 import ThemedButtonListenersManual from './ThemedButtonListenersManual';
 import ThemedButtonAllManual from './ThemedButtonAllManual';
 
-interface ThemedButtonConsumerProps {}
+interface ThemedButtonConsumerProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function ThemedButtonConsumer(props: ThemedButtonConsumerProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

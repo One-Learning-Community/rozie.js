@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { clsx, rozieContext } from '@rozie/runtime-react';
 import './ThemeProvider.css';
 
-interface ThemeProviderProps {
+interface ThemeProviderProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }

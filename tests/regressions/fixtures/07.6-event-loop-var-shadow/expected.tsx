@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { rozieDisplay } from '@rozie/runtime-react';
 
-interface EventLoopVarShadowProps {}
+interface EventLoopVarShadowProps extends Omit<import('react').ComponentPropsWithoutRef<'ul'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function EventLoopVarShadow(props: EventLoopVarShadowProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

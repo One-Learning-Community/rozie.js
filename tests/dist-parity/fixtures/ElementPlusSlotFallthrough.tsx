@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 import './ElementPlusSlotFallthrough.css';
 
-interface ElementPlusSlotFallthroughProps {
+interface ElementPlusSlotFallthroughProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'variant' | 'renderHeader' | 'children' | 'renderFooter' | 'slots' | 'dangerouslySetInnerHTML'> {
   variant?: string;
   renderHeader?: () => ReactNode;
   children?: ReactNode;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { clsx, useControllableState, useDebouncedCallback } from '@rozie/runtime-react';
 
-interface Spike012R5C3Props {
+interface Spike012R5C3Props extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'dangerouslySetInnerHTML'> {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;

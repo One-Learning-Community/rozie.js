@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { clsx, rozieAttr, rozieDisplay } from '@rozie/runtime-react';
 import './TreeNode.css';
 
-interface TreeNodeProps {
+interface TreeNodeProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'node' | 'children' | 'dangerouslySetInnerHTML'> {
   node?: Record<string, any>;
 }
 

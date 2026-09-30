@@ -1,6 +1,6 @@
 import { clsx, rozieContext, rozieDisplay } from '@rozie/runtime-react';
 
-interface InlineEquivHostLProps {
+interface InlineEquivHostLProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'base' | 'children' | 'dangerouslySetInnerHTML'> {
   base?: number;
 }
 

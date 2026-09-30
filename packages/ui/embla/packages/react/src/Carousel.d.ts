@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
-export interface CarouselProps {
+export interface CarouselProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'slides' | 'loop' | 'align' | 'axis' | 'slidesToScroll' | 'dragFree' | 'draggable' | 'containScroll' | 'startIndex' | 'skipSnaps' | 'duration' | 'direction' | 'autoplay' | 'autoplayDelay' | 'dots' | 'arrows' | 'thumbnails' | 'plugins' | 'options' | 'selectedIndex' | 'defaultSelectedIndex' | 'onSelectedIndexChange' | 'onSelect' | 'onSettle' | 'onReInit' | 'onPointerDown' | 'renderSlide' | 'children' | 'renderThumb' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * Slide data for config-array mode (mode a): Rozie renders one `.rozie-embla__slide` per item, optionally via the scoped `slide` slot for custom markup. Optional — leave it unset and use the default slot (mode b) to drop slide DOM directly.
    * @example

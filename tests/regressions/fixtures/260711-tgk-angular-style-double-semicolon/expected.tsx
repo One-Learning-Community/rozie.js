@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { parseInlineStyle } from '@rozie/runtime-react';
 
-interface StyleDoubleSemicolonProps {
+interface StyleDoubleSemicolonProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'colId' | 'children' | 'dangerouslySetInnerHTML'> {
   colId?: string;
 }
 

@@ -1,7 +1,7 @@
 import { clsx, useControllableState } from '@rozie/runtime-react';
 import './CvaOffState.css';
 
-interface CvaOffStateProps {
+interface CvaOffStateProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'dangerouslySetInnerHTML'> {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;

@@ -469,7 +469,8 @@ describe('React r-keynav emitter — multi-root, grid, page, explicit index (Pla
     expect(code).toBe(
       "import { useCallback, useId, useRef, useState } from 'react';\n" +
         "import { rozieDisplay, useKeynav } from '@rozie/runtime-react';\n\n" +
-        'interface KeynavMenuProps {\n' +
+        // Typed public surface phase 3 — single-<div>-root, attr-inheriting.
+        "interface KeynavMenuProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'children' | 'dangerouslySetInnerHTML'> {\n" +
         '  items?: any[];\n' +
         '}\n\n' +
         'export default function KeynavMenu(_props: KeynavMenuProps): JSX.Element {\n' +

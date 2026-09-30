@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { clsx, useControllableState } from '@rozie/runtime-react';
 
-interface ModelParamShadowProps {
+interface ModelParamShadowProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'token' | 'defaultToken' | 'onTokenChange' | 'onVerify' | 'children' | 'dangerouslySetInnerHTML'> {
   token?: string;
   defaultToken?: string;
   onTokenChange?: (token: string) => void;

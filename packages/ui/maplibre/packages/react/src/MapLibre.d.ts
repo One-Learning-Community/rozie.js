@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
-export interface MapLibreProps {
+export interface MapLibreProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'center' | 'defaultCenter' | 'onCenterChange' | 'zoom' | 'defaultZoom' | 'onZoomChange' | 'bearing' | 'defaultBearing' | 'onBearingChange' | 'pitch' | 'defaultPitch' | 'onPitchChange' | 'mapStyle' | 'minZoom' | 'maxZoom' | 'maxBounds' | 'bounds' | 'fitBoundsOptions' | 'dragPan' | 'dragRotate' | 'scrollZoom' | 'doubleClickZoom' | 'boxZoom' | 'keyboard' | 'touchZoomRotate' | 'touchPitch' | 'markers' | 'popups' | 'sources' | 'layers' | 'interactiveLayerIds' | 'controls' | 'options' | 'onMouseenter' | 'onMouseleave' | 'onLoad' | 'onIdle' | 'onMove' | 'onRotate' | 'onDragstart' | 'onDrag' | 'onDragend' | 'onClick' | 'onDblclick' | 'onContextmenu' | 'onMousemove' | 'onError' | 'onStyledata' | 'onSourcedata' | 'onMoveend' | 'onZoomend' | 'onRotateend' | 'onPitchend' | 'children' | 'renderMarker' | 'renderPopup' | 'renderControl' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * The map center as `[lng, lat]` — **longitude first** (MapLibre's convention, not Leaflet's `[lat, lng]`). Two-way: panning the map writes the new center back through the model path (echo-guarded), and a consumer write `easeTo`s the live map. The `moveend` echo reads `getCenter()` as `[lng, lat]`.
    * @example

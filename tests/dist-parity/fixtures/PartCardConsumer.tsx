@@ -2,7 +2,7 @@ import { clsx } from '@rozie/runtime-react';
 import './PartCardConsumer.css';
 import PartCard from './PartCard';
 
-interface PartCardConsumerProps {}
+interface PartCardConsumerProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function PartCardConsumer(props: PartCardConsumerProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

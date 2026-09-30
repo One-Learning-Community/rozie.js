@@ -1,6 +1,6 @@
 import { clsx, useControllableState } from '@rozie/runtime-react';
 
-interface RModelNumberModelPropProps {
+interface RModelNumberModelPropProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'quantity' | 'defaultQuantity' | 'onQuantityChange' | 'children' | 'dangerouslySetInnerHTML'> {
   quantity?: number;
   defaultQuantity?: number;
   onQuantityChange?: (quantity: number) => void;

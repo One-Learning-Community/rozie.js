@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface CounterProps {
+export interface CounterProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'step' | 'min' | 'max' | 'children' | 'dangerouslySetInnerHTML'> {
   value?: number;
   defaultValue?: number;
   onValueChange?: (next: number) => void;

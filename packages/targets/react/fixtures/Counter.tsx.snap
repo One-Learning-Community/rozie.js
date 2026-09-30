@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { clsx, useControllableState } from '@rozie/runtime-react';
 import './Counter.css';
 
-interface CounterProps {
+interface CounterProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'step' | 'min' | 'max' | 'children' | 'dangerouslySetInnerHTML'> {
   value?: number;
   defaultValue?: number;
   onValueChange?: (value: number) => void;

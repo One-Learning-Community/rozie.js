@@ -3,7 +3,7 @@ import { clsx, rozieDisplay } from '@rozie/runtime-react';
 import { clampB } from './partial-helpers.js';
 import { clampD } from './wr01-helpers.js';
 
-interface PartialInlineHostMultiProps {
+interface PartialInlineHostMultiProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'base' | 'children' | 'dangerouslySetInnerHTML'> {
   base?: number;
 }
 

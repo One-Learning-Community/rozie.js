@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface TodoListProps {
+export interface TodoListProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'title' | 'onAdd' | 'onToggle' | 'onRemove' | 'renderHeader' | 'children' | 'renderEmpty' | 'slots' | 'dangerouslySetInnerHTML'> {
   items?: unknown[];
   defaultItems?: unknown[];
   onItemsChange?: (next: unknown[]) => void;

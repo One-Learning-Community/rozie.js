@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface LoopMustacheSlotRforProps {
+interface LoopMustacheSlotRforProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   items?: any[];
   slots?: { [key: string]: ((...args: any[]) => import('react').ReactNode) | undefined; };
 }

@@ -6,7 +6,7 @@ import { firstEmptyIndex as firstEmpty, isAllowedChar, planEmits, planWrite } fr
 // ---- derived view (plain functions, uniform ×6) ------------------------
 // The current code, normalized to a string.
 
-interface OtpProps {
+interface OtpProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'length' | 'type' | 'mask' | 'autoFocus' | 'disabled' | 'placeholder' | 'ariaLabel' | 'onChange' | 'onComplete' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The assembled one-time code (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so an Otp **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Always a contiguous string of `0..length` characters; Otp writes the new code back on every edit (type, paste, backspace).
    * @example

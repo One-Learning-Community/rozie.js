@@ -15,7 +15,7 @@ import RegionsPlugin from 'wavesurfer.js/plugins/regions';
 // splits $onMount into onMount(...) + onCleanup(...), so a mount-local `let` would
 // be out of scope in teardown (TS2304).
 
-interface WaveformProps {
+interface WaveformProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'src' | 'peaks' | 'duration' | 'height' | 'waveColor' | 'progressColor' | 'cursorColor' | 'cursorWidth' | 'barWidth' | 'barGap' | 'barRadius' | 'minPxPerSec' | 'volume' | 'playbackRate' | 'autoplay' | 'normalizeAmplitude' | 'hideScrollbar' | 'disableInteraction' | 'disableDragToSeek' | 'timeline' | 'hover' | 'hoverColor' | 'regions' | 'defaultRegions' | 'onRegionsChange' | 'dragToCreateRegions' | 'regionColor' | 'options' | 'currentTime' | 'defaultCurrentTime' | 'onCurrentTimeChange' | 'onRegionCreated' | 'onRegionUpdated' | 'onRegionRemoved' | 'onRegionClicked' | 'onRegionIn' | 'onRegionOut' | 'onReady' | 'onPlaying' | 'onPaused' | 'onFinished' | 'onTimeupdate' | 'onSeeking' | 'onInteraction' | 'onLoading' | 'onError' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The audio URL the waveform loads. Bound at construction and reconciled at runtime — changing it calls the engine `load(url)`.
    * @example

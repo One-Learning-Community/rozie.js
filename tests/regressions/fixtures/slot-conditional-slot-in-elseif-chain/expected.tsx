@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface SlotConditionalSlotInElseifChainProps {
+interface SlotConditionalSlotInElseifChainProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'mode' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   mode?: number;
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;

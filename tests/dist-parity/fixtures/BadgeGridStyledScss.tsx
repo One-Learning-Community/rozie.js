@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 import './BadgeGridStyledScss.css';
 
-interface BadgeGridStyledScssProps {
+interface BadgeGridStyledScssProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'badges' | 'children' | 'dangerouslySetInnerHTML'> {
   badges?: any[];
 }
 

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface ModalConsumerProps {
+export interface ModalConsumerProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'title' | 'children' | 'dangerouslySetInnerHTML'> {
   title?: string;
 }
 

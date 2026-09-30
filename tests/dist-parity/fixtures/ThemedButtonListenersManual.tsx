@@ -1,7 +1,7 @@
 import { clsx } from '@rozie/runtime-react';
 import './ThemedButtonListenersManual.css';
 
-interface ThemedButtonListenersManualProps {
+interface ThemedButtonListenersManualProps extends Omit<import('react').ComponentPropsWithoutRef<'button'>, 'label' | 'variant' | 'children' | 'dangerouslySetInnerHTML'> {
   label?: string;
   variant?: string;
 }

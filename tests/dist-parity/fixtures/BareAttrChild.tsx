@@ -1,6 +1,6 @@
 import { clsx } from '@rozie/runtime-react';
 
-interface BareAttrChildProps {
+interface BareAttrChildProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'combobox' | 'children' | 'dangerouslySetInnerHTML'> {
   combobox?: boolean;
 }
 

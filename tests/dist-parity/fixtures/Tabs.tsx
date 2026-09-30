@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { clsx, rozieContext } from '@rozie/runtime-react';
 import './Tabs.css';
 
-interface TabsProps {
+interface TabsProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }

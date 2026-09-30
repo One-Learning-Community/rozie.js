@@ -15,7 +15,7 @@ import CropperEngine from 'cropperjs';
 // (queried from the ref'd container in $onMount). Both are the `let x = null`
 // idiom the engine-wrapper recipe relies on.
 
-interface CropperProps {
+interface CropperProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'src' | 'data' | 'defaultData' | 'onDataChange' | 'aspectRatio' | 'viewMode' | 'dragMode' | 'disabled' | 'guides' | 'center' | 'background' | 'movable' | 'rotatable' | 'scalable' | 'zoomable' | 'zoomOnWheel' | 'cropBoxMovable' | 'cropBoxResizable' | 'autoCrop' | 'autoCropArea' | 'responsive' | 'preview' | 'options' | 'onReady' | 'onCropstart' | 'onCropmove' | 'onCropend' | 'onCrop' | 'onZoom' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The image URL the cropper attaches to. Bound onto the `<img>` and reconciled at runtime — changing it calls the engine `replace(url)`.
    * @example

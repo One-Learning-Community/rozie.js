@@ -15,7 +15,7 @@ import * as lexicalUtils from '@lexical/utils';
 // bundled leaves; TOP-LEVEL scope so the hoisted Solid teardown can reach it (see
 // RichTextPlugin header for the full rationale).
 
-interface ToolbarProps {}
+interface ToolbarProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function Toolbar(props: ToolbarProps): JSX.Element {
   const editorCtx = useContext(rozieContext("rozie-lexical-editor"));

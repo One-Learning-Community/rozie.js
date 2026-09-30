@@ -14,7 +14,7 @@ import { loadRecaptchaV3, execute as v3Execute } from './internal/loadRecaptchaV
 // (contrast Captcha.rozie's `disposed`, which IS $onMount-local — its
 // exposed handle functions don't read it).
 
-interface RecaptchaV3Props {
+interface RecaptchaV3Props extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'sitekey' | 'action' | 'token' | 'defaultToken' | 'onTokenChange' | 'executeOnMount' | 'onError' | 'onVerify' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * Required. The public reCAPTCHA v3 site key from your Google admin console.
    */

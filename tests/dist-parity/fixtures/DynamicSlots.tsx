@@ -4,7 +4,7 @@ import { clsx, rozieDisplay } from '@rozie/runtime-react';
 
 interface HeaderCellCtx { title: any; }
 
-interface DynamicSlotsProps {
+interface DynamicSlotsProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'columns' | 'row' | 'total' | 'heading' | 'renderHeaderCell' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   columns?: any[];
   row?: Record<string, any>;
   total?: number;

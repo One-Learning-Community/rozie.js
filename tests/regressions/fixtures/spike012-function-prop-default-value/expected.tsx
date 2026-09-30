@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { clsx, useDebouncedCallback } from '@rozie/runtime-react';
 
-interface FunctionPropDefaultValueProps {
+interface FunctionPropDefaultValueProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'onPick' | 'children' | 'dangerouslySetInnerHTML'> {
   onPick?: (...args: any[]) => any;
 }
 

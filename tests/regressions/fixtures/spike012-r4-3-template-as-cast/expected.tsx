@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 
-interface TemplateAsCastProps {}
+interface TemplateAsCastProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function TemplateAsCast(props: TemplateAsCastProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

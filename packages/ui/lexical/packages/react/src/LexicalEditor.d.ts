@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface LexicalEditorProps {
+export interface LexicalEditorProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'nodes' | 'namespace' | 'ariaLabel' | 'theme' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * Extra Lexical node classes to register at editor creation. Lexical requires every node class to be declared up front, so consumer node extensions are passed here and composed after the built-in RichText/List/Link + `@mention` `MentionNode` set (the reference DecoratorNode is registered by the shell itself; these consumer nodes are composed last so they win).
    */

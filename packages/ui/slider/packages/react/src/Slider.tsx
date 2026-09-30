@@ -7,7 +7,7 @@ interface MarkCtx { value: any; label: any; position: any; }
 
 interface BubbleCtx { value: any; }
 
-interface SliderProps {
+interface SliderProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'range' | 'min' | 'max' | 'step' | 'orientation' | 'disabled' | 'marks' | 'ariaLabel' | 'pageStep' | 'formatValue' | 'showValue' | 'onChange' | 'renderMark' | 'renderBubble' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The current value (two-way `r-model`). A scalar number in single mode; a sorted `[lo, hi]` array in `range` mode, with each thumb neighbour-clamped so the pair stays sorted on every commit. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Slider **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).
    * @example

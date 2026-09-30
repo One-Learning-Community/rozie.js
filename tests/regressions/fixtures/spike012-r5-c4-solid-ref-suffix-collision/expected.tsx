@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface RefSuffixCollisionProps {}
+interface RefSuffixCollisionProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function RefSuffixCollision(props: RefSuffixCollisionProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

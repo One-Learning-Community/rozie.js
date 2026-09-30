@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 import DummyEngine from 'dummy-engine';
 
-interface SpikeImportElProps {
+interface SpikeImportElProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }

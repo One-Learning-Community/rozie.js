@@ -2,7 +2,7 @@ import { useContext } from 'react';
 import { clsx, rozieAttr, rozieContext } from '@rozie/runtime-react';
 import './Tab.css';
 
-interface TabProps {
+interface TabProps extends Omit<import('react').ComponentPropsWithoutRef<'button'>, 'label' | 'index' | 'children' | 'dangerouslySetInnerHTML'> {
   label?: string;
   index?: number;
 }

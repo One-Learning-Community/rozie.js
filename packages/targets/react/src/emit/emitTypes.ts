@@ -138,6 +138,9 @@ export function emitReactTypes(ir: IRComponent, opts: EmitReactTypesOptions = {}
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'ReactNode',
       target: 'react',
+      // Typed public surface phase 3 — mirror the inline interface's
+      // `extends Omit<ComponentPropsWithoutRef<tag>, …>` in the public sidecar.
+      htmlAttrs: 'react',
     }),
   );
   lines.push('');

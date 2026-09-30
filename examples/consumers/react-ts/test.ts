@@ -217,3 +217,18 @@ void [
   dynamicSlotsZeroParamFamily,
   dynamicSlotsCoexist,
 ];
+
+// ---- Typed public surface phase 3 — pass-through HTML attributes --------
+// Counter is a single-<div>-root, attr-inheriting component.
+const counterAttrs: CounterProps = {
+  value: 0,
+  className: 'c',
+  style: { color: 'red' },
+  id: 'counter-1',
+  'aria-label': 'Counter',
+  onClick: (e) => void e.currentTarget,
+};
+void counterAttrs;
+// @ts-expect-error — `href` is not a <div> attribute
+const counterBadHref: CounterProps = { value: 0, href: '/x' };
+void counterBadHref;

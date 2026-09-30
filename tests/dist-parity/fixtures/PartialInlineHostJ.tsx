@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 
-interface PartialInlineHostJProps {
+interface PartialInlineHostJProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'base' | 'children' | 'dangerouslySetInnerHTML'> {
   base?: number;
 }
 

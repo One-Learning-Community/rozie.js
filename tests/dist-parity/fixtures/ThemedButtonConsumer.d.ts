@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface ThemedButtonConsumerProps {
+export interface ThemedButtonConsumerProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {
 }
 
 declare function ThemedButtonConsumer(props: ThemedButtonConsumerProps): JSX.Element;

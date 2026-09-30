@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 import './RModelNumberTrim.css';
 
-interface RModelNumberTrimProps {}
+interface RModelNumberTrimProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function RModelNumberTrim(props: RModelNumberTrimProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

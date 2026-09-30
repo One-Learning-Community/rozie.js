@@ -2,7 +2,7 @@ import { useContext } from 'react';
 import { clsx, rozieContext, rozieDisplay } from '@rozie/runtime-react';
 import './ThemeButton.css';
 
-interface ThemeButtonProps {}
+interface ThemeButtonProps extends Omit<import('react').ComponentPropsWithoutRef<'button'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function ThemeButton(props: ThemeButtonProps): JSX.Element {
   const theme = useContext(rozieContext("theme"));

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
-export interface CaptchaProps {
+export interface CaptchaProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'provider' | 'sitekey' | 'token' | 'defaultToken' | 'onTokenChange' | 'theme' | 'size' | 'tabindex' | 'options' | 'onVerify' | 'onExpire' | 'onError' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * Which widget to render: `recaptcha` (Google reCAPTCHA v2), `hcaptcha`, `turnstile` (Cloudflare), or `friendly` (Friendly Captcha). The first three share a near-identical explicit-render API; Friendly Captcha rides an internal `adapt()` bridge onto the same surface. Construction-time — re-key the component to switch it live.
    */

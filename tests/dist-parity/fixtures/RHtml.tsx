@@ -1,7 +1,7 @@
 import { clsx } from '@rozie/runtime-react';
 import './RHtml.css';
 
-interface RHtmlProps {
+interface RHtmlProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'content' | 'children' | 'dangerouslySetInnerHTML'> {
   content?: string;
 }
 

@@ -9,7 +9,7 @@ import { clampPercent, percentFromPointer, nudge } from './internal/resizeMath';
 // bindings AND handlers) — never $computed (a $computed is a value on React but
 // an accessor on Solid; a plain fn reads uniformly).
 
-interface ResizableProps {
+interface ResizableProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'size' | 'defaultSize' | 'onSizeChange' | 'direction' | 'min' | 'max' | 'disabled' | 'ariaLabel' | 'onResize' | 'renderStart' | 'renderHandle' | 'renderEnd' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The first (`start`) panel's size as a percent of the container along the split axis (its width when `direction="horizontal"`, its height when `"vertical"`). Two-way via `r-model:size`. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so the splitter position **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Every commit (drag, keyboard, or a programmatic `applySize`) is clamped to `[min, max]` and written back.
    * @example

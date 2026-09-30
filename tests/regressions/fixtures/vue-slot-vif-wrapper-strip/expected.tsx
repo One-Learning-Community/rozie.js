@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 import './PresenceSlotFallback.css';
 
-interface PresenceSlotFallbackProps {
+interface PresenceSlotFallbackProps extends Omit<import('react').ComponentPropsWithoutRef<'section'>, 'title' | 'renderHeader' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   title?: string;
   renderHeader?: () => ReactNode;
   children?: ReactNode;

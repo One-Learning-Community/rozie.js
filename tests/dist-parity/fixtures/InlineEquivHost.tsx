@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 import { clamp } from './partial-helpers.js';
 
-interface InlineEquivHostProps {
+interface InlineEquivHostProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'base' | 'children' | 'dangerouslySetInnerHTML'> {
   base?: number;
 }
 

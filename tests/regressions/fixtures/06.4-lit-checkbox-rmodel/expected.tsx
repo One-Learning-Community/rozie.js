@@ -1,7 +1,7 @@
 import { clsx, useControllableState } from '@rozie/runtime-react';
 import './CheckboxRModel.css';
 
-interface CheckboxRModelProps {
+interface CheckboxRModelProps extends Omit<import('react').ComponentPropsWithoutRef<'label'>, 'checked' | 'defaultChecked' | 'onCheckedChange' | 'children' | 'dangerouslySetInnerHTML'> {
   checked?: boolean;
   defaultChecked?: boolean;
   onCheckedChange?: (checked: boolean) => void;

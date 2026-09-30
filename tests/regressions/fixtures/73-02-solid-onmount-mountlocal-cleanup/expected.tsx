@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 import './OnMountMountLocalCleanup.css';
 
-interface OnMountMountLocalCleanupProps {
+interface OnMountMountLocalCleanupProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'label' | 'children' | 'dangerouslySetInnerHTML'> {
   label?: string;
 }
 

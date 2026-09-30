@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 import DynamicSlots from './DynamicSlots';
 
-interface DynamicSlotsConsumerProps {}
+interface DynamicSlotsConsumerProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function DynamicSlotsConsumer(props: DynamicSlotsConsumerProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

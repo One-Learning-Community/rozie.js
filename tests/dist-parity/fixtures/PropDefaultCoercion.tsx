@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 import './PropDefaultCoercion.css';
 
-interface PropDefaultCoercionProps {
+interface PropDefaultCoercionProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'children' | 'dangerouslySetInnerHTML'> {
   a?: (Record<string, any>) | null;
   b?: number;
   c?: string;

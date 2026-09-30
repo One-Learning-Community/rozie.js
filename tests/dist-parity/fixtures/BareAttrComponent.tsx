@@ -1,7 +1,7 @@
 import { clsx } from '@rozie/runtime-react';
 import BareAttrChild from './BareAttrChild';
 
-interface BareAttrComponentProps {}
+interface BareAttrComponentProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function BareAttrComponent(props: BareAttrComponentProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

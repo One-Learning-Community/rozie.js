@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 import './RModelLazy.css';
 
-interface RModelLazyProps {}
+interface RModelLazyProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function RModelLazy(props: RModelLazyProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

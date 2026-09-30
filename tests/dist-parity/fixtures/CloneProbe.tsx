@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 import './CloneProbe.css';
 
-interface CloneProbeProps {}
+interface CloneProbeProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function CloneProbe(props: CloneProbeProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

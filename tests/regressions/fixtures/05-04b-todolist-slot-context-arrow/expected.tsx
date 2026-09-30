@@ -5,7 +5,7 @@ import './ScopedSlotContext.css';
 
 interface ItemCtx { item: any; remaining: any; }
 
-interface ScopedSlotContextProps {
+interface ScopedSlotContextProps extends Omit<import('react').ComponentPropsWithoutRef<'ul'>, 'items' | 'defaultItems' | 'onItemsChange' | 'renderItem' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   items?: any[];
   defaultItems?: any[];
   onItemsChange?: (items: any[]) => void;

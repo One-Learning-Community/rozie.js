@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface ClassNormShapesProps {
+interface ClassNormShapesProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'variant' | 'arr' | 'flags' | 'children' | 'dangerouslySetInnerHTML'> {
   variant?: string;
   arr?: any[];
   flags?: Record<string, any>;

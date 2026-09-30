@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { clsx, rozieContext, rozieDisplay } from '@rozie/runtime-react';
 
-interface InjectAsCastProps {}
+interface InjectAsCastProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function InjectAsCast(props: InjectAsCastProps): JSX.Element {
   const theme = (useContext(rozieContext("theme"))) as {

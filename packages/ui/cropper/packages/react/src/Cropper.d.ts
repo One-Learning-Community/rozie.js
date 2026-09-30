@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
-export interface CropperProps {
+export interface CropperProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'src' | 'data' | 'defaultData' | 'onDataChange' | 'aspectRatio' | 'viewMode' | 'dragMode' | 'disabled' | 'guides' | 'center' | 'background' | 'movable' | 'rotatable' | 'scalable' | 'zoomable' | 'zoomOnWheel' | 'cropBoxMovable' | 'cropBoxResizable' | 'autoCrop' | 'autoCropArea' | 'responsive' | 'preview' | 'options' | 'onReady' | 'onCropstart' | 'onCropmove' | 'onCropend' | 'onCrop' | 'onZoom' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The image URL the cropper attaches to. Bound onto the `<img>` and reconciled at runtime — changing it calls the engine `replace(url)`.
    * @example

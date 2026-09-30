@@ -1,7 +1,7 @@
 import { clsx } from '@rozie/runtime-react';
 import './PropDocs.css';
 
-interface PropDocsProps {
+interface PropDocsProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'label' | 'count' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The visible text label for the control.
    * @deprecated Use `text` instead — `label` is retained only for back-compat.

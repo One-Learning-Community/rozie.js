@@ -3,7 +3,7 @@
 exports[`React $model producer-side two-way-write sigil > emitted model fixture matches snapshot 1`] = `
 "import { useControllableState } from '@rozie/runtime-react';
 
-interface ModelSigilProps {
+interface ModelSigilProps extends Omit<import('react').ComponentPropsWithoutRef<'button'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'dangerouslySetInnerHTML'> {
   value?: number;
   defaultValue?: number;
   onValueChange?: (value: number) => void;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { clsx, rozieContext } from '@rozie/runtime-react';
 
-interface ProvideAsCastProps {
+interface ProvideAsCastProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }

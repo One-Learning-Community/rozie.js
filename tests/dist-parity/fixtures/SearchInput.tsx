@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clsx, useDebouncedCallback } from '@rozie/runtime-react';
 import './SearchInput.css';
 
-interface SearchInputProps {
+interface SearchInputProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'placeholder' | 'minLength' | 'autofocus' | 'onSearch' | 'onClear' | 'children' | 'dangerouslySetInnerHTML'> {
   placeholder?: string;
   minLength?: number;
   autofocus?: boolean;

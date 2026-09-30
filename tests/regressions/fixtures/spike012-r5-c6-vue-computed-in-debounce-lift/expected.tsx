@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useDebouncedCallback } from '@rozie/runtime-react';
 
-interface ComputedInDebounceLiftProps {}
+interface ComputedInDebounceLiftProps extends Omit<import('react').ComponentPropsWithoutRef<'input'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function ComputedInDebounceLift(props: ComputedInDebounceLiftProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

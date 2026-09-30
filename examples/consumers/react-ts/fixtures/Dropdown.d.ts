@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
-export interface DropdownProps {
+export interface DropdownProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'closeOnOutsideClick' | 'closeOnEscape' | 'renderTrigger' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (next: boolean) => void;

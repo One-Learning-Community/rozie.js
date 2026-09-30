@@ -3,7 +3,7 @@ import { clsx } from '@rozie/runtime-react';
 
 interface ChildrenCtx { title: any; }
 
-interface SlotConditionalScopedSlotRIfProps {
+interface SlotConditionalScopedSlotRIfProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'show' | 'title' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   show?: boolean;
   title?: string;
   children?: ReactNode | ((ctx: ChildrenCtx) => ReactNode);

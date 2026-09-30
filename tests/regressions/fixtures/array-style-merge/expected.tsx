@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { parseInlineStyle } from '@rozie/runtime-react';
 
-interface ArrayStyleMergeProps {
+interface ArrayStyleMergeProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'base' | 's' | 'children' | 'dangerouslySetInnerHTML'> {
   base?: Record<string, any>;
   s?: string;
 }

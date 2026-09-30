@@ -2,7 +2,7 @@ import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 import './ExposeProbe.css';
 
-interface ExposeProbeProps {}
+interface ExposeProbeProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export interface ExposeProbeHandle {
   reset(): void;

@@ -12,7 +12,7 @@ interface InternalShape {
 
 type Mode = 'idle' | 'busy';
 
-interface TsPassthroughProps {
+interface TsPassthroughProps extends Omit<import('react').ComponentPropsWithoutRef<'button'>, 'label' | 'children' | 'dangerouslySetInnerHTML'> {
   label?: string;
 }
 
@@ -59,7 +59,7 @@ exports[`React ts-passthrough — untyped emit byte-identity anchor > untyped em
 "import { useEffect, useRef } from 'react';
 import { rozieDisplay } from '@rozie/runtime-react';
 
-interface TsPassthroughProps {
+interface TsPassthroughProps extends Omit<import('react').ComponentPropsWithoutRef<'button'>, 'label' | 'children' | 'dangerouslySetInnerHTML'> {
   label?: string;
 }
 

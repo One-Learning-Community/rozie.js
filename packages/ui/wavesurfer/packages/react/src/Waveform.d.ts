@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
-export interface WaveformProps {
+export interface WaveformProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'src' | 'peaks' | 'duration' | 'height' | 'waveColor' | 'progressColor' | 'cursorColor' | 'cursorWidth' | 'barWidth' | 'barGap' | 'barRadius' | 'minPxPerSec' | 'volume' | 'playbackRate' | 'autoplay' | 'normalizeAmplitude' | 'hideScrollbar' | 'disableInteraction' | 'disableDragToSeek' | 'timeline' | 'hover' | 'hoverColor' | 'regions' | 'defaultRegions' | 'onRegionsChange' | 'dragToCreateRegions' | 'regionColor' | 'options' | 'currentTime' | 'defaultCurrentTime' | 'onCurrentTimeChange' | 'onRegionCreated' | 'onRegionUpdated' | 'onRegionRemoved' | 'onRegionClicked' | 'onRegionIn' | 'onRegionOut' | 'onReady' | 'onPlaying' | 'onPaused' | 'onFinished' | 'onTimeupdate' | 'onSeeking' | 'onInteraction' | 'onLoading' | 'onError' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The audio URL the waveform loads. Bound at construction and reconciled at runtime — changing it calls the engine `load(url)`.
    * @example

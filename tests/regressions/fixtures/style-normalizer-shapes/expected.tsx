@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { parseInlineStyle } from '@rozie/runtime-react';
 
-interface StyleNormShapesProps {
+interface StyleNormShapesProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 's' | 'obj' | 'children' | 'dangerouslySetInnerHTML'> {
   s?: string;
   obj?: Record<string, any>;
 }

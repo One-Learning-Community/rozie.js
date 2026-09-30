@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-interface InterpArrowAsCastProps {}
+interface InterpArrowAsCastProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function InterpArrowAsCast(props: InterpArrowAsCastProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

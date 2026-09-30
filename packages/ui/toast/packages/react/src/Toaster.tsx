@@ -5,7 +5,7 @@ import './Toaster.css';
 
 interface ToastCtx { toast: any; dismiss: any; }
 
-interface ToasterProps {
+interface ToasterProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe' | 'stacked' | 'onDismissed' | 'renderToast' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * Which corner the toast stack renders in: `'top-left'`, `'top-right'`, `'top-center'`, `'bottom-left'`, `'bottom-right'`, or `'bottom-center'`. Drives the fixed-position layout and the stack direction.
    */

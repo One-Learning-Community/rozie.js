@@ -1,7 +1,7 @@
 import { clsx } from '@rozie/runtime-react';
 import './CardHeader.css';
 
-interface CardHeaderProps {
+interface CardHeaderProps extends Omit<import('react').ComponentPropsWithoutRef<'header'>, 'title' | 'onClose' | 'children' | 'dangerouslySetInnerHTML'> {
   title?: string;
   onClose?: ((...args: any[]) => any) | null;
 }

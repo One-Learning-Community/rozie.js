@@ -61,7 +61,9 @@ function parseSurface(src: string): ParsedSurface {
   const componentMatch =
     src.match(/export\s+default\s+function\s+(\w+)\s*\(/) ??
     src.match(/const\s+(\w+)\s*=\s*forwardRef\b/);
-  const propsInterfaceMatch = src.match(/interface\s+(\w*Props)\s*\{([\s\S]*?)\n\}/);
+  // Typed public surface phase 3 — tolerate an `extends Omit<…>` clause between
+  // the interface name and its body (single-root attr-inheriting components).
+  const propsInterfaceMatch = src.match(/interface\s+(\w*Props)\b[^{]*\{([\s\S]*?)\n\}/);
   const propsFields: string[] = [];
   if (propsInterfaceMatch) {
     const body = propsInterfaceMatch[2] ?? '';

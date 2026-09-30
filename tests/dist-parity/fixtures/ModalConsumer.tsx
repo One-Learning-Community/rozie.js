@@ -4,7 +4,7 @@ import './ModalConsumer.css';
 import Modal from './Modal';
 import WrapperModal from './WrapperModal';
 
-interface ModalConsumerProps {
+interface ModalConsumerProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'title' | 'children' | 'dangerouslySetInnerHTML'> {
   title?: string;
 }
 

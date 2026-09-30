@@ -3,7 +3,7 @@ import { clsx } from '@rozie/runtime-react';
 import './EngineDomEscape.css';
 import './EngineDomEscape.global.css';
 
-interface EngineDomEscapeProps {}
+interface EngineDomEscapeProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function EngineDomEscape(props: EngineDomEscapeProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

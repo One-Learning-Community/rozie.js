@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export interface AttrNullishDropProps {
+export interface AttrNullishDropProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'maybeNullProp' | 'children' | 'dangerouslySetInnerHTML'> {
   maybeNullProp?: (string) | null;
 }
 

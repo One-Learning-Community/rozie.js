@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 import './PartCard.css';
 
-interface PartCardProps {
+interface PartCardProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'title' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   title?: string;
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;

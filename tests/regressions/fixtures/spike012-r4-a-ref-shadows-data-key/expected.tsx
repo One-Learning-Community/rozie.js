@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface RefShadowsDataKeyProps {}
+interface RefShadowsDataKeyProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function RefShadowsDataKey(props: RefShadowsDataKeyProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

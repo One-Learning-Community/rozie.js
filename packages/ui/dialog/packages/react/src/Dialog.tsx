@@ -13,7 +13,7 @@ import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock'
 // this instance participates (the opt-out); the shared helper decides WHEN
 // the DOM actually changes.
 
-interface DialogProps {
+interface DialogProps extends Omit<import('react').ComponentPropsWithoutRef<'dialog'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'disableBackdropClose' | 'disableEscapeClose' | 'disableScrollLock' | 'ariaLabel' | 'ariaLabelledby' | 'onClose' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.
    * @example

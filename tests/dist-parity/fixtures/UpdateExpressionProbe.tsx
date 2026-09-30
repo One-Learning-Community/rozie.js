@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { clsx, useControllableState } from '@rozie/runtime-react';
 import './UpdateExpressionProbe.css';
 
-interface UpdateExpressionProbeProps {
+interface UpdateExpressionProbeProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'children' | 'dangerouslySetInnerHTML'> {
   value?: number;
   defaultValue?: number;
   onValueChange?: (value: number) => void;

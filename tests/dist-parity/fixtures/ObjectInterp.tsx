@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { clsx, rozieAttr, rozieDisplay } from '@rozie/runtime-react';
 
-interface ObjectInterpProps {}
+interface ObjectInterpProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
 
 export default function ObjectInterp(props: ObjectInterpProps): JSX.Element {
   const attrs = props as Record<string, unknown>;

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
-export interface RecaptchaV3Props {
+export interface RecaptchaV3Props extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'sitekey' | 'action' | 'token' | 'defaultToken' | 'onTokenChange' | 'executeOnMount' | 'onError' | 'onVerify' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * Required. The public reCAPTCHA v3 site key from your Google admin console.
    */
