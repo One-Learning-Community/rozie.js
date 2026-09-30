@@ -39,6 +39,8 @@ const BLOCK_NAMES = new Set([
   'template',
   'style',
   'components',
+  'types',
+  'emits',
 ] as const);
 
 /**
@@ -67,6 +69,8 @@ const OPAQUE_BLOCK_NAMES = new Set<string>([
   'data',
   'listeners',
   'components',
+  'types',
+  'emits',
 ]);
 
 type BlockName =
@@ -76,7 +80,9 @@ type BlockName =
   | 'listeners'
   | 'template'
   | 'style'
-  | 'components';
+  | 'components'
+  | 'types'
+  | 'emits';
 
 /** Hostile-input cap (T-1-02-01 mitigation). */
 const MAX_DIAGNOSTICS = 1000;
@@ -444,7 +450,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
             pushDiag({
               code: RozieErrorCode.UNKNOWN_TOP_LEVEL_BLOCK,
               severity: 'error',
-              message: `Unknown top-level block: <${pendingTagName}>. Recognized blocks are: <props>, <data>, <script>, <listeners>, <template>, <style>, <components>.`,
+              message: `Unknown top-level block: <${pendingTagName}>. Recognized blocks are: <props>, <data>, <script>, <listeners>, <template>, <style>, <components>, <types>, <emits>.`,
               loc: { start: lastOpenTagStart, end: endIndex + 1 },
               ...(isRefs
                 ? { hint: 'Refs are derived from `ref="..."` attributes inside the <template> block — there is no <refs> block.' }

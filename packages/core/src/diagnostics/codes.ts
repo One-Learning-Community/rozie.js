@@ -18,7 +18,7 @@ export const RozieErrorCode = {
   // ---- SFC envelope (Plan 02) — ROZ001..ROZ009 ----
   MISSING_ROZIE_ENVELOPE: 'ROZ001', // error — the .rozie file has no <rozie> root element wrapping its blocks.
   MULTIPLE_ROZIE_ENVELOPES: 'ROZ002', // error — more than one <rozie> root, or a <rozie> nested inside another envelope.
-  UNKNOWN_TOP_LEVEL_BLOCK: 'ROZ003', // error — a tag at envelope top level is not a recognized block (<props> <data> <script> <listeners> <template> <style> <components>).
+  UNKNOWN_TOP_LEVEL_BLOCK: 'ROZ003', // error — a tag at envelope top level is not a recognized block (<props> <data> <script> <listeners> <template> <style> <components> <types> <emits>).
   DUPLICATE_BLOCK: 'ROZ004', // error — the same block name appears more than once inside one <rozie> (each block is allowed at most once).
   // 260603 — error: a literal close sequence (e.g. `</script>` inside a JS
   // string or comment in the `<script>` block) terminated its own block early.
@@ -76,6 +76,8 @@ export const RozieErrorCode = {
 
   // Typed public surface (spec 2026-09-29) — ROZ019..ROZ023 continue the
   // ROZ010-029 declarative-block band.
+  TYPES_BLOCK_DISALLOWED_STATEMENT: 'ROZ019', // error — the <types> block holds a statement that is not type-only (runtime code, a value import, enum, declare const, …); only `import type`, interface, type, and export of those are allowed, so hoisting <types> into every target can never change runtime behaviour.
+  TYPES_BLOCK_PARSE_ERROR: 'ROZ020', // error — the <types> block is not valid TypeScript.
   INVALID_AUTHORED_TYPE: 'ROZ022', // error — an author-written type string (an <emits> payload, a :param-types value, or an $expose signature) is not a single valid TypeScript type.
 
   // ---- Script parse (Plan 03) — ROZ030..ROZ049 ----

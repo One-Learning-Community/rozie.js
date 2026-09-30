@@ -33,6 +33,8 @@ import type {
 } from './blocks/TemplateAST.js';
 import type { StyleAST } from './blocks/StyleAST.js';
 import type { ComponentsAST } from './blocks/ComponentsAST.js';
+import type { TypesAST } from './blocks/TypesAST.js';
+import type { EmitsAST } from './blocks/EmitsAST.js';
 import { parseModifierChain } from '../modifier-grammar/parseModifierChain.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
 
@@ -46,6 +48,8 @@ export interface NormalizeInput {
   style: StyleAST | null;
   /** Phase 06.2 P1 — parsed `<components>` AST or null when block absent. */
   components: ComponentsAST | null;
+  types?: TypesAST | null;
+  emits?: EmitsAST | null;
 }
 
 /**
@@ -92,6 +96,8 @@ export function buildRozieAST(input: NormalizeInput): {
     style: input.style,
     // Phase 06.2 P1: parsed <components> block (D-114/D-115). null when absent.
     components: input.components,
+    types: input.types ?? null,
+    emits: input.emits ?? null,
     // Phase 06.1 Plan 01: thread BlockMap through so per-target buildShell()
     // implementations can anchor MagicString.overwrite() at .rozie byte
     // offsets (DX-04). The splitter's `diagnostics` field is intentionally

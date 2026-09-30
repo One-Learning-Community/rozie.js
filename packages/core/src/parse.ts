@@ -14,6 +14,8 @@
  */
 import { splitBlocks } from './splitter/splitBlocks.js';
 import { parseProps } from './parsers/parseProps.js';
+import { parseTypes } from './parsers/parseTypes.js';
+import { parseEmits } from './parsers/parseEmits.js';
 import { parseData } from './parsers/parseData.js';
 import { parseComponents } from './parsers/parseComponents.js';
 import { parseScript } from './parsers/parseScript.js';
@@ -74,6 +76,12 @@ export function parse(source: string, opts: { filename?: string } = {}): ParseRe
   const componentsRes = blocks.components
     ? parseComponents(blocks.components.content, blocks.components.contentLoc, source, filename)
     : { node: null, diagnostics: [] as Diagnostic[] };
+  const typesRes = blocks.types
+    ? parseTypes(blocks.types.content, blocks.types.contentLoc, source, filename)
+    : { node: null, diagnostics: [] as Diagnostic[] };
+  const emitsRes = blocks.emits
+    ? parseEmits(blocks.emits.content, blocks.emits.contentLoc, source, filename)
+    : { node: null, diagnostics: [] as Diagnostic[] };
   const scriptRes = blocks.script
     ? // Phase 9: thread the resolved `<script lang="...">` value from the
       // splitter so parseScript can conditionally enable the `typescript`
@@ -110,6 +118,8 @@ export function parse(source: string, opts: { filename?: string } = {}): ParseRe
     ...propsRes.diagnostics,
     ...dataRes.diagnostics,
     ...componentsRes.diagnostics,
+    ...typesRes.diagnostics,
+    ...emitsRes.diagnostics,
     ...scriptRes.diagnostics,
     ...templateRes.diagnostics,
     ...listenersRes.diagnostics,
@@ -125,6 +135,8 @@ export function parse(source: string, opts: { filename?: string } = {}): ParseRe
     template: templateRes.node,
     style: styleRes.node,
     components: componentsRes.node,
+    types: typesRes.node,
+    emits: emitsRes.node,
   });
   diagnostics.push(...normDiags);
 

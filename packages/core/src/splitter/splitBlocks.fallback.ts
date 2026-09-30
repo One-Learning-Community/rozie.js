@@ -36,6 +36,8 @@ import type { BlockEntry, BlockMap } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
 
+const FALLBACK_OPAQUE_TAGS = new Set(['props', 'data', 'listeners', 'components', 'types', 'emits']);
+
 export type SplitBlocksResult = BlockMap & { diagnostics: Diagnostic[] };
 
 /**
@@ -95,11 +97,12 @@ export function splitBlocksFallback(source: string, filename?: string): SplitBlo
     });
   }
 
-  // Our first-class blocks (<props>, <data>, <listeners>, <components>) land in customBlocks.
+  // Our first-class blocks (<props>, <data>, <listeners>, <components>, <types>, <emits>) land in customBlocks.
   for (const cb of descriptor.customBlocks) {
     const tag = cb.type;
-    if (tag === 'props' || tag === 'data' || tag === 'listeners' || tag === 'components') {
-      if (result[tag] !== undefined) {
+    if (FALLBACK_OPAQUE_TAGS.has(tag)) {
+      const key = tag as 'props' | 'data' | 'listeners' | 'components' | 'types' | 'emits';
+      if (result[key] !== undefined) {
         result.diagnostics.push({
           code: RozieErrorCode.DUPLICATE_BLOCK,
           severity: 'error',
@@ -110,13 +113,13 @@ export function splitBlocksFallback(source: string, filename?: string): SplitBlo
         continue;
       }
       const entry = sfcBlockToEntry(source, cb);
-      if (entry) result[tag] = entry;
+      if (entry) result[key] = entry;
     } else {
       const isRefs = tag === 'refs';
       result.diagnostics.push({
         code: RozieErrorCode.UNKNOWN_TOP_LEVEL_BLOCK,
         severity: 'error',
-        message: `Unknown top-level block: <${tag}>. Recognized blocks are: <props>, <data>, <script>, <listeners>, <template>, <style>, <components>.`,
+        message: `Unknown top-level block: <${tag}>. Recognized blocks are: <props>, <data>, <script>, <listeners>, <template>, <style>, <components>, <types>, <emits>.`,
         loc: { start: cb.loc.start.offset, end: cb.loc.end.offset },
         ...(isRefs
           ? { hint: 'Refs are derived from `ref="..."` attributes inside the <template> block — there is no <refs> block.' }

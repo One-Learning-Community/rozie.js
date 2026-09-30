@@ -3611,6 +3611,8 @@
       ]
     },
     "components": null,
+    "types": null,
+    "emits": null,
     "blocks": {
       "diagnostics": [],
       "rozie": {

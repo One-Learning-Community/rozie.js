@@ -91,6 +91,10 @@ export interface BlockMap {
   style?: BlockEntry;
   /** Phase 06.2 P1 — `<components>` block (component composition). */
   components?: BlockEntry;
+  /** `<types>` block — type-only TypeScript (typed public surface). */
+  types?: BlockEntry;
+  /** `<emits>` block — declared event names and payload types. */
+  emits?: BlockEntry;
 }
 
 // Plan 03 lands the concrete per-block AST shapes; we re-export them here so
@@ -118,6 +122,8 @@ import type { ListenersAST } from './blocks/ListenersAST.js';
 import type { TemplateAST } from './blocks/TemplateAST.js';
 import type { StyleAST } from './blocks/StyleAST.js';
 import type { ComponentsAST } from './blocks/ComponentsAST.js';
+import type { TypesAST } from './blocks/TypesAST.js';
+import type { EmitsAST } from './blocks/EmitsAST.js';
 
 /**
  * Top-level RozieAST shape. Per-block AST shapes (PropsAST, ScriptAST, etc.)
@@ -142,6 +148,10 @@ export interface RozieAST {
    * was parsed successfully (D-114/D-115).
    */
   components: ComponentsAST | null;
+  /** Parsed `<types>` block; `null` when absent. @experimental */
+  types: TypesAST | null;
+  /** Parsed `<emits>` block; `null` when absent. @experimental */
+  emits: EmitsAST | null;
   /**
    * Block byte offsets from splitBlocks() — required by per-target buildShell()
    * to anchor MagicString at the original `.rozie` source text (Phase 06.1 P1).
