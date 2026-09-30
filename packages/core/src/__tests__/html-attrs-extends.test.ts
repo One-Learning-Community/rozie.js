@@ -75,9 +75,17 @@ describe('renderHtmlAttrsExtends', () => {
     expect(renderHtmlAttrsExtends(r, 'solid', [])).toContain(
       "import('solid-js').JSX.HTMLAttributes<HTMLElement>",
     );
+    // Svelte indexes SvelteHTMLElements by the real tag: its catch-all
+    // `[name: string]: { [name: string]: any }` entry covers custom elements.
     expect(renderHtmlAttrsExtends(r, 'svelte', [])).toContain(
-      "import('svelte/elements').HTMLAttributes<HTMLElement>",
+      "import('svelte/elements').SvelteHTMLElements['my-widget']",
     );
+  });
+  it('an <svg> root gets the SVG element attributes on every target (review finding #1)', () => {
+    const r = ir(wrap('', '<svg viewBox="0 0 1 1"><path d="M0 0" /></svg>'));
+    expect(renderHtmlAttrsExtends(r, 'react', [])).toContain("import('react').ComponentPropsWithoutRef<'svg'>");
+    expect(renderHtmlAttrsExtends(r, 'solid', [])).toContain("import('solid-js').ComponentProps<'svg'>");
+    expect(renderHtmlAttrsExtends(r, 'svelte', [])).toContain("import('svelte/elements').SvelteHTMLElements['svg']");
   });
   it('an upper-case root tag resolves case-insensitively', () => {
     const r = ir(wrap('', '<DIV>x</DIV>'));

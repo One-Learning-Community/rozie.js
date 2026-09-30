@@ -1,0 +1,20 @@
+<!--
+  SvgIcon.rozie — typed-public-surface phase 3 fixture (review finding #1).
+  Single <svg> root with attr inheritance ON: the props type must extend the
+  SVG element's attributes (fill, viewBox, stroke, …) on every target, and on
+  Svelte the component's own `{...__rozieAttrs}` spread onto <svg> must
+  svelte-check clean.
+-->
+<rozie name="SvgIcon">
+
+<props>
+{
+  size: { type: Number, default: 16 },
+}
+</props>
+
+<template>
+  <svg class="svg-icon" :width="$props.size" :height="$props.size" viewBox="0 0 16 16"><path d="M0 0h16v16H0z" /></svg>
+</template>
+
+</rozie>

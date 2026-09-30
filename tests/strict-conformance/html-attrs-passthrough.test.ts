@@ -100,4 +100,23 @@ describe('HTML-ATTRS-PASSTHROUGH — strict consumer (typed-surface P3)', () => 
     });
     expect(totalErrors(inventory), raw).toBe(0);
   });
+
+  // Review finding #1 — an <svg> root types SVG attributes (fill, stroke, …).
+  const SVG_FIXTURE = readFileSync(resolve(ROOT, 'tests/fixtures/typed-surface/SvgIcon.rozie'), 'utf8');
+  const SVG_CONSUMERS = {
+    react: `import SvgIcon from './SvgIcon';\nexport const ok = <SvgIcon size={24} fill="red" stroke="currentColor" className="c" aria-hidden="true" />;\n// @ts-expect-error — own size: number wins\nexport const bad = <SvgIcon size="x" />;\n`,
+    solid: `import SvgIcon from './SvgIcon';\nexport const ok = <SvgIcon size={24} fill="red" stroke="currentColor" class="c" aria-hidden="true" />;\n// @ts-expect-error — own size: number wins\nexport const bad = <SvgIcon size="x" />;\n`,
+  } as const;
+  for (const target of ['react', 'solid'] as const) {
+    it(`${target}: svg root accepts SVG attributes`, () => {
+      const { code, diagnostics } = compile(SVG_FIXTURE, { target, filename: 'SvgIcon.rozie', sourceMap: false });
+      expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      const { raw, inventory } = typecheckCompiled({
+        target,
+        files: { 'SvgIcon.tsx': code, 'Consumer.tsx': SVG_CONSUMERS[target] },
+        nodeModulesFrom: `packages/ui/combobox/packages/${target}`,
+      });
+      expect(totalErrors(inventory), raw).toBe(0);
+    });
+  }
 });

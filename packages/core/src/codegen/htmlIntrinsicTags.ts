@@ -20,3 +20,17 @@ export const HTML_INTRINSIC_TAGS: ReadonlySet<string> = new Set([
   'summary', 'sup', 'table', 'tbody', 'td', 'textarea', 'tfoot', 'th', 'thead', 'time',
   'tr', 'track', 'u', 'ul', 'var', 'video', 'wbr',
 ]);
+
+/**
+ * Typed-surface P3 review fix — SVG root tags that React's intrinsic elements
+ * (`ComponentPropsWithoutRef<'svg'>` → `SVGProps<SVGSVGElement>`) and Solid's
+ * (`ComponentProps<'svg'>` → `SvgSVGAttributes`) both key. An `<svg>` root
+ * (the common icon-component shape) must get SVG attributes (`fill`,
+ * `viewBox`, …) — the generic `HTMLAttributes<HTMLElement>` fallback both
+ * rejects them for the consumer and mistypes the component's own
+ * `{...attrs}` spread onto the `<svg>`. Svelte needs no list: it indexes
+ * `SvelteHTMLElements` by the real tag (catch-all entry for unknown tags).
+ *
+ * @experimental — shape may change before v1.0
+ */
+export const SVG_INTRINSIC_TAGS: ReadonlySet<string> = new Set(['svg']);

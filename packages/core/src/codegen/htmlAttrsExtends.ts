@@ -23,7 +23,7 @@
 import type { IRComponent } from '../ir/types.js';
 import { resolveAttrsFallthroughRoot } from '../ir/lowerers/lowerTemplate.js';
 import { escapeSingleQuotedKey } from './escapeSingleQuotedKey.js';
-import { HTML_INTRINSIC_TAGS } from './htmlIntrinsicTags.js';
+import { HTML_INTRINSIC_TAGS, SVG_INTRINSIC_TAGS } from './htmlIntrinsicTags.js';
 
 /**
  * The targets whose props interfaces need the `extends` clause. Vue, Angular
@@ -52,7 +52,7 @@ export function renderHtmlAttrsBaseType(target: HtmlAttrsTarget, tag: string): s
 }
 
 function attrsBaseType(target: HtmlAttrsTarget, tag: string): string {
-  const known = HTML_INTRINSIC_TAGS.has(tag);
+  const known = HTML_INTRINSIC_TAGS.has(tag) || SVG_INTRINSIC_TAGS.has(tag);
   switch (target) {
     case 'react':
       return known
@@ -63,9 +63,11 @@ function attrsBaseType(target: HtmlAttrsTarget, tag: string): string {
         ? `import('solid-js').ComponentProps<'${tag}'>`
         : `import('solid-js').JSX.HTMLAttributes<HTMLElement>`;
     case 'svelte':
-      return known
-        ? `import('svelte/elements').SvelteHTMLElements['${tag}']`
-        : `import('svelte/elements').HTMLAttributes<HTMLElement>`;
+      // Always index by the real tag: `SvelteHTMLElements` types every HTML
+      // and SVG element, and its catch-all `[name: string]: { [name: string]:
+      // any }` entry covers custom elements — so the component's own
+      // `{...__rozieAttrs}` spread onto the root always svelte-checks.
+      return `import('svelte/elements').SvelteHTMLElements['${tag}']`;
   }
 }
 

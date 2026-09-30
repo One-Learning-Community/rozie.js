@@ -193,7 +193,7 @@ When auto-fallthrough fires (a single root element, `inherit-attrs` not `"false"
 | Vue / Lit | unchanged — both already accept fallthrough attributes |
 | Angular | unchanged — host attributes are template-level, not part of the class's TS surface |
 
-The component's own props win on a name collision, because they are omitted from the attribute type. `children` stays rejected (and on React `dangerouslySetInnerHTML`, on Solid `innerHTML` / `innerText` / `textContent`), because spreading it onto the root would replace the root's content. A root that is not a standard HTML element (a custom element, `<svg>`) gets the generic `HTMLAttributes<HTMLElement>`. Components with `inherit-attrs="false"`, an `r-if` root or a component root are unchanged, and so are the `.d.rozie.ts` sidecars' rules: they carry the same types as the compiled component.
+The component's own props win on a name collision, because they are omitted from the attribute type. `children` stays rejected (and on React `dangerouslySetInnerHTML`, on Solid `innerHTML` / `innerText` / `textContent`), because spreading it onto the root would replace the root's content. An `<svg>` root gets the SVG element's attributes (`fill`, `stroke`, `viewBox`, …). Any other root that is not a standard HTML element (a custom element) gets the generic `HTMLAttributes<HTMLElement>` on React and Solid, and Svelte's permissive custom-element entry. Components with `inherit-attrs="false"`, an `r-if` root or a component root are unchanged, and so are the `.d.rozie.ts` sidecars' rules: they carry the same types as the compiled component.
 
 On Svelte this is stricter than before: the props type used to accept any key. An attribute the root element doesn't support is now a type error.
 

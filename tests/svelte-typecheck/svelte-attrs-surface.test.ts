@@ -119,6 +119,15 @@ describe('SVELTE-ATTRS-SURFACE — pass-through HTML attrs (typed-surface P3)', 
     expect(output).toMatch(pattern);
   });
 
+  it('svg root (review finding #1): the component AND a consumer passing SVG attributes are svelte-check clean', () => {
+    const svgSrc = readFileSync(resolve(ROOT, 'tests/fixtures/typed-surface/SvgIcon.rozie'), 'utf8');
+    const result = compile(svgSrc, { target: 'svelte', filename: 'SvgIcon.rozie', sourceMap: false });
+    expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    const consumer = `<script lang="ts">\n  import SvgIcon from './SvgIcon.svelte';\n</script>\n\n<SvgIcon size={24} fill="red" stroke="currentColor" class="c" aria-hidden="true" />\n`;
+    const { threw, output } = svelteCheck({ 'SvgIcon.svelte': result.code, 'Consumer.svelte': consumer });
+    expect(threw, output).toBe(false);
+  });
+
   it('sidecar: .d.rozie.ts consumer accepts root attrs; negatives stay errors', () => {
     const { ast } = parse(FIXTURE, { filename: 'AttrsButton.rozie' });
     if (!ast) throw new Error('parse() returned null for AttrsButton.rozie');
