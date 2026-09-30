@@ -1,0 +1,28 @@
+<!--
+  AttrsButton.rozie — typed-public-surface phase 3 fixture (spec §5).
+  Single <button> root, attr + listener inheritance ON (defaults). `title` is a
+  Number prop that deliberately collides with the HTML `title: string`
+  attribute so consumer fixtures prove own-props-win. No default slot, so
+  `children` must stay rejected. No <style> block, so the React emit carries
+  no CSS import.
+-->
+<rozie name="AttrsButton">
+
+<props>
+{
+  label: { type: String, default: 'Go' },
+  title: { type: Number, default: 0 },
+}
+</props>
+
+<script>
+function fire() {
+  $emit('press', $props.title)
+}
+</script>
+
+<template>
+  <button class="attrs-button" @click="fire()">{{ $props.label }} {{ $props.title }}</button>
+</template>
+
+</rozie>

@@ -35,6 +35,7 @@ import { buildPropJsdoc } from './buildPropJsdoc.js';
 import { isSlotNameIdentifier } from './slotNameIdentifier.js';
 import { lowerSlotParamType } from './slotParamTypeLowering.js';
 import { renderRecordKey } from './escapeSingleQuotedKey.js';
+import { renderHtmlAttrsExtends, type HtmlAttrsTarget } from './htmlAttrsExtends.js';
 
 /**
  * Options controlling the shared props-interface body rendering.
@@ -64,6 +65,14 @@ export interface RenderPropsInterfaceOptions {
    * target would silently become the wrong-output path (SPEC decision D-06).
    */
   target: CompileTarget;
+  /**
+   * Typed public surface phase 3 — when set, and attribute auto-fallthrough
+   * fires, the header gains `extends Omit<<root element attrs>, …>` for this
+   * target (see `renderHtmlAttrsExtends`). Omitted ⇒ byte-identical output.
+   * Only React/Solid/Svelte pass it; Vue/Angular/Lit accept pass-through
+   * attributes natively.
+   */
+  htmlAttrs?: HtmlAttrsTarget;
 }
 
 /**
@@ -277,6 +286,14 @@ export function renderPropsInterface(
   }
 
   lines.push(`}`);
+
+  // Typed public surface phase 3 (spec §5) — when attribute auto-fallthrough
+  // fires, the header extends the root element's HTML attributes (own members
+  // omitted so they win on a collision). Absent option ⇒ byte-identical.
+  if (opts.htmlAttrs !== undefined) {
+    const ext = renderHtmlAttrsExtends(ir, opts.htmlAttrs, lines.slice(1, -1));
+    if (ext !== '') lines[0] = `export interface ${ir.name}Props${generics}${ext} {`;
+  }
   return lines.join('\n');
 }
 

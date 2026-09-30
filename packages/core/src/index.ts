@@ -75,6 +75,14 @@ export {
   renderPropsInterface,
   renderPropType,
 } from './codegen/renderPropsInterface.js';
+// Typed public surface phase 3 — the `extends Omit<<root attrs>, …>` clause the
+// React/Solid/Svelte props interfaces gain when attributes fall through.
+// @experimental — shape may change before v1.0
+export type { HtmlAttrsTarget } from './codegen/htmlAttrsExtends.js';
+export {
+  collectInterfaceMemberNames,
+  renderHtmlAttrsExtends,
+} from './codegen/htmlAttrsExtends.js';
 export type { CompileOptions, CompileResult, CompileTarget } from './compile.js';
 // Phase 6 — public compile() entrypoint (DIST-01 / D-80).
 // Single source of truth for `.rozie` → per-target compilation. Consumed by
