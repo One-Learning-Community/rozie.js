@@ -3,14 +3,13 @@ import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
 import { onMount } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'children'> {
   a?: (any) | null;
   b?: number;
   c?: string;
   d?: boolean;
   e?: any[];
   f?: any;
-  [key: string]: unknown;
 }
 
 let __defaultE = (() => [])();

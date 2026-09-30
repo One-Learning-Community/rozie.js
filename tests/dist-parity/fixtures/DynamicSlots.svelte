@@ -3,14 +3,13 @@ import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'columns' | 'row' | 'total' | 'heading' | 'headerCell' | 'snippets' | 'children'> {
   columns?: any[];
   row?: any;
   total?: number;
   heading?: string;
   headerCell?: Snippet<[{ title: any }]>;
   snippets?: { 'cell-total'?: Snippet<[{ value: any }]>; [key: `cell-${string}`]: Snippet<[{ row: any; value: any }]>; } & Record<string, any>;
-  [key: string]: unknown;
 }
 
 let __defaultColumns = (() => [])();

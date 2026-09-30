@@ -3,7 +3,7 @@ import { applyListeners, rozieAttr } from '@rozie/runtime-svelte';
 
 import { onMount } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'value' | 'length' | 'type' | 'mask' | 'autoFocus' | 'disabled' | 'placeholder' | 'ariaLabel' | 'onchange' | 'oncomplete' | 'children'> {
   /**
    * The assembled one-time code (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so an Otp **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Always a contiguous string of `0..length` characters; Otp writes the new code back on every edit (type, paste, backspace).
    * @example
@@ -40,7 +40,6 @@ interface Props {
   ariaLabel?: (string) | null;
   onchange?: (...args: unknown[]) => void;
   oncomplete?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let {

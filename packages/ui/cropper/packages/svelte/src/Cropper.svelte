@@ -3,7 +3,7 @@ import { applyListeners } from '@rozie/runtime-svelte';
 
 import { onMount, untrack } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'src' | 'data' | 'aspectRatio' | 'viewMode' | 'dragMode' | 'disabled' | 'guides' | 'center' | 'background' | 'movable' | 'rotatable' | 'scalable' | 'zoomable' | 'zoomOnWheel' | 'cropBoxMovable' | 'cropBoxResizable' | 'autoCrop' | 'autoCropArea' | 'responsive' | 'preview' | 'options' | 'onready' | 'oncropstart' | 'oncropmove' | 'oncropend' | 'oncrop' | 'onzoom' | 'children'> {
   /**
    * The image URL the cropper attaches to. Bound onto the `<img>` and reconciled at runtime — changing it calls the engine `replace(url)`.
    * @example
@@ -96,7 +96,6 @@ interface Props {
   oncropend?: (...args: unknown[]) => void;
   oncrop?: (...args: unknown[]) => void;
   onzoom?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultOptions = (() => ({}))();

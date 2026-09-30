@@ -4,7 +4,7 @@ import { applyListeners, rozieAttr } from '@rozie/runtime-svelte';
 import type { Snippet } from 'svelte';
 import { onMount, untrack } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'open' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'reference' | 'anchor' | 'children' | 'snippets' | 'onchange'> {
   /**
    * Whether the floating content is open. The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Popover writes the new state back whenever the trigger or a dismissal toggles it. Left unbound it falls back to an uncontrolled default.
    */
@@ -73,7 +73,6 @@ interface Props {
   children?: Snippet;
   snippets?: Record<string, any>;
   onchange?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let {

@@ -3,12 +3,11 @@ import { applyListeners } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'show' | 'title' | 'children' | 'snippets'> {
   show?: boolean;
   title?: string;
   children?: Snippet<[{ title: any }]>;
   snippets?: Record<string, any>;
-  [key: string]: unknown;
 }
 
 let {

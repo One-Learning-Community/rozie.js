@@ -3,7 +3,7 @@ import { applyListeners, rozieAttr, rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['nav'], 'modelValue' | 'totalPages' | 'total' | 'pageSize' | 'siblingCount' | 'boundaryCount' | 'disabled' | 'ariaLabel' | 'prevControl' | 'ellipsis' | 'item' | 'nextControl' | 'snippets' | 'onchange' | 'children'> {
   /**
    * The 1-based current page (two-way model). Clamped into `[1, totalPages]`. Bind it with `r-model:modelValue` / `v-model:modelValue` / `modelValue` + `onModelValueChange`; it is also the Angular ControlValueAccessor control value.
    */
@@ -42,7 +42,6 @@ interface Props {
   nextControl?: Snippet<[{ disabled: any; goto: any; page: any }]>;
   snippets?: Record<string, any>;
   onchange?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let {

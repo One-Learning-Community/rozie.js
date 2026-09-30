@@ -1,7 +1,7 @@
 <script lang="ts">
 import { applyListeners } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'label' | 'count' | 'children'> {
   /**
    * The visible text label for the control.
    * @deprecated Use `text` instead — `label` is retained only for back-compat.
@@ -10,7 +10,6 @@ interface Props {
    */
   label?: string;
   count?: number;
-  [key: string]: unknown;
 }
 
 let {

@@ -449,9 +449,10 @@ describe('Svelte r-keynav emitter — multi-root, grid, page, explicit index (Pl
         "import { applyListeners, keynav, rozieDisplay } from '@rozie/runtime-svelte';\n\n" +
         'let __rozieKeynavRootRef = $state<HTMLElement | undefined>(undefined);\n\n' +
         'const __rozieKeynavGroupId = `keynav-${Math.random().toString(36).slice(2)}`;\n\n' +
-        'interface Props {\n' +
+        // Typed public surface phase 3 — single-<div>-root, attr-inheriting:
+        // Props extends the div's attrs instead of an index signature.
+        "interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'items' | 'children'> {\n" +
         '  items?: any[];\n' +
-        '  [key: string]: unknown;\n' +
         '}\n\n' +
         'let __defaultItems = (() => [])();\n\n' +
         'let { items = __defaultItems, ...__rozieAttrs }: Props = $props();\n\n' +

@@ -3,7 +3,7 @@ import { applyListeners, rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runt
 
 import type { Snippet } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'value' | 'range' | 'min' | 'max' | 'step' | 'orientation' | 'disabled' | 'marks' | 'ariaLabel' | 'pageStep' | 'formatValue' | 'showValue' | 'mark' | 'bubble' | 'snippets' | 'onchange' | 'children'> {
   /**
    * The current value (two-way `r-model`). A scalar number in single mode; a sorted `[lo, hi]` array in `range` mode, with each thumb neighbour-clamped so the pair stays sorted on every commit. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Slider **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).
    * @example
@@ -58,7 +58,6 @@ interface Props {
   bubble?: Snippet<[{ value: any }]>;
   snippets?: Record<string, any>;
   onchange?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultMarks = (() => [])();

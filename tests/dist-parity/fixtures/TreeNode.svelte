@@ -2,9 +2,8 @@
 import TreeNode from './TreeNode.svelte';
 import { applyListeners, rozieAttr, rozieDisplay } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'node' | 'children'> {
   node?: any;
-  [key: string]: unknown;
 }
 
 let __defaultNode = (() => ({

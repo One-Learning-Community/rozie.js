@@ -3,7 +3,7 @@ import { applyListeners, rozieAttr, rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'modelValue' | 'delimiters' | 'allowDuplicates' | 'max' | 'disabled' | 'readonly' | 'validate' | 'placeholder' | 'ariaLabel' | 'tag' | 'snippets' | 'onchange' | 'onadd' | 'onremove' | 'children'> {
   /**
    * The committed tokens — `model: true`, so a commit/remove/paste writes a **fresh** array back through `r-model:modelValue` (uncontrolled fallback `[]`). Because it is the sole model prop, the Angular output is a `ControlValueAccessor` (`[formControl]` / `[(ngModel)]` bind directly).
    * @example
@@ -49,7 +49,6 @@ interface Props {
   onchange?: (...args: unknown[]) => void;
   onadd?: (...args: unknown[]) => void;
   onremove?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultDelimiters = (() => [',', 'Enter'])();

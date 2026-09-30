@@ -3,13 +3,12 @@ import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'row' | 'total' | 'cellKey' | 'freeSlotName' | 'snippets' | 'children'> {
   row?: any;
   total?: number;
   cellKey?: string;
   freeSlotName?: string;
   snippets?: { 'cell-total'?: Snippet<[{ value: any }]>; [key: `cell-${string}`]: Snippet<[{ row: any; value: any }]>; [key: `row-${string}`]: Snippet; } & Record<string, any>;
-  [key: string]: unknown;
 }
 
 let __defaultRow = (() => ({}))();

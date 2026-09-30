@@ -3,10 +3,9 @@ import { applyListeners } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'rows' | 'snippets' | 'children'> {
   rows?: any[];
   snippets?: Record<string, any>;
-  [key: string]: unknown;
 }
 
 let __defaultRows = (() => [])();

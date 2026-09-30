@@ -1,9 +1,8 @@
 <script lang="ts">
 import { applyListeners } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'combobox' | 'children'> {
   combobox?: boolean;
-  [key: string]: unknown;
 }
 
 let { combobox = false, ...__rozieAttrs }: Props = $props();

@@ -3,7 +3,7 @@ import { applyListeners } from '@rozie/runtime-svelte';
 
 import { onMount, untrack } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'src' | 'peaks' | 'duration' | 'height' | 'waveColor' | 'progressColor' | 'cursorColor' | 'cursorWidth' | 'barWidth' | 'barGap' | 'barRadius' | 'minPxPerSec' | 'volume' | 'playbackRate' | 'autoplay' | 'normalizeAmplitude' | 'hideScrollbar' | 'disableInteraction' | 'disableDragToSeek' | 'timeline' | 'hover' | 'hoverColor' | 'regions' | 'dragToCreateRegions' | 'regionColor' | 'options' | 'currentTime' | 'onregioncreated' | 'onregionupdated' | 'onregionremoved' | 'onregionclicked' | 'onregionin' | 'onregionout' | 'onready' | 'onplaying' | 'onpaused' | 'onfinished' | 'ontimeupdate' | 'onseeking' | 'oninteraction' | 'onloading' | 'onerror' | 'children'> {
   /**
    * The audio URL the waveform loads. Bound at construction and reconciled at runtime — changing it calls the engine `load(url)`.
    * @example
@@ -129,7 +129,6 @@ interface Props {
   oninteraction?: (...args: unknown[]) => void;
   onloading?: (...args: unknown[]) => void;
   onerror?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultOptions = (() => ({}))();

@@ -4,7 +4,7 @@ import { applyListeners } from '@rozie/runtime-svelte';
 import type { Snippet } from 'svelte';
 import { onMount, setContext } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'nodes' | 'namespace' | 'ariaLabel' | 'theme' | 'children' | 'snippets'> {
   /**
    * Extra Lexical node classes to register at editor creation. Lexical requires every node class to be declared up front, so consumer node extensions are passed here and composed after the built-in RichText/List/Link + `@mention` `MentionNode` set (the reference DecoratorNode is registered by the shell itself; these consumer nodes are composed last so they win).
    */
@@ -23,7 +23,6 @@ interface Props {
   theme?: any;
   children?: Snippet;
   snippets?: Record<string, any>;
-  [key: string]: unknown;
 }
 
 let __defaultNodes = (() => [])();

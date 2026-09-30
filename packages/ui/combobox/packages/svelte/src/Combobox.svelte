@@ -5,7 +5,7 @@ import { applyListeners, rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runt
 import type { Snippet } from 'svelte';
 import { onDestroy, onMount, untrack } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'value' | 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'multiple' | 'creatable' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'chip' | 'option' | 'empty' | 'create' | 'groupHeading' | 'groupMore' | 'snippets' | 'oncreate' | 'onchange' | 'onsearch' | 'children'> {
   /**
    * The selected option's value (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a combobox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `null` when nothing is selected.
    * @example
@@ -110,7 +110,6 @@ interface Props {
   oncreate?: (...args: unknown[]) => void;
   onchange?: (...args: unknown[]) => void;
   onsearch?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultOptions = (() => [])();

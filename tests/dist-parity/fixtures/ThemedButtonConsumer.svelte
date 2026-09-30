@@ -5,9 +5,7 @@ import ThemedButtonListenersManual from './ThemedButtonListenersManual.svelte';
 import ThemedButtonAllManual from './ThemedButtonAllManual.svelte';
 import { applyListeners } from '@rozie/runtime-svelte';
 
-interface Props {
-  [key: string]: unknown;
-}
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'children'> {}
 
 let { ...__rozieAttrs }: Props = $props();
 

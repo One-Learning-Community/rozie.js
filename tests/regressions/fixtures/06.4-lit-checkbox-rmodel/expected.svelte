@@ -1,9 +1,8 @@
 <script lang="ts">
 import { applyListeners } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['label'], 'checked' | 'children'> {
   checked?: boolean;
-  [key: string]: unknown;
 }
 
 let { checked = $bindable(false), ...__rozieAttrs }: Props = $props();

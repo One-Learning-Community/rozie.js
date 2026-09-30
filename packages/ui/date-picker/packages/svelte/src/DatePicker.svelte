@@ -16,7 +16,7 @@ const __rozieKeynavGroupId2 = `keynav-${Math.random().toString(36).slice(2)}`;
 import type { Snippet } from 'svelte';
 import { onMount } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'value' | 'selectionMode' | 'min' | 'max' | 'disabledDates' | 'weekStartsOn' | 'disabled' | 'locale' | 'labels' | 'presetRanges' | 'monthYearNav' | 'numberOfMonths' | 'showFooter' | 'disabledDaysOfWeek' | 'isDateDisabled' | 'header' | 'footer' | 'presets' | 'snippets' | 'onchange' | 'onrangecomplete' | 'children'> {
   /**
    * The selected value (two-way `r-model`). **Polymorphic** on `selectionMode`: in `single` mode an ISO `YYYY-MM-DD` string (`""` = nothing selected); in `range` mode a `{ start, end }` object of ISO endpoints (`""` = an unset endpoint). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a DatePicker **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Selecting a day writes the new value back and emits `change`. **Lit caveat (range mode):** the object form must be delivered via a *property* binding (`.value=${obj}` / `r-model`), never a string `value="..."` attribute — the same rule already in force for `disabledDates`.
    * @example
@@ -87,7 +87,6 @@ interface Props {
   snippets?: Record<string, any>;
   onchange?: (...args: unknown[]) => void;
   onrangecomplete?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultDisabledDates = (() => [])();

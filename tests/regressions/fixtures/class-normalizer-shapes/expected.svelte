@@ -1,11 +1,10 @@
 <script lang="ts">
 import { applyListeners, rozieClass } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'variant' | 'arr' | 'flags' | 'children'> {
   variant?: string;
   arr?: any[];
   flags?: any;
-  [key: string]: unknown;
 }
 
 let __defaultArr = (() => [])();

@@ -1,10 +1,9 @@
 <script lang="ts">
 import { applyListeners, rozieStyle } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 's' | 'obj' | 'children'> {
   s?: string;
   obj?: any;
-  [key: string]: unknown;
 }
 
 let __defaultObj = (() => ({}))();

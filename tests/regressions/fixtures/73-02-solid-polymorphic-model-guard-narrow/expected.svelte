@@ -1,9 +1,8 @@
 <script lang="ts">
 import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'value' | 'children'> {
   value?: string | any;
-  [key: string]: unknown;
 }
 
 let { value = $bindable(''), ...__rozieAttrs }: Props = $props();

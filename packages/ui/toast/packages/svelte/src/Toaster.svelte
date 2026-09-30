@@ -4,7 +4,7 @@ import { applyListeners, rozieAttr, rozieClass, rozieDisplay, rozieStyle } from 
 import type { Snippet } from 'svelte';
 import { onDestroy } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe' | 'stacked' | 'toast' | 'snippets' | 'ondismissed' | 'children'> {
   /**
    * Which corner the toast stack renders in: `'top-left'`, `'top-right'`, `'top-center'`, `'bottom-left'`, `'bottom-right'`, or `'bottom-center'`. Drives the fixed-position layout and the stack direction.
    */
@@ -36,7 +36,6 @@ interface Props {
   toast?: Snippet<[{ toast: any; dismiss: any }]>;
   snippets?: Record<string, any>;
   ondismissed?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let {

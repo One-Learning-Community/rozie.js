@@ -1,9 +1,8 @@
 <script lang="ts">
 import { applyListeners } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'closeOnBackdrop' | 'children'> {
   closeOnBackdrop?: boolean;
-  [key: string]: unknown;
 }
 
 let { closeOnBackdrop = true, ...__rozieAttrs }: Props = $props();

@@ -1,10 +1,9 @@
 <script lang="ts">
 import { applyListeners } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['header'], 'title' | 'onClose' | 'children'> {
   title?: string;
   onClose?: ((...args: any[]) => any) | null;
-  [key: string]: unknown;
 }
 
 let {

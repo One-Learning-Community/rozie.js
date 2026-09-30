@@ -1,12 +1,11 @@
 import { onMount } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'placeholder' | 'minLength' | 'autofocus' | 'onsearch' | 'onclear' | 'children'> {
   placeholder?: string;
   minLength?: number;
   autofocus?: boolean;
   onsearch?: (...args: unknown[]) => void;
   onclear?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let {

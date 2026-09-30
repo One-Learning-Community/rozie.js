@@ -4,7 +4,7 @@ import { applyListeners, rozieAttr, rozieClass, rozieStyle } from '@rozie/runtim
 import type { Snippet } from 'svelte';
 import { onMount, untrack } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'items' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'itemStyle' | 'header' | 'children' | 'footer' | 'snippets' | 'onchange' | 'onadd' | 'onremove' | 'onstart' | 'onend'> {
   /**
    * The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.
    * @example
@@ -96,7 +96,6 @@ interface Props {
   onremove?: (...args: unknown[]) => void;
   onstart?: (...args: unknown[]) => void;
   onend?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultOptions = (() => ({}))();

@@ -3,7 +3,7 @@ import { applyListeners } from '@rozie/runtime-svelte';
 
 import { onMount } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'sitekey' | 'action' | 'token' | 'executeOnMount' | 'onerror' | 'onverify' | 'children'> {
   /**
    * Required. The public reCAPTCHA v3 site key from your Google admin console.
    */
@@ -24,7 +24,6 @@ interface Props {
   executeOnMount?: boolean;
   onerror?: (...args: unknown[]) => void;
   onverify?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let {

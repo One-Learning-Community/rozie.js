@@ -3,7 +3,7 @@ import { applyListeners } from '@rozie/runtime-svelte';
 
 import { onMount } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'provider' | 'sitekey' | 'token' | 'theme' | 'size' | 'tabindex' | 'options' | 'onverify' | 'onexpire' | 'onerror' | 'children'> {
   /**
    * Which widget to render: `recaptcha` (Google reCAPTCHA v2), `hcaptcha`, `turnstile` (Cloudflare), or `friendly` (Friendly Captcha). The first three share a near-identical explicit-render API; Friendly Captcha rides an internal `adapt()` bridge onto the same surface. Construction-time — re-key the component to switch it live.
    */
@@ -37,7 +37,6 @@ interface Props {
   onverify?: (...args: unknown[]) => void;
   onexpire?: (...args: unknown[]) => void;
   onerror?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultOptions = (() => ({}))();

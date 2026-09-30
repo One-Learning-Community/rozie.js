@@ -3,9 +3,8 @@ import Modal from './Modal.svelte';
 import WrapperModal from './WrapperModal.svelte';
 import { applyListeners } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'title' | 'children'> {
   title?: string;
-  [key: string]: unknown;
 }
 
 let { title = 'Confirm', ...__rozieAttrs }: Props = $props();

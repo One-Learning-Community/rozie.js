@@ -2,9 +2,7 @@
 import DynamicSlots from './DynamicSlots.svelte';
 import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
-interface Props {
-  [key: string]: unknown;
-}
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'children'> {}
 
 let { ...__rozieAttrs }: Props = $props();
 

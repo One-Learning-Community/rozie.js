@@ -14,14 +14,13 @@ const throttledLReposition = (() => {
 import type { Snippet } from 'svelte';
 import { onMount, untrack } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'open' | 'closeOnOutsideClick' | 'closeOnEscape' | 'trigger' | 'children' | 'snippets'> {
   open?: boolean;
   closeOnOutsideClick?: boolean;
   closeOnEscape?: boolean;
   trigger?: Snippet<[{ open: any; toggle: any }]>;
   children?: Snippet<[{ close: any }]>;
   snippets?: Record<string, any>;
-  [key: string]: unknown;
 }
 
 let {

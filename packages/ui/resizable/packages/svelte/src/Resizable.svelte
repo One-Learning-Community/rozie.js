@@ -3,7 +3,7 @@ import { applyListeners, rozieAttr, rozieStyle } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'size' | 'direction' | 'min' | 'max' | 'disabled' | 'ariaLabel' | 'start' | 'handle' | 'end' | 'snippets' | 'onresize' | 'children'> {
   /**
    * The first (`start`) panel's size as a percent of the container along the split axis (its width when `direction="horizontal"`, its height when `"vertical"`). Two-way via `r-model:size`. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so the splitter position **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Every commit (drag, keyboard, or a programmatic `applySize`) is clamped to `[min, max]` and written back.
    * @example
@@ -35,7 +35,6 @@ interface Props {
   end?: Snippet;
   snippets?: Record<string, any>;
   onresize?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let {

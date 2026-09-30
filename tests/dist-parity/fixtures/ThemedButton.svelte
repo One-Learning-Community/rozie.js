@@ -1,10 +1,9 @@
 <script lang="ts">
 import { applyListeners } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['button'], 'label' | 'variant' | 'children'> {
   label?: string;
   variant?: string;
-  [key: string]: unknown;
 }
 
 let {

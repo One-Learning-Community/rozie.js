@@ -103,7 +103,10 @@ describe('emitScript — behavior (Plan 05-02a Task 1)', () => {
 
   it('Test 8: Counter Props interface includes value, step, min, max fields', () => {
     const { scriptBlock } = emitScript(lowerExample('Counter'));
-    expect(scriptBlock).toContain('interface Props {');
+    // Typed public surface phase 3 — Counter is single-<div>-root, attr-inheriting.
+    expect(scriptBlock).toContain(
+      "interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], ",
+    );
     expect(scriptBlock).toMatch(/value\?: number;/);
     expect(scriptBlock).toMatch(/step\?: number;/);
     expect(scriptBlock).toMatch(/min\?: number;/);

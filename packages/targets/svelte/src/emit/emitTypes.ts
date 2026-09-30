@@ -87,6 +87,9 @@ export function emitSvelteTypes(ir: IRComponent, opts: EmitSvelteTypesOptions = 
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'Snippet',
       target: 'svelte',
+      // Typed public surface phase 3 — mirror the inline Props interface's
+      // `extends Omit<SvelteHTMLElements[tag], …>` in the public sidecar.
+      htmlAttrs: 'svelte',
     }),
   );
   lines.push('');

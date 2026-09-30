@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { mergeProps, splitProps } from 'solid-js';
 import { rozieDisplay } from '@rozie/runtime-solid';
 
-interface DynamicSlotsProps {
+interface DynamicSlotsProps extends Omit<import('solid-js').ComponentProps<'div'>, 'row' | 'total' | 'cellKey' | 'freeSlotName' | 'slots' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
   row?: Record<string, any>;
   total?: number;
   cellKey?: string;

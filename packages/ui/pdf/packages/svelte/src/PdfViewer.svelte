@@ -3,7 +3,7 @@ import { applyListeners } from '@rozie/runtime-svelte';
 
 import { onMount, untrack } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'src' | 'page' | 'scale' | 'rotation' | 'workerSrc' | 'standardFontDataUrl' | 'renderAllPages' | 'textLayer' | 'password' | 'query' | 'autoFit' | 'options' | 'onpagerendered' | 'onerror' | 'onpagesrendered' | 'onpasswordrequest' | 'onprogress' | 'onload' | 'onpagechange' | 'onfindresult' | 'children'> {
   /**
    * The PDF source — a URL string, a `data:` base64 URL, or binary data (`ArrayBuffer` / `Uint8Array`). Changing it tears down the previous document (via its loading task) and loads the new one; `undefined` renders an empty viewer.
    * @example
@@ -62,7 +62,6 @@ interface Props {
   onload?: (...args: unknown[]) => void;
   onpagechange?: (...args: unknown[]) => void;
   onfindresult?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultOptions = (() => ({}))();

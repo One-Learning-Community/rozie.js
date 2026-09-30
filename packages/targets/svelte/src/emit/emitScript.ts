@@ -41,7 +41,7 @@ import type {
   PropDecl,
   PropTypeAnnotation,
 } from '@rozie/core';
-import { buildPropJsdoc } from '@rozie/core';
+import { buildPropJsdoc, renderHtmlAttrsExtends, resolveAttrsFallthroughRoot } from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { isMutableLiteralFactoryDefault } from '../../../../core/src/codegen/propDefaultFactory.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
@@ -715,7 +715,18 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   // via the gate-widen at `buildPropsDestructureEntries`; that destructure
   // needs a matching `Record<string,unknown>` slot on the Props interface or
   // svelte-check fails the rest pattern.
-  if (ir.inheritAttrs !== false || templateUsesSpreadBinding(ir.template)) {
+  //
+  // Typed public surface phase 3 (spec §5) — when attribute auto-fallthrough
+  // fires onto a single html root, the Props interface instead EXTENDS that
+  // root's `svelte/elements` attributes (see `emitPropsBlock`), which also
+  // types the `...__rozieAttrs` rest bucket. The permissive index signature
+  // remains only for inheriting components whose attrs do NOT auto-land on a
+  // single html root (component root, r-if root) and for the explicit-manual
+  // `r-bind="$attrs"` case.
+  if (
+    (ir.inheritAttrs !== false || templateUsesSpreadBinding(ir.template)) &&
+    resolveAttrsFallthroughRoot(ir.template, ir.inheritAttrs) === null
+  ) {
     lines.push('  [key: string]: unknown;');
   }
 
@@ -992,7 +1003,16 @@ function emitPropsBlock(ir: IRComponent): string {
   // so the destructure can reference the cached name.
   const factoryDefaultPrelude = buildPropsFactoryDefaultPrelude(ir);
 
-  const interfaceBlock = `interface Props {\n${fields.join('\n')}\n}`;
+  // Typed public surface phase 3 (spec §5) — `extends Omit<SvelteHTMLElements[tag], …>`
+  // when attribute auto-fallthrough fires; '' ⇒ byte-identical.
+  // A fields-less Props (zero own props/slots/emits — possible only now that
+  // the fallthrough index signature can be replaced by the extends clause)
+  // renders `{}` like the React/Solid emitters, not an empty line.
+  const htmlAttrsExtends = renderHtmlAttrsExtends(ir, 'svelte', fields);
+  const interfaceBlock =
+    fields.length === 0
+      ? `interface Props${htmlAttrsExtends} {}`
+      : `interface Props${htmlAttrsExtends} {\n${fields.join('\n')}\n}`;
 
   // Multi-line destructure for readability when more than 2 entries.
   // Plan 14-05 — when the last entry is the `...__rozieAttrs` rest pattern,

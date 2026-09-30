@@ -3,7 +3,7 @@ import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'items' | 'title' | 'header' | 'children' | 'empty' | 'snippets' | 'onadd' | 'ontoggle' | 'onremove'> {
   items?: any[];
   title?: string;
   header?: Snippet<[{ remaining: any; total: any }]>;
@@ -13,7 +13,6 @@ interface Props {
   onadd?: (...args: unknown[]) => void;
   ontoggle?: (...args: unknown[]) => void;
   onremove?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let {

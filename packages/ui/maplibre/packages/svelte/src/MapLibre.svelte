@@ -7,7 +7,7 @@ import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';
 import PortalHostReactive from '@rozie/runtime-svelte/PortalHostReactive.svelte';
 import { onMount, setContext, untrack } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'center' | 'zoom' | 'bearing' | 'pitch' | 'mapStyle' | 'minZoom' | 'maxZoom' | 'maxBounds' | 'bounds' | 'fitBoundsOptions' | 'dragPan' | 'dragRotate' | 'scrollZoom' | 'doubleClickZoom' | 'boxZoom' | 'keyboard' | 'touchZoomRotate' | 'touchPitch' | 'markers' | 'popups' | 'sources' | 'layers' | 'interactiveLayerIds' | 'controls' | 'options' | 'children' | 'marker' | 'popup' | 'control' | 'snippets' | 'onmouseenter' | 'onmouseleave' | 'onload' | 'onidle' | 'onmove' | 'onrotate' | 'ondragstart' | 'ondrag' | 'ondragend' | 'onclick' | 'ondblclick' | 'oncontextmenu' | 'onmousemove' | 'onerror' | 'onstyledata' | 'onsourcedata' | 'onmoveend' | 'onzoomend' | 'onrotateend' | 'onpitchend'> {
   /**
    * The map center as `[lng, lat]` — **longitude first** (MapLibre's convention, not Leaflet's `[lat, lng]`). Two-way: panning the map writes the new center back through the model path (echo-guarded), and a consumer write `easeTo`s the live map. The `moveend` echo reads `getCenter()` as `[lng, lat]`.
    * @example
@@ -135,7 +135,6 @@ interface Props {
   onzoomend?: (...args: unknown[]) => void;
   onrotateend?: (...args: unknown[]) => void;
   onpitchend?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultFitBoundsOptions = (() => ({}))();

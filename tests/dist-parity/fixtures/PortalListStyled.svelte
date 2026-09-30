@@ -6,11 +6,10 @@ import { mount, unmount } from 'svelte';
 import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';
 import { onMount } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'items' | 'item' | 'snippets' | 'children'> {
   items?: any[];
   item?: Snippet<[{ item: any }]>;
   snippets?: Record<string, any>;
-  [key: string]: unknown;
 }
 
 let __defaultItems = (() => [])();

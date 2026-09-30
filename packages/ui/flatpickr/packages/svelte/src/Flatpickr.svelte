@@ -3,7 +3,7 @@ import { applyListeners } from '@rozie/runtime-svelte';
 
 import { onMount, untrack } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['input'], 'date' | 'mode' | 'dateFormat' | 'altInput' | 'altFormat' | 'enableTime' | 'enableSeconds' | 'time24hr' | 'noCalendar' | 'minDate' | 'maxDate' | 'placeholder' | 'disabled' | 'commitOn' | 'options' | 'name' | 'inline' | 'staticPosition' | 'position' | 'appendTo' | 'showMonths' | 'weekNumbers' | 'monthSelectorType' | 'prevArrow' | 'nextArrow' | 'allowInput' | 'disable' | 'enable' | 'locale' | 'firstDayOfWeek' | 'parseDate' | 'formatDate' | 'plugins' | 'onchange' | 'onready' | 'onopen' | 'onclose' | 'onmonthchange' | 'onyearchange' | 'onvalueupdate' | 'ondaycreate' | 'children'> {
   /**
    * The two-way value (`r-model:date`) — the **formatted string** flatpickr produces, not a `Date`. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Consumers that need the parsed `Date[]` read them off the `change` event payload instead.
    * @example
@@ -146,7 +146,6 @@ interface Props {
   onyearchange?: (...args: unknown[]) => void;
   onvalueupdate?: (...args: unknown[]) => void;
   ondaycreate?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultOptions = (() => ({}))();

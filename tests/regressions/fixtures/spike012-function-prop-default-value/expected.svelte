@@ -1,9 +1,8 @@
 <script lang="ts">
 import { applyListeners } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'onPick' | 'children'> {
   onPick?: (...args: any[]) => any;
-  [key: string]: unknown;
 }
 
 let { onPick = () => {}, ...__rozieAttrs }: Props = $props();

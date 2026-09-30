@@ -3,7 +3,7 @@ import { applyListeners, rozieAttr } from '@rozie/runtime-svelte';
 
 import { onMount } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'modelValue' | 'min' | 'max' | 'step' | 'largeStep' | 'formatOptions' | 'allowScrub' | 'disabled' | 'readonly' | 'ariaLabel' | 'onchange' | 'children'> {
   /**
    * The numeric value of the field (two-way `r-model`). `null` means the field is empty. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a number field **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). The value is clamped to `[min, max]` and snapped to `step` on every commit.
    * @example
@@ -49,7 +49,6 @@ interface Props {
    */
   ariaLabel?: (string) | null;
   onchange?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultFormatOptions = (() => ({}))();

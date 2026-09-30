@@ -3,9 +3,8 @@ import { applyListeners } from '@rozie/runtime-svelte';
 
 import { onMount } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'label' | 'children'> {
   label?: string;
-  [key: string]: unknown;
 }
 
 let { label = '', ...__rozieAttrs }: Props = $props();

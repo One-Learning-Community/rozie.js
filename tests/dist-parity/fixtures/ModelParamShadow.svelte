@@ -1,10 +1,9 @@
 <script lang="ts">
 import { applyListeners } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'token' | 'onverify' | 'children'> {
   token?: string;
   onverify?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let {

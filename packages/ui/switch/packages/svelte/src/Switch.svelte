@@ -3,7 +3,7 @@ import { applyListeners, rozieAttr } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['button'], 'modelValue' | 'disabled' | 'readonly' | 'ariaLabel' | 'children' | 'snippets' | 'onchange'> {
   /**
    * The on/off state of the switch (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a switch **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `true` is the checked/on state; reflected as `aria-checked`.
    * @example
@@ -25,7 +25,6 @@ interface Props {
   children?: Snippet<[{ checked: any; toggle: any }]>;
   snippets?: Record<string, any>;
   onchange?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let {

@@ -6,7 +6,7 @@ import { mount, unmount } from 'svelte';
 import PortalHostReactive from '@rozie/runtime-svelte/PortalHostReactive.svelte';
 import { onMount, setContext, untrack } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'graph' | 'validateTypes' | 'zoom' | 'pannable' | 'zoomable' | 'selectable' | 'readonly' | 'minZoom' | 'maxZoom' | 'snapGrid' | 'accumulateOnCtrl' | 'curvature' | 'fitOnMount' | 'controls' | 'minimap' | 'background' | 'canConnect' | 'history' | 'mode' | 'marquee' | 'nodeToolbar' | 'node' | 'toolbar' | 'children' | 'snippets' | 'onedgeclick' | 'onedgeselected' | 'onselectionchange' | 'onconnectend' | 'onnodeaction' | 'onconnectionrejected' | 'onconnectioncreated' | 'onconnectionremoved' | 'onnodepicked' | 'onnodemoved' | 'ontranslated' | 'oncontextmenu'> {
   /**
    * The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data?, width?, height? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, type?, label?, stroke?, dashed?, waypoints? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope; `width`/`height` are the explicit fixed box a `<NodeType resizable>` corner-drag persists (absent = auto-sized, and double-clicking a resize handle clears them back to auto). A connection's `type` is its path shape — `bezier` (default), `step`, `smoothstep`, or `straight`. A connection's optional `waypoints` (`{x,y}[]`) is the route the `autoArrange()` verb writes for an edge it routed around an intermediate node (see Auto-layout) — additive and optional; an edge without one renders exactly as before. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.
    * @example
@@ -109,7 +109,6 @@ interface Props {
   onnodemoved?: (...args: unknown[]) => void;
   ontranslated?: (...args: unknown[]) => void;
   oncontextmenu?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let {

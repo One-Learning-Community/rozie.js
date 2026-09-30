@@ -4,7 +4,7 @@ import { applyListeners, rozieAttr, rozieDisplay } from '@rozie/runtime-svelte';
 import type { Snippet } from 'svelte';
 import { onMount, untrack } from 'svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'slides' | 'loop' | 'align' | 'axis' | 'slidesToScroll' | 'dragFree' | 'draggable' | 'containScroll' | 'startIndex' | 'skipSnaps' | 'duration' | 'direction' | 'autoplay' | 'autoplayDelay' | 'dots' | 'arrows' | 'thumbnails' | 'plugins' | 'options' | 'selectedIndex' | 'slide' | 'children' | 'thumb' | 'snippets' | 'onselect' | 'onsettle' | 'onreinit' | 'onpointerdown'> {
   /**
    * Slide data for config-array mode (mode a): Rozie renders one `.rozie-embla__slide` per item, optionally via the scoped `slide` slot for custom markup. Optional — leave it unset and use the default slot (mode b) to drop slide DOM directly.
    * @example
@@ -97,7 +97,6 @@ interface Props {
   onsettle?: (...args: unknown[]) => void;
   onreinit?: (...args: unknown[]) => void;
   onpointerdown?: (...args: unknown[]) => void;
-  [key: string]: unknown;
 }
 
 let __defaultSlides = (() => [])();

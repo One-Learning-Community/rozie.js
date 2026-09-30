@@ -1,10 +1,9 @@
 <script lang="ts">
 import { applyListeners } from '@rozie/runtime-svelte';
 
-interface Props {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'onSave' | 'onCancel' | 'children'> {
   onSave?: (...args: any[]) => any;
   onCancel?: ((...args: any[]) => any) | null;
-  [key: string]: unknown;
 }
 
 let {
