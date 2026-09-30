@@ -4,8 +4,8 @@ export interface SearchInputProps extends Omit<import('react').ComponentPropsWit
   placeholder?: string;
   minLength?: number;
   autofocus?: boolean;
-  onSearch?: (...args: unknown[]) => void;
-  onClear?: (...args: unknown[]) => void;
+  onSearch?: (...args: any[]) => void;
+  onClear?: (...args: any[]) => void;
 }
 
 declare function SearchInput(props: SearchInputProps): JSX.Element;

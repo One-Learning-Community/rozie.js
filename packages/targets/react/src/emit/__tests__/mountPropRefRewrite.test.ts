@@ -110,7 +110,6 @@ describe('emitScript (React) — $onMount-scoped prop reads must go through sync
   // `$onUpdate` hook and must stay untouched.
   const SRC = `<rozie name="Test" inherit-attrs="false">
 <props>{ pannable: { type: Boolean, default: true }, gain: { type: Number, default: 1 }, live: { type: Boolean, default: false } }</props>
-<emits>{ ping: null }</emits>
 <data>{ handler: null }</data>
 <script>
 $onMount(() => {
@@ -233,7 +232,6 @@ $watch(() => $props.gain, (v) => { note(v); });
   // `filteredSetupDeps` needs no new disjunct — unlike swj's and w7b's seams.
   const SRC_EMIT_PHASE = `<rozie name="Test" inherit-attrs="false">
 <props>{ live: { type: Boolean, default: false } }</props>
-<emits>{ ping: null, tick: null }</emits>
 <script>
 $onMount(() => {
   const h = () => { $emit('ping'); };

@@ -8,7 +8,7 @@ export interface ModalProps {
   closeOnBackdrop?: boolean;
   lockBodyScroll?: boolean;
   title?: string;
-  onClose?: (...args: unknown[]) => void;
+  onClose?: (...args: any[]) => void;
   renderHeader?: (params: { close: (...args: any[]) => any }) => ReactNode;
   children?: ReactNode | ((params: { close: (...args: any[]) => any }) => ReactNode);
   renderFooter?: (params: { close: (...args: any[]) => any }) => ReactNode;

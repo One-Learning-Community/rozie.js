@@ -5,9 +5,9 @@ export interface TodoListProps extends Omit<import('react').ComponentPropsWithou
   defaultItems?: unknown[];
   onItemsChange?: (next: unknown[]) => void;
   title?: string;
-  onAdd?: (...args: unknown[]) => void;
-  onToggle?: (...args: unknown[]) => void;
-  onRemove?: (...args: unknown[]) => void;
+  onAdd?: (...args: any[]) => void;
+  onToggle?: (...args: any[]) => void;
+  onRemove?: (...args: any[]) => void;
   renderHeader?: (params: { remaining: unknown; total: unknown }) => ReactNode;
   children?: ReactNode | ((params: { item: unknown; toggle: unknown; remove: unknown }) => ReactNode);
   renderEmpty?: () => ReactNode;
