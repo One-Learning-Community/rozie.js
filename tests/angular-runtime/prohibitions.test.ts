@@ -104,7 +104,22 @@ function readExample(name: string): string {
 
 /**
  * The byte-identity baseline for every tracked Angular fixture (prohibition
- * 4b). Advanced by Quick task 260829-cd4 to
+ * 4b). Advanced by Quick task 260929-lyc to
+ * `f22b0ee4686994a061ffb0ccec1d915364431159` — quick 260929-mn8's commit, which
+ * re-blessed the Dropdown/Modal dist-parity fixtures for the deliberate
+ * `<listeners>` handler-shape parity fix (method-ref handlers are now invoked
+ * with the DOM event: `this.close();` → `((this.close) as (...args: any[]) =>
+ * any)($event);`). mn8 did not run this suite, so 4b went red against the prior
+ * `7bbca75dd` baseline. The owed prohibition-5 hand-diff for this advance
+ * (performed, not deferred): `git diff --name-only 7bbca75dd f22b0ee46` scoped
+ * to the three globs `listAngularFixtureFiles()` tracks returned exactly
+ * `tests/dist-parity/fixtures/Dropdown.angular.ts` and
+ * `tests/dist-parity/fixtures/Modal.angular.ts`. Those are precisely the two
+ * tracked fixtures (of 132) whose `.rozie` source declares a `<listeners>`
+ * block (examples/SearchInput.rozie only mentions it in a comment). Nothing
+ * that should have changed stayed the same, and nothing else drifted.
+ * Previously advanced by Quick task 260830-j53 to `7bbca75dd`; before that by
+ * Quick task 260829-cd4 to
  * `ba42bc291c7e32fca77cd1f015578b1d84bcda8a` — that quick task's own `pnpm
  * --filter dist-parity bootstrap` re-bless commit, which hoisted the
  * `$portals` closure to component/class scope on react/angular/lit (Task 3's
@@ -130,7 +145,7 @@ function readExample(name: string): string {
 // contain this object, and every gate below then fails with
 // "Command failed: git show …" (134 of 144 tests, one root cause). The
 // angular-matrix workflow sets it explicitly; keep them in sync.
-const BASELINE_COMMIT = '7bbca75dd';
+const BASELINE_COMMIT = 'f22b0ee46';
 
 /** `git show <commit>:<path>` — throws if the path did not exist at that commit. */
 function readAtBaseline(relPath: string): string {
