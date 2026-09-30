@@ -84,6 +84,9 @@ export function emitVueTypes(ir: IRComponent, opts: EmitVueTypesOptions = {}): s
     renderPropsInterface(ir, {
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'unknown',
+      // Slots are not props on vue: the compiled module declares none, so the
+      // sidecar declares no slot fields / `slots` record.
+      slotSurface: { fields: [] },
       target: 'vue',
     }),
   );

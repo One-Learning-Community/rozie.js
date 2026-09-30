@@ -109,6 +109,9 @@ export function emitLitTypes(ir: IRComponent, opts: EmitLitTypesOptions = {}): s
     renderPropsInterface(ir, {
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'unknown',
+      // Slots are not props on lit: the compiled module declares none, so the
+      // sidecar declares no slot fields / `slots` record.
+      slotSurface: { fields: [] },
       target: 'lit',
     }),
   );

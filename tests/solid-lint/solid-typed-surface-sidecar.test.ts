@@ -76,4 +76,38 @@ describe('SOLID-TYPED-SURFACE-SIDECAR — .d.ts consumer sees the typed public s
       rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it('zero-param named slot is a JSX.Element prop, like the compiled module (footSlot)', () => {
+    const src = `<rozie name="FootShape">
+<props>
+{ tone: { type: String, default: 'info' } }
+</props>
+<template>
+  <div><slot name="foot" /></div>
+</template>
+</rozie>
+`;
+    const { ast } = parse(src, { filename: 'FootShape.rozie' });
+    const { ir } = lowerToIR(ast!, { modifierRegistry: createDefaultRegistry() });
+    const dts = emitSolidTypes(ir!);
+    const tsx = `import FootShape from './FootShape';
+export const ok = <FootShape footSlot={<span />} />;
+// @ts-expect-error — footSlot takes no ctx (zero-param slot)
+export const bad = <FootShape footSlot={(c: number) => <span>{c}</span>} />;
+`;
+    const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-solid-foot-sidecar-'));
+    try {
+      writeFileSync(join(tmpDir, 'FootShape.d.ts'), dts, 'utf8');
+      writeFileSync(join(tmpDir, 'Consumer.tsx'), tsx, 'utf8');
+      copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
+      try {
+        execFileSync(resolve(HERE, 'node_modules/.bin/tsc'), ['--noEmit', '-p', 'tsconfig.json'], { cwd: tmpDir, stdio: 'pipe' });
+      } catch (err) {
+        throw new Error('tsc failed:\n' + ((err as { stdout?: Buffer }).stdout?.toString() ?? ''));
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });

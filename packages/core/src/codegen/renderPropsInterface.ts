@@ -103,13 +103,16 @@ export interface RenderPropsInterfaceOptions {
    */
   includeTypesBlock?: boolean;
   /**
-   * Maps a NAMED slot's name to the public prop field that carries it.
-   * Default: `render<Name>` (React). A target whose compiled module names the
-   * slot prop differently (Solid `<name>Slot`, Svelte `<name>`) passes the
-   * SAME function its emitter uses, so the sidecar and the module cannot drift.
-   * The default slot is always `children`.
+   * The target's slot surface as its COMPILED MODULE declares it: the slot
+   * prop field lines (already indented) and, optionally, the dynamic-slot
+   * record line (e.g. Svelte `  snippets?: ...;`). When provided it REPLACES
+   * the generic `render<Name>` fields and `slots?:` record, so the sidecar
+   * and the module are generated from the same function. An empty `fields`
+   * with no `recordLine` means "slots are not props on this target"
+   * (Vue/Angular/Lit): nothing is emitted. Omitted => the shared React-shaped
+   * rendering (byte-identical).
    */
-  slotFieldName?: (slotName: string) => string;
+  slotSurface?: { fields: string[]; recordLine?: string };
 }
 
 /**
@@ -244,7 +247,10 @@ export function renderPropsInterface(
   // no attempt to union/merge param shapes across occurrences, matching the
   // existing, already-shipped per-target precedent exactly.
   const seenSlotFields = new Set<string>();
-  for (const slot of ir.slots) {
+  if (opts.slotSurface !== undefined) {
+    for (const l of opts.slotSurface.fields) lines.push(l);
+  }
+  for (const slot of opts.slotSurface !== undefined ? [] : ir.slots) {
     const isDefault = slot.name === ''; // D-18 default-slot sentinel
     // Task 0 (79-12, R12 escape found during 79-04) — `render${capitalize(name)}`
     // only uppercases the first character; it does NOT split on `-`/`_` the way
@@ -281,7 +287,7 @@ export function renderPropsInterface(
     }
     const renderName = isDefault
       ? 'children'
-      : (opts.slotFieldName ?? ((n: string) => `render${capitalize(n)}`))(slot.name);
+      : `render${capitalize(slot.name)}`;
     if (seenSlotFields.has(renderName)) {
       continue;
     }
@@ -324,7 +330,9 @@ export function renderPropsInterface(
   // Phase 07.3.2 Plan 07 (CR-01 fix) — value type aligned with the no-args
   // invocation form at emitSlotInvocation.ts:302. See the sibling note in
   // emitPropsInterface.ts for the contract rationale.
-  if (ir.slots.length > 0) {
+  if (opts.slotSurface !== undefined) {
+    if (opts.slotSurface.recordLine !== undefined) lines.push(opts.slotSurface.recordLine);
+  } else if (ir.slots.length > 0) {
     // Phase 79 Plan 12 (R6) — a component with at least one dynamic-name
     // slot gets a family-aware `slots?:` type instead of the generic
     // `Record<string, () => X>`; a component with none keeps that exact

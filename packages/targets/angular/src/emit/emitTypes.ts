@@ -130,6 +130,9 @@ export function emitAngularTypes(ir: IRComponent, opts: EmitAngularTypesOptions 
     renderPropsInterface(ir, {
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'unknown',
+      // Slots are not props on angular: the compiled module declares none, so the
+      // sidecar declares no slot fields / `slots` record.
+      slotSurface: { fields: [] },
       target: 'angular',
     }),
   );
