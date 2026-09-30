@@ -1,11 +1,11 @@
 /**
  * SOLID-TYPED-SURFACE-SIDECAR — typed-surface phase 1. The Solid `.d.rozie.ts`
- * sidecar (`emitSolidTypes`) carries typed emit handlers, and the
- * `<types>` names. (Slot params: NOT covered here — the shared sidecar names
- * the slot prop `renderRow` while the compiled module names it `rowSlot`, a
- * pre-existing Solid sidecar/inline mismatch; slot ctx types are proven in
- * tests/strict-conformance.) (The handle is exercised via the compiled-module consumer
- * in tests/strict-conformance: Solid's `ref` is `unknown` on every component.)
+ * sidecar (`emitSolidTypes`) must carry the typed public surface a consumer
+ * sees: typed emit handlers, the `<types>` names, and the typed scoped-slot
+ * prop. The slot prop is named `<slot>Slot` (`rowSlot`), exactly as in the
+ * compiled module (one naming function shared by both emitters).
+ * The handle is exercised via the compiled-module consumer in
+ * tests/strict-conformance: Solid's `ref` is `unknown` on every component.
  */
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
@@ -29,10 +29,16 @@ export const ok = (
     onReset={() => {}}
     onSelect={(v) => v.toFixed()}
     onRowOpen={(r) => r.index.toFixed()}
+    rowSlot={(ctx) => {
+      const c: Count = ctx.count;
+      return <span>{c.toFixed()}{ctx.tone}</span>;
+    }}
   />
 );
 // @ts-expect-error — payload has no 'nope'
 export const bad = <TypedEvents onPing={(p) => p.nope} />;
+// @ts-expect-error — ctx.tone is a string, not a number
+export const badSlot = <TypedEvents rowSlot={(ctx) => { const n: number = ctx.tone; return <span>{n}</span>; }} />;
 // @ts-expect-error — reset has no payload: a handler requiring an argument is rejected
 export const badReset = <TypedEvents onReset={(x: number) => {}} />;
 `;

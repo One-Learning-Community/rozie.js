@@ -41,6 +41,7 @@
  */
 import type { IRComponent } from '@rozie/core';
 import { renderPropsInterface } from '@rozie/core';
+import { slotFieldName } from './emitSlotDecl.js';
 // `synthesizeHandleType` is not yet in the `@rozie/core` barrel — import it
 // relatively as React's emitTypes.ts does.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
@@ -77,6 +78,7 @@ export function emitSolidTypes(ir: IRComponent, opts: EmitSolidTypesOptions = {}
     renderPropsInterface(ir, {
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'JSX.Element',
+      slotFieldName,
       target: 'solid',
       // Typed public surface phase 3 — mirror the inline interface's
       // `extends Omit<ComponentProps<tag>, …>` in the public sidecar.

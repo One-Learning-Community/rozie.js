@@ -50,7 +50,7 @@ const CONSUMER_TSX = `import Dropdown from './Dropdown';
 export function App() {
   return (
     <Dropdown
-      renderTrigger={({ toggle }) => <button onClick={toggle}>Toggle</button>}
+      triggerSlot={({ toggle }) => <button onClick={toggle}>Toggle</button>}
     />
   );
 }

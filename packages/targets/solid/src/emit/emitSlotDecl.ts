@@ -35,6 +35,15 @@ function pascalCase(name: string): string {
   return parts.map((p) => capitalize(p)).join('');
 }
 
+/**
+ * Solid's public prop name for a NAMED slot (`row` -> `rowSlot`). Single
+ * source of truth: the compiled module (decl + invocation) and the
+ * `.d.rozie.ts` sidecar (`emitSolidTypes`) all call this.
+ */
+export function slotFieldName(slotName: string): string {
+  return slotName + 'Slot';
+}
+
 export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
   const fields: string[] = [];
   const ctxInterfaces: string[] = [];
@@ -69,7 +78,7 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
     } else if (!isSlotNameIdentifier(slot.name)) {
     } else {
       const hasCtx = slot.params && slot.params.length > 0;
-      const slotFieldName = slot.name + 'Slot';
+      const fieldName = slotFieldName(slot.name);
       const pascal = pascalCase(slot.name);
       const ctxName = pascal + 'SlotCtx';
 
@@ -83,7 +92,7 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
         const ctxParamType =
           slot.isPortal === true && slot.isReactive === true ? `() => ${ctxName}` : ctxName;
         // Named slot WITH context → function-prop signature per D-132.
-        fields.push(`  ${slotFieldName}?: (ctx: ${ctxParamType}) => JSX.Element;`);
+        fields.push(`  ${fieldName}?: (ctx: ${ctxParamType}) => JSX.Element;`);
 
         // Emit a standalone interface for the ctx (deduplicated).
         if (!seenInterfaces.has(ctxName)) {
@@ -95,7 +104,7 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
         }
       } else {
         // Named slot WITHOUT context → JSX.Element prop per D-132.
-        fields.push(`  ${slotFieldName}?: JSX.Element;`);
+        fields.push(`  ${fieldName}?: JSX.Element;`);
       }
     }
   }

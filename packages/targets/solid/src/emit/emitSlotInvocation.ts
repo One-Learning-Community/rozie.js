@@ -38,6 +38,7 @@
  * @experimental — shape may change before v1.0
  */
 import type { IRComponent, SlotDecl, TemplateSlotInvocationIR } from '@rozie/core';
+import { slotFieldName } from './emitSlotDecl.js';
 import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
@@ -232,7 +233,7 @@ export function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNode
   }
 
   // Named slot — build the prop field name with Slot suffix.
-  const slotFieldName = slotName + 'Slot';
+  const fieldName = slotFieldName(slotName);
   const hasParams = slot ? slot.params.length > 0 : false;
   const paramObj =
     slot && hasParams
@@ -258,7 +259,7 @@ export function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNode
   // for no-context slots so both sides resolve to `JSX.Element | undefined`.
   const slotKey = `'${slotName}'`;
   // Phase 79 Plan 04 (R12/D-03) — a non-identifier slot name (e.g.
-  // `cell-status`) cannot even PARSE as `_props.${slotFieldName}`
+  // `cell-status`) cannot even PARSE as `_props.${fieldName}`
   // (`_props.cell-statusSlot` reads as subtraction). ROZ127's identifier
   // check retired in 79-03 is what lets such a name reach this point at all.
   // Drop the left operand and the `??` in BOTH the function form and the
@@ -271,10 +272,10 @@ export function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNode
   const recordKey = isRecordOnly ? `'${escapeSingleQuotedKey(slotName)}'` : slotKey;
   const mergedFnForm = isRecordOnly
     ? `_props.slots?.[${recordKey}]`
-    : `(_props.${slotFieldName} ?? _props.slots?.[${slotKey}])`;
+    : `(_props.${fieldName} ?? _props.slots?.[${slotKey}])`;
   const mergedDirectForm = isRecordOnly
     ? `_props.slots?.[${recordKey}]?.()`
-    : `(_props.${slotFieldName} ?? _props.slots?.[${slotKey}]?.({}))`;
+    : `(_props.${fieldName} ?? _props.slots?.[${slotKey}]?.({}))`;
 
   // No SlotDecl found — best-effort fallback using naming convention. Treat as
   // no-context (direct form) so the rendered JSX type checks.

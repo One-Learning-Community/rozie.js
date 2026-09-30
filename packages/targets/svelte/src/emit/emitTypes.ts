@@ -86,6 +86,8 @@ export function emitSvelteTypes(ir: IRComponent, opts: EmitSvelteTypesOptions = 
     renderPropsInterface(ir, {
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'Snippet',
+      // Compiled module names a named slot's Snippet prop `<name>` (refineSlotTypes).
+      slotFieldName: (slotName: string) => slotName,
       target: 'svelte',
       // Typed public surface phase 3 — mirror the inline Props interface's
       // `extends Omit<SvelteHTMLElements[tag], …>` in the public sidecar.

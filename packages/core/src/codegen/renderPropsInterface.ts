@@ -102,6 +102,14 @@ export interface RenderPropsInterfaceOptions {
    * @experimental — added in typed-surface P1
    */
   includeTypesBlock?: boolean;
+  /**
+   * Maps a NAMED slot's name to the public prop field that carries it.
+   * Default: `render<Name>` (React). A target whose compiled module names the
+   * slot prop differently (Solid `<name>Slot`, Svelte `<name>`) passes the
+   * SAME function its emitter uses, so the sidecar and the module cannot drift.
+   * The default slot is always `children`.
+   */
+  slotFieldName?: (slotName: string) => string;
 }
 
 /**
@@ -271,7 +279,9 @@ export function renderPropsInterface(
     if (slot.dynamicNameExpr !== undefined) {
       continue;
     }
-    const renderName = isDefault ? 'children' : `render${capitalize(slot.name)}`;
+    const renderName = isDefault
+      ? 'children'
+      : (opts.slotFieldName ?? ((n: string) => `render${capitalize(n)}`))(slot.name);
     if (seenSlotFields.has(renderName)) {
       continue;
     }
