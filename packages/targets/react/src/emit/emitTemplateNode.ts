@@ -1078,19 +1078,16 @@ function emitElementListeners(
   // handlers in source order across spreads.
   const mergeArgs: string[] = [];
   if (eventsPartialEntries.length > 0) {
-    // In the forced all-fire merge (local @events + dropped bare `$listeners`,
-    // typed-surface P3 review fix) the handlers used to be JSX props on the
-    // element and got their `$event` type contextually. An object-literal
-    // merge partial has no contextual type, so `satisfies <element props>`
-    // restores exactly that typing (no implicit-any `$event` under a strict
-    // consumer tsconfig). The element surface is the SAME one the props
-    // interface extends (`renderHtmlAttrsBaseType`), `& Record<string,
+    // As JSX props on the element these handlers would get their `$event`
+    // type contextually; an object-literal merge partial has none (implicit-
+    // any `$event` under a strict consumer tsconfig). `satisfies <element
+    // props>` restores exactly that typing on EVERY merge partial
+    // (typed-surface P3 review). The element surface is the SAME one the
+    // props interface extends (`renderHtmlAttrsBaseType`); `& Record<string,
     // unknown>` so a custom-event key never trips an excess-property check.
     const partial = `{ ${eventsPartialEntries.join(', ')} }`;
     mergeArgs.push(
-      mergeDroppedListeners
-        ? `${partial} satisfies ${renderHtmlAttrsBaseType('react', node.tagName)} & Record<string, unknown>`
-        : partial,
+      `${partial} satisfies ${renderHtmlAttrsBaseType('react', node.tagName)} & Record<string, unknown>`,
     );
   }
   const attrCtx: import('./emitTemplateAttribute.js').EmitAttrCtx = {

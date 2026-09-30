@@ -264,7 +264,7 @@ export default function Test(_props: TestProps): JSX.Element {
   }, []);
 
   return (
-    <button {...mergeListeners({ onClick: onTick5 }, attrs)} data-rozie-s-8fd6d49e="">Go</button>
+    <button {...mergeListeners({ onClick: onTick5 } satisfies import('react').ComponentPropsWithoutRef<'button'> & Record<string, unknown>, attrs)} data-rozie-s-8fd6d49e="">Go</button>
   );
 }
 "

@@ -26,7 +26,7 @@ exports[`emitTemplateAttribute (React) — ListenerSpreadIR (Plan 15-03) > (4) d
 
 exports[`emitTemplateAttribute (React) — ListenerSpreadIR (Plan 15-03) > (5) dynamic with-merge: @click + r-on dynamic → mergeListeners(...) runtime call 1`] = `
 "<>
-      <button {...mergeListeners({ onClick: f1 }, normalizeListeners(someObj))} data-rozie-s-8fd6d49e="">go</button>
+      <button {...mergeListeners({ onClick: f1 } satisfies import('react').ComponentPropsWithoutRef<'button'> & Record<string, unknown>, normalizeListeners(someObj))} data-rozie-s-8fd6d49e="">go</button>
     </>"
 `;
 
@@ -38,6 +38,6 @@ exports[`emitTemplateAttribute (React) — ListenerSpreadIR (Plan 15-03) > (6) b
 
 exports[`emitTemplateAttribute (React) — ListenerSpreadIR (Plan 15-03) > (7) bare $listeners + @click (R6 + D-19): mergeListeners({ onClick: ... }, attrs) 1`] = `
 "<>
-      <button {...mergeListeners({ onClick: f1 }, attrs)} data-rozie-s-8fd6d49e="">go</button>
+      <button {...mergeListeners({ onClick: f1 } satisfies import('react').ComponentPropsWithoutRef<'button'> & Record<string, unknown>, attrs)} data-rozie-s-8fd6d49e="">go</button>
     </>"
 `;
