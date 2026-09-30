@@ -19,10 +19,10 @@ export default function DynamicSlots(_props: DynamicSlotsProps): JSX.Element {
     <div {...attrs} class={"dynamic-slots" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-96693586="">
 
       
-      {_props.slots?.['cell-total']?.({ value: local.total }) ?? <strong data-rozie-s-96693586="">{local.total}</strong>}
+      {_props.slots?.['cell-total']?.({ get value() { return local.total; } }) ?? <strong data-rozie-s-96693586="">{local.total}</strong>}
 
       
-      {_props.slots?.[`cell-${local.cellKey}`]?.({ row: local.row, value: local.row[local.cellKey] }) ?? <span data-rozie-s-96693586="">{rozieDisplay(local.row[local.cellKey])}</span>}
+      {_props.slots?.[`cell-${local.cellKey}`]?.({ get row() { return local.row; }, get value() { return local.row[local.cellKey]; } }) ?? <span data-rozie-s-96693586="">{rozieDisplay(local.row[local.cellKey])}</span>}
 
       
       {_props.slots?.[`row-${local.freeSlotName}`]?.() ?? <em data-rozie-s-96693586="">fallback</em>}

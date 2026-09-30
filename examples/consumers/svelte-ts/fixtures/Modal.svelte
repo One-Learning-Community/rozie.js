@@ -78,7 +78,7 @@ $effect(() => {
   if (!(open && closeOnEscape)) return;
   const handler = ($event: KeyboardEvent) => {
     if ($event.key !== 'Escape') return;
-    close();
+    ((close) as (...args: any[]) => any)($event);
   };
   document.addEventListener('keydown', handler);
   return () => document.removeEventListener('keydown', handler);

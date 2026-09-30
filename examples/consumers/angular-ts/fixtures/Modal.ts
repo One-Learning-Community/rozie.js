@@ -124,7 +124,7 @@ export class Modal {
         if (!(this.open() && this.closeOnEscape())) return;
         const handler = ($event: KeyboardEvent) => {
           if ($event.key !== 'Escape') return;
-          this._close();
+          ((this._close) as (...args: any[]) => any)($event);
         };
         const unlisten = renderer.listen('document', 'keydown', handler);
         onCleanup(unlisten);
@@ -145,6 +145,8 @@ export class Modal {
     this.open.set(false), this.__rozieCvaOnChange(false);
     this.close.emit();
   };
+  // Body-scroll-lock state lives outside reactive data because it tracks DOM
+  // rather than UI; managed entirely via lifecycle and listeners.
   savedBodyOverflow = '';
   lockScroll = () => {
     if (!this.lockBodyScroll() || !this.open()) return;
