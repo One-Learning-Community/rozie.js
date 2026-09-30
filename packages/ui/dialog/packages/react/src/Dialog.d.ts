@@ -31,7 +31,7 @@ export interface DialogProps extends Omit<import('react').ComponentPropsWithoutR
    * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog.
    */
   ariaLabelledby?: (string) | null;
-  onClose?: (...args: unknown[]) => void;
+  onClose?: (...args: any[]) => void;
   children?: ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

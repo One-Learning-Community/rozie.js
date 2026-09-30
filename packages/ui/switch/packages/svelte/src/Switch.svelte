@@ -24,7 +24,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['butto
   ariaLabel?: (string) | null;
   children?: Snippet<[{ checked: any; toggle: any }]>;
   snippets?: Record<string, any>;
-  onchange?: (...args: unknown[]) => void;
+  onchange?: (...args: any[]) => void;
 }
 
 let {

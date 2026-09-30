@@ -138,4 +138,12 @@ describe('Svelte — typed public surface phase 3 — fields-less Props', () => 
       "interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['button'], 'children'> {}",
     );
   });
+
+  it('untyped emit handler on the inline props type is (...args: any[]) => void', async () => {
+    const { compile } = await import('../../../core/src/compile.js');
+    const src = `<rozie name="E">\n<script>\nfunction f(){ $emit('ping', 1) }\n</script>\n<template><div></div></template>\n</rozie>\n`;
+    const { code } = compile(src, { target: 'svelte', filename: 'E.rozie', sourceMap: false });
+    expect(code).toContain('(...args: any[]) => void');
+    expect(code).not.toContain('(...args: unknown[]) => void');
+  });
 });

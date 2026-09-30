@@ -59,17 +59,17 @@ export interface FullCalendarProps {
    * Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface does not special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Spread **first** into the engine config so the curated props/events/slots win on key collision; `:options` only fills gaps. Runtime-updatable per key via `setOption` (no key-removal reset — a removed key keeps its last applied value until remount; use `getApi()` for full imperative control). The `plugins` key is the one exception that **merges** with the baked-in defaults instead of overriding them, making the wrapper consumer-extensible.
    */
   options?: Record<string, unknown>;
-  onEventClick?: (...args: unknown[]) => void;
-  onDateClick?: (...args: unknown[]) => void;
-  onEventDrop?: (...args: unknown[]) => void;
-  onSelect?: (...args: unknown[]) => void;
-  onEventResize?: (...args: unknown[]) => void;
-  onDatesSet?: (...args: unknown[]) => void;
-  onEventMouseEnter?: (...args: unknown[]) => void;
-  onEventMouseLeave?: (...args: unknown[]) => void;
-  onUnselect?: (...args: unknown[]) => void;
-  onLoading?: (...args: unknown[]) => void;
-  onEventsSet?: (...args: unknown[]) => void;
+  onEventClick?: (...args: any[]) => void;
+  onDateClick?: (...args: any[]) => void;
+  onEventDrop?: (...args: any[]) => void;
+  onSelect?: (...args: any[]) => void;
+  onEventResize?: (...args: any[]) => void;
+  onDatesSet?: (...args: any[]) => void;
+  onEventMouseEnter?: (...args: any[]) => void;
+  onEventMouseLeave?: (...args: any[]) => void;
+  onUnselect?: (...args: any[]) => void;
+  onLoading?: (...args: any[]) => void;
+  onEventsSet?: (...args: any[]) => void;
   renderEvent?: (params: { arg: unknown }) => ReactNode;
   renderDayCell?: (params: { arg: unknown }) => ReactNode;
   renderDayHeader?: (params: { arg: unknown }) => ReactNode;

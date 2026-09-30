@@ -10,9 +10,9 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   children?: Snippet<[{ item: any; toggle: any; remove: any }]>;
   empty?: Snippet;
   snippets?: Record<string, any>;
-  onadd?: (...args: unknown[]) => void;
-  ontoggle?: (...args: unknown[]) => void;
-  onremove?: (...args: unknown[]) => void;
+  onadd?: (...args: any[]) => void;
+  ontoggle?: (...args: any[]) => void;
+  onremove?: (...args: any[]) => void;
 }
 
 let {

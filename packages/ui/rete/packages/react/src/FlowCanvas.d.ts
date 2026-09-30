@@ -95,18 +95,18 @@ export interface FlowCanvasProps extends Omit<import('react').ComponentPropsWith
    * Render the opt-in NodeToolbar (default OFF) — a floating toolbar over the single selected node (positioned from the engine node-view rect + the area transform, re-tracked on pan/zoom/drag). Default content is Delete (cascading controlled-graph `deleteNode`) + Duplicate (clone the node spec at an offset with a new id into a fresh `graph` object); both fire `@node-action` (`name: 'delete' | 'duplicate'`). Override the content by filling the `#toolbar` reactive slot.
    */
   nodeToolbar?: boolean;
-  onEdgeClick?: (...args: unknown[]) => void;
-  onEdgeSelected?: (...args: unknown[]) => void;
-  onSelectionChange?: (...args: unknown[]) => void;
-  onConnectEnd?: (...args: unknown[]) => void;
-  onNodeAction?: (...args: unknown[]) => void;
-  onConnectionRejected?: (...args: unknown[]) => void;
-  onConnectionCreated?: (...args: unknown[]) => void;
-  onConnectionRemoved?: (...args: unknown[]) => void;
-  onNodePicked?: (...args: unknown[]) => void;
-  onNodeMoved?: (...args: unknown[]) => void;
-  onTranslated?: (...args: unknown[]) => void;
-  onContextMenu?: (...args: unknown[]) => void;
+  onEdgeClick?: (...args: any[]) => void;
+  onEdgeSelected?: (...args: any[]) => void;
+  onSelectionChange?: (...args: any[]) => void;
+  onConnectEnd?: (...args: any[]) => void;
+  onNodeAction?: (...args: any[]) => void;
+  onConnectionRejected?: (...args: any[]) => void;
+  onConnectionCreated?: (...args: any[]) => void;
+  onConnectionRemoved?: (...args: any[]) => void;
+  onNodePicked?: (...args: any[]) => void;
+  onNodeMoved?: (...args: any[]) => void;
+  onTranslated?: (...args: any[]) => void;
+  onContextMenu?: (...args: any[]) => void;
   renderNode?: (params: { node: unknown; selected: unknown; emit: unknown }) => ReactNode;
   renderToolbar?: (params: { node: unknown; emit: unknown }) => ReactNode;
   children?: ReactNode;

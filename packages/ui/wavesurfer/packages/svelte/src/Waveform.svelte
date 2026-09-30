@@ -114,21 +114,21 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    * The current playback position in seconds. The lone two-way `model: true` prop: playback writes the live position back on every `timeupdate` (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write seeks the engine via `setTime`.
    */
   currentTime?: unknown;
-  onregioncreated?: (...args: unknown[]) => void;
-  onregionupdated?: (...args: unknown[]) => void;
-  onregionremoved?: (...args: unknown[]) => void;
-  onregionclicked?: (...args: unknown[]) => void;
-  onregionin?: (...args: unknown[]) => void;
-  onregionout?: (...args: unknown[]) => void;
-  onready?: (...args: unknown[]) => void;
-  onplaying?: (...args: unknown[]) => void;
-  onpaused?: (...args: unknown[]) => void;
-  onfinished?: (...args: unknown[]) => void;
-  ontimeupdate?: (...args: unknown[]) => void;
-  onseeking?: (...args: unknown[]) => void;
-  oninteraction?: (...args: unknown[]) => void;
-  onloading?: (...args: unknown[]) => void;
-  onerror?: (...args: unknown[]) => void;
+  onregioncreated?: (...args: any[]) => void;
+  onregionupdated?: (...args: any[]) => void;
+  onregionremoved?: (...args: any[]) => void;
+  onregionclicked?: (...args: any[]) => void;
+  onregionin?: (...args: any[]) => void;
+  onregionout?: (...args: any[]) => void;
+  onready?: (...args: any[]) => void;
+  onplaying?: (...args: any[]) => void;
+  onpaused?: (...args: any[]) => void;
+  onfinished?: (...args: any[]) => void;
+  ontimeupdate?: (...args: any[]) => void;
+  onseeking?: (...args: any[]) => void;
+  oninteraction?: (...args: any[]) => void;
+  onloading?: (...args: any[]) => void;
+  onerror?: (...args: any[]) => void;
 }
 
 let __defaultOptions = (() => ({}))();

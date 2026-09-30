@@ -18,7 +18,7 @@
  *   - the `export interface <Name>Props<generics> {` opening line,
  *   - the D-84 model:true triplet (`value? / defaultValue? / onValueChange?`),
  *   - required/optional gating (required ⇒ no `?`; defaulted ⇒ `?`),
- *   - `ir.emits` → `on<Event>?: (...args: unknown[]) => void` (SPEC-R3),
+ *   - `ir.emits` → `on<Event>?: (...args: any[]) => void` (SPEC-R3),
  *   - slot params via `inferParamType` (D-86 best-effort inference),
  *   - the closing `}`.
  *
@@ -174,7 +174,7 @@ export function renderPropsInterface(
     const handlerName = `on${eventPascal}`;
     if (emittedHandlers.has(handlerName)) continue;
     emittedHandlers.add(handlerName);
-    lines.push(`  ${handlerName}?: (...args: unknown[]) => void;`);
+    lines.push(`  ${handlerName}?: (...args: any[]) => void;`);
   }
 
   // Slots per D-84 + D-86. The slot-children type token is the per-target

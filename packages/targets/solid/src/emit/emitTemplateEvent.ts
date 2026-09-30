@@ -240,11 +240,11 @@ export function solidEventParamType(eventOrProp: string, elementTag: string | un
  * WHY unannotated on a component: the DOM-event annotation (above) exists to
  * satisfy `noImplicitAny` on Solid's UNION-typed native JSX event slots
  * (`EventHandlerUnion<T,E>` supplies no contextual param type). A component's
- * Rozie-emitted emit-handler prop is typed `(...args: unknown[]) => void`, which
- * DOES supply a contextual param type — so there is no TS7006 to silence — and a
- * bare `($event: Event)` is NOT assignable to it under `strictFunctionTypes`
- * (param contravariance: `(Event) => void` ⊄ `(unknown) => void`) → TS2322. So a
- * component handler is left unannotated and TS infers the param from the prop.
+ * Rozie-emitted emit-handler prop is typed `(...args: any[]) => void`, which
+ * DOES supply a contextual param type — so there is no TS7006 to silence. (Before
+ * the typed-surface any[] convergence it was `unknown[]`, where a bare
+ * `($event: Event)` was NOT assignable under `strictFunctionTypes`.) A component
+ * handler is left unannotated and TS infers the param from the prop.
  * (Native-element behavior is byte-identical to before.)
  */
 export function solidEventParam(eventOrProp: string, elementTag: string | undefined): string {

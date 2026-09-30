@@ -23,7 +23,7 @@ export interface SwitchProps extends Omit<import('react').ComponentPropsWithoutR
    * Accessible name applied to the `role="switch"` control (`aria-label`). Provide this (or an external `<label>`) so the switch is announced.
    */
   ariaLabel?: (string) | null;
-  onChange?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
   children?: ReactNode | ((params: { checked: unknown; toggle: (...args: any[]) => any }) => ReactNode);
   slots?: Record<string, () => ReactNode>;
 }

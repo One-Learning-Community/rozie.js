@@ -103,7 +103,7 @@ interface NumberFieldProps extends Omit<import('solid-js').ComponentProps<'div'>
    * Accessible name applied to the `role="spinbutton"` input (`aria-label`). Provide this (or an external `<label>`) so the control is announced.
    */
   ariaLabel?: (string) | null;
-  onChange?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
   ref?: (h: NumberFieldHandle) => void;
 }
 

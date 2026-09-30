@@ -112,12 +112,12 @@ interface CropperProps extends Omit<import('solid-js').ComponentProps<'div'>, 's
    * Raw Cropper.js `Options` passthrough — spread into the constructor before the curated keys (explicit props win). Use it for any v1 option not surfaced as a first-class prop (`modal`, `restore`, `minCropBoxWidth`, `wheelZoomRatio`, …).
    */
   options?: Record<string, any>;
-  onReady?: (...args: unknown[]) => void;
-  onCropstart?: (...args: unknown[]) => void;
-  onCropmove?: (...args: unknown[]) => void;
-  onCropend?: (...args: unknown[]) => void;
-  onCrop?: (...args: unknown[]) => void;
-  onZoom?: (...args: unknown[]) => void;
+  onReady?: (...args: any[]) => void;
+  onCropstart?: (...args: any[]) => void;
+  onCropmove?: (...args: any[]) => void;
+  onCropend?: (...args: any[]) => void;
+  onCrop?: (...args: any[]) => void;
+  onZoom?: (...args: any[]) => void;
   ref?: (h: CropperHandle) => void;
 }
 

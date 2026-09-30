@@ -55,14 +55,14 @@ export interface PdfViewerProps extends Omit<import('react').ComponentPropsWitho
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */
   options?: Record<string, unknown>;
-  onPagerendered?: (...args: unknown[]) => void;
-  onError?: (...args: unknown[]) => void;
-  onPagesrendered?: (...args: unknown[]) => void;
-  onPasswordrequest?: (...args: unknown[]) => void;
-  onProgress?: (...args: unknown[]) => void;
-  onLoad?: (...args: unknown[]) => void;
-  onPagechange?: (...args: unknown[]) => void;
-  onFindresult?: (...args: unknown[]) => void;
+  onPagerendered?: (...args: any[]) => void;
+  onError?: (...args: any[]) => void;
+  onPagesrendered?: (...args: any[]) => void;
+  onPasswordrequest?: (...args: any[]) => void;
+  onProgress?: (...args: any[]) => void;
+  onLoad?: (...args: any[]) => void;
+  onPagechange?: (...args: any[]) => void;
+  onFindresult?: (...args: any[]) => void;
 }
 
 export interface PdfViewerHandle {

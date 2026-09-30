@@ -212,7 +212,7 @@ interface SliderProps extends Omit<import('solid-js').ComponentProps<'div'>, 'va
    * Render the value-bubble overlay (one bubble per thumb in range mode). Headless and opt-in — there is no default-styled bubble; supply the `bubble` slot to control its appearance.
    */
   showValue?: boolean;
-  onChange?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
   markSlot?: (ctx: MarkSlotCtx) => JSX.Element;
   bubbleSlot?: (ctx: BubbleSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

@@ -4,7 +4,7 @@ export interface ModelParamShadowProps extends Omit<import('react').ComponentPro
   token?: string;
   defaultToken?: string;
   onTokenChange?: (next: string) => void;
-  onVerify?: (...args: unknown[]) => void;
+  onVerify?: (...args: any[]) => void;
 }
 
 declare function ModelParamShadow(props: ModelParamShadowProps): JSX.Element;

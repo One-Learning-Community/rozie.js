@@ -70,9 +70,9 @@ interface PolarAreaProps {
    * Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.
    */
   destroyDelay?: number;
-  onClick?: (...args: unknown[]) => void;
-  onDatasetClick?: (...args: unknown[]) => void;
-  onHover?: (...args: unknown[]) => void;
+  onClick?: (...args: any[]) => void;
+  onDatasetClick?: (...args: any[]) => void;
+  onHover?: (...args: any[]) => void;
   fallbackSlot?: JSX.Element;
   tooltipSlot?: (ctx: TooltipSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

@@ -90,12 +90,12 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    * Raw Cropper.js `Options` passthrough — spread into the constructor before the curated keys (explicit props win). Use it for any v1 option not surfaced as a first-class prop (`modal`, `restore`, `minCropBoxWidth`, `wheelZoomRatio`, …).
    */
   options?: any;
-  onready?: (...args: unknown[]) => void;
-  oncropstart?: (...args: unknown[]) => void;
-  oncropmove?: (...args: unknown[]) => void;
-  oncropend?: (...args: unknown[]) => void;
-  oncrop?: (...args: unknown[]) => void;
-  onzoom?: (...args: unknown[]) => void;
+  onready?: (...args: any[]) => void;
+  oncropstart?: (...args: any[]) => void;
+  oncropmove?: (...args: any[]) => void;
+  oncropend?: (...args: any[]) => void;
+  oncrop?: (...args: any[]) => void;
+  onzoom?: (...args: any[]) => void;
 }
 
 let __defaultOptions = (() => ({}))();

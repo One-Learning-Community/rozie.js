@@ -87,11 +87,11 @@ export interface SortableListProps extends Omit<import('react').ComponentPropsWi
    * Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.
    */
   itemStyle?: (string | Record<string, unknown> | ((...args: any[]) => any)) | null;
-  onChange?: (...args: unknown[]) => void;
-  onAdd?: (...args: unknown[]) => void;
-  onRemove?: (...args: unknown[]) => void;
-  onStart?: (...args: unknown[]) => void;
-  onEnd?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
+  onAdd?: (...args: any[]) => void;
+  onRemove?: (...args: any[]) => void;
+  onStart?: (...args: any[]) => void;
+  onEnd?: (...args: any[]) => void;
   renderHeader?: () => ReactNode;
   children?: ReactNode | ((params: { item: unknown; index: unknown }) => ReactNode);
   renderFooter?: () => ReactNode;

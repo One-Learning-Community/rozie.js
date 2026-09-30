@@ -38,8 +38,8 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    * Accessible name for the whole group (`role="group"`, applied as `aria-label`). Each cell additionally gets an ordinal `aria-label` (`"Digit 1 of 6"`).
    */
   ariaLabel?: (string) | null;
-  onchange?: (...args: unknown[]) => void;
-  oncomplete?: (...args: unknown[]) => void;
+  onchange?: (...args: any[]) => void;
+  oncomplete?: (...args: any[]) => void;
 }
 
 let {

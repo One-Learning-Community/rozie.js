@@ -84,12 +84,12 @@ describe('renderPropsInterface — Task 1 behavior', () => {
     expect(out.trimEnd().endsWith('}')).toBe(true);
   });
 
-  it('Test 2: ir.emits → on<Event>?: (...args: unknown[]) => void', () => {
+  it('Test 2: ir.emits → on<Event>?: (...args: any[]) => void', () => {
     const ir = emptyIR('Widget');
     ir.emits = ['save', 'value-change'];
     const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode', target: 'react' });
-    expect(out).toContain('  onSave?: (...args: unknown[]) => void;');
-    expect(out).toContain('  onValueChange?: (...args: unknown[]) => void;');
+    expect(out).toContain('  onSave?: (...args: any[]) => void;');
+    expect(out).toContain('  onValueChange?: (...args: any[]) => void;');
   });
 
   it('Test 3: renderPropType maps the built-in tokens + union + fallback', () => {
@@ -208,7 +208,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
     expect(occurrences).toHaveLength(1);
     // The surviving member is the model triplet's typed form, not the emit's loose form.
     expect(out).toContain('  onValueChange?: (next: string) => void;');
-    expect(out).not.toContain('  onValueChange?: (...args: unknown[]) => void;');
+    expect(out).not.toContain('  onValueChange?: (...args: any[]) => void;');
   });
 
   it('Test 8 (CR-01): literal `onSelect` prop + emit `select` does NOT duplicate onSelect', () => {

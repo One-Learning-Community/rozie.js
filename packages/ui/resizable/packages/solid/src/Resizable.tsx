@@ -118,7 +118,7 @@ interface ResizableProps extends Omit<import('solid-js').ComponentProps<'div'>, 
    * Accessible name applied to the `role="separator"` handle (its `aria-label`). The handle has no visible text of its own, so a screen reader needs this to announce it. Defaults to `"Resize panels"`.
    */
   ariaLabel?: string;
-  onResize?: (...args: unknown[]) => void;
+  onResize?: (...args: any[]) => void;
   startSlot?: JSX.Element;
   handleSlot?: JSX.Element;
   endSlot?: JSX.Element;

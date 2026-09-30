@@ -89,10 +89,10 @@ export interface CarouselProps extends Omit<import('react').ComponentPropsWithou
   selectedIndex?: number;
   defaultSelectedIndex?: number;
   onSelectedIndexChange?: (next: number) => void;
-  onSelect?: (...args: unknown[]) => void;
-  onSettle?: (...args: unknown[]) => void;
-  onReInit?: (...args: unknown[]) => void;
-  onPointerDown?: (...args: unknown[]) => void;
+  onSelect?: (...args: any[]) => void;
+  onSettle?: (...args: any[]) => void;
+  onReInit?: (...args: any[]) => void;
+  onPointerDown?: (...args: any[]) => void;
   renderSlide?: (params: { slide: unknown; index: unknown }) => ReactNode;
   children?: ReactNode;
   renderThumb?: (params: { slide: unknown; index: unknown }) => ReactNode;

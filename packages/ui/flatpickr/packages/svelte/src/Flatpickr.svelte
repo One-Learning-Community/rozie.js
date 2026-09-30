@@ -138,14 +138,14 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['input
    * An array of flatpickr plugin instances (imported from `flatpickr/dist/plugins/…`); the headline use is `rangePlugin` for two-input ranges. **Construction-time only** — re-key the component to swap plugins live.
    */
   plugins?: any[];
-  onchange?: (...args: unknown[]) => void;
-  onready?: (...args: unknown[]) => void;
-  onopen?: (...args: unknown[]) => void;
-  onclose?: (...args: unknown[]) => void;
-  onmonthchange?: (...args: unknown[]) => void;
-  onyearchange?: (...args: unknown[]) => void;
-  onvalueupdate?: (...args: unknown[]) => void;
-  ondaycreate?: (...args: unknown[]) => void;
+  onchange?: (...args: any[]) => void;
+  onready?: (...args: any[]) => void;
+  onopen?: (...args: any[]) => void;
+  onclose?: (...args: any[]) => void;
+  onmonthchange?: (...args: any[]) => void;
+  onyearchange?: (...args: any[]) => void;
+  onvalueupdate?: (...args: any[]) => void;
+  ondaycreate?: (...args: any[]) => void;
 }
 
 let __defaultOptions = (() => ({}))();

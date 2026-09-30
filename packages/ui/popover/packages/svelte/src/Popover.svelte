@@ -72,7 +72,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   anchor?: Snippet<[{ open: any; toggle: any; show: any; hide: any }]>;
   children?: Snippet;
   snippets?: Record<string, any>;
-  onchange?: (...args: unknown[]) => void;
+  onchange?: (...args: any[]) => void;
 }
 
 let {

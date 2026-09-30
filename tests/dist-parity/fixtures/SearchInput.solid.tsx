@@ -11,8 +11,8 @@ interface SearchInputProps extends Omit<import('solid-js').ComponentProps<'div'>
   placeholder?: string;
   minLength?: number;
   autofocus?: boolean;
-  onSearch?: (...args: unknown[]) => void;
-  onClear?: (...args: unknown[]) => void;
+  onSearch?: (...args: any[]) => void;
+  onClear?: (...args: any[]) => void;
 }
 
 export default function SearchInput(_props: SearchInputProps): JSX.Element {

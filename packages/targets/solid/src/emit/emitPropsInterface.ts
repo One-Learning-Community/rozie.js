@@ -227,7 +227,7 @@ export function emitPropsInterface(
   for (const e of ir.emits) {
     const eventPascal = toPascalCase(e);
     if (eventPascal.length === 0) continue;
-    fields.push(`  on${eventPascal}?: (...args: unknown[]) => void;`);
+    fields.push(`  on${eventPascal}?: (...args: any[]) => void;`);
   }
 
   // Slots — use slotPropFields when provided (P2 filled by emitSlotDecl).

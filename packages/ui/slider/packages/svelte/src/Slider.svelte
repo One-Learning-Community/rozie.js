@@ -57,7 +57,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   mark?: Snippet<[{ value: any; label: any; position: any }]>;
   bubble?: Snippet<[{ value: any }]>;
   snippets?: Record<string, any>;
-  onchange?: (...args: unknown[]) => void;
+  onchange?: (...args: any[]) => void;
 }
 
 let __defaultMarks = (() => [])();

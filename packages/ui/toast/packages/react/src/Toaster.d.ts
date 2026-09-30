@@ -31,7 +31,7 @@ export interface ToasterProps extends Omit<import('react').ComponentPropsWithout
    * Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times.
    */
   stacked?: boolean;
-  onDismissed?: (...args: unknown[]) => void;
+  onDismissed?: (...args: any[]) => void;
   renderToast?: (params: { toast: unknown; dismiss: (...args: any[]) => any }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

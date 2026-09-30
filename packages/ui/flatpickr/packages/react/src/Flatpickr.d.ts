@@ -139,14 +139,14 @@ export interface FlatpickrProps extends Omit<import('react').ComponentPropsWitho
    * An array of flatpickr plugin instances (imported from `flatpickr/dist/plugins/…`); the headline use is `rangePlugin` for two-input ranges. **Construction-time only** — re-key the component to swap plugins live.
    */
   plugins?: unknown[];
-  onChange?: (...args: unknown[]) => void;
-  onReady?: (...args: unknown[]) => void;
-  onOpen?: (...args: unknown[]) => void;
-  onClose?: (...args: unknown[]) => void;
-  onMonthChange?: (...args: unknown[]) => void;
-  onYearChange?: (...args: unknown[]) => void;
-  onValueUpdate?: (...args: unknown[]) => void;
-  onDayCreate?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
+  onReady?: (...args: any[]) => void;
+  onOpen?: (...args: any[]) => void;
+  onClose?: (...args: any[]) => void;
+  onMonthChange?: (...args: any[]) => void;
+  onYearChange?: (...args: any[]) => void;
+  onValueUpdate?: (...args: any[]) => void;
+  onDayCreate?: (...args: any[]) => void;
 }
 
 export interface FlatpickrHandle {

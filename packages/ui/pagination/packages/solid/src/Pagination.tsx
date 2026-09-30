@@ -113,7 +113,7 @@ interface PaginationProps extends Omit<import('solid-js').ComponentProps<'nav'>,
    * Accessible name for the surrounding `<nav>` landmark (its `aria-label`). Defaults to `"Pagination"`.
    */
   ariaLabel?: string;
-  onChange?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
   prevControlSlot?: (ctx: PrevControlSlotCtx) => JSX.Element;
   ellipsisSlot?: (ctx: EllipsisSlotCtx) => JSX.Element;
   itemSlot?: (ctx: ItemSlotCtx) => JSX.Element;

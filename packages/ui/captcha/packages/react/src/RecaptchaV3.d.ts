@@ -23,8 +23,8 @@ export interface RecaptchaV3Props extends Omit<import('react').ComponentPropsWit
    * Opt in to running one `execute()` at mount and emitting `@verify` with the initial token. Off by default — v3 is imperative-first and tokens are short-lived (~2 min), so fetch one at the moment of submission rather than eagerly at mount.
    */
   executeOnMount?: boolean;
-  onError?: (...args: unknown[]) => void;
-  onVerify?: (...args: unknown[]) => void;
+  onError?: (...args: any[]) => void;
+  onVerify?: (...args: any[]) => void;
 }
 
 export interface RecaptchaV3Handle {

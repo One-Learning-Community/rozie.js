@@ -45,9 +45,9 @@ export interface TagsProps extends Omit<import('react').ComponentPropsWithoutRef
    * Accessible name for the whole control (`role="group"`). The inline text input is labelled with the same name so assistive tech announces what is being entered. A visually-hidden live region announces the current token count on change.
    */
   ariaLabel?: (string) | null;
-  onChange?: (...args: unknown[]) => void;
-  onAdd?: (...args: unknown[]) => void;
-  onRemove?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
+  onAdd?: (...args: any[]) => void;
+  onRemove?: (...args: any[]) => void;
   renderTag?: (params: { tag: unknown; index: unknown; remove: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

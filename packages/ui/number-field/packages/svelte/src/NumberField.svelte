@@ -48,7 +48,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    * Accessible name applied to the `role="spinbutton"` input (`aria-label`). Provide this (or an external `<label>`) so the control is announced.
    */
   ariaLabel?: (string) | null;
-  onchange?: (...args: unknown[]) => void;
+  onchange?: (...args: any[]) => void;
 }
 
 let __defaultFormatOptions = (() => ({}))();

@@ -99,9 +99,9 @@ export interface ComboboxProps extends Omit<import('react').ComponentPropsWithou
    * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
    */
   disableShift?: boolean;
-  onCreate?: (...args: unknown[]) => void;
-  onChange?: (...args: unknown[]) => void;
-  onSearch?: (...args: unknown[]) => void;
+  onCreate?: (...args: any[]) => void;
+  onChange?: (...args: any[]) => void;
+  onSearch?: (...args: any[]) => void;
   renderChip?: (params: { option: unknown; remove: unknown; index: unknown }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;

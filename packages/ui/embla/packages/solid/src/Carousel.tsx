@@ -170,10 +170,10 @@ interface CarouselProps extends Omit<import('solid-js').ComponentProps<'div'>, '
   selectedIndex?: number;
   defaultSelectedIndex?: number;
   onSelectedIndexChange?: (selectedIndex: number) => void;
-  onSelect?: (...args: unknown[]) => void;
-  onSettle?: (...args: unknown[]) => void;
-  onReInit?: (...args: unknown[]) => void;
-  onPointerDown?: (...args: unknown[]) => void;
+  onSelect?: (...args: any[]) => void;
+  onSettle?: (...args: any[]) => void;
+  onReInit?: (...args: any[]) => void;
+  onPointerDown?: (...args: any[]) => void;
   slideSlot?: (ctx: SlideSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;

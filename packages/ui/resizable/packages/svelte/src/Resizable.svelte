@@ -34,7 +34,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   handle?: Snippet;
   end?: Snippet;
   snippets?: Record<string, any>;
-  onresize?: (...args: unknown[]) => void;
+  onresize?: (...args: any[]) => void;
 }
 
 let {

@@ -109,10 +109,10 @@ interface Props {
   actions?: Snippet<[{ option: any; actions: any }]>;
   trailing?: Snippet<[{ option: any }]>;
   snippets?: Record<string, any>;
-  onnavigate?: (...args: unknown[]) => void;
-  onback?: (...args: unknown[]) => void;
-  onselect?: (...args: unknown[]) => void;
-  onactionselect?: (...args: unknown[]) => void;
+  onnavigate?: (...args: any[]) => void;
+  onback?: (...args: any[]) => void;
+  onselect?: (...args: any[]) => void;
+  onactionselect?: (...args: any[]) => void;
   [key: string]: unknown;
 }
 

@@ -11,7 +11,7 @@ interface Props {
   children?: Snippet<[{ close: any }]>;
   footer?: Snippet<[{ close: any }]>;
   snippets?: Record<string, any>;
-  onclose?: (...args: unknown[]) => void;
+  onclose?: (...args: any[]) => void;
   [key: string]: unknown;
 }
 

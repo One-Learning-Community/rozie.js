@@ -443,10 +443,10 @@ interface CommandPaletteProps {
    * <CommandPalette virtual virtualEstimateRowHeight={44} items={longCommandList} />
    */
   virtualEstimateRowHeight?: (number) | null;
-  onNavigate?: (...args: unknown[]) => void;
-  onBack?: (...args: unknown[]) => void;
-  onSelect?: (...args: unknown[]) => void;
-  onActionSelect?: (...args: unknown[]) => void;
+  onNavigate?: (...args: any[]) => void;
+  onBack?: (...args: any[]) => void;
+  onSelect?: (...args: any[]) => void;
+  onActionSelect?: (...args: any[]) => void;
   breadcrumbSlot?: (ctx: BreadcrumbSlotCtx) => JSX.Element;
   optionSlot?: (ctx: OptionSlotCtx) => JSX.Element;
   groupHeadingSlot?: (ctx: GroupHeadingSlotCtx) => JSX.Element;

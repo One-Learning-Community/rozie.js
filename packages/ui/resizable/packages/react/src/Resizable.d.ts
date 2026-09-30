@@ -31,7 +31,7 @@ export interface ResizableProps extends Omit<import('react').ComponentPropsWitho
    * Accessible name applied to the `role="separator"` handle (its `aria-label`). The handle has no visible text of its own, so a screen reader needs this to announce it. Defaults to `"Resize panels"`.
    */
   ariaLabel?: string;
-  onResize?: (...args: unknown[]) => void;
+  onResize?: (...args: any[]) => void;
   renderStart?: () => ReactNode;
   renderHandle?: () => ReactNode;
   renderEnd?: () => ReactNode;

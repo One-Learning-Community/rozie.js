@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { createSignal, onMount, splitProps } from 'solid-js';
 
 interface RefEmitDedupProps extends Omit<import('solid-js').ComponentProps<'div'>, 'onSave' | 'children' | 'innerHTML' | 'innerText' | 'textContent' | 'ref'> {
-  onSave?: (...args: unknown[]) => void;
+  onSave?: (...args: any[]) => void;
 }
 
 export default function RefEmitDedup(_props: RefEmitDedupProps): JSX.Element {

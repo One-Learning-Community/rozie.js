@@ -108,11 +108,11 @@ interface SortableListProps extends Omit<import('solid-js').ComponentProps<'div'
    * Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.
    */
   itemStyle?: (string | Record<string, any> | ((...args: any[]) => any)) | null;
-  onChange?: (...args: unknown[]) => void;
-  onAdd?: (...args: unknown[]) => void;
-  onRemove?: (...args: unknown[]) => void;
-  onStart?: (...args: unknown[]) => void;
-  onEnd?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
+  onAdd?: (...args: any[]) => void;
+  onRemove?: (...args: any[]) => void;
+  onStart?: (...args: any[]) => void;
+  onEnd?: (...args: any[]) => void;
   headerSlot?: JSX.Element;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;

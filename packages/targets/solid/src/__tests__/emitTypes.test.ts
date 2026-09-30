@@ -100,4 +100,12 @@ describe('emitSolidTypes — typed public surface phase 3 (pass-through HTML att
       'export interface ThemedButtonManualProps {',
     );
   });
+
+  it('untyped emit handler on the inline props interface is (...args: any[]) => void', async () => {
+    const { compile } = await import('@rozie/core');
+    const src = `<rozie name="E">\n<script>\nfunction f(){ $emit('ping', 1) }\n</script>\n<template><div></div></template>\n</rozie>\n`;
+    const { code } = compile(src, { target: 'solid', filename: 'E.rozie', sourceMap: false });
+    expect(code).toContain('(...args: any[]) => void');
+    expect(code).not.toContain('(...args: unknown[]) => void');
+  });
 });

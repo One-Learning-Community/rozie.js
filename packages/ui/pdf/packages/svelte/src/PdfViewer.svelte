@@ -54,14 +54,14 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */
   options?: any;
-  onpagerendered?: (...args: unknown[]) => void;
-  onerror?: (...args: unknown[]) => void;
-  onpagesrendered?: (...args: unknown[]) => void;
-  onpasswordrequest?: (...args: unknown[]) => void;
-  onprogress?: (...args: unknown[]) => void;
-  onload?: (...args: unknown[]) => void;
-  onpagechange?: (...args: unknown[]) => void;
-  onfindresult?: (...args: unknown[]) => void;
+  onpagerendered?: (...args: any[]) => void;
+  onerror?: (...args: any[]) => void;
+  onpagesrendered?: (...args: any[]) => void;
+  onpasswordrequest?: (...args: any[]) => void;
+  onprogress?: (...args: any[]) => void;
+  onload?: (...args: any[]) => void;
+  onpagechange?: (...args: any[]) => void;
+  onfindresult?: (...args: any[]) => void;
 }
 
 let __defaultOptions = (() => ({}))();

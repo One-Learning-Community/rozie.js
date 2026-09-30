@@ -92,7 +92,7 @@ interface DialogProps extends Omit<import('solid-js').ComponentProps<'dialog'>, 
    * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog.
    */
   ariaLabelledby?: (string) | null;
-  onClose?: (...args: unknown[]) => void;
+  onClose?: (...args: any[]) => void;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

@@ -67,8 +67,8 @@ export interface ListboxProps extends Omit<import('react').ComponentPropsWithout
    * A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-listbox-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
    */
   maxHeight?: string;
-  onOpenChange?: (...args: unknown[]) => void;
-  onChange?: (...args: unknown[]) => void;
+  onOpenChange?: (...args: any[]) => void;
+  onChange?: (...args: any[]) => void;
   renderSelected?: (params: { selected: unknown; value: unknown }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;

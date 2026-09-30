@@ -40,7 +40,7 @@ interface ModalProps {
   closeOnBackdrop?: boolean;
   lockBodyScroll?: boolean;
   title?: string;
-  onClose?: (...args: unknown[]) => void;
+  onClose?: (...args: any[]) => void;
   headerSlot?: (ctx: HeaderSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;

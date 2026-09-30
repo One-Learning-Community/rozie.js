@@ -235,12 +235,12 @@ interface TipTapProps {
    * <TipTap bubbleMenuShouldShow={({ editor }) => editor.isActive('table')} />
    */
   bubbleMenuShouldShow?: ((...args: any[]) => any) | null;
-  onUpdate?: (...args: unknown[]) => void;
-  onSelectionUpdate?: (...args: unknown[]) => void;
-  onFocus?: (...args: unknown[]) => void;
-  onBlur?: (...args: unknown[]) => void;
-  onReady?: (...args: unknown[]) => void;
-  onError?: (...args: unknown[]) => void;
+  onUpdate?: (...args: any[]) => void;
+  onSelectionUpdate?: (...args: any[]) => void;
+  onFocus?: (...args: any[]) => void;
+  onBlur?: (...args: any[]) => void;
+  onReady?: (...args: any[]) => void;
+  onError?: (...args: any[]) => void;
   countSlot?: (ctx: CountSlotCtx) => JSX.Element;
   toolbarSlot?: (ctx: ToolbarSlotCtx) => JSX.Element;
   bubbleMenuSlot?: (ctx: BubbleMenuSlotCtx) => JSX.Element;

@@ -35,9 +35,9 @@ export interface CaptchaProps extends Omit<import('react').ComponentPropsWithout
    * Escape hatch — provider-specific render options merged last (e.g. Turnstile `action`/`cData`/`retry`, hCaptcha `hl`, reCAPTCHA `badge`, Friendly Captcha `startMode`). Lets you reach keys this component does not promote to first-class props.
    */
   options?: Record<string, unknown>;
-  onVerify?: (...args: unknown[]) => void;
-  onExpire?: (...args: unknown[]) => void;
-  onError?: (...args: unknown[]) => void;
+  onVerify?: (...args: any[]) => void;
+  onExpire?: (...args: any[]) => void;
+  onError?: (...args: any[]) => void;
 }
 
 export interface CaptchaHandle {

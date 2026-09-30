@@ -312,9 +312,9 @@ interface ComboboxProps extends Omit<import('solid-js').ComponentProps<'div'>, '
    * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
    */
   disableShift?: boolean;
-  onCreate?: (...args: unknown[]) => void;
-  onChange?: (...args: unknown[]) => void;
-  onSearch?: (...args: unknown[]) => void;
+  onCreate?: (...args: any[]) => void;
+  onChange?: (...args: any[]) => void;
+  onSearch?: (...args: any[]) => void;
   chipSlot?: (ctx: ChipSlotCtx) => JSX.Element;
   optionSlot?: (ctx: OptionSlotCtx) => JSX.Element;
   emptySlot?: (ctx: EmptySlotCtx) => JSX.Element;

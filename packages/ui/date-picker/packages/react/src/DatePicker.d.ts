@@ -69,8 +69,8 @@ export interface DatePickerProps extends Omit<import('react').ComponentPropsWith
    * A consumer predicate `(iso: string) => boolean` — return `true` to disable the given ISO `YYYY-MM-DD` date (e.g. custom holiday / blackout rules beyond `disabledDates`/`min`/`max`). Threaded through the single gating funnel so day cells, drill enablement, and focus all agree. **Lit caveat:** pass via a *property* binding (`.isDateDisabled=${fn}`), never a string attribute — a function cannot survive attribute serialization, the same rule already in force for `disabledDates`/`presetRanges`.
    */
   isDateDisabled?: ((...args: any[]) => any) | null;
-  onChange?: (...args: unknown[]) => void;
-  onRangeComplete?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
+  onRangeComplete?: (...args: any[]) => void;
   renderHeader?: (params: { label: unknown; prev: (...args: any[]) => any; next: (...args: any[]) => any; disabled: unknown; openMonths: (...args: any[]) => any; openYears: (...args: any[]) => any; closeDrill: (...args: any[]) => any; viewMode: unknown }) => ReactNode;
   renderFooter?: (params: { today: (...args: any[]) => any; clear: (...args: any[]) => any; todayIso: unknown }) => ReactNode;
   renderPresets?: (params: { presets: unknown; apply: (...args: any[]) => any }) => ReactNode;

@@ -46,9 +46,9 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   ariaLabel?: (string) | null;
   tag?: Snippet<[{ tag: any; index: any; remove: any }]>;
   snippets?: Record<string, any>;
-  onchange?: (...args: unknown[]) => void;
-  onadd?: (...args: unknown[]) => void;
-  onremove?: (...args: unknown[]) => void;
+  onchange?: (...args: any[]) => void;
+  onadd?: (...args: any[]) => void;
+  onremove?: (...args: any[]) => void;
 }
 
 let __defaultDelimiters = (() => [',', 'Enter'])();

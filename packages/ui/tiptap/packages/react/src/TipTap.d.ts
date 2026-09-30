@@ -71,12 +71,12 @@ export interface TipTapProps {
    * <TipTap bubbleMenuShouldShow={({ editor }) => editor.isActive('table')} />
    */
   bubbleMenuShouldShow?: ((...args: any[]) => any) | null;
-  onUpdate?: (...args: unknown[]) => void;
-  onSelectionUpdate?: (...args: unknown[]) => void;
-  onFocus?: (...args: unknown[]) => void;
-  onBlur?: (...args: unknown[]) => void;
-  onReady?: (...args: unknown[]) => void;
-  onError?: (...args: unknown[]) => void;
+  onUpdate?: (...args: any[]) => void;
+  onSelectionUpdate?: (...args: any[]) => void;
+  onFocus?: (...args: any[]) => void;
+  onBlur?: (...args: any[]) => void;
+  onReady?: (...args: any[]) => void;
+  onError?: (...args: any[]) => void;
   renderCount?: (params: { characters: unknown; words: unknown; maxLength: number; over: unknown }) => ReactNode;
   renderToolbar?: (params: { editor: unknown }) => ReactNode;
   renderBubbleMenu?: (params: { editor: unknown }) => ReactNode;

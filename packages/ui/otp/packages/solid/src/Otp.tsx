@@ -81,8 +81,8 @@ interface OtpProps extends Omit<import('solid-js').ComponentProps<'div'>, 'value
    * Accessible name for the whole group (`role="group"`, applied as `aria-label`). Each cell additionally gets an ordinal `aria-label` (`"Digit 1 of 6"`).
    */
   ariaLabel?: (string) | null;
-  onChange?: (...args: unknown[]) => void;
-  onComplete?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
+  onComplete?: (...args: any[]) => void;
   ref?: (h: OtpHandle) => void;
 }
 

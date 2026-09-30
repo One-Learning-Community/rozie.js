@@ -35,7 +35,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   stacked?: boolean;
   toast?: Snippet<[{ toast: any; dismiss: any }]>;
   snippets?: Record<string, any>;
-  ondismissed?: (...args: unknown[]) => void;
+  ondismissed?: (...args: any[]) => void;
 }
 
 let {

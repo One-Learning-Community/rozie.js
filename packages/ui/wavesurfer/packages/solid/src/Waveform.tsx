@@ -134,21 +134,21 @@ interface WaveformProps extends Omit<import('solid-js').ComponentProps<'div'>, '
   currentTime?: unknown;
   defaultCurrentTime?: unknown;
   onCurrentTimeChange?: (currentTime: unknown) => void;
-  onRegionCreated?: (...args: unknown[]) => void;
-  onRegionUpdated?: (...args: unknown[]) => void;
-  onRegionRemoved?: (...args: unknown[]) => void;
-  onRegionClicked?: (...args: unknown[]) => void;
-  onRegionIn?: (...args: unknown[]) => void;
-  onRegionOut?: (...args: unknown[]) => void;
-  onReady?: (...args: unknown[]) => void;
-  onPlaying?: (...args: unknown[]) => void;
-  onPaused?: (...args: unknown[]) => void;
-  onFinished?: (...args: unknown[]) => void;
-  onTimeupdate?: (...args: unknown[]) => void;
-  onSeeking?: (...args: unknown[]) => void;
-  onInteraction?: (...args: unknown[]) => void;
-  onLoading?: (...args: unknown[]) => void;
-  onError?: (...args: unknown[]) => void;
+  onRegionCreated?: (...args: any[]) => void;
+  onRegionUpdated?: (...args: any[]) => void;
+  onRegionRemoved?: (...args: any[]) => void;
+  onRegionClicked?: (...args: any[]) => void;
+  onRegionIn?: (...args: any[]) => void;
+  onRegionOut?: (...args: any[]) => void;
+  onReady?: (...args: any[]) => void;
+  onPlaying?: (...args: any[]) => void;
+  onPaused?: (...args: any[]) => void;
+  onFinished?: (...args: any[]) => void;
+  onTimeupdate?: (...args: any[]) => void;
+  onSeeking?: (...args: any[]) => void;
+  onInteraction?: (...args: any[]) => void;
+  onLoading?: (...args: any[]) => void;
+  onError?: (...args: any[]) => void;
   ref?: (h: WaveformHandle) => void;
 }
 

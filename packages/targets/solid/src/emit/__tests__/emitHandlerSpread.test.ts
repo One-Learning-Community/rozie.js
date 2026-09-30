@@ -48,8 +48,8 @@ function commit(next) {
     expect(code).toContain("splitProps(_props, ['value', 'onChange', 'onComplete'])");
 
     // Non-regression: the props interface already declares both fields.
-    expect(code).toContain('onChange?: (...args: unknown[]) => void;');
-    expect(code).toContain('onComplete?: (...args: unknown[]) => void;');
+    expect(code).toContain('onChange?: (...args: any[]) => void;');
+    expect(code).toContain('onComplete?: (...args: any[]) => void;');
   });
 
   it('a call-getter-free $emit-only component (zero props) stays syntactically valid', () => {
@@ -69,6 +69,6 @@ function fire() {
 </script>
 </rozie>`;
     const code = compile(src);
-    expect(code).toContain('onChange?: (...args: unknown[]) => void;');
+    expect(code).toContain('onChange?: (...args: any[]) => void;');
   });
 });

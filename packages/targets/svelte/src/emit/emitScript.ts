@@ -679,7 +679,7 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   // onsearch?.(x) by rewriteScript; the corresponding `onsearch?` prop must
   // be declared and destructured. Svelte 5 callback-prop convention is
   // ALL-LOWERCASE (e.g., `onclose`, `onsearch`) — NOT React's PascalCase
-  // `onSearch`. v1 types args as `(...args: unknown[]) => void` since IR
+  // `onSearch`. v1 types args as `(...args: any[]) => void` since IR
   // doesn't carry per-emit arg types (Phase 6 TYPES-01 refines).
   //
   // Phase 07.7 fix — shared `svelteCallbackPropName` helper strips hyphens
@@ -689,7 +689,7 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   // $emit-lowering use the same helper to stay in lockstep.
   for (const e of ir.emits) {
     const onName = svelteCallbackPropName(e);
-    lines.push(`  ${onName}?: (...args: unknown[]) => void;`);
+    lines.push(`  ${onName}?: (...args: any[]) => void;`);
   }
 
   // Synthesized `on<key>change` callback for each re-exposed model prop (a
@@ -699,7 +699,7 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   // The write is fired from the get/set binding emitted by `emitSingleAttr`.
   for (const name of collectChildBoundModelNames(ir)) {
     const onName = svelteCallbackPropName(`${name}-change`);
-    lines.push(`  ${onName}?: (...args: unknown[]) => void;`);
+    lines.push(`  ${onName}?: (...args: any[]) => void;`);
   }
 
   // Plan 14-05 — when `inheritAttrs !== false`, declare an index signature so

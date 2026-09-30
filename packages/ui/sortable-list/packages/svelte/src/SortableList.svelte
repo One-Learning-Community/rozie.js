@@ -91,11 +91,11 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   children?: Snippet<[{ item: any; index: any }]>;
   footer?: Snippet;
   snippets?: Record<string, any>;
-  onchange?: (...args: unknown[]) => void;
-  onadd?: (...args: unknown[]) => void;
-  onremove?: (...args: unknown[]) => void;
-  onstart?: (...args: unknown[]) => void;
-  onend?: (...args: unknown[]) => void;
+  onchange?: (...args: any[]) => void;
+  onadd?: (...args: any[]) => void;
+  onremove?: (...args: any[]) => void;
+  onstart?: (...args: any[]) => void;
+  onend?: (...args: any[]) => void;
 }
 
 let __defaultOptions = (() => ({}))();

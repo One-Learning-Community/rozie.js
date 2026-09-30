@@ -93,10 +93,10 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   children?: Snippet;
   thumb?: Snippet<[{ slide: any; index: any }]>;
   snippets?: Record<string, any>;
-  onselect?: (...args: unknown[]) => void;
-  onsettle?: (...args: unknown[]) => void;
-  onreinit?: (...args: unknown[]) => void;
-  onpointerdown?: (...args: unknown[]) => void;
+  onselect?: (...args: any[]) => void;
+  onsettle?: (...args: any[]) => void;
+  onreinit?: (...args: any[]) => void;
+  onpointerdown?: (...args: any[]) => void;
 }
 
 let __defaultSlides = (() => [])();

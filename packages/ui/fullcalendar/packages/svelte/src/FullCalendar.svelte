@@ -70,17 +70,17 @@ interface Props {
   slotLaneContent?: Snippet<[{ arg: any }]>;
   noEventsContent?: Snippet<[{ arg: any }]>;
   snippets?: Record<string, any>;
-  oneventclick?: (...args: unknown[]) => void;
-  ondateclick?: (...args: unknown[]) => void;
-  oneventdrop?: (...args: unknown[]) => void;
-  onselect?: (...args: unknown[]) => void;
-  oneventresize?: (...args: unknown[]) => void;
-  ondatesset?: (...args: unknown[]) => void;
-  oneventmouseenter?: (...args: unknown[]) => void;
-  oneventmouseleave?: (...args: unknown[]) => void;
-  onunselect?: (...args: unknown[]) => void;
-  onloading?: (...args: unknown[]) => void;
-  oneventsset?: (...args: unknown[]) => void;
+  oneventclick?: (...args: any[]) => void;
+  ondateclick?: (...args: any[]) => void;
+  oneventdrop?: (...args: any[]) => void;
+  onselect?: (...args: any[]) => void;
+  oneventresize?: (...args: any[]) => void;
+  ondatesset?: (...args: any[]) => void;
+  oneventmouseenter?: (...args: any[]) => void;
+  oneventmouseleave?: (...args: any[]) => void;
+  onunselect?: (...args: any[]) => void;
+  onloading?: (...args: any[]) => void;
+  oneventsset?: (...args: any[]) => void;
 }
 
 let __defaultEvents = (() => [])();

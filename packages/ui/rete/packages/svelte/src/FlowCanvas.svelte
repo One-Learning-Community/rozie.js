@@ -97,18 +97,18 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   toolbar?: Snippet<[{ node: any; emit: any }]>;
   children?: Snippet;
   snippets?: Record<string, any>;
-  onedgeclick?: (...args: unknown[]) => void;
-  onedgeselected?: (...args: unknown[]) => void;
-  onselectionchange?: (...args: unknown[]) => void;
-  onconnectend?: (...args: unknown[]) => void;
-  onnodeaction?: (...args: unknown[]) => void;
-  onconnectionrejected?: (...args: unknown[]) => void;
-  onconnectioncreated?: (...args: unknown[]) => void;
-  onconnectionremoved?: (...args: unknown[]) => void;
-  onnodepicked?: (...args: unknown[]) => void;
-  onnodemoved?: (...args: unknown[]) => void;
-  ontranslated?: (...args: unknown[]) => void;
-  oncontextmenu?: (...args: unknown[]) => void;
+  onedgeclick?: (...args: any[]) => void;
+  onedgeselected?: (...args: any[]) => void;
+  onselectionchange?: (...args: any[]) => void;
+  onconnectend?: (...args: any[]) => void;
+  onnodeaction?: (...args: any[]) => void;
+  onconnectionrejected?: (...args: any[]) => void;
+  onconnectioncreated?: (...args: any[]) => void;
+  onconnectionremoved?: (...args: any[]) => void;
+  onnodepicked?: (...args: any[]) => void;
+  onnodemoved?: (...args: any[]) => void;
+  ontranslated?: (...args: any[]) => void;
+  oncontextmenu?: (...args: any[]) => void;
 }
 
 let {

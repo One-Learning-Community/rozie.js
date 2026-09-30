@@ -37,7 +37,7 @@ export interface PaginationProps extends Omit<import('react').ComponentPropsWith
    * Accessible name for the surrounding `<nav>` landmark (its `aria-label`). Defaults to `"Pagination"`.
    */
   ariaLabel?: string;
-  onChange?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
   renderPrevControl?: (params: { disabled: unknown; goto: (...args: any[]) => any; page: unknown }) => ReactNode;
   renderEllipsis?: (params: { index: unknown }) => ReactNode;
   renderItem?: (params: { page: unknown; selected: unknown; goto: unknown }) => ReactNode;

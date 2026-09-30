@@ -85,8 +85,8 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   footer?: Snippet<[{ today: any; clear: any; todayIso: any }]>;
   presets?: Snippet<[{ presets: any; apply: any }]>;
   snippets?: Record<string, any>;
-  onchange?: (...args: unknown[]) => void;
-  onrangecomplete?: (...args: unknown[]) => void;
+  onchange?: (...args: any[]) => void;
+  onrangecomplete?: (...args: any[]) => void;
 }
 
 let __defaultDisabledDates = (() => [])();

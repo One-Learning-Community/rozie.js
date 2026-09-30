@@ -6,7 +6,7 @@ interface ModelParamShadowProps extends Omit<import('solid-js').ComponentProps<'
   token?: string;
   defaultToken?: string;
   onTokenChange?: (token: string) => void;
-  onVerify?: (...args: unknown[]) => void;
+  onVerify?: (...args: any[]) => void;
 }
 
 export default function ModelParamShadow(_props: ModelParamShadowProps): JSX.Element {

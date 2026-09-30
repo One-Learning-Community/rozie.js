@@ -10,7 +10,7 @@ interface Props {
   children?: Snippet;
   actions?: Snippet;
   snippets?: Record<string, any>;
-  onopenchange?: (...args: unknown[]) => void;
+  onopenchange?: (...args: any[]) => void;
   [key: string]: unknown;
 }
 

@@ -17,9 +17,9 @@ interface TodoListProps extends Omit<import('solid-js').ComponentProps<'div'>, '
   defaultItems?: any[];
   onItemsChange?: (items: any[]) => void;
   title?: string;
-  onAdd?: (...args: unknown[]) => void;
-  onToggle?: (...args: unknown[]) => void;
-  onRemove?: (...args: unknown[]) => void;
+  onAdd?: (...args: any[]) => void;
+  onToggle?: (...args: any[]) => void;
+  onRemove?: (...args: any[]) => void;
   headerSlot?: (ctx: HeaderSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;

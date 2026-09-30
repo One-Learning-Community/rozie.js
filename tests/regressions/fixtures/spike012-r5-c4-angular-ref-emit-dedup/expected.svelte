@@ -4,7 +4,7 @@ import { applyListeners } from '@rozie/runtime-svelte';
 import { onMount } from 'svelte';
 
 interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'onsave' | 'children'> {
-  onsave?: (...args: unknown[]) => void;
+  onsave?: (...args: any[]) => void;
 }
 
 let { onsave, ...__rozieAttrs }: Props = $props();

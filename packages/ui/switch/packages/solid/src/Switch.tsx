@@ -72,7 +72,7 @@ interface SwitchProps extends Omit<import('solid-js').ComponentProps<'button'>, 
    * Accessible name applied to the `role="switch"` control (`aria-label`). Provide this (or an external `<label>`) so the switch is announced.
    */
   ariaLabel?: (string) | null;
-  onChange?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

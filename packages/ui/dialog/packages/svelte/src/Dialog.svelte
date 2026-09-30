@@ -33,7 +33,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['dialo
   ariaLabelledby?: (string) | null;
   children?: Snippet;
   snippets?: Record<string, any>;
-  onclose?: (...args: unknown[]) => void;
+  onclose?: (...args: any[]) => void;
 }
 
 let {

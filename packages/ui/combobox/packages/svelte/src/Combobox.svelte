@@ -107,9 +107,9 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   groupHeading?: Snippet<[{ group: any }]>;
   groupMore?: Snippet<[{ group: any; hidden: any; expand: any }]>;
   snippets?: Record<string, any>;
-  oncreate?: (...args: unknown[]) => void;
-  onchange?: (...args: unknown[]) => void;
-  onsearch?: (...args: unknown[]) => void;
+  oncreate?: (...args: any[]) => void;
+  onchange?: (...args: any[]) => void;
+  onsearch?: (...args: any[]) => void;
 }
 
 let __defaultOptions = (() => [])();

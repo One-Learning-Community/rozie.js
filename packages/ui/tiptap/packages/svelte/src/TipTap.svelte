@@ -81,12 +81,12 @@ interface Props {
   linkEditor?: Snippet<[{ editor: any; href: any; attrs: any; setLink: any; unsetLink: any; close: any }]>;
   nodeView?: Snippet<[{ node: any; selected: any; updateAttributes: any; getPos: any; editor: any; contentDOM: any }]>;
   snippets?: Record<string, any>;
-  onupdate?: (...args: unknown[]) => void;
-  onselectionupdate?: (...args: unknown[]) => void;
-  onfocus?: (...args: unknown[]) => void;
-  onblur?: (...args: unknown[]) => void;
-  onready?: (...args: unknown[]) => void;
-  onerror?: (...args: unknown[]) => void;
+  onupdate?: (...args: any[]) => void;
+  onselectionupdate?: (...args: any[]) => void;
+  onfocus?: (...args: any[]) => void;
+  onblur?: (...args: any[]) => void;
+  onready?: (...args: any[]) => void;
+  onerror?: (...args: any[]) => void;
 }
 
 let __defaultEditorProps = (() => ({}))();

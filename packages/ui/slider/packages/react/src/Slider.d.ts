@@ -55,7 +55,7 @@ export interface SliderProps extends Omit<import('react').ComponentPropsWithoutR
    * Render the value-bubble overlay (one bubble per thumb in range mode). Headless and opt-in — there is no default-styled bubble; supply the `bubble` slot to control its appearance.
    */
   showValue?: boolean;
-  onChange?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
   renderMark?: (params: { value: unknown; label: unknown; position: unknown }) => ReactNode;
   renderBubble?: (params: { value: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;

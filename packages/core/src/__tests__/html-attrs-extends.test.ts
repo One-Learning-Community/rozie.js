@@ -155,4 +155,11 @@ describe('renderPropsInterface htmlAttrs option', () => {
     const b = renderPropsInterface(r, { slotChildrenType: 'ReactNode', target: 'react', htmlAttrs: 'react' });
     expect(b).toBe(a);
   });
+
+  it('untyped emit handlers are (...args: any[]) => void on the shared sidecar', () => {
+    const r = ir(`<rozie name="E">\n<script>\nfunction f(){ $emit('ping', 1) }\n</script>\n<template><div></div></template>\n</rozie>\n`);
+    const out = renderPropsInterface(r, { slotChildrenType: 'ReactNode', target: 'react' });
+    expect(out).toContain('onPing?: (...args: any[]) => void;');
+    expect(out).not.toContain('unknown[]');
+  });
 });

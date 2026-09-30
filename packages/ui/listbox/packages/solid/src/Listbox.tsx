@@ -181,8 +181,8 @@ interface ListboxProps extends Omit<import('solid-js').ComponentProps<'div'>, 'o
    * A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-listbox-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
    */
   maxHeight?: string;
-  onOpenChange?: (...args: unknown[]) => void;
-  onChange?: (...args: unknown[]) => void;
+  onOpenChange?: (...args: any[]) => void;
+  onChange?: (...args: any[]) => void;
   selectedSlot?: (ctx: SelectedSlotCtx) => JSX.Element;
   optionSlot?: (ctx: OptionSlotCtx) => JSX.Element;
   emptySlot?: (ctx: EmptySlotCtx) => JSX.Element;

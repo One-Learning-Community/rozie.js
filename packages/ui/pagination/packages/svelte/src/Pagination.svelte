@@ -41,7 +41,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['nav']
   item?: Snippet<[{ page: any; selected: any; goto: any }]>;
   nextControl?: Snippet<[{ disabled: any; goto: any; page: any }]>;
   snippets?: Record<string, any>;
-  onchange?: (...args: unknown[]) => void;
+  onchange?: (...args: any[]) => void;
 }
 
 let {

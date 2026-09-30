@@ -54,9 +54,9 @@ interface Props {
   fallback?: Snippet;
   tooltip?: Snippet<[{ model: any }]>;
   snippets?: Record<string, any>;
-  onclick?: (...args: unknown[]) => void;
-  ondatasetclick?: (...args: unknown[]) => void;
-  onhover?: (...args: unknown[]) => void;
+  onclick?: (...args: any[]) => void;
+  ondatasetclick?: (...args: any[]) => void;
+  onhover?: (...args: any[]) => void;
 }
 
 let __defaultData = (() => ({

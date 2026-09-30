@@ -391,8 +391,8 @@ interface DatePickerProps extends Omit<import('solid-js').ComponentProps<'div'>,
    * A consumer predicate `(iso: string) => boolean` — return `true` to disable the given ISO `YYYY-MM-DD` date (e.g. custom holiday / blackout rules beyond `disabledDates`/`min`/`max`). Threaded through the single gating funnel so day cells, drill enablement, and focus all agree. **Lit caveat:** pass via a *property* binding (`.isDateDisabled=${fn}`), never a string attribute — a function cannot survive attribute serialization, the same rule already in force for `disabledDates`/`presetRanges`.
    */
   isDateDisabled?: ((...args: any[]) => any) | null;
-  onChange?: (...args: unknown[]) => void;
-  onRangeComplete?: (...args: unknown[]) => void;
+  onChange?: (...args: any[]) => void;
+  onRangeComplete?: (...args: any[]) => void;
   headerSlot?: (ctx: HeaderSlotCtx) => JSX.Element;
   footerSlot?: (ctx: FooterSlotCtx) => JSX.Element;
   presetsSlot?: (ctx: PresetsSlotCtx) => JSX.Element;

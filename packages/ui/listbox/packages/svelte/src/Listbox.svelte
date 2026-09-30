@@ -71,8 +71,8 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   option?: Snippet<[{ option: any; index: any; active: any; selected: any; disabled: any }]>;
   empty?: Snippet<[{ query: any }]>;
   snippets?: Record<string, any>;
-  onopenchange?: (...args: unknown[]) => void;
-  onchange?: (...args: unknown[]) => void;
+  onopenchange?: (...args: any[]) => void;
+  onchange?: (...args: any[]) => void;
 }
 
 let __defaultOptions = (() => [])();

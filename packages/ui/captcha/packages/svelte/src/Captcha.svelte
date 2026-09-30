@@ -34,9 +34,9 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    * Escape hatch — provider-specific render options merged last (e.g. Turnstile `action`/`cData`/`retry`, hCaptcha `hl`, reCAPTCHA `badge`, Friendly Captcha `startMode`). Lets you reach keys this component does not promote to first-class props.
    */
   options?: any;
-  onverify?: (...args: unknown[]) => void;
-  onexpire?: (...args: unknown[]) => void;
-  onerror?: (...args: unknown[]) => void;
+  onverify?: (...args: any[]) => void;
+  onexpire?: (...args: any[]) => void;
+  onerror?: (...args: any[]) => void;
 }
 
 let __defaultOptions = (() => ({}))();
