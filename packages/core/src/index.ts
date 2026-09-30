@@ -93,6 +93,7 @@ export { synthesizeHandleType, untypedExposeSignature } from './codegen/synthesi
 // @experimental — shape may change before v1.0
 export type { AuthoredTypeResult } from './codegen/renderAuthoredType.js';
 export {
+  indentContinuation,
   parseAuthoredType,
   printTSType,
 } from './codegen/renderAuthoredType.js';

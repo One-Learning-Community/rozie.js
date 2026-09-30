@@ -60,6 +60,7 @@ import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHan
 // Reuse the SAME tag-deriving helper the runtime `@customElement` decorator
 // uses so the HTMLElementTagNameMap key cannot drift from the registration.
 import { emitTagName } from './emitDecorator.js';
+import { renderLitEventMap, renderLitListenerOverloads } from './litEventMap.js';
 
 /**
  * Options controlling Lit `.d.rozie.ts` emission.
@@ -113,9 +114,18 @@ export function emitLitTypes(ir: IRComponent, opts: EmitLitTypesOptions = {}): s
       // sidecar declares no slot fields / `slots` record.
       slotSurface: { fields: [] },
       target: 'lit',
+      // Typed public surface P1 — the authored `<types>` prelude ('' without).
+      includeTypesBlock: true,
     }),
   );
   lines.push('');
+  // Typed public surface P1 — the same `Rozie<Name>EventMap` the compiled
+  // module exports ('' without `<emits>`).
+  const eventMap = renderLitEventMap(ir);
+  if (eventMap !== '') {
+    lines.push(eventMap);
+    lines.push('');
+  }
 
   // Lit default-export idiom: the element class. Exposed methods become PUBLIC
   // class members (Phase 21 21-06 public-element-method guarantee).
@@ -137,6 +147,9 @@ export function emitLitTypes(ir: IRComponent, opts: EmitLitTypesOptions = {}): s
       lines.push(member);
     }
   }
+  // Typed listener overloads — declaration-only in a `declare class`.
+  const listenerOverloads = renderLitListenerOverloads(ir, 'declare');
+  if (listenerOverloads !== '') lines.push(listenerOverloads);
   lines.push(`}`);
   lines.push(`export default ${ir.name};`);
   lines.push('');

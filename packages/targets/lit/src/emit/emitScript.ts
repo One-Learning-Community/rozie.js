@@ -26,7 +26,12 @@ import type {
   SignalRef,
   WatchHook,
 } from '@rozie/core';
-import { buildPropJsdoc } from '@rozie/core';
+import {
+  buildPropJsdoc,
+  exposeSignatureAnnotation,
+  exposeSignatureMethodOverload,
+  untypedExposeSignature,
+} from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import {
@@ -47,6 +52,7 @@ import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.
 import { emitContext } from './emitContext.js';
 import { toKebabCase } from './emitDecorator.js';
 import { emitPortals } from './emitPortals.js';
+import { renderLitListenerOverloads } from './litEventMap.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
@@ -1165,6 +1171,18 @@ function classBodyFromStatements(
 ): { methods: string; freeStatements: string } {
   const computedDepsByName = new Map(ir.computed.map((c) => [c.name, c.deps] as const));
   const methodChunks: string[] = [];
+  // Typed public surface P1 — the `$expose` signature for an exposed verb.
+  // Opt-in components (at least one signature declared) give untyped verbs the
+  // documented `(...args: any[]) => any` shape; otherwise `undefined` (no
+  // emit change).
+  const exposeSigs = new Map(
+    ir.expose.flatMap((e) => (e.signature !== undefined ? [[e.name, e.signature] as const] : [])),
+  );
+  const exposedNameSet = new Set(ir.expose.map((e) => e.name));
+  const exposeSignatureFor = (name: string): t.TSFunctionType | undefined => {
+    if (exposeSigs.size === 0 || !exposedNameSet.has(name)) return undefined;
+    return exposeSigs.get(name) ?? untypedExposeSignature();
+  };
   const freeChunks: string[] = [];
 
   // Quick task 260830-j53 — block-wide printed-comment ledger for the class-body
@@ -1333,7 +1351,14 @@ function classBodyFromStatements(
           // re-emit it as `f: (e: MouseEvent) => void = …`.
           const code = renderExpression(decl.init);
           const declTypeSuffix = renderDeclaratorTypeSuffix(decl.id);
-          methodChunks.push(`  ${name}${declTypeSuffix} = ${code};`);
+          // Typed public surface P1 — an exposed field-arrow verb carries its
+          // `$expose` signature as the field annotation (an authored declarator
+          // annotation wins).
+          const exposedSig = declTypeSuffix === '' ? exposeSignatureFor(name) : undefined;
+          const fieldSuffix = exposedSig
+            ? `: ${generate(exposeSignatureAnnotation(exposedSig).typeAnnotation, GEN_OPTS).code}`
+            : declTypeSuffix;
+          methodChunks.push(`  ${name}${fieldSuffix} = ${code};`);
           continue;
         }
 
@@ -1378,9 +1403,16 @@ function classBodyFromStatements(
       // function both are absent, so the result is `null` — no emit change.
       method.returnType = stmt.returnType ?? null;
       method.typeParameters = stmt.typeParameters ?? null;
+      // Typed public surface P1 — an exposed verb with a `$expose` signature
+      // gets a method overload immediately above its (possibly untyped JS)
+      // implementation.
+      const exposedSig = exposeSignatureFor(stmt.id.name);
+      const overload = exposedSig
+        ? `${generate(exposeSignatureMethodOverload(stmt.id.name, exposedSig), GEN_OPTS).code}\n`
+        : '';
       // Indent the generated method by 2 to carry the class-body prefix the
       // surrounding `methodChunks` entries already include.
-      methodChunks.push(indent(generate(method, GEN_OPTS).code, 2));
+      methodChunks.push(indent(overload + generate(method, GEN_OPTS).code, 2));
       continue;
     }
 
@@ -1645,7 +1677,13 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
   // 4. Model-prop getter/setter pair → methods.
   const modelMethodLines: string[] = modelProps.map(emitModelGetterSetter);
 
-  const methodDecls = [classMethodsFromScript, modelMethodLines.join('\n')]
+  // Typed public surface P1 — typed `addEventListener`/`removeEventListener`
+  // overloads over `Rozie<Name>EventMap` ('' without `<emits>`).
+  const methodDecls = [
+    classMethodsFromScript,
+    modelMethodLines.join('\n'),
+    renderLitListenerOverloads(ir, 'class'),
+  ]
     .filter((s) => s.trim().length > 0)
     .join('\n\n');
 

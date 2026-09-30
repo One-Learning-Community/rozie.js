@@ -37,6 +37,7 @@ import {
   deconflictReservedClassFields,
   reservedClassMembers,
 } from '../../../../core/src/rewrite/deconflict.js';
+import { typeCustomEventDispatch } from '../emit/litEventMap.js';
 import { kebabize } from '../emit/resolveLitSetterText.js';
 import { cloneScriptProgram } from './cloneProgram.js';
 import type { RuntimeLitImportCollector } from './collectLitImports.js';
@@ -1137,6 +1138,9 @@ export function rewriteScript(
             t.objectProperty(t.identifier('composed'), t.booleanLiteral(true)),
           ]),
         ]);
+        // Typed public surface P1 — `new CustomEvent<P>(…)` for a declared payload
+        // (type-only; untyped / no-`<emits>` dispatch is unchanged).
+        typeCustomEventDispatch(ir, firstArg.value, customEvent);
         path.replaceWith(
           t.callExpression(t.memberExpression(t.thisExpression(), t.identifier('dispatchEvent')), [
             customEvent,

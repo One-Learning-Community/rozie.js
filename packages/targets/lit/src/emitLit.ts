@@ -31,7 +31,7 @@ import type {
   ModifierRegistry,
   IRTemplateNode as TemplateNode,
 } from '@rozie/core';
-import { createDefaultRegistry } from '@rozie/core';
+import { createDefaultRegistry, renderTypesBlock } from '@rozie/core';
 import {
   isPublishedSpecifier,
   rewriteRozieImport,
@@ -47,6 +47,7 @@ import { emitScript } from './emit/emitScript.js';
 import { emitSlotDecl } from './emit/emitSlotDecl.js';
 import { emitStyle } from './emit/emitStyle.js';
 import { emitTemplate } from './emit/emitTemplate.js';
+import { renderLitEventMap } from './emit/litEventMap.js';
 import { computeScopeHash } from './emit/scopeHash.js';
 import { buildShell } from './emit/shell.js';
 import { shouldDistributeSlots } from './emit/shouldDistributeSlots.js';
@@ -586,7 +587,14 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   // the top of the file; the synthesized per-slot context interfaces follow.
   // Both share the shell's `interfaceDecls` bucket. `hoistedTypeDecls` is empty
   // for an untyped `<script>`, so untyped emit stays byte-identical.
+  // Typed public surface P1 — the authored `<types>` prelude, then the
+  // generated `Rozie<Name>EventMap`, lead the module scope. Both are '' (and
+  // filtered out) for a component without `<types>` / `<emits>`.
+  const typedSurfaceDecls = [renderTypesBlock(ir), renderLitEventMap(ir)].filter(
+    (s) => s !== '',
+  );
   const moduleScopeDecls = [
+    ...typedSurfaceDecls,
     ...scriptResult.hoistedTypeDecls,
     // Phase 36 (R10) — module-scope `const __rozieCtx_<key> =
     // createContext(Symbol.for('rozie:<key>'));` decls. They sit above the class

@@ -20,6 +20,7 @@ import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
 import * as t from '@babel/types';
 import type { IRComponent } from '@rozie/core';
+import { typeCustomEventDispatch } from '../emit/litEventMap.js';
 import { kebabize } from '../emit/resolveLitSetterText.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
@@ -407,6 +408,8 @@ export function rewriteTemplateExpression(
           t.objectProperty(t.identifier('composed'), t.booleanLiteral(true)),
         ]),
       ]);
+      // Typed public surface P1 — same `CustomEvent<P>` typing as rewriteScript.
+      typeCustomEventDispatch(ir, firstArg.value, customEvent);
       path.replaceWith(
         t.callExpression(t.memberExpression(t.thisExpression(), t.identifier('dispatchEvent')), [
           customEvent,

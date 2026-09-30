@@ -74,6 +74,42 @@ export const badReset = <TypedEvents onReset={(x: number) => {}} />;
 export const badTone = <TypedEvents rowSlot={(ctx) => { const x: number = ctx.tone; return <span>{x}</span>; }} />;
 `;
 
+// Lit: the element class is the consumer surface. Events are typed through the
+// generated `Rozie<Name>EventMap` (extends HTMLElementEventMap) via
+// `addEventListener` overloads; the scoped slot's ctx is the parameter of the
+// `row` render-function property; exposed verbs are public methods.
+const LIT_CONSUMER = `import TypedEvents, { type PingPayload, type Count, type RozieTypedEventsEventMap } from './TypedEvents';
+declare const el: TypedEvents;
+el.addEventListener('ping', (e) => { const p: PingPayload = e.detail; p.count.toFixed(); });
+el.addEventListener('select', (e) => e.detail.toFixed());
+el.addEventListener('row-open', (e) => e.detail.index.toFixed());
+el.addEventListener('click', (e) => e.clientX.toFixed());
+el.addEventListener('reset', (e) => { const d: undefined = e.detail; void d; });
+el.addEventListener('reset', () => {});
+el.removeEventListener('ping', (e) => { e.detail.count.toFixed(); });
+// @ts-expect-error — reset has no payload: its detail is undefined
+el.addEventListener('reset', (e) => e.detail.toFixed());
+const n: number = el.getCount();
+el.getCount().toFixed();
+el.jump(3);
+el.clear('anything');
+// @ts-expect-error — bump takes no arguments
+el.bump(1);
+// @ts-expect-error — payload has no 'nope'
+el.addEventListener('ping', (e) => e.detail.nope);
+type K = keyof RozieTypedEventsEventMap;
+const k: K = 'reset';
+const c0: Count = 1;
+type RowCtx = Parameters<NonNullable<TypedEvents['row']>>[0];
+declare const ctx: RowCtx;
+const sc: Count = ctx.count;
+const st: string = ctx.tone;
+// @ts-expect-error — tone is string, not number
+const bad: number = ctx.tone;
+el.row = ({ count, tone }) => count.toFixed() + tone;
+void n; void k; void c0; void sc; void st; void bad;
+`;
+
 describe('TYPED-SURFACE-CONSUMER — strict consumer (typed-surface P1)', () => {
   it('react', () => {
     const { code, diagnostics } = compile(FIXTURE, {
@@ -101,6 +137,20 @@ describe('TYPED-SURFACE-CONSUMER — strict consumer (typed-surface P1)', () => 
       target: 'solid',
       files: { 'TypedEvents.tsx': code, 'Consumer.tsx': SOLID_CONSUMER },
       nodeModulesFrom: 'packages/ui/combobox/packages/solid',
+    });
+    expect(totalErrors(inventory), raw).toBe(0);
+  });
+  it('lit', () => {
+    const { code, diagnostics } = compile(FIXTURE, {
+      target: 'lit',
+      filename: 'TypedEvents.rozie',
+      sourceMap: false,
+    });
+    expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    const { raw, inventory } = typecheckCompiled({
+      target: 'lit',
+      files: { 'TypedEvents.ts': code, 'Consumer.ts': LIT_CONSUMER },
+      nodeModulesFrom: 'packages/ui/combobox/packages/lit',
     });
     expect(totalErrors(inventory), raw).toBe(0);
   });
