@@ -100,6 +100,10 @@ export type { LowerOptions, LowerResult } from './ir/lower.js';
 // lowerToIR — Phase 2 Plan 02-05 coordinator.
 // @experimental — shape may change before v1.0
 export { lowerToIR } from './ir/lower.js';
+// Typed public surface phase 3 — the shared "does attr auto-fallthrough fire,
+// and onto which root element" predicate (also drives synthesizeAttrsFallthrough).
+// @experimental — shape may change before v1.0
+export { resolveAttrsFallthroughRoot } from './ir/lowerers/lowerTemplate.js';
 // Quick 260819-9tc — `threadParamTypes` and `validateTwoWayBindings` are
 // compiler passes that `@rozie/unplugin` already depends on. They were the last
 // two symbols the plugin still had to reach through a relative

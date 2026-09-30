@@ -2248,6 +2248,61 @@ function resolveMatchHostRoot(template: IRTemplateNode | null): TemplateElementI
 }
 
 /**
+ * Typed public surface phase 3 — the element `synthesizeAttrsFallthrough` lands
+ * the `$attrs` spread on, or `null` exactly when synthesis is skipped
+ * (inherit-attrs off, no template, multi-root, non-element root,
+ * component/self root). The single source of truth for "does auto-fallthrough
+ * fire": the props-interface `extends` clause (`renderHtmlAttrsExtends`) reads
+ * it at emit time, so the typing can never disagree with the runtime spread.
+ */
+export function resolveAttrsFallthroughRoot(
+  template: IRTemplateNode | null,
+  inheritAttrs: boolean,
+): TemplateElementIR | null {
+  if (inheritAttrs === false) return null;
+  if (template === null) return null;
+
+  // Resolve the single root TemplateElement (direct, or the sole element of a
+  // whitespace-and-slot-padded TemplateFragment). Anything else is
+  // multi-root / not a single element — no synthesis (R8 handles it).
+  // WR-01: a sole-structural-root `<div r-match>` already has an
+  // unconditionally-rendered wrapper — that host IS the spread's destination,
+  // so resolve it before falling through to the element/slot loop below.
+  let rootEl: TemplateElementIR | null = resolveMatchHostRoot(template);
+  if (rootEl !== null) {
+    // resolved — skip the element/slot root resolution entirely
+  } else if (template.type === 'TemplateElement') {
+    rootEl = template;
+  } else if (template.type === 'TemplateFragment') {
+    for (const child of template.children) {
+      if (child.type === 'TemplateStaticText') continue; // cosmetic whitespace
+      if (child.type === 'TemplateSlotInvocation') continue; // Phase 82 D-01: renders nothing itself, does not disqualify
+      if (child.type === 'TemplateElement') {
+        if (rootEl !== null) {
+          rootEl = null; // multiple structural elements — not single-root
+          break;
+        }
+        rootEl = child;
+        continue;
+      }
+      // Every other structural sibling kind still disqualifies.
+      rootEl = null;
+      break;
+    }
+  }
+  if (rootEl === null) return null;
+  // Plan 14-05 — skip synthesis when the single root is NOT an HTML element.
+  // Component-tag / self-tag roots are nested Rozie/cross-framework component
+  // invocations: the spread would land as a "prop" on the inner component,
+  // not as a DOM attribute on the consumer's element. The semantics there
+  // are target-specific and out of scope for v1 — the consumer in that case
+  // is itself a thin wrapper and the inner component owns its own
+  // fallthrough surface. R8/R9 still apply via validateAttrFallthrough.
+  if (rootEl.tagKind !== 'html') return null;
+  return rootEl;
+}
+
+/**
  * Phase 14 R4 / RESEARCH.md Pattern 5 — synthesize the `$attrs` auto-fallthrough
  * spread.
  *
@@ -2288,46 +2343,8 @@ export function synthesizeAttrsFallthrough(
   template: IRTemplateNode | null,
   inheritAttrs: boolean,
 ): void {
-  if (inheritAttrs === false) return;
-  if (template === null) return;
-
-  // Resolve the single root TemplateElement (direct, or the sole element of a
-  // whitespace-and-slot-padded TemplateFragment). Anything else is
-  // multi-root / not a single element — no synthesis (R8 handles it).
-  // WR-01: a sole-structural-root `<div r-match>` already has an
-  // unconditionally-rendered wrapper — that host IS the spread's destination,
-  // so resolve it before falling through to the element/slot loop below.
-  let rootEl: TemplateElementIR | null = resolveMatchHostRoot(template);
-  if (rootEl !== null) {
-    // resolved — skip the element/slot root resolution entirely
-  } else if (template.type === 'TemplateElement') {
-    rootEl = template;
-  } else if (template.type === 'TemplateFragment') {
-    for (const child of template.children) {
-      if (child.type === 'TemplateStaticText') continue; // cosmetic whitespace
-      if (child.type === 'TemplateSlotInvocation') continue; // Phase 82 D-01: renders nothing itself, does not disqualify
-      if (child.type === 'TemplateElement') {
-        if (rootEl !== null) {
-          rootEl = null; // multiple structural elements — not single-root
-          break;
-        }
-        rootEl = child;
-        continue;
-      }
-      // Every other structural sibling kind still disqualifies.
-      rootEl = null;
-      break;
-    }
-  }
+  const rootEl = resolveAttrsFallthroughRoot(template, inheritAttrs);
   if (rootEl === null) return;
-  // Plan 14-05 — skip synthesis when the single root is NOT an HTML element.
-  // Component-tag / self-tag roots are nested Rozie/cross-framework component
-  // invocations: the spread would land as a "prop" on the inner component,
-  // not as a DOM attribute on the consumer's element. The semantics there
-  // are target-specific and out of scope for v1 — the consumer in that case
-  // is itself a thin wrapper and the inner component owns its own
-  // fallthrough surface. R8/R9 still apply via validateAttrFallthrough.
-  if (rootEl.tagKind !== 'html') return;
 
   // Append the synthesized `$attrs` spread LAST. `deps` is empty — `$attrs` is
   // a stable identifier (registered in STABLE_IDENTIFIERS, Plan 14-01), so it
