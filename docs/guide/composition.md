@@ -181,6 +181,22 @@ Vue exposes a single `inheritAttrs` switch, and its `$attrs` carries listeners a
 
 A component with more than one root element and `inherit-attrs` / `inherit-listeners` not set to `false` is a compile error with a code frame (`ROZ970` for attrs, `ROZ973` for listeners) — the auto-fallthrough machinery has no unambiguous target. Reference `$attrs` or `$listeners` manually while leaving the flag on and you'll see a soft warning (`ROZ971` / `ROZ974`) nudging you toward the explicit opt-out, since double application is legal but usually a mistake.
 
+### Consumer typing of passed-through attributes
+
+When auto-fallthrough fires (a single root element, `inherit-attrs` not `"false"`), the generated props type also accepts that root element's HTML attributes. A consumer can pass `class`, `style`, `id`, `aria-*`, `data-*`, element-specific attributes such as `disabled` on a `<button>` root, and DOM listeners without a cast:
+
+| Target | Props type |
+|---|---|
+| React | `interface FooProps extends Omit<React.ComponentPropsWithoutRef<'button'>, …>` |
+| Solid | `interface FooProps extends Omit<ComponentProps<'button'>, …>` |
+| Svelte | `interface Props extends Omit<SvelteHTMLElements['button'], …>` |
+| Vue / Lit | unchanged — both already accept fallthrough attributes |
+| Angular | unchanged — host attributes are template-level, not part of the class's TS surface |
+
+The component's own props win on a name collision, because they are omitted from the attribute type. `children` stays rejected (and on React `dangerouslySetInnerHTML`, on Solid `innerHTML` / `innerText` / `textContent`), because spreading it onto the root would replace the root's content. A root that is not a standard HTML element (a custom element, `<svg>`) gets the generic `HTMLAttributes<HTMLElement>`. Components with `inherit-attrs="false"`, an `r-if` root or a component root are unchanged, and so are the `.d.rozie.ts` sidecars' rules: they carry the same types as the compiled component.
+
+On Svelte this is stricter than before: the props type used to accept any key. An attribute the root element doesn't support is now a type error.
+
 ### When does this matter?
 
 Cross-framework wrappers around vanilla-JS engines — `flatpickr`, `Leaflet`, `Mapbox`, `TipTap`, `Chart.js`, `Sortable`, `FullCalendar`. Today you hand-write per-framework wrapper components, threading `id` / `aria-*` / `data-*` / styles / handlers / refs through a different idiom in each target. With Rozie you write the wrapper once: fallthrough handles the attribute and listener clusters, `$classSelector` handles class-name-as-selector strings (`handle: $classSelector('grip')`), `$refs` handles direct DOM access, and the same source ships React, Vue, Svelte, Angular, Solid, and Lit consumers.
