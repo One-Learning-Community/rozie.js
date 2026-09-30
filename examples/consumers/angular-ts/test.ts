@@ -85,3 +85,32 @@ void [cellKeyValue, freeSlotNameValue, wrongCellKeyType];
 
 // Suppress "declared but never read" for shape-pin locals.
 void [Counter, Dropdown, Modal, SearchInput, TodoList, DynamicSlots];
+
+// ---- TypedEvents: typed public surface P1 (typed outputs / <types> / handle) ----
+import { TypedEvents, type PingPayload, type Count } from './fixtures/TypedEvents';
+import type { TemplateRef, OutputEmitterRef } from '@angular/core';
+type TypedEventsShape = InstanceType<typeof TypedEvents>;
+declare const te: TypedEventsShape;
+type TeEqual<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+te.ping.subscribe((p: PingPayload) => p.count.toFixed());
+te.select.subscribe((v) => v.toFixed());
+te.rowOpen.subscribe((r) => r.index.toFixed());
+te.reset.subscribe(() => {});
+// @ts-expect-error TS2339 — PingPayload has no 'nope'
+te.ping.subscribe((p) => p.nope);
+// @ts-expect-error TS2345 — reset carries no payload; a subscriber requiring one is rejected
+te.reset.subscribe((x: number) => x);
+const teCount: number = te.getCount();
+te.jump(3);
+te.clear('anything');
+// @ts-expect-error TS2554 — bump() takes no arguments
+te.bump(1);
+const teC0: Count = 1;
+// Slot ctx surface: the emitted `rowTpl` is a `TemplateRef<RowCtx>`.
+type TeRowCtx = NonNullable<TypedEventsShape['rowTpl']> extends TemplateRef<infer C> ? C : never;
+declare const teCtx: TeRowCtx;
+const teSlotCount: Count = teCtx.count;
+// @ts-expect-error TS2322 — tone is a string
+const teSlotTone: number = teCtx.tone;
+const teResetVoid: TeEqual<typeof te.reset, OutputEmitterRef<void>> = true;
+void [teCount, teC0, teSlotCount, teSlotTone, teResetVoid];

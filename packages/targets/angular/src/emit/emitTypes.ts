@@ -134,6 +134,7 @@ export function emitAngularTypes(ir: IRComponent, opts: EmitAngularTypesOptions 
       // sidecar declares no slot fields / `slots` record.
       slotSurface: { fields: [] },
       target: 'angular',
+      includeTypesBlock: true,
     }),
   );
   lines.push('');

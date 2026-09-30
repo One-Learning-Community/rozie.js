@@ -2,6 +2,12 @@ import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef
 import { NgTemplateOutlet } from '@angular/common';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
 
+export type Count = number;
+export interface PingPayload {
+  count: Count;
+  label: string;
+}
+
 interface RowCtx {
   $implicit: { count: Count; tone: string };
   count: Count;
@@ -29,10 +35,12 @@ interface RowCtx {
 export class TypedEvents {
   tone = input<string>('info');
   count = signal(0);
-  ping = output<unknown>();
+  ping = output<PingPayload>();
   reset = output<void>();
-  select = output<unknown>();
-  rowOpen = output<unknown>({ alias: 'row-open' });
+  select = output<number>();
+  rowOpen = output<{
+    index: number;
+  }>({ alias: 'row-open' });
   @ContentChild('row', { read: TemplateRef }) rowTpl?: TemplateRef<RowCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   __rozieFills = contentChildren(RozieSlot, { descendants: true });
@@ -47,7 +55,7 @@ export class TypedEvents {
     return map;
   });
 
-  bump = () => {
+  bump: () => void = () => {
     const next = this.count() + 1;
     this.count.set(next);
     this.ping.emit({
@@ -55,14 +63,14 @@ export class TypedEvents {
       label: this.tone()
     });
   };
-  clear = () => {
+  clear: (...args: any[]) => any = () => {
     this.count.set(0);
     this.reset.emit();
   };
-  getCount = () => {
+  getCount: () => number = () => {
     return this.count();
   };
-  jump = (...a: any[]) => {
+  jump: (to: number) => void = (...a: any[]) => {
     this.count.set(a.length);
   };
 

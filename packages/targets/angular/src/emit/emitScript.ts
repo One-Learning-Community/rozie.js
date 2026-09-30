@@ -61,7 +61,14 @@ import type {
   RefDecl,
   StateDecl,
 } from '@rozie/core';
-import { buildPropJsdoc, RozieErrorCode } from '@rozie/core';
+import {
+  buildPropJsdoc,
+  exposeSignatureAnnotation,
+  printTSType,
+  renderTypesBlock,
+  RozieErrorCode,
+  untypedExposeSignature,
+} from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import {
   deconflictReservedImportBindings,
@@ -1137,6 +1144,9 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   for (const typeDecl of hoistedTypeDecls) {
     interfaceDecls.push(genCode(typeDecl));
   }
+  // Typed public surface P1 — `<types>` lands at module top, above `@Component`.
+  const typesBlock = renderTypesBlock(ir);
+  if (typesBlock !== '') interfaceDecls.push(typesBlock);
   const slotFieldDecls: string[] = [];
   // Dedupe by DISTINCT slot name — a template may reference the same named
   // slot in multiple locations (e.g. DataTable's `colHeader`, Slider's
@@ -1315,7 +1325,17 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   //     event name via `output()`'s optional `{ alias }` argument. Names that
   //     are already valid identifiers stay byte-identical (no alias arg).
   for (const e of ir.emits) {
-    const outputType = emitsWithPayload.has(e) ? 'unknown' : 'void';
+    // Typed public surface P1: when `<emits>` is declared, the authored payload
+    // type (or `void`) wins; otherwise the unknown/void arity heuristic stays.
+    const emitDecl = ir.emitDecls !== null ? ir.emitDecls.find((d) => d.name === e) : undefined;
+    const outputType =
+      ir.emitDecls !== null
+        ? emitDecl?.payload
+          ? printTSType(emitDecl.payload)
+          : 'void'
+        : emitsWithPayload.has(e)
+          ? 'unknown'
+          : 'void';
     // Quick task 260811-trz (D-04) — routed through the single
     // `angularOutputBinding` source of truth both this declaration side AND
     // `emitTemplateEvent.ts`'s consumer-side resolution consume. Emitted
@@ -1816,6 +1836,18 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   //    (so they're invokable via `this.name(...)`); top-level statements
   //    (console.log, expression-statements) go in the constructor body.
   const classMethodLines: string[] = [];
+  // Typed public surface P1 — class-property type annotation (`: (to: number) => void`)
+  // for an `$expose`d verb. Opt-in components (any `$expose` signature declared)
+  // give untyped verbs the documented `(...args: any[]) => any` shape. '' otherwise.
+  const exposeSigs = new Map(
+    ir.expose.flatMap((e) => (e.signature !== undefined ? [[e.name, e.signature] as const] : [])),
+  );
+  const exposedNameSet = new Set(ir.expose.map((e) => e.name));
+  const exposedAnnotation = (name: string): string => {
+    if (!exposedNameSet.has(name)) return '';
+    const sig = exposeSigs.get(name) ?? (exposeSigs.size > 0 ? untypedExposeSignature() : undefined);
+    return sig ? `: ${genCode(exposeSignatureAnnotation(sig).typeAnnotation)}` : '';
+  };
   const constructorExpressionLines: string[] = [];
   // Collect the raw t.Statement nodes for user residual constructor expressions
   // so we can generate a single-program source map (for devtools line accuracy).
@@ -1977,7 +2009,9 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
             annotateUntypedParams(d.init.params);
           }
           const arrowCode = genCode(d.init);
-          classMethodLines.push(`${d.id.name}${declTypeSuffix} = ${arrowCode};`);
+          const exposedSuffix =
+            declTypeSuffix === '' ? exposedAnnotation(d.id.name) : declTypeSuffix;
+          classMethodLines.push(`${d.id.name}${exposedSuffix} = ${arrowCode};`);
         } else {
           // Primitive / other init — emit as class-level field too. Class fields
           // initialized at field declaration time match user intent ("this is
@@ -2012,7 +2046,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
       arrow.returnType = stmt.returnType ?? null;
       arrow.typeParameters = stmt.typeParameters ?? null;
       const fnCode = genCode(arrow);
-      classMethodLines.push(`${stmt.id.name} = ${fnCode};`);
+      classMethodLines.push(`${stmt.id.name}${exposedAnnotation(stmt.id.name)} = ${fnCode};`);
       continue;
     }
 
