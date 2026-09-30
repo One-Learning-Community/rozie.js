@@ -131,3 +131,16 @@ void [
   selectNum,
   dynamicSlots,
 ];
+
+// ---- Typed public surface phase 3 — pass-through HTML attributes --------
+// Spec §5: Vue needs no emitter change — `h()` accepts fallthrough attrs on a
+// component. Counter is a single-<div>-root, attr-inheriting component.
+const counterAttrs = h(Counter, {
+  value: 0,
+  class: 'consumer-class',
+  style: { color: 'red' },
+  id: 'counter-1',
+  'aria-label': 'Counter',
+  'data-test': 'counter',
+});
+void counterAttrs;

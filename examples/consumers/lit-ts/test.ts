@@ -65,3 +65,11 @@ instance.rozieSlots = {
 };
 
 void [instance];
+
+// ---- Typed public surface phase 3 — pass-through HTML attributes --------
+// Spec §5: Lit needs no emitter change — the component IS an HTMLElement.
+instance.className = 'consumer-class';
+instance.id = 'dyn-1';
+instance.style.color = 'red';
+instance.setAttribute('aria-label', 'Dynamic slots');
+instance.dataset.test = 'dyn';
