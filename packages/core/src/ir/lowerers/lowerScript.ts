@@ -42,7 +42,6 @@ export interface LowerScriptResult {
   /** Quick plan 260515-u2b — parallel to `lifecycle`. */
   watchers: WatchHook[];
   setupBody: SetupBody;
-  emits: string[];
   /** Phase 21 — `$expose({...})` names in source order; `[]` when no $expose. */
   expose: ExposedMethod[];
   /** Phase 36 — `$provide('key', value)` decls in source order; `[]` when none. */
@@ -305,11 +304,7 @@ export function lowerScript(
     annotations: buildAnnotations(script, bindings),
   };
 
-  // 4. emits — collected by Plan 02-01; nothing to add here (template-level
-  // discovery handled by lowerTemplate via $emit() walk).
-  const emits = [...bindings.emits];
-
-  // 5. expose — Phase 21. Map the collected $expose names (source order; NOT
+  // 4. expose — Phase 21. Map the collected $expose names (source order; NOT
   // Set-deduped — per-name sourceLoc must survive) into ExposedMethod IR nodes.
   const expose: ExposedMethod[] = bindings.expose.map((e) => ({
     type: 'ExposedMethod',
@@ -317,7 +312,7 @@ export function lowerScript(
     sourceLoc: e.sourceLoc,
   }));
 
-  // 6. provides / injects — Phase 36. Thin lowerer READS the collected
+  // 5. provides / injects — Phase 36. Thin lowerer READS the collected
   // bindings.provides / bindings.injects (populated by collectScriptDecls) and
   // produces IR ProvideDecl[] / InjectDecl[] — no AST re-walk.
   const { provides, injects } = lowerContext(bindings);
@@ -327,7 +322,6 @@ export function lowerScript(
     lifecycle,
     watchers,
     setupBody,
-    emits,
     expose,
     provides,
     injects,

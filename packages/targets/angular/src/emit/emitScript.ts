@@ -507,6 +507,73 @@ function collectEmitsWithPayload(clonedProgram: t.File): Set<string> {
   return withPayload;
 }
 
+/**
+ * quick 260929-ua4 — sibling of `collectEmitsWithPayload` for the calls that
+ * live OUTSIDE `<script>`: every `$emit('name', payload)` in `ir.template` and
+ * `ir.listeners`. Same payload rule (Identifier callee `$emit`, StringLiteral
+ * first argument, 2+ arguments).
+ *
+ * The script-only scan was insufficient once template- and listeners-only
+ * emits were collected into `ir.emits`: `$emit('ping', 1)` written in a click
+ * handler declared `ping = output<void>()`, and the template's `ping.emit(1)`
+ * then failed TS2554.
+ *
+ * MUST run before `emitTemplate` rewrites `$emit(...)` into `name.emit(...)`
+ * (`emitAngular.ts` calls `emitScript` first, so the IR template expressions
+ * still carry the raw `$emit` callee here).
+ *
+ * A generic read-only deep walk: it recurses into arrays and plain objects,
+ * so it covers every IR node kind (events, bindings, interpolations, slot
+ * fillers, r-for, r-if) without enumerating them. IR template nodes reference
+ * no foreign IRComponent or Program, so it cannot pick up another component's
+ * emits. It assigns nothing (unlike `emitContext.ts`'s `walk`), skips source
+ * location and comment keys, and guards against cycles with a WeakSet.
+ */
+const IR_EMIT_WALK_SKIP_KEYS = new Set([
+  'loc',
+  'start',
+  'end',
+  'sourceLoc',
+  'leadingComments',
+  'trailingComments',
+  'innerComments',
+]);
+
+function collectTemplateEmitsWithPayload(ir: IRComponent): Set<string> {
+  const withPayload = new Set<string>();
+  const seen = new WeakSet<object>();
+  const visit = (value: unknown): void => {
+    if (value === null || typeof value !== 'object') return;
+    if (seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+    const node = value as Record<string, unknown>;
+    if (node.type === 'CallExpression') {
+      const call = node as unknown as t.CallExpression;
+      const first = call.arguments[0];
+      if (
+        t.isIdentifier(call.callee) &&
+        call.callee.name === '$emit' &&
+        first !== undefined &&
+        t.isStringLiteral(first) &&
+        call.arguments.length >= 2
+      ) {
+        withPayload.add(first.value);
+      }
+    }
+    for (const key of Object.keys(node)) {
+      if (IR_EMIT_WALK_SKIP_KEYS.has(key)) continue;
+      visit(node[key]);
+    }
+  };
+  visit(ir.template);
+  visit(ir.listeners);
+  return withPayload;
+}
+
 interface LifecycleClonedBody {
   setupCloned: t.Expression | t.BlockStatement;
   cleanupCloned: t.Expression | null;
@@ -1037,6 +1104,11 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   // 2b. Bug 4: scan for `$emit('name', payload)` BEFORE the rewrite erases the
   //     `$emit` callee. Events never passed a payload → `output<void>()`.
   const emitsWithPayload = collectEmitsWithPayload(cloned);
+  //     quick 260929-ua4 — a `$emit` written only in <template> or <listeners>
+  //     is now in `ir.emits`, but the script scan above never sees its
+  //     payload, so it would be declared `output<void>()` and the template's
+  //     `name.emit(payload)` would fail TS2554. Union in the IR-side scan.
+  for (const name of collectTemplateEmitsWithPayload(ir)) emitsWithPayload.add(name);
 
   // 3. Rewrite identifiers on the clone.
   // Phase 23 — thread the single CVA model prop NAME (or null) so the rewrite

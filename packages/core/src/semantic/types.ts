@@ -231,8 +231,12 @@ export interface BindingsTable {
   slots: Map<string, SlotDeclEntry>;
   computeds: Map<string, ComputedDeclEntry>;
   /**
-   * Discovered from $emit('name', ...) call sites in <script>; template
-   * @event handler expressions are also walked (RESEARCH.md A4).
+   * Event names from `$emit('name', ...)` calls with a string-literal name,
+   * deduped, in first-seen order: `<script>` names first
+   * (`collectors/collectScriptDecls.ts`), then `<template>` names in DFS
+   * pre-order, then `<listeners>` names (both from
+   * `collectors/collectTemplateEmits.ts`, quick 260929-ua4). Dynamic names are
+   * not collected.
    */
   emits: Set<string>;
   /**

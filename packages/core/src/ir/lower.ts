@@ -196,7 +196,7 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
 
   const scriptResult = ast.script
     ? lowerScript(ast.script, bindings, depGraph, diagnostics)
-    : { computed: [], lifecycle: [], watchers: [], setupBody: emptySetupBody(), emits: [], expose: [], provides: [], injects: [] };
+    : { computed: [], lifecycle: [], watchers: [], setupBody: emptySetupBody(), expose: [], provides: [], injects: [] };
 
   // RefDecl[] sourced from BindingsTable (template-collected refs).
   const refs: RefDecl[] = [];
@@ -241,7 +241,12 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     computed: scriptResult.computed,
     refs,
     slots,
-    emits: [...new Set(scriptResult.emits)],
+    // Emit names come from the semantic collectors, not from lowerScript:
+    // collectScriptDecls adds the <script> names and collectTemplateEmits then
+    // adds the <template> and <listeners> names (quick 260929-ua4). The Set is
+    // already deduped in first-seen order, and it is filled even when the
+    // component has no <script> block.
+    emits: [...bindings.emits],
     // Phase 21 — $expose({...}) method names in source order; [] when no
     // $expose call. NOT Set-deduped (per-name sourceLoc + source order must
     // survive); every emitter branches on expose.length === 0 (D-02).

@@ -33,8 +33,8 @@
  * consumer side must keep warning about it, not silently equate the two.
  *
  * One ROZ997 per colliding GROUP (not one per pair) at `ir.sourceLoc` — the IR
- * carries no per-emit source locations (lower.ts dedupes `scriptResult.emits`
- * by exact string into a plain `string[]`); the `ir.sourceLoc` fallback is the
+ * carries no per-emit source locations (`bindings.emits` is a Set deduped by
+ * exact string, copied into a plain `string[]` by lower.ts); the `ir.sourceLoc` fallback is the
  * validateListenerFallthrough precedent. Groups are emitted in
  * first-occurrence source order so the diagnostic sequence is stable and
  * snapshot-safe.

@@ -65,6 +65,8 @@ export default defineConfig({
       // quick 260929-mn8 (DD-8) — <listeners> handler-shape parity matrix
       // (callable vs statement × plain/.outside/.debounce × 6 targets).
       'listener-handler-shapes.test.ts',
+      // quick 260929-ua4 — template/listeners-only $emit collection matrix.
+      'template-emit-collection.test.ts',
       '**/*.test.tsx',
     ],
     testTimeout: 30000,

@@ -1,7 +1,7 @@
 /**
  * BindingsTable + collectors substage entrypoint for Phase 2.
  *
- * `collectAllDeclarations(ast)` runs the four per-block collectors in order
+ * `collectAllDeclarations(ast)` runs the per-block collectors in order
  * and returns the populated BindingsTable. NEVER emits diagnostics —
  * collectors are silent. Plan 02 wraps this with the validators substage to
  * produce a full `analyzeAST` result.
@@ -16,6 +16,7 @@ import { collectPropDecls } from './collectors/collectPropDecls.js';
 import { collectDataDecls } from './collectors/collectDataDecls.js';
 import { collectRefsAndSlots } from './collectors/collectRefsAndSlots.js';
 import { collectScriptDecls } from './collectors/collectScriptDecls.js';
+import { collectTemplateEmits } from './collectors/collectTemplateEmits.js';
 
 export type {
   BindingsTable,
@@ -68,5 +69,8 @@ export function collectAllDeclarations(ast: RozieAST): BindingsTable {
   if (ast.data) collectDataDecls(ast.data, bindings);
   if (ast.template) collectRefsAndSlots(ast.template, bindings);
   if (ast.script) collectScriptDecls(ast.script, bindings);
+  // quick 260929-ua4 — LAST, so `bindings.emits` keeps script names first
+  // (Set insertion order), then template (DFS pre-order), then listeners.
+  collectTemplateEmits(ast, bindings);
   return bindings;
 }

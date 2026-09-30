@@ -18,14 +18,15 @@
  * string literal:
  *
  *   - <script>     — full Babel program traversal (CallExpression visitor).
- *   - <template>   — for each TemplateAttr where kind === 'binding' | 'directive'
- *                    | 'event' (SKIP directive `for` — r-for LHS is not a JS
- *                    expression), and each TemplateInterpolation ({{ ... }}),
- *                    re-parse the expression text and walk it.
- *   - <listeners>  — each ListenerEntry's `value` Expression (absolute byte
- *                    offsets, baseOffset 0); the `$emit` call lives in the
- *                    handler, so traversing the full expression tree with the
- *                    CallExpression visitor is sufficient.
+ *   - <template> + <listeners> — quick 260929-ua4: walked through the SHARED
+ *                    `forEachTemplateAndListenersEmitCall` walker
+ *                    (`../walkEmitCalls.ts`), the same walk
+ *                    `collectors/collectTemplateEmits.ts` uses to add template
+ *                    and listeners event names to `bindings.emits`. So every
+ *                    name that gets collected is also shape-checked here. The
+ *                    walker's coverage rules (which attribute kinds, the `{{ }}`
+ *                    base offset, the two-pass TS-plugin parse, skipping
+ *                    recovered interpolations) are documented there.
  *
  * An empty event name is meaningless on every target — Angular emits a class
  * field with an empty name; no consumer can bind it. ROZ122 makes the shape an
@@ -51,16 +52,9 @@
  */
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
-import { parseExpression } from '@babel/parser';
 import type { RozieAST, SourceLoc } from '../../ast/types.js';
 import type { ScriptAST } from '../../ast/blocks/ScriptAST.js';
-import type { ListenersAST, ListenerEntry } from '../../ast/blocks/ListenersAST.js';
-import type {
-  TemplateAST,
-  TemplateNode,
-  TemplateElement,
-  TemplateAttr,
-} from '../../ast/blocks/TemplateAST.js';
+import { forEachTemplateAndListenersEmitCall } from '../walkEmitCalls.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
 
@@ -165,105 +159,8 @@ function traverseProgram(file: t.File, ctx: ValidatorContext): void {
   });
 }
 
-/**
- * Walk a stand-alone Babel Expression (re-parsed from a template attribute
- * value/interpolation, or a listener handler). The expression's offsets are
- * relative to the parsed-fragment start, so `baseOffset` is added to all
- * emitted diagnostic locs.
- */
-function traverseFragmentExpression(
-  expr: t.Expression,
-  baseOffset: number,
-  ctx: ValidatorContext,
-): void {
-  const wrapped = t.file(t.program([t.expressionStatement(expr)]));
-  traverse(wrapped, {
-    CallExpression(path) {
-      checkCallExpression(path.node, ctx, baseOffset);
-    },
-  });
-}
-
-/**
- * Re-parse a template-attribute or interpolation expression text and walk it.
- * Returns silently on parse failure — the parser layer already emitted a
- * diagnostic for malformed expression text. NEVER throws (D-08).
- */
-function parseAndTraverse(
-  text: string,
-  baseOffset: number,
-  ctx: ValidatorContext,
-): void {
-  try {
-    const expr = parseExpression(text, { sourceType: 'module' });
-    traverseFragmentExpression(expr, baseOffset, ctx);
-  } catch {
-    // Parser-layer diagnostics already cover this; stay silent here.
-  }
-}
-
-function isElement(node: TemplateNode): node is TemplateElement {
-  return node.type === 'TemplateElement';
-}
-
-function isInterpolation(
-  node: TemplateNode,
-): node is { type: 'TemplateInterpolation'; rawExpr: string; loc: SourceLoc } {
-  return node.type === 'TemplateInterpolation';
-}
-
-/**
- * Walk a TemplateAttr's expression value if the attr's kind is a known
- * expression-bearing kind (binding, directive, event). SKIP directive `for`
- * (r-for LHS is not a JS expression).
- */
-function validateTemplateAttr(attr: TemplateAttr, ctx: ValidatorContext): void {
-  if (attr.value === null || attr.valueLoc === null) return;
-  if (attr.kind === 'directive' && attr.name === 'for') return;
-  if (
-    attr.kind === 'binding' ||
-    attr.kind === 'directive' ||
-    attr.kind === 'event'
-  ) {
-    parseAndTraverse(attr.value, attr.valueLoc.start, ctx);
-  }
-}
-
-function visitTemplateNode(node: TemplateNode, ctx: ValidatorContext): void {
-  if (isInterpolation(node)) {
-    // {{ ... }} — baseOffset = loc.start + 2 (skipping `{{`).
-    parseAndTraverse(node.rawExpr, node.loc.start + 2, ctx);
-    return;
-  }
-  if (!isElement(node)) return;
-  for (const attr of node.attributes) {
-    validateTemplateAttr(attr, ctx);
-  }
-  for (const child of node.children) {
-    visitTemplateNode(child, ctx);
-  }
-}
-
-function validateListenerEntry(entry: ListenerEntry, ctx: ValidatorContext): void {
-  // entry.value carries ABSOLUTE byte offsets (baseOffset 0). The `$emit` call
-  // lives in the handler; walking the full expression tree covers it.
-  traverseFragmentExpression(entry.value, 0, ctx);
-}
-
 function validateScript(script: ScriptAST, ctx: ValidatorContext): void {
   traverseProgram(script.program, ctx);
-}
-
-function validateListeners(listeners: ListenersAST, ctx: ValidatorContext): void {
-  for (const entry of listeners.entries) {
-    validateListenerEntry(entry, ctx);
-  }
-}
-
-function validateTemplate(template: TemplateAST, ctx: ValidatorContext): void {
-  for (const child of template.children) {
-    visitTemplateNode(child, ctx);
-  }
 }
 
 /**
@@ -276,6 +173,8 @@ export function runEmitNameValidator(
 ): void {
   const ctx: ValidatorContext = { diagnostics };
   if (ast.script) validateScript(ast.script, ctx);
-  if (ast.template) validateTemplate(ast.template, ctx);
-  if (ast.listeners) validateListeners(ast.listeners, ctx);
+  // <template> (DFS pre-order) then <listeners> — the shared walker.
+  forEachTemplateAndListenersEmitCall(ast, (call, baseOffset) => {
+    checkCallExpression(call, ctx, baseOffset);
+  });
 }
