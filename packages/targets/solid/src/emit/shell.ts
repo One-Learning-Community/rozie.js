@@ -55,6 +55,8 @@ export interface SolidShellParts {
    * Empty/undefined for an untyped `<script>`.
    */
   hoistedTypeDecls?: string[];
+  /** Typed-surface P1 — rendered `<types>` block, placed at module top after `hoistedTypeDecls`. '' / undefined when absent. */
+  typesBlock?: string;
   /**
    * Standalone interface declarations for slot-context types.
    * Each entry is a complete `interface XCtx { ... }` block.
@@ -232,6 +234,11 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
       moduleParts.push(decl);
       moduleParts.push('\n\n');
     }
+  }
+
+  if (parts.typesBlock) {
+    moduleParts.push(parts.typesBlock);
+    moduleParts.push('\n\n');
   }
 
   // Item-1-residual closure — module-top style-injection side-effect.
@@ -413,6 +420,11 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
       ms.append(decl);
       ms.append('\n\n');
     }
+  }
+
+  if (parts.typesBlock) {
+    ms.append(parts.typesBlock);
+    ms.append('\n\n');
   }
 
   // Item-1-residual closure — module-top style-injection side-effect

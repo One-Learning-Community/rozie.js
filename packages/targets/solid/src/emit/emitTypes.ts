@@ -81,6 +81,7 @@ export function emitSolidTypes(ir: IRComponent, opts: EmitSolidTypesOptions = {}
       // Typed public surface phase 3 — mirror the inline interface's
       // `extends Omit<ComponentProps<tag>, …>` in the public sidecar.
       htmlAttrs: 'solid',
+      includeTypesBlock: true,
     }),
   );
   lines.push('');

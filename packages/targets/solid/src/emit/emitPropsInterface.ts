@@ -16,7 +16,7 @@
  */
 import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation, SlotDecl } from '@rozie/core';
-import { buildPropJsdoc, renderHtmlAttrsExtends } from '@rozie/core';
+import { buildPropJsdoc, renderEmitHandlerType, renderHtmlAttrsExtends } from '@rozie/core';
 // WR-05 fix (79-REVIEW-FIX): was a local copy of this exact one-line
 // escaping predicate — consolidated into core; see that module's doc
 // comment for why (drift risk on shared, security-relevant escaping logic).
@@ -227,7 +227,9 @@ export function emitPropsInterface(
   for (const e of ir.emits) {
     const eventPascal = toPascalCase(e);
     if (eventPascal.length === 0) continue;
-    fields.push(`  on${eventPascal}?: (...args: any[]) => void;`);
+    fields.push(
+      `  on${eventPascal}?: ${renderEmitHandlerType(ir.emitDecls?.find((d) => d.name === e))};`,
+    );
   }
 
   // Slots — use slotPropFields when provided (P2 filled by emitSlotDecl).

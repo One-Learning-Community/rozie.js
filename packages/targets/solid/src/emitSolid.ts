@@ -19,7 +19,7 @@
  * @experimental — shape may change before v1.0
  */
 import type { BlockMap, Diagnostic, IRComponent, ModifierRegistry } from '@rozie/core';
-import { createDefaultRegistry } from '@rozie/core';
+import { createDefaultRegistry, renderTypesBlock } from '@rozie/core';
 import type { SourceMap } from 'magic-string';
 import { buildPartialLineOffsets } from '../../../core/src/codegen/composeMaps.js';
 import { resolveComponentRefs } from '../../../core/src/codegen/resolveComponentRefs.js';
@@ -345,6 +345,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     runtimeImports: runtimeImports.render(),
     userImports: scriptResult.userImports,
     hoistedTypeDecls: scriptResult.hoistedTypeDecls,
+    typesBlock: renderTypesBlock(ir),
     componentImportsBlock,
     ctxInterfaces: slotResult.ctxInterfaces,
     mergePropsCall: scriptResult.mergePropsCall ?? undefined,

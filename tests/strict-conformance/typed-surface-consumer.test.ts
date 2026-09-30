@@ -47,6 +47,33 @@ export function App() {
 }
 `;
 
+const SOLID_CONSUMER = `import TypedEvents, { type TypedEventsHandle, type PingPayload, type Count } from './TypedEvents';
+let h: TypedEventsHandle | undefined;
+export const n: number | undefined = h?.getCount();
+h?.jump(3);
+h?.clear('anything');
+// @ts-expect-error — bump takes no arguments
+h?.bump(1);
+export const c0: Count = 1;
+export const ok = (
+  <TypedEvents
+    ref={(x) => { h = x; }}
+    tone="info"
+    onPing={(p: PingPayload) => p.count.toFixed()}
+    onReset={() => {}}
+    onSelect={(v) => v.toFixed()}
+    onRowOpen={(r) => r.index.toFixed()}
+    rowSlot={(ctx) => { const c: Count = ctx.count; return <span>{c.toFixed()}{ctx.tone}</span>; }}
+  />
+);
+// @ts-expect-error — payload has no 'nope'
+export const bad = <TypedEvents onPing={(p) => p.nope} />;
+// @ts-expect-error — reset has no payload: a handler requiring an argument is rejected
+export const badReset = <TypedEvents onReset={(x: number) => {}} />;
+// @ts-expect-error — tone is string, not number
+export const badTone = <TypedEvents rowSlot={(ctx) => { const x: number = ctx.tone; return <span>{x}</span>; }} />;
+`;
+
 describe('TYPED-SURFACE-CONSUMER — strict consumer (typed-surface P1)', () => {
   it('react', () => {
     const { code, diagnostics } = compile(FIXTURE, {
@@ -59,6 +86,21 @@ describe('TYPED-SURFACE-CONSUMER — strict consumer (typed-surface P1)', () => 
       target: 'react',
       files: { 'TypedEvents.tsx': code, 'Consumer.tsx': REACT_CONSUMER },
       nodeModulesFrom: 'packages/ui/combobox/packages/react',
+    });
+    expect(totalErrors(inventory), raw).toBe(0);
+  });
+
+  it('solid', () => {
+    const { code, diagnostics } = compile(FIXTURE, {
+      target: 'solid',
+      filename: 'TypedEvents.rozie',
+      sourceMap: false,
+    });
+    expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    const { raw, inventory } = typecheckCompiled({
+      target: 'solid',
+      files: { 'TypedEvents.tsx': code, 'Consumer.tsx': SOLID_CONSUMER },
+      nodeModulesFrom: 'packages/ui/combobox/packages/solid',
     });
     expect(totalErrors(inventory), raw).toBe(0);
   });
