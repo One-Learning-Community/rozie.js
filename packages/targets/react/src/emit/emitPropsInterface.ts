@@ -13,10 +13,12 @@
  *   - `onValueChange?: (value: T) => void`  (parent notification)
  *
  * Slot decls produce render-prop signatures (`renderX?: (ctx: XCtx) => ReactNode`)
- * — Plan 04-03 implements the slot-side; this plan stubs to never emit slots.
+ * — the slot fields come from emitSlotDecl (Plan 04-03).
  *
  * Each entry in ir.emits synthesizes an additional optional field on the
- * interface: `on<PascalCase>?: (...args: unknown[]) => void`.
+ * interface: `on<PascalCase>?: <handler type>` from core `renderEmitHandlerType`
+ * — `(payload: P) => void` / `() => void` when `<emits>` declares the event,
+ * `(...args: any[]) => void` otherwise (typed public surface P1).
  *
  * @experimental — shape may change before v1.0
  */
@@ -152,10 +154,10 @@ export function emitPropsInterface(ir: IRComponent, slotPropFields?: string[]): 
     }
   }
 
-  // Emits → optional `on<EventPascal>` props.
-  // v1: ship `(...args: any[]) => void` since IR doesn't carry per-emit arg types.
-  // 2026-05-18 — `any[]` (not `unknown[]`) so consumer-side TS doesn't complain
-  // about untyped event args at call sites like `props.onSearch(query)`.
+  // Emits → optional `on<EventPascal>` props, typed by the shared core
+  // `renderEmitHandlerType`: the authored `<emits>` payload when declared,
+  // else `(...args: any[]) => void` (`any[]`, not `unknown[]`, so consumer-side
+  // TS accepts handlers written with a concrete parameter type).
   for (const e of ir.emits) {
     const eventPascal = toPascalCase(e);
     if (eventPascal.length === 0) continue;

@@ -170,17 +170,10 @@ function extractWatchFromExpression(expr: t.Expression): WatchEntry | null {
 }
 
 /**
- * Phase 21 ($expose) — read the canonical `$expose({...})` argument object and
- * return its property key names as ExposedMethodEntry items in source order.
- *
- * Mirrors `extractWatchFromExpression`'s guard shape. Returns `null` when the
- * expression is not a top-level `$expose(...)` call. Returns `[]` when the call
- * exists but its argument is not an ObjectExpression (malformed — the VALIDATOR
- * emits ROZ115; the collector stays silent). Each well-formed property (both
- * shorthand `{ clear }` and explicit `{ clear: clear }`) yields one entry keyed
- * by its property name; spread / computed-key / non-identifier-key properties
- * are skipped here (the validator emits ROZ116/ROZ117). `__proto__` /
- * `constructor` / `prototype` keys are filtered (FORBIDDEN_EXPOSE_KEYS).
+ * Typed public surface P1 — record the `$expose` SECOND argument (compile-time
+ * signatures: `{ verb: '<TS function type>' }`) on `bindings.exposeSignatures`.
+ * Malformed shapes are skipped silently here (the validator reports ROZ155 /
+ * ROZ156).
  */
 function collectExposeSignatures(
   expr: t.Expression,
@@ -200,6 +193,19 @@ function collectExposeSignatures(
   }
 }
 
+/**
+ * Phase 21 ($expose) — read the canonical `$expose({...})` argument object and
+ * return its property key names as ExposedMethodEntry items in source order.
+ *
+ * Mirrors `extractWatchFromExpression`'s guard shape. Returns `null` when the
+ * expression is not a top-level `$expose(...)` call. Returns `[]` when the call
+ * exists but its argument is not an ObjectExpression (malformed — the VALIDATOR
+ * emits ROZ115; the collector stays silent). Each well-formed property (both
+ * shorthand `{ clear }` and explicit `{ clear: clear }`) yields one entry keyed
+ * by its property name; spread / computed-key / non-identifier-key properties
+ * are skipped here (the validator emits ROZ116/ROZ117). `__proto__` /
+ * `constructor` / `prototype` keys are filtered (FORBIDDEN_EXPOSE_KEYS).
+ */
 function extractExposeFromExpression(
   expr: t.Expression,
 ): ExposedMethodEntry[] | null {

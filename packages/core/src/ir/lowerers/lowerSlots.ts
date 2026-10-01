@@ -213,12 +213,6 @@ function determinePresence(
 }
 
 /**
- * Find the FIRST `binding`-kind attribute on `slot` whose name is exactly
- * `attrName` (with a non-null value). Used to locate the `:name` binding
- * separately from `collectParamsFromSlotElement`'s param-collection pass,
- * which now skips it entirely (Phase 79 R1).
- */
-/**
  * Typed-surface — lower `<slot :param-types="{ row: 'Row[]' }">` to an
  * index-aligned TSType[] (omitted params are `any`). Returns undefined (after
  * pushing a diagnostic) when the attribute is unusable.
@@ -288,6 +282,12 @@ function lowerParamTypes(
   return paramNames.map((n) => typed.get(n) ?? t.tsAnyKeyword());
 }
 
+/**
+ * Find the FIRST `binding`-kind attribute on `slot` whose name is exactly
+ * `attrName` (with a non-null value). Used to locate the `:name` binding
+ * separately from `collectParamsFromSlotElement`'s param-collection pass,
+ * which now skips it entirely (Phase 79 R1).
+ */
 function findBindingAttr(slot: TemplateElement, attrName: string): TemplateAttr | null {
   for (const a of slot.attributes) {
     if (a.kind === 'binding' && a.name === attrName && a.value !== null) return a;

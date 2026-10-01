@@ -1,17 +1,16 @@
 /**
- * `<emits>` block parser (typed public surface).
+ * `<emits>` block parser (typed public surface P1).
  *
  * Uses `@babel/parser.parseExpression` to parse the block content as a single
- * JS expression — must be an `ObjectExpression` at top level. Identifier
- * references like `Number`/`Array`, unary expressions like `-Infinity`, and
- * arrow-function default factories like `() => []` are all supported by
- * Babel's expression grammar (none of which JSON5 can parse — see
- * RESEARCH.md "Five Big Decisions" §5).
+ * JS expression — must be an `ObjectExpression` at top level, shaped like Vue's
+ * `defineEmits({...})`: `{ name: { payload?: '<TS type>', docs?: {...} } }`.
+ * Entry-level validation (shape, keys, payload type strings, docs) happens at
+ * lowering (`ir/lowerers/lowerTypesAndEmits.ts`: ROZ021/ROZ022/ROZ023).
  *
  * D-08 contract: NEVER throw on user input. Returns
  * `{ node: EmitsAST | null, diagnostics: Diagnostic[] }`.
  *
- * ROZxxx codes owned here (Plan 04 will centralize the registry):
+ * ROZxxx codes owned here (registry: diagnostics/codes.ts):
  *  - ROZ010  Invalid JS expression in <emits>
  *  - ROZ011  <emits> top-level is not an object literal
  *

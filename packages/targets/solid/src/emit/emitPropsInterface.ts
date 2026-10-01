@@ -143,6 +143,11 @@ function buildFamilyFnType(slot: SlotDecl): string {
   return `(ctx: { ${paramFields} }) => JSX.Element`;
 }
 
+/** The `slots?:` prop line (module + sidecar share this); undefined when no slots. */
+export function slotsRecordLine(ir: IRComponent): string | undefined {
+  return ir.slots.length > 0 ? `  slots?: ${buildSlotsRecordType(ir.slots)};` : undefined;
+}
+
 /**
  * Build the TS type text for the `slots?:` record field (Phase 79 Plan 12,
  * R6). A component with no dynamic-name slot returns the EXACT pre-Plan-12
@@ -152,12 +157,6 @@ function buildFamilyFnType(slot: SlotDecl): string {
  * fills, and satisfying the invocation site's non-literal runtime-string
  * index access).
  */
-/** Escape a single-quoted string-literal key body (T-79-07 — mirrors every per-target copy). */
-/** The `slots?:` prop line (module + sidecar share this); undefined when no slots. */
-export function slotsRecordLine(ir: IRComponent): string | undefined {
-  return ir.slots.length > 0 ? `  slots?: ${buildSlotsRecordType(ir.slots)};` : undefined;
-}
-
 export function buildSlotsRecordType(slots: SlotDecl[]): string {
   const dynamicSlots = slots.filter((s) => s.dynamicNameExpr !== undefined);
   if (dynamicSlots.length === 0) {
