@@ -1,13 +1,14 @@
 name: Visual Regression Matrix
 
 # Phase 7 Plan 02 — the 48-cell (8 examples × 6 targets) cross-target visual
-# regression gate (EX-06, COMP-05).
+# regression gate (EX-06, COMP-05). Sharded since quick 261001-cox (see `jobs:`).
 #
 # D-12: screenshots are deterministic ONLY inside one pinned Playwright
 # container image — fonts baked in, content-addressed by sha256 digest so the
-# tag cannot be silently re-pointed (threat T-07-05). The whole job therefore
-# runs inside `container:` keyed to that digest. Local runs are advisory; this
-# CI job is authoritative. CI fails on any diff outside the ≤2px tolerance.
+# tag cannot be silently re-pointed (threat T-07-05). Every build and test job
+# therefore runs inside `container:` keyed to that digest. Local runs are
+# advisory; this CI workflow is authoritative. CI fails on any diff outside the
+# ≤2px tolerance.
 #
 # The digest matches tests/visual-regression/Dockerfile and the
 # @playwright/test 1.60.0 pin in tests/visual-regression/package.json.
@@ -25,11 +26,28 @@ on:
     branches: [main]
 
 jobs:
-  visual-regression:
+  # ---------------------------------------------------------------------------
+  # STRUCTURE (quick 261001-cox). This used to be ONE job: install -> `turbo run
+  # build` (~10m cold) -> 4004 Playwright tests on 2 workers (~21m) under a 30m
+  # cap. Green runs took 22-28m, and run 36853412215 (ca28b62da) blew the cap
+  # on a cold cache — reported as "cancelled", like every GHA timeout.
+  #
+  # It is now three stages:
+  #   vr-build          — builds the workspace once, publishes the VR `dist/`
+  #   vr-shard (N/4)    — four Playwright shards against that `dist/`
+  #   visual-regression — aggregate; keeps the old check name for required checks
+  #
+  # `needs: vr-build` is an ORDERING edge, never a gate (see vue-matrix.yml's
+  # header for the incident that made this the rule): the shards are
+  # `if: ${{ !cancelled() }}`, so a red producer does not skip them, and each
+  # falls back to a real full build when the artifact is missing. The failure
+  # mode degrades to the pre-sharding behaviour, never to a skip.
+  vr-build:
+    name: Build visual-regression dist
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # D-12 — the pinned, digest-addressed Playwright container is the single
-    # authoritative screenshot environment (threat T-07-05 mitigation).
+    # D-12 — built in the same pinned container the shards screenshot in, so the
+    # dist's native-binding toolchain (rolldown/esbuild) matches the test env.
     container:
       image: mcr.microsoft.com/playwright:v1.60.0-jammy@sha256:e1529a04087193966ea15d4a1617345bdaa0791690a24ab2c42b65f9ce5b2cdc
     steps:
@@ -45,25 +63,81 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Keyed `visual-regression` (the pre-sharding job name) rather than
+      # `github.job`, so the existing cache lineage keeps hitting.
       - name: Cache turbo build output
         uses: actions/cache@v6
         with:
           path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.job }}-${{ github.sha }}
+          key: ${{ runner.os }}-turbo-visual-regression-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-turbo-${{ github.job }}-
+            ${{ runner.os }}-turbo-visual-regression-
             ${{ runner.os }}-turbo-
 
-      # The visual-regression host consumes the 6 targets' build outputs;
-      # `turbo run build` builds @rozie/core + all 6 target packages + unplugin.
-      - name: Build all packages (core + 6 targets + unplugin)
+      # Builds @rozie/core + the 6 targets + unplugin AND
+      # @rozie/visual-regression itself (scripts/build-cells.mjs — the six
+      # per-target Vite sub-builds), which materializes tests/visual-regression/dist.
+      - name: Build all packages (core + 6 targets + unplugin + VR cells)
         run: pnpm turbo run build
 
-      # The visual-regression workspace's webServer block runs `pnpm build &&
-      # pnpm preview` (the 6 per-target Vite sub-builds + the unified preview
-      # server); test:visual then drives Playwright against it.
-      - name: Run visual-regression matrix
-        run: pnpm --filter @rozie/visual-regression test:visual
+      - name: Upload visual-regression dist
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-regression-dist
+          path: tests/visual-regression/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  vr-shard:
+    name: visual-regression shard (${{ matrix.shard }}/4)
+    needs: vr-build
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # D-12 — the pinned, digest-addressed Playwright container is the single
+    # authoritative screenshot environment (threat T-07-05 mitigation).
+    container:
+      image: mcr.microsoft.com/playwright:v1.60.0-jammy@sha256:e1529a04087193966ea15d4a1617345bdaa0791690a24ab2c42b65f9ce5b2cdc
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # A red/absent producer leaves no artifact; the next step then rebuilds.
+      - name: Download visual-regression dist
+        id: dist
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: visual-regression-dist
+          path: tests/visual-regression/dist
+
+      - name: Fallback — build all packages (producer artifact missing)
+        if: steps.dist.outcome != 'success'
+        run: pnpm turbo run build
+
+      # playwright.config.ts's webServer is `[ -d dist ] || pnpm build; pnpm
+      # preview`, so the downloaded dist is served as-is, no rebuild.
+      #
+      # --fully-parallel shards by TEST rather than by file: file-level sharding
+      # split 4004 tests as 1008/1322/1428/246, test-level as 1001×4. Safe because
+      # no spec uses serial mode or beforeAll. `--list` over the four shards was
+      # verified diff-identical to the unsharded list (no gaps, no dupes).
+      # tools/ci-repro/vr.sh stays a single unsharded run.
+      - name: Run visual-regression matrix (shard ${{ matrix.shard }}/4)
+        run: pnpm --filter @rozie/visual-regression test:visual --fully-parallel --shard=${{ matrix.shard }}/4
 
       # playwright.config.ts sets no `reporter`, so Playwright uses the
       # default `list` reporter and never writes `playwright-report/` — an
@@ -76,6 +150,21 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-test-results-visual-regression
+          name: playwright-test-results-visual-regression-shard-${{ matrix.shard }}
           path: tests/visual-regression/test-results
           retention-days: 7
+
+  # Keeps the pre-sharding check name `visual-regression`. `always()` so it
+  # reports red (never "skipped") when anything upstream failed or was cancelled.
+  visual-regression:
+    needs: [vr-build, vr-shard]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the build and all four shards to pass
+        run: |
+          echo "vr-build: ${{ needs.vr-build.result }}"
+          echo "vr-shard: ${{ needs.vr-shard.result }}"
+          test "${{ needs.vr-build.result }}" = success
+          test "${{ needs.vr-shard.result }}" = success
