@@ -12,7 +12,7 @@
  * at vue-tsc (gate 3).
  *
  * This pass extends `vueGroups` with a `{ kind: 'binding' }` group seeded from
- * `VUE_EMITTER_BINDINGS ∪ VUE_IMPORT_NAMES ∪ VUE_RUNTIME_IMPORTS` (the single
+ * `VUE_EMITTER_BINDINGS ∪ VUE_IMPORT_NAMES ∪ VUE_RUNTIME_IMPORT_NAMES` (the single
  * source of truth in `@rozie/core/rewrite/reservedNames.ts`). The renameable
  * side is ALWAYS the USER binding (`X$local`); the generated binding / import is
  * the contract and stays intact. `$expose` verbs are public contract — never

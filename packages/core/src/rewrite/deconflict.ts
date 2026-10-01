@@ -1230,7 +1230,7 @@ export function deconflictRefsAgainstUserBindings(
  *
  * @param ir       the component IR (state/computed/inject `.name`/`.localBinding` renamed).
  * @param reserved the Vue generated-binding set: VUE_EMITTER_BINDINGS ∪
- *                 VUE_IMPORT_NAMES ∪ VUE_RUNTIME_IMPORTS.
+ *                 VUE_IMPORT_NAMES ∪ VUE_RUNTIME_IMPORT_NAMES.
  * @param protectedNames PUBLIC-CONTRACT names never renamed (prop names + $expose verbs).
  */
 export function deconflictVueGeneratedBindingNames(

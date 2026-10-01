@@ -8,7 +8,7 @@
  * redeclare) or the injected import (TS2440 import shadow).
  *
  * CRITICAL — only-on-ACTUAL-generation. The full reserved tables
- * (VUE_EMITTER_BINDINGS ∪ VUE_IMPORT_NAMES ∪ VUE_RUNTIME_IMPORTS) list every name
+ * (VUE_EMITTER_BINDINGS ∪ VUE_IMPORT_NAMES ∪ VUE_RUNTIME_IMPORT_NAMES) list every name
  * the emitter COULD mint. But `defineProps`/`defineEmits`/`useSlots`/`ref`/
  * `computed`/`watch`/… are each emitted CONDITIONALLY (only when the component
  * has props / emits / a `$slots.X` read / `<data>`+refs / `$computed` / `$watch`).
@@ -43,7 +43,7 @@ import type { IRComponent } from '@rozie/core';
 import {
   VUE_EMITTER_BINDINGS,
   VUE_IMPORT_NAMES,
-  VUE_RUNTIME_IMPORTS,
+  VUE_RUNTIME_IMPORT_NAMES,
 } from '../../../../core/src/rewrite/reservedNames.js';
 
 /** Recursively scan a Babel subtree for a non-computed `$slots.<x>` member read. */
@@ -127,7 +127,7 @@ export function vueGeneratedBindingNames(ir: IRComponent): Set<string> {
   // `h` / `render` / `Fragment` are NEVER emitted by the Vue SFC target —
   // deliberately NOT added (the chartjs `resizeChart(w, h)` over-apply guard).
 
-  // VUE_RUNTIME_IMPORTS — gated on the feature that injects the @rozie/runtime-vue
+  // VUE_RUNTIME_IMPORT_NAMES — gated on the feature that injects the @rozie/runtime-vue
   // helper. `debounce`/`throttle` come from `.debounce(ms)`/`.throttle(ms)`
   // modifiers; `useOutsideClick` from `.outside(...)`; `normalizeListeners` from a
   // dynamic `r-on`; `rozieDeepClone` from `$clone(x)`. These all surface through
@@ -139,7 +139,7 @@ export function vueGeneratedBindingNames(ir: IRComponent): Set<string> {
   // collide; gating on `ir.listeners.length` keeps the common no-listeners corpus
   // byte-identical while still covering the genuine engine-wrapper case.)
   const mayInjectRuntime = (ir.listeners?.length ?? 0) > 0;
-  for (const name of VUE_RUNTIME_IMPORTS) {
+  for (const name of VUE_RUNTIME_IMPORT_NAMES) {
     if (mayInjectRuntime) out.add(name);
   }
 
@@ -149,7 +149,7 @@ export function vueGeneratedBindingNames(ir: IRComponent): Set<string> {
   const canonical = new Set<string>([
     ...VUE_EMITTER_BINDINGS,
     ...VUE_IMPORT_NAMES,
-    ...VUE_RUNTIME_IMPORTS,
+    ...VUE_RUNTIME_IMPORT_NAMES,
   ]);
   for (const n of [...out]) {
     if (!canonical.has(n)) out.delete(n);

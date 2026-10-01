@@ -1,3 +1,10 @@
+import {
+  SVELTE_IMPORTS,
+  VUE_IMPORTS,
+  VUE_RUNTIME_IMPORTS,
+  targetModuleImportBindings,
+} from '../codegen/targetModuleImports.js';
+
 // Phase 61 Plan 01 — the SINGLE SOURCE OF TRUTH for cross-target reserved-name
 // data. Both halves of the collision system consume these tables:
 //   - Half A (per-target emitter auto-deconfliction) widens its reserved
@@ -16,7 +23,8 @@
 // class-field tables.
 
 // DIRECTION (locked, documented per Plan 61-01): reservedNames.ts is a PURE LEAF
-// — it imports NOTHING from deconflict.ts. deconflict.ts imports its reserved
+// — it imports NOTHING from deconflict.ts (its only import is the import
+// catalog, codegen/targetModuleImports.ts, itself a leaf). deconflict.ts imports its reserved
 // tables FROM here. This one direction avoids the module-init cycle that the
 // reverse (re-exporting deconflict's runtime sets here) caused: deconflict.ts
 // runs `deriveLitDomMembers()` at module-load and reads `LIT_DOM_MEMBERS`, so it
@@ -262,17 +270,13 @@ export const VUE_EMITTER_BINDINGS: ReadonlySet<string> = new Set([
 
 // collision-vue §2 set D — `'vue'` named imports the emitter may inject. A helper
 // or `<data>` named like one of these collides with the auto-injected import.
-export const VUE_IMPORT_NAMES: ReadonlySet<string> = new Set([
-  'ref', 'computed', 'watch', 'provide', 'inject', 'useSlots',
-  'onMounted', 'onBeforeUnmount', 'onUpdated', 'h', 'render', 'Fragment',
-]);
+// DERIVED from the import catalog (codegen/targetModuleImports.ts) — the same
+// list the Vue import collector is typed against and ROZ025 reserves.
+export const VUE_IMPORT_NAMES: ReadonlySet<string> = new Set(VUE_IMPORTS);
 
 // collision-vue §2 set E — @rozie/runtime-vue helper imports the emitter may
-// inject.
-export const VUE_RUNTIME_IMPORTS: ReadonlySet<string> = new Set([
-  'rozieDeepClone', 'debounce', 'throttle', 'useOutsideClick',
-  'normalizeListeners',
-]);
+// inject. Derived from the catalog's `VUE_RUNTIME_IMPORTS`.
+export const VUE_RUNTIME_IMPORT_NAMES: ReadonlySet<string> = new Set(VUE_RUNTIME_IMPORTS);
 
 // ============================================================================
 // SVELTE (collision-svelte.md §2)
@@ -295,10 +299,8 @@ export const SVELTE_EMITTER_NAMES: ReadonlySet<string> = new Set([
 
 // collision-svelte §2d — imported value names folded into the single `'svelte'`
 // import line. A helper/import named like one of these duplicate-binds or
-// shadows the generated import.
-export const SVELTE_RUNTIME_IMPORTS: ReadonlySet<string> = new Set([
-  'onMount', 'onDestroy', 'untrack', 'getContext', 'setContext',
-]);
+// shadows the generated import. Derived from the catalog's `SVELTE_IMPORTS`.
+export const SVELTE_IMPORT_NAMES: ReadonlySet<string> = new Set(SVELTE_IMPORTS);
 
 // ============================================================================
 // SOLID (collision-solid.md "Reserved emitter-minted identifiers" + imports)
@@ -318,19 +320,15 @@ export const SOLID_EMITTER_LOCALS: ReadonlySet<string> = new Set([
 // collision-solid — solid-js + @rozie/runtime-solid imports done by BARE name
 // (shadowable). A `<data>`/helper/import named like one of these collides with
 // the auto-injected import.
-export const SOLID_IMPORT_NAMES: ReadonlySet<string> = new Set([
-  // solid-js
-  'splitProps', 'children', 'createSignal', 'createMemo', 'createEffect', 'on',
-  'untrack', 'mergeProps', 'onMount', 'onCleanup', 'Show', 'For', 'useContext',
-  // solid-js/web
-  'render',
-  // @rozie/runtime-solid
-  'createControllableSignal', 'createOutsideClick', 'createDebouncedHandler',
-  'createThrottledHandler', 'rozieDisplay', 'rozieAttr', 'rozieClass',
-  'rozieContext', 'parseInlineStyle', 'normalizeAttrs', 'normalizeComponentAttrs',
-  'normalizeListeners',
-  'mergeListeners', '__rozieInjectStyle',
-]);
+// DERIVED from the import catalog (codegen/targetModuleImports.ts): every
+// module-scope binding the Solid emitter may import — solid-js, solid-js/web,
+// @solid-primitives/keyed and @rozie/runtime-solid (the same list the Solid
+// collectors are typed against and ROZ025 reserves).
+export const SOLID_IMPORT_NAMES: ReadonlySet<string> = new Set(
+  targetModuleImportBindings()
+    .filter((b) => b.target === 'Solid')
+    .map((b) => b.name),
+);
 
 // ============================================================================
 // REACT (collision-react.md §3.G + §2)

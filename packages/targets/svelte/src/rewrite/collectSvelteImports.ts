@@ -19,14 +19,14 @@ import type { SVELTE_TYPE_IMPORTS } from '../../../../core/src/codegen/targetMod
 
 export interface SvelteImportSet {
   /** Type-only imports from `'svelte'` (rendered as `import type { ... }`). */
-  typeImports: Set<string>;
+  typeImports: Set<SvelteTypeImport>;
 }
 
 /** The `import type { … } from 'svelte'` names (catalog: core targetModuleImports.ts). */
 export type SvelteTypeImport = (typeof SVELTE_TYPE_IMPORTS)[number];
 
 export class SvelteImportCollector {
-  private typeSymbols = new Set<string>();
+  private typeSymbols = new Set<SvelteTypeImport>();
 
   useType(name: SvelteTypeImport): void {
     if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
@@ -35,7 +35,7 @@ export class SvelteImportCollector {
     this.typeSymbols.add(name);
   }
 
-  hasType(name: string): boolean {
+  hasType(name: SvelteTypeImport): boolean {
     return this.typeSymbols.has(name);
   }
 

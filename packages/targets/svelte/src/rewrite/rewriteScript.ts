@@ -36,7 +36,7 @@ import {
 } from '../../../../core/src/rewrite/deconflict.js';
 import {
   SVELTE_EMITTER_NAMES,
-  SVELTE_RUNTIME_IMPORTS,
+  SVELTE_IMPORT_NAMES,
 } from '../../../../core/src/rewrite/reservedNames.js';
 import { portalSlotMergeName } from '../emit/portalSlotMergeName.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
@@ -235,7 +235,7 @@ export function rewriteRozieIdentifiers(
   // true` restricts the rename to a PROGRAM/setup-scope binding so a NESTED param
   // / function-local that legally shadows the name (the over-application class the
   // Vue leg (61-07) fixed) is never touched. `$expose` verbs stay protected.
-  const svelteBindingNames = new Set<string>([...SVELTE_EMITTER_NAMES, ...SVELTE_RUNTIME_IMPORTS]);
+  const svelteBindingNames = new Set<string>([...SVELTE_EMITTER_NAMES, ...SVELTE_IMPORT_NAMES]);
   const svelteGroups: GeneratedSymbolGroup[] = [
     { names: propNames, trigger: { kind: 'accessor', accessor: '$props' } },
     { names: refNames, trigger: { kind: 'accessor', accessor: '$refs' } },

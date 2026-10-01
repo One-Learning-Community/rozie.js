@@ -17,10 +17,10 @@ import {
   VUE_RESERVED_PROPS,
   VUE_EMITTER_BINDINGS,
   VUE_IMPORT_NAMES,
-  VUE_RUNTIME_IMPORTS,
+  VUE_RUNTIME_IMPORT_NAMES,
   SVELTE_RUNE_NAMES,
   SVELTE_EMITTER_NAMES,
-  SVELTE_RUNTIME_IMPORTS,
+  SVELTE_IMPORT_NAMES,
   SOLID_EMITTER_LOCALS,
   SOLID_IMPORT_NAMES,
   REACT_RESERVED_PROPS,
@@ -119,7 +119,7 @@ describe('reservedNames — Vue tables (collision-vue §2)', () => {
     expect(VUE_EMITTER_BINDINGS.has('props')).toBe(true);
     expect(VUE_EMITTER_BINDINGS.has('emit')).toBe(true);
     expect(VUE_IMPORT_NAMES.has('computed')).toBe(true);
-    expect(VUE_RUNTIME_IMPORTS.has('rozieDeepClone')).toBe(true);
+    expect(VUE_RUNTIME_IMPORT_NAMES.has('rozieDeepClone')).toBe(true);
   });
 });
 
@@ -133,8 +133,8 @@ describe('reservedNames — Svelte tables (collision-svelte §2)', () => {
   it('emitter names + runtime imports present', () => {
     expect(SVELTE_EMITTER_NAMES.has('children')).toBe(true);
     expect(SVELTE_EMITTER_NAMES.has('snippets')).toBe(true);
-    expect(SVELTE_RUNTIME_IMPORTS.has('onMount')).toBe(true);
-    expect(SVELTE_RUNTIME_IMPORTS.has('getContext')).toBe(true);
+    expect(SVELTE_IMPORT_NAMES.has('onMount')).toBe(true);
+    expect(SVELTE_IMPORT_NAMES.has('getContext')).toBe(true);
   });
 });
 

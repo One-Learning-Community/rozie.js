@@ -13,6 +13,10 @@
  *     reserves every listed name for every component, because a `<types>`
  *     declaration or import with the same name fails the leaf build
  *     (TS2440 / TS2300).
+ *   - script / `<data>` deconfliction: `rewrite/reservedNames.ts` derives its
+ *     Vue, Svelte and Solid import tables (`VUE_IMPORT_NAMES`,
+ *     `VUE_RUNTIME_IMPORT_NAMES`, `SVELTE_IMPORT_NAMES`, `SOLID_IMPORT_NAMES`)
+ *     from these lists.
  *
  * The handful of emitter sites that mint import names from untyped strings
  * (Vue/Svelte value imports, Angular keynav/portal helpers, modifier-registry

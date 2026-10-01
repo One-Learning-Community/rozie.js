@@ -14,7 +14,7 @@
  * keeps ROZ025's reserved set complete.
  */
 import { describe, expect, it } from 'vitest';
-import { globSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse as babelParse } from '@babel/parser';
@@ -43,6 +43,18 @@ const SIDECAR: Record<(typeof TARGETS)[number], (ir: IRComponent) => string> = {
   lit: emitLitTypes,
 };
 
+function rozieFilesUnder(rel: string): string[] {
+  const abs = join(ROOT, rel);
+  if (!existsSync(abs) || !statSync(abs).isDirectory()) return [];
+  const out: string[] = [];
+  for (const entry of readdirSync(abs, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name === 'dist') continue;
+    if (entry.isDirectory()) out.push(...rozieFilesUnder(`${rel}/${entry.name}`));
+    else if (entry.name.endsWith('.rozie')) out.push(`${rel}/${entry.name}`);
+  }
+  return out;
+}
+
 function scriptBodies(code: string, target: string, isModule: boolean): string[] {
   if (isModule && (target === 'vue' || target === 'svelte')) {
     return [...code.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
@@ -67,10 +79,17 @@ function importBindings(code: string, jsx: boolean): Array<{ name: string; from:
 describe('targetModuleImports catalog covers every emitted import (ROZ025 drift guard)', () => {
   it('every emitter-added module-scope import binding is in the catalog', () => {
     const catalog = new Set(targetModuleImportBindings().map((b) => `${b.name}\u0000${b.from}`));
-    const files = globSync(['examples/*.rozie', 'packages/ui/**/src/**/*.rozie'], {
-      cwd: ROOT,
-      exclude: (p: string) => /node_modules|[\\/]dist[\\/]/.test(p),
-    });
+    // Node 20-compatible (no fs.globSync): top-level examples + every
+    // `packages/ui/<family>/src/**` .rozie (a hand walk that never enters
+    // node_modules / dist).
+    const files = [
+      ...readdirSync(join(ROOT, 'examples'))
+        .filter((f) => f.endsWith('.rozie'))
+        .map((f) => `examples/${f}`),
+      ...readdirSync(join(ROOT, 'packages/ui')).flatMap((family) =>
+        rozieFilesUnder(`packages/ui/${family}/src`),
+      ),
+    ].sort();
     expect(files.length).toBeGreaterThan(100);
     const missing = new Set<string>();
     let checked = 0;
@@ -100,11 +119,8 @@ describe('targetModuleImports catalog covers every emitted import (ROZ025 drift 
           sourceMap: false,
         });
         const sources: Array<[string, boolean]> = [[r.code, true]];
-        try {
-          sources.push([SIDECAR[target](ir), false]);
-        } catch {
-          // a sidecar renderer that cannot handle this IR is covered by its own suites
-        }
+        // A sidecar renderer that throws is a real failure, not a skip.
+        sources.push([SIDECAR[target](ir), false]);
         for (const [code, isModule] of sources) {
           if (!code) continue;
           for (const body of scriptBodies(code, target, isModule)) {

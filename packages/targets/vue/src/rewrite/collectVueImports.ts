@@ -23,7 +23,7 @@ import type { VUE_IMPORTS, VUE_RUNTIME_IMPORTS } from '../../../../core/src/code
 export type VueImport = (typeof VUE_IMPORTS)[number];
 
 export class VueImportCollector {
-  private symbols = new Set<string>();
+  private symbols = new Set<VueImport>();
 
   use(name: VueImport): void {
     if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
@@ -32,7 +32,7 @@ export class VueImportCollector {
     this.symbols.add(name);
   }
 
-  has(name: string): boolean {
+  has(name: VueImport): boolean {
     return this.symbols.has(name);
   }
 
@@ -69,7 +69,7 @@ export class VueImportCollector {
 export type VueRuntimeImport = (typeof VUE_RUNTIME_IMPORTS)[number];
 
 export class RuntimeVueImportCollector {
-  private symbols = new Set<string>();
+  private symbols = new Set<VueRuntimeImport>();
 
   use(name: VueRuntimeImport): void {
     if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
@@ -78,7 +78,7 @@ export class RuntimeVueImportCollector {
     this.symbols.add(name);
   }
 
-  has(name: string): boolean {
+  has(name: VueRuntimeImport): boolean {
     return this.symbols.has(name);
   }
 
