@@ -39,7 +39,7 @@ describe('Lit typed listener overloads (typed-surface P1)', () => {
     expect(code.match(/super\.addEventListener\(/g)).toHaveLength(1);
     expect(code.match(/super\.removeEventListener\(/g)).toHaveLength(1);
     expect(code).toContain(
-      'export interface RozieTypedEventsEventMap extends HTMLElementEventMap {',
+      "export interface RozieTypedEventsEventMap extends Omit<HTMLElementEventMap, 'ping' | 'reset' | 'select' | 'row-open'> {",
     );
   });
 

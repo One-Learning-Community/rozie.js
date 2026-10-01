@@ -109,6 +109,13 @@ export interface RenderPropsInterfaceOptions {
    */
   emitHandlerName?: (event: string) => string;
   /**
+   * `false` => no `<emit>` handler props at all: on this target events are not
+   * props (Lit dispatches DOM `CustomEvent`s; its compiled element declares no
+   * `on<Event>` property). Omitted / `true` => the shared handler props
+   * (byte-identical).
+   */
+  emitHandlers?: boolean;
+  /**
    * The target's slot surface as its COMPILED MODULE declares it: the slot
    * prop field lines (already indented) and, optionally, the dynamic-slot
    * record line (e.g. Svelte `  snippets?: ...;`). When provided it REPLACES
@@ -214,7 +221,7 @@ export function renderPropsInterface(
     // Literal `on<Event>` props (e.g. `onSelect`) occupy the same name space.
     emittedHandlers.add(prop.name);
   }
-  for (const e of ir.emits) {
+  for (const e of opts.emitHandlers === false ? [] : ir.emits) {
     const eventPascal = toPascalCase(e);
     if (eventPascal.length === 0) continue;
     const handlerName = opts.emitHandlerName ? opts.emitHandlerName(e) : `on${eventPascal}`;

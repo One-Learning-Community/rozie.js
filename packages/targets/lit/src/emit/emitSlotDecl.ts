@@ -263,38 +263,50 @@ function emitOneSlot(
   // `@property ... cell-total?: ...` field. Every fill targeting such a slot
   // routes through the `rozieSlots` record instead (`emitSlotFiller.ts`'s
   // `wantsRecordPath`), so no named receiver is needed for it here either.
-  const isScopedOrPortal =
-    (slot.isPortal === true || slot.params.length > 0) &&
-    slot.dynamicNameExpr === undefined &&
-    (slot.name === '' || isSlotNameIdentifier(slot.name));
-  let propertyField = '';
-  if (isScopedOrPortal) {
-    // Default slot ('') collides with the JS reserved word 'default'; use a
-    // clearly-prefixed sentinel. consumer-side emitSlotFiller must use the
-    // SAME mapping (cross-file lockstep enforced by Task 2 grep checks).
-    // WR-02 (Phase 07.5 review): sentinel uses double-underscore + `rozie` infix
-    // so the chance of a user authoring `<slot name="__rozieDefaultSlot__">` and
-    // colliding with the synthetic default-slot property is vanishingly small.
-    // Single-underscore `_defaultSlotFn` was the prior name; it left a plausible
-    // collision surface in v1 user slot names. Lockstep across emitSlotDecl /
-    // emitSlotFiller / emitTemplate.
-    // Collision-gated disambiguation (mirrors Solid's `Slot` suffix, but only
-    // when the bare slot name collides with a declared prop — keeps existing
-    // non-colliding fixtures byte-identical). The consumer-side emitSlotFiller
-    // applies the SAME helper against the producer's prop list so the
-    // `.<member>=` property assignment stays in lockstep.
-    const propertyFieldName =
-      slot.name === '' ? '__rozieDefaultSlot__' : portalSlotMemberName(slot.name, ir);
-    const scopeType =
-      slot.params.length > 0
-        ? slotScopeTypeObject(slot.params, slot.paramTypes, slot.paramTypesAuthored === true)
-        : 'unknown';
-    propertyField = `  @property({ attribute: false }) ${propertyFieldName}?: (scope: ${scopeType}) => unknown;`;
-  }
+  // Typed public surface P1 — the receiver member text comes from
+  // `slotPropertyMember`, shared with the `.d.rozie.ts` sidecar.
+  const member = slotPropertyMember(slot, ir);
+  const propertyField = member === null ? '' : `  @property({ attribute: false }) ${member};`;
 
   return [stateField, queryField, assignedField, propertyField]
     .filter((s) => s.length > 0)
     .join('\n');
+}
+
+/**
+ * The producer-side scoped/portal slot receiver member, WITHOUT decorator or
+ * indentation: `<member>?: (scope: <ctx>) => unknown`, or `null` when the slot
+ * gets no named receiver. The ONE rule shared by the compiled module
+ * (`emitOneSlot`, which prefixes `@property({ attribute: false })`) and the
+ * `.d.rozie.ts` sidecar (`litSlotSurfaceMembers`).
+ */
+export function slotPropertyMember(slot: SlotDecl, ir: IRComponent): string | null {
+  const isScopedOrPortal =
+    (slot.isPortal === true || slot.params.length > 0) &&
+    slot.dynamicNameExpr === undefined &&
+    (slot.name === '' || isSlotNameIdentifier(slot.name));
+  if (!isScopedOrPortal) return null;
+  // Default slot ('') collides with the JS reserved word 'default'; use a
+  // clearly-prefixed sentinel. consumer-side emitSlotFiller must use the
+  // SAME mapping (cross-file lockstep enforced by Task 2 grep checks).
+  // WR-02 (Phase 07.5 review): sentinel uses double-underscore + `rozie` infix
+  // so the chance of a user authoring `<slot name="__rozieDefaultSlot__">` and
+  // colliding with the synthetic default-slot property is vanishingly small.
+  // Single-underscore `_defaultSlotFn` was the prior name; it left a plausible
+  // collision surface in v1 user slot names. Lockstep across emitSlotDecl /
+  // emitSlotFiller / emitTemplate.
+  // Collision-gated disambiguation (mirrors Solid's `Slot` suffix, but only
+  // when the bare slot name collides with a declared prop — keeps existing
+  // non-colliding fixtures byte-identical). The consumer-side emitSlotFiller
+  // applies the SAME helper against the producer's prop list so the
+  // `.<member>=` property assignment stays in lockstep.
+  const propertyFieldName =
+    slot.name === '' ? '__rozieDefaultSlot__' : portalSlotMemberName(slot.name, ir);
+  const scopeType =
+    slot.params.length > 0
+      ? slotScopeTypeObject(slot.params, slot.paramTypes, slot.paramTypesAuthored === true)
+      : 'unknown';
+  return `${propertyFieldName}?: (scope: ${scopeType}) => unknown`;
 }
 
 export function emitSlotDecl(ir: IRComponent, opts: EmitSlotDeclOpts): EmitSlotDeclResult {
@@ -358,14 +370,7 @@ export function emitSlotDecl(ir: IRComponent, opts: EmitSlotDeclOpts): EmitSlotD
   // prefix is derivable) and both survive this dedup, while two genuinely
   // same-named STATIC slots still key identically and still dedupe to one
   // (pre-existing behaviour, preserved exactly).
-  const seenSlotKeys = new Set<string>();
-  const distinctSlots: Array<{ slot: SlotDecl; index: number }> = [];
-  slots.forEach((slot, index) => {
-    const key = slotIdentityKey(slot, index);
-    if (seenSlotKeys.has(key)) return;
-    seenSlotKeys.add(key);
-    distinctSlots.push({ slot, index });
-  });
+  const distinctSlots = distinctSlotsOf(slots);
 
   const perSlotFields = distinctSlots
     .map(({ slot, index }) =>
@@ -392,11 +397,9 @@ export function emitSlotDecl(ir: IRComponent, opts: EmitSlotDeclOpts): EmitSlotD
   // behaviour spec. A component with none of those emits nothing here, which
   // is what preserves AC-1's byte-identity for every component the feature
   // does not touch.
-  const needsRozieSlots = slots.some(
-    (s) => s.isPortal === true || s.params.length > 0 || s.dynamicNameExpr !== undefined,
-  );
+  const rozieSlotsRecordMember = rozieSlotsMember(slots);
   let rozieSlotsField = '';
-  if (needsRozieSlots) {
+  if (rozieSlotsRecordMember !== null) {
     opts.decorators.add('property');
     rozieSlotsField = [
       '  // Phase 79 Plan 08 (R4) contract for 79-09: the record intake for',
@@ -408,7 +411,7 @@ export function emitSlotDecl(ir: IRComponent, opts: EmitSlotDeclOpts): EmitSlotD
       '  // named function-prop / <slot> fallback (AC-9). Attribute',
       '  // deserialization is disabled — this is a function-valued record,',
       '  // never reflected to/from an HTML attribute.',
-      `  @property({ attribute: false }) rozieSlots?: ${buildRozieSlotsRecordType(slots)};`,
+      `  @property({ attribute: false }) ${rozieSlotsRecordMember};`,
     ].join('\n');
   }
 
@@ -424,4 +427,47 @@ export function emitSlotDecl(ir: IRComponent, opts: EmitSlotDeclOpts): EmitSlotD
     preSeedLines: preSeedLinesArr.join('\n    '),
     diagnostics,
   };
+}
+
+/** Distinct slot identities, first occurrence wins (see emitSlotDecl). */
+function distinctSlotsOf(slots: SlotDecl[]): Array<{ slot: SlotDecl; index: number }> {
+  const seenSlotKeys = new Set<string>();
+  const distinctSlots: Array<{ slot: SlotDecl; index: number }> = [];
+  slots.forEach((slot, index) => {
+    const key = slotIdentityKey(slot, index);
+    if (seenSlotKeys.has(key)) return;
+    seenSlotKeys.add(key);
+    distinctSlots.push({ slot, index });
+  });
+  return distinctSlots;
+}
+
+/**
+ * The once-per-component `rozieSlots` record member (no decorator/indent), or
+ * `null` when no slot is scoped, portal or dynamic-name (see emitSlotDecl).
+ */
+function rozieSlotsMember(slots: SlotDecl[]): string | null {
+  const needsRozieSlots = slots.some(
+    (s) => s.isPortal === true || s.params.length > 0 || s.dynamicNameExpr !== undefined,
+  );
+  return needsRozieSlots ? `rozieSlots?: ${buildRozieSlotsRecordType(slots)}` : null;
+}
+
+/**
+ * Typed public surface P1 — the slot members the compiled Lit element class
+ * declares (per-slot receivers + the `rozieSlots` record), as undecorated
+ * `  <member>;` lines for the `.d.rozie.ts` sidecar. Generated by the SAME
+ * helpers `emitSlotDecl` uses, so the sidecar cannot drift from the module.
+ */
+export function litSlotSurfaceMembers(ir: IRComponent): {
+  fields: string[];
+  recordLine?: string;
+} {
+  const slots = ir.slots ?? [];
+  const fields = distinctSlotsOf(slots).flatMap(({ slot }) => {
+    const member = slotPropertyMember(slot, ir);
+    return member === null ? [] : [`  ${member};`];
+  });
+  const record = rozieSlotsMember(slots);
+  return record === null ? { fields } : { fields, recordLine: `  ${record};` };
 }

@@ -110,6 +110,51 @@ el.row = ({ count, tone }) => count.toFixed() + tone;
 void n; void k; void c0; void sc; void st; void bad;
 `;
 
+// Lit DOM-name collisions (R14): `<emits>` names whose HTMLElementEventMap type
+// is NOT plain `Event` (`click` → PointerEvent, `toggle` → ToggleEvent). The
+// event map must Omit them (no TS2430 in the compiled module), the consumer
+// sees the declared CustomEvent, and undeclared DOM events stay inherited.
+// Also covers `$expose` verbs that are FIELD ARROWS (typed + untyped fallback).
+const LIT_DOM_EVENTS_FIXTURE = `<rozie name="DomEvents">
+<emits>
+{
+  click: { payload: 'number' },
+  toggle: {},
+}
+</emits>
+<script>
+function fire() {
+  $emit('click', 1)
+  $emit('toggle')
+}
+const reset2 = () => {
+  fire()
+}
+const loose = (...a) => a.length
+$expose({ fire, reset2, loose }, { reset2: '() => void' })
+</script>
+<template>
+  <button @click="fire()">x</button>
+</template>
+</rozie>
+`;
+
+const LIT_DOM_EVENTS_CONSUMER = `import DomEvents, { type RozieDomEventsEventMap } from './DomEvents';
+declare const el: DomEvents;
+el.addEventListener('click', (e) => e.detail.toFixed());
+// @ts-expect-error — click is the declared CustomEvent<number>, not a PointerEvent
+el.addEventListener('click', (e) => e.clientX);
+el.addEventListener('toggle', (e) => { const d: undefined = e.detail; void d; });
+el.addEventListener('keydown', (e) => e.key.toUpperCase());
+el.reset2();
+// @ts-expect-error — reset2 takes no arguments
+el.reset2(1);
+el.loose('anything', 2);
+el.fire('anything');
+const kk: keyof RozieDomEventsEventMap = 'keydown';
+void kk;
+`;
+
 describe('TYPED-SURFACE-CONSUMER — strict consumer (typed-surface P1)', () => {
   it('react', () => {
     const { code, diagnostics } = compile(FIXTURE, {
@@ -150,6 +195,23 @@ describe('TYPED-SURFACE-CONSUMER — strict consumer (typed-surface P1)', () => 
     const { raw, inventory } = typecheckCompiled({
       target: 'lit',
       files: { 'TypedEvents.ts': code, 'Consumer.ts': LIT_CONSUMER },
+      nodeModulesFrom: 'packages/ui/combobox/packages/lit',
+    });
+    expect(totalErrors(inventory), raw).toBe(0);
+  });
+  it('lit — DOM-name collisions (click/toggle) + field-arrow exposed verbs', () => {
+    const { code, diagnostics } = compile(LIT_DOM_EVENTS_FIXTURE, {
+      target: 'lit',
+      filename: 'DomEvents.rozie',
+      sourceMap: false,
+    });
+    expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    // Field-arrow verbs carry the signature annotation / the untyped fallback.
+    expect(code).toContain('reset2: () => void = () => {');
+    expect(code).toContain('loose: (...args: any[]) => any = ');
+    const { raw, inventory } = typecheckCompiled({
+      target: 'lit',
+      files: { 'DomEvents.ts': code, 'Consumer.ts': LIT_DOM_EVENTS_CONSUMER },
       nodeModulesFrom: 'packages/ui/combobox/packages/lit',
     });
     expect(totalErrors(inventory), raw).toBe(0);

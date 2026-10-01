@@ -42,10 +42,12 @@
  * `@customElement` uses at runtime (emitDecorator.ts) so the map entry CANNOT
  * drift from the registered element (T-22-04-01).
  *
- * Slot idiom (Lit): Lit slots are projected as light-DOM children; the
- * slot-props surface is not part of the element-class consumer contract, so the
- * shared props body uses `'unknown'` as the slot-children token (import-free,
- * mirrors the conservative Vue choice in 22-03).
+ * Slot idiom (Lit): Lit slots are projected as light-DOM children; a scoped /
+ * portal slot additionally gets the function-valued receiver property the
+ * compiled element declares (`row?: (scope: …) => unknown`, `rozieSlots?`),
+ * rendered by emitSlotDecl's `litSlotSurfaceMembers` (one rule for module and
+ * sidecar). `<emit>` handler props are suppressed (`emitHandlers: false`):
+ * Lit events are DOM `CustomEvent`s typed through `Rozie<Name>EventMap`.
  *
  * NO do-not-edit header / source-hash is prepended here — the Wave-3 sidecar
  * WRITER owns that.
@@ -60,6 +62,7 @@ import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHan
 // Reuse the SAME tag-deriving helper the runtime `@customElement` decorator
 // uses so the HTMLElementTagNameMap key cannot drift from the registration.
 import { emitTagName } from './emitDecorator.js';
+import { litSlotSurfaceMembers } from './emitSlotDecl.js';
 import { renderLitEventMap, renderLitListenerOverloads } from './litEventMap.js';
 
 /**
@@ -101,6 +104,7 @@ export function emitLitTypes(ir: IRComponent, opts: EmitLitTypesOptions = {}): s
   const exposed = (ir.expose ?? []).length > 0;
   const handleInterface = exposed ? synthesizeHandleType(ir, `${ir.name}Handle`) : null;
 
+  const slotSurface = litSlotSurfaceMembers(ir);
   const lines: string[] = [];
   // Type-only LitElement import — the element class extends it in the .d.ts.
   lines.push(`import type { LitElement } from 'lit';`);
@@ -110,9 +114,11 @@ export function emitLitTypes(ir: IRComponent, opts: EmitLitTypesOptions = {}): s
     renderPropsInterface(ir, {
       ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
       slotChildrenType: 'unknown',
-      // Slots are not props on lit: the compiled module declares none, so the
-      // sidecar declares no slot fields / `slots` record.
-      slotSurface: { fields: [] },
+      // The slot receivers the compiled element declares (`row?: (scope: …) =>
+      // unknown`, `rozieSlots?: …`), from the SAME helper emitSlotDecl uses.
+      slotSurface,
+      // Events are DOM `CustomEvent`s on Lit, not `on<Event>` props.
+      emitHandlers: false,
       target: 'lit',
       // Typed public surface P1 — the authored `<types>` prelude ('' without).
       includeTypesBlock: true,
@@ -147,6 +153,9 @@ export function emitLitTypes(ir: IRComponent, opts: EmitLitTypesOptions = {}): s
       lines.push(member);
     }
   }
+  // The slot receiver properties, exactly as the compiled class declares them.
+  for (const field of slotSurface.fields) lines.push(field);
+  if (slotSurface.recordLine !== undefined) lines.push(slotSurface.recordLine);
   // Typed listener overloads — declaration-only in a `declare class`.
   const listenerOverloads = renderLitListenerOverloads(ir, 'declare');
   if (listenerOverloads !== '') lines.push(listenerOverloads);

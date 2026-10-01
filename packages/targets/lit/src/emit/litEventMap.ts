@@ -7,9 +7,10 @@
  *   - `declaredPayloadType(ir, name)` — the authored payload for a dispatch's
  *     `new CustomEvent<P>(…)` type argument (type-only).
  *   - `renderLitEventMap(ir)` — `export interface Rozie<Name>EventMap extends
- *     HTMLElementEventMap { '<kebab>': CustomEvent<P>; … }` at module scope.
- *     Keys use the SAME `kebabize` the dispatch uses. `CustomEvent<P>` narrows
- *     `Event`, so a DOM-name collision such as `select` is a legal override.
+ *     Omit<HTMLElementEventMap, '<declared keys>'> { '<kebab>': CustomEvent<P>;
+ *     … }` at module scope. Keys use the SAME `kebabize` the dispatch uses. The
+ *     `Omit` makes any DOM-name collision (`select`, `click`, `toggle`, …) a
+ *     replacement rather than an incompatible override (no TS2430).
  *   - `renderLitListenerOverloads(ir, mode)` — typed `addEventListener` /
  *     `removeEventListener` overloads. `'class'` appends an implementation that
  *     is a behaviour-identical `super` pass-through (the single allowed
@@ -54,11 +55,16 @@ export function typeCustomEventDispatch(
 /** The module-scope event-map interface; `''` without `<emits>`. */
 export function renderLitEventMap(ir: IRComponent): string {
   if (ir.emitDecls === null) return '';
-  const members = ir.emitDecls.map((d) => {
+  const keys = ir.emitDecls.map((d) => `'${kebabize(d.name)}'`);
+  const members = ir.emitDecls.map((d, i) => {
     const payload = d.payload ? indentContinuation(printTSType(d.payload)) : 'undefined';
-    return `  '${kebabize(d.name)}': CustomEvent<${payload}>;`;
+    return `  ${keys[i]}: CustomEvent<${payload}>;`;
   });
-  return `export interface ${litEventMapName(ir)} extends HTMLElementEventMap {\n${members.join('\n')}\n}`;
+  // `Omit` the declared keys first: a declared name that collides with a DOM
+  // event whose map type is NOT plain `Event` (`click` → PointerEvent, `focus`
+  // → FocusEvent, `toggle` → ToggleEvent, …) would otherwise be an incompatible
+  // override (TS2430). Every other DOM event stays inherited.
+  return `export interface ${litEventMapName(ir)} extends Omit<HTMLElementEventMap, ${keys.length > 0 ? keys.join(' | ') : 'never'}> {\n${members.join('\n')}\n}`;
 }
 
 /**
