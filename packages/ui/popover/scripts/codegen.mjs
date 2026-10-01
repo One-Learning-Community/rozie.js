@@ -34,7 +34,6 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { resolve } from 'node:path';
 import { buildManifest, compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
-import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
@@ -117,7 +116,9 @@ const COMMON_VUE_BUILD_DEV_DEPS = {
  * vite-plugin-css-injected-by-js. Writes/patches the four Vue-leaf files
  * idempotently each codegen run; `version` is PRESERVED.
  */
-function emitVueDualPackaging({ leafDir, componentName, externals, engineDevDeps }) {
+function emitVueDualPackaging({ leafDir, componentName, externals, engineDevDeps, exportsTypes = false }) {
+  // `<types>` names live in the SFC's module script; re-export them as types.
+  const vueTypesBarrel = exportsTypes ? `export type * from './${componentName}.vue';\n` : '';
   const renderExternal = (e) => (e instanceof RegExp ? e.toString() : `'${e}'`);
   const externalsLiteral = `[${externals.map(renderExternal).join(', ')}]`;
 
@@ -154,7 +155,7 @@ export default defineConfig({
     resolve(leafDir, 'src', 'index.ts'),
     `export { default as ${componentName} } from './${componentName}.vue';
 export { default } from './${componentName}.vue';
-`,
+${vueTypesBarrel}`,
   );
 
   writeFileSync(
@@ -246,14 +247,12 @@ function main() {
   const manifest = buildManifest(ir);
   const manifestJson = JSON.stringify(manifest, null, 2) + '\n';
 
-  // Keep the hand-kept manifests in lockstep with the IR.
-  for (const ev of ir.emits) {
-    if (!eventManifest[ev]) {
-      throw new Error(
-        `codegen: event "${ev}" is emitted by the source but has no entry in event-manifest.mjs`,
-      );
-    }
+  // Events are first-class `<emits>` now (typed payload + docs); a migration
+  // regression to the inferred form must not silently ship.
+  if (ir.emitDecls === null) {
+    throw new Error('codegen: Popover.rozie has no <emits> block — events are authored there');
   }
+  // Keep the hand-kept handle manifest in lockstep with the IR.
   for (const m of ir.expose) {
     if (!handleManifest[m.name]) {
       throw new Error(
@@ -284,12 +283,13 @@ function main() {
         componentName: cfg.file.replace(/\.vue$/, ''),
         externals: cfg.externals,
         engineDevDeps: cfg.engineDevDeps,
+        exportsTypes: Boolean(ir.types?.exportedNames.length),
       });
     }
 
     // Bundled leaves (tsdown) entry on src/index.ts.
     if (cfg.build === 'tsdown') {
-      const barrel =
+      let barrel =
         (target === 'react' || target === 'solid') && ir.expose.length > 0
           ? `export { default as Popover } from './Popover';\n` +
             `export { default } from './Popover';\n\n` +
@@ -298,6 +298,9 @@ function main() {
               .join(', ')} }. */\n` +
             `export type { PopoverHandle } from './Popover';\n`
           : `export { default as Popover } from './Popover';\nexport { default } from './Popover';\n`;
+      // `<types>` names are part of the public surface: re-export them as types.
+      // (Popover has no `<types>` block today, so its barrels are unchanged.)
+      if (ir.types?.exportedNames.length) barrel += `export type * from './Popover';\n`;
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 
@@ -319,7 +322,7 @@ function main() {
 
     // (5) README from the single IR parse.
     const pkgName = leafPkgName(cfg.dir);
-    const readme = renderReadme(target, ir, eventManifest, pkgName, handleManifest);
+    const readme = renderReadme(target, ir, pkgName, handleManifest);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
     // Vendor the repo LICENSE into each published leaf.

@@ -132,10 +132,15 @@
           "name": "hide"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "boolean",
+        "() => void",
+        "() => void",
+        "() => void"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "",
@@ -149,26 +154,28 @@
   "emits": [
     {
       "name": "change",
-      "payload": null,
-      "docs": null
+      "payload": "boolean",
+      "docs": {
+        "description": "Fired whenever the open state changes — a click/hover/focus trigger gesture, an Escape or click-outside dismissal, or a programmatic `show`/`hide`/`toggle`. The two-way `open` model is updated alongside it."
+      }
     }
   ],
   "expose": [
     {
       "name": "show",
-      "signature": null
+      "signature": "() => void"
     },
     {
       "name": "hide",
-      "signature": null
+      "signature": "() => void"
     },
     {
       "name": "toggle",
-      "signature": null
+      "signature": "() => void"
     },
     {
       "name": "reposition",
-      "signature": null
+      "signature": "() => void"
     }
   ],
   "types": null

@@ -52,6 +52,7 @@ import type {
   PropTypeAnnotation,
 } from '@rozie/core';
 import { buildPropJsdoc, hasPropJsdoc, printTSType } from '@rozie/core';
+import { buildVueModuleScript } from './moduleScript.js';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
@@ -1437,6 +1438,29 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
 
   const imports = new VueImportCollector();
 
+  // Typed public surface P1: with a module `<script lang="ts">` present, Volar
+  // wraps the setup body in a function and a user `import` that follows
+  // `defineProps(...)` fails with TS1232. Lift the user's top-level imports out
+  // of the residual body to the HEAD of `<script setup>`. Opt-in only — with no
+  // module script the imports stay where the author wrote them (byte-identical).
+  const hoistedUserImports: string[] = [];
+  if (buildVueModuleScript(ir).length > 0) {
+    const body = cloned.program.body;
+    for (let i = 0; i < body.length; ) {
+      const stmt = body[i];
+      if (stmt && t.isImportDeclaration(stmt)) {
+        // A trailing comment on the import is the SAME comment object that leads
+        // the next statement (@babel/parser attaches it to both): printing it here
+        // would duplicate it in the residual body.
+        stmt.trailingComments = null;
+        hoistedUserImports.push(genCode(stmt));
+        body.splice(i, 1);
+      } else {
+        i++;
+      }
+    }
+  }
+
   // 3. Emit blocks in canonical order.
   const propsLine = emitPropsDecl(ir, opts.genericParams);
   const modelLines = emitDefineModels(ir);
@@ -1514,6 +1538,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   const preambleSections: string[] = [];
   const importLine = imports.render();
   if (importLine) preambleSections.push(importLine);
+  if (hoistedUserImports.length > 0) preambleSections.push(hoistedUserImports.join('\n'));
   if (propsLine) preambleSections.push(propsLine);
   if (modelLines.length > 0) preambleSections.push(modelLines.join('\n'));
   if (emitsLine) preambleSections.push(emitsLine);

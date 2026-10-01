@@ -31,7 +31,7 @@ import { buildMiddleware } from './internal/middleware';
 //   Same null-let convention as the others: read/written only in handlers, `any`
 //   via typeNeutralize.
 
-interface AnchorCtx { open: any; toggle: any; show: any; hide: any; }
+interface AnchorCtx { open: boolean; toggle: () => void; show: () => void; hide: () => void; }
 
 interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'reference' | 'onChange' | 'renderAnchor' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
@@ -100,17 +100,17 @@ interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'di
    * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded` / `aria-controls`), typically with `trigger='manual'` and a two-way-bound `open`. Pass a stable value — a new object on every render restarts tracking.
    */
   reference?: (Element | Record<string, any>) | null;
-  onChange?: (...args: any[]) => void;
+  onChange?: (payload: boolean) => void;
   renderAnchor?: (ctx: AnchorCtx) => ReactNode;
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
 export interface PopoverHandle {
-  show: (...args: any[]) => any;
-  hide: (...args: any[]) => any;
-  toggle: (...args: any[]) => any;
-  reposition: (...args: any[]) => any;
+  show: () => void;
+  hide: () => void;
+  toggle: () => void;
+  reposition: () => void;
 }
 
 const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props: PopoverProps, ref): JSX.Element {

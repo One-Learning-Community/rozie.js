@@ -69,10 +69,10 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded` / `aria-controls`), typically with `trigger='manual'` and a two-way-bound `open`. Pass a stable value — a new object on every render restarts tracking.
    */
   reference?: (Element | any) | null;
-  anchor?: Snippet<[{ open: any; toggle: any; show: any; hide: any }]>;
+  anchor?: Snippet<[{ open: boolean; toggle: () => void; show: () => void; hide: () => void }]>;
   children?: Snippet;
   snippets?: Record<string, any>;
-  onchange?: (...args: any[]) => void;
+  onchange?: (payload: boolean) => void;
 }
 
 let {
@@ -336,6 +336,7 @@ const isTooltip = () => trigger === 'hover' || trigger === 'focus';
 // `undefined` drops the attribute identically (Vue/Solid nullish-attr drop treats both
 // alike) while keeping the emitted leaf's inferred type a clean `'tooltip' | 'dialog' | undefined`.
 const floatingRole = () => isTooltip() ? 'tooltip' : modal ? 'dialog' : undefined;
+export function show(): void;
 // ─── imperative handle ($expose) ────────────────────────────────────────────────
 // Verbs: show/hide/toggle/reposition. NOT `update` (reserved Lit lifecycle) → the
 // reposition verb is `reposition`. None collide with the `change` emit, the `open`
@@ -343,12 +344,15 @@ const floatingRole = () => isTooltip() ? 'tooltip' : modal ? 'dialog' : undefine
 export function show() {
   if (!disabled) requestOpen(true);
 }
+export function hide(): void;
 export function hide() {
   requestOpen(false);
 }
+export function toggle(): void;
 export function toggle() {
   if (!disabled) requestOpen(!open);
 }
+export function reposition(): void;
 export function reposition() {
   position();
 }

@@ -33,11 +33,11 @@ import { buildMiddleware } from './internal/middleware';
 //   via typeNeutralize.
 
 interface AnchorCtx {
-  $implicit: { open: any; toggle: any; show: any; hide: any };
-  open: any;
-  toggle: any;
-  show: any;
-  hide: any;
+  $implicit: { open: boolean; toggle: () => void; show: () => void; hide: () => void };
+  open: boolean;
+  toggle: () => void;
+  show: () => void;
+  hide: () => void;
 }
 
 interface DefaultCtx {}
@@ -190,7 +190,7 @@ export class Popover {
   anchorEl = viewChild<ElementRef<HTMLDivElement>>('anchorEl');
   floatingEl = viewChild<ElementRef<HTMLDivElement>>('floatingEl');
   arrowEl = viewChild<ElementRef<HTMLDivElement>>('arrowEl');
-  change = output<unknown>();
+  change = output<boolean>();
   @ContentChild('anchor', { read: TemplateRef }) anchorTpl?: TemplateRef<AnchorCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
@@ -511,16 +511,16 @@ export class Popover {
   // Verbs: show/hide/toggle/reposition. NOT `update` (reserved Lit lifecycle) → the
   // reposition verb is `reposition`. None collide with the `change` emit, the `open`
   // model, or its React `setOpen` setter, nor with inherited HTMLElement members.
-  show = () => {
+  show: () => void = () => {
     if (!(this.disabled() || this.__rozieCvaDisabled())) this.requestOpen(true);
   };
-  hide = () => {
+  hide: () => void = () => {
     this.requestOpen(false);
   };
-  toggle = () => {
+  toggle: () => void = () => {
     if (!(this.disabled() || this.__rozieCvaDisabled())) this.requestOpen(!this.open());
   };
-  reposition = () => {
+  reposition: () => void = () => {
     this.position();
   };
 

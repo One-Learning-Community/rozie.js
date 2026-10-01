@@ -31,11 +31,15 @@ import { buildMiddleware } from './internal/middleware';
 //   Same null-let convention as the others: read/written only in handlers, `any`
 //   via typeNeutralize.
 
+export interface RoziePopoverEventMap extends Omit<HTMLElementEventMap, 'change'> {
+  'change': CustomEvent<boolean>;
+}
+
 interface RozieAnchorSlotCtx {
-  open: any;
-  toggle: any;
-  show: any;
-  hide: any;
+  open: boolean;
+  toggle: () => void;
+  show: () => void;
+  hide: () => void;
 }
 
 @customElement('rozie-popover')
@@ -162,7 +166,7 @@ private __rozieFirstUpdateDone = false;
 
   @state() private _hasSlotAnchor = false;
   @queryAssignedElements({ slot: 'anchor', flatten: true }) private _slotAnchorElements!: Element[];
-  @property({ attribute: false }) anchor?: (scope: { open: any; toggle: any; show: any; hide: any }) => unknown;
+  @property({ attribute: false }) anchor?: (scope: { open: boolean; toggle: () => void; show: () => void; hide: () => void }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
   // Phase 79 Plan 08 (R4) contract for 79-09: the record intake for
@@ -365,7 +369,7 @@ private __rozieFirstUpdateDone = false;
     this.lastFocusedEl = this.deepActiveElement();
   }
   this._openControllable.write(next);
-  this.dispatchEvent(new CustomEvent("change", {
+  this.dispatchEvent(new CustomEvent<boolean>("change", {
     detail: next,
     bubbles: true,
     composed: true
@@ -552,24 +556,39 @@ private __rozieFirstUpdateDone = false;
   // Verbs: show/hide/toggle/reposition. NOT `update` (reserved Lit lifecycle) → the
   // reposition verb is `reposition`. None collide with the `change` emit, the `open`
   // model, or its React `setOpen` setter, nor with inherited HTMLElement members.
+  show(): void;
   show() {
     if (!this.disabled) this.requestOpen(true);
   }
 
+  hide(): void;
   hide() {
     this.requestOpen(false);
   }
 
+  toggle(): void;
   toggle() {
     if (!this.disabled) this.requestOpen(!this.open);
   }
 
+  reposition(): void;
   reposition() {
     this.position();
   }
 
   get open(): boolean { return this._openControllable.read(); }
   set open(v: boolean) { this._openControllable.notifyPropertyWrite(v); }
+
+  addEventListener<K extends keyof RoziePopoverEventMap>(type: K, listener: (this: Popover, ev: RoziePopoverEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
+    super.addEventListener(type, listener, options);
+  }
+  removeEventListener<K extends keyof RoziePopoverEventMap>(type: K, listener: (this: Popover, ev: RoziePopoverEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    super.removeEventListener(type, listener, options);
+  }
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the

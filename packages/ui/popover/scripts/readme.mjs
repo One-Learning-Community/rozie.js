@@ -12,7 +12,7 @@
  * Pure glue over the `@rozie/core` public IR — NO compiler/emitter surface.
  */
 
-import { renderPropDescription } from '@rozie/core';
+import { printTSType, renderPropDescription } from '@rozie/core';
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
 import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 import { requiredPeerNote } from '../../required-peer-note.mjs';
@@ -291,7 +291,10 @@ el.reposition();`,
 // README rendering.
 // ---------------------------------------------------------------------------
 
-export function renderReadme(target, ir, eventManifest, pkgName, handleManifest = {}) {
+export function renderReadme(target, ir, pkgName, handleManifest = {}) {
+  if (ir.emitDecls === null) {
+    throw new Error('renderReadme: Popover.rozie has no <emits> block — the events table is generated from it');
+  }
   const usage = USAGE[target];
   if (!usage) throw new Error(`renderReadme: no usage snippet for target "${target}"`);
 
@@ -380,17 +383,16 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   // Events
   lines.push('## Events');
   lines.push('');
-  if (target === 'lit' && litEventNamesDiverge(ir.emits)) {
+  if (target === 'lit' && litEventNamesDiverge(ir.emitDecls.map((d) => d.name))) {
     lines.push(LIT_EVENT_NOTE);
     lines.push('');
   }
-  lines.push('| Event | Description |');
-  lines.push('| --- | --- |');
-  for (const ev of ir.emits) {
-    const desc = eventManifest[ev];
-    if (!desc) throw new Error(`renderReadme: event "${ev}" missing from event-manifest`);
-    const eventCol = target === 'lit' ? litEventName(ev) : ev;
-    lines.push(`| \`${eventCol}\` | ${desc} |`);
+  lines.push('| Event | Payload | Description |');
+  lines.push('| --- | --- | --- |');
+  for (const d of ir.emitDecls) {
+    const eventCol = target === 'lit' ? litEventName(d.name) : d.name;
+    const payload = d.payload ? `\`${printTSType(d.payload)}\`` : '—';
+    lines.push(`| \`${eventCol}\` | ${payload} | ${d.docs?.description ?? ''} |`);
   }
   lines.push('');
 

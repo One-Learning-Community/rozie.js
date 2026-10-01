@@ -69,17 +69,17 @@ export interface PopoverProps extends Omit<import('react').ComponentPropsWithout
    * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded` / `aria-controls`), typically with `trigger='manual'` and a two-way-bound `open`. Pass a stable value — a new object on every render restarts tracking.
    */
   reference?: (Element | Record<string, unknown>) | null;
-  onChange?: (...args: any[]) => void;
-  renderAnchor?: (params: { open: boolean; toggle: (...args: any[]) => any; show: (...args: any[]) => any; hide: (...args: any[]) => any }) => ReactNode;
+  onChange?: (payload: boolean) => void;
+  renderAnchor?: (params: { open: boolean; toggle: () => void; show: () => void; hide: () => void }) => ReactNode;
   children?: ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 
 export interface PopoverHandle {
-  show: (...args: any[]) => any;
-  hide: (...args: any[]) => any;
-  toggle: (...args: any[]) => any;
-  reposition: (...args: any[]) => any;
+  show: () => void;
+  hide: () => void;
+  toggle: () => void;
+  reposition: () => void;
 }
 
 declare const Popover: React.ForwardRefExoticComponent<PopoverProps & React.RefAttributes<PopoverHandle>>;

@@ -14,9 +14,29 @@
 
 </template>
 
+<script lang="ts">
+export interface PopoverHandle {
+  show: () => void;
+  hide: () => void;
+  toggle: () => void;
+  reposition: () => void;
+}
+</script>
+
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
 import { useOutsideClick } from '@rozie/runtime-vue';
+
+// The `offset` AND `arrow` middleware factories are ALIASED on import: both are
+// ALSO author PROP names (`offset`, `arrow`). A bare `offset`/`arrow` shorthand in
+// the buildMiddleware factories object resolves to the PROP — on Vue/Svelte the
+// destructured prop local shadows the import, and on Angular the emitter rewrites
+// the bare shorthand to the prop signal (`offset: this.offset()`, a number) instead
+// of the middleware function (TS2322). Aliasing both severs the import↔prop clash.
+// (The Cropper import-name==component-name class, applied to imports vs PROP names —
+// two collisions, not one.) computePosition/autoUpdate/flip/shift carry no clash.
+import { computePosition, autoUpdate, offset as offsetMiddleware, flip, shift, arrow as arrowMiddleware, size } from '@floating-ui/dom';
+import { buildMiddleware } from './internal/middleware';
 
 const props = withDefaults(
   defineProps<{
@@ -90,11 +110,11 @@ const props = withDefaults(
 const open = defineModel<boolean>('open', { default: false });
 
 const emit = defineEmits<{
-  change: [...args: any[]];
+  change: [payload: boolean];
 }>();
 
 defineSlots<{
-  anchor(props: { open: any; toggle: any; show: any; hide: any }): any;
+  anchor(props: { open: boolean; toggle: () => void; show: () => void; hide: () => void }): any;
   default(props: {  }): any;
 }>();
 
@@ -102,16 +122,6 @@ const anchorElRef = ref<HTMLElement>();
 const floatingElRef = ref<HTMLElement>();
 const arrowElRef = ref<HTMLElement>();
 
-// The `offset` AND `arrow` middleware factories are ALIASED on import: both are
-// ALSO author PROP names (`offset`, `arrow`). A bare `offset`/`arrow` shorthand in
-// the buildMiddleware factories object resolves to the PROP — on Vue/Svelte the
-// destructured prop local shadows the import, and on Angular the emitter rewrites
-// the bare shorthand to the prop signal (`offset: this.offset()`, a number) instead
-// of the middleware function (TS2322). Aliasing both severs the import↔prop clash.
-// (The Cropper import-name==component-name class, applied to imports vs PROP names —
-// two collisions, not one.) computePosition/autoUpdate/flip/shift carry no clash.
-import { computePosition, autoUpdate, offset as offsetMiddleware, flip, shift, arrow as arrowMiddleware, size } from '@floating-ui/dom';
-import { buildMiddleware } from './internal/middleware';
 // null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
 //   anchorNode/floatingNode/arrowNode hold the resolved ref ELEMENTS (read ONLY in
 //   $onMount/handlers, ROZ123). They are deliberately named DIFFERENTLY from the
@@ -413,7 +423,7 @@ watch(() => props.reference, () => {
   }
 }, { flush: 'post' });
 
-defineExpose({ show, hide, toggle, reposition });
+defineExpose({ show, hide, toggle, reposition } as PopoverHandle);
 
 watchEffect((onCleanup) => {
   if (!(open.value && !props.disableDismiss)) return;

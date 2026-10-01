@@ -76,7 +76,7 @@ __rozieInjectStyle('Popover-c6cf02ea', `.rozie-popover[data-rozie-s-c6cf02ea] {
   transform: rotate(45deg);
 }`);
 
-interface AnchorSlotCtx { open: any; toggle: any; show: any; hide: any; }
+interface AnchorSlotCtx { open: boolean; toggle: () => void; show: () => void; hide: () => void; }
 
 interface PopoverProps extends Omit<import('solid-js').ComponentProps<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'reference' | 'onChange' | 'anchorSlot' | 'children' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
@@ -145,7 +145,7 @@ interface PopoverProps extends Omit<import('solid-js').ComponentProps<'div'>, 'o
    * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded` / `aria-controls`), typically with `trigger='manual'` and a two-way-bound `open`. Pass a stable value — a new object on every render restarts tracking.
    */
   reference?: (Element | Record<string, any>) | null;
-  onChange?: (...args: any[]) => void;
+  onChange?: (payload: boolean) => void;
   anchorSlot?: (ctx: AnchorSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
@@ -154,10 +154,10 @@ interface PopoverProps extends Omit<import('solid-js').ComponentProps<'div'>, 'o
 }
 
 export interface PopoverHandle {
-  show: (...args: any[]) => any;
-  hide: (...args: any[]) => any;
-  toggle: (...args: any[]) => any;
-  reposition: (...args: any[]) => any;
+  show: () => void;
+  hide: () => void;
+  toggle: () => void;
+  reposition: () => void;
 }
 
 export default function Popover(_props: PopoverProps): JSX.Element {

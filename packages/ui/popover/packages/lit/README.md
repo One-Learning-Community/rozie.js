@@ -72,9 +72,9 @@ Every visual value is a `--rozie-popover-*` CSS custom property (background, bor
 
 ## Events
 
-| Event | Description |
-| --- | --- |
-| `change` | Fired whenever the open state changes — a click/hover/focus trigger gesture, an Escape or click-outside dismissal, or a programmatic `show`/`hide`/`toggle`. Payload is the new `open` boolean. The two-way `open` model is updated alongside it. |
+| Event | Payload | Description |
+| --- | --- | --- |
+| `change` | `boolean` | Fired whenever the open state changes — a click/hover/focus trigger gesture, an Escape or click-outside dismissal, or a programmatic `show`/`hide`/`toggle`. The two-way `open` model is updated alongside it. |
 
 ## Imperative handle
 

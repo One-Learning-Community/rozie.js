@@ -197,6 +197,12 @@
 }
 </props>
 
+<emits>
+{
+  change: { payload: 'boolean', docs: { description: 'Fired whenever the open state changes — a click/hover/focus trigger gesture, an Escape or click-outside dismissal, or a programmatic `show`/`hide`/`toggle`. The two-way `open` model is updated alongside it.' } },
+}
+</emits>
+
 <script>
 // The `offset` AND `arrow` middleware factories are ALIASED on import: both are
 // ALSO author PROP names (`offset`, `arrow`). A bare `offset`/`arrow` shorthand in
@@ -530,7 +536,7 @@ function hide() { requestOpen(false) }
 function toggle() { if (!$props.disabled) requestOpen(!$props.open) }
 function reposition() { position() }
 
-$expose({ show, hide, toggle, reposition })
+$expose({ show, hide, toggle, reposition }, { show: '() => void', hide: '() => void', toggle: '() => void', reposition: '() => void' })
 </script>
 
 <listeners>
@@ -557,7 +563,7 @@ $expose({ show, hide, toggle, reposition })
     :aria-expanded="hasGestureTrigger() ? !!$props.open : null"
     :aria-describedby="isTooltip() && $props.open ? 'rozie-popover-floating' : null"
   >
-    <slot name="anchor" :open="$props.open" :toggle="toggle" :show="show" :hide="hide" />
+    <slot name="anchor" :open="$props.open" :toggle="toggle" :show="show" :hide="hide" :param-types="{ open: 'boolean', toggle: '() => void', show: '() => void', hide: '() => void' }" />
   </div>
 
   <!-- Floating content. Mounted only while open + enabled. Floating UI writes its
