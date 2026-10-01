@@ -756,7 +756,7 @@ function emitDefineEmitsCall(ir: IRComponent): string {
   const lines = ir.emits
     .map((e) => {
       const key = /^[A-Za-z_$][\w$]*$/.test(e) ? e : `'${e}'`;
-      if (ir.emitDecls !== null && ir.emitDecls !== undefined) {
+      if (ir.emitDecls != null) {
         const decl = declByName.get(e);
         if (decl !== undefined) {
           return decl.payload === null

@@ -39,7 +39,7 @@ export function typedSurfaceBarrelLines(target, ir, componentName) {
   if (target === 'vue') {
     if (hasTypes || hasSignatures) lines.push(`export type * from './${componentName}.vue';`);
   } else if (target === 'react' || target === 'solid' || target === 'lit') {
-    if (target === 'lit' && ir.emitDecls !== null) {
+    if (target === 'lit' && ir.emitDecls != null) {
       lines.push(`export type { Rozie${ir.name}EventMap } from './${componentName}';`);
     }
     if (hasTypes) lines.push(`export type * from './${componentName}';`);

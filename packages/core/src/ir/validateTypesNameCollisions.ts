@@ -112,7 +112,7 @@ export function validateTypesNameCollisions(
   scriptBody: readonly t.Statement[] | null | undefined,
   diagnostics: Diagnostic[],
 ): void {
-  if (ir.types === null) return;
+  if (ir.types == null) return;
   const reserved = reservedGeneratedTypeNames(ir);
   const script = scriptBindings(scriptBody ?? []);
   for (const b of typesBindings(ir.types.statements)) {

@@ -16,7 +16,7 @@
  *     is a behaviour-identical `super` pass-through (the single allowed
  *     runtime-visible addition); `'declare'` is declaration-only (sidecar).
  *
- * Every helper returns `''` / `null` when `ir.emitDecls === null`, so a
+ * Every helper returns `''` / `null` when `ir.emitDecls == null`, so a
  * component without `<emits>` stays byte-identical.
  *
  * @experimental — added in typed-surface P1
@@ -38,7 +38,7 @@ export function litEventMapName(ir: IRComponent): string {
  * block, the event is undeclared, or it declares no payload.
  */
 export function declaredPayloadType(ir: IRComponent, name: string): t.TSType | null {
-  if (ir.emitDecls === null) return null;
+  if (ir.emitDecls == null) return null;
   const decl = ir.emitDecls.find((d) => d.name === name);
   return decl?.payload ? t.cloneNode(decl.payload, true) : null;
 }
@@ -55,7 +55,7 @@ export function typeCustomEventDispatch(
 
 /** The module-scope event-map interface; `''` without `<emits>`. */
 export function renderLitEventMap(ir: IRComponent): string {
-  if (ir.emitDecls === null) return '';
+  if (ir.emitDecls == null) return '';
   const keys = ir.emitDecls.map((d) => `'${kebabize(d.name)}'`);
   const members = ir.emitDecls.map((d, i) => {
     const payload = d.payload ? indentContinuation(printTSType(d.payload)) : 'undefined';
@@ -73,7 +73,7 @@ export function renderLitEventMap(ir: IRComponent): string {
  * `<emits>`. `mode: 'class'` adds the `super` pass-through implementations.
  */
 export function renderLitListenerOverloads(ir: IRComponent, mode: 'class' | 'declare'): string {
-  if (ir.emitDecls === null) return '';
+  if (ir.emitDecls == null) return '';
   const map = litEventMapName(ir);
   const cls = ir.name;
   const opts = (kind: 'Add' | '') => `options?: boolean | ${kind}EventListenerOptions`;

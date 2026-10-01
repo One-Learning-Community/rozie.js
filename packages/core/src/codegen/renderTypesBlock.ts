@@ -35,7 +35,7 @@ export interface RenderTypesBlockOptions {
 
 /** @experimental — added in typed-surface P1 */
 export function renderTypesBlock(ir: IRComponent, opts: RenderTypesBlockOptions = {}): string {
-  if (ir.types === null) return '';
+  if (ir.types == null) return '';
   const stmts =
     opts.module === true
       ? typesStatementsForModule(ir.types.statements, ir.setupBody?.scriptProgram?.program.body)
@@ -54,5 +54,5 @@ export function renderTypesBlock(ir: IRComponent, opts: RenderTypesBlockOptions 
  * @experimental — added in typed-surface P1
  */
 export function typesExportedNames(ir: IRComponent): string[] {
-  return ir.types === null ? [] : [...ir.types.exportedNames];
+  return ir.types == null ? [] : [...ir.types.exportedNames];
 }

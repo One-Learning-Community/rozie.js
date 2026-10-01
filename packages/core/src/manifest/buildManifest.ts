@@ -72,7 +72,7 @@ function buildProp(prop: IRComponent['props'][number]): RozieManifestProp {
 }
 
 function buildEmits(ir: IRComponent): RozieManifestEmit[] {
-  if (ir.emitDecls === null) {
+  if (ir.emitDecls == null) {
     return ir.emits.map((name) => ({ name, payload: null, docs: null }));
   }
   return ir.emitDecls.map((d) => ({
@@ -98,6 +98,6 @@ export function buildManifest(ir: IRComponent): RozieManifest {
       name: m.name,
       signature: m.signature ? generate(m.signature).code : null,
     })),
-    types: ir.types === null ? null : renderTypesBlock(ir),
+    types: ir.types == null ? null : renderTypesBlock(ir),
   };
 }

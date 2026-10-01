@@ -364,7 +364,7 @@ export function renderPropsInterface(
     if (ext !== '') lines[0] = `export interface ${propsInterfaceName(ir.name)}${generics}${ext} {`;
   }
   const body = lines.join('\n');
-  if (opts.includeTypesBlock === true && ir.types !== null) {
+  if (opts.includeTypesBlock === true && ir.types != null) {
     return `${renderTypesBlock(ir)}\n\n${body}`;
   }
   return body;
