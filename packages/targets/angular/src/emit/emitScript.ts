@@ -67,7 +67,7 @@ import {
   printTSType,
   renderTypesBlock,
   RozieErrorCode,
-  untypedExposeSignature,
+  exposedVerbSurface,
 } from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import {
@@ -1837,15 +1837,12 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   //    (console.log, expression-statements) go in the constructor body.
   const classMethodLines: string[] = [];
   // Typed public surface P1 — class-property type annotation (`: (to: number) => void`)
-  // for an `$expose`d verb. Opt-in components (any `$expose` signature declared)
-  // give untyped verbs the documented `(...args: any[]) => any` shape. '' otherwise.
-  const exposeSigs = new Map(
-    ir.expose.flatMap((e) => (e.signature !== undefined ? [[e.name, e.signature] as const] : [])),
-  );
-  const exposedNameSet = new Set(ir.expose.map((e) => e.name));
+  // for an `$expose`d verb, from the shared core rule (`exposedVerbSurface`):
+  // a signature ⇒ it; an author-typed implementation ⇒ none (its own types are
+  // the surface); an untyped verb of an opt-in component ⇒
+  // `(...args: any[]) => any`. '' otherwise.
   const exposedAnnotation = (name: string): string => {
-    if (!exposedNameSet.has(name)) return '';
-    const sig = exposeSigs.get(name) ?? (exposeSigs.size > 0 ? untypedExposeSignature() : undefined);
+    const sig = exposedVerbSurface(ir, name);
     return sig ? `: ${genCode(exposeSignatureAnnotation(sig).typeAnnotation)}` : '';
   };
   const constructorExpressionLines: string[] = [];

@@ -48,7 +48,7 @@ import {
   renderEmitHandlerType,
   renderHtmlAttrsExtends,
   resolveAttrsFallthroughRoot,
-  untypedExposeSignature,
+  exposedVerbSurface,
 } from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { isMutableLiteralFactoryDefault } from '../../../../core/src/codegen/propDefaultFactory.js';
@@ -1512,7 +1512,10 @@ function emitResidualScriptBody(
   clonedProgram: t.File,
   consumedLifecycleIndices: Set<number>,
   exposeNames: Set<string>,
-  exposeSignatures: Map<string, t.TSFunctionType> = new Map(),
+  // Typed public surface P1 (final wave I1) — the shared exposed-verb typing
+  // rule (core `exposedVerbSurface`): signature ⇒ it; author-typed ⇒ undefined;
+  // untyped in an opt-in component ⇒ `(...args: any[]) => any`.
+  exposedSurface: (name: string) => t.TSFunctionType | undefined = () => undefined,
 ): { code: string; stmts: t.Statement[] } {
   const stmts: t.Statement[] = [];
   const body = clonedProgram.program.body;
@@ -1613,27 +1616,23 @@ function emitResidualScriptBody(
   const code = stmts
     .map((s) => {
       if (exposeNames.size > 0 && isExposedTopLevelDecl(s, exposeNames)) {
-        // Typed public surface P1: an authored `$expose` signature becomes the
-        // public TS overload (emitted immediately before the implementation
-        // `export function`); for an arrow/function-valued const it becomes the
-        // declarator's type annotation. The implementation's params are already
-        // `any`, so an untyped rest-arg implementation stays overload-compatible.
+        // Typed public surface P1: the exposed-verb surface (shared core rule)
+        // becomes the public TS overload (emitted immediately before the
+        // implementation `export function`); for an arrow/function-valued const
+        // it becomes the declarator's type annotation. An author-typed
+        // implementation gets neither (its own types are the surface), and an
+        // authored declarator annotation is never replaced.
         let overloadCode = '';
         if (t.isFunctionDeclaration(s) && s.id) {
-          // Untyped verbs of an opt-in component keep `(...args: any[]) => any`.
-          const sig =
-            exposeSignatures.get(s.id.name) ??
-            (exposeSignatures.size > 0 ? untypedExposeSignature() : undefined);
+          const sig = exposedSurface(s.id.name);
           if (sig) {
             overloadCode =
               genCode(t.exportNamedDeclaration(exposeSignatureOverload(s.id.name, sig))) + '\n';
           }
         } else if (t.isVariableDeclaration(s)) {
           const d = s.declarations[0]!;
-          if (t.isIdentifier(d.id)) {
-            const sig =
-              exposeSignatures.get(d.id.name) ??
-              (exposeSignatures.size > 0 ? untypedExposeSignature() : undefined);
+          if (t.isIdentifier(d.id) && d.id.typeAnnotation == null) {
+            const sig = exposedSurface(d.id.name);
             if (sig) d.id.typeAnnotation = exposeSignatureAnnotation(sig);
           }
         }
@@ -1800,9 +1799,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
     cloned,
     consumedIndices,
     exposeNames,
-    new Map(
-      ir.expose.flatMap((e) => (e.signature !== undefined ? [[e.name, e.signature] as const] : [])),
-    ),
+    (name) => exposedVerbSurface(ir, name),
   );
 
   // Bug B fix (260519 linechart-watch-recreate) — assemble the `'svelte'`

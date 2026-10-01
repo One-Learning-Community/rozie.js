@@ -30,7 +30,7 @@ import {
   buildPropJsdoc,
   exposeSignatureAnnotation,
   exposeSignatureMethodOverload,
-  untypedExposeSignature,
+  exposedVerbSurface,
 } from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
@@ -1171,18 +1171,12 @@ function classBodyFromStatements(
 ): { methods: string; freeStatements: string } {
   const computedDepsByName = new Map(ir.computed.map((c) => [c.name, c.deps] as const));
   const methodChunks: string[] = [];
-  // Typed public surface P1 — the `$expose` signature for an exposed verb.
-  // Opt-in components (at least one signature declared) give untyped verbs the
-  // documented `(...args: any[]) => any` shape; otherwise `undefined` (no
-  // emit change).
-  const exposeSigs = new Map(
-    ir.expose.flatMap((e) => (e.signature !== undefined ? [[e.name, e.signature] as const] : [])),
-  );
-  const exposedNameSet = new Set(ir.expose.map((e) => e.name));
-  const exposeSignatureFor = (name: string): t.TSFunctionType | undefined => {
-    if (exposeSigs.size === 0 || !exposedNameSet.has(name)) return undefined;
-    return exposeSigs.get(name) ?? untypedExposeSignature();
-  };
+  // Typed public surface P1 — the overload/annotation for an exposed verb, from
+  // the shared core rule (`exposedVerbSurface`): a signature ⇒ it; an
+  // author-typed implementation ⇒ undefined (its own types are the surface);
+  // an untyped verb of an opt-in component ⇒ `(...args: any[]) => any`;
+  // otherwise undefined (no emit change).
+  const exposeSignatureFor = (name: string): t.TSFunctionType | undefined => exposedVerbSurface(ir, name);
   const freeChunks: string[] = [];
 
   // Quick task 260830-j53 — block-wide printed-comment ledger for the class-body

@@ -1,0 +1,49 @@
+<!--
+  AuthorExpose.rozie — typed public surface P1, final fix wave I1. An opt-in
+  component (one $expose signature: `reset`) whose other verbs carry the
+  author's own types in <script lang="ts">. Every target's consumer must see
+  the author types (add/sub/mul/half), the signature (reset), and the untyped
+  fallback `(...args: any[]) => any` only for genuinely untyped verbs
+  (loose/twice).
+-->
+<rozie name="AuthorExpose">
+
+<data>
+{
+  total: 0,
+}
+</data>
+
+<script lang="ts">
+function add(by: number): string {
+  $data.total += by
+  return String($data.total)
+}
+const sub = (by: number): string => {
+  $data.total -= by
+  return String($data.total)
+}
+const mul: (by: number) => string = (by) => {
+  $data.total *= by
+  return String($data.total)
+}
+const half = function (by: number): number {
+  return by / 2
+}
+function reset() {
+  $data.total = 0
+}
+function loose(...a) {
+  return a.length
+}
+const twice = function (n) {
+  return n
+}
+$expose({ add, sub, mul, half, reset, loose, twice }, { reset: '() => void' })
+</script>
+
+<template>
+  <span class="total">{{ $data.total }}</span>
+</template>
+
+</rozie>

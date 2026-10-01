@@ -166,7 +166,7 @@ $expose(
 - The second argument is **compile-time only**. It is stripped from every emitted module, so no signature string ever reaches a JavaScript consumer.
 - It must be an object literal that maps exposed verbs to string-literal function types. Anything else is [ROZ156](/reference/diagnostics).
 - Each key must be a verb named in the first argument. An unknown key is [ROZ155](/reference/diagnostics).
-- A verb you do not list keeps `(...args: any[]) => any`, so you can type the verbs consumers call most and leave the rest.
+- A verb you do not list keeps the types its implementation already has. In `<script lang="ts">`, a verb with a return-type annotation (`function add(by: number): string`) or an annotated `const` (`const add: AddFn = …`) keeps those types on every target. A verb with no types at all is `(...args: any[]) => any`. So you can type the verbs consumers call most and leave the rest.
 - The implementation can stay untyped. A rest-argument forwarder such as `(...a) => cal?.gotoDate(...a)` is accepted against `'(date: DateInput) => void'` on every target.
 
 ## Type-string scope {#type-string-scope}
@@ -196,7 +196,7 @@ Notes on the less obvious rows:
 
 - **Lit event map.** The generated `Rozie<Name>EventMap` extends `Omit<HTMLElementEventMap, …>` with the names you declared omitted, so an emit named like a DOM event (`select`) narrows cleanly instead of failing with TS2430. The typed `addEventListener` and `removeEventListener` overloads call `super`, so listener behavior is unchanged.
 - **Svelte overloads.** A typed verb is emitted as an overload signature above an implementation that still accepts the untyped arguments, so an untyped JS body compiles.
-- **Untyped verbs** in an opted-in component keep `(...args: any[]) => any` on every target.
+- **Verbs without a signature.** On every target, a verb whose implementation carries author types (a return-type annotation, or an annotated `const` declarator) keeps them, and only a verb with no types at all is `(...args: any[]) => any`.
 
 The `.d.rozie.ts` sidecar for each target types slots the same way the compiled module does, including Solid's `<name>Slot` props and Svelte's `Snippet` shapes. A Solid scoped default slot accepts a function child.
 

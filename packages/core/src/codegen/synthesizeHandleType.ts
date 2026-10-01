@@ -28,12 +28,10 @@
  */
 import * as t from '@babel/types';
 import _generate from '@babel/generator';
-import type { ExposedMethod, IRComponent } from '../ir/types.js';
+import type { IRComponent } from '../ir/types.js';
 import { printTSType } from './renderAuthoredType.js';
-import {
-  collectExposedFunctionsByName,
-  type FnLike,
-} from './collectExposedFunctions.js';
+import type { FnLike } from './collectExposedFunctions.js';
+import { exposedVerbTypings, type ExposedVerbTyping } from './exposedVerbSurface.js';
 
 // Default-export interop (see collectScriptDecls.ts).
 type GenerateFn = typeof import('@babel/generator').default;
@@ -44,18 +42,9 @@ const generate: GenerateFn =
 
 const UNTYPED_METHOD = '(...args: any[]) => any';
 
-/**
- * AST form of the untyped-verb handle shape `(...args: any[]) => any` — the
- * one definition targets use when they must annotate/overload an untyped
- * `$expose` verb (Svelte).
- *
- * @experimental — added in typed-surface P1
- */
-export function untypedExposeSignature(): t.TSFunctionType {
-  const rest = t.restElement(t.identifier('args'));
-  rest.typeAnnotation = t.tsTypeAnnotation(t.tsArrayType(t.tsAnyKeyword()));
-  return t.tsFunctionType(null, [rest], t.tsTypeAnnotation(t.tsAnyKeyword()));
-}
+// The untyped-verb AST shape lives with the shared exposed-verb typing rule;
+// re-exported here for existing importers.
+export { untypedExposeSignature } from './exposedVerbSurface.js';
 
 /** Generate the TS source for a node fragment (type annotation inner type). */
 function gen(node: t.Node): string {
@@ -147,29 +136,18 @@ function stripTypeAnnotation(param: t.Node): t.Node {
 }
 
 /**
- * Does this function carry an author-written return-type annotation? That is the
- * reliable "typed by the author" signal — untyped `<script>` functions never
- * have one (typeNeutralizeScript only fills params).
+ * Render one method member line for the interface body, from the shared
+ * exposed-verb typing rule (`exposedVerbSurface.ts`):
+ *   signature          → `name: <$expose signature>;` (typed-surface P1)
+ *   author-declarator  → `name: <declarator annotation>;`
+ *   author-fn          → `name(<params>): <ret>;`
+ *   untyped            → `name: (...args: any[]) => any;`
  */
-function hasAuthorReturnType(fn: FnLike): boolean {
-  return fn.returnType != null && t.isTSTypeAnnotation(fn.returnType);
-}
-
-/**
- * Render one method member line for the interface body.
- *   signature → `name: <$expose signature>;` (typed-surface P1)
- *   typed   → `name(<params>): <ret>;`
- *   untyped → `name: (...args: any[]) => any;`
- */
-function renderMember(method: ExposedMethod, fn: FnLike | undefined): string {
-  const name = method.name;
-  // Typed public surface P1 — an `$expose` compile-time signature (second
-  // argument) wins over the implementation's own shape: it is the author's
-  // declared public contract, and the implementation may be untyped JS.
-  if (method.signature !== undefined) {
-    return `  ${name}: ${printTSType(method.signature)};`;
-  }
-  if (fn && hasAuthorReturnType(fn)) {
+function renderMember(name: string, typing: ExposedVerbTyping | undefined): string {
+  if (typing?.kind === 'signature') return `  ${name}: ${printTSType(typing.signature)};`;
+  if (typing?.kind === 'author-declarator') return `  ${name}: ${printTSType(typing.annotation)};`;
+  if (typing?.kind === 'author-fn') {
+    const fn: FnLike = typing.fn;
     const params = fn.params.map((p) => renderParam(p)).join(', ');
     // Generate the inner TSType (not the TSTypeAnnotation wrapper — @babel/
     // generator cannot print a bare annotation node standalone).
@@ -192,10 +170,10 @@ export function synthesizeHandleType(
 ): string | null {
   if (ir.expose.length === 0) return null;
 
-  const fnsByName = collectExposedFunctionsByName(ir);
+  const typings = exposedVerbTypings(ir);
 
   const members = ir.expose.map((method) =>
-    renderMember(method, fnsByName.get(method.name)),
+    renderMember(method.name, typings.get(method.name)),
   );
 
   return `interface ${interfaceName} {\n${members.join('\n')}\n}`;
