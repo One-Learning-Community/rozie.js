@@ -43,7 +43,8 @@ import type {
   TemplateInterpolation,
   TemplateNode,
 } from '../ast/blocks/TemplateAST.js';
-import type { RozieAST } from '../ast/types.js';
+import type { RozieAST, SourceLoc } from '../ast/types.js';
+import { locFromBabel } from '../diagnostics/locFromBabel.js';
 
 // Default-export interop: see validators/unknownRefValidator.ts for the same pattern.
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -127,4 +128,65 @@ export function forEachTemplateAndListenersEmitCall(ast: RozieAST, visit: EmitCa
   if (ast.listeners) {
     for (const entry of ast.listeners.entries) walkExpression(entry.value, 0, visit);
   }
+}
+
+/**
+ * One `$emit('name', …)` call with a string-literal event name, located in the
+ * `.rozie` source (or a spliced `.rzts`/`.rzjs` partial — `loc.filename`).
+ * `argCount` excludes the event name; `hasSpread` is true when any payload
+ * argument is a spread (its arity is unknowable statically).
+ *
+ * @experimental — added in typed-surface P1 (final fix wave M6/M7)
+ */
+export interface EmitCallSite {
+  name: string;
+  argCount: number;
+  hasSpread: boolean;
+  loc: SourceLoc;
+}
+
+function siteOf(call: t.CallExpression, baseOffset: number): EmitCallSite | null {
+  const first = call.arguments[0];
+  if (!first || !t.isStringLiteral(first)) return null;
+  const rest = call.arguments.slice(1);
+  const base = locFromBabel(call);
+  return {
+    name: first.value,
+    argCount: rest.length,
+    hasSpread: rest.some((a) => t.isSpreadElement(a)),
+    loc: {
+      start: base.start + baseOffset,
+      end: base.end + baseOffset,
+      ...(base.filename !== undefined ? { filename: base.filename } : {}),
+    },
+  };
+}
+
+/**
+ * Every string-literal `$emit` call site in `<script>` (source order), then
+ * `<template>` and `<listeners>` (the shared walk above). NEVER throws.
+ *
+ * @experimental — added in typed-surface P1 (final fix wave M6/M7)
+ */
+export function collectEmitCallSites(ast: RozieAST): EmitCallSite[] {
+  const out: EmitCallSite[] = [];
+  if (ast.script) {
+    try {
+      traverse(ast.script.program, {
+        CallExpression(path) {
+          const callee = path.node.callee;
+          if (!t.isIdentifier(callee) || callee.name !== '$emit') return;
+          const site = siteOf(path.node, 0);
+          if (site) out.push(site);
+        },
+      });
+    } catch {
+      // D-08 — never escape the semantic stage.
+    }
+  }
+  forEachTemplateAndListenersEmitCall(ast, (call, baseOffset) => {
+    const site = siteOf(call, baseOffset);
+    if (site) out.push(site);
+  });
+  return out;
 }

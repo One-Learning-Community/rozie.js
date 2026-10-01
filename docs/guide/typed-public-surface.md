@@ -123,7 +123,7 @@ The `.d.rozie.ts` sidecar that editors read carries the `<types>` block too, so 
 
 - `payload` is **one** TypeScript type string. It is one argument, not a tuple, which matches the single-`detail` model every target already uses. An absent `payload` means the event carries no argument. A syntax error in the string is [ROZ022](/reference/diagnostics).
 - `docs` takes the same shape as the `docs:` key in `<props>` (`description`, `deprecated`, `example`). A malformed `docs:` is a warning, [ROZ023](/reference/diagnostics), and the bad part is dropped.
-- An entry that is not `{}` or `{ payload?, docs? }`, or that uses a computed or spread key, is [ROZ021](/reference/diagnostics).
+- An entry that is not `{}` or `{ payload?, docs? }`, that uses a computed or spread key, that repeats an event name, or that repeats its `payload` or `docs` key, is [ROZ021](/reference/diagnostics).
 
 ### Completeness rules
 
@@ -131,8 +131,9 @@ When `<emits>` is present it is the **complete list** of events:
 
 - `$emit('x')` of a name that is not declared is an error, [ROZ151](/reference/diagnostics).
 - A declared name that nothing ever emits is a warning, [ROZ152](/reference/diagnostics).
+- A `$emit` call whose arguments don't match the declaration is a warning, [ROZ157](/reference/diagnostics): an argument passed to an event declared without a payload, no argument for an event that declares one, or more than one payload argument.
 
-Both checks count every `$emit` call in `<script>`, `<template>` and `<listeners>`.
+These checks count every `$emit` call in `<script>`, `<template>` and `<listeners>`, and point at the offending call.
 
 When `<emits>` is absent, nothing changes: event names are inferred from the `$emit` calls and the handlers keep their `(...args: any[]) => void` type. The one deliberate change in this release is that the untyped handler is now `any[]` everywhere. The shared `.d.rozie.ts` sidecar, Solid and Svelte used to emit `unknown[]`, which rejected a handler written with a concrete parameter type. React already used `any[]`.
 
@@ -221,13 +222,15 @@ Every code below is listed in the [diagnostics reference](/reference/diagnostics
 |---|---|---|
 | [ROZ019](/reference/diagnostics) | error | `<types>` holds a statement that is not type-only |
 | [ROZ020](/reference/diagnostics) | error | `<types>` is not valid TypeScript |
-| [ROZ021](/reference/diagnostics) | error | an `<emits>` entry is not `{}` or `{ payload?, docs? }` |
+| [ROZ021](/reference/diagnostics) | error | an `<emits>` entry is not `{}` or `{ payload?, docs? }`, or repeats a name or sub-key |
 | [ROZ022](/reference/diagnostics) | error | an authored type string is not a valid TypeScript type |
 | [ROZ023](/reference/diagnostics) | warning | an `<emits>` `docs:` is malformed |
 | [ROZ024](/reference/diagnostics) | error | a `<types>` import conflicts with a `<script>` import |
+| [ROZ025](/reference/diagnostics) | error | a `<types>` name collides with a generated name or a `<script>` declaration |
 | [ROZ151](/reference/diagnostics) | error | `$emit` of a name `<emits>` does not declare |
 | [ROZ152](/reference/diagnostics) | warning | `<emits>` declares an event that is never emitted |
 | [ROZ153](/reference/diagnostics) | error | a `:param-types` key is not a parameter the slot passes |
 | [ROZ154](/reference/diagnostics) | error | `:param-types` is not an object literal of string literals |
 | [ROZ155](/reference/diagnostics) | error | an `$expose` signature names a verb that is not exposed |
 | [ROZ156](/reference/diagnostics) | error | the `$expose` second argument is not an object literal of function-type strings |
+| [ROZ157](/reference/diagnostics) | warning | a `$emit` call's argument count does not match the declared payload |

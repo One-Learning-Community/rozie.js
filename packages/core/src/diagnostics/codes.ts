@@ -79,7 +79,7 @@ export const RozieErrorCode = {
   // ROZ010-029 declarative-block band.
   TYPES_BLOCK_DISALLOWED_STATEMENT: 'ROZ019', // error — the <types> block holds a statement that is not type-only (runtime code, a value import, enum, declare const, …); only `import type`, interface, type, and export of those are allowed, so hoisting <types> into every target can never change runtime behaviour.
   TYPES_BLOCK_PARSE_ERROR: 'ROZ020', // error — the <types> block is not valid TypeScript.
-  INVALID_EMIT_DECL: 'ROZ021', // error — an <emits> entry is not `{}` / `{ payload?: '<TS type>', docs?: {...} }`, or uses a computed/spread key or an unknown sub-key.
+  INVALID_EMIT_DECL: 'ROZ021', // error — an <emits> entry is not `{}` / `{ payload?: '<TS type>', docs?: {...} }`, or uses a computed/spread key, an unknown sub-key, a duplicate event name, or a repeated `payload`/`docs` sub-key.
   INVALID_AUTHORED_TYPE: 'ROZ022', // error — an author-written type string (an <emits> payload, a :param-types value, or an $expose signature) is not a single valid TypeScript type.
   INVALID_EMIT_DOCS_SHAPE: 'ROZ023', // warning — an <emits> `docs:` is malformed (same shape as <props> docs: { description?, deprecated?, example? }); the bad docs/sub-key is dropped.
   TYPES_SCRIPT_IMPORT_CONFLICT: 'ROZ024', // error — a <types> import binds a local name that a <script> import already binds to a DIFFERENT source or imported name; both land in one module scope on every target. (Same source + same name is fine: the <types> copy is dropped from the module.) Rename one with `as`.
@@ -661,13 +661,14 @@ export const RozieErrorCode = {
   // the shipped corpus does not use. See setupOncePropReadValidator.ts.
   SETUP_ONCE_PROP_READ: 'ROZ150', // warning (suppressible) — setup-once <script> code (no enclosing function) reads $props.<x>/$model.<x>; on Angular (and Lit, for a top-level declaration initializer) that runs before consumer-bound inputs arrive, so it sees the default. Read it through a derived function (`const xValue = () => $props.x`) instead.
 
-  // Typed public surface (spec 2026-09-29) — ROZ151..ROZ156.
+  // Typed public surface (spec 2026-09-29) — ROZ151..ROZ157.
   EMIT_UNDECLARED: 'ROZ151', // error — <emits> is present and a $emit('x') (in <script>, <template> or <listeners>) names an event it does not declare; <emits> is the complete list.
   EMIT_DECLARED_UNUSED: 'ROZ152', // warning — <emits> declares an event that no $emit call ever fires.
   SLOT_PARAM_TYPES_UNKNOWN_KEY: 'ROZ153', // error — a <slot :param-types> key is not a param the slot passes (via :params or a scoped attribute).
   SLOT_PARAM_TYPES_INVALID: 'ROZ154', // error — <slot :param-types> must be an object literal whose values are string literals holding TypeScript types, e.g. :param-types="{ row: 'Row<T>', index: 'number' }".
   EXPOSE_SIGNATURE_UNKNOWN_VERB: 'ROZ155', // error — an $expose signature key (second argument) names a verb that the first argument does not expose.
   EXPOSE_SIGNATURES_INVALID: 'ROZ156', // error — the $expose second argument must be an object literal mapping exposed verbs to string-literal TypeScript function types, e.g. $expose({ gotoDate }, { gotoDate: '(date: DateInput) => void' }); it is compile-time only.
+  EMIT_PAYLOAD_ARITY: 'ROZ157', // warning — with <emits> present, a $emit call's argument count disagrees with the declaration: arguments passed to an event declared without a payload, no argument for an event that declares one, or more than one payload argument. The typed leaf build can reject the call on some targets while others accept it silently; make the call match the declared payload.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // error — SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)

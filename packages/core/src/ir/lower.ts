@@ -64,6 +64,7 @@ import type { ProducerResolver } from '../resolver/index.js';
 import * as t from '@babel/types';
 import { analyzeTypesScriptImports } from '../codegen/typesScriptImports.js';
 import { validateTypesNameCollisions } from './validateTypesNameCollisions.js';
+import { collectEmitCallSites } from '../semantic/walkEmitCalls.js';
 import { babelLocToRozieLoc } from '../parsers/parserPosition.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
 
@@ -254,8 +255,16 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
       });
     }
   }
-  const emitDecls = lowerEmitsBlock(ast.emits, diagnostics);
-  validateEmitCompleteness(emitDecls, bindings.emits, ast.emits?.loc, diagnostics);
+  const emitsNotes = { malformed: new Set<string>(), invalidPayload: new Set<string>() };
+  const emitDecls = lowerEmitsBlock(ast.emits, diagnostics, emitsNotes);
+  validateEmitCompleteness(
+    emitDecls,
+    bindings.emits,
+    ast.emits?.loc,
+    diagnostics,
+    emitDecls !== null ? collectEmitCallSites(ast) : [],
+    emitsNotes,
+  );
 
   const ir: IRComponent = {
     type: 'IRComponent',
