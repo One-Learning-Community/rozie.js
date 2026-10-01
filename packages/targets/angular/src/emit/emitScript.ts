@@ -104,6 +104,7 @@ import {
   hasKeyedFillIntake,
   isRecordOnlySlotDecl,
 } from './refineSlotTypes.js';
+import { functionExpressionAsArrow } from '../../../../core/src/codegen/functionExpressionAsArrow.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -2005,7 +2006,11 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
           if (!declaratorHasFunctionType(d.id)) {
             annotateUntypedParams(d.init.params);
           }
-          const arrowCode = genCode(d.init);
+          // A `function` expression becomes an arrow field so the rewritten
+          // `this.…` reads are lexical (core functionExpressionAsArrow).
+          const arrowCode = genCode(
+            t.isFunctionExpression(d.init) ? (functionExpressionAsArrow(d.init) ?? d.init) : d.init,
+          );
           const exposedSuffix =
             declTypeSuffix === '' ? exposedAnnotation(d.id.name) : declTypeSuffix;
           classMethodLines.push(`${d.id.name}${exposedSuffix} = ${arrowCode};`);

@@ -53,6 +53,7 @@ import { emitContext } from './emitContext.js';
 import { toKebabCase } from './emitDecorator.js';
 import { emitPortals } from './emitPortals.js';
 import { renderLitListenerOverloads } from './litEventMap.js';
+import { functionExpressionAsArrow } from '../../../../core/src/codegen/functionExpressionAsArrow.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
@@ -1343,7 +1344,11 @@ function classBodyFromStatements(
           // callback the field annotation is the sole type carrier (core's
           // typeNeutralizeScript leaves the contextually-typed params bare), so
           // re-emit it as `f: (e: MouseEvent) => void = …`.
-          const code = renderExpression(decl.init);
+          // A `function` expression becomes an arrow field so the rewritten
+          // `this.…` reads are lexical (core functionExpressionAsArrow).
+          const code = renderExpression(
+            t.isFunctionExpression(decl.init) ? (functionExpressionAsArrow(decl.init) ?? decl.init) : decl.init,
+          );
           const declTypeSuffix = renderDeclaratorTypeSuffix(decl.id);
           // Typed public surface P1 — an exposed field-arrow verb carries its
           // `$expose` signature as the field annotation (an authored declarator

@@ -42,7 +42,7 @@ describe('EXPOSE-AUTHOR-TYPED — Angular', () => {
     const r = compile(SRC, { target: 'angular', filename: 'AuthorExpose.rozie', sourceMap: false });
     expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
     expect(r.code).toMatch(/\n\s+add = \(by: number\): string => \{/);
-    expect(r.code).toMatch(/\n\s+half = function \(by: number\): number \{/);
+    expect(r.code).toMatch(/\n\s+half = \(by: number\): number => \{/);
     expect(r.code).toMatch(/\n\s+reset: \(\) => void = /);
     expect(r.code).toMatch(/\n\s+loose: \(\.\.\.args: any\[\]\) => any = /);
   });
