@@ -23,6 +23,7 @@ import { buildPropJsdoc, renderEmitHandlerType, renderHtmlAttrsExtends } from '@
 import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
+import { propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 export function renderType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {
@@ -278,8 +279,8 @@ export function emitPropsInterface(
   const htmlAttrsExtends = renderHtmlAttrsExtends(ir, 'solid', fields);
 
   if (fields.length === 0) {
-    return `interface ${ir.name}Props${htmlAttrsExtends} {}`;
+    return `interface ${propsInterfaceName(ir.name)}${htmlAttrsExtends} {}`;
   }
 
-  return `interface ${ir.name}Props${htmlAttrsExtends} {\n${fields.join('\n')}\n}`;
+  return `interface ${propsInterfaceName(ir.name)}${htmlAttrsExtends} {\n${fields.join('\n')}\n}`;
 }

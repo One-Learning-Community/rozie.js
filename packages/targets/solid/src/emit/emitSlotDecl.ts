@@ -16,6 +16,7 @@
 import type { Diagnostic, IRComponent } from '@rozie/core';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
+import { solidSlotCtxName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 export interface EmitSlotDeclResult {
   /** Interface field lines for each slot. */
@@ -23,16 +24,6 @@ export interface EmitSlotDeclResult {
   /** Standalone ctx interface declarations for context-bearing named slots. */
   ctxInterfaces: string[];
   diagnostics: Diagnostic[];
-}
-
-function capitalize(name: string): string {
-  if (name.length === 0) return name;
-  return name.charAt(0).toUpperCase() + name.slice(1);
-}
-
-function pascalCase(name: string): string {
-  const parts = name.split(/[-_]/).filter(Boolean);
-  return parts.map((p) => capitalize(p)).join('');
 }
 
 /**
@@ -78,14 +69,15 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
         // Scoped default slot (`<slot :close="close" />`): the runtime calls
         // children as a function with the ctx, so a function child is accepted
         // alongside plain JSX.
-        if (!seenInterfaces.has('DefaultSlotCtx')) {
+        const defaultCtxName = solidSlotCtxName('');
+        if (!seenInterfaces.has(defaultCtxName)) {
           const paramFields = slot.params
             .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)};`)
             .join(' ');
-          ctxInterfaces.push(`interface DefaultSlotCtx { ${paramFields} }`);
-          seenInterfaces.add('DefaultSlotCtx');
+          ctxInterfaces.push(`interface ${defaultCtxName} { ${paramFields} }`);
+          seenInterfaces.add(defaultCtxName);
         }
-        fields.push(`  children?: JSX.Element | ((ctx: DefaultSlotCtx) => JSX.Element);`);
+        fields.push(`  children?: JSX.Element | ((ctx: ${defaultCtxName}) => JSX.Element);`);
       } else {
         fields.push(`  children?: JSX.Element;`);
       }
@@ -93,8 +85,7 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
     } else {
       const hasCtx = slot.params && slot.params.length > 0;
       const fieldName = slotFieldName(slot.name);
-      const pascal = pascalCase(slot.name);
-      const ctxName = pascal + 'SlotCtx';
+      const ctxName = solidSlotCtxName(slot.name);
 
       if (hasCtx) {
         // Phase 33 / REQ-26 — a REACTIVE portal slot passes its scope as a Solid

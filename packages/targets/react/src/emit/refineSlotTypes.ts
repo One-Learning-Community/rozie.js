@@ -44,6 +44,7 @@ import type { SlotDecl } from '@rozie/core';
 import { renderRecordKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
+import { reactSlotCtxName, slotPascalName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 // WR-05 fix (79-REVIEW-FIX): re-export so existing `import { renderRecordKey }
 // from './refineSlotTypes.js'` call sites (emitSlotInvocation.ts,
@@ -149,17 +150,6 @@ export function buildSlotsRecordType(slots: SlotDecl[], slotChildrenType: string
   return `{ ${members.join(' ')} }`;
 }
 
-function capitalize(name: string): string {
-  if (name.length === 0) return name;
-  return name.charAt(0).toUpperCase() + name.slice(1);
-}
-
-function pascalCase(name: string): string {
-  // Convert hyphenated/underscored to PascalCase
-  const parts = name.split(/[-_]/).filter(Boolean);
-  return parts.map((p) => capitalize(p)).join('');
-}
-
 export interface RefinedSlotType {
   /** Field name on the props interface (e.g., 'children', 'renderTrigger') */
   propFieldName: string;
@@ -210,10 +200,11 @@ export function refineSlotTypes(slot: SlotDecl): RefinedSlotType {
     const paramFields = slot.params
       .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)};`)
       .join(' ');
-    const ctxInterface = `interface ChildrenCtx { ${paramFields} }`;
+    const ctxName = reactSlotCtxName('');
+    const ctxInterface = `interface ${ctxName} { ${paramFields} }`;
     return {
       propFieldName: 'children',
-      propFieldType: 'ReactNode | ((ctx: ChildrenCtx) => ReactNode)',
+      propFieldType: `ReactNode | ((ctx: ${ctxName}) => ReactNode)`,
       ctxInterface,
       defaultLifting: lifting,
       defaultFnName: lifting === 'function-const' ? '__defaultChildren' : null,
@@ -221,7 +212,7 @@ export function refineSlotTypes(slot: SlotDecl): RefinedSlotType {
   }
 
   // Named slot
-  const pascal = pascalCase(slot.name);
+  const pascal = slotPascalName(slot.name);
   const propFieldName = 'render' + pascal;
   if (!hasParams) {
     // Phase 07.3.2 fix — align inline TSX type with public .d.ts
@@ -248,7 +239,7 @@ export function refineSlotTypes(slot: SlotDecl): RefinedSlotType {
   const paramFields = slot.params
     .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i], slot.paramTypesAuthored === true)};`)
     .join(' ');
-  const ctxName = pascal + 'Ctx';
+  const ctxName = reactSlotCtxName(slot.name);
   const ctxInterface = `interface ${ctxName} { ${paramFields} }`;
   return {
     propFieldName,

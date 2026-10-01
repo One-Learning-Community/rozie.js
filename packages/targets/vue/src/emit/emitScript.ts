@@ -62,6 +62,7 @@ import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.
 import { emitContext } from './emitContext.js';
 import { emitPortals } from './emitPortals.js';
 import { buildSlotTypeBlock } from './refineSlotTypes.js';
+import { handleInterfaceName, propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -662,14 +663,14 @@ function emitPropsDecl(ir: IRComponent, genericParams?: readonly string[]): stri
     // members so each can carry its JSDoc block; docless sets stay the compact
     // one-line `{ a?: A; b?: B }` form (byte-identical). Interface members sit
     // at the 2-space class/interface-body indent.
-    const interfaceLine = `interface ${ir.name}Props${generics} ${renderPropsTypeBody(nonModel, fields, '')}`;
+    const interfaceLine = `interface ${propsInterfaceName(ir.name)}${generics} ${renderPropsTypeBody(nonModel, fields, '')}`;
     if (defaultsEntries.length === 0) {
-      return `${interfaceLine}\n` + `const props = defineProps<${ir.name}Props${generics}>();`;
+      return `${interfaceLine}\n` + `const props = defineProps<${propsInterfaceName(ir.name)}${generics}>();`;
     }
     return (
       `${interfaceLine}\n` +
       `const props = withDefaults(\n` +
-      `  defineProps<${ir.name}Props${generics}>(),\n` +
+      `  defineProps<${propsInterfaceName(ir.name)}${generics}>(),\n` +
       `  { ${defaultsEntries.join(', ')} }\n` +
       `);`
     );
@@ -783,7 +784,7 @@ function emitDefineExposeCall(ir: IRComponent): string {
   // Typed public surface P1: an `$expose` signature exists ⇒ cast to the
   // exported `<Name>Handle` (declared in the module `<script lang="ts">`).
   if (ir.expose.some((e) => e.signature !== undefined)) {
-    return `defineExpose({ ${names} } as ${ir.name}Handle);`;
+    return `defineExpose({ ${names} } as ${handleInterfaceName(ir.name)});`;
   }
   return `defineExpose({ ${names} });`;
 }

@@ -69,6 +69,7 @@ import {
   distinctSlotsByName,
   renderRecordKey,
 } from './refineSlotTypes.js';
+import { SVELTE_PROPS_INTERFACE_NAME } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -1019,8 +1020,8 @@ function emitPropsBlock(ir: IRComponent): string {
   const htmlAttrsExtends = renderHtmlAttrsExtends(ir, 'svelte', fields);
   const interfaceBlock =
     fields.length === 0
-      ? `interface Props${htmlAttrsExtends} {}`
-      : `interface Props${htmlAttrsExtends} {\n${fields.join('\n')}\n}`;
+      ? `interface ${SVELTE_PROPS_INTERFACE_NAME}${htmlAttrsExtends} {}`
+      : `interface ${SVELTE_PROPS_INTERFACE_NAME}${htmlAttrsExtends} {\n${fields.join('\n')}\n}`;
 
   // Multi-line destructure for readability when more than 2 entries.
   // Plan 14-05 — when the last entry is the `...__rozieAttrs` rest pattern,
@@ -1030,7 +1031,7 @@ function emitPropsBlock(ir: IRComponent): string {
   // exists (appended after props/slots/emits in buildPropsDestructureEntries).
   let destructure: string;
   if (entries.length <= 2) {
-    destructure = `let { ${entries.join(', ')} }: Props = $props();`;
+    destructure = `let { ${entries.join(', ')} }: ${SVELTE_PROPS_INTERFACE_NAME} = $props();`;
   } else {
     destructure = `let {\n  ${entries.join(',\n  ')}\n}: Props = $props();`;
   }

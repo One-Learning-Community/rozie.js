@@ -38,6 +38,7 @@ import { renderRecordKey } from './escapeSingleQuotedKey.js';
 import { renderHtmlAttrsExtends, type HtmlAttrsTarget } from './htmlAttrsExtends.js';
 import { indentContinuation, printTSType } from './renderAuthoredType.js';
 import { renderTypesBlock } from './renderTypesBlock.js';
+import { propsInterfaceName } from './generatedTypeNames.js';
 
 /**
  * Typed public surface P1 (spec §4.2) — the ONE handler-type renderer for an
@@ -148,7 +149,7 @@ export function renderPropsInterface(
       : '';
 
   // Props interface (parameterized when generics present per D-85).
-  lines.push(`export interface ${ir.name}Props${generics} {`);
+  lines.push(`export interface ${propsInterfaceName(ir.name)}${generics} {`);
 
   for (const prop of ir.props) {
     // Phase 58 (SC-2/SC-3) — leading per-prop JSDoc block from the shared
@@ -360,7 +361,7 @@ export function renderPropsInterface(
   // omitted so they win on a collision). Absent option ⇒ byte-identical.
   if (opts.htmlAttrs !== undefined) {
     const ext = renderHtmlAttrsExtends(ir, opts.htmlAttrs, lines.slice(1, -1));
-    if (ext !== '') lines[0] = `export interface ${ir.name}Props${generics}${ext} {`;
+    if (ext !== '') lines[0] = `export interface ${propsInterfaceName(ir.name)}${generics}${ext} {`;
   }
   const body = lines.join('\n');
   if (opts.includeTypesBlock === true && ir.types !== null) {

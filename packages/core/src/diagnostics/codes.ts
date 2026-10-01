@@ -75,7 +75,7 @@ export const RozieErrorCode = {
   // block-parse cluster.
   INVALID_PROP_DOCS_SHAPE: 'ROZ018', // warning — a <props> `docs:` key is malformed (non-object, wrong-typed description/deprecated/example, or unknown sub-key); the bad docs/sub-key is dropped and no JSDoc is emitted. Shape: docs: { description?: string, deprecated?: true | string, example?: string }.
 
-  // Typed public surface (spec 2026-09-29) — ROZ019..ROZ024 continue the
+  // Typed public surface (spec 2026-09-29) — ROZ019..ROZ025 continue the
   // ROZ010-029 declarative-block band.
   TYPES_BLOCK_DISALLOWED_STATEMENT: 'ROZ019', // error — the <types> block holds a statement that is not type-only (runtime code, a value import, enum, declare const, …); only `import type`, interface, type, and export of those are allowed, so hoisting <types> into every target can never change runtime behaviour.
   TYPES_BLOCK_PARSE_ERROR: 'ROZ020', // error — the <types> block is not valid TypeScript.
@@ -83,6 +83,7 @@ export const RozieErrorCode = {
   INVALID_AUTHORED_TYPE: 'ROZ022', // error — an author-written type string (an <emits> payload, a :param-types value, or an $expose signature) is not a single valid TypeScript type.
   INVALID_EMIT_DOCS_SHAPE: 'ROZ023', // warning — an <emits> `docs:` is malformed (same shape as <props> docs: { description?, deprecated?, example? }); the bad docs/sub-key is dropped.
   TYPES_SCRIPT_IMPORT_CONFLICT: 'ROZ024', // error — a <types> import binds a local name that a <script> import already binds to a DIFFERENT source or imported name; both land in one module scope on every target. (Same source + same name is fine: the <types> copy is dropped from the module.) Rename one with `as`.
+  TYPES_NAME_COLLISION: 'ROZ025', // error — a <types> name (declaration, import or export alias) collides with a name the compiler generates on some target (`<Name>Props`, `<Name>Handle`, `Rozie<Name>EventMap`, the component name, Svelte's `Props`, Solid's `JSX`, a slot context interface such as `RowCtx`/`RowSlotCtx`/`RozieRowSlotCtx`), or with a top-level <script> declaration that shares the module scope (an import vs any declaration; a type vs a class/interface/type/enum/import). Rename the <types> name.
 
   // ---- Script parse (Plan 03) — ROZ030..ROZ049 ----
   SCRIPT_PARSE_ERROR: 'ROZ030', // error — recoverable <script> syntax error(s) Babel collected under errorRecovery (one diagnostic per lifted error).

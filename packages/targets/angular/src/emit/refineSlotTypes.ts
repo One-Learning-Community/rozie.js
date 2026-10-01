@@ -34,6 +34,7 @@ import type { SlotDecl } from '@rozie/core';
 import { renderRecordKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
+import { angularFamilyCtxName, angularSlotCtxName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 // WR-05 fix (79-REVIEW-FIX): re-export so existing `import { renderRecordKey }
 // from './refineSlotTypes.js'` call sites (emitSlotFiller.ts,
@@ -51,15 +52,9 @@ export function slotFieldName(slotName: string): string {
   return slotName === '' ? 'defaultTpl' : `${slotName}Tpl`;
 }
 
-/** Capitalize first letter — `header` → `HeaderCtx`. */
-function capitalize(name: string): string {
-  if (name.length === 0) return name;
-  return name.charAt(0).toUpperCase() + name.slice(1);
-}
-
 /** Context interface name for a SlotDecl — `header` → `HeaderCtx`, default → `DefaultCtx`. */
 export function slotCtxName(slotName: string): string {
-  return slotName === '' ? 'DefaultCtx' : `${capitalize(slotName)}Ctx`;
+  return angularSlotCtxName(slotName);
 }
 
 export interface SlotCtxRendered {
@@ -236,23 +231,9 @@ export function eligibleSlotFieldNames(slots: SlotDecl[]): string[] {
   return out;
 }
 
-/**
- * PascalCase a raw prefix fragment for use as a ctx interface name —
- * `'cell-'` -> `'Cell'`, `'user-row-'` -> `'UserRow'`. Mirrors Lit's
- * `pascalCaseFragment` (`slotIdentityKey.ts`, 79-08) so every target derives
- * a family identifier the same way.
- */
-function pascalCaseFragment(raw: string): string {
-  return raw
-    .split(/[^a-zA-Z0-9]+/)
-    .filter((segment) => segment.length > 0)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join('');
-}
-
 /** Family ctx interface name: `'cell-'` -> `'CellCtx'`. */
 function familyCtxName(namePrefix: string): string {
-  return `${pascalCaseFragment(namePrefix)}Ctx`;
+  return angularFamilyCtxName(namePrefix);
 }
 
 /**

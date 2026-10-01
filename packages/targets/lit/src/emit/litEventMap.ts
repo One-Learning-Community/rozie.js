@@ -25,10 +25,11 @@ import * as t from '@babel/types';
 import type { IRComponent } from '@rozie/core';
 import { indentContinuation, printTSType } from '@rozie/core';
 import { kebabize } from './resolveLitSetterText.js';
+import { litEventMapName as coreLitEventMapName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 /** `Rozie<Name>EventMap` — the exported event-map interface name. */
 export function litEventMapName(ir: IRComponent): string {
-  return `Rozie${ir.name}EventMap`;
+  return coreLitEventMapName(ir.name);
 }
 
 /**

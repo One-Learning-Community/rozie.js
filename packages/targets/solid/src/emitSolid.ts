@@ -48,6 +48,7 @@ import {
   deconflictSolidRefSuffix,
 } from './rewrite/deconflictRefSuffix.js';
 import { composeSourceMap } from './sourcemap/compose.js';
+import { SOLID_JSX_TYPE_NAME, handleInterfaceName } from '../../../core/src/codegen/generatedTypeNames.js';
 
 export interface EmitSolidOptions {
   filename?: string;
@@ -196,7 +197,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   let exposeRefField: string | undefined;
   let exposeOnMount: string | undefined;
   if (hasExpose) {
-    const handleName = `${ir.name}Handle`;
+    const handleName = handleInterfaceName(ir.name);
     // synthesizeHandleType returns the bare `interface <Name>Handle {...}` (or
     // null); prepend `export ` so the named handle type is importable from the
     // emitted `.tsx` (leaf barrels re-export it). The `.d.ts` sidecar prepends
@@ -311,7 +312,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
 
   // `JSX.Element` is always used in the function signature; the JSX namespace
   // must be explicitly imported as a type-only import from solid-js.
-  const jsxTypeImport = `import type { JSX } from 'solid-js';\n`;
+  const jsxTypeImport = `import type { ${SOLID_JSX_TYPE_NAME} } from 'solid-js';\n`;
   // Prepend JSX type import before the value imports (or stand alone if none).
   const solidImportsStr = jsxTypeImport + solidImports.render();
 

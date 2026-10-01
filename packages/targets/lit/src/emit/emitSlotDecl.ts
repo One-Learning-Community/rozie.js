@@ -34,6 +34,7 @@ import type {
 import { collectMethodNamesFromIR } from './methodNames.js';
 import { portalSlotMemberName } from './portalSlotMemberName.js';
 import { slotFieldSuffix, slotIdentityKey } from './slotIdentityKey.js';
+import { litSlotCtxName } from '../../../../core/src/codegen/generatedTypeNames.js';
 import {
   buildRozieSlotsRecordType,
   slotScopeParamType,
@@ -229,7 +230,7 @@ function emitOneSlot(
   if (slot.params.length > 0) {
     const anyDataTyped = slot.params.some((p) => !isFunctionTypedParam(p, methodNameSet));
     if (anyDataTyped) {
-      const ifaceName = `Rozie${suffix}SlotCtx`;
+      const ifaceName = litSlotCtxName(suffix);
       const fields = slot.params
         .map((p, i) => `  ${p.name}: ${slotScopeParamType(slot.paramTypes, i, slot.paramTypesAuthored === true)};`)
         .join('\n');

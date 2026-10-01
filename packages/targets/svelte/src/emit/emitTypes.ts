@@ -49,6 +49,7 @@ import { buildSlotTypeFields, snippetsRecordLine } from './refineSlotTypes.js';
 // `synthesizeHandleType` is not yet in the `@rozie/core` barrel — import it
 // relatively as React's emitTypes.ts does.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
+import { handleInterfaceName, propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 /**
  * Options controlling Svelte `.d.rozie.ts` emission.
@@ -71,7 +72,7 @@ export interface EmitSvelteTypesOptions {
  */
 export function emitSvelteTypes(ir: IRComponent, opts: EmitSvelteTypesOptions = {}): string {
   const exposed = (ir.expose ?? []).length > 0;
-  const handleInterface = exposed ? synthesizeHandleType(ir, `${ir.name}Handle`) : null;
+  const handleInterface = exposed ? synthesizeHandleType(ir, handleInterfaceName(ir.name)) : null;
 
   const generics =
     opts.genericParams && opts.genericParams.length > 0 ? `<${opts.genericParams.join(', ')}>` : '';
@@ -108,7 +109,7 @@ export function emitSvelteTypes(ir: IRComponent, opts: EmitSvelteTypesOptions = 
     lines.push('');
   }
 
-  lines.push(`declare const ${ir.name}: import('svelte').Component<${ir.name}Props${generics}>;`);
+  lines.push(`declare const ${ir.name}: import('svelte').Component<${propsInterfaceName(ir.name)}${generics}>;`);
   lines.push(`export default ${ir.name};`);
   lines.push('');
   return lines.join('\n');

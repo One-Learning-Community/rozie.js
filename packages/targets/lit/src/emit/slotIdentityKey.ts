@@ -52,6 +52,7 @@
  * can never collide with a real static slot's identity key.
  */
 import type { SlotDecl } from '@rozie/core';
+import { litSlotFieldSuffix } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 // WR-01 (quick task 260817-buk) — React (`findSlotDecl` in
 // packages/targets/react/src/emit/emitSlotInvocation.ts) and Svelte
@@ -95,19 +96,6 @@ export function slotIdentityKey(slot: SlotDecl, index: number): string {
 }
 
 /**
- * PascalCase a raw authored fragment for use in a generated identifier —
- * every run of non-alphanumeric characters is treated as a segment
- * boundary, e.g. `'cell-'` -> `'Cell'`, `'user-row-'` -> `'UserRow'`.
- */
-function pascalCaseFragment(raw: string): string {
-  return raw
-    .split(/[^a-zA-Z0-9]+/)
-    .filter((segment) => segment.length > 0)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join('');
-}
-
-/**
  * Return the PascalCase field suffix used to name `emitSlotDecl.ts`'s
  * per-slot class members (`_hasSlot<suffix>`, `_slot<suffix>Elements`,
  * `Rozie<suffix>SlotCtx`). Derived from the SAME three-priority identity as
@@ -132,13 +120,5 @@ function pascalCaseFragment(raw: string): string {
  * predates this plan.
  */
 export function slotFieldSuffix(slot: SlotDecl, index: number): string {
-  if (slot.dynamicNameExpr !== undefined) {
-    if (slot.namePrefix !== undefined && slot.namePrefix.length > 0) {
-      return `Dynamic${pascalCaseFragment(slot.namePrefix)}`;
-    }
-    return `Dynamic${index}`;
-  }
-  // Default slot: name === ''. Use 'Default' as the field suffix.
-  if (slot.name === '') return 'Default';
-  return pascalCaseFragment(slot.name);
+  return litSlotFieldSuffix(slot, index);
 }

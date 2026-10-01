@@ -96,6 +96,7 @@ Rules:
 - Only type-only statements are allowed: `import type`, `interface`, `type`, and `export` forms of those, including `export type { … }` with or without `from …`.
 - Anything else is an error: runtime code, a value `import`, an `enum`, `declare const`. This restriction is what lets the block be hoisted into every target without being able to change runtime behavior. See [ROZ019](/reference/diagnostics) (a statement that is not type-only) and [ROZ020](/reference/diagnostics) (not valid TypeScript).
 - A `<types>` import and a `<script>` import that bind the same local name to the same source and name are deduplicated silently. If they bind the same name to a different source, that is [ROZ024](/reference/diagnostics).
+- A `<types>` name can't reuse a name the compiler generates: `<Name>Props`, `<Name>Handle`, `Rozie<Name>EventMap`, the component name, Svelte's `Props`, Solid's `JSX`, or a slot context interface (`RowCtx`, `RowSlotCtx`, `RozieRowSlotCtx` for a slot `row` that passes params). It also can't clash with a top-level `<script>` declaration in the shared module scope: a `<types>` import against any `<script>` declaration, or a `<types>` type against a `<script>` class, interface, type, enum or import. A `<types>` type next to a `<script>` `const` or `function` of the same name is fine. Both clashes are [ROZ025](/reference/diagnostics).
 
 Where the block lands in the compiled output:
 

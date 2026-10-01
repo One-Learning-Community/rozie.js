@@ -47,6 +47,7 @@ import { slotsRecordLine } from './emitPropsInterface.js';
 // `synthesizeHandleType` is not yet in the `@rozie/core` barrel — import it
 // relatively as React's emitTypes.ts does.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
+import { SOLID_JSX_TYPE_NAME, handleInterfaceName, propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 /**
  * Options controlling Solid `.d.rozie.ts` emission.
@@ -69,7 +70,7 @@ export interface EmitSolidTypesOptions {
  */
 export function emitSolidTypes(ir: IRComponent, opts: EmitSolidTypesOptions = {}): string {
   const exposed = (ir.expose ?? []).length > 0;
-  const handleInterface = exposed ? synthesizeHandleType(ir, `${ir.name}Handle`) : null;
+  const handleInterface = exposed ? synthesizeHandleType(ir, handleInterfaceName(ir.name)) : null;
 
   const generics =
     opts.genericParams && opts.genericParams.length > 0 ? `<${opts.genericParams.join(', ')}>` : '';
@@ -82,7 +83,7 @@ export function emitSolidTypes(ir: IRComponent, opts: EmitSolidTypesOptions = {}
   // `JSX.Element` (slot fields) must resolve — an unresolved `JSX` silently
   // degrades every slot prop to `any` in a consumer with skipLibCheck.
   if (ir.slots.length > 0) {
-    lines.push(`import type { JSX } from 'solid-js';`);
+    lines.push(`import type { ${SOLID_JSX_TYPE_NAME} } from 'solid-js';`);
     lines.push('');
   }
   for (const iface of slotDecl.ctxInterfaces) lines.push(iface);
@@ -111,7 +112,7 @@ export function emitSolidTypes(ir: IRComponent, opts: EmitSolidTypesOptions = {}
     lines.push('');
   }
 
-  lines.push(`declare const ${ir.name}: import('solid-js').Component<${ir.name}Props${generics}>;`);
+  lines.push(`declare const ${ir.name}: import('solid-js').Component<${propsInterfaceName(ir.name)}${generics}>;`);
   lines.push(`export default ${ir.name};`);
   lines.push('');
   return lines.join('\n');

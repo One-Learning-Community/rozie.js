@@ -49,6 +49,7 @@ import { renderPropsInterface } from '@rozie/core';
 // `synthesizeHandleType` is not yet in the `@rozie/core` barrel (22-02-SUMMARY
 // "Next Phase Readiness") — import it relatively as React's emitTypes.ts does.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
+import { handleInterfaceName, propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 /**
  * Options controlling Vue `.d.rozie.ts` emission.
@@ -71,7 +72,7 @@ export interface EmitVueTypesOptions {
  */
 export function emitVueTypes(ir: IRComponent, opts: EmitVueTypesOptions = {}): string {
   const exposed = (ir.expose ?? []).length > 0;
-  const handleInterface = exposed ? synthesizeHandleType(ir, `${ir.name}Handle`) : null;
+  const handleInterface = exposed ? synthesizeHandleType(ir, handleInterfaceName(ir.name)) : null;
 
   const generics =
     opts.genericParams && opts.genericParams.length > 0 ? `<${opts.genericParams.join(', ')}>` : '';
@@ -98,7 +99,7 @@ export function emitVueTypes(ir: IRComponent, opts: EmitVueTypesOptions = {}): s
     lines.push('');
   }
 
-  lines.push(`declare const ${ir.name}: DefineComponent<${ir.name}Props${generics}>;`);
+  lines.push(`declare const ${ir.name}: DefineComponent<${propsInterfaceName(ir.name)}${generics}>;`);
   lines.push(`export default ${ir.name};`);
   lines.push('');
   return lines.join('\n');

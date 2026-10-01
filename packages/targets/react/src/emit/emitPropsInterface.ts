@@ -24,6 +24,7 @@ import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation } from '@rozie/core';
 import { buildPropJsdoc, renderEmitHandlerType, renderHtmlAttrsExtends } from '@rozie/core';
 import { buildSlotsRecordType } from './refineSlotTypes.js';
+import { propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 /**
  * Render a PropTypeAnnotation as a TypeScript type string.
@@ -215,8 +216,8 @@ export function emitPropsInterface(ir: IRComponent, slotPropFields?: string[]): 
   const htmlAttrsExtends = renderHtmlAttrsExtends(ir, 'react', fields);
 
   if (fields.length === 0) {
-    return `interface ${ir.name}Props${htmlAttrsExtends} {}`;
+    return `interface ${propsInterfaceName(ir.name)}${htmlAttrsExtends} {}`;
   }
 
-  return `interface ${ir.name}Props${htmlAttrsExtends} {\n${fields.join('\n')}\n}`;
+  return `interface ${propsInterfaceName(ir.name)}${htmlAttrsExtends} {\n${fields.join('\n')}\n}`;
 }

@@ -52,6 +52,7 @@ import type { IRComponent } from '@rozie/core';
 // declaration below stays React-specific.
 import { renderPropsInterface } from '@rozie/core';
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
+import { handleInterfaceName, propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 /**
  * Options controlling .d.ts emission.
@@ -106,7 +107,7 @@ export function emitReactTypes(ir: IRComponent, opts: EmitReactTypesOptions = {}
   // always carry `expose: []`). Mirrors the `ir.components ?? []` guard in
   // emitReact.ts.
   const exposed = (ir.expose ?? []).length > 0;
-  const handleInterface = exposed ? synthesizeHandleType(ir, `${ir.name}Handle`) : null;
+  const handleInterface = exposed ? synthesizeHandleType(ir, handleInterfaceName(ir.name)) : null;
 
   const lines: string[] = [];
   lines.push(`import type { ReactNode } from 'react';`);
@@ -124,7 +125,7 @@ export function emitReactTypes(ir: IRComponent, opts: EmitReactTypesOptions = {}
   const generics =
     opts.genericParams && opts.genericParams.length > 0 ? `<${opts.genericParams.join(', ')}>` : '';
 
-  // Phase 22 Plan 22-02 — the entire `export interface ${ir.name}Props { … }`
+  // Phase 22 Plan 22-02 — the entire `export interface ${propsInterfaceName(ir.name)} { … }`
   // body (model-triplet, required/optional gating, ir.emits→on<Event>, slot
   // params, the slots?: mirror field) is now rendered by the core-shared
   // `renderPropsInterface`. React passes its own slot-children token
@@ -155,11 +156,11 @@ export function emitReactTypes(ir: IRComponent, opts: EmitReactTypesOptions = {}
     lines.push(`export ${handleInterface}`);
     lines.push('');
     lines.push(
-      `declare const ${ir.name}: React.ForwardRefExoticComponent<${ir.name}Props${generics} & React.RefAttributes<${ir.name}Handle>>;`,
+      `declare const ${ir.name}: React.ForwardRefExoticComponent<${propsInterfaceName(ir.name)}${generics} & React.RefAttributes<${handleInterfaceName(ir.name)}>>;`,
     );
   } else {
     lines.push(
-      `declare function ${ir.name}${generics}(props: ${ir.name}Props${generics}): JSX.Element;`,
+      `declare function ${ir.name}${generics}(props: ${propsInterfaceName(ir.name)}${generics}): JSX.Element;`,
     );
   }
   lines.push(`export default ${ir.name};`);

@@ -64,6 +64,7 @@ import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHan
 import { emitTagName } from './emitDecorator.js';
 import { litSlotSurfaceMembers } from './emitSlotDecl.js';
 import { renderLitEventMap, renderLitListenerOverloads } from './litEventMap.js';
+import { handleInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 /**
  * Options controlling Lit `.d.rozie.ts` emission.
@@ -102,7 +103,7 @@ function exposeMemberLines(handleInterface: string): string[] {
  */
 export function emitLitTypes(ir: IRComponent, opts: EmitLitTypesOptions = {}): string {
   const exposed = (ir.expose ?? []).length > 0;
-  const handleInterface = exposed ? synthesizeHandleType(ir, `${ir.name}Handle`) : null;
+  const handleInterface = exposed ? synthesizeHandleType(ir, handleInterfaceName(ir.name)) : null;
 
   const slotSurface = litSlotSurfaceMembers(ir);
   const lines: string[] = [];

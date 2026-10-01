@@ -14,12 +14,13 @@
 import type { IRComponent } from '@rozie/core';
 import { renderTypesBlock } from '@rozie/core';
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
+import { handleInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 export function buildVueModuleScript(ir: IRComponent): string {
   const hasSignatures = (ir.expose ?? []).some((e) => e.signature !== undefined);
   return [
     renderTypesBlock(ir, { module: true }),
-    hasSignatures ? `export ${synthesizeHandleType(ir, `${ir.name}Handle`)}` : '',
+    hasSignatures ? `export ${synthesizeHandleType(ir, handleInterfaceName(ir.name))}` : '',
   ]
     .filter(Boolean)
     .join('\n\n');

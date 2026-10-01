@@ -64,6 +64,7 @@ import { emitContext } from './emitContext.js';
 import { emitPortals } from './emitPortals.js';
 import { toPascalCase } from './emitPropsInterface.js';
 import { renderDepArray as renderDepArrayWithIR } from './renderDepArray.js';
+import { propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -3431,7 +3432,7 @@ export function emitScript(
     // type so downstream `props.step` reads don't fire TS18048 ("possibly
     // undefined"). The override narrows just the defaulted slots; other
     // fields keep the interface's optional-marker. Without this override, the
-    // declared type was bare `${ir.name}Props` and TS treated `..._props` spread
+    // declared type was bare `${propsInterfaceName(ir.name)}` and TS treated `..._props` spread
     // as "still optional" → every `props.step + 1` arithmetic was an error.
     //
     // Phase 16 — for `default: null` props, widen the override type with
@@ -3457,7 +3458,7 @@ export function emitScript(
         return `${p.name}: ${widened}`;
       })
       .join('; ');
-    const mergedType = `Omit<${ir.name}Props, ${defaultedNames.join(' | ')}> & { ${requiredOverride} }`;
+    const mergedType = `Omit<${propsInterfaceName(ir.name)}, ${defaultedNames.join(' | ')}> & { ${requiredOverride} }`;
     // Spread first so user-supplied values come through, then explicit
     // `X: _props.X ?? <default>` lines override any missing/undefined values
     // with the declared default.
@@ -3564,7 +3565,7 @@ export function emitScript(
       // the rest bucket.
       hookLines.push(
         `const attrs: Record<string, unknown> = (() => {\n` +
-          `  const { ${propNameList}, ...rest } = ${propsParam} as ${ir.name}Props & Record<string, unknown>;\n` +
+          `  const { ${propNameList}, ...rest } = ${propsParam} as ${propsInterfaceName(ir.name)} & Record<string, unknown>;\n` +
           `  void ${declaredNamesUnique.join('; void ')};\n` +
           `  return rest;\n` +
           `})();`,

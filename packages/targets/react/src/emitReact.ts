@@ -59,6 +59,7 @@ import {
   RuntimeReactImportCollector,
 } from './rewrite/collectReactImports.js';
 import { composeSourceMap } from './sourcemap/compose.js';
+import { handleInterfaceName } from '../../../core/src/codegen/generatedTypeNames.js';
 
 export interface EmitReactOptions {
   filename?: string;
@@ -274,7 +275,7 @@ export function emitReact(ir: IRComponent, opts: EmitReactOptions = {}): EmitRea
     // null); prepend `export ` so the named handle type is importable from the
     // emitted `.tsx`. The `.d.ts` sidecar (emitTypes.ts) prepends its own
     // export, so this only affects the `.tsx` surface — no double-export.
-    const synthesized = synthesizeHandleType(ir, `${ir.name}Handle`);
+    const synthesized = synthesizeHandleType(ir, handleInterfaceName(ir.name));
     handleInterface = synthesized != null ? `export ${synthesized}` : undefined;
     // Quick task 260618-ao9 (ROZ138 stale-read class applied to $expose verbs) —
     // STABLE-IDENTITY, LIVE-READ handle. Previously this emitted

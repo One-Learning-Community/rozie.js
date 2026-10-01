@@ -71,6 +71,7 @@ import { renderPropsInterface, renderPropType } from '@rozie/core';
 // `synthesizeHandleType` is not yet in the `@rozie/core` barrel (22-02-SUMMARY
 // "Next Phase Readiness") — import it relatively as React/Vue's emitTypes.ts do.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
+import { handleInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 /**
  * Options controlling Angular `.d.rozie.ts` emission.
@@ -122,7 +123,7 @@ function classPropMembers(ir: IRComponent): string[] {
  */
 export function emitAngularTypes(ir: IRComponent, opts: EmitAngularTypesOptions = {}): string {
   const exposed = (ir.expose ?? []).length > 0;
-  const handleInterface = exposed ? synthesizeHandleType(ir, `${ir.name}Handle`) : null;
+  const handleInterface = exposed ? synthesizeHandleType(ir, handleInterfaceName(ir.name)) : null;
 
   const lines: string[] = [];
 

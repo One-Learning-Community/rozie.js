@@ -63,6 +63,7 @@ import { expandMemo } from './lowerers/expandMemo.js';
 import type { ProducerResolver } from '../resolver/index.js';
 import * as t from '@babel/types';
 import { analyzeTypesScriptImports } from '../codegen/typesScriptImports.js';
+import { validateTypesNameCollisions } from './validateTypesNameCollisions.js';
 import { babelLocToRozieLoc } from '../parsers/parserPosition.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
 
@@ -240,8 +241,10 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   const types = lowerTypesBlock(ast.types);
   // R16 — a `<types>` import whose local name a `<script>` import binds to a
   // DIFFERENT source/imported name cannot share the one emitted module scope.
+  // Reads `setupBody.scriptProgram` — the SAME post-partial-inlining program
+  // the module dedupe (`renderTypesBlock({ module: true })`) reads (M4).
   if (types !== null) {
-    for (const c of analyzeTypesScriptImports(types.statements, ast.script?.program.program.body).conflicts) {
+    for (const c of analyzeTypesScriptImports(types.statements, scriptResult.setupBody.scriptProgram.program.body).conflicts) {
       diagnostics.push({
         code: RozieErrorCode.TYPES_SCRIPT_IMPORT_CONFLICT,
         severity: 'error',
@@ -316,6 +319,11 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // Mutates `ir` in place; no-op when $el is unused or root template is not
   // a single TemplateElement or already has a user-authored ref attribute.
   lowerRootElementRef(ir);
+
+  // Typed public surface P1 (final wave I3) — ROZ025: a `<types>` name that
+  // collides with a generated type name (same builders the emitters use) or a
+  // top-level `<script>` declaration in the shared module scope.
+  validateTypesNameCollisions(ir, ir.setupBody.scriptProgram.program.body, diagnostics);
 
   // Type-neutralize the `<script>` AST so every target emits type-correct
   // TypeScript. The pass fills only the untyped residue and preserves author
