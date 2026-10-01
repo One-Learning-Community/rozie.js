@@ -108,6 +108,7 @@ export default defineConfig({
                 { text: 'Props, state & two-way binding', link: '/guide/props-and-two-way' },
                 { text: 'Reactivity & lifecycle', link: '/guide/reactivity' },
                 { text: 'Composition: slots, context, handles', link: '/guide/composition' },
+                { text: 'Typed public surface', link: '/guide/typed-public-surface' },
                 { text: 'Engine-wrapper toolkit', link: '/guide/engine-wrappers' },
                 { text: 'Styling & scoped CSS', link: '/guide/styling' },
                 { text: 'Scoped CSS for React (zero runtime)', link: '/guide/scoped-css-for-react' },
