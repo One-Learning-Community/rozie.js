@@ -65,3 +65,30 @@ describe('Vue emitter — hoisted import does not duplicate the following commen
     expect(out.match(/null-lets marker comment/g)).toHaveLength(1);
   });
 });
+
+/**
+ * Task 18 (FullCalendar) finding: `inherit-attrs="false" inherit-listeners="false"`
+ * emits `defineOptions({ inheritAttrs: false })` in the shell prelude, which sat
+ * ABOVE every import of `<script setup>`. With a module script present that is
+ * the same TS1232 class as above, so the macro must follow the import run.
+ */
+describe('Vue emitter — defineOptions follows the imports when a module script exists', () => {
+  const optsBody = (expose: string) =>
+    body(expose).replace('<rozie name="T">', '<rozie name="T" inherit-attrs="false" inherit-listeners="false">');
+
+  it('places defineOptions after the last import (with $expose signatures)', () => {
+    const out = emit(optsBody(`$expose({ bump }, { bump: '() => void' })`));
+    const opts = out.indexOf('defineOptions({ inheritAttrs: false });');
+    expect(opts).toBeGreaterThan(out.indexOf(`import { clamp } from './util';`));
+    expect(opts).toBeGreaterThan(out.indexOf(`from 'vue';`));
+    expect(opts).toBeLessThan(out.indexOf('defineProps'));
+    expect(out.match(/defineOptions\(/g)).toHaveLength(1);
+  });
+
+  it('keeps defineOptions first when there is no module script (byte-identical path)', () => {
+    const out = emit(optsBody(`$expose({ bump })`));
+    expect(out.indexOf('defineOptions({ inheritAttrs: false });')).toBe(
+      out.indexOf('<script setup lang="ts">\n') + '<script setup lang="ts">\n'.length,
+    );
+  });
+});

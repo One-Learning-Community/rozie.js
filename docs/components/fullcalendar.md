@@ -170,7 +170,7 @@ el.addEventListener('event-click', (e) => {
 | `datesSet` | The visible date range changed (navigation or view switch). Payload: `{ start, end, view }`. |
 | `eventMouseEnter` | The pointer entered a calendar event. Payload: `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventClick`). |
 | `eventMouseLeave` | The pointer left a calendar event. Payload: `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventMouseEnter`). |
-| `unselect` | A previously selected date/time range was cleared. Payload: `{ jsEvent }`. |
+| `unselect` | A previously selected date/time range was cleared. Payload: `{ jsEvent }` — `jsEvent` is `null` when the selection was cleared programmatically (e.g. `clearSelection()`). |
 | `loading` | The calendar began or finished loading events (e.g. from an event source). Payload: `{ isLoading }` boolean. It fires only while FullCalendar fetches an event source itself; with only the `events` array bound it never fires — see [`loading` fires only for fetched sources](#loading-fires-only-for-fetched-sources). |
 | `eventsSet` | The set of rendered events changed. Payload: `{ events: [{ id, title, start, end }, …] }` — the normalized current event set, for persistence/sync consumers. |
 
@@ -485,7 +485,7 @@ The two-way `view` prop is guarded against the cross-framework "infinite update 
 
 ### `getApi` returns the raw instance
 
-`getApi()` returns the underlying `Calendar` instance directly (it is **not** guard-nulled away) so you can call any FullCalendar API the wrapper doesn't surface. It is `null` before mount and after destroy — callers handle the pre-mount null.
+`getApi()` returns the underlying `Calendar` instance directly (it is **not** guard-nulled away) so you can call any FullCalendar API the wrapper doesn't surface. It is `null` before mount — callers handle the pre-mount null.
 
 ### Custom event content is not reactive after mount
 

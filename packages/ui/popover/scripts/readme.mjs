@@ -2,9 +2,10 @@
  * README rendering + docs-table validation for @rozie-ui/popover.
  *
  * Everything structural is derived from a SINGLE parse of Popover.rozie
- * (`ir.props` / `ir.slots` / `ir.emits` / `ir.expose`) so the per-leaf READMEs
- * cannot drift from the compiled output. The event + handle prose comes from the
- * hand-kept manifests; the PER-PROP prose comes from each prop's `<props>`
+ * (`ir.props` / `ir.slots` / `ir.emitDecls` / `ir.expose`) so the per-leaf READMEs
+ * cannot drift from the compiled output. The events table (name, payload type,
+ * prose) comes from the `<emits>` block (`ir.emitDecls`); the handle prose from
+ * the hand-kept handle manifest; the PER-PROP prose comes from each prop's `<props>`
  * `docs.description` (Phase 59 single-source-of-truth), rendered through the
  * shared `renderPropDescription` helper from `@rozie/core` so the README + the
  * docs-site `rozie-props` table cannot diverge.

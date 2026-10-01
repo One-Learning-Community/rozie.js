@@ -22,7 +22,8 @@
  *   2. parse() + lowerToIR() ONCE → ir (props/slots/emits/expose) for docs tables
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
  *        (React only: also write FullCalendar.css + FullCalendar.d.ts)
- *   4. render each leaf README from the IR + the hand-kept event/handle manifests
+ *   4. render each leaf README from the IR (events table from `<emits>`) + the
+ *      hand-kept handle manifest
  *   5. ENFORCE validateDocsPropsTable against docs/components/fullcalendar.md
  *      (THROWS if the guide is absent AND on drift of the IR-derivable
  *      structural columns — prop name, type, default. Never rewrites the
@@ -36,7 +37,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
-import { eventManifest } from './event-manifest.mjs';
+import { typedSurfaceBarrelLines } from '../../typed-surface-barrel.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
@@ -97,7 +98,7 @@ const COMMON_VUE_BUILD_DEV_DEPS = {
  * the workspace:^ normalization below (a no-op for Vue, which has zero
  * @rozie/runtime-* deps).
  */
-function emitVueDualPackaging({ leafDir, componentName, externals, engineDevDeps }) {
+function emitVueDualPackaging({ leafDir, componentName, externals, engineDevDeps, typesBarrel = '' }) {
   const renderExternal = (e) => (e instanceof RegExp ? e.toString() : `'${e}'`);
   const externalsLiteral = `[${externals.map(renderExternal).join(', ')}]`;
 
@@ -131,12 +132,14 @@ export default defineConfig({
 `,
   );
 
-  // src/index.ts barrel — re-export the SFC default under the named component.
+  // src/index.ts barrel — re-export the SFC default under the named component,
+  // plus the typed public surface (`<types>` names + `FullCalendarHandle`, which
+  // live in the SFC's module script).
   writeFileSync(
     resolve(leafDir, 'src', 'index.ts'),
     `export { default as ${componentName} } from './${componentName}.vue';
 export { default } from './${componentName}.vue';
-`,
+${typesBarrel}`,
   );
 
   // tsconfig.json — drives vue-tsc DECLARATION EMIT (dist/index.d.ts) with relaxed
@@ -226,13 +229,10 @@ function main() {
   const { ast } = parse(source, { filename: FILENAME });
   const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
 
-  // Keep the hand-kept event manifest in lockstep with ir.emits.
-  for (const ev of ir.emits) {
-    if (!eventManifest[ev]) {
-      throw new Error(
-        `codegen: event "${ev}" is emitted by the source but has no entry in event-manifest.mjs`,
-      );
-    }
+  // Events are first-class `<emits>` (typed payload + docs); a migration
+  // regression to the inferred form must not silently ship.
+  if (ir.emitDecls === null) {
+    throw new Error('codegen: FullCalendar.rozie has no <emits> block — events are authored there');
   }
 
   // Keep the hand-kept handle manifest in lockstep with ir.expose (Phase 21).
@@ -321,6 +321,7 @@ function main() {
         componentName: cfg.file.replace(/\.vue$/, ''),
         externals: cfg.externals,
         engineDevDeps: cfg.engineDevDeps,
+        typesBarrel: typedSurfaceBarrelLines(target, ir, 'FullCalendar'),
       });
     }
 
@@ -334,10 +335,11 @@ function main() {
       // synthesized handle interface as `export interface FullCalendarHandle`
       // in the .tsx itself (Phase 21 REQ-10 follow-up), so consumers can
       // `import type { FullCalendarHandle }` and the barrel forwards it verbatim
-      // — no ComponentRef derivation, no module-private caveat. Lit gets no
-      // named type: its handle is the custom element itself, so the plain
-      // barrel is correct there.
-      const barrel =
+      // — no ComponentRef derivation, no module-private caveat. Lit's handle is
+      // the custom element itself; its `RozieFullCalendarEventMap` and every
+      // leaf's `<types>` names are appended by the shared
+      // ../../typed-surface-barrel.mjs helper.
+      let barrel =
         (target === 'react' || target === 'solid') && ir.expose.length > 0
           ? `export { default as FullCalendar } from './FullCalendar';\n` +
             `export { default } from './FullCalendar';\n\n` +
@@ -346,6 +348,7 @@ function main() {
               .join(', ')} }. */\n` +
             `export type { FullCalendarHandle } from './FullCalendar';\n`
           : `export { default as FullCalendar } from './FullCalendar';\nexport { default } from './FullCalendar';\n`;
+      barrel += typedSurfaceBarrelLines(target, ir, 'FullCalendar');
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 
@@ -357,7 +360,7 @@ function main() {
 
     // (4) README from the single IR parse.
     const pkgName = leafPkgName(cfg.dir);
-    const readme = renderReadme(target, ir, eventManifest, pkgName, handleManifest);
+    const readme = renderReadme(target, ir, pkgName, handleManifest);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
     // Vendor the repo LICENSE into each published leaf so the tarball carries

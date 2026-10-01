@@ -7,44 +7,122 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
+// The typed public surface (always TypeScript, whatever the script lang).
+// Payload interfaces describe what the wrapper ACTUALLY emits (normalized
+// `{ id, title, start, end }` event refs, the view TYPE string, `{ isLoading }`),
+// not FullCalendar's raw callback args. Engine types come from the
+// `@fullcalendar/core` peer and are re-exported so consumers can name them.
+// `Calendar` is NOT imported here: the script's value import of the same name
+// shares the emitted module scope on every target, so it is re-exported
+// straight from the peer and the `getApi` signature names it via `import()`.
+import type { DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput, EventSourceApi, ViewApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg } from '@fullcalendar/core';
+export interface FullCalendarEventRef {
+  id: string;
+  title: string;
+  start: Date | null;
+  end: Date | null;
+}
+export interface FullCalendarEventPointer {
+  event: FullCalendarEventRef;
+  jsEvent: MouseEvent;
+  el: HTMLElement;
+}
+export interface FullCalendarDateClick {
+  date: Date;
+  dateStr: string;
+  allDay: boolean;
+}
+export interface FullCalendarEventDrop {
+  event: FullCalendarEventRef;
+  delta: Duration;
+}
+export interface FullCalendarSelection {
+  start: Date;
+  end: Date;
+  startStr: string;
+  endStr: string;
+  allDay: boolean;
+}
+export interface FullCalendarEventResize {
+  event: FullCalendarEventRef;
+  startDelta: Duration;
+  endDelta: Duration;
+}
+export interface FullCalendarDatesSet {
+  start: Date;
+  end: Date;
+  view: string;
+}
+/** `jsEvent` is `null` when the selection is cleared programmatically (e.g. the `clearSelection` verb). */
+export interface FullCalendarUnselect {
+  jsEvent: MouseEvent | null;
+}
+export interface FullCalendarLoading {
+  isLoading: boolean;
+}
+export interface FullCalendarEventsSet {
+  events: FullCalendarEventRef[];
+}
+/** `noEventsContent` arg — `@fullcalendar/list`'s NoEventsContentArg, restated so the core-only peer set suffices. */
+export interface FullCalendarNoEventsContentArg {
+  text: string;
+  view: ViewApi;
+}
+export type { Calendar } from '@fullcalendar/core';
+export type { DateInput, EventApi, EventInput, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg };
+
+export interface RozieFullCalendarEventMap extends Omit<HTMLElementEventMap, 'event-click' | 'date-click' | 'event-drop' | 'select' | 'event-resize' | 'dates-set' | 'event-mouse-enter' | 'event-mouse-leave' | 'unselect' | 'loading' | 'events-set'> {
+  'event-click': CustomEvent<FullCalendarEventPointer>;
+  'date-click': CustomEvent<FullCalendarDateClick>;
+  'event-drop': CustomEvent<FullCalendarEventDrop>;
+  'select': CustomEvent<FullCalendarSelection>;
+  'event-resize': CustomEvent<FullCalendarEventResize>;
+  'dates-set': CustomEvent<FullCalendarDatesSet>;
+  'event-mouse-enter': CustomEvent<FullCalendarEventPointer>;
+  'event-mouse-leave': CustomEvent<FullCalendarEventPointer>;
+  'unselect': CustomEvent<FullCalendarUnselect>;
+  'loading': CustomEvent<FullCalendarLoading>;
+  'events-set': CustomEvent<FullCalendarEventsSet>;
+}
+
 interface RozieEventSlotCtx {
-  arg: any;
+  arg: EventContentArg;
 }
 
 interface RozieDayCellSlotCtx {
-  arg: any;
+  arg: DayCellContentArg;
 }
 
 interface RozieDayHeaderSlotCtx {
-  arg: any;
+  arg: DayHeaderContentArg;
 }
 
 interface RozieSlotLabelSlotCtx {
-  arg: any;
+  arg: SlotLabelContentArg;
 }
 
 interface RozieWeekNumberSlotCtx {
-  arg: any;
+  arg: WeekNumberContentArg;
 }
 
 interface RozieNowIndicatorContentSlotCtx {
-  arg: any;
+  arg: NowIndicatorContentArg;
 }
 
 interface RozieMoreLinkSlotCtx {
-  arg: any;
+  arg: MoreLinkContentArg;
 }
 
 interface RozieAllDayContentSlotCtx {
-  arg: any;
+  arg: AllDayContentArg;
 }
 
 interface RozieSlotLaneContentSlotCtx {
-  arg: any;
+  arg: SlotLaneContentArg;
 }
 
 interface RozieNoEventsContentSlotCtx {
-  arg: any;
+  arg: FullCalendarNoEventsContentArg;
 }
 
 @customElement('rozie-full-calendar')
@@ -121,7 +199,7 @@ private __rozieWatchInitial_1 = true;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
 private portals = {
-  event: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  event: (container: HTMLElement, scope: { arg: EventContentArg }): (() => void) => {
     const tpl = this.event;
     if (typeof tpl !== 'function') return () => {};
     // Spike 004: portal-scope attribute injection.
@@ -133,7 +211,7 @@ private portals = {
       this._portalContainers.delete(container);
     };
   },
-  dayCell: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  dayCell: (container: HTMLElement, scope: { arg: DayCellContentArg }): (() => void) => {
     const tpl = this.dayCell;
     if (typeof tpl !== 'function') return () => {};
     // Spike 004: portal-scope attribute injection.
@@ -145,7 +223,7 @@ private portals = {
       this._portalContainers.delete(container);
     };
   },
-  dayHeader: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  dayHeader: (container: HTMLElement, scope: { arg: DayHeaderContentArg }): (() => void) => {
     const tpl = this.dayHeader;
     if (typeof tpl !== 'function') return () => {};
     // Spike 004: portal-scope attribute injection.
@@ -157,7 +235,7 @@ private portals = {
       this._portalContainers.delete(container);
     };
   },
-  slotLabel: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  slotLabel: (container: HTMLElement, scope: { arg: SlotLabelContentArg }): (() => void) => {
     const tpl = this.slotLabel;
     if (typeof tpl !== 'function') return () => {};
     // Spike 004: portal-scope attribute injection.
@@ -169,7 +247,7 @@ private portals = {
       this._portalContainers.delete(container);
     };
   },
-  weekNumber: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  weekNumber: (container: HTMLElement, scope: { arg: WeekNumberContentArg }): (() => void) => {
     const tpl = this.weekNumber;
     if (typeof tpl !== 'function') return () => {};
     // Spike 004: portal-scope attribute injection.
@@ -181,7 +259,7 @@ private portals = {
       this._portalContainers.delete(container);
     };
   },
-  nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  nowIndicatorContent: (container: HTMLElement, scope: { arg: NowIndicatorContentArg }): (() => void) => {
     const tpl = this.nowIndicatorContent;
     if (typeof tpl !== 'function') return () => {};
     // Spike 004: portal-scope attribute injection.
@@ -193,7 +271,7 @@ private portals = {
       this._portalContainers.delete(container);
     };
   },
-  moreLink: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  moreLink: (container: HTMLElement, scope: { arg: MoreLinkContentArg }): (() => void) => {
     const tpl = this.moreLink;
     if (typeof tpl !== 'function') return () => {};
     // Spike 004: portal-scope attribute injection.
@@ -205,7 +283,7 @@ private portals = {
       this._portalContainers.delete(container);
     };
   },
-  allDayContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  allDayContent: (container: HTMLElement, scope: { arg: AllDayContentArg }): (() => void) => {
     const tpl = this.allDayContent;
     if (typeof tpl !== 'function') return () => {};
     // Spike 004: portal-scope attribute injection.
@@ -217,7 +295,7 @@ private portals = {
       this._portalContainers.delete(container);
     };
   },
-  slotLaneContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  slotLaneContent: (container: HTMLElement, scope: { arg: SlotLaneContentArg }): (() => void) => {
     const tpl = this.slotLaneContent;
     if (typeof tpl !== 'function') return () => {};
     // Spike 004: portal-scope attribute injection.
@@ -229,7 +307,7 @@ private portals = {
       this._portalContainers.delete(container);
     };
   },
-  noEventsContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  noEventsContent: (container: HTMLElement, scope: { arg: FullCalendarNoEventsContentArg }): (() => void) => {
     const tpl = this.noEventsContent;
     if (typeof tpl !== 'function') return () => {};
     // Spike 004: portal-scope attribute injection.
@@ -245,34 +323,34 @@ private portals = {
 
   @state() private _hasSlotEvent = false;
   @queryAssignedElements({ slot: 'event', flatten: true }) private _slotEventElements!: Element[];
-  @property({ attribute: false }) event?: (scope: { arg: any }) => unknown;
+  @property({ attribute: false }) event?: (scope: { arg: EventContentArg }) => unknown;
   @state() private _hasSlotDayCell = false;
   @queryAssignedElements({ slot: 'dayCell', flatten: true }) private _slotDayCellElements!: Element[];
-  @property({ attribute: false }) dayCell?: (scope: { arg: any }) => unknown;
+  @property({ attribute: false }) dayCell?: (scope: { arg: DayCellContentArg }) => unknown;
   @state() private _hasSlotDayHeader = false;
   @queryAssignedElements({ slot: 'dayHeader', flatten: true }) private _slotDayHeaderElements!: Element[];
-  @property({ attribute: false }) dayHeader?: (scope: { arg: any }) => unknown;
+  @property({ attribute: false }) dayHeader?: (scope: { arg: DayHeaderContentArg }) => unknown;
   @state() private _hasSlotSlotLabel = false;
   @queryAssignedElements({ slot: 'slotLabel', flatten: true }) private _slotSlotLabelElements!: Element[];
-  @property({ attribute: false }) slotLabel?: (scope: { arg: any }) => unknown;
+  @property({ attribute: false }) slotLabel?: (scope: { arg: SlotLabelContentArg }) => unknown;
   @state() private _hasSlotWeekNumber = false;
   @queryAssignedElements({ slot: 'weekNumber', flatten: true }) private _slotWeekNumberElements!: Element[];
-  @property({ attribute: false }) weekNumber?: (scope: { arg: any }) => unknown;
+  @property({ attribute: false }) weekNumber?: (scope: { arg: WeekNumberContentArg }) => unknown;
   @state() private _hasSlotNowIndicatorContent = false;
   @queryAssignedElements({ slot: 'nowIndicatorContent', flatten: true }) private _slotNowIndicatorContentElements!: Element[];
-  @property({ attribute: false }) nowIndicatorContent?: (scope: { arg: any }) => unknown;
+  @property({ attribute: false }) nowIndicatorContent?: (scope: { arg: NowIndicatorContentArg }) => unknown;
   @state() private _hasSlotMoreLink = false;
   @queryAssignedElements({ slot: 'moreLink', flatten: true }) private _slotMoreLinkElements!: Element[];
-  @property({ attribute: false }) moreLink?: (scope: { arg: any }) => unknown;
+  @property({ attribute: false }) moreLink?: (scope: { arg: MoreLinkContentArg }) => unknown;
   @state() private _hasSlotAllDayContent = false;
   @queryAssignedElements({ slot: 'allDayContent', flatten: true }) private _slotAllDayContentElements!: Element[];
-  @property({ attribute: false }) allDayContent?: (scope: { arg: any }) => unknown;
+  @property({ attribute: false }) allDayContent?: (scope: { arg: AllDayContentArg }) => unknown;
   @state() private _hasSlotSlotLaneContent = false;
   @queryAssignedElements({ slot: 'slotLaneContent', flatten: true }) private _slotSlotLaneContentElements!: Element[];
-  @property({ attribute: false }) slotLaneContent?: (scope: { arg: any }) => unknown;
+  @property({ attribute: false }) slotLaneContent?: (scope: { arg: SlotLaneContentArg }) => unknown;
   @state() private _hasSlotNoEventsContent = false;
   @queryAssignedElements({ slot: 'noEventsContent', flatten: true }) private _slotNoEventsContentElements!: Element[];
-  @property({ attribute: false }) noEventsContent?: (scope: { arg: any }) => unknown;
+  @property({ attribute: false }) noEventsContent?: (scope: { arg: FullCalendarNoEventsContentArg }) => unknown;
   // Phase 79 Plan 08 (R4) contract for 79-09: the record intake for
   // record-routed slot fills. 79-09's consumer-side emitSlotFiller
   // accumulates an object literal onto the SAME `.rozieSlots=${{ ... }}`
@@ -460,7 +538,7 @@ private portals = {
       // toolbar; the built-in default lives in the `headerToolbar` prop default.
       headerToolbar: this.headerToolbar,
       eventClick: (info: any) => {
-        this.dispatchEvent(new CustomEvent("event-click", {
+        this.dispatchEvent(new CustomEvent<FullCalendarEventPointer>("event-click", {
           detail: {
             event: {
               id: info.event.id,
@@ -476,7 +554,7 @@ private portals = {
         }));
       },
       dateClick: (info: any) => {
-        this.dispatchEvent(new CustomEvent("date-click", {
+        this.dispatchEvent(new CustomEvent<FullCalendarDateClick>("date-click", {
           detail: {
             date: info.date,
             dateStr: info.dateStr,
@@ -487,7 +565,7 @@ private portals = {
         }));
       },
       eventDrop: (info: any) => {
-        this.dispatchEvent(new CustomEvent("event-drop", {
+        this.dispatchEvent(new CustomEvent<FullCalendarEventDrop>("event-drop", {
           detail: {
             event: {
               id: info.event.id,
@@ -502,7 +580,7 @@ private portals = {
         }));
       },
       select: (info: any) => {
-        this.dispatchEvent(new CustomEvent("select", {
+        this.dispatchEvent(new CustomEvent<FullCalendarSelection>("select", {
           detail: {
             start: info.start,
             end: info.end,
@@ -515,7 +593,7 @@ private portals = {
         }));
       },
       eventResize: (info: any) => {
-        this.dispatchEvent(new CustomEvent("event-resize", {
+        this.dispatchEvent(new CustomEvent<FullCalendarEventResize>("event-resize", {
           detail: {
             event: {
               id: info.event.id,
@@ -531,7 +609,7 @@ private portals = {
         }));
       },
       datesSet: (info: any) => {
-        this.dispatchEvent(new CustomEvent("dates-set", {
+        this.dispatchEvent(new CustomEvent<FullCalendarDatesSet>("dates-set", {
           detail: {
             start: info.start,
             end: info.end,
@@ -542,7 +620,7 @@ private portals = {
         }));
       },
       eventMouseEnter: (info: any) => {
-        this.dispatchEvent(new CustomEvent("event-mouse-enter", {
+        this.dispatchEvent(new CustomEvent<FullCalendarEventPointer>("event-mouse-enter", {
           detail: {
             event: {
               id: info.event.id,
@@ -558,7 +636,7 @@ private portals = {
         }));
       },
       eventMouseLeave: (info: any) => {
-        this.dispatchEvent(new CustomEvent("event-mouse-leave", {
+        this.dispatchEvent(new CustomEvent<FullCalendarEventPointer>("event-mouse-leave", {
           detail: {
             event: {
               id: info.event.id,
@@ -574,7 +652,7 @@ private portals = {
         }));
       },
       unselect: (info: any) => {
-        this.dispatchEvent(new CustomEvent("unselect", {
+        this.dispatchEvent(new CustomEvent<FullCalendarUnselect>("unselect", {
           detail: {
             jsEvent: info.jsEvent
           },
@@ -585,7 +663,7 @@ private portals = {
       loading: (isLoading: any) => {
         // FullCalendar's `loading` callback receives a bare boolean (not an info
         // object) — normalize to the structured `{ isLoading }` payload shape.
-        this.dispatchEvent(new CustomEvent("loading", {
+        this.dispatchEvent(new CustomEvent<FullCalendarLoading>("loading", {
           detail: {
             isLoading
           },
@@ -596,7 +674,7 @@ private portals = {
       eventsSet: (events: any) => {
         // `eventsSet` receives the array of current EventApi objects — map each to
         // the normalized floor shape for persistence/sync consumers.
-        this.dispatchEvent(new CustomEvent("events-set", {
+        this.dispatchEvent(new CustomEvent<FullCalendarEventsSet>("events-set", {
           detail: {
             events: events.map((e: any) => ({
               id: e.id,
@@ -896,70 +974,97 @@ private portals = {
   // the view TYPE, datesSet only the visible RANGE) and getEvents (synchronous
   // event read — eventsSet is push-only). scrollToTime/updateSize cover timeGrid
   // scroll + container-resize relayout; prevYear/nextYear mirror prev/next.
+  getApi(): import('@fullcalendar/core').Calendar | null;
   getApi() {
     return this.instance;
   }
 
+  changeView(viewType: string, dateOrRange?: DateRangeInput | DateInput): void;
   changeView(...a: any[]) {
     return this.instance?.changeView(...a);
   }
 
+  addEvent(event: EventInput, source?: EventSourceApi | string | boolean): EventApi | null | undefined;
   addEvent(...a: any[]) {
     return this.instance?.addEvent(...a);
   }
 
+  removeEvent(id: string): void;
   removeEvent(id: any) {
     this.instance?.getEventById(id)?.remove();
   }
 
+  today(): void;
   today() {
     this.instance?.today();
   }
 
+  prev(): void;
   prev() {
     this.instance?.prev();
   }
 
+  next(): void;
   next() {
     this.instance?.next();
   }
 
+  gotoDate(date: DateInput): void;
   gotoDate(...a: any[]) {
     this.instance?.gotoDate(...a);
   }
 
+  getDate(): Date | null;
   getDate() {
     return this.instance ? this.instance.getDate() : null;
   }
 
+  getEvents(): EventApi[];
   getEvents() {
     return this.instance ? this.instance.getEvents() : [];
   }
 
+  scrollToTime(time: DurationInput): void;
   scrollToTime(...a: any[]) {
     this.instance?.scrollToTime(...a);
   }
 
+  updateSize(): void;
   updateSize() {
     this.instance?.updateSize();
   }
 
+  prevYear(): void;
   prevYear() {
     this.instance?.prevYear();
   }
 
+  nextYear(): void;
   nextYear() {
     this.instance?.nextYear();
   }
 
+  selectRange(dateOrSpan: DateInput | DateSpanInput, end?: DateInput): void;
   selectRange(...a: any[]) {
     this.instance?.select(...a);
   }
 
+  clearSelection(): void;
   clearSelection() {
     this.instance?.unselect();
   }
 
   get view(): string { return this._viewControllable.read(); }
   set view(v: string) { this._viewControllable.notifyPropertyWrite(v); }
+
+  addEventListener<K extends keyof RozieFullCalendarEventMap>(type: K, listener: (this: FullCalendar, ev: RozieFullCalendarEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
+    super.addEventListener(type, listener, options);
+  }
+  removeEventListener<K extends keyof RozieFullCalendarEventMap>(type: K, listener: (this: FullCalendar, ev: RozieFullCalendarEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    super.removeEventListener(type, listener, options);
+  }
 }

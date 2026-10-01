@@ -7,54 +7,118 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
+// The typed public surface (always TypeScript, whatever the script lang).
+// Payload interfaces describe what the wrapper ACTUALLY emits (normalized
+// `{ id, title, start, end }` event refs, the view TYPE string, `{ isLoading }`),
+// not FullCalendar's raw callback args. Engine types come from the
+// `@fullcalendar/core` peer and are re-exported so consumers can name them.
+// `Calendar` is NOT imported here: the script's value import of the same name
+// shares the emitted module scope on every target, so it is re-exported
+// straight from the peer and the `getApi` signature names it via `import()`.
+import type { DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput, EventSourceApi, ViewApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg } from '@fullcalendar/core';
+export interface FullCalendarEventRef {
+  id: string;
+  title: string;
+  start: Date | null;
+  end: Date | null;
+}
+export interface FullCalendarEventPointer {
+  event: FullCalendarEventRef;
+  jsEvent: MouseEvent;
+  el: HTMLElement;
+}
+export interface FullCalendarDateClick {
+  date: Date;
+  dateStr: string;
+  allDay: boolean;
+}
+export interface FullCalendarEventDrop {
+  event: FullCalendarEventRef;
+  delta: Duration;
+}
+export interface FullCalendarSelection {
+  start: Date;
+  end: Date;
+  startStr: string;
+  endStr: string;
+  allDay: boolean;
+}
+export interface FullCalendarEventResize {
+  event: FullCalendarEventRef;
+  startDelta: Duration;
+  endDelta: Duration;
+}
+export interface FullCalendarDatesSet {
+  start: Date;
+  end: Date;
+  view: string;
+}
+/** `jsEvent` is `null` when the selection is cleared programmatically (e.g. the `clearSelection` verb). */
+export interface FullCalendarUnselect {
+  jsEvent: MouseEvent | null;
+}
+export interface FullCalendarLoading {
+  isLoading: boolean;
+}
+export interface FullCalendarEventsSet {
+  events: FullCalendarEventRef[];
+}
+/** `noEventsContent` arg — `@fullcalendar/list`'s NoEventsContentArg, restated so the core-only peer set suffices. */
+export interface FullCalendarNoEventsContentArg {
+  text: string;
+  view: ViewApi;
+}
+export type { Calendar } from '@fullcalendar/core';
+export type { DateInput, EventApi, EventInput, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg };
+
 interface EventCtx {
-  $implicit: { arg: any };
-  arg: any;
+  $implicit: { arg: EventContentArg };
+  arg: EventContentArg;
 }
 
 interface DayCellCtx {
-  $implicit: { arg: any };
-  arg: any;
+  $implicit: { arg: DayCellContentArg };
+  arg: DayCellContentArg;
 }
 
 interface DayHeaderCtx {
-  $implicit: { arg: any };
-  arg: any;
+  $implicit: { arg: DayHeaderContentArg };
+  arg: DayHeaderContentArg;
 }
 
 interface SlotLabelCtx {
-  $implicit: { arg: any };
-  arg: any;
+  $implicit: { arg: SlotLabelContentArg };
+  arg: SlotLabelContentArg;
 }
 
 interface WeekNumberCtx {
-  $implicit: { arg: any };
-  arg: any;
+  $implicit: { arg: WeekNumberContentArg };
+  arg: WeekNumberContentArg;
 }
 
 interface NowIndicatorContentCtx {
-  $implicit: { arg: any };
-  arg: any;
+  $implicit: { arg: NowIndicatorContentArg };
+  arg: NowIndicatorContentArg;
 }
 
 interface MoreLinkCtx {
-  $implicit: { arg: any };
-  arg: any;
+  $implicit: { arg: MoreLinkContentArg };
+  arg: MoreLinkContentArg;
 }
 
 interface AllDayContentCtx {
-  $implicit: { arg: any };
-  arg: any;
+  $implicit: { arg: AllDayContentArg };
+  arg: AllDayContentArg;
 }
 
 interface SlotLaneContentCtx {
-  $implicit: { arg: any };
-  arg: any;
+  $implicit: { arg: SlotLaneContentArg };
+  arg: SlotLaneContentArg;
 }
 
 interface NoEventsContentCtx {
-  $implicit: { arg: any };
-  arg: any;
+  $implicit: { arg: FullCalendarNoEventsContentArg };
+  arg: FullCalendarNoEventsContentArg;
 }
 
 @Component({
@@ -145,17 +209,17 @@ export class FullCalendar {
    */
   options = input<Record<string, any>>((() => ({}))());
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
-  eventClick = output<unknown>();
-  dateClick = output<unknown>();
-  eventDrop = output<unknown>();
-  select = output<unknown>();
-  eventResize = output<unknown>();
-  datesSet = output<unknown>();
-  eventMouseEnter = output<unknown>();
-  eventMouseLeave = output<unknown>();
-  unselect = output<unknown>();
-  loading = output<unknown>();
-  eventsSet = output<unknown>();
+  eventClick = output<FullCalendarEventPointer>();
+  dateClick = output<FullCalendarDateClick>();
+  eventDrop = output<FullCalendarEventDrop>();
+  select = output<FullCalendarSelection>();
+  eventResize = output<FullCalendarEventResize>();
+  datesSet = output<FullCalendarDatesSet>();
+  eventMouseEnter = output<FullCalendarEventPointer>();
+  eventMouseLeave = output<FullCalendarEventPointer>();
+  unselect = output<FullCalendarUnselect>();
+  loading = output<FullCalendarLoading>();
+  eventsSet = output<FullCalendarEventsSet>();
   @ContentChild('event', { read: TemplateRef }) eventTpl?: TemplateRef<EventCtx>;
   @ContentChild('dayCell', { read: TemplateRef }) dayCellTpl?: TemplateRef<DayCellCtx>;
   @ContentChild('dayHeader', { read: TemplateRef }) dayHeaderTpl?: TemplateRef<DayHeaderCtx>;
@@ -191,7 +255,7 @@ export class FullCalendar {
   private _slotLaneContentTpl = contentChild('slotLaneContent', { read: TemplateRef });
   private _noEventsContentTpl = contentChild('noEventsContent', { read: TemplateRef });
   private portals = {
-    event: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    event: (container: HTMLElement, scope: { arg: EventContentArg }): (() => void) => {
       const tpl = this._eventTpl();
       const vcr = this._portalAnchor();
       if (!tpl || !vcr) return () => {};
@@ -206,7 +270,7 @@ export class FullCalendar {
         this._portalViews.delete(view as EmbeddedViewRef<unknown>);
       };
     },
-    dayCell: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    dayCell: (container: HTMLElement, scope: { arg: DayCellContentArg }): (() => void) => {
       const tpl = this._dayCellTpl();
       const vcr = this._portalAnchor();
       if (!tpl || !vcr) return () => {};
@@ -221,7 +285,7 @@ export class FullCalendar {
         this._portalViews.delete(view as EmbeddedViewRef<unknown>);
       };
     },
-    dayHeader: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    dayHeader: (container: HTMLElement, scope: { arg: DayHeaderContentArg }): (() => void) => {
       const tpl = this._dayHeaderTpl();
       const vcr = this._portalAnchor();
       if (!tpl || !vcr) return () => {};
@@ -236,7 +300,7 @@ export class FullCalendar {
         this._portalViews.delete(view as EmbeddedViewRef<unknown>);
       };
     },
-    slotLabel: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    slotLabel: (container: HTMLElement, scope: { arg: SlotLabelContentArg }): (() => void) => {
       const tpl = this._slotLabelTpl();
       const vcr = this._portalAnchor();
       if (!tpl || !vcr) return () => {};
@@ -251,7 +315,7 @@ export class FullCalendar {
         this._portalViews.delete(view as EmbeddedViewRef<unknown>);
       };
     },
-    weekNumber: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    weekNumber: (container: HTMLElement, scope: { arg: WeekNumberContentArg }): (() => void) => {
       const tpl = this._weekNumberTpl();
       const vcr = this._portalAnchor();
       if (!tpl || !vcr) return () => {};
@@ -266,7 +330,7 @@ export class FullCalendar {
         this._portalViews.delete(view as EmbeddedViewRef<unknown>);
       };
     },
-    nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    nowIndicatorContent: (container: HTMLElement, scope: { arg: NowIndicatorContentArg }): (() => void) => {
       const tpl = this._nowIndicatorContentTpl();
       const vcr = this._portalAnchor();
       if (!tpl || !vcr) return () => {};
@@ -281,7 +345,7 @@ export class FullCalendar {
         this._portalViews.delete(view as EmbeddedViewRef<unknown>);
       };
     },
-    moreLink: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    moreLink: (container: HTMLElement, scope: { arg: MoreLinkContentArg }): (() => void) => {
       const tpl = this._moreLinkTpl();
       const vcr = this._portalAnchor();
       if (!tpl || !vcr) return () => {};
@@ -296,7 +360,7 @@ export class FullCalendar {
         this._portalViews.delete(view as EmbeddedViewRef<unknown>);
       };
     },
-    allDayContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    allDayContent: (container: HTMLElement, scope: { arg: AllDayContentArg }): (() => void) => {
       const tpl = this._allDayContentTpl();
       const vcr = this._portalAnchor();
       if (!tpl || !vcr) return () => {};
@@ -311,7 +375,7 @@ export class FullCalendar {
         this._portalViews.delete(view as EmbeddedViewRef<unknown>);
       };
     },
-    slotLaneContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    slotLaneContent: (container: HTMLElement, scope: { arg: SlotLaneContentArg }): (() => void) => {
       const tpl = this._slotLaneContentTpl();
       const vcr = this._portalAnchor();
       if (!tpl || !vcr) return () => {};
@@ -326,7 +390,7 @@ export class FullCalendar {
         this._portalViews.delete(view as EmbeddedViewRef<unknown>);
       };
     },
-    noEventsContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    noEventsContent: (container: HTMLElement, scope: { arg: FullCalendarNoEventsContentArg }): (() => void) => {
       const tpl = this._noEventsContentTpl();
       const vcr = this._portalAnchor();
       if (!tpl || !vcr) return () => {};
@@ -750,52 +814,52 @@ export class FullCalendar {
   // the view TYPE, datesSet only the visible RANGE) and getEvents (synchronous
   // event read — eventsSet is push-only). scrollToTime/updateSize cover timeGrid
   // scroll + container-resize relayout; prevYear/nextYear mirror prev/next.
-  getApi = () => {
+  getApi: () => import('@fullcalendar/core').Calendar | null = () => {
     return this.instance;
   };
-  changeView = (...a: any[]) => {
+  changeView: (viewType: string, dateOrRange?: DateRangeInput | DateInput) => void = (...a: any[]) => {
     return this.instance?.changeView(...a);
   };
-  addEvent = (...a: any[]) => {
+  addEvent: (event: EventInput, source?: EventSourceApi | string | boolean) => EventApi | null | undefined = (...a: any[]) => {
     return this.instance?.addEvent(...a);
   };
-  removeEvent = (id: any) => {
+  removeEvent: (id: string) => void = (id: any) => {
     this.instance?.getEventById(id)?.remove();
   };
-  today = () => {
+  today: () => void = () => {
     this.instance?.today();
   };
-  prev = () => {
+  prev: () => void = () => {
     this.instance?.prev();
   };
-  next = () => {
+  next: () => void = () => {
     this.instance?.next();
   };
-  gotoDate = (...a: any[]) => {
+  gotoDate: (date: DateInput) => void = (...a: any[]) => {
     this.instance?.gotoDate(...a);
   };
-  getDate = () => {
+  getDate: () => Date | null = () => {
     return this.instance ? this.instance.getDate() : null;
   };
-  getEvents = () => {
+  getEvents: () => EventApi[] = () => {
     return this.instance ? this.instance.getEvents() : [];
   };
-  scrollToTime = (...a: any[]) => {
+  scrollToTime: (time: DurationInput) => void = (...a: any[]) => {
     this.instance?.scrollToTime(...a);
   };
-  updateSize = () => {
+  updateSize: () => void = () => {
     this.instance?.updateSize();
   };
-  prevYear = () => {
+  prevYear: () => void = () => {
     this.instance?.prevYear();
   };
-  nextYear = () => {
+  nextYear: () => void = () => {
     this.instance?.nextYear();
   };
-  selectRange = (...a: any[]) => {
+  selectRange: (dateOrSpan: DateInput | DateSpanInput, end?: DateInput) => void = (...a: any[]) => {
     this.instance?.select(...a);
   };
-  clearSelection = () => {
+  clearSelection: () => void = () => {
     this.instance?.unselect();
   };
 

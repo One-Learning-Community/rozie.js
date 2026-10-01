@@ -2,6 +2,70 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
+// The typed public surface (always TypeScript, whatever the script lang).
+// Payload interfaces describe what the wrapper ACTUALLY emits (normalized
+// `{ id, title, start, end }` event refs, the view TYPE string, `{ isLoading }`),
+// not FullCalendar's raw callback args. Engine types come from the
+// `@fullcalendar/core` peer and are re-exported so consumers can name them.
+// `Calendar` is NOT imported here: the script's value import of the same name
+// shares the emitted module scope on every target, so it is re-exported
+// straight from the peer and the `getApi` signature names it via `import()`.
+import type { DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput, EventSourceApi, ViewApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg } from '@fullcalendar/core';
+export interface FullCalendarEventRef {
+  id: string;
+  title: string;
+  start: Date | null;
+  end: Date | null;
+}
+export interface FullCalendarEventPointer {
+  event: FullCalendarEventRef;
+  jsEvent: MouseEvent;
+  el: HTMLElement;
+}
+export interface FullCalendarDateClick {
+  date: Date;
+  dateStr: string;
+  allDay: boolean;
+}
+export interface FullCalendarEventDrop {
+  event: FullCalendarEventRef;
+  delta: Duration;
+}
+export interface FullCalendarSelection {
+  start: Date;
+  end: Date;
+  startStr: string;
+  endStr: string;
+  allDay: boolean;
+}
+export interface FullCalendarEventResize {
+  event: FullCalendarEventRef;
+  startDelta: Duration;
+  endDelta: Duration;
+}
+export interface FullCalendarDatesSet {
+  start: Date;
+  end: Date;
+  view: string;
+}
+/** `jsEvent` is `null` when the selection is cleared programmatically (e.g. the `clearSelection` verb). */
+export interface FullCalendarUnselect {
+  jsEvent: MouseEvent | null;
+}
+export interface FullCalendarLoading {
+  isLoading: boolean;
+}
+export interface FullCalendarEventsSet {
+  events: FullCalendarEventRef[];
+}
+/** `noEventsContent` arg — `@fullcalendar/list`'s NoEventsContentArg, restated so the core-only peer set suffices. */
+export interface FullCalendarNoEventsContentArg {
+  text: string;
+  view: ViewApi;
+}
+export type { Calendar } from '@fullcalendar/core';
+export type { DateInput, EventApi, EventInput, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg };
+
 export interface FullCalendarProps {
   /**
    * The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
@@ -59,47 +123,47 @@ export interface FullCalendarProps {
    * Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface does not special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Spread **first** into the engine config so the curated props/events/slots win on key collision; `:options` only fills gaps. Runtime-updatable per key via `setOption` (no key-removal reset — a removed key keeps its last applied value until remount; use `getApi()` for full imperative control). The `plugins` key is the one exception that **merges** with the baked-in defaults instead of overriding them, making the wrapper consumer-extensible.
    */
   options?: Record<string, unknown>;
-  onEventClick?: (...args: any[]) => void;
-  onDateClick?: (...args: any[]) => void;
-  onEventDrop?: (...args: any[]) => void;
-  onSelect?: (...args: any[]) => void;
-  onEventResize?: (...args: any[]) => void;
-  onDatesSet?: (...args: any[]) => void;
-  onEventMouseEnter?: (...args: any[]) => void;
-  onEventMouseLeave?: (...args: any[]) => void;
-  onUnselect?: (...args: any[]) => void;
-  onLoading?: (...args: any[]) => void;
-  onEventsSet?: (...args: any[]) => void;
-  renderEvent?: (params: { arg: unknown }) => ReactNode;
-  renderDayCell?: (params: { arg: unknown }) => ReactNode;
-  renderDayHeader?: (params: { arg: unknown }) => ReactNode;
-  renderSlotLabel?: (params: { arg: unknown }) => ReactNode;
-  renderWeekNumber?: (params: { arg: unknown }) => ReactNode;
-  renderNowIndicatorContent?: (params: { arg: unknown }) => ReactNode;
-  renderMoreLink?: (params: { arg: unknown }) => ReactNode;
-  renderAllDayContent?: (params: { arg: unknown }) => ReactNode;
-  renderSlotLaneContent?: (params: { arg: unknown }) => ReactNode;
-  renderNoEventsContent?: (params: { arg: unknown }) => ReactNode;
+  onEventClick?: (payload: FullCalendarEventPointer) => void;
+  onDateClick?: (payload: FullCalendarDateClick) => void;
+  onEventDrop?: (payload: FullCalendarEventDrop) => void;
+  onSelect?: (payload: FullCalendarSelection) => void;
+  onEventResize?: (payload: FullCalendarEventResize) => void;
+  onDatesSet?: (payload: FullCalendarDatesSet) => void;
+  onEventMouseEnter?: (payload: FullCalendarEventPointer) => void;
+  onEventMouseLeave?: (payload: FullCalendarEventPointer) => void;
+  onUnselect?: (payload: FullCalendarUnselect) => void;
+  onLoading?: (payload: FullCalendarLoading) => void;
+  onEventsSet?: (payload: FullCalendarEventsSet) => void;
+  renderEvent?: (params: { arg: EventContentArg }) => ReactNode;
+  renderDayCell?: (params: { arg: DayCellContentArg }) => ReactNode;
+  renderDayHeader?: (params: { arg: DayHeaderContentArg }) => ReactNode;
+  renderSlotLabel?: (params: { arg: SlotLabelContentArg }) => ReactNode;
+  renderWeekNumber?: (params: { arg: WeekNumberContentArg }) => ReactNode;
+  renderNowIndicatorContent?: (params: { arg: NowIndicatorContentArg }) => ReactNode;
+  renderMoreLink?: (params: { arg: MoreLinkContentArg }) => ReactNode;
+  renderAllDayContent?: (params: { arg: AllDayContentArg }) => ReactNode;
+  renderSlotLaneContent?: (params: { arg: SlotLaneContentArg }) => ReactNode;
+  renderNoEventsContent?: (params: { arg: FullCalendarNoEventsContentArg }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 
 export interface FullCalendarHandle {
-  getApi: (...args: any[]) => any;
-  changeView: (...args: any[]) => any;
-  addEvent: (...args: any[]) => any;
-  removeEvent: (...args: any[]) => any;
-  today: (...args: any[]) => any;
-  prev: (...args: any[]) => any;
-  next: (...args: any[]) => any;
-  gotoDate: (...args: any[]) => any;
-  getDate: (...args: any[]) => any;
-  getEvents: (...args: any[]) => any;
-  scrollToTime: (...args: any[]) => any;
-  updateSize: (...args: any[]) => any;
-  prevYear: (...args: any[]) => any;
-  nextYear: (...args: any[]) => any;
-  selectRange: (...args: any[]) => any;
-  clearSelection: (...args: any[]) => any;
+  getApi: () => import('@fullcalendar/core').Calendar | null;
+  changeView: (viewType: string, dateOrRange?: DateRangeInput | DateInput) => void;
+  addEvent: (event: EventInput, source?: EventSourceApi | string | boolean) => EventApi | null | undefined;
+  removeEvent: (id: string) => void;
+  today: () => void;
+  prev: () => void;
+  next: () => void;
+  gotoDate: (date: DateInput) => void;
+  getDate: () => Date | null;
+  getEvents: () => EventApi[];
+  scrollToTime: (time: DurationInput) => void;
+  updateSize: () => void;
+  prevYear: () => void;
+  nextYear: () => void;
+  selectRange: (dateOrSpan: DateInput | DateSpanInput, end?: DateInput) => void;
+  clearSelection: () => void;
 }
 
 declare const FullCalendar: React.ForwardRefExoticComponent<FullCalendarProps & React.RefAttributes<FullCalendarHandle>>;

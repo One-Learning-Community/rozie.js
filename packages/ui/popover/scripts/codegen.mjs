@@ -22,7 +22,8 @@
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
  *        (React only: also write Popover.css [+ Popover.global.css if present] + Popover.d.ts)
  *   4. vendor src/internal/ → each leaf src/internal/
- *   5. render each leaf README from the IR + the hand-kept event/handle manifests
+ *   5. render each leaf README from the IR (events table from `<emits>`) + the
+ *      hand-kept handle manifest
  *   6. ENFORCE validateDocsPropsTable against docs/components/popover.md
  *      (THROWS if absent AND on drift of the IR-derivable structural columns —
  *      prop name, type, default. ROZIE_POPOVER_SKIP_GUIDE=1 relaxes the
@@ -34,6 +35,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { resolve } from 'node:path';
 import { buildManifest, compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { typedSurfaceBarrelLines } from '../../typed-surface-barrel.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
@@ -116,9 +118,7 @@ const COMMON_VUE_BUILD_DEV_DEPS = {
  * vite-plugin-css-injected-by-js. Writes/patches the four Vue-leaf files
  * idempotently each codegen run; `version` is PRESERVED.
  */
-function emitVueDualPackaging({ leafDir, componentName, externals, engineDevDeps, exportsTypes = false }) {
-  // `<types>` names live in the SFC's module script; re-export them as types.
-  const vueTypesBarrel = exportsTypes ? `export type * from './${componentName}.vue';\n` : '';
+function emitVueDualPackaging({ leafDir, componentName, externals, engineDevDeps, typesBarrel = '' }) {
   const renderExternal = (e) => (e instanceof RegExp ? e.toString() : `'${e}'`);
   const externalsLiteral = `[${externals.map(renderExternal).join(', ')}]`;
 
@@ -155,7 +155,7 @@ export default defineConfig({
     resolve(leafDir, 'src', 'index.ts'),
     `export { default as ${componentName} } from './${componentName}.vue';
 export { default } from './${componentName}.vue';
-${vueTypesBarrel}`,
+${typesBarrel}`,
   );
 
   writeFileSync(
@@ -283,7 +283,8 @@ function main() {
         componentName: cfg.file.replace(/\.vue$/, ''),
         externals: cfg.externals,
         engineDevDeps: cfg.engineDevDeps,
-        exportsTypes: Boolean(ir.types?.exportedNames.length),
+        // Typed public surface (module-script `PopoverHandle`) on the package entry.
+        typesBarrel: typedSurfaceBarrelLines(target, ir, 'Popover'),
       });
     }
 
@@ -298,9 +299,9 @@ function main() {
               .join(', ')} }. */\n` +
             `export type { PopoverHandle } from './Popover';\n`
           : `export { default as Popover } from './Popover';\nexport { default } from './Popover';\n`;
-      // `<types>` names are part of the public surface: re-export them as types.
-      // (Popover has no `<types>` block today, so its barrels are unchanged.)
-      if (ir.types?.exportedNames.length) barrel += `export type * from './Popover';\n`;
+      // Typed public surface on the package entry (Lit: `RoziePopoverEventMap`;
+      // `<types>` names on every bundled leaf — see ../../typed-surface-barrel.mjs).
+      barrel += typedSurfaceBarrelLines(target, ir, 'Popover');
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 

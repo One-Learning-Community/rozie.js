@@ -167,12 +167,20 @@ export interface BuildShellResult {
  * Returns '' when nothing is present so non-composing examples stay
  * byte-stable.
  */
-function buildScriptPrelude(parts: ShellParts): string {
+function buildScriptPrelude(parts: ShellParts, includeOptions = true): string {
   const lines: string[] = [];
   if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
     // componentImportsBlock is already newline-terminated.
     lines.push(parts.componentImportsBlock.replace(/\n$/, ''));
   }
+  const optionsLine = includeOptions ? buildDefineOptionsLine(parts) : '';
+  if (optionsLine) lines.push(optionsLine);
+  if (lines.length === 0) return '';
+  return lines.join('\n') + '\n\n';
+}
+
+/** The merged `defineOptions({ name?, inheritAttrs? })` macro line, or ''. */
+function buildDefineOptionsLine(parts: ShellParts): string {
   const options: string[] = [];
   if (parts.hasSelfReference === true && parts.componentName) {
     options.push(`name: '${parts.componentName}'`);
@@ -198,11 +206,57 @@ function buildScriptPrelude(parts: ShellParts): string {
   if (parts.inheritAttrs === false && parts.inheritListeners === false) {
     options.push('inheritAttrs: false');
   }
-  if (options.length > 0) {
-    lines.push(`defineOptions({ ${options.join(', ')} });`);
+  return options.length > 0 ? `defineOptions({ ${options.join(', ')} });` : '';
+}
+
+/**
+ * Typed public surface P1 (Task 18): with a module `<script lang="ts">`
+ * present, Volar/vue-tsc wraps the `<script setup>` body in a function, so an
+ * `import` that FOLLOWS any statement (here the prelude's `defineOptions(...)`)
+ * fails with TS1232 — the same class the user-import hoist in emitScript.ts
+ * fixes for `defineProps`. Insert the macro after the leading import run of the
+ * script body instead. Returns the new body and the number of newlines inserted
+ * ahead of the user code (for the source-map line offset); `null` when the body
+ * has no leading imports (the prelude placement is already valid).
+ */
+function placeDefineOptionsAfterImports(
+  body: string,
+  optionsLine: string,
+): { body: string; insertedNewlines: number } | null {
+  const lines = body.split('\n');
+  let lastImportEnd = -1;
+  let inImport = false;
+  let inBlockComment = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    if (inImport) {
+      if (/;\s*$/.test(line)) {
+        inImport = false;
+        lastImportEnd = i;
+      }
+      continue;
+    }
+    // Comments (e.g. a leading comment on a hoisted user import) are skipped.
+    if (inBlockComment) {
+      if (line.includes('*/')) inBlockComment = false;
+      continue;
+    }
+    const trimmed = line.trim();
+    if (trimmed === '' || trimmed.startsWith('//')) continue;
+    if (trimmed.startsWith('/*')) {
+      if (!trimmed.includes('*/')) inBlockComment = true;
+      continue;
+    }
+    if (/^import\s/.test(line)) {
+      if (/;\s*$/.test(line)) lastImportEnd = i;
+      else inImport = true;
+      continue;
+    }
+    break;
   }
-  if (lines.length === 0) return '';
-  return lines.join('\n') + '\n\n';
+  if (lastImportEnd < 0) return null;
+  lines.splice(lastImportEnd + 1, 0, '', optionsLine);
+  return { body: lines.join('\n'), insertedNewlines: 2 };
 }
 
 /** `<script lang="ts">…</script>` + blank line, or '' when nothing to emit. */
@@ -276,11 +330,22 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   // (status quo; preserves byte-stable shape) AND additionally re-anchor a
   // sourcemap via the components block via a zero-width overwrite-then-move.
   const componentImportLines = (parts.componentImportsBlock ?? '').replace(/\n$/, '');
-  const scriptPrelude = buildScriptPrelude(parts);
+  let scriptPrelude = buildScriptPrelude(parts);
+  let scriptBody = parts.script;
+  let movedOptionsNewlines = 0;
+  const optionsLine = buildDefineOptionsLine(parts);
+  if (moduleScriptBlock.length > 0 && optionsLine) {
+    const placed = placeDefineOptionsAfterImports(scriptBody, optionsLine);
+    if (placed !== null) {
+      scriptPrelude = buildScriptPrelude(parts, false);
+      scriptBody = placed.body;
+      movedOptionsNewlines = placed.insertedNewlines;
+    }
+  }
   ms.overwrite(
     blocks.script.loc.start,
     blocks.script.loc.end,
-    `\n${moduleScriptBlock}${scriptOpenFraming}${scriptPrelude}${parts.script}${scriptCloseFraming}`,
+    `\n${moduleScriptBlock}${scriptOpenFraming}${scriptPrelude}${scriptBody}${scriptCloseFraming}`,
   );
 
   // D-128 sourcemap anchor: when the <components> block is present, use it
@@ -381,7 +446,8 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     // script body. Then add prelude + preamble lines inside the script.
     const textBeforeScriptBody = fullOutput.slice(0, scriptIdx + scriptOpenFraming.length);
     const linesBeforeScriptBody = (textBeforeScriptBody.match(/\n/g) ?? []).length;
-    userCodeLineOffset = linesBeforeScriptBody + scriptPreludeNewlines + preambleSectionLines;
+    userCodeLineOffset =
+      linesBeforeScriptBody + scriptPreludeNewlines + preambleSectionLines + movedOptionsNewlines;
   }
 
   return { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: parts.scriptMap ?? null };

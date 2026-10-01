@@ -38,6 +38,7 @@
  */
 import type { IRComponent, SlotDecl } from '@rozie/core';
 import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
+import { portalScopeType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 import { portalKey } from '../../../../core/src/ir/types.js';
 import type {
   ReactImportCollector,
@@ -158,11 +159,9 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   if (slot.isReactive === true) return buildReactiveSlotMethod(slot, scopeHash);
   const ids = slotIdsFor(slot);
   const { slotName, isDefault } = ids;
-  const paramNames = slot.portalParamNames ?? [];
-  // Scope type: `{ arg: unknown; ... }` from portalParamNames, or `unknown`
-  // when no names declared.
-  const scopeType =
-    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
+  // Scope type: `{ arg: <authored :param-types | unknown>; ... }` from
+  // portalParamNames, or `unknown` when no names declared (portalScopeType).
+  const scopeType = portalScopeType(slot);
   // Default portal slot: source is `props.children` (a ReactNode OR a render
   // fn), guarded by `== null` (a JSX node is not a function). Named slots keep
   // the `typeof slot !== 'function'` render-prop guard byte-identically.
@@ -209,9 +208,7 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
 function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
   const ids = slotIdsFor(slot);
   const { slotName, isDefault } = ids;
-  const paramNames = slot.portalParamNames ?? [];
-  const scopeType =
-    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
+  const scopeType = portalScopeType(slot);
   // Default portal slot sources `props.children` (ReactNode or render fn); named
   // slots keep the render-prop function guard byte-identically.
   const guard = isDefault

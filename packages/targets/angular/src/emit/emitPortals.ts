@@ -28,6 +28,7 @@
  */
 import type { IRComponent, SlotDecl } from '@rozie/core';
 import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
+import { portalScopeType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 import { portalKey } from '../../../../core/src/ir/types.js';
 
 /**
@@ -77,9 +78,7 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   if (slot.isReactive === true) return buildReactiveSlotMethod(slot, scopeHash);
   const slotName = portalKey(slot);
   const tplField = angularTplField(slot);
-  const paramNames = slot.portalParamNames ?? [];
-  const scopeType =
-    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
+  const scopeType = portalScopeType(slot);
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
     `    const tpl = this.${tplField}();\n` +
@@ -116,9 +115,7 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
 function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
   const slotName = portalKey(slot);
   const tplField = angularTplField(slot);
-  const paramNames = slot.portalParamNames ?? [];
-  const scopeType =
-    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
+  const scopeType = portalScopeType(slot);
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): ReactivePortalHandle => {\n` +
     `    const tpl = this.${tplField}();\n` +

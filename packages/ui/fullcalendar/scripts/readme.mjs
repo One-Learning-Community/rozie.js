@@ -2,9 +2,10 @@
  * README rendering + docs-table validation for @rozie-ui/fullcalendar.
  *
  * Everything structural is derived from a SINGLE parse of FullCalendar.rozie
- * (`ir.props` / `ir.slots` / `ir.emits` / `ir.expose`) so the per-leaf READMEs
- * cannot drift from the compiled output. Only event/handle prose comes from the
- * hand-kept manifests.
+ * (`ir.props` / `ir.slots` / `ir.emitDecls` / `ir.expose`) so the per-leaf READMEs
+ * cannot drift from the compiled output. The events table (name, payload type,
+ * prose) comes from the `<emits>` block (`ir.emitDecls`); only the handle prose
+ * comes from the hand-kept handle manifest.
  *
  * Pure glue over the `@rozie/core` public IR — NO compiler/emitter surface.
  * (Mirror of packages/ui/flatpickr/scripts/readme.mjs, retargeted to the
@@ -13,6 +14,7 @@
  * section — a calendar `view` name is not a form value, see the gating note.)
  */
 
+import { printTSType } from '@rozie/core';
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
 import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 
@@ -80,7 +82,7 @@ function slotParams(slot) {
 //
 // The two-way model prop is `view` (the active view name STRING). Events are
 // bound via `:events`; `@eventClick` surfaces the structured payload
-// `{ event, jsEvent, el }` (there is NO `view` key — see event-manifest). FullCalendar
+// `{ event, jsEvent, el }` (there is NO `view` key — see `<emits>`). FullCalendar
 // v6 AUTO-INJECTS its CSS — there is NO manual stylesheet import (the load-bearing
 // divergence from flatpickr).
 // ---------------------------------------------------------------------------
@@ -277,7 +279,10 @@ const api = el.getApi();`,
 // README rendering.
 // ---------------------------------------------------------------------------
 
-export function renderReadme(target, ir, eventManifest, pkgName, handleManifest = {}) {
+export function renderReadme(target, ir, pkgName, handleManifest = {}) {
+  if (ir.emitDecls === null) {
+    throw new Error('renderReadme: FullCalendar.rozie has no <emits> block — the events table is generated from it');
+  }
   const usage = USAGE[target];
   if (!usage) throw new Error(`renderReadme: no usage snippet for target "${target}"`);
 
@@ -349,17 +354,16 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   // Events
   lines.push('## Events');
   lines.push('');
-  if (target === 'lit' && litEventNamesDiverge(ir.emits)) {
+  if (target === 'lit' && litEventNamesDiverge(ir.emitDecls.map((d) => d.name))) {
     lines.push(LIT_EVENT_NOTE);
     lines.push('');
   }
-  lines.push('| Event | Description |');
-  lines.push('| --- | --- |');
-  for (const ev of ir.emits) {
-    const desc = eventManifest[ev];
-    if (!desc) throw new Error(`renderReadme: event "${ev}" missing from event-manifest`);
-    const eventCol = target === 'lit' ? litEventName(ev) : ev;
-    lines.push(`| \`${eventCol}\` | ${desc} |`);
+  lines.push('| Event | Payload | Description |');
+  lines.push('| --- | --- | --- |');
+  for (const d of ir.emitDecls) {
+    const eventCol = target === 'lit' ? litEventName(d.name) : d.name;
+    const payload = d.payload ? `\`${printTSType(d.payload)}\`` : '—';
+    lines.push(`| \`${eventCol}\` | ${payload} | ${d.docs?.description ?? ''} |`);
   }
   lines.push('');
 

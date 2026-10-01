@@ -27,6 +27,7 @@
  */
 import type { IRComponent, SlotDecl } from '@rozie/core';
 import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
+import { portalScopeType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 import { portalKey } from '../../../../core/src/ir/types.js';
 import type { VueImportCollector } from '../rewrite/collectVueImports.js';
 
@@ -67,10 +68,8 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   // effective portal key — `default` for the DEFAULT (unnamed) portal slot, so
   // `slots.default` (Vue's built-in default slot fn) is the content source.
   const slotName = portalKey(slot);
-  const paramNames = slot.portalParamNames ?? [];
   // Scope type from portalParamNames; falls back to `unknown` when omitted.
-  const scopeType =
-    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
+  const scopeType = portalScopeType(slot);
   // Wrap the slot's VNode array in a `Fragment` so the rendered output has
   // NO extra wrapper element — the slot's nodes become direct children of
   // `container`. An earlier `h('div', null, slotFn(scope))` version added an
@@ -107,9 +106,7 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
  */
 function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
   const slotName = portalKey(slot);
-  const paramNames = slot.portalParamNames ?? [];
-  const scopeType =
-    paramNames.length > 0 ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }` : 'unknown';
+  const scopeType = portalScopeType(slot);
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): ReactivePortalHandle => {\n` +
     `    const slotFn = slots.${slotName};\n` +

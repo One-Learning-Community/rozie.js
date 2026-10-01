@@ -101,4 +101,12 @@ describe('VUE-POPOVER-TYPED-SURFACE — change: boolean, typed anchor ctx, typed
       expect(r.out).not.toMatch(/TS2304|TS2614/);
     });
   }
+
+  it('barrel parity: Popover + PopoverHandle importable from the leaf barrel (src/index.ts)', () => {
+    const barrel = readFileSync(resolve(ROOT, 'packages/ui/popover/packages/vue/src/index.ts'), 'utf8');
+    const consumer = `<script setup lang="ts">\nimport { ref } from 'vue';\nimport { Popover, type PopoverHandle } from './index';\nconst h = ref<PopoverHandle | null>(null);\nh.value?.show();\n</script>\n<template>\n  <Popover ref="h" />\n</template>\n`;
+    const r = run({ 'Popover.vue': vue, 'index.ts': barrel, 'Consumer.vue': consumer });
+    expect(r.out).toBe('');
+    expect(r.ok).toBe(true);
+  });
 });

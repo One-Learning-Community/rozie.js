@@ -136,3 +136,27 @@ describe('POPOVER-TYPED-SURFACE — change: boolean, typed anchor ctx, typed han
     });
   }
 });
+
+/**
+ * Barrel parity (Task 18): the package entry (`src/index.ts`, committed leaf
+ * barrel) must let a consumer name the public types — the handle on
+ * React/Solid, and on Lit the `RoziePopoverEventMap` (the element is the handle).
+ */
+describe('POPOVER-TYPED-SURFACE — leaf barrel re-exports the public types', () => {
+  const BARREL_CONSUMERS = {
+    react: `import { Popover, type PopoverHandle } from './index';\ndeclare const h: PopoverHandle;\nh.show();\nvoid Popover;\n`,
+    solid: `import { Popover, type PopoverHandle } from './index';\ndeclare const h: PopoverHandle;\nh.show();\nvoid Popover;\n`,
+    lit: `import { Popover, type RoziePopoverEventMap } from './index';\nconst e: RoziePopoverEventMap['change'] = new CustomEvent('change', { detail: true });\ndeclare const el: Popover;\nel.show();\nvoid e;\n`,
+  } as const;
+  for (const c of CASES) {
+    it(`${c.target}: public types importable from the barrel`, () => {
+      const index = readFileSync(resolve(ROOT, c.nm, 'src/index.ts'), 'utf8');
+      const { raw, inventory } = typecheckCompiled({
+        target: c.target,
+        files: { [c.file]: compiled(c.target), 'index.ts': index, [c.consumer]: BARREL_CONSUMERS[c.target] },
+        nodeModulesFrom: c.nm,
+      });
+      expect(totalErrors(inventory), raw).toBe(0);
+    });
+  }
+});

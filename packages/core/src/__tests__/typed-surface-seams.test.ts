@@ -79,3 +79,64 @@ describe('typed-surface shared seams', () => {
     expect(renderEmitHandlerType({ name: 's', payload: num.type, docs: null, sourceLoc: loc })).toBe('(payload: number) => void');
   });
 });
+
+/**
+ * Portal slots with `:param-types` (Task 18, FullCalendar): the producer-side
+ * `$portals.<name>(container, scope)` method must take the AUTHORED scope type,
+ * or passing `scope` into the typed slot fn fails strict tsc (TS2345
+ * `{ arg: unknown }` → `{ arg: EventContentArg }`). Unauthored portal slots keep
+ * `{ arg: unknown }` byte-identically.
+ */
+describe('typed-surface: portal-slot scope type', () => {
+  const PORTAL = `<rozie name="P">
+<types>
+export interface Cell { day: number }
+</types>
+<script>
+$onMount(() => {
+  const a = $portals.typed(document.body, { arg: 1 })
+  const b = $portals.plain(document.body, { arg: 2 })
+  return () => { a(); b() }
+})
+</script>
+<template>
+<div />
+<slot name="typed" portal :params="['arg']" :param-types="{ arg: 'Cell' }" />
+<slot name="plain" portal :params="['arg']" />
+</template>
+</rozie>`;
+  for (const target of ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const) {
+    it(`${target}: typed portal scope is the authored type; untyped stays unknown`, async () => {
+      const { compile } = await import('../compile.js');
+      const r = compile(PORTAL, { target, filename: 'P.rozie', sourceMap: false });
+      expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      expect(r.code).toMatch(/typed: \(container: HTMLElement, scope: \{ arg: Cell \}\)/);
+      expect(r.code).toMatch(/plain: \(container: HTMLElement, scope: \{ arg: unknown \}\)/);
+    });
+  }
+});
+
+/**
+ * A comment BETWEEN two `<types>` statements is attached by Babel both as the
+ * previous statement's trailing comment and the next one's leading comment;
+ * generating each statement separately printed it twice (Task 18: FullCalendar's
+ * JSDoc on `FullCalendarUnselect` doubled in every leaf).
+ */
+describe('typed-surface: renderTypesBlock comment fidelity', () => {
+  it('a JSDoc between statements renders exactly once; leading + final trailing comments survive', () => {
+    const src = `<rozie name="C">
+<types>
+// header
+export interface A { a: number }
+/** Doc for B. */
+export interface B { b: number }
+export type Z = A | B // trailing
+</types>
+<template><div /></template>
+</rozie>`;
+    const out = renderTypesBlock(ir(src));
+    expect(out.split('/** Doc for B. */').length - 1).toBe(1);
+    expect(out.split('// header').length - 1).toBe(1);
+    expect(out.split('// trailing').length - 1).toBe(1);
+  });
+});

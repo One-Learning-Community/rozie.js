@@ -52,19 +52,19 @@ el.addEventListener('event-click', (e) => {
 
 `addEventListener` name — the Lit target dispatches multi-word event names kebab-cased.
 
-| Event | Description |
-| --- | --- |
-| `event-click` | Fired when a calendar event is clicked. Payload `{ event: { id, title, start, end }, jsEvent, el }`. `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip). |
-| `date-click` | Fired when an empty date/time cell is clicked. Payload `{ date, dateStr, allDay }`. |
-| `event-drop` | Fired after an event is dragged to a new date/time. Payload `{ event: { id, title, start, end }, delta }`. |
-| `select` | Fired when a date/time range is selected by drag (requires `selectable`). Payload `{ start, end, startStr, endStr, allDay }`. |
-| `event-resize` | Fired after an event is resized by dragging its edge (requires `editable`). Payload `{ event: { id, title, start, end }, startDelta, endDelta }`. |
-| `dates-set` | Fired whenever the visible date range changes (navigation or view switch). Payload `{ start, end, view }` where `view` is the active view type string. |
-| `event-mouse-enter` | Fired when the pointer enters a calendar event. Payload `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventClick`). |
-| `event-mouse-leave` | Fired when the pointer leaves a calendar event. Payload `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventMouseEnter`). |
-| `unselect` | Fired when a previously selected date/time range is cleared. Payload `{ jsEvent }`. |
-| `loading` | Fired when the calendar begins or finishes loading events. Payload `{ isLoading }` boolean. It fires only while FullCalendar fetches an event source itself (a URL/JSON feed or a function source); with only the `events` array bound it never fires (see Gotchas). |
-| `events-set` | Fired after the set of rendered events changes. Payload `{ events: [{ id, title, start, end }, …] }` — the normalized current event set, for persistence/sync consumers. |
+| Event | Payload | Description |
+| --- | --- | --- |
+| `event-click` | `FullCalendarEventPointer` | Fired when a calendar event is clicked. `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip). |
+| `date-click` | `FullCalendarDateClick` | Fired when an empty date/time cell is clicked. |
+| `event-drop` | `FullCalendarEventDrop` | Fired after an event is dragged to a new date/time. |
+| `select` | `FullCalendarSelection` | Fired when a date/time range is selected by drag (requires `selectable`). |
+| `event-resize` | `FullCalendarEventResize` | Fired after an event is resized by dragging its edge (requires `editable`). |
+| `dates-set` | `FullCalendarDatesSet` | Fired whenever the visible date range changes (navigation or view switch). `view` is the active view type string. |
+| `event-mouse-enter` | `FullCalendarEventPointer` | Fired when the pointer enters a calendar event (payload mirrors `eventClick`). |
+| `event-mouse-leave` | `FullCalendarEventPointer` | Fired when the pointer leaves a calendar event (payload mirrors `eventMouseEnter`). |
+| `unselect` | `FullCalendarUnselect` | Fired when a previously selected date/time range is cleared. `jsEvent` is `null` when it was cleared programmatically (e.g. `clearSelection`). |
+| `loading` | `FullCalendarLoading` | Fired when the calendar begins or finishes loading events. It fires only while FullCalendar fetches an event source itself (a URL/JSON feed or a function source); with only the `events` array bound it never fires (see Gotchas). |
+| `events-set` | `FullCalendarEventsSet` | Fired after the set of rendered events changes — the normalized current event set, for persistence/sync consumers. |
 
 ## Imperative handle
 

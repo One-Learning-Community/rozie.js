@@ -1,3 +1,68 @@
+<script module lang="ts">
+// The typed public surface (always TypeScript, whatever the script lang).
+// Payload interfaces describe what the wrapper ACTUALLY emits (normalized
+// `{ id, title, start, end }` event refs, the view TYPE string, `{ isLoading }`),
+// not FullCalendar's raw callback args. Engine types come from the
+// `@fullcalendar/core` peer and are re-exported so consumers can name them.
+// `Calendar` is NOT imported here: the script's value import of the same name
+// shares the emitted module scope on every target, so it is re-exported
+// straight from the peer and the `getApi` signature names it via `import()`.
+import type { DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput, EventSourceApi, ViewApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg } from '@fullcalendar/core';
+export interface FullCalendarEventRef {
+  id: string;
+  title: string;
+  start: Date | null;
+  end: Date | null;
+}
+export interface FullCalendarEventPointer {
+  event: FullCalendarEventRef;
+  jsEvent: MouseEvent;
+  el: HTMLElement;
+}
+export interface FullCalendarDateClick {
+  date: Date;
+  dateStr: string;
+  allDay: boolean;
+}
+export interface FullCalendarEventDrop {
+  event: FullCalendarEventRef;
+  delta: Duration;
+}
+export interface FullCalendarSelection {
+  start: Date;
+  end: Date;
+  startStr: string;
+  endStr: string;
+  allDay: boolean;
+}
+export interface FullCalendarEventResize {
+  event: FullCalendarEventRef;
+  startDelta: Duration;
+  endDelta: Duration;
+}
+export interface FullCalendarDatesSet {
+  start: Date;
+  end: Date;
+  view: string;
+}
+/** `jsEvent` is `null` when the selection is cleared programmatically (e.g. the `clearSelection` verb). */
+export interface FullCalendarUnselect {
+  jsEvent: MouseEvent | null;
+}
+export interface FullCalendarLoading {
+  isLoading: boolean;
+}
+export interface FullCalendarEventsSet {
+  events: FullCalendarEventRef[];
+}
+/** `noEventsContent` arg — `@fullcalendar/list`'s NoEventsContentArg, restated so the core-only peer set suffices. */
+export interface FullCalendarNoEventsContentArg {
+  text: string;
+  view: ViewApi;
+}
+export type { Calendar } from '@fullcalendar/core';
+export type { DateInput, EventApi, EventInput, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg };
+</script>
 <script lang="ts">
 import type { Snippet } from 'svelte';
 import { mount, unmount } from 'svelte';
@@ -59,28 +124,28 @@ interface Props {
    * Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface does not special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Spread **first** into the engine config so the curated props/events/slots win on key collision; `:options` only fills gaps. Runtime-updatable per key via `setOption` (no key-removal reset — a removed key keeps its last applied value until remount; use `getApi()` for full imperative control). The `plugins` key is the one exception that **merges** with the baked-in defaults instead of overriding them, making the wrapper consumer-extensible.
    */
   options?: any;
-  event?: Snippet<[{ arg: any }]>;
-  dayCell?: Snippet<[{ arg: any }]>;
-  dayHeader?: Snippet<[{ arg: any }]>;
-  slotLabel?: Snippet<[{ arg: any }]>;
-  weekNumber?: Snippet<[{ arg: any }]>;
-  nowIndicatorContent?: Snippet<[{ arg: any }]>;
-  moreLink?: Snippet<[{ arg: any }]>;
-  allDayContent?: Snippet<[{ arg: any }]>;
-  slotLaneContent?: Snippet<[{ arg: any }]>;
-  noEventsContent?: Snippet<[{ arg: any }]>;
+  event?: Snippet<[{ arg: EventContentArg }]>;
+  dayCell?: Snippet<[{ arg: DayCellContentArg }]>;
+  dayHeader?: Snippet<[{ arg: DayHeaderContentArg }]>;
+  slotLabel?: Snippet<[{ arg: SlotLabelContentArg }]>;
+  weekNumber?: Snippet<[{ arg: WeekNumberContentArg }]>;
+  nowIndicatorContent?: Snippet<[{ arg: NowIndicatorContentArg }]>;
+  moreLink?: Snippet<[{ arg: MoreLinkContentArg }]>;
+  allDayContent?: Snippet<[{ arg: AllDayContentArg }]>;
+  slotLaneContent?: Snippet<[{ arg: SlotLaneContentArg }]>;
+  noEventsContent?: Snippet<[{ arg: FullCalendarNoEventsContentArg }]>;
   snippets?: Record<string, any>;
-  oneventclick?: (...args: any[]) => void;
-  ondateclick?: (...args: any[]) => void;
-  oneventdrop?: (...args: any[]) => void;
-  onselect?: (...args: any[]) => void;
-  oneventresize?: (...args: any[]) => void;
-  ondatesset?: (...args: any[]) => void;
-  oneventmouseenter?: (...args: any[]) => void;
-  oneventmouseleave?: (...args: any[]) => void;
-  onunselect?: (...args: any[]) => void;
-  onloading?: (...args: any[]) => void;
-  oneventsset?: (...args: any[]) => void;
+  oneventclick?: (payload: FullCalendarEventPointer) => void;
+  ondateclick?: (payload: FullCalendarDateClick) => void;
+  oneventdrop?: (payload: FullCalendarEventDrop) => void;
+  onselect?: (payload: FullCalendarSelection) => void;
+  oneventresize?: (payload: FullCalendarEventResize) => void;
+  ondatesset?: (payload: FullCalendarDatesSet) => void;
+  oneventmouseenter?: (payload: FullCalendarEventPointer) => void;
+  oneventmouseleave?: (payload: FullCalendarEventPointer) => void;
+  onunselect?: (payload: FullCalendarUnselect) => void;
+  onloading?: (payload: FullCalendarLoading) => void;
+  oneventsset?: (payload: FullCalendarEventsSet) => void;
 }
 
 let __defaultEvents = (() => [])();
@@ -144,7 +209,7 @@ let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 
 const portalInstances = new Set<Record<string, unknown>>();
 const portals = {
-  event: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  event: (container: HTMLElement, scope: { arg: EventContentArg }): (() => void) => {
     if (!event) return () => {};
     // Spike 004: portal-scope attribute injection.
     container.setAttribute('data-rozie-portal-event', '5589629a');
@@ -158,7 +223,7 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
-  dayCell: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  dayCell: (container: HTMLElement, scope: { arg: DayCellContentArg }): (() => void) => {
     if (!dayCell) return () => {};
     // Spike 004: portal-scope attribute injection.
     container.setAttribute('data-rozie-portal-dayCell', '5589629a');
@@ -172,7 +237,7 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
-  dayHeader: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  dayHeader: (container: HTMLElement, scope: { arg: DayHeaderContentArg }): (() => void) => {
     if (!dayHeader) return () => {};
     // Spike 004: portal-scope attribute injection.
     container.setAttribute('data-rozie-portal-dayHeader', '5589629a');
@@ -186,7 +251,7 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
-  slotLabel: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  slotLabel: (container: HTMLElement, scope: { arg: SlotLabelContentArg }): (() => void) => {
     if (!slotLabel) return () => {};
     // Spike 004: portal-scope attribute injection.
     container.setAttribute('data-rozie-portal-slotLabel', '5589629a');
@@ -200,7 +265,7 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
-  weekNumber: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  weekNumber: (container: HTMLElement, scope: { arg: WeekNumberContentArg }): (() => void) => {
     if (!weekNumber) return () => {};
     // Spike 004: portal-scope attribute injection.
     container.setAttribute('data-rozie-portal-weekNumber', '5589629a');
@@ -214,7 +279,7 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
-  nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  nowIndicatorContent: (container: HTMLElement, scope: { arg: NowIndicatorContentArg }): (() => void) => {
     if (!nowIndicatorContent) return () => {};
     // Spike 004: portal-scope attribute injection.
     container.setAttribute('data-rozie-portal-nowIndicatorContent', '5589629a');
@@ -228,7 +293,7 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
-  moreLink: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  moreLink: (container: HTMLElement, scope: { arg: MoreLinkContentArg }): (() => void) => {
     if (!moreLink) return () => {};
     // Spike 004: portal-scope attribute injection.
     container.setAttribute('data-rozie-portal-moreLink', '5589629a');
@@ -242,7 +307,7 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
-  allDayContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  allDayContent: (container: HTMLElement, scope: { arg: AllDayContentArg }): (() => void) => {
     if (!allDayContent) return () => {};
     // Spike 004: portal-scope attribute injection.
     container.setAttribute('data-rozie-portal-allDayContent', '5589629a');
@@ -256,7 +321,7 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
-  slotLaneContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  slotLaneContent: (container: HTMLElement, scope: { arg: SlotLaneContentArg }): (() => void) => {
     if (!slotLaneContent) return () => {};
     // Spike 004: portal-scope attribute injection.
     container.setAttribute('data-rozie-portal-slotLaneContent', '5589629a');
@@ -270,7 +335,7 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
-  noEventsContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+  noEventsContent: (container: HTMLElement, scope: { arg: FullCalendarNoEventsContentArg }): (() => void) => {
     if (!noEventsContent) return () => {};
     // Spike 004: portal-scope attribute injection.
     container.setAttribute('data-rozie-portal-noEventsContent', '5589629a');
@@ -316,6 +381,7 @@ const normalizeEvent = (e: any) => {
     color: e.color || defaultColor
   };
 };
+export function getApi(): import('@fullcalendar/core').Calendar | null;
 // Imperative handle (Phase 21 $expose). The 16 calendar verbs a consumer can't
 // drive through props alone — exposed uniformly to all 6 targets
 // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
@@ -338,48 +404,63 @@ const normalizeEvent = (e: any) => {
 export function getApi() {
   return instance;
 }
+export function changeView(viewType: string, dateOrRange?: DateRangeInput | DateInput): void;
 export function changeView(...a: any[]) {
   return instance?.changeView(...a);
 }
+export function addEvent(event: EventInput, source?: EventSourceApi | string | boolean): EventApi | null | undefined;
 export function addEvent(...a: any[]) {
   return instance?.addEvent(...a);
 }
+export function removeEvent(id: string): void;
 export function removeEvent(id: any) {
   instance?.getEventById(id)?.remove();
 }
+export function today(): void;
 export function today() {
   instance?.today();
 }
+export function prev(): void;
 export function prev() {
   instance?.prev();
 }
+export function next(): void;
 export function next() {
   instance?.next();
 }
+export function gotoDate(date: DateInput): void;
 export function gotoDate(...a: any[]) {
   instance?.gotoDate(...a);
 }
+export function getDate(): Date | null;
 export function getDate() {
   return instance ? instance.getDate() : null;
 }
+export function getEvents(): EventApi[];
 export function getEvents() {
   return instance ? instance.getEvents() : [];
 }
+export function scrollToTime(time: DurationInput): void;
 export function scrollToTime(...a: any[]) {
   instance?.scrollToTime(...a);
 }
+export function updateSize(): void;
 export function updateSize() {
   instance?.updateSize();
 }
+export function prevYear(): void;
 export function prevYear() {
   instance?.prevYear();
 }
+export function nextYear(): void;
 export function nextYear() {
   instance?.nextYear();
 }
+export function selectRange(dateOrSpan: DateInput | DateSpanInput, end?: DateInput): void;
 export function selectRange(...a: any[]) {
   instance?.select(...a);
 }
+export function clearSelection(): void;
 export function clearSelection() {
   instance?.unselect();
 }

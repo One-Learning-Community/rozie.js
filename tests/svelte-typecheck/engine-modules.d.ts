@@ -58,7 +58,33 @@ declare module 'codemirror';
 
 // FullCalendar — FullCalendar.rozie does `import { Calendar } from
 // '@fullcalendar/core'` + default-import plugins; untyped null-let instance.
-declare module '@fullcalendar/core';
+// Its `<types>` block (typed-surface P1) also `import type`s engine types, which
+// a shorthand `declare module` cannot supply as TYPES ("Cannot use namespace
+// 'X' as a type"), so each is declared `any` here — the gate verifies the emitted
+// scaffolding, not FullCalendar's own types (the typed-surface consumer test
+// path-maps the real ones).
+declare module '@fullcalendar/core' {
+  export const Calendar: any;
+  export type Calendar = any;
+  export type DateInput = any;
+  export type DateRangeInput = any;
+  export type DateSpanInput = any;
+  export type DurationInput = any;
+  export type Duration = any;
+  export type EventApi = any;
+  export type EventInput = any;
+  export type EventSourceApi = any;
+  export type ViewApi = any;
+  export type EventContentArg = any;
+  export type DayCellContentArg = any;
+  export type DayHeaderContentArg = any;
+  export type SlotLabelContentArg = any;
+  export type WeekNumberContentArg = any;
+  export type NowIndicatorContentArg = any;
+  export type MoreLinkContentArg = any;
+  export type AllDayContentArg = any;
+  export type SlotLaneContentArg = any;
+}
 declare module '@fullcalendar/daygrid';
 declare module '@fullcalendar/timegrid';
 declare module '@fullcalendar/interaction';

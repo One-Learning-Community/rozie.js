@@ -6,7 +6,9 @@
  * `ir.expose` (`getApi`, `changeView`, `addEvent`, `removeEvent`, `today`,
  * `prev`, `next`, `gotoDate` — the Phase 21 `$expose({ ... })` call in
  * FullCalendar.rozie), but their human-readable descriptions have no
- * first-class IR source — so the prose lives here. Mirrors event-manifest.mjs.
+ * first-class IR source — so the prose lives here. (Event prose moved to the
+ * `<emits>` block's `docs.description`; the handle's TYPES are the `$expose`
+ * signatures in FullCalendar.rozie.)
  *
  * KEYS MUST stay in lockstep with `ir.expose`: codegen.mjs asserts every
  * exposed method name has an entry here and throws if one is missing.

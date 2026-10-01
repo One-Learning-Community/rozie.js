@@ -7,30 +7,94 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
+// The typed public surface (always TypeScript, whatever the script lang).
+// Payload interfaces describe what the wrapper ACTUALLY emits (normalized
+// `{ id, title, start, end }` event refs, the view TYPE string, `{ isLoading }`),
+// not FullCalendar's raw callback args. Engine types come from the
+// `@fullcalendar/core` peer and are re-exported so consumers can name them.
+// `Calendar` is NOT imported here: the script's value import of the same name
+// shares the emitted module scope on every target, so it is re-exported
+// straight from the peer and the `getApi` signature names it via `import()`.
+import type { DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput, EventSourceApi, ViewApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg } from '@fullcalendar/core';
+export interface FullCalendarEventRef {
+  id: string;
+  title: string;
+  start: Date | null;
+  end: Date | null;
+}
+export interface FullCalendarEventPointer {
+  event: FullCalendarEventRef;
+  jsEvent: MouseEvent;
+  el: HTMLElement;
+}
+export interface FullCalendarDateClick {
+  date: Date;
+  dateStr: string;
+  allDay: boolean;
+}
+export interface FullCalendarEventDrop {
+  event: FullCalendarEventRef;
+  delta: Duration;
+}
+export interface FullCalendarSelection {
+  start: Date;
+  end: Date;
+  startStr: string;
+  endStr: string;
+  allDay: boolean;
+}
+export interface FullCalendarEventResize {
+  event: FullCalendarEventRef;
+  startDelta: Duration;
+  endDelta: Duration;
+}
+export interface FullCalendarDatesSet {
+  start: Date;
+  end: Date;
+  view: string;
+}
+/** `jsEvent` is `null` when the selection is cleared programmatically (e.g. the `clearSelection` verb). */
+export interface FullCalendarUnselect {
+  jsEvent: MouseEvent | null;
+}
+export interface FullCalendarLoading {
+  isLoading: boolean;
+}
+export interface FullCalendarEventsSet {
+  events: FullCalendarEventRef[];
+}
+/** `noEventsContent` arg — `@fullcalendar/list`'s NoEventsContentArg, restated so the core-only peer set suffices. */
+export interface FullCalendarNoEventsContentArg {
+  text: string;
+  view: ViewApi;
+}
+export type { Calendar } from '@fullcalendar/core';
+export type { DateInput, EventApi, EventInput, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg };
+
 __rozieInjectStyle('FullCalendar-5589629a', `.rozie-fullcalendar[data-rozie-s-5589629a] {
   width: 100%;
   font-size: 0.875rem;
 }`);
 
-interface EventSlotCtx { arg: any; }
+interface EventSlotCtx { arg: EventContentArg; }
 
-interface DayCellSlotCtx { arg: any; }
+interface DayCellSlotCtx { arg: DayCellContentArg; }
 
-interface DayHeaderSlotCtx { arg: any; }
+interface DayHeaderSlotCtx { arg: DayHeaderContentArg; }
 
-interface SlotLabelSlotCtx { arg: any; }
+interface SlotLabelSlotCtx { arg: SlotLabelContentArg; }
 
-interface WeekNumberSlotCtx { arg: any; }
+interface WeekNumberSlotCtx { arg: WeekNumberContentArg; }
 
-interface NowIndicatorContentSlotCtx { arg: any; }
+interface NowIndicatorContentSlotCtx { arg: NowIndicatorContentArg; }
 
-interface MoreLinkSlotCtx { arg: any; }
+interface MoreLinkSlotCtx { arg: MoreLinkContentArg; }
 
-interface AllDayContentSlotCtx { arg: any; }
+interface AllDayContentSlotCtx { arg: AllDayContentArg; }
 
-interface SlotLaneContentSlotCtx { arg: any; }
+interface SlotLaneContentSlotCtx { arg: SlotLaneContentArg; }
 
-interface NoEventsContentSlotCtx { arg: any; }
+interface NoEventsContentSlotCtx { arg: FullCalendarNoEventsContentArg; }
 
 interface FullCalendarProps {
   /**
@@ -89,17 +153,17 @@ interface FullCalendarProps {
    * Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface does not special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Spread **first** into the engine config so the curated props/events/slots win on key collision; `:options` only fills gaps. Runtime-updatable per key via `setOption` (no key-removal reset — a removed key keeps its last applied value until remount; use `getApi()` for full imperative control). The `plugins` key is the one exception that **merges** with the baked-in defaults instead of overriding them, making the wrapper consumer-extensible.
    */
   options?: Record<string, any>;
-  onEventClick?: (...args: any[]) => void;
-  onDateClick?: (...args: any[]) => void;
-  onEventDrop?: (...args: any[]) => void;
-  onSelect?: (...args: any[]) => void;
-  onEventResize?: (...args: any[]) => void;
-  onDatesSet?: (...args: any[]) => void;
-  onEventMouseEnter?: (...args: any[]) => void;
-  onEventMouseLeave?: (...args: any[]) => void;
-  onUnselect?: (...args: any[]) => void;
-  onLoading?: (...args: any[]) => void;
-  onEventsSet?: (...args: any[]) => void;
+  onEventClick?: (payload: FullCalendarEventPointer) => void;
+  onDateClick?: (payload: FullCalendarDateClick) => void;
+  onEventDrop?: (payload: FullCalendarEventDrop) => void;
+  onSelect?: (payload: FullCalendarSelection) => void;
+  onEventResize?: (payload: FullCalendarEventResize) => void;
+  onDatesSet?: (payload: FullCalendarDatesSet) => void;
+  onEventMouseEnter?: (payload: FullCalendarEventPointer) => void;
+  onEventMouseLeave?: (payload: FullCalendarEventPointer) => void;
+  onUnselect?: (payload: FullCalendarUnselect) => void;
+  onLoading?: (payload: FullCalendarLoading) => void;
+  onEventsSet?: (payload: FullCalendarEventsSet) => void;
   eventSlot?: (ctx: EventSlotCtx) => JSX.Element;
   dayCellSlot?: (ctx: DayCellSlotCtx) => JSX.Element;
   dayHeaderSlot?: (ctx: DayHeaderSlotCtx) => JSX.Element;
@@ -115,22 +179,22 @@ interface FullCalendarProps {
 }
 
 export interface FullCalendarHandle {
-  getApi: (...args: any[]) => any;
-  changeView: (...args: any[]) => any;
-  addEvent: (...args: any[]) => any;
-  removeEvent: (...args: any[]) => any;
-  today: (...args: any[]) => any;
-  prev: (...args: any[]) => any;
-  next: (...args: any[]) => any;
-  gotoDate: (...args: any[]) => any;
-  getDate: (...args: any[]) => any;
-  getEvents: (...args: any[]) => any;
-  scrollToTime: (...args: any[]) => any;
-  updateSize: (...args: any[]) => any;
-  prevYear: (...args: any[]) => any;
-  nextYear: (...args: any[]) => any;
-  selectRange: (...args: any[]) => any;
-  clearSelection: (...args: any[]) => any;
+  getApi: () => import('@fullcalendar/core').Calendar | null;
+  changeView: (viewType: string, dateOrRange?: DateRangeInput | DateInput) => void;
+  addEvent: (event: EventInput, source?: EventSourceApi | string | boolean) => EventApi | null | undefined;
+  removeEvent: (id: string) => void;
+  today: () => void;
+  prev: () => void;
+  next: () => void;
+  gotoDate: (date: DateInput) => void;
+  getDate: () => Date | null;
+  getEvents: () => EventApi[];
+  scrollToTime: (time: DurationInput) => void;
+  updateSize: () => void;
+  prevYear: () => void;
+  nextYear: () => void;
+  selectRange: (dateOrSpan: DateInput | DateSpanInput, end?: DateInput) => void;
+  clearSelection: () => void;
 }
 
 export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
@@ -145,7 +209,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
   const [view, setView] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'view', 'dayGridMonth');
   const portalDisposers = new Set<() => void>();
   const portals = {
-    event: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    event: (container: HTMLElement, scope: { arg: EventContentArg }): (() => void) => {
       const slot = _props.eventSlot ?? _props.slots?.['event'];
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.
@@ -157,7 +221,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         portalDisposers.delete(dispose);
       };
     },
-    dayCell: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    dayCell: (container: HTMLElement, scope: { arg: DayCellContentArg }): (() => void) => {
       const slot = _props.dayCellSlot ?? _props.slots?.['dayCell'];
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.
@@ -169,7 +233,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         portalDisposers.delete(dispose);
       };
     },
-    dayHeader: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    dayHeader: (container: HTMLElement, scope: { arg: DayHeaderContentArg }): (() => void) => {
       const slot = _props.dayHeaderSlot ?? _props.slots?.['dayHeader'];
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.
@@ -181,7 +245,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         portalDisposers.delete(dispose);
       };
     },
-    slotLabel: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    slotLabel: (container: HTMLElement, scope: { arg: SlotLabelContentArg }): (() => void) => {
       const slot = _props.slotLabelSlot ?? _props.slots?.['slotLabel'];
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.
@@ -193,7 +257,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         portalDisposers.delete(dispose);
       };
     },
-    weekNumber: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    weekNumber: (container: HTMLElement, scope: { arg: WeekNumberContentArg }): (() => void) => {
       const slot = _props.weekNumberSlot ?? _props.slots?.['weekNumber'];
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.
@@ -205,7 +269,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         portalDisposers.delete(dispose);
       };
     },
-    nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    nowIndicatorContent: (container: HTMLElement, scope: { arg: NowIndicatorContentArg }): (() => void) => {
       const slot = _props.nowIndicatorContentSlot ?? _props.slots?.['nowIndicatorContent'];
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.
@@ -217,7 +281,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         portalDisposers.delete(dispose);
       };
     },
-    moreLink: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    moreLink: (container: HTMLElement, scope: { arg: MoreLinkContentArg }): (() => void) => {
       const slot = _props.moreLinkSlot ?? _props.slots?.['moreLink'];
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.
@@ -229,7 +293,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         portalDisposers.delete(dispose);
       };
     },
-    allDayContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    allDayContent: (container: HTMLElement, scope: { arg: AllDayContentArg }): (() => void) => {
       const slot = _props.allDayContentSlot ?? _props.slots?.['allDayContent'];
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.
@@ -241,7 +305,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         portalDisposers.delete(dispose);
       };
     },
-    slotLaneContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    slotLaneContent: (container: HTMLElement, scope: { arg: SlotLaneContentArg }): (() => void) => {
       const slot = _props.slotLaneContentSlot ?? _props.slots?.['slotLaneContent'];
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.
@@ -253,7 +317,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         portalDisposers.delete(dispose);
       };
     },
-    noEventsContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    noEventsContent: (container: HTMLElement, scope: { arg: FullCalendarNoEventsContentArg }): (() => void) => {
       const slot = _props.noEventsContentSlot ?? _props.slots?.['noEventsContent'];
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.

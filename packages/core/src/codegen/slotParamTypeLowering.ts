@@ -80,3 +80,36 @@ export function buildSlotParamFields(
     type: lowerSlotParamType(paramTypes?.[i], authored),
   }));
 }
+
+/**
+ * The producer-side scope type of a PORTAL slot's `$portals.<name>(container,
+ * scope)` method — the ONE builder all six targets' `emitPortals.ts` use.
+ *
+ *   - no `:params` names → `'unknown'`;
+ *   - otherwise `{ <name>: <type>; … }` where `<type>` is the AUTHORED
+ *     `:param-types` entry (typed public surface P1) printed verbatim, and
+ *     `unknown` for every unauthored name — so a portal slot without
+ *     `:param-types` emits `{ arg: unknown }` byte-identically to before.
+ *
+ * The authored type must flow here because the method passes `scope` into the
+ * slot fn, whose ctx is typed from the same `:param-types`; an `unknown` member
+ * is not assignable to it under strict tsc (TS2345).
+ *
+ * @experimental — added in typed-surface P1
+ */
+export function portalScopeType(slot: {
+  portalParamNames?: readonly string[];
+  params: readonly ParamDecl[];
+  paramTypes?: readonly TSType[];
+  paramTypesAuthored?: true;
+}): string {
+  const names = slot.portalParamNames ?? [];
+  if (names.length === 0) return 'unknown';
+  const fieldType = (name: string): string => {
+    if (slot.paramTypesAuthored !== true) return 'unknown';
+    const i = slot.params.findIndex((p) => p.name === name);
+    const ty = i >= 0 ? slot.paramTypes?.[i] : undefined;
+    return ty === undefined ? 'unknown' : lowerSlotParamType(ty, true);
+  };
+  return `{ ${names.map((n) => `${n}: ${fieldType(n)}`).join('; ')} }`;
+}
