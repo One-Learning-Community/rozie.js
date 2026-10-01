@@ -1,144 +1,167 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "Combobox",
   "props": [
     {
       "name": "value",
       "isModel": true,
       "required": false,
-      "type": "unknown"
+      "type": "unknown",
+      "tsType": null
     },
     {
       "name": "options",
       "isModel": false,
       "required": false,
-      "type": "Array"
+      "type": "Array",
+      "tsType": null
     },
     {
       "name": "placeholder",
       "isModel": false,
       "required": false,
-      "type": "String"
+      "type": "String",
+      "tsType": null
     },
     {
       "name": "disabled",
       "isModel": false,
       "required": false,
-      "type": "Boolean"
+      "type": "Boolean",
+      "tsType": null
     },
     {
       "name": "disableFilter",
       "isModel": false,
       "required": false,
-      "type": "Boolean"
+      "type": "Boolean",
+      "tsType": null
     },
     {
       "name": "ariaLabel",
       "isModel": false,
       "required": false,
-      "type": "String"
+      "type": "String",
+      "tsType": null
     },
     {
       "name": "idBase",
       "isModel": false,
       "required": false,
-      "type": "String"
+      "type": "String",
+      "tsType": null
     },
     {
       "name": "inline",
       "isModel": false,
       "required": false,
-      "type": "Boolean"
+      "type": "Boolean",
+      "tsType": null
     },
     {
       "name": "closeOnSelect",
       "isModel": false,
       "required": false,
-      "type": "Boolean"
+      "type": "Boolean",
+      "tsType": null
     },
     {
       "name": "multiple",
       "isModel": false,
       "required": false,
-      "type": "Boolean"
+      "type": "Boolean",
+      "tsType": null
     },
     {
       "name": "creatable",
       "isModel": false,
       "required": false,
-      "type": "Boolean"
+      "type": "Boolean",
+      "tsType": null
     },
     {
       "name": "optionLabel",
       "isModel": false,
       "required": false,
-      "type": "Function"
+      "type": "Function",
+      "tsType": null
     },
     {
       "name": "optionValue",
       "isModel": false,
       "required": false,
-      "type": "Function"
+      "type": "Function",
+      "tsType": null
     },
     {
       "name": "optionDisabled",
       "isModel": false,
       "required": false,
-      "type": "Function"
+      "type": "Function",
+      "tsType": null
     },
     {
       "name": "virtual",
       "isModel": false,
       "required": false,
-      "type": "Boolean"
+      "type": "Boolean",
+      "tsType": null
     },
     {
       "name": "estimateRowHeight",
       "isModel": false,
       "required": false,
-      "type": "Number"
+      "type": "Number",
+      "tsType": null
     },
     {
       "name": "maxHeight",
       "isModel": false,
       "required": false,
-      "type": "String"
+      "type": "String",
+      "tsType": null
     },
     {
       "name": "groups",
       "isModel": false,
       "required": false,
-      "type": "Array"
+      "type": "Array",
+      "tsType": null
     },
     {
       "name": "groupCap",
       "isModel": false,
       "required": false,
-      "type": "Number"
+      "type": "Number",
+      "tsType": null
     },
     {
       "name": "placement",
       "isModel": false,
       "required": false,
-      "type": "String"
+      "type": "String",
+      "tsType": null
     },
     {
       "name": "offset",
       "isModel": false,
       "required": false,
-      "type": "Number"
+      "type": "Number",
+      "tsType": null
     },
     {
       "name": "disableFlip",
       "isModel": false,
       "required": false,
-      "type": "Boolean"
+      "type": "Boolean",
+      "tsType": null
     },
     {
       "name": "disableShift",
       "isModel": false,
       "required": false,
-      "type": "Boolean"
+      "type": "Boolean",
+      "tsType": null
     }
   ],
   "slots": [
@@ -157,7 +180,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "option",
@@ -180,7 +204,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "empty",
@@ -191,7 +216,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "create",
@@ -202,7 +228,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "groupHeading",
@@ -213,7 +240,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "option",
@@ -236,7 +264,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "empty",
@@ -247,7 +276,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "create",
@@ -258,7 +288,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "groupHeading",
@@ -269,7 +300,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "option",
@@ -292,7 +324,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "groupMore",
@@ -309,7 +342,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "empty",
@@ -320,7 +354,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "create",
@@ -331,7 +366,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "option",
@@ -354,7 +390,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "empty",
@@ -365,7 +402,8 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     },
     {
       "name": "create",
@@ -376,26 +414,44 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false
+      "isReactive": false,
+      "paramTypesAuthored": false
     }
   ],
   "emits": [
-    "create",
-    "change",
-    "search"
+    {
+      "name": "create",
+      "payload": null,
+      "docs": null
+    },
+    {
+      "name": "change",
+      "payload": null,
+      "docs": null
+    },
+    {
+      "name": "search",
+      "payload": null,
+      "docs": null
+    }
   ],
   "expose": [
     {
-      "name": "focus"
+      "name": "focus",
+      "signature": null
     },
     {
-      "name": "clear"
+      "name": "clear",
+      "signature": null
     },
     {
-      "name": "seedQuery"
+      "name": "seedQuery",
+      "signature": null
     },
     {
-      "name": "pinOpen"
+      "name": "pinOpen",
+      "signature": null
     }
-  ]
+  ],
+  "types": null
 }

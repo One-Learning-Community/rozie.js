@@ -1,118 +1,102 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 1,
   "name": "Popover",
   "props": [
     {
       "name": "open",
       "isModel": true,
       "required": false,
-      "type": "Boolean",
-      "tsType": null
+      "type": "Boolean"
     },
     {
       "name": "placement",
       "isModel": false,
       "required": false,
-      "type": "String",
-      "tsType": null
+      "type": "String"
     },
     {
       "name": "trigger",
       "isModel": false,
       "required": false,
-      "type": "String",
-      "tsType": null
+      "type": "String"
     },
     {
       "name": "offset",
       "isModel": false,
       "required": false,
-      "type": "Number",
-      "tsType": null
+      "type": "Number"
     },
     {
       "name": "disableFlip",
       "isModel": false,
       "required": false,
-      "type": "Boolean",
-      "tsType": null
+      "type": "Boolean"
     },
     {
       "name": "disableShift",
       "isModel": false,
       "required": false,
-      "type": "Boolean",
-      "tsType": null
+      "type": "Boolean"
     },
     {
       "name": "arrow",
       "isModel": false,
       "required": false,
-      "type": "Boolean",
-      "tsType": null
+      "type": "Boolean"
     },
     {
       "name": "disabled",
       "isModel": false,
       "required": false,
-      "type": "Boolean",
-      "tsType": null
+      "type": "Boolean"
     },
     {
       "name": "modal",
       "isModel": false,
       "required": false,
-      "type": "Boolean",
-      "tsType": null
+      "type": "Boolean"
     },
     {
       "name": "strategy",
       "isModel": false,
       "required": false,
-      "type": "String",
-      "tsType": null
+      "type": "String"
     },
     {
       "name": "bare",
       "isModel": false,
       "required": false,
-      "type": "Boolean",
-      "tsType": null
+      "type": "Boolean"
     },
     {
       "name": "disablePositioning",
       "isModel": false,
       "required": false,
-      "type": "Boolean",
-      "tsType": null
+      "type": "Boolean"
     },
     {
       "name": "keepMounted",
       "isModel": false,
       "required": false,
-      "type": "Boolean",
-      "tsType": null
+      "type": "Boolean"
     },
     {
       "name": "matchWidth",
       "isModel": false,
       "required": false,
-      "type": "Boolean",
-      "tsType": null
+      "type": "Boolean"
     },
     {
       "name": "disableDismiss",
       "isModel": false,
       "required": false,
-      "type": "Boolean",
-      "tsType": null
+      "type": "Boolean"
     },
     {
       "name": "reference",
       "isModel": false,
       "required": false,
-      "type": "Element | Object",
-      "tsType": null
+      "type": "Element | Object"
     }
   ],
   "slots": [
@@ -134,42 +118,31 @@
       ],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false,
-      "paramTypesAuthored": false
+      "isReactive": false
     },
     {
       "name": "",
       "params": [],
       "paramTypes": null,
       "isPortal": false,
-      "isReactive": false,
-      "paramTypesAuthored": false
+      "isReactive": false
     }
   ],
   "emits": [
-    {
-      "name": "change",
-      "payload": null,
-      "docs": null
-    }
+    "change"
   ],
   "expose": [
     {
-      "name": "show",
-      "signature": null
+      "name": "show"
     },
     {
-      "name": "hide",
-      "signature": null
+      "name": "hide"
     },
     {
-      "name": "toggle",
-      "signature": null
+      "name": "toggle"
     },
     {
-      "name": "reposition",
-      "signature": null
+      "name": "reposition"
     }
-  ],
-  "types": null
+  ]
 }

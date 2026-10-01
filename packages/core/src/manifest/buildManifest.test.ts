@@ -53,7 +53,7 @@ describe('buildManifest', () => {
     const ir = loadComboboxIR();
     const manifest = buildManifest(ir);
     expect(manifest.schemaVersion).toBe(MANIFEST_SCHEMA_VERSION);
-    expect(manifest.schemaVersion).toBe(1);
+    expect(manifest.schemaVersion).toBe(2);
   });
 
   it('derives emits === [\'create\', \'change\', \'search\'] from the real Combobox IR', () => {
@@ -65,7 +65,7 @@ describe('buildManifest', () => {
     // the live component's emit order, so it must track that surface exactly.
     const ir = loadComboboxIR();
     const manifest = buildManifest(ir);
-    expect(manifest.emits).toEqual(['create', 'change', 'search']);
+    expect(manifest.emits.map((e) => e.name)).toEqual(['create', 'change', 'search']);
   });
 
   it("derives expose === ['focus', 'clear', 'seedQuery', 'pinOpen'] from the real Combobox IR", () => {

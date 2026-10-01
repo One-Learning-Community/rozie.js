@@ -11,9 +11,10 @@ export type {
   ParseManifestResult,
   ProducerSurface,
 } from './readManifest.js';
-export { MANIFEST_SCHEMA_VERSION } from './schema.js';
+export { MANIFEST_SCHEMA_VERSION, SUPPORTED_MANIFEST_SCHEMA_VERSIONS } from './schema.js';
 export type {
   RozieManifest,
+  RozieManifestEmit,
   RozieManifestExposeMember,
   RozieManifestProp,
   RozieManifestSlot,

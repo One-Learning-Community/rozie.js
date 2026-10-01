@@ -18,8 +18,9 @@
 import { parse as babelParse } from '@babel/parser';
 import * as t from '@babel/types';
 import type { ParamDecl, PropDecl, SlotDecl } from '../ir/types.js';
+import { parseAuthoredType } from '../codegen/renderAuthoredType.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
-import { MANIFEST_SCHEMA_VERSION } from './schema.js';
+import { MANIFEST_SCHEMA_VERSION, SUPPORTED_MANIFEST_SCHEMA_VERSIONS } from './schema.js';
 
 /** A parseManifest failure — carries the ROZ code (D-04 fail-closed contract). */
 export interface ManifestError {
@@ -45,7 +46,15 @@ export interface ProducerSurface {
    * parity local `.rozie` consumers get via `IRComponent.emits`.
    */
   emits: string[];
-  expose: { name: string }[];
+  /**
+   * v2 — per-emit parsed payload type (`null` = no payload / unparseable /
+   * v1 manifest). READ-ONLY in phase 1: parsed, not yet consumed.
+   */
+  emitPayloads: Map<string, t.TSType | null>;
+  /** `signature` — v2 authored `$expose` function type (absent for v1 / untyped verbs). */
+  expose: { name: string; signature?: t.TSFunctionType }[];
+  /** v2 — the producer's `<types>` block source text, or `null`. */
+  types: string | null;
 }
 
 export interface ParseManifestOptions {
@@ -132,6 +141,8 @@ function readSlot(raw: unknown): SlotDecl | null {
   if (paramTypesRaw !== null && !Array.isArray(paramTypesRaw)) return null;
   if (typeof isPortal !== 'boolean') return null;
   if (typeof isReactive !== 'boolean') return null;
+  // v2 field; absent in v1 manifests ⇒ false.
+  const paramTypesAuthored = raw.paramTypesAuthored === true;
 
   const params: ParamDecl[] = [];
   for (const p of paramsRaw) {
@@ -164,14 +175,23 @@ function readSlot(raw: unknown): SlotDecl | null {
     sourceLoc: { start: 0, end: 0 },
     isPortal,
     isReactive,
+    ...(paramTypesAuthored && paramTypes !== undefined ? { paramTypesAuthored: true as const } : {}),
   };
 }
 
 /** Validate + rebuild one manifest expose entry. Returns null on structural violation. */
-function readExposeMember(raw: unknown): { name: string } | null {
+function readExposeMember(raw: unknown): { name: string; signature?: t.TSFunctionType } | null {
   if (!isPlainObject(raw)) return null;
   const name = raw.name;
   if (typeof name !== 'string') return null;
+  // v2 `signature` — dropped (not fatal) when unparseable or not a function type.
+  const sigRaw = raw.signature;
+  if (typeof sigRaw === 'string') {
+    const parsed = parseAuthoredType(sigRaw);
+    if (!('error' in parsed) && t.isTSFunctionType(parsed.type)) {
+      return { name, signature: parsed.type };
+    }
+  }
   return { name };
 }
 
@@ -194,9 +214,10 @@ export function parseManifest(
   if (typeof schemaVersion !== 'number') {
     return malformed('Manifest is missing a numeric "schemaVersion" field.');
   }
-  if (schemaVersion !== MANIFEST_SCHEMA_VERSION) {
+  if (!(SUPPORTED_MANIFEST_SCHEMA_VERSIONS as readonly number[]).includes(schemaVersion)) {
+    const lo = Math.min(...SUPPORTED_MANIFEST_SCHEMA_VERSIONS);
     return schemaMismatch(
-      `Manifest schemaVersion ${schemaVersion} is incompatible with the compiler's MANIFEST_SCHEMA_VERSION ${MANIFEST_SCHEMA_VERSION}. Reinstall a compatible version of the published primitive.`,
+      `Manifest schemaVersion ${schemaVersion} is incompatible with the compiler's supported manifest schema versions ${lo}\u2013${MANIFEST_SCHEMA_VERSION}. Reinstall a compatible version of the published primitive.`,
     );
   }
 
@@ -225,18 +246,35 @@ export function parseManifest(
     slots.push(slot);
   }
 
+  // v1: `string[]` (names only, null payloads). v2: `{ name, payload, docs }`.
   const emits: string[] = [];
+  const emitPayloads = new Map<string, t.TSType | null>();
   for (const e of emitsRaw) {
-    if (typeof e !== 'string') return malformed('Manifest "emits" entry is not a string.');
-    emits.push(e);
+    if (typeof e === 'string') {
+      emits.push(e);
+      emitPayloads.set(e, null);
+      continue;
+    }
+    if (!isPlainObject(e) || typeof e.name !== 'string') {
+      return malformed('Manifest "emits" entry is neither a string nor a { name } object.');
+    }
+    emits.push(e.name);
+    let payload: t.TSType | null = null;
+    if (typeof e.payload === 'string') {
+      const parsed = parseAuthoredType(e.payload);
+      if (!('error' in parsed)) payload = parsed.type; // bad payload dropped, like a bad paramType
+    }
+    emitPayloads.set(e.name, payload);
   }
 
-  const expose: { name: string }[] = [];
+  const expose: { name: string; signature?: t.TSFunctionType }[] = [];
   for (const m of exposeRaw) {
     const member = readExposeMember(m);
     if (member === null) return malformed('Manifest "expose" entry is malformed.');
     expose.push(member);
   }
 
-  return { surface: { slots, props, emits, expose }, error: null };
+  const types = typeof raw.types === 'string' ? raw.types : null;
+
+  return { surface: { slots, props, emits, emitPayloads, expose, types }, error: null };
 }

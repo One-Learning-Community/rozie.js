@@ -18,13 +18,22 @@
  *
  * @experimental — shape may change before v1.0
  */
+import type { PropDocs } from '../ir/types.js';
 
 /**
  * Current manifest schema version. Bumped whenever RozieManifest's shape
  * changes in a way that would break an older reader — parseManifest rejects
- * any manifest whose `schemaVersion` does not equal this constant (D-04).
+ * any manifest whose `schemaVersion` is not in SUPPORTED_MANIFEST_SCHEMA_VERSIONS (D-04).
  */
-export const MANIFEST_SCHEMA_VERSION = 1;
+export const MANIFEST_SCHEMA_VERSION = 2;
+
+/**
+ * Every schema version `parseManifest` can read. v1 (published before the
+ * typed public surface: `emits: string[]`, no `tsType`/`signature`/`types`/
+ * `paramTypesAuthored`) is still accepted so an installed v1 leaf keeps
+ * composing; the writer always emits {@link MANIFEST_SCHEMA_VERSION}.
+ */
+export const SUPPORTED_MANIFEST_SCHEMA_VERSIONS = [1, 2] as const;
 
 /**
  * One serialized prop entry. `type` is a best-effort informational token (the
@@ -36,6 +45,11 @@ export interface RozieManifestProp {
   isModel: boolean;
   required: boolean;
   type: string;
+  /**
+   * v2 — authored TS type string for the prop; always `null` until phase 2
+   * (typed props). Absent in v1 manifests.
+   */
+  tsType: string | null;
 }
 
 /**
@@ -60,11 +74,27 @@ export interface RozieManifestSlot {
   paramTypes: string[] | null;
   isPortal: boolean;
   isReactive: boolean;
+  /**
+   * v2 — `true` when `paramTypes` came from an authored `:param-types`
+   * declaration (printed verbatim, including function types, by consumers).
+   * Absent (⇒ false) in v1 manifests.
+   */
+  paramTypesAuthored: boolean;
 }
 
 /** One serialized `$expose` handle member. */
 export interface RozieManifestExposeMember {
   name: string;
+  /** v2 — authored `$expose` signature (function type source), or `null`. */
+  signature: string | null;
+}
+
+/** v2 — one serialized `<emits>` entry (v1 was a bare name string). */
+export interface RozieManifestEmit {
+  name: string;
+  /** ONE TS type string, or `null` for a no-argument / undeclared-payload event. */
+  payload: string | null;
+  docs: PropDocs | null;
 }
 
 /**
@@ -77,6 +107,8 @@ export interface RozieManifest {
   name: string;
   props: RozieManifestProp[];
   slots: RozieManifestSlot[];
-  emits: string[];
+  emits: RozieManifestEmit[];
   expose: RozieManifestExposeMember[];
+  /** v2 — `renderTypesBlock(ir)` text, or `null` when there is no `<types>`. */
+  types: string | null;
 }

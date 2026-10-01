@@ -226,7 +226,7 @@ export type {
 // consumable producer surface. Consumed by the cross-package resolution wiring
 // (Plan 02) and the combobox published-composition emission (Plan 03).
 // @experimental — shape may change before v1.0
-export { buildManifest, MANIFEST_SCHEMA_VERSION, parseManifest } from './manifest/index.js';
+export { buildManifest, MANIFEST_SCHEMA_VERSION, parseManifest, SUPPORTED_MANIFEST_SCHEMA_VERSIONS } from './manifest/index.js';
 // Modifier chain types (populated on listener entries + template event attrs).
 export type {
   ModifierArg,

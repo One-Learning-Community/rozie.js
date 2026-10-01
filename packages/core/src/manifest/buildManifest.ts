@@ -10,10 +10,12 @@
  * @experimental — shape may change before v1.0
  */
 import _generate from '@babel/generator';
+import { renderTypesBlock } from '../codegen/renderTypesBlock.js';
 import type { IRComponent, PropTypeAnnotation, SlotDecl } from '../ir/types.js';
 import { MANIFEST_SCHEMA_VERSION } from './schema.js';
 import type {
   RozieManifest,
+  RozieManifestEmit,
   RozieManifestProp,
   RozieManifestSlot,
 } from './schema.js';
@@ -55,6 +57,7 @@ function buildSlot(slot: SlotDecl): RozieManifestSlot {
     paramTypes: serializeSlotParamTypes(slot),
     isPortal: slot.isPortal === true,
     isReactive: slot.isReactive === true,
+    paramTypesAuthored: slot.paramTypesAuthored === true,
   };
 }
 
@@ -64,7 +67,19 @@ function buildProp(prop: IRComponent['props'][number]): RozieManifestProp {
     isModel: prop.isModel,
     required: prop.required,
     type: serializePropType(prop.typeAnnotation),
+    tsType: null, // phase 2 (typed props)
   };
+}
+
+function buildEmits(ir: IRComponent): RozieManifestEmit[] {
+  if (ir.emitDecls === null) {
+    return ir.emits.map((name) => ({ name, payload: null, docs: null }));
+  }
+  return ir.emitDecls.map((d) => ({
+    name: d.name,
+    payload: d.payload === null ? null : generate(d.payload).code,
+    docs: d.docs ?? null,
+  }));
 }
 
 /**
@@ -78,7 +93,11 @@ export function buildManifest(ir: IRComponent): RozieManifest {
     name: ir.name,
     props: ir.props.map(buildProp),
     slots: ir.slots.map(buildSlot),
-    emits: [...ir.emits],
-    expose: ir.expose.map((m) => ({ name: m.name })),
+    emits: buildEmits(ir),
+    expose: ir.expose.map((m) => ({
+      name: m.name,
+      signature: m.signature ? generate(m.signature).code : null,
+    })),
+    types: ir.types === null ? null : renderTypesBlock(ir),
   };
 }

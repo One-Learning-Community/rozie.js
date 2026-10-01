@@ -232,6 +232,6 @@ describe('@rozie/core barrel exports the manifest surface', () => {
   it('imports buildManifest, parseManifest, MANIFEST_SCHEMA_VERSION from @rozie/core', () => {
     expect(typeof rozieCoreBarrel.buildManifest).toBe('function');
     expect(typeof rozieCoreBarrel.parseManifest).toBe('function');
-    expect(rozieCoreBarrel.MANIFEST_SCHEMA_VERSION).toBe(1);
+    expect(rozieCoreBarrel.MANIFEST_SCHEMA_VERSION).toBe(2);
   });
 });

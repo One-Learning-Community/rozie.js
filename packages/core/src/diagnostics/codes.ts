@@ -1087,7 +1087,7 @@ export const RozieErrorCode = {
   // compiled leaf. Both codes fail closed (D-04) — parseManifest never
   // silently degrades on a mismatched or malformed manifest. ROZ987 is the
   // verified current highest (Phase 71 r-keynav) — these do NOT collide.
-  MANIFEST_SCHEMA_VERSION_MISMATCH: 'ROZ988', // error — installed primitive manifest schemaVersion incompatible with the compiler's MANIFEST_SCHEMA_VERSION (D-04)
+  MANIFEST_SCHEMA_VERSION_MISMATCH: 'ROZ988', // error — installed primitive manifest schemaVersion is not in the compiler's supported manifest schema versions 1–2 (SUPPORTED_MANIFEST_SCHEMA_VERSIONS; D-04)
   MALFORMED_MANIFEST: 'ROZ989', // error — manifest JSON is not an object, or is missing/mistyped a required field (props/slots/emits/expose/schemaVersion)
 
   // ---- command-palette-portal-overlay phase — r-portal element directive — ROZ990..ROZ992 ----
