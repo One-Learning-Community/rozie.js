@@ -12,6 +12,7 @@ import { createDefaultRegistry } from '../modifiers/registerBuiltins.js';
 import { buildManifest } from './buildManifest.js';
 import { parseManifest } from './readManifest.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
+import { MANIFEST_SCHEMA_VERSION } from './schema.js';
 import * as rozieCoreBarrel from '@rozie/core';
 
 const repoRoot = path.resolve(
@@ -104,6 +105,21 @@ describe('parseManifest — schema-version mismatch fails closed (D-04)', () => 
     expect(surface).toBeNull();
     expect(error).not.toBeNull();
     expect(error!.code).toBe(RozieErrorCode.MANIFEST_SCHEMA_VERSION_MISMATCH);
+  });
+
+  it('a manifest NEWER than this compiler advises upgrading the Rozie toolchain, not reinstalling the primitive (I4)', () => {
+    const { error } = parseManifest({ schemaVersion: MANIFEST_SCHEMA_VERSION + 1, name: 'Foo', props: [], slots: [], emits: [], expose: [] });
+    expect(error!.code).toBe(RozieErrorCode.MANIFEST_SCHEMA_VERSION_MISMATCH);
+    expect(error!.message).toMatch(/newer Rozie toolchain/);
+    expect(error!.message).toMatch(/[Uu]pgrade the Rozie toolchain \(@rozie\/\*\)/);
+    expect(error!.message).not.toMatch(/Reinstall/);
+  });
+
+  it('a manifest OLDER than every supported version keeps the reinstall advice (I4)', () => {
+    const { error } = parseManifest({ schemaVersion: 0, name: 'Foo', props: [], slots: [], emits: [], expose: [] });
+    expect(error!.code).toBe(RozieErrorCode.MANIFEST_SCHEMA_VERSION_MISMATCH);
+    expect(error!.message).toMatch(/Reinstall a compatible version of the published primitive/);
+    expect(error!.message).not.toMatch(/newer Rozie toolchain/);
   });
 
   it('a missing schemaVersion field returns MALFORMED_MANIFEST (not a silent degrade)', () => {

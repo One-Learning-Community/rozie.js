@@ -216,6 +216,14 @@ export function parseManifest(
   }
   if (!(SUPPORTED_MANIFEST_SCHEMA_VERSIONS as readonly number[]).includes(schemaVersion)) {
     const lo = Math.min(...SUPPORTED_MANIFEST_SCHEMA_VERSIONS);
+    // Direction-aware advice (typed-surface P1, final wave I4): a manifest
+    // NEWER than this reader was written by a newer Rozie toolchain — the fix
+    // is to upgrade the compiler, not to reinstall the primitive.
+    if (schemaVersion > MANIFEST_SCHEMA_VERSION) {
+      return schemaMismatch(
+        `Manifest schemaVersion ${schemaVersion} was written by a newer Rozie toolchain; this @rozie/core reads manifest schema versions ${lo}\u2013${MANIFEST_SCHEMA_VERSION}. Upgrade the Rozie toolchain (@rozie/*) to a release that reads manifest schema ${schemaVersion} (the release the primitive was built with, or newer).`,
+      );
+    }
     return schemaMismatch(
       `Manifest schemaVersion ${schemaVersion} is incompatible with the compiler's supported manifest schema versions ${lo}\u2013${MANIFEST_SCHEMA_VERSION}. Reinstall a compatible version of the published primitive.`,
     );

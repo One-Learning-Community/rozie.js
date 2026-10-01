@@ -84,7 +84,7 @@ Four opt-in authoring features (a component that uses none of them compiles exac
 
 Also in this release:
 
-- The component manifest (`rozie-manifest.json`) is schema v2 and carries emit payloads, expose signatures, the `<types>` text and slot `:param-types`. The reader still accepts v1, so composing an already-published v1 package keeps working.
+- The component manifest (`rozie-manifest.json`) is schema v2 and carries emit payloads, expose signatures, the `<types>` text and slot `:param-types`. The reader still accepts v1, so composing an already-published v1 package keeps working. Composing a package whose leaves ship a v2 manifest (`@rozie-ui/popover`, `@rozie-ui/combobox`, …) from your own `.rozie` requires `@rozie/*` at or above this release; a compiler that is too old now says so in ROZ988 (upgrade the toolchain) instead of advising a reinstall of the primitive.
 - `.d.rozie.ts` sidecars now carry `<types>` and type slots exactly as each compiled module does: Solid `<slot>Slot` props and JSX.Element shapes, Svelte Snippet shapes and lowercase handler names, no spurious `render<X>` props on Vue, Angular and Lit, and no `on<X>` props on Lit. A Solid scoped default slot now accepts a function child.
 - Text such as `<script`, `<style`, `<title` or `<textarea` inside a `<types>`, `<emits>`, `<props>`, `<data>`, `<listeners>` or `<components>` body (in a comment, a docs string, or a generic like `Array<Style>`) no longer desynchronises the block splitter. Those bodies are now opaque to the HTML tokenizer.
 
