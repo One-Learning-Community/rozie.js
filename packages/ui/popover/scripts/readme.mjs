@@ -15,6 +15,7 @@
 
 import { printTSType, renderPropDescription } from '@rozie/core';
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
+import { typeCodeCell } from '../../readme-type-cell.mjs';
 import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 import { requiredPeerNote } from '../../required-peer-note.mjs';
 
@@ -392,7 +393,7 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   lines.push('| --- | --- | --- |');
   for (const d of ir.emitDecls) {
     const eventCol = target === 'lit' ? litEventName(d.name) : d.name;
-    const payload = d.payload ? `\`${printTSType(d.payload)}\`` : '—';
+    const payload = d.payload ? typeCodeCell(printTSType(d.payload)) : '—';
     lines.push(`| \`${eventCol}\` | ${payload} | ${d.docs?.description ?? ''} |`);
   }
   lines.push('');
