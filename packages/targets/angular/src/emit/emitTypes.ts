@@ -72,6 +72,7 @@ import { renderPropsInterface, renderPropType } from '@rozie/core';
 // "Next Phase Readiness") — import it relatively as React/Vue's emitTypes.ts do.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
 import { handleInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
+import { angularOutputDecls } from './angularOutputs.js';
 
 /**
  * Options controlling Angular `.d.rozie.ts` emission.
@@ -134,6 +135,9 @@ export function emitAngularTypes(ir: IRComponent, opts: EmitAngularTypesOptions 
       // Slots are not props on angular: the compiled module declares none, so the
       // sidecar declares no slot fields / `slots` record.
       slotSurface: { fields: [] },
+      // Events are `output()` fields of the class on Angular, not `on<Event>`
+      // props (typed-surface P1 final wave M5 — the R15 class for Lit).
+      emitHandlers: false,
       target: 'angular',
       includeTypesBlock: true,
     }),
@@ -161,6 +165,10 @@ export function emitAngularTypes(ir: IRComponent, opts: EmitAngularTypesOptions 
   lines.push(`export declare class ${ir.name} {`);
   for (const member of classPropMembers(ir)) {
     lines.push(member);
+  }
+  // The `output()` fields, from the SAME derivation the compiled module uses.
+  for (const o of angularOutputDecls(ir)) {
+    lines.push(`  ${o.fieldId}: import('@angular/core').OutputEmitterRef<${o.outputType}>;`);
   }
   if (exposed && handleInterface) {
     for (const member of exposeMemberLines(handleInterface)) {

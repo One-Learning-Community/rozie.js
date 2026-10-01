@@ -155,8 +155,17 @@ describe('ANGULAR-TYPED-SURFACE — typed outputs / <types> at module top / type
     if (!ir) throw new Error('lowerToIR() null');
     const dts = emitAngularTypes(ir);
     expect(dts).toMatch(/export interface PingPayload/);
+    // M5 (final wave): events are outputs on Angular, not `on<Event>` props —
+    // the declared class carries them typed, and the Props interface does not.
+    expect(dts).not.toMatch(/\bon(Ping|Reset|Select|RowOpen)\??:/);
     const consumer = `import { TypedEvents, type PingPayload, type Count } from './TypedEventsSidecar';
 declare const c: TypedEvents;
+c.ping.subscribe((p) => { const q: PingPayload = p; q.count.toFixed(); });
+c.reset.subscribe(() => {});
+c.select.subscribe((v) => v.toFixed());
+c.rowOpen.subscribe((r) => r.index.toFixed());
+// @ts-expect-error — payload has no 'nope'
+c.ping.subscribe((p) => p.nope);
 const n: number = c.getCount();
 c.jump(3);
 c.clear('anything');
