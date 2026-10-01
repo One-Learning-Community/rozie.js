@@ -144,6 +144,11 @@ export function typesStatementsForModule(
       let first = true;
       const emitDecl = (d: t.ExportNamedDeclaration): void => {
         d.exportKind = 'type';
+        // `export type { type A }` is TS2207 — the declaration-level `type`
+        // already covers every specifier, so drop an inline modifier.
+        d.specifiers = d.specifiers.map((sp) =>
+          t.isExportSpecifier(sp) && sp.exportKind === 'type' ? { ...sp, exportKind: 'value' } : sp,
+        );
         out.push(first ? withCarried({ ...d, leadingComments: s.leadingComments ?? null } as t.Statement) : d);
         first = false;
       };
