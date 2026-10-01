@@ -53,6 +53,7 @@ import type { IRComponent } from '@rozie/core';
 import { renderPropsInterface } from '@rozie/core';
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
 import { handleInterfaceName, propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
+import { REACT_NODE_TYPE_IMPORT, REACT_SIDECAR_FORWARD_REF_IMPORTS } from '../../../../core/src/codegen/targetModuleImports.js';
 
 /**
  * Options controlling .d.ts emission.
@@ -110,15 +111,14 @@ export function emitReactTypes(ir: IRComponent, opts: EmitReactTypesOptions = {}
   const handleInterface = exposed ? synthesizeHandleType(ir, handleInterfaceName(ir.name)) : null;
 
   const lines: string[] = [];
-  lines.push(`import type { ReactNode } from 'react';`);
+  lines.push(REACT_NODE_TYPE_IMPORT);
   if (exposed) {
     // `ForwardRefExoticComponent` / `RefAttributes` are referenced via the
     // `React.` namespace in the declaration below (matching the SPEC Req 10
     // shape); import them as named types AND bring the `React` namespace into
     // scope so both `React.ForwardRefExoticComponent` and the named forms
     // resolve regardless of how downstream tooling reads the declaration.
-    lines.push(`import type { ForwardRefExoticComponent, RefAttributes } from 'react';`);
-    lines.push(`import type * as React from 'react';`);
+    lines.push(REACT_SIDECAR_FORWARD_REF_IMPORTS);
   }
   lines.push('');
 

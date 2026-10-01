@@ -60,6 +60,7 @@ import {
 } from './rewrite/collectReactImports.js';
 import { composeSourceMap } from './sourcemap/compose.js';
 import { handleInterfaceName } from '../../../core/src/codegen/generatedTypeNames.js';
+import { REACT_ELEMENT_PORTAL_IMPORT, REACT_NODE_TYPE_IMPORT, REACT_PORTAL_ROOT_IMPORTS } from '../../../core/src/codegen/targetModuleImports.js';
 
 export interface EmitReactOptions {
   filename?: string;
@@ -160,8 +161,8 @@ export function emitReact(ir: IRComponent, opts: EmitReactOptions = {}): EmitRea
   // with) the P33 createRoot-into-container slot machinery above.
   const portalImport =
     (hasPortals
-      ? "import { createRoot, type Root } from 'react-dom/client';\nimport { flushSync } from 'react-dom';\n"
-      : '') + (tmpl.hasElementPortal ? "import { createPortal } from 'react-dom';\n" : '');
+      ? `${REACT_PORTAL_ROOT_IMPORTS}\n`
+      : '') + (tmpl.hasElementPortal ? `${REACT_ELEMENT_PORTAL_IMPORT}\n` : '');
 
   // Plan 04-04: emit <listeners>-block entries (4-class A/B/C/D classifier).
   const listeners = emitListeners(ir, { react: reactImports, runtime: runtimeImports }, registry);
@@ -187,7 +188,7 @@ export function emitReact(ir: IRComponent, opts: EmitReactOptions = {}): EmitRea
     propsInterface.includes('ReactNode') ||
     tmpl.slotCtxInterfaces.some((s) => s.includes('ReactNode')) ||
     tmpl.scriptInjections.some((s) => s.includes('ReactNode'));
-  const reactTypeImports = referencesReactNode ? "import type { ReactNode } from 'react';\n" : '';
+  const reactTypeImports = referencesReactNode ? `${REACT_NODE_TYPE_IMPORT}\n` : '';
 
   // Phase 25 — synthesize the scoped CSS sibling import as a PLAIN side-effect
   // import (`import './X.css';`), NOT a CSS-Modules default import. React class

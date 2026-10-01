@@ -27,6 +27,9 @@ import * as t from '@babel/types';
 import type { AttributeBinding, IRComponent, ListenerSpreadIR } from '@rozie/core';
 import { svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import type { SVELTE_RUNTIME_IMPORTS } from '../../../../core/src/codegen/targetModuleImports.js';
+/** `@rozie/runtime-svelte` names the template walk may import (catalog: core targetModuleImports.ts). */
+type SvelteRuntimeImport = (typeof SVELTE_RUNTIME_IMPORTS)[number];
 
 export interface EmitAttrCtx {
   ir: IRComponent;
@@ -73,7 +76,7 @@ export interface EmitAttrCtx {
    * here so `emitSvelte` folds the runtime import line in. Optional so legacy
    * call sites (no wrap possible) stay unaffected.
    */
-  runtimeImports?: Set<string>;
+  runtimeImports?: Set<SvelteRuntimeImport>;
   /**
    * Quick task 260812-2ur — the callee's declared prop names, threaded from
    * `TemplateElementIR.producerProps` (populated by `threadParamTypes` when
@@ -570,7 +573,7 @@ function renderInterpolatedTemplateLiteral(
   ir: IRComponent,
   // Phase 26 — runtime-import accumulator so a wrapped class/attr interpolation
   // can register `rozieDisplay` (SPEC-4).
-  runtimeImports?: Set<string>,
+  runtimeImports?: Set<SvelteRuntimeImport>,
 ): string {
   let out = '';
   for (const seg of segments) {
@@ -864,7 +867,7 @@ export function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string
 function attrToArraySegment(
   attr: AttributeBinding,
   ir: IRComponent,
-  runtimeImports?: Set<string>,
+  runtimeImports?: Set<SvelteRuntimeImport>,
   // 260620-kby — true when this segment belongs to a `class` merge (vs a
   // `style` merge). Only a class member swaps the non-object wrap from
   // `rozieDisplay` to `rozieClass`; the style merge keeps `rozieDisplay`.
@@ -1144,7 +1147,7 @@ function isListenersIdentifier(expr: t.Expression): boolean {
 export function emitListenerSpread(
   spread: ListenerSpreadIR,
   ctx: EmitAttrCtx,
-  runtimeImports?: Set<string>,
+  runtimeImports?: Set<SvelteRuntimeImport>,
 ): string {
   // Bare $listeners and dynamic expressions both lower to the same action-
   // invocation shape — Svelte has no native object-form listener directive.

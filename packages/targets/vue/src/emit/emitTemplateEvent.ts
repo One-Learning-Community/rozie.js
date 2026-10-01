@@ -34,6 +34,7 @@ import type {
 } from '@rozie/core';
 import { isEventModifier, RozieErrorCode } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import type { VueImport, VueRuntimeImport } from '../rewrite/collectVueImports.js';
 
 export interface EmitEventCtx {
   ir: IRComponent;
@@ -65,15 +66,9 @@ export interface ScriptInjection {
   import:
     | {
         from: '@rozie/runtime-vue';
-        name:
-          | 'debounce'
-          | 'throttle'
-          | 'useOutsideClick'
-          | 'normalizeListeners'
-          | 'rozieDeepClone'
-          | 'useKeynav';
+        name: VueRuntimeImport;
       }
-    | { from: 'vue'; name: 'computed' };
+    | { from: 'vue'; name: Extract<VueImport, 'computed'> };
   /** Full `const wrapName = helper(handler, ...args);` declaration. */
   decl: string;
 }

@@ -17,11 +17,15 @@
  *
  * @experimental — shape may change before v1.0
  */
+import type { VUE_IMPORTS, VUE_RUNTIME_IMPORTS } from '../../../../core/src/codegen/targetModuleImports.js';
+
+/** The `'vue'` names this collector may import (catalog: core targetModuleImports.ts). */
+export type VueImport = (typeof VUE_IMPORTS)[number];
 
 export class VueImportCollector {
   private symbols = new Set<string>();
 
-  use(name: string): void {
+  use(name: VueImport): void {
     if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
       throw new Error(`[rozie] Invalid Vue import name: '${name}'`);
     }
@@ -61,10 +65,13 @@ export class VueImportCollector {
  *
  * @experimental — shape may change before v1.0
  */
+/** The `@rozie/runtime-vue` names this collector may import. */
+export type VueRuntimeImport = (typeof VUE_RUNTIME_IMPORTS)[number];
+
 export class RuntimeVueImportCollector {
   private symbols = new Set<string>();
 
-  use(name: string): void {
+  use(name: VueRuntimeImport): void {
     if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
       throw new Error(`[rozie] Invalid runtime-vue import name: '${name}'`);
     }

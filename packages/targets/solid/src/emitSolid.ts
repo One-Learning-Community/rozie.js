@@ -48,7 +48,13 @@ import {
   deconflictSolidRefSuffix,
 } from './rewrite/deconflictRefSuffix.js';
 import { composeSourceMap } from './sourcemap/compose.js';
-import { SOLID_JSX_TYPE_NAME, handleInterfaceName } from '../../../core/src/codegen/generatedTypeNames.js';
+import { handleInterfaceName } from '../../../core/src/codegen/generatedTypeNames.js';
+import {
+  SOLID_JSX_TYPE_IMPORT,
+  SOLID_KEYED_IMPORT,
+  SOLID_WEB_PORTAL_IMPORT,
+  SOLID_WEB_RENDER_IMPORT,
+} from '../../../core/src/codegen/targetModuleImports.js';
 
 export interface EmitSolidOptions {
   filename?: string;
@@ -312,7 +318,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
 
   // `JSX.Element` is always used in the function signature; the JSX namespace
   // must be explicitly imported as a type-only import from solid-js.
-  const jsxTypeImport = `import type { ${SOLID_JSX_TYPE_NAME} } from 'solid-js';\n`;
+  const jsxTypeImport = `${SOLID_JSX_TYPE_IMPORT}\n`;
   // Prepend JSX type import before the value imports (or stand alone if none).
   const solidImportsStr = jsxTypeImport + solidImports.render();
 
@@ -326,15 +332,15 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   // is the NATIVE element-subtree teleport construct — orthogonal to (and may
   // coexist with) the P33 render-into-container slot machinery above.
   const portalImport =
-    (scriptResult.hasPortals ? "import { render } from 'solid-js/web';\n" : '') +
-    (templateResult.hasElementPortal ? "import { Portal } from 'solid-js/web';\n" : '');
+    (scriptResult.hasPortals ? `${SOLID_WEB_RENDER_IMPORT}\n` : '') +
+    (templateResult.hasElementPortal ? `${SOLID_WEB_PORTAL_IMPORT}\n` : '');
 
   // Quick task 260704-mf3 — inject `Key` from @solid-primitives/keyed ONLY when
   // the template emitted a keyed `r-for` as `<Key>` (byte-identical import lines
   // otherwise). `Key` is not a solid-js export, so it rides its own shell part
   // rather than the SolidImportCollector — mirrors `portalImport`.
   const keyedImport = templateResult.needsKeyedImport
-    ? "import { Key } from '@solid-primitives/keyed';\n"
+    ? `${SOLID_KEYED_IMPORT}\n`
     : '';
 
   const shellParts = {

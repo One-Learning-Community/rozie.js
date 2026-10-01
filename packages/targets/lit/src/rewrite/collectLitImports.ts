@@ -17,14 +17,15 @@
  * @experimental — shape may change before v1.0
  */
 
-export type LitImport =
-  | 'LitElement'
-  | 'html'
-  | 'css'
-  | 'nothing'
-  | 'render'
-  | 'svg'
-  | 'PropertyValues';
+import type {
+  LIT_CONTEXT_IMPORTS,
+  LIT_DECORATOR_IMPORTS,
+  LIT_IMPORTS,
+  LIT_PREACT_SIGNALS_IMPORTS,
+  LIT_RUNTIME_IMPORTS,
+} from '../../../../core/src/codegen/targetModuleImports.js';
+
+export type LitImport = (typeof LIT_IMPORTS)[number];
 
 export class LitImportCollector {
   private symbols = new Set<LitImport>();
@@ -48,18 +49,7 @@ export class LitImportCollector {
   }
 }
 
-export type LitDecoratorImport =
-  | 'customElement'
-  | 'property'
-  | 'state'
-  | 'query'
-  | 'queryAsync'
-  | 'queryAssignedElements'
-  // D-LIT-14 (2026-05-13 correction): queryAssignedNodes is intentionally
-  // EXCLUDED from this union — whitespace text-nodes between elements yield
-  // false-positive presence detection, breaking $slots.X presence checks.
-  // Always use queryAssignedElements with `flatten: true` instead.
-  | 'eventOptions';
+export type LitDecoratorImport = (typeof LIT_DECORATOR_IMPORTS)[number];
 
 export class LitDecoratorImportCollector {
   private symbols = new Set<LitDecoratorImport>();
@@ -83,19 +73,7 @@ export class LitDecoratorImportCollector {
   }
 }
 
-export type PreactSignalsImport =
-  | 'SignalWatcher'
-  | 'signal'
-  | 'computed'
-  | 'effect'
-  /**
-   * Bug B fix (260519 linechart-watch-recreate): `untracked` — wraps the
-   * effect-route $watch callback so its reactive reads (and transitive helper
-   * reads) don't join the `effect()` dependency set. `@lit-labs/preact-signals`
-   * re-exports `untracked` via `export * from '@preact/signals-core'`.
-   */
-  | 'untracked'
-  | 'batch';
+export type PreactSignalsImport = (typeof LIT_PREACT_SIGNALS_IMPORTS)[number];
 
 export class PreactSignalsImportCollector {
   private symbols = new Set<PreactSignalsImport>();
@@ -119,134 +97,7 @@ export class PreactSignalsImportCollector {
   }
 }
 
-export type RuntimeLitImport =
-  | 'createLitControllableProperty'
-  | 'observeRozieSlotCtx'
-  | 'attachOutsideClickListener'
-  | 'injectGlobalStyles'
-  | 'adoptConsumerStyles'
-  // Item 3 (engine-CSS shadow bridge) — `adoptDocumentStyles` clones the
-  // document's same-origin stylesheets into the shadow root. Added by emitLit
-  // conditionally when the `<rozie adopt-document-styles>` envelope attr is set.
-  | 'adoptDocumentStyles'
-  | 'debounce'
-  | 'throttle'
-  /**
-   * Plan 14-05 / D-02 — `rozieSpread` lit-html element-position directive,
-   * shipped from `@rozie/runtime-lit`. Added by emitLit conditionally when
-   * `EmitTemplateResult.rozieSpreadUsed` is true (i.e., at least one
-   * `r-bind`/`$attrs` `spreadBinding` was lowered to `${rozieSpread(...)}`).
-   */
-  | 'rozieSpread'
-  /**
-   * Plan 15-05 / D-12 — `rozieListeners` lit-html element-position
-   * AsyncDirective, shipped from `@rozie/runtime-lit`. Added by emitLit
-   * conditionally when `EmitTemplateResult.rozieListenersUsed` is true (i.e.,
-   * at least one `r-on`/`$listeners` `ListenerSpreadIR` was lowered to
-   * `${rozieListeners(...)}`). Extends `AsyncDirective` (NOT regular
-   * `Directive` — Pitfall 7 / A2 LOCKED) so `disconnected()` removes every
-   * attached listener (T-15-V5-04 leak defense).
-   */
-  | 'rozieListeners'
-  /**
-   * Pre-Phase-16 cleanup Item 3 — `__rozieReconcileAfterDomMutation` runtime
-   * helper, shipped from `@rozie/runtime-lit`. Added by `rewriteScript` when
-   * the user calls the `$reconcileAfterDomMutation()` sigil from a
-   * `<script>` or listener-callback body. Tears down lit-html's part tree
-   * and schedules a fresh update — the engine-wrapper escape hatch for
-   * third-party DOM mutations (SortableJS, FullCalendar, …) that
-   * desynchronise lit-html's sentinel-comment-keyed `oldParts` cache.
-   * No-op on every non-Lit target.
-   */
-  | '__rozieReconcileAfterDomMutation'
-  /**
-   * Phase 26 (D-01/D-06) — portable display helper, shipped from
-   * `@rozie/runtime-lit`. Added by the template emitters ONLY when a
-   * `wrapForDisplay` interpolation actually wraps, so a primitive-only
-   * component's `@rozie/runtime-lit` import line stays byte-identical to
-   * pre-phase (SPEC-3). A non-primitive value renders portable pretty-printed
-   * JSON instead of lit-html's `[object Object]` auto-coercion.
-   */
-  | 'rozieDisplay'
-  /**
-   * 260608-sya — attribute-position display helper, shipped from
-   * `@rozie/runtime-lit`. Added by the attribute emitter ONLY on the wrapped
-   * whole-value generic-attr binding branch. Returns lit's `nothing` sentinel
-   * on a nullish value so the attribute is DROPPED (matching Vue's `:attr`
-   * binding), instead of rendering `attr=""`.
-   */
-  | 'rozieAttr'
-  /**
-   * 260620-kby — clsx-style `:class` normalizer, shipped from
-   * `@rozie/runtime-lit`. Added by the class-binding emitter ONLY on a
-   * non-provably-string (`wrapForDisplay=true`) plain `:class` binding, so a
-   * provably-string / object-literal class component's `@rozie/runtime-lit`
-   * import line stays byte-identical. Replaces the prior `rozieDisplay` wrap on
-   * the plain-class branch (which JSON-stringified an array class value).
-   */
-  | 'rozieClass'
-  /**
-   * 260620-rta — string|object `:style` normalizer, shipped from
-   * `@rozie/runtime-lit`. Added by the template emitter ONLY when a dynamic
-   * (non-literal-object) `:style` lowers, so a literal-object-styleMap /
-   * string-only / styleless component's `@rozie/runtime-lit` import line stays
-   * byte-identical. Routes a dynamic OBJECT `:style` through `styleMap` (real
-   * CSS, not `[object Object]`) and a string value through verbatim.
-   */
-  | 'rozieStyle'
-  /**
-   * Phase 71 (r-keynav, Plan 71-08) — the `KeynavController` ReactiveController,
-   * shipped from `@rozie/runtime-lit`. Added by `emitKeynav.ts`'s
-   * `buildKeynavFieldDecls` ONLY when the component has an `r-keynav` root, so
-   * a non-keynav component's `@rozie/runtime-lit` import line stays
-   * byte-identical (SPEC §11 — no corpus rebless).
-   */
-  | 'KeynavController'
-  /**
-   * command-palette-portal-overlay phase — the `RoziePortalController`
-   * ReactiveController, shipped from `@rozie/runtime-lit`. Added by
-   * `emitTemplate.ts` ONLY when the component has at least one `r-portal`
-   * element, so a non-portal component's `@rozie/runtime-lit` import line
-   * stays byte-identical (mirrors `KeynavController`'s identical gate).
-   */
-  | 'RoziePortalController'
-  /**
-   * Quick 260808-iyh (D5) — the `RozieSlotDistributor` ReactiveController,
-   * shipped from `@rozie/runtime-lit`. Added by `emitLit.ts` ONLY when
-   * `shouldDistributeSlots(ir)` trips (a duplicated slot name, or a slot
-   * nested under `r-for`), so a non-gated component's `@rozie/runtime-lit`
-   * import line stays byte-identical (mirrors `KeynavController`'s /
-   * `RoziePortalController`'s identical gate shape).
-   */
-  | 'RozieSlotDistributor'
-  /**
-   * command-palette-portal-through-portal cluster (BUG A) —
-   * `rozieResolvePortalledRef`, shipped from `@rozie/runtime-lit`. Added by
-   * `emitScript.ts`'s `emitRefField` ONLY when the component has at least
-   * one `r-portal` element AND at least one author `ref="x"` (the SAME
-   * `hasElementPortal` gate `RoziePortalController` itself uses), so a
-   * non-portal component's `@rozie/runtime-lit` import line stays
-   * byte-identical.
-   */
-  | 'rozieResolvePortalledRef'
-  /**
-   * Quick 260828-sdw — `rozieMemo`, the dep-keyed memoization helper for
-   * `$computed`, shipped from `@rozie/runtime-lit`. Added by `emitScript.ts`'s
-   * `classBodyFromStatements` ONLY when at least one `$computed` declaration
-   * is memoizable (its `SignalRef[]` deps can all be rendered as reads — see
-   * the `renderComputedDeps` bail rule for `closure`/`slots`/`slotted`), so a
-   * component with no `$computed` (or with only bailed computeds) keeps a
-   * byte-identical `@rozie/runtime-lit` import line.
-   */
-  | 'rozieMemo'
-  /**
-   * Quick 260930-814 — `rozieNumberOrStringAttr`, the Lit attribute converter
-   * for a Number+String union prop, shipped from `@rozie/runtime-lit`. Added by
-   * `emitScript.ts` ONLY when at least one prop (model or non-model) classifies
-   * as `number-string` under `classifyUnionAttr`, so every other component's
-   * `@rozie/runtime-lit` import line stays byte-identical.
-   */
-  | 'rozieNumberOrStringAttr';
+export type RuntimeLitImport = (typeof LIT_RUNTIME_IMPORTS)[number];
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();
@@ -279,10 +130,7 @@ export class RuntimeLitImportCollector {
  * components byte-identical (R12 / D-5). `@lit/context` is a peer dep of
  * `@rozie/runtime-lit` (devDep of `@rozie/target-lit`).
  */
-export type LitContextImport =
-  | 'createContext'
-  | 'ContextProvider'
-  | 'ContextConsumer';
+export type LitContextImport = (typeof LIT_CONTEXT_IMPORTS)[number];
 
 export class LitContextImportCollector {
   private symbols = new Set<LitContextImport>();

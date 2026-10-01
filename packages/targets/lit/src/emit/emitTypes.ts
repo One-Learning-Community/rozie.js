@@ -65,6 +65,7 @@ import { emitTagName } from './emitDecorator.js';
 import { litSlotSurfaceMembers } from './emitSlotDecl.js';
 import { renderLitEventMap, renderLitListenerOverloads } from './litEventMap.js';
 import { handleInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
+import { LIT_SIDECAR_LIT_ELEMENT_IMPORT } from '../../../../core/src/codegen/targetModuleImports.js';
 
 /**
  * Options controlling Lit `.d.rozie.ts` emission.
@@ -108,7 +109,7 @@ export function emitLitTypes(ir: IRComponent, opts: EmitLitTypesOptions = {}): s
   const slotSurface = litSlotSurfaceMembers(ir);
   const lines: string[] = [];
   // Type-only LitElement import — the element class extends it in the .d.ts.
-  lines.push(`import type { LitElement } from 'lit';`);
+  lines.push(LIT_SIDECAR_LIT_ELEMENT_IMPORT);
   lines.push('');
 
   lines.push(

@@ -50,6 +50,7 @@ import { buildSlotTypeFields, snippetsRecordLine } from './refineSlotTypes.js';
 // relatively as React's emitTypes.ts does.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
 import { handleInterfaceName, propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
+import { SVELTE_SNIPPET_TYPE_IMPORT } from '../../../../core/src/codegen/targetModuleImports.js';
 
 /**
  * Options controlling Svelte `.d.rozie.ts` emission.
@@ -81,7 +82,7 @@ export function emitSvelteTypes(ir: IRComponent, opts: EmitSvelteTypesOptions = 
   // Mirror the compiled `.svelte`: the Snippet import appears ONLY when slots
   // exist (emitScript Test 9 — Counter has no Snippet import).
   if (ir.slots.length > 0) {
-    lines.push(`import type { Snippet } from 'svelte';`);
+    lines.push(SVELTE_SNIPPET_TYPE_IMPORT);
     lines.push('');
   }
 

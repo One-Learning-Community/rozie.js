@@ -59,6 +59,9 @@ import { emitDynamicSnippetsProp, emitSlotFiller } from './emitSlotFiller.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 import { emitAttributes, emitListenerSpread, findRHtml } from './emitTemplateAttribute.js';
 import { emitTemplateEvent, svelteEventAttrName } from './emitTemplateEvent.js';
+import type { SVELTE_RUNTIME_IMPORTS } from '../../../../core/src/codegen/targetModuleImports.js';
+/** `@rozie/runtime-svelte` names the template walk may import (catalog: core targetModuleImports.ts). */
+type SvelteRuntimeImport = (typeof SVELTE_RUNTIME_IMPORTS)[number];
 
 /**
  * HTML void elements (no closing tag, self-close `/>`).
@@ -94,7 +97,7 @@ export interface EmitNodeCtx {
    * threads `import { applyListeners } from '@rozie/runtime-svelte';` when
    * this set is non-empty.
    */
-  runtimeImports: Set<string>;
+  runtimeImports: Set<SvelteRuntimeImport>;
   /**
    * Pre-Phase-16 cleanup Item 2 — per-component scope attribute (e.g.
    * `data-rozie-s-7914ecaa`). When non-empty, `emitElement` stamps it on

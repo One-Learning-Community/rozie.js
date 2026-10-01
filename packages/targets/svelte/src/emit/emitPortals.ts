@@ -26,6 +26,7 @@ import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
 import { portalScopeType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 import { portalKey } from '../../../../core/src/ir/types.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
+import { SVELTE_PORTAL_HOST_IMPORT, SVELTE_PORTAL_HOST_REACTIVE_IMPORT, SVELTE_PORTAL_MOUNT_IMPORT } from '../../../../core/src/codegen/targetModuleImports.js';
 
 /**
  * Spike 004 — portal-scope `setAttribute` line, or '' when no scopeHash.
@@ -151,11 +152,9 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
   // slot is present, so a reactive-only component carries just the reactive
   // import and a mount-once-only component is byte-identical (REQ-22).
   const extraImports =
-    "import { mount, unmount } from 'svelte';\n" +
-    (hasNonReactive ? "import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';\n" : '') +
-    (hasReactive
-      ? "import PortalHostReactive from '@rozie/runtime-svelte/PortalHostReactive.svelte';\n"
-      : '');
+    `${SVELTE_PORTAL_MOUNT_IMPORT}\n` +
+    (hasNonReactive ? `${SVELTE_PORTAL_HOST_IMPORT}\n` : '') +
+    (hasReactive ? `${SVELTE_PORTAL_HOST_REACTIVE_IMPORT}\n` : '');
 
   return {
     hasPortals: true,

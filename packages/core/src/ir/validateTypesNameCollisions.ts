@@ -11,6 +11,16 @@
  *
  * The generated-name list comes from `reservedGeneratedTypeNames`, built on the
  * SAME name builders the emitters use — no second copy of the naming rules.
+ *
+ * P1 follow-up — the module scope also holds every name the emitters IMPORT:
+ * each `<components>` local name (and the `<Local>Handle` type React/Solid
+ * import alongside a ref'd composed component), plus every framework /
+ * `@rozie/runtime-*` import in the `targetModuleImports.ts` catalog (the same
+ * catalog the emitters' import collectors and literal import lines are typed
+ * against). Those names are reserved on EVERY target and even when the import
+ * is conditional — `<types>` is target-neutral, so this stays stricter than TS.
+ * An `export { X as Y }` alias binds no module-scope local, so it is checked
+ * against generated names only.
  * `<types>` vs `<script>` IMPORT pairs are ROZ024's (see typesScriptImports.ts)
  * and are skipped here.
  *
@@ -20,7 +30,8 @@ import * as t from '@babel/types';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
 import { babelLocToRozieLoc } from '../parsers/parserPosition.js';
-import { reservedGeneratedTypeNames } from '../codegen/generatedTypeNames.js';
+import { handleInterfaceName, reservedGeneratedTypeNames } from '../codegen/generatedTypeNames.js';
+import { reservedTargetImportNames } from '../codegen/targetModuleImports.js';
 import type { IRComponent } from './types.js';
 
 type TypesKind = 'import' | 'interface' | 'type' | 'export';
@@ -107,13 +118,35 @@ const KIND_LABEL: Record<ScriptKind, string> = {
 };
 
 /** @experimental — added in typed-surface P1 */
+/**
+ * Names the emitters import for the `<components>` entries — the local name
+ * itself on every target, plus `<Local>Handle` (React/Solid, for a composed
+ * component targeted by `$refs`). Name → description.
+ */
+function reservedComponentImportNames(ir: Pick<IRComponent, 'name' | 'components'>): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const c of ir.components ?? []) {
+    if (c.localName === ir.name) continue; // self-reference: the component name is already reserved
+    if (!out.has(c.localName)) {
+      out.set(c.localName, `the \`<components>\` entry \`${c.localName}\` (imported into the compiled module on every target)`);
+    }
+    const handle = handleInterfaceName(c.localName);
+    if (!out.has(handle)) {
+      out.set(handle, `\`${handle}\`, which React and Solid import for the \`<components>\` entry \`${c.localName}\``);
+    }
+  }
+  return out;
+}
+
 export function validateTypesNameCollisions(
-  ir: Pick<IRComponent, 'name' | 'slots' | 'types'>,
+  ir: Pick<IRComponent, 'name' | 'slots' | 'types' | 'components'>,
   scriptBody: readonly t.Statement[] | null | undefined,
   diagnostics: Diagnostic[],
 ): void {
   if (ir.types == null) return;
   const reserved = reservedGeneratedTypeNames(ir);
+  const componentImports = reservedComponentImportNames(ir);
+  const targetImports = reservedTargetImportNames();
   const script = scriptBindings(scriptBody ?? []);
   for (const b of typesBindings(ir.types.statements)) {
     const generated = reserved.get(b.name);
@@ -126,6 +159,30 @@ export function validateTypesNameCollisions(
         hint: `Rename the <types> name (e.g. \`${b.name}Type\`)${b.kind === 'import' ? ` — \`import type { ${b.name} as ${b.name}Type }\`` : ''}.`,
       });
       continue;
+    }
+    if (b.kind !== 'export') {
+      const component = componentImports.get(b.name);
+      if (component !== undefined) {
+        diagnostics.push({
+          code: RozieErrorCode.TYPES_NAME_COLLISION,
+          severity: 'error',
+          message: `<types> name \`${b.name}\` collides with ${component}. Both would be bound in the same module.`,
+          loc: babelLocToRozieLoc(b.node),
+          hint: `Rename the <types> name (e.g. \`${b.name}Type\`)${b.kind === 'import' ? ` — \`import type { ${b.name} as ${b.name}Type }\`` : ''}, or rename the <components> key.`,
+        });
+        continue;
+      }
+      const imported = targetImports.get(b.name);
+      if (imported !== undefined) {
+        diagnostics.push({
+          code: RozieErrorCode.TYPES_NAME_COLLISION,
+          severity: 'error',
+          message: `<types> name \`${b.name}\` collides with ${imported}, which the compiled module (or its type sidecar) may import. Both would be bound in the same module.`,
+          loc: babelLocToRozieLoc(b.node),
+          hint: `Rename the <types> name (e.g. \`${b.name}Type\`)${b.kind === 'import' ? ` — \`import type { ${b.name} as ${b.name}Type }\`` : ''}. The name is reserved on every target, even where that import is only added when a feature is used.`,
+        });
+        continue;
+      }
     }
     const scriptKind = script.get(b.name);
     if (scriptKind !== undefined && clashes(b.kind, scriptKind)) {

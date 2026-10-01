@@ -173,6 +173,11 @@ import {
   rewriteListenerExpression,
 } from '../rewrite/rewriteListenerExpression.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import type { AngularCoreImport } from '../rewrite/collectAngularImports.js';
+import type { ANGULAR_KEYNAV_CORE_IMPORTS } from '../../../../core/src/codegen/targetModuleImports.js';
+/** A `@rozie/runtime-keynav-core` import specifier (catalog: core targetModuleImports.ts). */
+type KeynavCoreImport = (typeof ANGULAR_KEYNAV_CORE_IMPORTS)[number];
+type KeynavCoreSpecifier = KeynavCoreImport | `type ${KeynavCoreImport}`;
 
 // Synthesized (never author-visible) identifier names — namespaced
 // `__rozieKeynav*` so they can never collide with a `<script>`-declared
@@ -532,9 +537,9 @@ export interface KeynavClassEmission {
   /** True when at least one plan was emitted — `ngAfterViewInit`'s teardown registers via `this.__rozieDestroyRef.onDestroy(...)`. */
   needsDestroyRefField: boolean;
   /** `@angular/core` symbol names this emission references — caller adds them to the import collector. */
-  angularImports: string[];
-  /** `@rozie/runtime-keynav-core` symbol names this emission references. */
-  runtimeImports: string[];
+  angularImports: AngularCoreImport[];
+  /** `@rozie/runtime-keynav-core` symbol names this emission references (`type `-prefixed when type-only). */
+  runtimeImports: KeynavCoreSpecifier[];
 }
 
 /**
@@ -561,8 +566,8 @@ export function buildKeynavClassEmission(
   const fieldDecls: string[] = [];
   const constructorLines: string[] = [];
   const afterViewInitLines: string[] = [];
-  const angularImports = new Set<string>();
-  const runtimeImports = new Set<string>([
+  const angularImports = new Set<AngularCoreImport>();
+  const runtimeImports = new Set<KeynavCoreSpecifier>([
     'createKeynavStateMachine',
     'type KeynavStateMachine',
     // Plan 260806-lz7 — the shared strict-containment predicate.

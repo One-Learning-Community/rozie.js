@@ -11,25 +11,9 @@
  * @experimental — shape may change before v1.0
  */
 
-export type SolidImport =
-  | 'createSignal'
-  | 'createMemo'
-  | 'createEffect'
-  // 260602-9lw — `on(deps, fn, { defer: true })` is the idiomatic Solid lazy
-  // `$watch` form (skips the first `fn` run). Added to the allowlist alongside
-  // `createEffect`/`untrack`. `on` is a first-class `solid-js` export.
-  | 'on'
-  | 'untrack'
-  | 'mergeProps'
-  | 'onMount'
-  | 'onCleanup'
-  | 'Show'
-  | 'For'
-  | 'children'
-  | 'splitProps'
-  // Phase 36 ($inject) — emitted only when ir.injects is non-empty so a
-  // non-context component's `solid-js` import line stays byte-identical (R12/D-5).
-  | 'useContext';
+import type { SOLID_IMPORTS, SOLID_RUNTIME_IMPORTS } from '../../../../core/src/codegen/targetModuleImports.js';
+
+export type SolidImport = (typeof SOLID_IMPORTS)[number];
 
 export class SolidImportCollector {
   private symbols = new Set<SolidImport>();
@@ -53,62 +37,7 @@ export class SolidImportCollector {
   }
 }
 
-export type RuntimeSolidImport =
-  | 'createControllableSignal'
-  | 'createOutsideClick'
-  | 'createDebouncedHandler'
-  | 'createThrottledHandler'
-  // Phase 71 (r-keynav) — the Solid `r-keynav` primitive. Added by
-  // `emitKeynav.ts`'s `buildKeynavScriptInjections` ONLY when the component
-  // has an `r-keynav` root, so a non-keynav component's
-  // `@rozie/runtime-solid` import line stays byte-identical (SPEC §11).
-  | 'createKeynav'
-  // Phase 26 (D-01/D-06) — portable display helper. Added by the template
-  // emitters ONLY when a `wrapForDisplay` interpolation actually wraps, so a
-  // primitive-only component's `@rozie/runtime-solid` import line stays
-  // byte-identical to pre-phase (SPEC-3).
-  | 'rozieDisplay'
-  // 260608-sya — attribute-position display helper (nullish DROPS the
-  // attribute, matching Vue's `:attr` semantics). Added by the attribute
-  // emitter ONLY on the wrapped whole-value generic-attr binding branch.
-  | 'rozieAttr'
-  // 260620-kby — clsx-style `:class` normalizer. Added by the class-binding
-  // emitter ONLY on a non-provably-string (`wrapForDisplay=true`) class binding,
-  // so a provably-string / object-literal class component's
-  // `@rozie/runtime-solid` import line stays byte-identical.
-  | 'rozieClass'
-  // Phase 36 ($provide/$inject) — globalThis-backed Solid context registry.
-  // Added by emitContext ONLY when ir.provides/ir.injects is non-empty, so a
-  // non-context component's `@rozie/runtime-solid` import line stays
-  // byte-identical (R12 / D-5).
-  | 'rozieContext'
-  | 'parseInlineStyle'
-  | 'normalizeAttrs'
-  // Quick 260804-f15 — the COMPONENT-tag twin of `normalizeAttrs`. Added by the
-  // spread emitter ONLY when a DYNAMIC (non-literal, non-`$attrs`) `r-bind`
-  // lands on a component/self tag, so an unaffected component's
-  // `@rozie/runtime-solid` import line stays byte-identical.
-  | 'normalizeComponentAttrs'
-  | 'normalizeListeners'
-  | 'mergeListeners'
-  // Quick 260926 (R6 mergeListeners full-attrs clobber fix) — filters an
-  // opaque `attrs`/`$listeners` merge-partial down to its listener-shaped
-  // (`on*`, function-valued) keys before it reaches `mergeListeners`, so the
-  // component's own already-merged `class`/`style` isn't re-clobbered by the
-  // untouched rest of `attrs` riding along in the same merge call. Added by
-  // `emitListenerSpreadAsMergePartial` ONLY on the bare `$attrs`/`$listeners`
-  // merge-partial branch, so an unaffected component's `@rozie/runtime-solid`
-  // import line stays byte-identical.
-  | 'pickListeners'
-  /**
-   * Pre-Phase-16 Item-1-residual closure — `__rozieInjectStyle` runtime
-   * helper. Emitted at module top by the shell when `emitStyle` produced
-   * a non-empty `injectStatement`. Replaces the previous inline
-   * `<style>{...}</style>` JSX emit (which broke same-specificity cascade
-   * in cross-SFC composition because each wrapper INSTANCE rendered its
-   * own `<style>` element AFTER the consumer's in the DOM).
-   */
-  | '__rozieInjectStyle';
+export type RuntimeSolidImport = (typeof SOLID_RUNTIME_IMPORTS)[number];
 
 export class RuntimeSolidImportCollector {
   private symbols = new Set<RuntimeSolidImport>();

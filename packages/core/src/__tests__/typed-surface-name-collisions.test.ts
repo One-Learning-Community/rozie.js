@@ -174,3 +174,123 @@ $onMount(() => { helper() })
     expect(codes).toContain('ROZ025');
   });
 });
+
+// ---------------------------------------------------------------------------
+// P1 follow-up — ROZ025 also reserves the names the emitters IMPORT into the
+// module scope where `<types>` lands: `<components>` local names, the
+// per-component imports derived from them (React/Solid `<Local>Handle`), and
+// every framework / `@rozie/runtime-*` name an emitter may import. Each used
+// to compile with zero Rozie diagnostics and fail the leaf build (TS2440 /
+// TS2300).
+// ---------------------------------------------------------------------------
+
+const CHILD = `<rozie name="Child">
+<script>
+function focusIt() {}
+$expose({ focusIt })
+</script>
+<template><div /></template>
+</rozie>`;
+
+function withChild(types: string, target: (typeof TARGETS)[number]) {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'rozie-roz025-')));
+  try {
+    writeFileSync(join(dir, 'Child.rozie'), CHILD, 'utf8');
+    const src = `<rozie name="Parent">
+<components>
+{ Child: './Child.rozie' }
+</components>
+<types>
+${types}
+</types>
+<script>
+$onMount(() => { $refs.kid.focusIt() })
+</script>
+<template><div><Child ref="kid" /></div></template>
+</rozie>`;
+    const hostPath = join(dir, 'Parent.rozie');
+    writeFileSync(hostPath, src, 'utf8');
+    const r = compile(src, { target, filename: hostPath, resolverRoot: dir, sourceMap: false });
+    return { src, ds: r.diagnostics.filter((d) => d.code === 'ROZ025') };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+describe('ROZ025 — <types> name collides with a <components> import (P1 follow-up)', () => {
+  it('`<components>{ Child }` + `export type Child` is a located ROZ025 on every target', () => {
+    for (const target of TARGETS) {
+      const { src, ds } = withChild('export type Child = { a: number }', target);
+      expect(ds, target).toHaveLength(1);
+      expect(ds[0]!.severity).toBe('error');
+      // located on the <types> declaration name, not the <components> key
+      const at = ds[0]!.loc.start;
+      expect(src.slice(at, ds[0]!.loc.end)).toBe('Child');
+      expect(at).toBeGreaterThan(src.indexOf('<types>'));
+      expect(ds[0]!.message).toContain('`<components>` entry `Child`');
+      expect(ds[0]!.hint).toMatch(/rename/i);
+    }
+  });
+  it('`<Local>Handle` (imported by React/Solid for a composed component) is ROZ025 on every target', () => {
+    for (const target of TARGETS) {
+      const { src, ds } = withChild('export interface ChildHandle { a: number }', target);
+      expect(ds, target).toHaveLength(1);
+      expect(src.slice(ds[0]!.loc.start, ds[0]!.loc.end)).toBe('ChildHandle');
+      expect(ds[0]!.message).toContain('`ChildHandle`');
+      expect(ds[0]!.message).toContain('`<components>` entry `Child`');
+    }
+  });
+  it('a <types> import binding the same name is ROZ025 too', () => {
+    const { ds } = withChild("import type { Child } from './child-types'\nexport type X = Child", 'react');
+    expect(ds).toHaveLength(1);
+  });
+  it('non-colliding names next to <components> compile clean', () => {
+    for (const target of TARGETS) {
+      expect(withChild('export type ChildInfo = { a: number }\nexport interface Kid { b: string }', target).ds, target).toEqual([]);
+    }
+  });
+});
+
+describe('ROZ025 — <types> name collides with a framework / runtime import (P1 follow-up)', () => {
+  // One per target family + runtime packages. Every name is reserved on EVERY
+  // target (stricter than TS, like the rest of ROZ025): `<types>` is
+  // target-neutral, and many of these imports are added only when a feature is
+  // used.
+  const cases: Array<[string, RegExp]> = [
+    ['ReactNode', /React's `ReactNode` import/],
+    ['ForwardRefExoticComponent', /React's `ForwardRefExoticComponent` import/],
+    ['Fragment', /Vue's `Fragment` import/],
+    ['Snippet', /Svelte's `Snippet` import/],
+    ['TemplateRef', /Angular's `TemplateRef` import/],
+    ['RozieSlot', /Angular's `RozieSlot` import from '@rozie\/runtime-angular'/],
+    ['Show', /Solid's `Show` import/],
+    ['LitElement', /Lit's `LitElement` import/],
+    ['KeynavController', /Lit's `KeynavController` import from '@rozie\/runtime-lit'/],
+    ['Root', /React's `Root` import from 'react-dom\/client'/],
+    ['DefineComponent', /Vue's `DefineComponent` import/],
+  ];
+  for (const [name, why] of cases) {
+    it(`\`export type ${name}\` is a located ROZ025 on every target`, () => {
+      const src = host(`export type ${name} = { a: number }`);
+      for (const target of TARGETS) {
+        const ds = roz025(src, target);
+        expect(ds, target).toHaveLength(1);
+        expect(ds[0]!.severity).toBe('error');
+        expect(src.slice(ds[0]!.loc.start, ds[0]!.loc.end)).toBe(name);
+        expect(ds[0]!.message).toMatch(why);
+        expect(ds[0]!.hint).toMatch(/rename/i);
+        expect(ds[0]!.hint).toMatch(/every target/i);
+      }
+    });
+  }
+  it('a <types> `import type { ReactNode } from "react"` is ROZ025 (the emitter imports it too)', () => {
+    expect(roz025(host("import type { ReactNode } from 'react'\nexport type A = ReactNode"))).toHaveLength(1);
+  });
+  it('an export alias does not bind a module-scope local, so it is not an import collision', () => {
+    expect(roz025(host("import type { Thing } from './lib'\nexport type { Thing as ReactNode }"))).toEqual([]);
+  });
+  it('ordinary type names compile clean (no false positives)', () => {
+    const src = host('export interface Options { a: number }\nexport type Item = { id: string }\nexport type Size = number');
+    for (const target of TARGETS) expect(roz025(src, target), target).toEqual([]);
+  });
+});

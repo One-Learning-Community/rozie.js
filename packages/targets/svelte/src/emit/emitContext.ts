@@ -47,6 +47,7 @@ import _generate from '@babel/generator';
 import * as t from '@babel/types';
 import type { IRComponent } from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
+import type { SVELTE_IMPORTS } from '../../../../core/src/codegen/targetModuleImports.js';
 
 // CJS interop normalization for @babel/generator default export (mirrors emitScript).
 type GenerateFn = typeof import('@babel/generator').default;
@@ -84,7 +85,7 @@ export interface ContextEmit {
    * import line carries them alongside `onMount`/`untrack`. Empty when
    * `hasContext` is false.
    */
-  svelteImports: string[];
+  svelteImports: Array<(typeof SVELTE_IMPORTS)[number]>;
 }
 
 const EMPTY: ContextEmit = {
@@ -192,7 +193,7 @@ export function emitContext(ir: IRComponent, clonedProgram: t.File): ContextEmit
 
   const injectLines: string[] = [];
   const provideLines: string[] = [];
-  const svelteImports = new Set<string>();
+  const svelteImports = new Set<(typeof SVELTE_IMPORTS)[number]>();
 
   if (injectBinders.length > 0) {
     svelteImports.add('getContext');

@@ -30,6 +30,7 @@ import type { IRComponent, SlotDecl } from '@rozie/core';
 import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
 import { portalScopeType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 import { portalKey } from '../../../../core/src/ir/types.js';
+import type { AngularCoreImport } from '../rewrite/collectAngularImports.js';
 
 /**
  * Phase 37 — the Angular `contentChild` template-ref query NAME for a portal
@@ -172,7 +173,7 @@ export interface PortalsEmit {
   /** When true, emitScript hoists `this.__rozieDestroyRef = inject(DestroyRef);`. */
   needsDestroyRefField: boolean;
   /** Angular core symbol names to add to the import collector. */
-  angularImports: string[];
+  angularImports: AngularCoreImport[];
 }
 
 export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmit {

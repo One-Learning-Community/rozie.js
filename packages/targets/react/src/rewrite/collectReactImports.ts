@@ -15,29 +15,9 @@
  *
  * @experimental — shape may change before v1.0
  */
-export type ReactImport =
-  | 'useState'
-  | 'useMemo'
-  | 'useEffect'
-  | 'useRef'
-  | 'useCallback'
-  // Phase 71 (r-keynav) — emitted ONLY when the component has an r-keynav
-  // root, minting the SSR-safe group id shared by the root's
-  // aria-activedescendant and every item's id (see emitKeynav.ts). Byte-
-  // identical otherwise (D-03-style additive-only import).
-  | 'useId'
-  // Phase 21 ($expose) — emitted only when ir.expose is non-empty so a
-  // non-$expose component's `react` import line stays byte-identical (D-03).
-  | 'forwardRef'
-  | 'useImperativeHandle'
-  // Phase 36 ($inject) — emitted only when ir.injects is non-empty so a
-  // non-context component's `react` import line stays byte-identical (R12/D-5).
-  | 'useContext'
-  // Phase 50 (<template r-for> multi-root) — emitted only when a keyed multi-root
-  // loop body lowers to `<Fragment key={…}>` (the `<>` shorthand cannot carry a
-  // key, and `React.Fragment` is an undefined UMD global under the automatic JSX
-  // runtime where leaves import named hooks only). Byte-identical otherwise.
-  | 'Fragment';
+import type { REACT_IMPORTS, REACT_RUNTIME_IMPORTS } from '../../../../core/src/codegen/targetModuleImports.js';
+
+export type ReactImport = (typeof REACT_IMPORTS)[number];
 
 export class ReactImportCollector {
   private symbols = new Set<ReactImport>();
@@ -83,53 +63,7 @@ export class ReactImportCollector {
  *
  * @experimental — shape may change before v1.0
  */
-export type RuntimeReactImport =
-  | 'useControllableState'
-  | 'useOutsideClick'
-  // Phase 71 (r-keynav) — emitted ONLY when the component has an r-keynav
-  // root (see emitKeynav.ts). Byte-identical otherwise.
-  | 'useKeynav'
-  | 'useDebouncedCallback'
-  | 'useThrottledCallback'
-  | 'clsx'
-  // Phase 26 (D-01/D-06) — portable display helper. Added by the template
-  // emitters ONLY when a `wrapForDisplay` interpolation actually wraps, so a
-  // primitive-only component's `@rozie/runtime-react` import line stays
-  // byte-identical to pre-phase (SPEC-3).
-  | 'rozieDisplay'
-  // 260608-sya — attribute-position display helper (nullish DROPS the
-  // attribute, matching Vue's `:attr` semantics). Added by the attribute
-  // emitter ONLY on the wrapped whole-value generic-attr binding branch.
-  | 'rozieAttr'
-  // Phase 36 ($provide/$inject) — globalThis-backed React context registry.
-  // Added by emitContext ONLY when ir.provides/ir.injects is non-empty, so a
-  // non-context component's `@rozie/runtime-react` import line stays
-  // byte-identical (R12 / D-5).
-  | 'rozieContext'
-  | 'parseInlineStyle'
-  | 'normalizeAttrs'
-  // Quick 260804-f15 — the COMPONENT-tag twin of `normalizeAttrs`. Added by the
-  // spread emitter ONLY when a DYNAMIC (non-literal, non-`$attrs`) `r-bind`
-  // lands on a component/self tag, so an unaffected component's
-  // `@rozie/runtime-react` import line stays byte-identical.
-  | 'normalizeComponentAttrs'
-  | 'normalizeListeners'
-  | 'mergeListeners'
-  // Typed-surface P3 review fix — filters `attrs` to listener keys for the R6
-  // all-fire merge on an auto-fallthrough root with its own @events.
-  | 'pickListeners'
-  | 'isEnter'
-  | 'isEscape'
-  | 'isTab'
-  | 'isSpace'
-  | 'isUp'
-  | 'isDown'
-  | 'isLeft'
-  | 'isRight'
-  | 'isCtrl'
-  | 'isAlt'
-  | 'isShift'
-  | 'isMeta';
+export type RuntimeReactImport = (typeof REACT_RUNTIME_IMPORTS)[number];
 
 export class RuntimeReactImportCollector {
   private symbols = new Set<RuntimeReactImport>();

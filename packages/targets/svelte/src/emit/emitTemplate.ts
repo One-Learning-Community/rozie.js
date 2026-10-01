@@ -30,6 +30,9 @@ import {
 } from './emitKeynav.js';
 import type { SvelteScriptInjection } from './emitScript.js';
 import { type EmitNodeCtx, emitNode } from './emitTemplateNode.js';
+import type { SVELTE_RUNTIME_IMPORTS } from '../../../../core/src/codegen/targetModuleImports.js';
+/** `@rozie/runtime-svelte` names the template walk may import (catalog: core targetModuleImports.ts). */
+type SvelteRuntimeImport = (typeof SVELTE_RUNTIME_IMPORTS)[number];
 
 export interface EmitTemplateResult {
   template: string;
@@ -43,7 +46,7 @@ export interface EmitTemplateResult {
    * `import { applyListeners } from '@rozie/runtime-svelte';` when this
    * set is non-empty.
    */
-  runtimeImports: Set<string>;
+  runtimeImports: Set<SvelteRuntimeImport>;
 }
 
 export function emitTemplate(
@@ -53,7 +56,7 @@ export function emitTemplate(
 ): EmitTemplateResult {
   const diagnostics: Diagnostic[] = [];
   const scriptInjections: SvelteScriptInjection[] = [];
-  const runtimeImports = new Set<string>();
+  const runtimeImports = new Set<SvelteRuntimeImport>();
 
   if (ir.template === null) {
     return {

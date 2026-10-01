@@ -47,7 +47,8 @@ import { slotsRecordLine } from './emitPropsInterface.js';
 // `synthesizeHandleType` is not yet in the `@rozie/core` barrel — import it
 // relatively as React's emitTypes.ts does.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
-import { SOLID_JSX_TYPE_NAME, handleInterfaceName, propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
+import { handleInterfaceName, propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
+import { SOLID_JSX_TYPE_IMPORT } from '../../../../core/src/codegen/targetModuleImports.js';
 
 /**
  * Options controlling Solid `.d.rozie.ts` emission.
@@ -83,7 +84,7 @@ export function emitSolidTypes(ir: IRComponent, opts: EmitSolidTypesOptions = {}
   // `JSX.Element` (slot fields) must resolve — an unresolved `JSX` silently
   // degrades every slot prop to `any` in a consumer with skipLibCheck.
   if (ir.slots.length > 0) {
-    lines.push(`import type { ${SOLID_JSX_TYPE_NAME} } from 'solid-js';`);
+    lines.push(SOLID_JSX_TYPE_IMPORT);
     lines.push('');
   }
   for (const iface of slotDecl.ctxInterfaces) lines.push(iface);

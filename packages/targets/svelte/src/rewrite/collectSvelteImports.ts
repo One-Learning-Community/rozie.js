@@ -15,16 +15,20 @@
  * @experimental — shape may change before v1.0
  */
 import type { IRComponent } from '@rozie/core';
+import type { SVELTE_TYPE_IMPORTS } from '../../../../core/src/codegen/targetModuleImports.js';
 
 export interface SvelteImportSet {
   /** Type-only imports from `'svelte'` (rendered as `import type { ... }`). */
   typeImports: Set<string>;
 }
 
+/** The `import type { … } from 'svelte'` names (catalog: core targetModuleImports.ts). */
+export type SvelteTypeImport = (typeof SVELTE_TYPE_IMPORTS)[number];
+
 export class SvelteImportCollector {
   private typeSymbols = new Set<string>();
 
-  useType(name: string): void {
+  useType(name: SvelteTypeImport): void {
     if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
       throw new Error(`[rozie] Invalid Svelte type-import name: '${name}'`);
     }

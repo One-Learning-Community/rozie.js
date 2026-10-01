@@ -1553,10 +1553,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   // component has portals, even with no `$onMount` at all.
   const portalsEmit = emitPortals(ir, opts.portalScopeHash ?? '');
   if (portalsEmit.hasPortals) {
-    for (const symName of portalsEmit.angularImports) {
-      // AngularImportCollector accepts any string via .add — narrow at runtime.
-      (imports as { add: (n: string) => void }).add(symName);
-    }
+    for (const symName of portalsEmit.angularImports) imports.add(symName);
     for (const decl of portalsEmit.fieldDecls) fieldLines.push(decl);
     fieldLines.push(portalsEmit.closureBlock);
     if (portalsEmit.interfaceDecl) interfaceDecls.push(portalsEmit.interfaceDecl);
@@ -1605,9 +1602,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
       classMembers: rewriteResult.classMembers,
       signalMembers: rewriteResult.signalMembers,
     });
-    for (const symName of keynavEmission.angularImports) {
-      (imports as { add: (n: string) => void }).add(symName);
-    }
+    for (const symName of keynavEmission.angularImports) imports.add(symName);
     for (const decl of keynavEmission.fieldDecls) fieldLines.push(decl);
     lifecycleAfterViewInitLines.push(...keynavEmission.afterViewInitLines);
     lifecycleConstructorLines.push(...keynavEmission.constructorLines);

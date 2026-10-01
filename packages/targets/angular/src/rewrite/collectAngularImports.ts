@@ -37,72 +37,16 @@
  * @experimental — shape may change before v1.0
  */
 import type { IRComponent } from '@rozie/core';
+import type {
+  ANGULAR_CORE_IMPORTS,
+  ANGULAR_FORMS_IMPORTS,
+  ANGULAR_COMMON_IMPORTS,
+  ANGULAR_RUNTIME_IMPORTS,
+} from '../../../../core/src/codegen/targetModuleImports.js';
+// The specifier alias table lives with the import catalog (ROZ025 reserves the ALIAS).
+import { ANGULAR_RUNTIME_LOCAL_ALIAS as RUNTIME_LOCAL_ALIAS } from '../../../../core/src/codegen/targetModuleImports.js';
 
-export type AngularCoreImport =
-  | 'Component'
-  | 'ViewEncapsulation'
-  | 'signal'
-  | 'computed'
-  | 'effect'
-  | 'model'
-  | 'input'
-  | 'output'
-  | 'viewChild'
-  | 'ElementRef'
-  | 'inject'
-  | 'DestroyRef'
-  | 'Renderer2'
-  | 'ContentChild'
-  | 'TemplateRef'
-  /**
-   * Phase 80 Plan 04 (R3/R5): `contentChildren` — the SIGNAL content-query
-   * form (not the decorator `@ContentChildren`) that collects `[rozieSlot]`
-   * marker-directive fills on a producer declaring at least one key-fillable
-   * (record-only) slot. Added by emitScript alongside `computed` and
-   * `TemplateRef` whenever `ir.slots.some(isRecordOnlySlotDecl)` is true.
-   */
-  | 'contentChildren'
-  /**
-   * Bug B fix (260519 linechart-watch-recreate): `untracked` — wraps the
-   * $watch callback invocation inside the watcher `effect()` so the
-   * callback's reactive reads (and transitive helper reads) don't join the
-   * effect's dependency set. Added by emitScript alongside `effect` whenever
-   * the IR declares at least one watcher.
-   */
-  | 'untracked'
-  /**
-   * Phase 07.2 Plan 04 (R5 dynamic-name): `ViewChild` — captures the
-   * synthetic `<ng-template #__dynSlot_<N>>` declared inside a consumer's
-   * component-tag body so the templates getter can resolve it for
-   * `*ngTemplateOutlet` dispatch.
-   */
-  | 'ViewChild'
-  /**
-   * Phase 06.2 P2 (RESEARCH Pitfall 5): `forwardRef` — required for the
-   * self-reference idiom `imports: [forwardRef(() => Self)]` in standalone
-   * Angular components. emitAngular adds it via `imports.add('forwardRef')`
-   * when `tagKind: 'self'` appears anywhere in the template.
-   */
-  | 'forwardRef'
-  /**
-   * Phase 14.1 / WR-A1: `afterRenderEffect` — the post-render-phase reactive
-   * subscriber that drives the `$attrs` / `r-bind` spread's `__rozieApplyAttrs`
-   * call. Replaces the original `effect()` for spreadBinding because a plain
-   * effect schedules during change detection and Angular's `[ngClass]` /
-   * `ɵɵstyleMap` bindings re-fire AFTER the effect within the same CD pass,
-   * clobbering the consumer-merged class / style declarations. Running in the
-   * post-render phase guarantees the merge wins the last-write race for R6
-   * always-merge consumer-style override.
-   */
-  | 'afterRenderEffect'
-  /**
-   * Phase 36 ($provide/$inject context primitive): `InjectionToken` — the token
-   * type the inline `globalThis`-backed `rozieToken` helper mints + dedups
-   * (D-1/REQ-28). Added by emitScript whenever the component uses `$provide` or
-   * `$inject` (paired with `inject`). The provider's `useFactory` + the
-   * consumer's `inject(rozieToken('k'))` both resolve against this token.
-   */
-  | 'InjectionToken';
+export type AngularCoreImport = (typeof ANGULAR_CORE_IMPORTS)[number];
 
 /**
  * Forms-module import kind — separate import line from `@angular/forms`.
@@ -112,7 +56,7 @@ export type AngularCoreImport =
  * (`providers: [{ provide: NG_VALUE_ACCESSOR, ... }]`). Added by emitAngular via
  * `imports.addForms('NG_VALUE_ACCESSOR')` when the CVA gate is active.
  */
-export type AngularFormsImport = 'FormsModule' | 'NG_VALUE_ACCESSOR';
+export type AngularFormsImport = (typeof ANGULAR_FORMS_IMPORTS)[number];
 
 /**
  * Common-module import kind — separate import line from `@angular/common`.
@@ -131,7 +75,7 @@ export type AngularFormsImport = 'FormsModule' | 'NG_VALUE_ACCESSOR';
  * template string contains the corresponding binding (same emitted-template
  * scan pattern as `usedGlobals`).
  */
-export type AngularCommonImport = 'NgTemplateOutlet' | 'NgClass' | 'NgStyle';
+export type AngularCommonImport = (typeof ANGULAR_COMMON_IMPORTS)[number];
 
 /**
  * Third-party npm runtime-package import kind — separate import line from
@@ -151,7 +95,7 @@ export type AngularCommonImport = 'NgTemplateOutlet' | 'NgClass' | 'NgStyle';
  * `imports.addRuntime('rozieDisplay')` / `imports.addRuntime('rozieAttr')`
  * whenever `tmplResult.hasDisplayWrap` is set (at least one interpolation
  * wrapped). Both carry a LOCAL ALIAS (`__rozieDisplay` / `__rozieAttr`,
- * see `RUNTIME_LOCAL_ALIAS` below) because the delegating `rozieDisplay` /
+ * see `ANGULAR_RUNTIME_LOCAL_ALIAS` in core targetModuleImports.ts) because the delegating `rozieDisplay` /
  * `rozieAttr` CLASS METHODS synthesized elsewhere share those exported
  * names — an un-aliased import would make the class method bodies read as
  * infinite recursion (`rozieDisplay(v) { return rozieDisplay(v); }`) to
@@ -184,25 +128,8 @@ export type AngularCommonImport = 'NgTemplateOutlet' | 'NgClass' | 'NgStyle';
  * itself. Carry NO alias — neither name collides with a class member or
  * `@angular/core` symbol this emitter ever synthesizes.
  */
-export type AngularRuntimeImport =
-  | 'RozieSlot'
-  | 'rozieDisplay'
-  | 'rozieAttr'
-  | 'rozieToken'
-  | 'createRozieAttrApplier'
-  | 'createRozieHostAttrsReader';
+export type AngularRuntimeImport = (typeof ANGULAR_RUNTIME_IMPORTS)[number];
 
-/**
- * Local aliases for runtime-import specifiers whose exported name collides
- * with a same-named delegating class method the emitter synthesizes
- * elsewhere (`DISPLAY_CLASS_METHOD` / `ATTR_CLASS_METHOD` in
- * `emitAngular.ts`). Rendered as `` `${name} as ${alias}` `` in the import
- * specifier list; omitted members render as the bare exported name.
- */
-const RUNTIME_LOCAL_ALIAS: Partial<Record<AngularRuntimeImport, string>> = {
-  rozieDisplay: '__rozieDisplay',
-  rozieAttr: '__rozieAttr',
-};
 
 export class AngularImportCollector {
   private coreSymbols = new Set<AngularCoreImport>();

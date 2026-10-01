@@ -50,6 +50,7 @@ import { renderPropsInterface } from '@rozie/core';
 // "Next Phase Readiness") — import it relatively as React's emitTypes.ts does.
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
 import { handleInterfaceName, propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
+import { VUE_SIDECAR_DEFINE_COMPONENT_IMPORT } from '../../../../core/src/codegen/targetModuleImports.js';
 
 /**
  * Options controlling Vue `.d.rozie.ts` emission.
@@ -78,7 +79,7 @@ export function emitVueTypes(ir: IRComponent, opts: EmitVueTypesOptions = {}): s
     opts.genericParams && opts.genericParams.length > 0 ? `<${opts.genericParams.join(', ')}>` : '';
 
   const lines: string[] = [];
-  lines.push(`import type { DefineComponent } from 'vue';`);
+  lines.push(VUE_SIDECAR_DEFINE_COMPONENT_IMPORT);
   lines.push('');
 
   lines.push(

@@ -70,6 +70,9 @@ import {
   renderRecordKey,
 } from './refineSlotTypes.js';
 import { SVELTE_PROPS_INTERFACE_NAME } from '../../../../core/src/codegen/generatedTypeNames.js';
+import type { SVELTE_IMPORTS } from '../../../../core/src/codegen/targetModuleImports.js';
+/** `'svelte'` value imports (catalog: core targetModuleImports.ts). */
+type SvelteImport = (typeof SVELTE_IMPORTS)[number];
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -1369,11 +1372,11 @@ function cbParamCount(cbArg: t.ArrowFunctionExpression | t.FunctionExpression): 
 function emitLifecycleHooks(clonedProgram: t.File): {
   lines: string[];
   consumedIndices: Set<number>;
-  runtimeImports: Set<string>;
+  runtimeImports: Set<SvelteImport>;
 } {
   const lines: string[] = [];
   const consumed = new Set<number>();
-  const runtimeImports = new Set<string>();
+  const runtimeImports = new Set<SvelteImport>();
 
   const body = clonedProgram.program.body;
 
@@ -1808,7 +1811,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
   // emitted by emitWatcherHooks to keep the $watch callback's transitive
   // reactive reads out of the watcher's dependency set. Runes
   // ($props/$state/$derived/$effect/$bindable) need no import.
-  const valueImports = new Set<string>([...lifecycleRuntimeImports]);
+  const valueImports = new Set<SvelteImport>([...lifecycleRuntimeImports]);
   if (needsUntrack) valueImports.add('untrack');
   // Phase 36 (REQ-32) — `setContext`/`getContext` join the single `'svelte'`
   // value-import line. Empty when the component has no $provide/$inject.

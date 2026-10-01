@@ -59,6 +59,7 @@ import {
   PreactSignalsImportCollector,
   RuntimeLitImportCollector,
 } from './rewrite/collectLitImports.js';
+import { LIT_KEYED_IMPORT, LIT_REF_IMPORT, LIT_REPEAT_IMPORT, LIT_STYLE_MAP_IMPORT, LIT_UNSAFE_HTML_IMPORT } from '../../../core/src/codegen/targetModuleImports.js';
 
 export interface EmitLitOptions {
   filename?: string;
@@ -543,20 +544,20 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // the `.filter` below) when the component has no `$provide`/`$inject`.
     contextImports.render(),
     // CR-06 fix: read repeatUsed from templateResult instead of module-level singleton.
-    templateResult.repeatUsed ? `import { repeat } from 'lit/directives/repeat.js';\n` : '',
+    templateResult.repeatUsed ? `${LIT_REPEAT_IMPORT}\n` : '',
     // Quick-task 260518-e2t (Spike 004 Lit subset) — conditional styleMap
     // import. Threaded the SAME way as `repeat`: emitTemplate marks
     // `styleMapUsed` on EmitTemplateResult when any literal-object `:style`
     // was lowered via styleMap(); we add the side-effect-free value import
     // only when actually used, so unused-import noise is avoided.
-    templateResult.styleMapUsed ? `import { styleMap } from 'lit/directives/style-map.js';\n` : '',
+    templateResult.styleMapUsed ? `${LIT_STYLE_MAP_IMPORT}\n` : '',
     // Phase 07.6 — consumer-side property-fill bridge (see
     // emitTemplate's `refUsed` plumbing). When any property-fill is emitted
     // onto a producer component's open tag, we wrap that tag with a `ref()`
     // directive that propagates the consumer's stylesheets across the
     // producer's shadow boundary via `adoptedStyleSheets`. Same conditional
     // pattern as `repeat`/`styleMap`.
-    templateResult.refUsed ? `import { ref } from 'lit/directives/ref.js';\n` : '',
+    templateResult.refUsed ? `${LIT_REF_IMPORT}\n` : '',
     // `r-external` engine-wrapper marker — when at least one marked element
     // was emitted, wire `import { keyed } from 'lit/directives/keyed.js';`.
     // `keyed(this._rozieReconcileSeq ?? 0, …)` lets
@@ -564,7 +565,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // child DOM via a seq bump while preserving the marked element itself,
     // so third-party DOM-mutating engines (SortableJS, TipTap, …) stay
     // attached across reconciliations.
-    templateResult.keyedUsed ? `import { keyed } from 'lit/directives/keyed.js';\n` : '',
+    templateResult.keyedUsed ? `${LIT_KEYED_IMPORT}\n` : '',
     // Phase 24 (req 2) — conditional `unsafeHTML` import. emitTemplate marks
     // `unsafeHtmlUsed` on EmitTemplateResult when any `r-html` was lowered to
     // `${unsafeHTML(<expr>)}`. `lit/directives/unsafe-html.js` is a subpath of
@@ -576,7 +577,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // that co-location as an XSS-surface guard — every line importing
     // `lit/directives/unsafe-html.js` must visibly carry its gate. Splitting this
     // ternary across lines silently defeats that check.
-    templateResult.unsafeHtmlUsed ? `import { unsafeHTML } from 'lit/directives/unsafe-html.js';\n` : '',
+    templateResult.unsafeHtmlUsed ? `${LIT_UNSAFE_HTML_IMPORT}\n` : '',
   ]
     .filter((s) => s.length > 0)
     .join('');
