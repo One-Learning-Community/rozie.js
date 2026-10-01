@@ -133,7 +133,7 @@ When `<emits>` is present it is the **complete list** of events:
 - A declared name that nothing ever emits is a warning, [ROZ152](/reference/diagnostics).
 - A `$emit` call whose arguments don't match the declaration is a warning, [ROZ157](/reference/diagnostics): an argument passed to an event declared without a payload, no argument for an event that declares one, or more than one payload argument.
 
-These checks count every `$emit` call in `<script>`, `<template>` and `<listeners>`, and point at the offending call.
+These checks count every `$emit` call in `<script>`, `<template>` and `<listeners>`. ROZ151 and ROZ157 point at the offending `$emit` call; ROZ152 has no call to point at, so it points at the event's entry in `<emits>`.
 
 When `<emits>` is absent, nothing changes: event names are inferred from the `$emit` calls and the handlers keep their `(...args: any[]) => void` type. The one deliberate change in this release is that the untyped handler is now `any[]` everywhere. The shared `.d.rozie.ts` sidecar, Solid and Svelte used to emit `unknown[]`, which rejected a handler written with a concrete parameter type. React already used `any[]`.
 

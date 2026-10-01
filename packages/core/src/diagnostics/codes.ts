@@ -662,8 +662,8 @@ export const RozieErrorCode = {
   SETUP_ONCE_PROP_READ: 'ROZ150', // warning (suppressible) — setup-once <script> code (no enclosing function) reads $props.<x>/$model.<x>; on Angular (and Lit, for a top-level declaration initializer) that runs before consumer-bound inputs arrive, so it sees the default. Read it through a derived function (`const xValue = () => $props.x`) instead.
 
   // Typed public surface (spec 2026-09-29) — ROZ151..ROZ157.
-  EMIT_UNDECLARED: 'ROZ151', // error — <emits> is present and a $emit('x') (in <script>, <template> or <listeners>) names an event it does not declare; <emits> is the complete list.
-  EMIT_DECLARED_UNUSED: 'ROZ152', // warning — <emits> declares an event that no $emit call ever fires.
+  EMIT_UNDECLARED: 'ROZ151', // error — <emits> is present and a $emit('x') (in <script>, <template> or <listeners>) names an event it does not declare; <emits> is the complete list. Reported at the $emit call (at the <emits> block only when the call carries no source location).
+  EMIT_DECLARED_UNUSED: 'ROZ152', // warning — <emits> declares an event that no $emit call ever fires. Reported at the event's <emits> entry (there is no call to point at).
   SLOT_PARAM_TYPES_UNKNOWN_KEY: 'ROZ153', // error — a <slot :param-types> key is not a param the slot passes (via :params or a scoped attribute).
   SLOT_PARAM_TYPES_INVALID: 'ROZ154', // error — <slot :param-types> must be an object literal whose values are string literals holding TypeScript types, e.g. :param-types="{ row: 'Row<T>', index: 'number' }".
   EXPOSE_SIGNATURE_UNKNOWN_VERB: 'ROZ155', // error — an $expose signature key (second argument) names a verb that the first argument does not expose.
