@@ -34,6 +34,7 @@ export const RozieErrorCode = {
   // escape (`<\/script>`) as the hint. Collateral ROZ002/003/004 noise located
   // after the premature close is suppressed.
   PREMATURE_BLOCK_CLOSE: 'ROZ005', // error — literal `</script>` (or other block close sequence) inside the block's own body ended the block early; escape it as `<\/script>`
+  RAWTEXT_TAG_IN_OPAQUE_BLOCK: 'ROZ006', // error — the text `<script`, `<style`, `<textarea`, `<title` (or another HTML raw-text tag: iframe/noembed/noframes/plaintext/xmp) appears inside a <types>/<emits>/<props>/<data>/<listeners>/<components> body, e.g. in a comment. The SFC tokenizer switches to raw-text mode there and would swallow the rest of the file; break the sequence (`< script`, `&lt;script`) or reword.
 
   // ---- Block parse — declarative <props>/<data>/<listeners> (Plan 03) — ROZ010..ROZ029 ----
   INVALID_DECLARATIVE_EXPRESSION: 'ROZ010', // error — a <props>/<data>/<components> body fails to parse as a single JS expression.
@@ -74,13 +75,14 @@ export const RozieErrorCode = {
   // block-parse cluster.
   INVALID_PROP_DOCS_SHAPE: 'ROZ018', // warning — a <props> `docs:` key is malformed (non-object, wrong-typed description/deprecated/example, or unknown sub-key); the bad docs/sub-key is dropped and no JSDoc is emitted. Shape: docs: { description?: string, deprecated?: true | string, example?: string }.
 
-  // Typed public surface (spec 2026-09-29) — ROZ019..ROZ023 continue the
+  // Typed public surface (spec 2026-09-29) — ROZ019..ROZ024 continue the
   // ROZ010-029 declarative-block band.
   TYPES_BLOCK_DISALLOWED_STATEMENT: 'ROZ019', // error — the <types> block holds a statement that is not type-only (runtime code, a value import, enum, declare const, …); only `import type`, interface, type, and export of those are allowed, so hoisting <types> into every target can never change runtime behaviour.
   TYPES_BLOCK_PARSE_ERROR: 'ROZ020', // error — the <types> block is not valid TypeScript.
   INVALID_EMIT_DECL: 'ROZ021', // error — an <emits> entry is not `{}` / `{ payload?: '<TS type>', docs?: {...} }`, or uses a computed/spread key or an unknown sub-key.
   INVALID_AUTHORED_TYPE: 'ROZ022', // error — an author-written type string (an <emits> payload, a :param-types value, or an $expose signature) is not a single valid TypeScript type.
   INVALID_EMIT_DOCS_SHAPE: 'ROZ023', // warning — an <emits> `docs:` is malformed (same shape as <props> docs: { description?, deprecated?, example? }); the bad docs/sub-key is dropped.
+  TYPES_SCRIPT_IMPORT_CONFLICT: 'ROZ024', // error — a <types> import binds a local name that a <script> import already binds to a DIFFERENT source or imported name; both land in one module scope on every target. (Same source + same name is fine: the <types> copy is dropped from the module.) Rename one with `as`.
 
   // ---- Script parse (Plan 03) — ROZ030..ROZ049 ----
   SCRIPT_PARSE_ERROR: 'ROZ030', // error — recoverable <script> syntax error(s) Babel collected under errorRecovery (one diagnostic per lifted error).

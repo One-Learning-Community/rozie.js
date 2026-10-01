@@ -2,7 +2,7 @@
  * renderTypesBlock — typed public surface P1 (spec §4.2).
  *
  * Renders a component's validated `<types>` block (`IRComponent.types`) back to
- * TypeScript source: each statement generated in SOURCE order, joined by `\n`.
+ * TypeScript source in SOURCE order (one generate() over the statements).
  * The single printer every target's sidecar / module placement consumes, so the
  * authored type prelude cannot drift between targets.
  *
@@ -11,7 +11,9 @@
  * @experimental — added in typed-surface P1
  */
 import _generate from '@babel/generator';
+import * as t from '@babel/types';
 import type { IRComponent } from '../ir/types.js';
+import { typesStatementsForModule } from './typesScriptImports.js';
 
 // Default-export interop (see synthesizeHandleType.ts / collectScriptDecls.ts).
 type GenerateFn = typeof import('@babel/generator').default;
@@ -21,24 +23,28 @@ const generate: GenerateFn =
     : (_generate as unknown as { default: GenerateFn }).default;
 
 /** @experimental — added in typed-surface P1 */
-export function renderTypesBlock(ir: IRComponent): string {
+export interface RenderTypesBlockOptions {
+  /**
+   * `true` for the placement INSIDE the component module (every target's
+   * emitted component): `<types>` import specifiers that duplicate a `<script>`
+   * import are dropped (R16, see typesScriptImports.ts). Omit for sidecar /
+   * manifest renders, which have no script imports.
+   */
+  module?: boolean;
+}
+
+/** @experimental — added in typed-surface P1 */
+export function renderTypesBlock(ir: IRComponent, opts: RenderTypesBlockOptions = {}): string {
   if (ir.types === null) return '';
-  const stmts = ir.types.statements;
-  return stmts
-    .map((stmt, i) => {
-      // Babel attaches a comment BETWEEN two statements to both — the previous
-      // statement's `trailingComments` and the next one's `leadingComments`.
-      // Each statement is generated on its own here, so drop the trailing copy
-      // the next statement will print as its leading comment (else it doubles).
-      const nextLeading = stmts[i + 1]?.leadingComments ?? [];
-      const trailing = stmt.trailingComments ?? [];
-      const sameComment = (a: { start?: number | null }, b: { start?: number | null }): boolean =>
-        a === b || (a.start != null && a.start === b.start);
-      const kept = trailing.filter((c) => !nextLeading.some((n) => sameComment(c, n)));
-      if (kept.length === trailing.length) return generate(stmt).code;
-      return generate({ ...stmt, trailingComments: kept.length > 0 ? kept : null } as typeof stmt).code;
-    })
-    .join('\n');
+  const stmts =
+    opts.module === true
+      ? typesStatementsForModule(ir.types.statements, ir.setupBody?.scriptProgram?.program.body)
+      : ir.types.statements;
+  if (stmts.length === 0) return '';
+  // ONE generate() over a synthetic program: @babel/generator tracks printed
+  // comments, so a comment Babel attached both as one statement's trailing and
+  // the next one's leading comment prints exactly once, in place.
+  return generate(t.program([...stmts])).code;
 }
 
 /**

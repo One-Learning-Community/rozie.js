@@ -1145,7 +1145,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
     interfaceDecls.push(genCode(typeDecl));
   }
   // Typed public surface P1 — `<types>` lands at module top, above `@Component`.
-  const typesBlock = renderTypesBlock(ir);
+  const typesBlock = renderTypesBlock(ir, { module: true });
   if (typesBlock !== '') interfaceDecls.push(typesBlock);
   const slotFieldDecls: string[] = [];
   // Dedupe by DISTINCT slot name — a template may reference the same named

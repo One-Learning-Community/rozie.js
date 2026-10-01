@@ -73,6 +73,14 @@ const OPAQUE_BLOCK_NAMES = new Set<string>([
   'emits',
 ]);
 
+/**
+ * htmlparser2's raw-text start sequences (v12 `specialStartSequences` +
+ * the `style`/`textarea` continuations): `<name` followed by whitespace, `/`,
+ * `>` or end-of-input switches the tokenizer into raw-text mode. Matched
+ * case-insensitively, exactly like the tokenizer.
+ */
+const RAWTEXT_OPEN_RE = /<(script|style|title|textarea|iframe|noembed|noframes|plaintext|xmp)(?=[\s/>]|$)/i;
+
 type BlockName =
   | 'props'
   | 'data'
@@ -443,6 +451,29 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
             // `<template>` stays in normal HTML mode (real nested elements).
             if (OPAQUE_BLOCK_NAMES.has(blockName)) {
               inOpaqueBlock = true;
+              // ROZ006 — htmlparser2 enters RAWTEXT mode on ANY `<script`/
+              // `<style`/… open sequence, even inside an opaque body, and then
+              // scans to `</script>`, swallowing this block's close and the
+              // rest of the envelope (previously a locationless ROZ977). Scan
+              // the body up to its own close and report the real cause.
+              const bodyStart = endIndex + 1;
+              const closeAt = source.toLowerCase().indexOf(`</${blockName}`, bodyStart);
+              const body = source.slice(bodyStart, closeAt < 0 ? source.length : closeAt);
+              const m = RAWTEXT_OPEN_RE.exec(body);
+              if (m) {
+                const at = bodyStart + m.index;
+                pushDiag({
+                  code: RozieErrorCode.RAWTEXT_TAG_IN_OPAQUE_BLOCK,
+                  severity: 'error',
+                  message: `The text '${m[0]}' inside the <${blockName}> block opens an HTML raw-text element: the .rozie tokenizer would treat everything up to '</${m[1]!.toLowerCase()}>' as its body, swallowing the rest of the file.`,
+                  loc: { start: at, end: at + m[0].length },
+                  hint: `Escape it by breaking the sequence — write '< ${m[1]}' (with a space) or '&lt;${m[1]}', or reword (e.g. 'the ${m[1]} block') — even inside a comment or string.`,
+                  ...(filename !== undefined ? { filename } : {}),
+                });
+                if (firstPrematureCloseOffset === -1 || at < firstPrematureCloseOffset) {
+                  firstPrematureCloseOffset = at;
+                }
+              }
             }
           } else {
             // Unknown top-level block — ROZ003.

@@ -139,4 +139,92 @@ export type Z = A | B // trailing
     expect(out.split('// header').length - 1).toBe(1);
     expect(out.split('// trailing').length - 1).toBe(1);
   });
+  it('a same-line trailing comment on a MIDDLE statement stays on that statement, once', () => {
+    const src = `<rozie name="C">
+<types>
+export interface A { a: number } // about A
+export interface B { b: number }
+</types>
+<template><div /></template>
+</rozie>`;
+    const out = renderTypesBlock(ir(src));
+    expect(out.split('// about A').length - 1).toBe(1);
+    // stays attached to A (before B), not moved below B
+    expect(out.indexOf('// about A')).toBeLessThan(out.indexOf('interface B'));
+    expect(out.indexOf('// about A')).toBeGreaterThan(out.indexOf('interface A'));
+  });
+});
+
+/**
+ * R16 (Task 18 review): a `<types>` `import type { X } from 'm'` and a `<script>`
+ * `import { X } from 'm'` land in ONE module scope on every target (TS2300).
+ * Same source + same imported name ⇒ the `<types>` specifier is dropped from the
+ * module placement (the value import already provides the type); a different
+ * source/imported name under the same local ⇒ ROZ024, located at the specifier.
+ * The sidecar / manifest renders (no script imports) keep the type import.
+ */
+describe('typed-surface: <types> vs <script> import dedupe (R16)', () => {
+  const DUP = `<rozie name="Dup">
+<types>
+import type { Thing, Other } from './lib'
+export interface DupInfo { thing: Thing; other: Other }
+</types>
+<emits>
+{ info: { payload: 'DupInfo' } }
+</emits>
+<script>
+import { Thing } from './lib'
+const make = () => new Thing()
+$onMount(() => { $emit('info', { thing: make(), other: null }) })
+function current() { return make() }
+$expose({ current }, { current: '() => Thing' })
+</script>
+<template><div /></template>
+</rozie>`;
+  for (const target of ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const) {
+    it(`${target}: the duplicated specifier is dropped from the module; the rest stays`, async () => {
+      const { compile } = await import('../compile.js');
+      const r = compile(DUP, { target, filename: 'Dup.rozie', sourceMap: false });
+      expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      expect(r.code).toMatch(/import type \{ Other \} from '\.\/lib';/);
+      expect(r.code).not.toMatch(/import type \{[^}]*\bThing\b/);
+      expect(r.code.match(/import \{ Thing \} from '\.\/lib'/g)).toHaveLength(1);
+    });
+  }
+  it('drops the whole import when every specifier duplicates a script import', async () => {
+    const { compile } = await import('../compile.js');
+    const r = compile(DUP.replace('Thing, Other }', 'Thing }').replace('; other: Other', '').replace(', other: null', ''), {
+      target: 'react', filename: 'Dup.rozie', sourceMap: false,
+    });
+    expect(r.code).not.toMatch(/import type \{[^}]*\} from '\.\/lib'/);
+  });
+  it('the React sidecar keeps the type import (no script imports there)', async () => {
+    const { compile } = await import('../compile.js');
+    const r = compile(DUP, { target: 'react', filename: 'Dup.rozie', sourceMap: false });
+    expect(r.types).toMatch(/import type \{ Thing, Other \} from '\.\/lib';/);
+  });
+  it('ROZ024: same local name bound to a different source/imported name is a located error', async () => {
+    const { compile } = await import('../compile.js');
+    for (const variant of [
+      DUP.replace("import { Thing } from './lib'", "import { Thing } from './other'"),
+      DUP.replace("import { Thing } from './lib'", "import { Widget as Thing } from './lib'"),
+    ]) {
+      const r = compile(variant, { target: 'react', filename: 'Dup.rozie', sourceMap: false });
+      const d = r.diagnostics.find((x) => x.code === 'ROZ024');
+      expect(d?.severity).toBe('error');
+      expect(variant.slice(d!.loc.start, d!.loc.end)).toBe('Thing');
+    }
+  });
+  it('a local `export type { X }` of a dropped binding becomes a re-export FROM its source', async () => {
+    const { compile } = await import('../compile.js');
+    const src = DUP.replace('export interface DupInfo', "export type { Thing as T2, Other }\nexport interface DupInfo");
+    for (const target of ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const) {
+      const r = compile(src, { target, filename: 'Dup.rozie', sourceMap: false });
+      expect(r.code).toMatch(/export type \{ Other \};/);
+      expect(r.code).toMatch(/export type \{ Thing as T2 \} from '\.\/lib';/);
+    }
+  });
+  it('no-op without <types> (byte-identical)', () => {
+    expect(renderTypesBlock(ir('<rozie name="N"><script>import { a } from "x"</script><template><div></div></template></rozie>'))).toBe('');
+  });
 });

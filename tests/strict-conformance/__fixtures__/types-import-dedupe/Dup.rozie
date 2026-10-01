@@ -1,0 +1,26 @@
+<!--
+  R16 fixture (typed-surface P1): `<types>` imports the type `Thing` that the
+  `<script>` imports as a value from the SAME module. Every target hoists both
+  into one module scope; the compiler drops the duplicated `<types>` specifier
+  from the module (the value import already provides the type), and a module
+  type that references `Thing` (DupInfo, DupHandle) must still resolve, and the
+  local `export type { Thing }` must still re-export it.
+-->
+<rozie name="Dup">
+<types>
+import type { Thing, Other } from './lib'
+export interface DupInfo { thing: Thing; other: Other | null }
+export type { Thing }
+</types>
+<emits>
+{ info: { payload: 'DupInfo' } }
+</emits>
+<script>
+import { Thing } from './lib'
+const make = () => new Thing()
+$onMount(() => { $emit('info', { thing: make(), other: null }) })
+function current() { return make() }
+$expose({ current }, { current: '() => Thing' })
+</script>
+<template><div class="dup" /></template>
+</rozie>

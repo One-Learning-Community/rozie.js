@@ -329,7 +329,7 @@ export function emitReact(ir: IRComponent, opts: EmitReactOptions = {}): EmitRea
     runtimeImports: runtimeImports.render(),
     userImports: userScriptImports,
     hoistedTypeDecls: userHoistedTypeDecls,
-    typesBlock: renderTypesBlock(ir),
+    typesBlock: renderTypesBlock(ir, { module: true }),
     cssModuleImport,
     globalCssImport,
     ctxInterfaces: tmpl.slotCtxInterfaces,

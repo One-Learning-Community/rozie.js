@@ -590,7 +590,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   // Typed public surface P1 — the authored `<types>` prelude, then the
   // generated `Rozie<Name>EventMap`, lead the module scope. Both are '' (and
   // filtered out) for a component without `<types>` / `<emits>`.
-  const typedSurfaceDecls = [renderTypesBlock(ir), renderLitEventMap(ir)].filter(
+  const typedSurfaceDecls = [renderTypesBlock(ir, { module: true }), renderLitEventMap(ir)].filter(
     (s) => s !== '',
   );
   const moduleScopeDecls = [

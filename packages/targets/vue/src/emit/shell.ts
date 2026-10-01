@@ -26,6 +26,8 @@
 import type { EncodedSourceMap } from '@ampproject/remapping';
 import type { BlockMap } from '@rozie/core';
 import MagicString from 'magic-string';
+import { parse as babelParse } from '@babel/parser';
+import * as t from '@babel/types';
 
 export interface ShellParts {
   /** Body of `<template>...</template>` — already produced by emitTemplate. */
@@ -215,48 +217,40 @@ function buildDefineOptionsLine(parts: ShellParts): string {
  * `import` that FOLLOWS any statement (here the prelude's `defineOptions(...)`)
  * fails with TS1232 — the same class the user-import hoist in emitScript.ts
  * fixes for `defineProps`. Insert the macro after the leading import run of the
- * script body instead. Returns the new body and the number of newlines inserted
- * ahead of the user code (for the source-map line offset); `null` when the body
- * has no leading imports (the prelude placement is already valid).
+ * script body instead.
+ *
+ * The boundary is AST-derived: the body is parsed (TS) and the macro goes after
+ * the LINE that ends the last leading `ImportDeclaration`, so a same-line
+ * trailing comment (`import x from 'y'; // c`) stays with its import. Returns
+ * the new body and the newlines inserted ahead of the user code (the shell's
+ * source-map line offset adds them back; the prelude lost the same two lines),
+ * or `null` when the body has no leading import / does not parse (the prelude
+ * placement is then kept).
  */
-function placeDefineOptionsAfterImports(
+/** @internal — exported for tests. */
+export function placeDefineOptionsAfterImports(
   body: string,
   optionsLine: string,
 ): { body: string; insertedNewlines: number } | null {
-  const lines = body.split('\n');
+  let program: t.Program;
+  try {
+    program = babelParse(body, {
+      sourceType: 'module',
+      plugins: ['typescript'],
+      errorRecovery: true,
+    }).program;
+  } catch {
+    return null;
+  }
   let lastImportEnd = -1;
-  let inImport = false;
-  let inBlockComment = false;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    if (inImport) {
-      if (/;\s*$/.test(line)) {
-        inImport = false;
-        lastImportEnd = i;
-      }
-      continue;
-    }
-    // Comments (e.g. a leading comment on a hoisted user import) are skipped.
-    if (inBlockComment) {
-      if (line.includes('*/')) inBlockComment = false;
-      continue;
-    }
-    const trimmed = line.trim();
-    if (trimmed === '' || trimmed.startsWith('//')) continue;
-    if (trimmed.startsWith('/*')) {
-      if (!trimmed.includes('*/')) inBlockComment = true;
-      continue;
-    }
-    if (/^import\s/.test(line)) {
-      if (/;\s*$/.test(line)) lastImportEnd = i;
-      else inImport = true;
-      continue;
-    }
-    break;
+  for (const stmt of program.body) {
+    if (!t.isImportDeclaration(stmt)) break;
+    lastImportEnd = stmt.end ?? -1;
   }
   if (lastImportEnd < 0) return null;
-  lines.splice(lastImportEnd + 1, 0, '', optionsLine);
-  return { body: lines.join('\n'), insertedNewlines: 2 };
+  const eol = body.indexOf('\n', lastImportEnd);
+  const at = eol < 0 ? body.length : eol;
+  return { body: `${body.slice(0, at)}\n\n${optionsLine}${body.slice(at)}`, insertedNewlines: 2 };
 }
 
 /** `<script lang="ts">…</script>` + blank line, or '' when nothing to emit. */

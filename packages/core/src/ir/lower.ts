@@ -62,6 +62,9 @@ import { inlineScriptPartials } from './inlineScriptPartials.js';
 import { expandMemo } from './lowerers/expandMemo.js';
 import type { ProducerResolver } from '../resolver/index.js';
 import * as t from '@babel/types';
+import { analyzeTypesScriptImports } from '../codegen/typesScriptImports.js';
+import { babelLocToRozieLoc } from '../parsers/parserPosition.js';
+import { RozieErrorCode } from '../diagnostics/codes.js';
 
 /**
  * @experimental — shape may change before v1.0
@@ -235,6 +238,19 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   const styles = ast.style ? lowerStyles(ast.style) : emptyStyles();
 
   const types = lowerTypesBlock(ast.types);
+  // R16 — a `<types>` import whose local name a `<script>` import binds to a
+  // DIFFERENT source/imported name cannot share the one emitted module scope.
+  if (types !== null) {
+    for (const c of analyzeTypesScriptImports(types.statements, ast.script?.program.program.body).conflicts) {
+      diagnostics.push({
+        code: RozieErrorCode.TYPES_SCRIPT_IMPORT_CONFLICT,
+        severity: 'error',
+        message: `<types> imports \`${c.local}\` from '${c.typesSource}', but <script> already binds \`${c.local}\` to ${c.scriptImported === 'default' ? 'the default export' : c.scriptImported === '*' ? 'the namespace' : `\`${c.scriptImported}\``} of '${c.scriptSource}' — both land in one module scope on every target.`,
+        loc: babelLocToRozieLoc(c.specifier.local),
+        hint: `Import the same binding in both blocks, or rename one with \`as\` (e.g. \`import type { ${c.local} as ${c.local}Type } from '${c.typesSource}'\`).`,
+      });
+    }
+  }
   const emitDecls = lowerEmitsBlock(ast.emits, diagnostics);
   validateEmitCompleteness(emitDecls, bindings.emits, ast.emits?.loc, diagnostics);
 

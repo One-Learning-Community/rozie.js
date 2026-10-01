@@ -92,3 +92,64 @@ describe('Vue emitter — defineOptions follows the imports when a module script
     );
   });
 });
+
+/**
+ * Task 18 review (R17-4): the defineOptions placement is AST-derived, so an
+ * import with a same-line trailing comment keeps working; and the source map
+ * still lands user code on its own `.rozie` line after the move.
+ */
+describe('Vue emitter — defineOptions placement robustness', () => {
+  const optsSrc = (importLine: string) => `<rozie name="T" inherit-attrs="false" inherit-listeners="false">
+<props>
+{ n: { type: Number, default: 0 } }
+</props>
+<script>
+${importLine}
+const bump = () => { return clamp($props.n + 1) }
+$expose({ bump }, { bump: '() => void' })
+</script>
+<template><div>{{ $props.n }}</div></template>
+</rozie>
+`;
+
+  it('an import with a same-line trailing comment: defineOptions still follows it, valid output', () => {
+    const out = emit(optsSrc(`import { clamp } from './util'; // why`));
+    const setup = out.slice(out.indexOf('<script setup lang="ts">'));
+    const opts = setup.indexOf('defineOptions({ inheritAttrs: false });');
+    expect(opts).toBeGreaterThan(setup.indexOf(`import { clamp } from './util';`));
+    expect(opts).toBeLessThan(setup.indexOf('defineProps'));
+    // nothing but whitespace/comments between the import line and the macro
+    const between = setup.slice(setup.indexOf(`import { clamp } from './util';`), opts).split('\n').slice(1);
+    for (const l of between) expect(l.trim() === '' || l.trim().startsWith('//')).toBe(true);
+  });
+
+  it('source map: user code still maps to its .rozie line after the move', async () => {
+    const { SourceMapConsumer } = await import('source-map-js');
+    const src = optsSrc(`import { clamp } from './util';`);
+    const { ast } = parse(src, { filename: 'T.rozie' });
+    const { ir } = lowerToIR(ast!, { modifierRegistry: createDefaultRegistry() });
+    const r = emitVue(ir!, { filename: 'T.rozie', source: src });
+    const genLine = r.code.split('\n').findIndex((l) => l.includes('const bump')) + 1;
+    const srcLine = src.split('\n').findIndex((l) => l.includes('const bump')) + 1;
+    const c = new SourceMapConsumer(r.map as never);
+    const pos = c.originalPositionFor({ line: genLine, column: r.code.split('\n')[genLine - 1]!.indexOf('const') });
+    expect(pos.line).toBe(srcLine);
+  });
+});
+
+describe('placeDefineOptionsAfterImports (unit)', () => {
+  it('handles a same-line trailing comment and a multi-line import', async () => {
+    const { placeDefineOptionsAfterImports } = await import('../emit/shell.js');
+    const body = `import a from 'b'; // c\nimport {\n  x,\n  y,\n} from 'z';\n\nconst props = defineProps<{ n: number }>();`;
+    const r = placeDefineOptionsAfterImports(body, 'defineOptions({ inheritAttrs: false });');
+    expect(r?.body).toBe(
+      `import a from 'b'; // c\nimport {\n  x,\n  y,\n} from 'z';\n\ndefineOptions({ inheritAttrs: false });\n\nconst props = defineProps<{ n: number }>();`,
+    );
+    expect(r?.insertedNewlines).toBe(2);
+    // the trailing-comment import as the LAST import: a line-regex scanner read
+    // it as an unterminated import and swallowed `defineProps` into the run.
+    const last = placeDefineOptionsAfterImports(`import a from 'b'; // c\n\nconst props = defineProps();`, 'X;');
+    expect(last?.body).toBe(`import a from 'b'; // c\n\nX;\n\nconst props = defineProps();`);
+    expect(placeDefineOptionsAfterImports(`const a = 1;`, 'x;')).toBeNull();
+  });
+});

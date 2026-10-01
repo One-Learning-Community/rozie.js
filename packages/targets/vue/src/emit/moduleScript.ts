@@ -18,7 +18,7 @@ import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHan
 export function buildVueModuleScript(ir: IRComponent): string {
   const hasSignatures = (ir.expose ?? []).some((e) => e.signature !== undefined);
   return [
-    renderTypesBlock(ir),
+    renderTypesBlock(ir, { module: true }),
     hasSignatures ? `export ${synthesizeHandleType(ir, `${ir.name}Handle`)}` : '',
   ]
     .filter(Boolean)

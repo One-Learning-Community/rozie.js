@@ -431,3 +431,43 @@ const s = '</script>';
     }
   });
 });
+
+// Task 18 review (R17-3): a `<script`/`<style` (or any other htmlparser2
+// RAWTEXT tag) inside an OPAQUE block body (`<types>`, `<emits>`, `<props>`, …)
+// switches the tokenizer into raw-text mode and swallows the rest of the file.
+// Before: a locationless ROZ977 "internal failure" from compile(). Now: ROZ006,
+// located at the offending `<script`, with an escape hint — and no cascade.
+describe('raw-text tag inside an opaque block — ROZ006', () => {
+  const src = (body: string) => `<rozie name="X">
+<types>
+// always TypeScript, whatever the ${body} lang
+export interface P { a: number }
+</types>
+<script>
+const x = 1
+</script>
+<template><div /></template>
+</rozie>
+`;
+  for (const tag of ['<script>', '<style>', '<textarea>']) {
+    it(`reports a located ROZ006 for ${tag} in a <types> comment`, () => {
+      const s = src(tag);
+      const r = splitBlocks(s, 'X.rozie');
+      const d = r.diagnostics.find((x) => x.code === 'ROZ006');
+      expect(d?.severity).toBe('error');
+      expect(s.slice(d!.loc.start, d!.loc.end)).toBe(tag.slice(0, -1));
+      expect(d!.hint).toMatch(/escape|space/i);
+      expect(r.diagnostics.filter((x) => x.code !== 'ROZ006' && x.severity === 'error')).toEqual([]);
+    });
+  }
+  it('compile() surfaces ROZ006 instead of the locationless ROZ977', async () => {
+    const { compile } = await import('../src/compile.js');
+    const r = compile(src('<script>'), { target: 'react', filename: 'X.rozie' });
+    expect(r.diagnostics.map((d) => d.code)).toContain('ROZ006');
+    expect(r.diagnostics.map((d) => d.code)).not.toContain('ROZ977');
+  });
+  it('no false positive: `<scripts>` / `Array<ScriptX>` / `< style` are not raw-text tags', () => {
+    const r = splitBlocks(src('<scripts> Array<ScriptX> x < style'), 'X.rozie');
+    expect(r.diagnostics.find((x) => x.code === 'ROZ006')).toBeUndefined();
+  });
+});

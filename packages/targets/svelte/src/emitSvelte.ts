@@ -274,7 +274,7 @@ export function emitSvelte(ir: IRComponent, opts: EmitSvelteOptions = {}): EmitS
     scriptMap,
     preambleSectionLines,
     componentImportsBlock,
-    moduleScript: renderTypesBlock(ir),
+    moduleScript: renderTypesBlock(ir, { module: true }),
   });
 
   const code = ms.toString();
