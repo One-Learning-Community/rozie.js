@@ -37,7 +37,7 @@ function compiled(target: 'react' | 'solid' | 'lit'): string {
 const barrel = (target: string): string => readFileSync(resolve(FC, 'packages', target, 'src/index.ts'), 'utf8');
 
 const REACT_PRELUDE = `import { useRef } from 'react';
-import FullCalendar, { type FullCalendarHandle, type EventContentArg, type FullCalendarEventPointer } from './index';
+import FullCalendar, { type FullCalendarHandle, type EventContentArg, type FullCalendarEventPointer, type FullCalendarEventClick } from './index';
 const h = useRef<FullCalendarHandle>(null);
 `;
 const REACT_OK = `${REACT_PRELUDE}
@@ -49,7 +49,8 @@ void d;
 export const ok = (
   <FullCalendar
     ref={h}
-    onEventClick={(p) => { const id: string = p.event.id; p.jsEvent.preventDefault(); const q: FullCalendarEventPointer = p; void id; void q; }}
+    onEventClick={(p) => { const id: string = p.event.id; p.jsEvent.preventDefault(); const q: FullCalendarEventClick = p; void id; void q; }}
+    onEventMouseEnter={(p) => { const x: number = p.jsEvent.clientX; const q: FullCalendarEventPointer = p; void x; void q; }}
     onDatesSet={(p) => { const v: string = p.view; void v; }}
     onLoading={(p) => { const b: boolean = p.isLoading; void b; }}
     onUnselect={(p) => { p.jsEvent?.preventDefault(); }}
@@ -58,13 +59,14 @@ export const ok = (
 );
 `;
 const REACT_NEG = {
+  keyboard: { line: `export const bad = <FullCalendar onEventClick={(p) => p.jsEvent.clientX} />;`, match: /TS2339: Property 'clientX' does not exist on type 'MouseEvent \| KeyboardEvent'/ },
   payload: { line: `export const bad = <FullCalendar onEventClick={(p) => p.event.nope} />;`, match: /TS2339: Property 'nope' does not exist on type 'FullCalendarEventRef'/ },
   nullable: { line: `export const bad = <FullCalendar onUnselect={(p) => p.jsEvent.preventDefault()} />;`, match: /TS18047: 'p\.jsEvent' is possibly 'null'/ },
   slot: { line: `export const bad = <FullCalendar renderEvent={({ arg }) => arg.nope} />;`, match: /TS2339: Property 'nope' does not exist on type 'EventContentArg'/ },
   verb: { line: `h.current?.gotoDate();`, match: /TS2554: Expected 1 arguments, but got 0/ },
 };
 
-const SOLID_PRELUDE = `import FullCalendar, { type FullCalendarHandle, type EventContentArg, type FullCalendarEventPointer } from './index';
+const SOLID_PRELUDE = `import FullCalendar, { type FullCalendarHandle, type EventContentArg, type FullCalendarEventPointer, type FullCalendarEventClick } from './index';
 let h: FullCalendarHandle | undefined;
 `;
 const SOLID_OK = `${SOLID_PRELUDE}
@@ -74,7 +76,8 @@ h?.changeView('dayGridMonth');
 export const ok = (
   <FullCalendar
     ref={(x) => { h = x; }}
-    onEventClick={(p) => { const id: string = p.event.id; p.jsEvent.preventDefault(); const q: FullCalendarEventPointer = p; void id; void q; }}
+    onEventClick={(p) => { const id: string = p.event.id; p.jsEvent.preventDefault(); const q: FullCalendarEventClick = p; void id; void q; }}
+    onEventMouseEnter={(p) => { const x: number = p.jsEvent.clientX; const q: FullCalendarEventPointer = p; void x; void q; }}
     onDatesSet={(p) => { const v: string = p.view; void v; }}
     onLoading={(p) => { const b: boolean = p.isLoading; void b; }}
     onUnselect={(p) => { p.jsEvent?.preventDefault(); }}
@@ -83,17 +86,19 @@ export const ok = (
 );
 `;
 const SOLID_NEG = {
+  keyboard: { line: `export const bad = <FullCalendar onEventClick={(p) => p.jsEvent.clientX} />;`, match: /TS2339: Property 'clientX' does not exist on type 'MouseEvent \| KeyboardEvent'/ },
   payload: { line: `export const bad = <FullCalendar onEventClick={(p) => p.event.nope} />;`, match: /TS2339: Property 'nope' does not exist on type 'FullCalendarEventRef'/ },
   nullable: { line: `export const bad = <FullCalendar onUnselect={(p) => p.jsEvent.preventDefault()} />;`, match: /TS18047: 'p\.jsEvent' is possibly 'null'/ },
   slot: { line: `export const bad = <FullCalendar eventSlot={({ arg }) => <span>{arg.nope}</span>} />;`, match: /TS2339: Property 'nope' does not exist on type 'EventContentArg'/ },
   verb: { line: `h?.gotoDate();`, match: /TS2554: Expected 1 arguments, but got 0/ },
 };
 
-const LIT_PRELUDE = `import FullCalendar, { type EventContentArg, type FullCalendarEventPointer, type RozieFullCalendarEventMap } from './index';
+const LIT_PRELUDE = `import FullCalendar, { type EventContentArg, type FullCalendarEventPointer, type FullCalendarEventClick, type RozieFullCalendarEventMap } from './index';
 declare const el: FullCalendar;
 `;
 const LIT_OK = `${LIT_PRELUDE}
-el.addEventListener('event-click', (e) => { const id: string = e.detail.event.id; e.detail.jsEvent.preventDefault(); const q: FullCalendarEventPointer = e.detail; void id; void q; });
+el.addEventListener('event-click', (e) => { const id: string = e.detail.event.id; e.detail.jsEvent.preventDefault(); const q: FullCalendarEventClick = e.detail; void id; void q; });
+el.addEventListener('event-mouse-enter', (e) => { const x: number = e.detail.jsEvent.clientX; const q: FullCalendarEventPointer = e.detail; void x; void q; });
 el.addEventListener('dates-set', (e) => { const v: string = e.detail.view; void v; });
 el.addEventListener('loading', (e) => { const b: boolean = e.detail.isLoading; void b; });
 el.addEventListener('unselect', (e) => { e.detail.jsEvent?.preventDefault(); });
@@ -106,6 +111,7 @@ el.changeView('dayGridMonth');
 el.event = ({ arg }) => { const a: EventContentArg = arg; return arg.event.title + a.timeText; };
 `;
 const LIT_NEG = {
+  keyboard: { line: `el.addEventListener('event-click', (e) => e.detail.jsEvent.clientX);`, match: /TS2339: Property 'clientX' does not exist on type 'MouseEvent \| KeyboardEvent'/ },
   payload: { line: `el.addEventListener('event-click', (e) => e.detail.event.nope);`, match: /TS2339: Property 'nope' does not exist on type 'FullCalendarEventRef'/ },
   nullable: { line: `el.addEventListener('unselect', (e) => e.detail.jsEvent.preventDefault());`, match: /TS18047: 'e\.detail\.jsEvent' is possibly 'null'/ },
   slot: { line: `el.event = ({ arg }) => arg.nope;`, match: /TS2339: Property 'nope' does not exist on type 'EventContentArg'/ },

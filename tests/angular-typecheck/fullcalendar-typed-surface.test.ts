@@ -22,7 +22,7 @@ const LEAF = resolve(ROOT, 'packages/ui/fullcalendar/packages/angular');
 const SRC = readFileSync(resolve(ROOT, 'packages/ui/fullcalendar/src/FullCalendar.rozie'), 'utf8');
 const BARREL = readFileSync(resolve(LEAF, 'src/index.ts'), 'utf8');
 
-const PRELUDE = `import { FullCalendar, type EventContentArg, type FullCalendarEventPointer, type FullCalendarDatesSet } from './index';
+const PRELUDE = `import { FullCalendar, type EventContentArg, type FullCalendarEventPointer, type FullCalendarEventClick, type FullCalendarDatesSet } from './index';
 import type { TemplateRef, OutputEmitterRef } from '@angular/core';
 declare const c: FullCalendar;
 type EventCtx = NonNullable<FullCalendar['eventTpl']> extends TemplateRef<infer C> ? C : never;
@@ -30,7 +30,8 @@ type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B 
 `;
 
 const OK = `${PRELUDE}
-c.eventClick.subscribe((p) => { const id: string = p.event.id; p.jsEvent.preventDefault(); const q: FullCalendarEventPointer = p; void id; void q; });
+c.eventClick.subscribe((p) => { const id: string = p.event.id; p.jsEvent.preventDefault(); const q: FullCalendarEventClick = p; void id; void q; });
+c.eventMouseEnter.subscribe((p) => { const x: number = p.jsEvent.clientX; const q: FullCalendarEventPointer = p; void x; void q; });
 c.datesSet.subscribe((p) => { const v: string = p.view; void v; });
 c.loading.subscribe((p) => { const b: boolean = p.isLoading; void b; });
 c.unselect.subscribe((p) => p.jsEvent?.preventDefault());
@@ -49,6 +50,11 @@ const NEGATIVES: Array<{ name: string; body: string; match: RegExp }> = [
     name: 'eventClick payload event ref has no `nope`',
     body: `c.eventClick.subscribe((p) => p.event.nope);`,
     match: /TS2339: Property 'nope' does not exist on type 'FullCalendarEventRef'/,
+  },
+  {
+    name: 'eventClick jsEvent may be a KeyboardEvent (no clientX on the union)',
+    body: `c.eventClick.subscribe((p) => p.jsEvent.clientX);`,
+    match: /TS2339: Property 'clientX' does not exist on type 'MouseEvent \| KeyboardEvent'/,
   },
   {
     name: 'unselect jsEvent is nullable (programmatic clearSelection)',
@@ -102,7 +108,7 @@ describe('ANGULAR-FULLCALENDAR-TYPED-SURFACE — typed outputs, portal-slot ctx,
 
   it('compiles without errors and emits typed outputs', () => {
     expect(r0.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
-    expect(ng).toMatch(/eventClick = output<FullCalendarEventPointer>\(\);/);
+    expect(ng).toMatch(/eventClick = output<FullCalendarEventClick>\(\);/);
   });
 
   it('typed consumer tsc-checks clean', () => {

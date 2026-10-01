@@ -24,7 +24,7 @@ const ROOT = resolve(HERE, '../..');
 const LEAF = resolve(ROOT, 'packages/ui/fullcalendar/packages/svelte');
 const SRC = readFileSync(resolve(ROOT, 'packages/ui/fullcalendar/src/FullCalendar.rozie'), 'utf8');
 
-const IMPORTS = `import FullCalendar, { type EventContentArg, type FullCalendarEventPointer } from './FullCalendar.svelte';`;
+const IMPORTS = `import FullCalendar, { type EventContentArg, type FullCalendarEventPointer, type FullCalendarEventClick } from './FullCalendar.svelte';`;
 
 const OK = `<script lang="ts">
   ${IMPORTS}
@@ -32,7 +32,7 @@ const OK = `<script lang="ts">
   inst?.getApi()?.render();
   inst?.gotoDate('2026-01-01');
   inst?.changeView('dayGridMonth');
-  const onClick = (p: FullCalendarEventPointer) => { const id: string = p.event.id; p.jsEvent.preventDefault(); void id; };
+  const onClick = (p: FullCalendarEventClick) => { const id: string = p.event.id; p.jsEvent.preventDefault(); void id; };
 </script>
 
 <FullCalendar
@@ -50,6 +50,11 @@ const NEGATIVES: Array<{ name: string; markup: string; script?: string; match: R
     name: 'eventClick payload event ref has no `nope`',
     markup: `<FullCalendar oneventclick={(p) => p.event.nope} />`,
     match: /Property 'nope' does not exist on type 'FullCalendarEventRef'/,
+  },
+  {
+    name: 'eventClick jsEvent may be a KeyboardEvent (no clientX on the union)',
+    markup: `<FullCalendar oneventclick={(p) => p.jsEvent.clientX} />`,
+    match: /Property 'clientX' does not exist on type 'MouseEvent \| KeyboardEvent'/,
   },
   {
     name: 'event snippet arg is EventContentArg',
@@ -106,7 +111,7 @@ describe('SVELTE-FULLCALENDAR-TYPED-SURFACE — typed payloads, portal-slot arg,
 
   for (const neg of NEGATIVES) {
     it(`negative fails for the right reason: ${neg.name}`, () => {
-      const consumer = `<script lang="ts">\n  ${IMPORTS}\n  void (null as EventContentArg | FullCalendarEventPointer | null);\n  ${neg.script ?? ''}\n</script>\n\n${neg.markup}\n`;
+      const consumer = `<script lang="ts">\n  ${IMPORTS}\n  void (null as EventContentArg | FullCalendarEventPointer | FullCalendarEventClick | null);\n  ${neg.script ?? ''}\n</script>\n\n${neg.markup}\n`;
       const r = svelteCheck({ 'FullCalendar.svelte': svelte, 'Consumer.svelte': consumer });
       expect(r.threw).toBe(true);
       expect(r.output).toMatch(neg.match);

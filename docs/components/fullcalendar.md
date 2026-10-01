@@ -162,7 +162,7 @@ el.addEventListener('event-click', (e) => {
 
 | Event | Description |
 | --- | --- |
-| `eventClick` | An event was clicked. Payload: `{ event: { id, title, start, end }, jsEvent, el }`. `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip). |
+| `eventClick` | An event was clicked, or activated with Enter/Space. Payload: `{ event: { id, title, start, end }, jsEvent, el }` — `jsEvent` is a `MouseEvent`, or a `KeyboardEvent` for keyboard activation. `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip). |
 | `dateClick` | A date/cell was clicked. Payload: `{ date, dateStr, allDay }`. |
 | `eventDrop` | An event was dragged to a new date. Payload: `{ event: { id, title, start, end }, delta }`. |
 | `select` | A date/time range was selected. Payload: `{ start, end, startStr, endStr, allDay }`. |
@@ -170,7 +170,7 @@ el.addEventListener('event-click', (e) => {
 | `datesSet` | The visible date range changed (navigation or view switch). Payload: `{ start, end, view }`. |
 | `eventMouseEnter` | The pointer entered a calendar event. Payload: `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventClick`). |
 | `eventMouseLeave` | The pointer left a calendar event. Payload: `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventMouseEnter`). |
-| `unselect` | A previously selected date/time range was cleared. Payload: `{ jsEvent }` — `jsEvent` is `null` when the selection was cleared programmatically (e.g. `clearSelection()`). |
+| `unselect` | A previously selected date/time range was cleared. Payload: `{ jsEvent }` — the pointer/touch `UIEvent` that cleared it, or `null` when the selection was cleared programmatically (e.g. `clearSelection()`). |
 | `loading` | The calendar began or finished loading events (e.g. from an event source). Payload: `{ isLoading }` boolean. It fires only while FullCalendar fetches an event source itself; with only the `events` array bound it never fires — see [`loading` fires only for fetched sources](#loading-fires-only-for-fetched-sources). |
 | `eventsSet` | The set of rendered events changed. Payload: `{ events: [{ id, title, start, end }, …] }` — the normalized current event set, for persistence/sync consumers. |
 

@@ -42,30 +42,29 @@
 // `{ id, title, start, end }` event refs, the view TYPE string, `{ isLoading }`),
 // not FullCalendar's raw callback args. Engine types come from the
 // `@fullcalendar/core` peer and are re-exported so consumers can name them.
-// `Calendar` is NOT imported here: the script's value import of the same name
-// shares the emitted module scope on every target, so it is re-exported
-// straight from the peer and the `getApi` signature names it via `import()`.
 import type {
-  DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput,
+  Calendar, DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput,
   EventSourceApi, ViewApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg,
   WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg,
 } from '@fullcalendar/core'
 export interface FullCalendarEventRef { id: string; title: string; start: Date | null; end: Date | null }
+/** `eventClick` payload — `jsEvent` is a `KeyboardEvent` when the event is activated with Enter/Space. */
+export interface FullCalendarEventClick { event: FullCalendarEventRef; jsEvent: MouseEvent | KeyboardEvent; el: HTMLElement }
+/** `eventMouseEnter` / `eventMouseLeave` payload. */
 export interface FullCalendarEventPointer { event: FullCalendarEventRef; jsEvent: MouseEvent; el: HTMLElement }
 export interface FullCalendarDateClick { date: Date; dateStr: string; allDay: boolean }
 export interface FullCalendarEventDrop { event: FullCalendarEventRef; delta: Duration }
 export interface FullCalendarSelection { start: Date; end: Date; startStr: string; endStr: string; allDay: boolean }
 export interface FullCalendarEventResize { event: FullCalendarEventRef; startDelta: Duration; endDelta: Duration }
 export interface FullCalendarDatesSet { start: Date; end: Date; view: string }
-/** `jsEvent` is `null` when the selection is cleared programmatically (e.g. the `clearSelection` verb). */
-export interface FullCalendarUnselect { jsEvent: MouseEvent | null }
+/** `jsEvent` is the pointer/touch `UIEvent` that cleared the selection, or `null` when it was cleared programmatically (e.g. the `clearSelection` verb). */
+export interface FullCalendarUnselect { jsEvent: UIEvent | null }
 export interface FullCalendarLoading { isLoading: boolean }
 export interface FullCalendarEventsSet { events: FullCalendarEventRef[] }
 /** `noEventsContent` arg — `@fullcalendar/list`'s NoEventsContentArg, restated so the core-only peer set suffices. */
 export interface FullCalendarNoEventsContentArg { text: string; view: ViewApi }
-export type { Calendar } from '@fullcalendar/core'
 export type {
-  DateInput, EventApi, EventInput, EventContentArg, DayCellContentArg, DayHeaderContentArg,
+  Calendar, DateInput, EventApi, EventInput, EventContentArg, DayCellContentArg, DayHeaderContentArg,
   SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg,
 }
 </types>
@@ -192,15 +191,15 @@ export type {
 
 <emits>
 {
-  eventClick: { payload: 'FullCalendarEventPointer', docs: { description: "Fired when a calendar event is clicked. `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip)." } },
+  eventClick: { payload: 'FullCalendarEventClick', docs: { description: "Fired when a calendar event is clicked, or activated with Enter/Space (then `jsEvent` is a `KeyboardEvent`). `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip)." } },
   dateClick: { payload: 'FullCalendarDateClick', docs: { description: 'Fired when an empty date/time cell is clicked.' } },
   eventDrop: { payload: 'FullCalendarEventDrop', docs: { description: 'Fired after an event is dragged to a new date/time.' } },
   select: { payload: 'FullCalendarSelection', docs: { description: 'Fired when a date/time range is selected by drag (requires `selectable`).' } },
   eventResize: { payload: 'FullCalendarEventResize', docs: { description: 'Fired after an event is resized by dragging its edge (requires `editable`).' } },
   datesSet: { payload: 'FullCalendarDatesSet', docs: { description: 'Fired whenever the visible date range changes (navigation or view switch). `view` is the active view type string.' } },
-  eventMouseEnter: { payload: 'FullCalendarEventPointer', docs: { description: 'Fired when the pointer enters a calendar event (payload mirrors `eventClick`).' } },
+  eventMouseEnter: { payload: 'FullCalendarEventPointer', docs: { description: 'Fired when the pointer enters a calendar event (payload mirrors `eventClick`, with `jsEvent` always a `MouseEvent`).' } },
   eventMouseLeave: { payload: 'FullCalendarEventPointer', docs: { description: 'Fired when the pointer leaves a calendar event (payload mirrors `eventMouseEnter`).' } },
-  unselect: { payload: 'FullCalendarUnselect', docs: { description: 'Fired when a previously selected date/time range is cleared. `jsEvent` is `null` when it was cleared programmatically (e.g. `clearSelection`).' } },
+  unselect: { payload: 'FullCalendarUnselect', docs: { description: 'Fired when a previously selected date/time range is cleared. `jsEvent` is the pointer/touch `UIEvent`, or `null` when it was cleared programmatically (e.g. `clearSelection`).' } },
   loading: { payload: 'FullCalendarLoading', docs: { description: 'Fired when the calendar begins or finishes loading events. It fires only while FullCalendar fetches an event source itself (a URL/JSON feed or a function source); with only the `events` array bound it never fires (see Gotchas).' } },
   eventsSet: { payload: 'FullCalendarEventsSet', docs: { description: 'Fired after the set of rendered events changes — the normalized current event set, for persistence/sync consumers.' } },
 }
@@ -471,8 +470,8 @@ $watch(() => $props.options, (v) => {
 // drive through props alone — exposed uniformly to all 6 targets
 // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
 // Angular+Lit public method / Solid callback ref). Each delegates to the
-// underlying Calendar instance, which is null before $onMount and after
-// destroy — callers handle the pre-mount null.
+// underlying Calendar instance, which is null before $onMount (unmount
+// destroys it but keeps the reference) — callers handle the pre-mount null.
 //
 // Collision discipline (the load-bearing flatpickr lesson): no exposed name may
 // collide with an emitted event (eventClick/dateClick/eventDrop/eventResize/
@@ -508,7 +507,7 @@ $expose({
   getDate, getEvents, scrollToTime, updateSize, prevYear, nextYear,
   selectRange, clearSelection,
 }, {
-  getApi: "() => import('@fullcalendar/core').Calendar | null",
+  getApi: '() => Calendar | null',
   changeView: '(viewType: string, dateOrRange?: DateRangeInput | DateInput) => void',
   addEvent: '(event: EventInput, source?: EventSourceApi | string | boolean) => EventApi | null | undefined',
   removeEvent: '(id: string) => void',

@@ -4,9 +4,6 @@
 // `{ id, title, start, end }` event refs, the view TYPE string, `{ isLoading }`),
 // not FullCalendar's raw callback args. Engine types come from the
 // `@fullcalendar/core` peer and are re-exported so consumers can name them.
-// `Calendar` is NOT imported here: the script's value import of the same name
-// shares the emitted module scope on every target, so it is re-exported
-// straight from the peer and the `getApi` signature names it via `import()`.
 import type { DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput, EventSourceApi, ViewApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg } from '@fullcalendar/core';
 export interface FullCalendarEventRef {
   id: string;
@@ -14,6 +11,13 @@ export interface FullCalendarEventRef {
   start: Date | null;
   end: Date | null;
 }
+/** `eventClick` payload — `jsEvent` is a `KeyboardEvent` when the event is activated with Enter/Space. */
+export interface FullCalendarEventClick {
+  event: FullCalendarEventRef;
+  jsEvent: MouseEvent | KeyboardEvent;
+  el: HTMLElement;
+}
+/** `eventMouseEnter` / `eventMouseLeave` payload. */
 export interface FullCalendarEventPointer {
   event: FullCalendarEventRef;
   jsEvent: MouseEvent;
@@ -45,9 +49,9 @@ export interface FullCalendarDatesSet {
   end: Date;
   view: string;
 }
-/** `jsEvent` is `null` when the selection is cleared programmatically (e.g. the `clearSelection` verb). */
+/** `jsEvent` is the pointer/touch `UIEvent` that cleared the selection, or `null` when it was cleared programmatically (e.g. the `clearSelection` verb). */
 export interface FullCalendarUnselect {
-  jsEvent: MouseEvent | null;
+  jsEvent: UIEvent | null;
 }
 export interface FullCalendarLoading {
   isLoading: boolean;
@@ -60,8 +64,8 @@ export interface FullCalendarNoEventsContentArg {
   text: string;
   view: ViewApi;
 }
-export type { Calendar } from '@fullcalendar/core';
 export type { DateInput, EventApi, EventInput, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg };
+export type { Calendar } from '@fullcalendar/core';
 </script>
 <script lang="ts">
 import type { Snippet } from 'svelte';
@@ -135,7 +139,7 @@ interface Props {
   slotLaneContent?: Snippet<[{ arg: SlotLaneContentArg }]>;
   noEventsContent?: Snippet<[{ arg: FullCalendarNoEventsContentArg }]>;
   snippets?: Record<string, any>;
-  oneventclick?: (payload: FullCalendarEventPointer) => void;
+  oneventclick?: (payload: FullCalendarEventClick) => void;
   ondateclick?: (payload: FullCalendarDateClick) => void;
   oneventdrop?: (payload: FullCalendarEventDrop) => void;
   onselect?: (payload: FullCalendarSelection) => void;
@@ -381,13 +385,13 @@ const normalizeEvent = (e: any) => {
     color: e.color || defaultColor
   };
 };
-export function getApi(): import('@fullcalendar/core').Calendar | null;
+export function getApi(): Calendar | null;
 // Imperative handle (Phase 21 $expose). The 16 calendar verbs a consumer can't
 // drive through props alone — exposed uniformly to all 6 targets
 // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
 // Angular+Lit public method / Solid callback ref). Each delegates to the
-// underlying Calendar instance, which is null before $onMount and after
-// destroy — callers handle the pre-mount null.
+// underlying Calendar instance, which is null before $onMount (unmount
+// destroys it but keeps the reference) — callers handle the pre-mount null.
 //
 // Collision discipline (the load-bearing flatpickr lesson): no exposed name may
 // collide with an emitted event (eventClick/dateClick/eventDrop/eventResize/

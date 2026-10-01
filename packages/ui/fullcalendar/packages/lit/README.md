@@ -54,15 +54,15 @@ el.addEventListener('event-click', (e) => {
 
 | Event | Payload | Description |
 | --- | --- | --- |
-| `event-click` | `FullCalendarEventPointer` | Fired when a calendar event is clicked. `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip). |
+| `event-click` | `FullCalendarEventClick` | Fired when a calendar event is clicked, or activated with Enter/Space (then `jsEvent` is a `KeyboardEvent`). `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip). |
 | `date-click` | `FullCalendarDateClick` | Fired when an empty date/time cell is clicked. |
 | `event-drop` | `FullCalendarEventDrop` | Fired after an event is dragged to a new date/time. |
 | `select` | `FullCalendarSelection` | Fired when a date/time range is selected by drag (requires `selectable`). |
 | `event-resize` | `FullCalendarEventResize` | Fired after an event is resized by dragging its edge (requires `editable`). |
 | `dates-set` | `FullCalendarDatesSet` | Fired whenever the visible date range changes (navigation or view switch). `view` is the active view type string. |
-| `event-mouse-enter` | `FullCalendarEventPointer` | Fired when the pointer enters a calendar event (payload mirrors `eventClick`). |
+| `event-mouse-enter` | `FullCalendarEventPointer` | Fired when the pointer enters a calendar event (payload mirrors `eventClick`, with `jsEvent` always a `MouseEvent`). |
 | `event-mouse-leave` | `FullCalendarEventPointer` | Fired when the pointer leaves a calendar event (payload mirrors `eventMouseEnter`). |
-| `unselect` | `FullCalendarUnselect` | Fired when a previously selected date/time range is cleared. `jsEvent` is `null` when it was cleared programmatically (e.g. `clearSelection`). |
+| `unselect` | `FullCalendarUnselect` | Fired when a previously selected date/time range is cleared. `jsEvent` is the pointer/touch `UIEvent`, or `null` when it was cleared programmatically (e.g. `clearSelection`). |
 | `loading` | `FullCalendarLoading` | Fired when the calendar begins or finishes loading events. It fires only while FullCalendar fetches an event source itself (a URL/JSON feed or a function source); with only the `events` array bound it never fires (see Gotchas). |
 | `events-set` | `FullCalendarEventsSet` | Fired after the set of rendered events changes — the normalized current event set, for persistence/sync consumers. |
 

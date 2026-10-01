@@ -23,7 +23,7 @@ const SRC = readFileSync(resolve(ROOT, 'packages/ui/fullcalendar/src/FullCalenda
 const BARREL = readFileSync(resolve(LEAF, 'src/index.ts'), 'utf8');
 
 const IMPORTS = `import { ref } from 'vue';
-import { FullCalendar, type FullCalendarHandle, type EventContentArg, type FullCalendarEventPointer } from './index';`;
+import { FullCalendar, type FullCalendarHandle, type EventContentArg, type FullCalendarEventPointer, type FullCalendarEventClick } from './index';`;
 
 const OK = `<script setup lang="ts">
 ${IMPORTS}
@@ -31,12 +31,13 @@ const h = ref<FullCalendarHandle | null>(null);
 h.value?.getApi()?.render();
 h.value?.gotoDate('2026-01-01');
 h.value?.changeView('dayGridMonth');
-const onClick = (p: FullCalendarEventPointer) => { const id: string = p.event.id; p.jsEvent.preventDefault(); void id; };
+const onClick = (p: FullCalendarEventClick) => { const id: string = p.event.id; p.jsEvent.preventDefault(); void id; };
 </script>
 <template>
   <FullCalendar
     ref="h"
     @event-click="onClick"
+    @event-mouse-enter="(p: FullCalendarEventPointer) => { const x: number = p.jsEvent.clientX; void x; }"
     @dates-set="(p) => { const v: string = p.view; void v; }"
     @loading="(p) => { const b: boolean = p.isLoading; void b; }"
     @unselect="(p) => p.jsEvent?.preventDefault()"
@@ -51,6 +52,11 @@ const NEGATIVES: Array<{ name: string; script?: string; template: string; match:
     name: 'eventClick payload event ref has no `nope`',
     template: `<FullCalendar @event-click="(p) => p.event.nope" />`,
     match: /Property 'nope' does not exist on type 'FullCalendarEventRef'/,
+  },
+  {
+    name: 'eventClick jsEvent may be a KeyboardEvent (no clientX on the union)',
+    template: `<FullCalendar @event-click="(p) => p.jsEvent.clientX" />`,
+    match: /Property 'clientX' does not exist on type 'MouseEvent \| KeyboardEvent'/,
   },
   {
     name: 'unselect jsEvent is nullable (programmatic clearSelection)',
@@ -113,7 +119,7 @@ describe('VUE-FULLCALENDAR-TYPED-SURFACE — typed payloads, portal-slot arg, ha
 
   for (const neg of NEGATIVES) {
     it(`negative fails for the right reason: ${neg.name}`, () => {
-      const consumer = `<script setup lang="ts">\n${IMPORTS}\nvoid ref; void FullCalendar;\nvoid (null as FullCalendarHandle | EventContentArg | FullCalendarEventPointer | null);\n${neg.script ?? ''}\n</script>\n<template>\n  ${neg.template}\n</template>\n`;
+      const consumer = `<script setup lang="ts">\n${IMPORTS}\nvoid ref; void FullCalendar;\nvoid (null as FullCalendarHandle | EventContentArg | FullCalendarEventPointer | FullCalendarEventClick | null);\n${neg.script ?? ''}\n</script>\n<template>\n  ${neg.template}\n</template>\n`;
       const r = run({ 'FullCalendar.vue': vue, 'index.ts': BARREL, 'Consumer.vue': consumer });
       expect(r.ok).toBe(false);
       expect(r.out).toMatch(neg.match);

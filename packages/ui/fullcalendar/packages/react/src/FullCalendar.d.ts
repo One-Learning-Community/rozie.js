@@ -7,16 +7,20 @@ import type * as React from 'react';
 // `{ id, title, start, end }` event refs, the view TYPE string, `{ isLoading }`),
 // not FullCalendar's raw callback args. Engine types come from the
 // `@fullcalendar/core` peer and are re-exported so consumers can name them.
-// `Calendar` is NOT imported here: the script's value import of the same name
-// shares the emitted module scope on every target, so it is re-exported
-// straight from the peer and the `getApi` signature names it via `import()`.
-import type { DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput, EventSourceApi, ViewApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg } from '@fullcalendar/core';
+import type { Calendar, DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput, EventSourceApi, ViewApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg } from '@fullcalendar/core';
 export interface FullCalendarEventRef {
   id: string;
   title: string;
   start: Date | null;
   end: Date | null;
 }
+/** `eventClick` payload — `jsEvent` is a `KeyboardEvent` when the event is activated with Enter/Space. */
+export interface FullCalendarEventClick {
+  event: FullCalendarEventRef;
+  jsEvent: MouseEvent | KeyboardEvent;
+  el: HTMLElement;
+}
+/** `eventMouseEnter` / `eventMouseLeave` payload. */
 export interface FullCalendarEventPointer {
   event: FullCalendarEventRef;
   jsEvent: MouseEvent;
@@ -48,9 +52,9 @@ export interface FullCalendarDatesSet {
   end: Date;
   view: string;
 }
-/** `jsEvent` is `null` when the selection is cleared programmatically (e.g. the `clearSelection` verb). */
+/** `jsEvent` is the pointer/touch `UIEvent` that cleared the selection, or `null` when it was cleared programmatically (e.g. the `clearSelection` verb). */
 export interface FullCalendarUnselect {
-  jsEvent: MouseEvent | null;
+  jsEvent: UIEvent | null;
 }
 export interface FullCalendarLoading {
   isLoading: boolean;
@@ -63,8 +67,7 @@ export interface FullCalendarNoEventsContentArg {
   text: string;
   view: ViewApi;
 }
-export type { Calendar } from '@fullcalendar/core';
-export type { DateInput, EventApi, EventInput, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg };
+export type { Calendar, DateInput, EventApi, EventInput, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg };
 
 export interface FullCalendarProps {
   /**
@@ -123,7 +126,7 @@ export interface FullCalendarProps {
    * Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface does not special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Spread **first** into the engine config so the curated props/events/slots win on key collision; `:options` only fills gaps. Runtime-updatable per key via `setOption` (no key-removal reset — a removed key keeps its last applied value until remount; use `getApi()` for full imperative control). The `plugins` key is the one exception that **merges** with the baked-in defaults instead of overriding them, making the wrapper consumer-extensible.
    */
   options?: Record<string, unknown>;
-  onEventClick?: (payload: FullCalendarEventPointer) => void;
+  onEventClick?: (payload: FullCalendarEventClick) => void;
   onDateClick?: (payload: FullCalendarDateClick) => void;
   onEventDrop?: (payload: FullCalendarEventDrop) => void;
   onSelect?: (payload: FullCalendarSelection) => void;
@@ -148,7 +151,7 @@ export interface FullCalendarProps {
 }
 
 export interface FullCalendarHandle {
-  getApi: () => import('@fullcalendar/core').Calendar | null;
+  getApi: () => Calendar | null;
   changeView: (viewType: string, dateOrRange?: DateRangeInput | DateInput) => void;
   addEvent: (event: EventInput, source?: EventSourceApi | string | boolean) => EventApi | null | undefined;
   removeEvent: (id: string) => void;

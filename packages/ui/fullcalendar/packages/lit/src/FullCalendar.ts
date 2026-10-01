@@ -12,9 +12,6 @@ import interactionPlugin from '@fullcalendar/interaction';
 // `{ id, title, start, end }` event refs, the view TYPE string, `{ isLoading }`),
 // not FullCalendar's raw callback args. Engine types come from the
 // `@fullcalendar/core` peer and are re-exported so consumers can name them.
-// `Calendar` is NOT imported here: the script's value import of the same name
-// shares the emitted module scope on every target, so it is re-exported
-// straight from the peer and the `getApi` signature names it via `import()`.
 import type { DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput, EventSourceApi, ViewApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg } from '@fullcalendar/core';
 export interface FullCalendarEventRef {
   id: string;
@@ -22,6 +19,13 @@ export interface FullCalendarEventRef {
   start: Date | null;
   end: Date | null;
 }
+/** `eventClick` payload — `jsEvent` is a `KeyboardEvent` when the event is activated with Enter/Space. */
+export interface FullCalendarEventClick {
+  event: FullCalendarEventRef;
+  jsEvent: MouseEvent | KeyboardEvent;
+  el: HTMLElement;
+}
+/** `eventMouseEnter` / `eventMouseLeave` payload. */
 export interface FullCalendarEventPointer {
   event: FullCalendarEventRef;
   jsEvent: MouseEvent;
@@ -53,9 +57,9 @@ export interface FullCalendarDatesSet {
   end: Date;
   view: string;
 }
-/** `jsEvent` is `null` when the selection is cleared programmatically (e.g. the `clearSelection` verb). */
+/** `jsEvent` is the pointer/touch `UIEvent` that cleared the selection, or `null` when it was cleared programmatically (e.g. the `clearSelection` verb). */
 export interface FullCalendarUnselect {
-  jsEvent: MouseEvent | null;
+  jsEvent: UIEvent | null;
 }
 export interface FullCalendarLoading {
   isLoading: boolean;
@@ -68,11 +72,11 @@ export interface FullCalendarNoEventsContentArg {
   text: string;
   view: ViewApi;
 }
-export type { Calendar } from '@fullcalendar/core';
 export type { DateInput, EventApi, EventInput, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg };
+export type { Calendar } from '@fullcalendar/core';
 
 export interface RozieFullCalendarEventMap extends Omit<HTMLElementEventMap, 'event-click' | 'date-click' | 'event-drop' | 'select' | 'event-resize' | 'dates-set' | 'event-mouse-enter' | 'event-mouse-leave' | 'unselect' | 'loading' | 'events-set'> {
-  'event-click': CustomEvent<FullCalendarEventPointer>;
+  'event-click': CustomEvent<FullCalendarEventClick>;
   'date-click': CustomEvent<FullCalendarDateClick>;
   'event-drop': CustomEvent<FullCalendarEventDrop>;
   'select': CustomEvent<FullCalendarSelection>;
@@ -538,7 +542,7 @@ private portals = {
       // toolbar; the built-in default lives in the `headerToolbar` prop default.
       headerToolbar: this.headerToolbar,
       eventClick: (info: any) => {
-        this.dispatchEvent(new CustomEvent<FullCalendarEventPointer>("event-click", {
+        this.dispatchEvent(new CustomEvent<FullCalendarEventClick>("event-click", {
           detail: {
             event: {
               id: info.event.id,
@@ -959,8 +963,8 @@ private portals = {
   // drive through props alone — exposed uniformly to all 6 targets
   // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
   // Angular+Lit public method / Solid callback ref). Each delegates to the
-  // underlying Calendar instance, which is null before $onMount and after
-  // destroy — callers handle the pre-mount null.
+  // underlying Calendar instance, which is null before $onMount (unmount
+  // destroys it but keeps the reference) — callers handle the pre-mount null.
   //
   // Collision discipline (the load-bearing flatpickr lesson): no exposed name may
   // collide with an emitted event (eventClick/dateClick/eventDrop/eventResize/
@@ -974,7 +978,7 @@ private portals = {
   // the view TYPE, datesSet only the visible RANGE) and getEvents (synchronous
   // event read — eventsSet is push-only). scrollToTime/updateSize cover timeGrid
   // scroll + container-resize relayout; prevYear/nextYear mirror prev/next.
-  getApi(): import('@fullcalendar/core').Calendar | null;
+  getApi(): Calendar | null;
   getApi() {
     return this.instance;
   }
