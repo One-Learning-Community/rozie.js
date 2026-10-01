@@ -42,6 +42,8 @@ export function App() {
       />
       {/* @ts-expect-error — payload has no 'nope' */}
       <TypedEvents onPing={(p) => p.nope} />
+      {/* @ts-expect-error — reset has no payload: a handler requiring an argument is rejected */}
+      <TypedEvents onReset={(x: number) => {}} />
       {/* @ts-expect-error — tone is string, not number */}
       <TypedEvents renderRow={({ tone }) => { const x: number = tone; return null; }} />
     </>

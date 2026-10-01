@@ -47,17 +47,17 @@ const NEGATIVES: Array<{ name: string; template: string; match: RegExp }> = [
   {
     name: 'payload field that does not exist',
     template: `<TypedEvents @ping="(p) => p.nope" />`,
-    match: /nope/,
+    match: /TS2339: Property 'nope' does not exist on type 'PingPayload'/,
   },
   {
     name: 'no-payload event handler requiring an argument',
     template: `<TypedEvents @reset="(x: number) => x" />`,
-    match: /reset|not assignable|number/i,
+    match: /TS2322: Type '\(x: number\) => number' is not assignable to type/,
   },
   {
     name: 'slot tone (string) assigned to number',
     template: `<TypedEvents><template #row="{ tone }">{{ (tone as string) satisfies number }}</template></TypedEvents>`,
-    match: /string.*number|number.*string/i,
+    match: /TS1360: Type 'string' does not satisfy the expected type 'number'/,
   },
 ];
 

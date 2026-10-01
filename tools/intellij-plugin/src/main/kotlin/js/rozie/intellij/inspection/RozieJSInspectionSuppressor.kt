@@ -58,8 +58,11 @@ import js.rozie.intellij.xml.RozieContextCheck
  *    + token-walk pattern that
  *    [js.rozie.intellij.references.RoziePropsReference.Companion.findBlockBodyRange]
  *    uses. Only [RozieTokenTypes.SCRIPT_BODY], [RozieTokenTypes.PROPS_BODY],
- *    [RozieTokenTypes.DATA_BODY], [RozieTokenTypes.LISTENERS_BODY], and
- *    [RozieTokenTypes.COMPONENTS_BODY] trigger suppression.
+ *    [RozieTokenTypes.DATA_BODY], [RozieTokenTypes.LISTENERS_BODY],
+ *    [RozieTokenTypes.COMPONENTS_BODY], [RozieTokenTypes.EMITS_BODY] and
+ *    [RozieTokenTypes.TYPES_BODY] (typed public surface P1: `<emits>` is a
+ *    JS object literal, `<types>` is TypeScript whose exported names are
+ *    consumed by the compiled module) trigger suppression.
  *
  * Empirical SPI notes (verified by introspecting `com.intellij.codeInspection.InspectionSuppressor`
  * in IU 2024.2.5 lib/app.jar):
@@ -107,7 +110,7 @@ class RozieJSInspectionSuppressor : InspectionSuppressor {
         // start offset.
         val bodyType = findEnclosingBodyType(host, hostRange.startOffset) ?: return false
 
-        // Per-block dispatch table. All five JS-flavored block bodies share the
+        // Per-block dispatch table. All seven JS/TS-flavored block bodies share the
         // same JS unused-symbol suppression — the per-block test (kept explicit
         // for readability + future divergence) cross-references the dispatch
         // table in the plan's <interfaces> block.
@@ -169,7 +172,7 @@ class RozieJSInspectionSuppressor : InspectionSuppressor {
     }
 
     private companion object {
-        /** The five JS-injected block body tokens — see plan <interfaces> dispatch table. */
+        /** The seven JS/TS-injected block body tokens (incl. typed-surface `<emits>`/`<types>`). */
         private val JS_FLAVORED_BODY_TYPES: Set<IElementType> = setOf(
             RozieTokenTypes.SCRIPT_BODY,
             RozieTokenTypes.COMPONENTS_BODY,

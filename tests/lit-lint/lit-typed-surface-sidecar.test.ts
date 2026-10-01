@@ -2,7 +2,8 @@
  * LIT-TYPED-SURFACE-SIDECAR — typed-surface phase 1. The Lit `.d.rozie.ts`
  * sidecar (`emitLitTypes`) must carry the same typed public surface the
  * compiled module declares: the `<types>` names, the exported
- * `Rozie<Name>EventMap` (extends HTMLElementEventMap), typed
+ * `Rozie<Name>EventMap` (extends `Omit<HTMLElementEventMap, <declared names>>`,
+ * R14), typed
  * `addEventListener`/`removeEventListener` overloads on the `declare class`,
  * and typed `$expose` verbs. Strict `tsc` over a consumer of the sidecar.
  * The `@ts-expect-error` lines are the negatives (TS2578 if one stops erroring).
