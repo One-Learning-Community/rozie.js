@@ -243,4 +243,25 @@ describe('IDE surface parity — TextMate grammar vs @rozie/core', () => {
     expect(required.size).toBeGreaterThan(15);
     expect(missing(required, grammarSigils(file))).toEqual([]);
   });
+
+  // Typed-surface P1 Task 16: every SFC block the splitter knows must have
+  // grammar, outline and IntelliJ lexer coverage. `<types>`/`<emits>` were
+  // added to BLOCK_NAMES without any IDE surface noticing.
+  it('every SFC block name is covered by the grammar, the outline, and the IntelliJ lexer', () => {
+    const split = readFileSync(join(REPO_ROOT, 'packages/core/src/splitter/splitBlocks.ts'), 'utf8');
+    const block = split.match(/BLOCK_NAMES\s*=\s*new Set\(\[([\s\S]*?)\]/);
+    expect(block, 'BLOCK_NAMES declaration').not.toBeNull();
+    const names = [...block![1]!.matchAll(/'([a-z]+)'/g)]
+      .map((m) => m[1]!)
+      .filter((n) => n !== 'rozie');
+    expect(names.length).toBeGreaterThan(6);
+    const grammar = readFileSync(ROZIE_GRAMMAR, 'utf8');
+    const outline = readFileSync(join(REPO_ROOT, 'packages/language-server/src/outline.ts'), 'utf8');
+    const flex = readFileSync(join(REPO_ROOT, 'tools/intellij-plugin/src/main/jflex/Rozie.flex'), 'utf8');
+    for (const n of names) {
+      expect(grammar, `grammar <${n}>`).toMatch(new RegExp(`\\(<\\)\\(${n}\\)`));
+      expect(outline, `outline <${n}>`).toMatch(new RegExp(`blocks\\.${n}\\b`));
+      expect(flex, `IntelliJ <${n}>`).toContain(`"<${n}"`);
+    }
+  });
 });

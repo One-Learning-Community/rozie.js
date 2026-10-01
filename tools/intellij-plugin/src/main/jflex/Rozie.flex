@@ -49,6 +49,8 @@ import static js.rozie.intellij.lexer.RozieTokenTypes.*;
 %state IN_DATA_BODY
 %state IN_LISTENERS_BODY
 %state IN_COMPONENTS_BODY
+%state IN_TYPES_BODY
+%state IN_EMITS_BODY
 %state IN_STYLE_BODY
 
 %state IN_TEMPLATE_BODY
@@ -97,6 +99,8 @@ ATTR_IDENT         = [A-Za-z_][A-Za-z0-9_.\-]*
   "<data"                         { pendingBodyState = IN_DATA_BODY;     yybegin(IN_BLOCK_OPEN_TAG); return DATA_BLOCK_TAG; }
   "<listeners"                    { pendingBodyState = IN_LISTENERS_BODY;yybegin(IN_BLOCK_OPEN_TAG); return LISTENERS_BLOCK_TAG; }
   "<components"                   { pendingBodyState = IN_COMPONENTS_BODY; yybegin(IN_BLOCK_OPEN_TAG); return COMPONENTS_BLOCK_TAG; }
+  "<types"                        { pendingBodyState = IN_TYPES_BODY;    yybegin(IN_BLOCK_OPEN_TAG); return TYPES_BLOCK_TAG; }
+  "<emits"                        { pendingBodyState = IN_EMITS_BODY;    yybegin(IN_BLOCK_OPEN_TAG); return EMITS_BLOCK_TAG; }
   "<style"                        { pendingBodyState = IN_STYLE_BODY;    yybegin(IN_BLOCK_OPEN_TAG); return STYLE_BLOCK_TAG; }
 
   "</rozie>"                      { return ROZIE_CLOSE_TAG; }
@@ -106,6 +110,8 @@ ATTR_IDENT         = [A-Za-z_][A-Za-z0-9_.\-]*
   "</data>"                       { return DATA_CLOSE_TAG; }
   "</listeners>"                  { return LISTENERS_CLOSE_TAG; }
   "</components>"                 { return COMPONENTS_CLOSE_TAG; }
+  "</types>"                      { return TYPES_CLOSE_TAG; }
+  "</emits>"                      { return EMITS_CLOSE_TAG; }
   "</style>"                      { return STYLE_CLOSE_TAG; }
 
   {WS}                            { return WHITE_SPACE; }
@@ -221,6 +227,16 @@ ATTR_IDENT         = [A-Za-z_][A-Za-z0-9_.\-]*
   "</components>"                 { yybegin(YYINITIAL); return COMPONENTS_CLOSE_TAG; }
   [^<]+                           { return COMPONENTS_BODY; }
   "<"                             { return COMPONENTS_BODY; }
+}
+<IN_TYPES_BODY> {
+  "</types>"                      { yybegin(YYINITIAL); return TYPES_CLOSE_TAG; }
+  [^<]+                           { return TYPES_BODY; }
+  "<"                             { return TYPES_BODY; }
+}
+<IN_EMITS_BODY> {
+  "</emits>"                      { yybegin(YYINITIAL); return EMITS_CLOSE_TAG; }
+  [^<]+                           { return EMITS_BODY; }
+  "<"                             { return EMITS_BODY; }
 }
 <IN_STYLE_BODY> {
   "</style>"                      { yybegin(YYINITIAL); return STYLE_CLOSE_TAG; }

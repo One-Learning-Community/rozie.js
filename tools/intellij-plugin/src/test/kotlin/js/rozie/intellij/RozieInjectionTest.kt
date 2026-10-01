@@ -482,6 +482,15 @@ class RozieInjectionTest : BasePlatformTestCase() {
      * anchor offset. Helper for Plan 08.2-11 paren-wrap tests that need access to
      * the injected JS PSI tree (not just the language id).
      */
+    // Typed-surface P1: `<types>` is injected as TypeScript, `<emits>` as JavaScript.
+    fun testTypesBodyInjectedAsTypeScript() {
+        assertInjectedLanguageAt("types-emits-blocks.rozie", "interface PingPayload", "TypeScript")
+    }
+
+    fun testEmitsBodyInjectedAsJavaScript() {
+        assertInjectedLanguageAt("types-emits-blocks.rozie", "ping: { payload", "JavaScript")
+    }
+
     private fun configureAndGetInjectedJs(fixtureFile: String, anchor: String): PsiFile {
         myFixture.configureByFile(fixtureFile)
         val text = myFixture.file.text

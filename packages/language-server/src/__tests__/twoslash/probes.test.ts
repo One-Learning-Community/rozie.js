@@ -54,8 +54,9 @@ describe('probes — recorded answers for every marked examples/*.rozie probe (R
     // (either no `{{ }}`/binding/event expression exists in the template at
     // all, or none has an inert trailing placement).
     expect(markedFiles.length).toBeGreaterThan(0);
-    // 80 original probes (Task 2) + SlotCompositionProbe.rozie (Task 3).
-    expect(exampleFiles.length).toBe(81);
+    // 80 original probes (Task 2) + SlotCompositionProbe.rozie (Task 3)
+    // + the typed-surface P1 TypedEvents example.
+    expect(exampleFiles.length).toBe(82);
   });
 
   for (const file of markedFiles) {

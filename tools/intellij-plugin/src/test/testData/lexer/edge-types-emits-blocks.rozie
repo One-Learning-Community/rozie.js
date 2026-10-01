@@ -1,0 +1,11 @@
+<rozie name="TestTypesEmits">
+<types>
+export interface P { a: Array<number> }
+</types>
+<emits>
+{ ping: { payload: 'P' } }
+</emits>
+<template>
+  <div></div>
+</template>
+</rozie>

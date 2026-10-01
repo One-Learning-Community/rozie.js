@@ -40,4 +40,16 @@ describe('computeDocumentSymbols', () => {
   it('returns [] when there is no envelope', () => {
     expect(computeDocumentSymbols(doc('plain text'))).toEqual([]);
   });
+
+  it('lists <types> and <emits> blocks', () => {
+    const text = [
+      '<rozie name="Pinger">',
+      '<types>export interface P { a: number }</types>',
+      "<emits>{ ping: { payload: 'P' } }</emits>",
+      '<template><div /></template>',
+      '</rozie>',
+    ].join('\n');
+    const root = computeDocumentSymbols(doc(text))[0]!;
+    expect(root.children!.map((c) => c.name)).toEqual(['types', 'emits', 'template']);
+  });
 });

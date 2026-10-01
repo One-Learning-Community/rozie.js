@@ -1,0 +1,14 @@
+<rozie name="TypesEmits">
+<types>
+export interface PingPayload { count: number }
+</types>
+<emits>
+{ ping: { payload: 'PingPayload' } }
+</emits>
+<script>
+const x = 1;
+</script>
+<template>
+  <div></div>
+</template>
+</rozie>

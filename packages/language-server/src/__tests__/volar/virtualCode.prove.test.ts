@@ -37,7 +37,7 @@ import { generateVirtualTs } from '../../volar/virtualCode.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = path.join(HERE, '..', 'fixtures');
-const FIXTURES = ['Probe.rozie', 'ProbeBad.rozie'];
+const FIXTURES = ['Probe.rozie', 'ProbeBad.rozie', 'ProbeTypes.rozie'];
 
 /**
  * TS diagnostic codes for the "this file is missing `export {};`, so it is
@@ -216,6 +216,17 @@ describe('virtualCode.prove — pinned assertions against a real ts.LanguageServ
       expect(tf, JSON.stringify(mapped)).toBeTruthy();
       expect(tf?.text, JSON.stringify(tf)).toBe('toFixed');
     });
+  });
+
+  it('(11) a <types> interface is in scope for <script lang="ts"> and the template: zero diagnostics, hover works', () => {
+    const d = ls.getSemanticDiagnostics(F('ProbeTypes.rozie')).filter((x) => !MODULE_COLLISION_CODES.has(x.code));
+    const detail = d.map((x) => ts.flattenDiagnosticMessageText(x.messageText, ' ')).join(' | ');
+    expect(d, detail).toHaveLength(0);
+    // hover on the use of `PingPayload` inside <script> resolves to the <types> interface
+    const info = quickInfo('ProbeTypes.rozie', at('ProbeTypes.rozie', 'PingPayload', 2) + 2);
+    expect(info, info).toMatch(/interface PingPayload/);
+    // and a diagnostic INSIDE <types> would map back to source (the block is fully mapped)
+    expect(toGen('ProbeTypes.rozie', at('ProbeTypes.rozie', 'PingPayload', 1))).toBeDefined();
   });
 
   it('(7) completion after `$props.` offers exactly the declared props and nothing else', () => {

@@ -65,7 +65,9 @@ export function computeDocumentSymbols(doc: TextDocument): DocumentSymbol[] {
     if (sym) out.push(sym);
   };
 
+  push(blockSymbol(doc, 'types', blocks.types));
   push(blockSymbol(doc, 'props', blocks.props, memberSymbols(doc, symbols.props, SymbolKind.Field)));
+  push(blockSymbol(doc, 'emits', blocks.emits));
   push(blockSymbol(doc, 'data', blocks.data, memberSymbols(doc, symbols.data, SymbolKind.Field)));
   push(
     blockSymbol(

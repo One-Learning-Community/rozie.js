@@ -117,6 +117,8 @@ class RozieJSInspectionSuppressor : InspectionSuppressor {
             RozieTokenTypes.PROPS_BODY,
             RozieTokenTypes.DATA_BODY,
             RozieTokenTypes.LISTENERS_BODY,
+            RozieTokenTypes.EMITS_BODY,
+            RozieTokenTypes.TYPES_BODY,
             -> true
 
             else -> false
@@ -174,6 +176,8 @@ class RozieJSInspectionSuppressor : InspectionSuppressor {
             RozieTokenTypes.PROPS_BODY,
             RozieTokenTypes.DATA_BODY,
             RozieTokenTypes.LISTENERS_BODY,
+            RozieTokenTypes.EMITS_BODY,
+            RozieTokenTypes.TYPES_BODY,
         )
     }
 }

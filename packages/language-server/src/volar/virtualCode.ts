@@ -225,6 +225,17 @@ function generateVirtualTsUnsafe(source: string, filename: string): GenerateVirt
     code += text;
   };
 
+  // ---- 0. <types> block, verbatim and fully mapped ---------------------------
+  // Always TypeScript (type-only statements, whatever <script>'s lang). Emitted
+  // BEFORE everything else so its names are in scope for the $props interface,
+  // the <script> body and the template expressions below. No-op without <types>.
+  if (ast?.types) {
+    const ty = ast.types.loc;
+    gen('// --- <types> ---\n');
+    mapped(source.slice(ty.start, ty.end), ty.start);
+    gen('\n');
+  }
+
   // ---- 1. $props interface, each key mapped back to its <props> key ----------
   const propNames: string[] = [];
   gen('interface __RozieProps {\n');

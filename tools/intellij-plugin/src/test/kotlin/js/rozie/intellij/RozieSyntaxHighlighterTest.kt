@@ -49,6 +49,8 @@ class RozieSyntaxHighlighterTest {
         "LISTENERS_BLOCK_TAG" to RozieTokenTypes.LISTENERS_BLOCK_TAG,
         "COMPONENTS_BLOCK_TAG" to RozieTokenTypes.COMPONENTS_BLOCK_TAG,
         "STYLE_BLOCK_TAG" to RozieTokenTypes.STYLE_BLOCK_TAG,
+        "TYPES_BLOCK_TAG" to RozieTokenTypes.TYPES_BLOCK_TAG,
+        "EMITS_BLOCK_TAG" to RozieTokenTypes.EMITS_BLOCK_TAG,
         // Block close tags
         "ROZIE_CLOSE_TAG" to RozieTokenTypes.ROZIE_CLOSE_TAG,
         "TEMPLATE_CLOSE_TAG" to RozieTokenTypes.TEMPLATE_CLOSE_TAG,
@@ -58,6 +60,8 @@ class RozieSyntaxHighlighterTest {
         "LISTENERS_CLOSE_TAG" to RozieTokenTypes.LISTENERS_CLOSE_TAG,
         "COMPONENTS_CLOSE_TAG" to RozieTokenTypes.COMPONENTS_CLOSE_TAG,
         "STYLE_CLOSE_TAG" to RozieTokenTypes.STYLE_CLOSE_TAG,
+        "TYPES_CLOSE_TAG" to RozieTokenTypes.TYPES_CLOSE_TAG,
+        "EMITS_CLOSE_TAG" to RozieTokenTypes.EMITS_CLOSE_TAG,
         // Lang attribute
         "LANG_ATTR_NAME" to RozieTokenTypes.LANG_ATTR_NAME,
         "LANG_ATTR_VALUE" to RozieTokenTypes.LANG_ATTR_VALUE,

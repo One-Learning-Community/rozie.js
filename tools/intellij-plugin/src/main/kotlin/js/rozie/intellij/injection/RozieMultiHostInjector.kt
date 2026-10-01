@@ -20,7 +20,8 @@ import js.rozie.intellij.xml.RozieComponentRegistry
  * Walks every [RozieRootBlock]'s token stream and registers JavaScript / HTML / CSS
  * (or SCSS / Less) injection ranges per the D-09 / D-10 / D-11 / D-12 contracts:
  *
- *  - SCRIPT_BODY / PROPS_BODY / DATA_BODY / LISTENERS_BODY / COMPONENTS_BODY -> JavaScript (D-09, D-12)
+ *  - SCRIPT_BODY / PROPS_BODY / DATA_BODY / LISTENERS_BODY / COMPONENTS_BODY / EMITS_BODY -> JavaScript (D-09, D-12)
+ *  - TYPES_BODY -> TypeScript (always; typed-surface P1)
  *  - TEMPLATE_BODY                                          -> HTML       (D-10)
  *  - STYLE_BODY                                             -> CSS / SCSS / Less based on `lang=...` (D-11)
  *
@@ -108,7 +109,26 @@ class RozieMultiHostInjector : MultiHostInjector {
                 RozieTokenTypes.PROPS_BODY,
                 RozieTokenTypes.DATA_BODY,
                 RozieTokenTypes.COMPONENTS_BODY,
+                RozieTokenTypes.EMITS_BODY,
                 -> { injectJsAsExpression(registrar, host, tok.range); i++ }
+
+                // Typed-surface P1: `<types>` is always TypeScript (whatever
+                // `<script>`'s lang), type-only statements. Coalesce the
+                // per-`<` fragments (e.g. `Array<string>`) into one range so
+                // generics don't split the TS parse, then inject as TypeScript
+                // WITHOUT the JS globals prefix (type-only code; no `$props`).
+                RozieTokenTypes.TYPES_BODY,
+                -> {
+                    var j = i
+                    val start = tok.range.startOffset
+                    var end = tok.range.endOffset
+                    while (j + 1 < tokens.size && tokens[j + 1].type == RozieTokenTypes.TYPES_BODY) {
+                        j++
+                        end = tokens[j].range.endOffset
+                    }
+                    injectTs(registrar, host, TextRange(start, end))
+                    i = j + 1
+                }
 
                 // Phase 19: `<listeners>` is now a WIRING (markup) block of
                 // `<listener>` elements — NOT a JS object literal. Its body is
@@ -334,6 +354,13 @@ class RozieMultiHostInjector : MultiHostInjector {
         // See [injectJs] KDoc for the strategy rationale and Pitfall 2 mitigation.
         registrar.startInjecting(js)
             .addPlace(globalsPrefixFor(host) + "(\n", "\n)", host, range)
+            .doneInjecting()
+    }
+
+    private fun injectTs(registrar: MultiHostRegistrar, host: RozieRootBlock, range: TextRange) {
+        val ts = Language.findLanguageByID("TypeScript") ?: return
+        registrar.startInjecting(ts)
+            .addPlace(null, null, host, range)
             .doneInjecting()
     }
 

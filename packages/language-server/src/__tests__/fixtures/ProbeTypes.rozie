@@ -1,0 +1,15 @@
+<rozie>
+<types>
+export interface PingPayload { count: number }
+</types>
+
+<script lang="ts">
+const payload: PingPayload = { count: 1 };
+const total: number = payload.count;
+void total;
+</script>
+
+<template>
+  <div>{{ payload.count }}</div>
+</template>
+</rozie>

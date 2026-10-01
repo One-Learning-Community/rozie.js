@@ -31,6 +31,8 @@ object RozieTokenTypes {
     @JvmField val DATA_BLOCK_TAG: IElementType = RozieElementType("DATA_BLOCK_TAG")
     @JvmField val LISTENERS_BLOCK_TAG: IElementType = RozieElementType("LISTENERS_BLOCK_TAG")
     @JvmField val COMPONENTS_BLOCK_TAG: IElementType = RozieElementType("COMPONENTS_BLOCK_TAG")
+    @JvmField val TYPES_BLOCK_TAG: IElementType = RozieElementType("TYPES_BLOCK_TAG")
+    @JvmField val EMITS_BLOCK_TAG: IElementType = RozieElementType("EMITS_BLOCK_TAG")
     @JvmField val STYLE_BLOCK_TAG: IElementType = RozieElementType("STYLE_BLOCK_TAG")
 
     // --- Block close tags (full `</rozie>` / `</template>` / etc. spans) ---
@@ -41,6 +43,8 @@ object RozieTokenTypes {
     @JvmField val DATA_CLOSE_TAG: IElementType = RozieElementType("DATA_CLOSE_TAG")
     @JvmField val LISTENERS_CLOSE_TAG: IElementType = RozieElementType("LISTENERS_CLOSE_TAG")
     @JvmField val COMPONENTS_CLOSE_TAG: IElementType = RozieElementType("COMPONENTS_CLOSE_TAG")
+    @JvmField val TYPES_CLOSE_TAG: IElementType = RozieElementType("TYPES_CLOSE_TAG")
+    @JvmField val EMITS_CLOSE_TAG: IElementType = RozieElementType("EMITS_CLOSE_TAG")
     @JvmField val STYLE_CLOSE_TAG: IElementType = RozieElementType("STYLE_CLOSE_TAG")
 
     // --- Block body tokens (single token per block body; injectors carve ranges) ---
@@ -49,6 +53,8 @@ object RozieTokenTypes {
     @JvmField val DATA_BODY: IElementType = RozieElementType("DATA_BODY")
     @JvmField val LISTENERS_BODY: IElementType = RozieElementType("LISTENERS_BODY")
     @JvmField val COMPONENTS_BODY: IElementType = RozieElementType("COMPONENTS_BODY")
+    @JvmField val TYPES_BODY: IElementType = RozieElementType("TYPES_BODY")
+    @JvmField val EMITS_BODY: IElementType = RozieElementType("EMITS_BODY")
     @JvmField val TEMPLATE_BODY: IElementType = RozieElementType("TEMPLATE_BODY")
     @JvmField val STYLE_BODY: IElementType = RozieElementType("STYLE_BODY")
 
@@ -79,23 +85,23 @@ object RozieTokenTypes {
     @JvmField
     val BLOCK_TAGS: TokenSet = TokenSet.create(
         ROZIE_BLOCK_TAG, TEMPLATE_BLOCK_TAG, SCRIPT_BLOCK_TAG, PROPS_BLOCK_TAG,
-        DATA_BLOCK_TAG, LISTENERS_BLOCK_TAG, COMPONENTS_BLOCK_TAG, STYLE_BLOCK_TAG,
+        DATA_BLOCK_TAG, LISTENERS_BLOCK_TAG, COMPONENTS_BLOCK_TAG, TYPES_BLOCK_TAG, EMITS_BLOCK_TAG, STYLE_BLOCK_TAG,
         ROZIE_CLOSE_TAG, TEMPLATE_CLOSE_TAG, SCRIPT_CLOSE_TAG, PROPS_CLOSE_TAG,
-        DATA_CLOSE_TAG, LISTENERS_CLOSE_TAG, COMPONENTS_CLOSE_TAG, STYLE_CLOSE_TAG
+        DATA_CLOSE_TAG, LISTENERS_CLOSE_TAG, COMPONENTS_CLOSE_TAG, TYPES_CLOSE_TAG, EMITS_CLOSE_TAG, STYLE_CLOSE_TAG
     )
 
     /** Block OPENING tag tokens only (`<template`, `<script`, …). Used by RozieFoldingBuilder. */
     @JvmField
     val BLOCK_OPEN_TAGS: TokenSet = TokenSet.create(
         ROZIE_BLOCK_TAG, TEMPLATE_BLOCK_TAG, SCRIPT_BLOCK_TAG, PROPS_BLOCK_TAG,
-        DATA_BLOCK_TAG, LISTENERS_BLOCK_TAG, COMPONENTS_BLOCK_TAG, STYLE_BLOCK_TAG
+        DATA_BLOCK_TAG, LISTENERS_BLOCK_TAG, COMPONENTS_BLOCK_TAG, TYPES_BLOCK_TAG, EMITS_BLOCK_TAG, STYLE_BLOCK_TAG
     )
 
     /** Block CLOSING tag tokens only (`</template>`, `</script>`, …). Used by RozieFoldingBuilder. */
     @JvmField
     val BLOCK_CLOSE_TAGS: TokenSet = TokenSet.create(
         ROZIE_CLOSE_TAG, TEMPLATE_CLOSE_TAG, SCRIPT_CLOSE_TAG, PROPS_CLOSE_TAG,
-        DATA_CLOSE_TAG, LISTENERS_CLOSE_TAG, COMPONENTS_CLOSE_TAG, STYLE_CLOSE_TAG
+        DATA_CLOSE_TAG, LISTENERS_CLOSE_TAG, COMPONENTS_CLOSE_TAG, TYPES_CLOSE_TAG, EMITS_CLOSE_TAG, STYLE_CLOSE_TAG
     )
 
     /**
@@ -104,7 +110,7 @@ object RozieTokenTypes {
      */
     @JvmField
     val SCRIPT_FLAVORED_BODY_TOKENS: TokenSet = TokenSet.create(
-        SCRIPT_BODY, PROPS_BODY, DATA_BODY, LISTENERS_BODY, COMPONENTS_BODY
+        SCRIPT_BODY, PROPS_BODY, DATA_BODY, LISTENERS_BODY, COMPONENTS_BODY, EMITS_BODY
     )
 
     /** Comment tokens (used by ParserDefinition.getCommentTokens). */

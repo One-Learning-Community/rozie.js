@@ -98,6 +98,8 @@ class RozieSyntaxHighlighter : SyntaxHighlighterBase() {
         RozieTokenTypes.SCRIPT_BLOCK_TAG, RozieTokenTypes.PROPS_BLOCK_TAG,
         RozieTokenTypes.DATA_BLOCK_TAG, RozieTokenTypes.LISTENERS_BLOCK_TAG,
         RozieTokenTypes.COMPONENTS_BLOCK_TAG, RozieTokenTypes.STYLE_BLOCK_TAG,
+        RozieTokenTypes.TYPES_BLOCK_TAG, RozieTokenTypes.EMITS_BLOCK_TAG,
+        RozieTokenTypes.TYPES_CLOSE_TAG, RozieTokenTypes.EMITS_CLOSE_TAG,
         RozieTokenTypes.ROZIE_CLOSE_TAG, RozieTokenTypes.TEMPLATE_CLOSE_TAG,
         RozieTokenTypes.SCRIPT_CLOSE_TAG, RozieTokenTypes.PROPS_CLOSE_TAG,
         RozieTokenTypes.DATA_CLOSE_TAG, RozieTokenTypes.LISTENERS_CLOSE_TAG,

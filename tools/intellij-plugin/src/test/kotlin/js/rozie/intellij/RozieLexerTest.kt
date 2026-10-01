@@ -34,6 +34,7 @@ class RozieLexerTest : LexerTestCase() {
     fun testModal() = doFixtureTest("Modal.rozie", null)
     fun testEdgeComponentsBlock() = doFixtureTest("edge-components-block.rozie", null)
     fun testEdgeNestedTemplate() = doFixtureTest("edge-nested-template.rozie", null)
+    fun testEdgeTypesEmitsBlocks() = doFixtureTest("edge-types-emits-blocks.rozie", null)
 
     /**
      * Drives a single fixture: reads `<inputName>` from [getDirPath], lexes it,
