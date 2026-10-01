@@ -57,7 +57,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: '24'
           cache: pnpm
 
       # Root install first: `bundle:server` shells out to

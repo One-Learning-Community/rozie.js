@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Node 20 or newer
+- Node 24 or newer
 - TypeScript 5.6 or newer (if your project uses TypeScript)
 - A package manager (pnpm, npm, or yarn — examples below use pnpm)
 

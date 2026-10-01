@@ -14,7 +14,7 @@ The audience is **component-library and design-system authors** who today mainta
 ### Constraints
 
 - **Language:** Project source is JavaScript (Node) for the toolchain; emitted code is JS/TS for each target framework.
-- **Tech stack:** Vite plugin must support Vite 5+. Babel plugin must support Babel 7+. CLI must work on Node 20+.
+- **Tech stack:** Vite plugin must support Vite 5+. Babel plugin must support Babel 7+. CLI must work on Node 24+ (floor bumped from 20 → 24 in Oct 2026 after Node 20 hit EOL in April 2026).
 - **Compatibility:** Target framework versions are React 18+, Vue 3.4+, Svelte 5+, Angular 19+ (signals era). **TypeScript 5.6+** in consumer projects. Older versions are out of scope. (Angular floor bumped from 17 → 19 in May 2026 after Angular 17 hit EOL and its TS ~5.4.5 pin became the root cause of repeated upstream-tooling breakages. TS floor bumped from 5.4.5 → 5.6.0 in May 2026 — TS 5.4 hit Microsoft EOL, and TS 5.5+ exports the CJS namespace flat which sidesteps an entire class of `import * as ts from 'typescript'` resolution bugs in upstream tooling like @analogjs/vite-plugin-angular.)
 - **Compatibility bar:** "High percentage" cross-framework parity, not 100%. Documented edge cases (notably React's render-prop-flavored slot consumer experience) are acceptable.
 - **Audience constraint:** Every feature must answer "does a component-library author actually need this?" — if not, defer.
@@ -187,8 +187,8 @@ The audience is **component-library and design-system authors** who today mainta
 | `Angular 19+` (target output) | Standalone components, signals (`signal()`, `computed()`, `effect()`) | Signals are stable since 17, but the floor is 19+ — 17 hit EOL May 2025 and 18 hit EOL Nov 2025. We compile to `signal()` not `BehaviorSubject`. |
 | `React 18+` (target output) | `useState`, `useEffect`, `useSyncExternalStore`. React Compiler optional. | `useEvent`/`useEventCallback` not used (still unstable). React 19 adds `use()` — opt-in. |
 | `htmlparser2@12` | Node 18+ | Pure JS, no native deps. |
-| `Vitest@4` | Node 20+, Vite 5+ | Vitest 4 dropped Node 18. Project constraint is Node 20+, so we're fine. |
-| `Biome@2.4` | Node 20+ | Same. |
+| `Vitest@4` | Node 20+, Vite 5+ | Vitest 4 dropped Node 18. Project constraint is Node 24+, so we're fine. |
+| `Biome@2.4` | Node 20+ | Same (project floor Node 24+). |
 ## Where to Start
 ## Sources
 ### Verified — Context7 / Official Docs (HIGH confidence)
