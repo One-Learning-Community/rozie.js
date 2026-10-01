@@ -96,7 +96,6 @@ Rules:
 - Only type-only statements are allowed: `import type`, `interface`, `type`, and `export` forms of those, including `export type { … }` with or without `from …`.
 - Anything else is an error: runtime code, a value `import`, an `enum`, `declare const`. This restriction is what lets the block be hoisted into every target without being able to change runtime behavior. See [ROZ019](/reference/diagnostics) (a statement that is not type-only) and [ROZ020](/reference/diagnostics) (not valid TypeScript).
 - A `<types>` import and a `<script>` import that bind the same local name to the same source and name are deduplicated silently. If they bind the same name to a different source, that is [ROZ024](/reference/diagnostics).
-- Don't write the text `<script`, `<style`, `<textarea` or `<title` inside the block, even in a comment. Rozie's block splitter treats it as an HTML raw-text tag and reports [ROZ006](/reference/diagnostics).
 
 Where the block lands in the compiled output:
 

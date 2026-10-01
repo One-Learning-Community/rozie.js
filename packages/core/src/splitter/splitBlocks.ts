@@ -29,7 +29,7 @@ import type { BlockEntry, BlockMap } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
 
-/** The eight recognized top-level block tags (Phase 06.2 P1 added 'components'). */
+/** The recognized top-level block tags (Phase 06.2 P1 added 'components'; typed-surface P1 added 'types' and 'emits'). */
 const BLOCK_NAMES = new Set([
   'rozie',
   'props',
@@ -57,7 +57,9 @@ const BLOCK_NAMES = new Set([
  * for the literal `</script>` / `</style>` close sequence; nested open tags
  * never fire. The four blocks here have no htmlparser2-side raw-text
  * treatment, so the splitter applies the equivalent opaque-body discipline
- * itself via the `inOpaqueBlock` flag below.
+ * itself: each body is fed to the tokenizer MASKED (every `<` replaced by a
+ * space — see maskOpaqueBody), so no tag, comment or raw-text sequence can
+ * start inside it; the `inOpaqueBlock` flag below stays as a second guard.
  *
  * `<template>` is intentionally EXCLUDED — its body is real HTML and must
  * be tokenized normally so nested-element / consumer-side-fill detection in
@@ -74,12 +76,30 @@ const OPAQUE_BLOCK_NAMES = new Set<string>([
 ]);
 
 /**
- * htmlparser2's raw-text start sequences (v12 `specialStartSequences` +
- * the `style`/`textarea` continuations): `<name` followed by whitespace, `/`,
- * `>` or end-of-input switches the tokenizer into raw-text mode. Matched
- * case-insensitively, exactly like the tokenizer.
+ * Replace every `<` in an opaque block body with a space (same length, so all
+ * tokenizer offsets stay byte-accurate against the ORIGINAL source). Only the
+ * tokenizer sees the masked text — block contents are always sliced from the
+ * original `source`. Without the mask, htmlparser2 enters raw-text mode on
+ * ANY `<script`/`<style`/`<title`/`<textarea`/… sequence, even inside a
+ * `<types>` comment or an `Array<Style>` generic, and swallows the rest of the
+ * file (final fix wave I2).
  */
-const RAWTEXT_OPEN_RE = /<(script|style|title|textarea|iframe|noembed|noframes|plaintext|xmp)(?=[\s/>]|$)/i;
+function maskOpaqueBody(body: string): string {
+  return body.replace(/</g, ' ');
+}
+
+/**
+ * Offset of the `</blockName` close sequence that ends an opaque body
+ * starting at `from` (case-insensitive, followed by whitespace, `/`, `>` or
+ * end-of-input — exactly what the tokenizer would treat as that close tag),
+ * or `source.length` when the body is unterminated.
+ */
+function findOpaqueClose(source: string, blockName: string, from: number): number {
+  const re = new RegExp(`</${blockName}(?=[\\s/>]|$)`, 'ig');
+  re.lastIndex = from;
+  const m = re.exec(source);
+  return m ? m.index : source.length;
+}
 
 type BlockName =
   | 'props'
@@ -198,6 +218,9 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
   // (ROZ002/003/004) located after this point is desync noise and is filtered
   // out in a post-pass.
   let firstPrematureCloseOffset = -1;
+  // Set by onopentagend when an opaque block opens: the body span the write
+  // loop must feed to the tokenizer MASKED (see maskOpaqueBody).
+  let pendingOpaqueBody: { start: number; end: number } | null = null;
 
   const pushDiag = (d: Diagnostic): void => {
     if (result.diagnostics.length < MAX_DIAGNOSTICS) {
@@ -451,29 +474,13 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
             // `<template>` stays in normal HTML mode (real nested elements).
             if (OPAQUE_BLOCK_NAMES.has(blockName)) {
               inOpaqueBlock = true;
-              // ROZ006 — htmlparser2 enters RAWTEXT mode on ANY `<script`/
-              // `<style`/… open sequence, even inside an opaque body, and then
-              // scans to `</script>`, swallowing this block's close and the
-              // rest of the envelope (previously a locationless ROZ977). Scan
-              // the body up to its own close and report the real cause.
-              const bodyStart = endIndex + 1;
-              const closeAt = source.toLowerCase().indexOf(`</${blockName}`, bodyStart);
-              const body = source.slice(bodyStart, closeAt < 0 ? source.length : closeAt);
-              const m = RAWTEXT_OPEN_RE.exec(body);
-              if (m) {
-                const at = bodyStart + m.index;
-                pushDiag({
-                  code: RozieErrorCode.RAWTEXT_TAG_IN_OPAQUE_BLOCK,
-                  severity: 'error',
-                  message: `The text '${m[0]}' inside the <${blockName}> block opens an HTML raw-text element: the .rozie tokenizer would treat everything up to '</${m[1]!.toLowerCase()}>' as its body, swallowing the rest of the file.`,
-                  loc: { start: at, end: at + m[0].length },
-                  hint: `Escape it by breaking the sequence — write '< ${m[1]}' (with a space) or '&lt;${m[1]}', or reword (e.g. 'the ${m[1]} block') — even inside a comment or string.`,
-                  ...(filename !== undefined ? { filename } : {}),
-                });
-                if (firstPrematureCloseOffset === -1 || at < firstPrematureCloseOffset) {
-                  firstPrematureCloseOffset = at;
-                }
-              }
+              // Mask the body (up to its own close) before the tokenizer
+              // reads it — see maskOpaqueBody. The write loop below feeds the
+              // masked slice next; this `>` always ends the current chunk.
+              pendingOpaqueBody = {
+                start: endIndex + 1,
+                end: findOpaqueClose(source, blockName, endIndex + 1),
+              };
             }
           } else {
             // Unknown top-level block — ROZ003.
@@ -610,7 +617,26 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
     },
   );
 
-  tokenizer.write(source);
+  // Feed the source in chunks that each end at a `>`, so that when an opaque
+  // block's opening tag completes (onopentagend fires on that `>`) its body
+  // has not been written yet and can be written masked. Offsets reported by
+  // the tokenizer are global across chunks; every slice above reads from the
+  // original `source`.
+  let pos = 0;
+  while (pos < source.length) {
+    const gt = source.indexOf('>', pos);
+    const chunkEnd = gt < 0 ? source.length : gt + 1;
+    tokenizer.write(source.slice(pos, chunkEnd));
+    pos = chunkEnd;
+    if (pendingOpaqueBody !== null) {
+      const { start, end } = pendingOpaqueBody;
+      pendingOpaqueBody = null;
+      if (start === pos && end > pos) {
+        tokenizer.write(maskOpaqueBody(source.slice(pos, end)));
+        pos = end;
+      }
+    }
+  }
   tokenizer.end();
 
   // Post-pass: collateral-noise suppression for premature block closes (ROZ005).

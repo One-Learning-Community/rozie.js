@@ -432,12 +432,15 @@ const s = '</script>';
   });
 });
 
-// Task 18 review (R17-3): a `<script`/`<style` (or any other htmlparser2
-// RAWTEXT tag) inside an OPAQUE block body (`<types>`, `<emits>`, `<props>`, …)
-// switches the tokenizer into raw-text mode and swallows the rest of the file.
-// Before: a locationless ROZ977 "internal failure" from compile(). Now: ROZ006,
-// located at the offending `<script`, with an escape hint — and no cascade.
-describe('raw-text tag inside an opaque block — ROZ006', () => {
+// Final fix wave I2: a `<script`/`<style`/`<title`/`<textarea` (or any other
+// htmlparser2 RAWTEXT tag text) inside an OPAQUE block body (`<types>`,
+// `<emits>`, `<props>`, …) is plain JS/TS text. The splitter masks opaque
+// bodies before the tokenizer sees them, so raw-text detection can never fire
+// there: `Array<Style>`, `Partial<Title>`, a `<style>` literal in a docs string
+// and a `// the <script> lang` comment all compile. (Task 18's interim ROZ006
+// hard error for these is retired.)
+describe('raw-text tag text inside an opaque block is inert (I2)', () => {
+  const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const;
   const src = (body: string) => `<rozie name="X">
 <types>
 // always TypeScript, whatever the ${body} lang
@@ -449,25 +452,75 @@ const x = 1
 <template><div /></template>
 </rozie>
 `;
-  for (const tag of ['<script>', '<style>', '<textarea>']) {
-    it(`reports a located ROZ006 for ${tag} in a <types> comment`, () => {
+  for (const tag of ['<script>', '<style>', '<textarea>', '<title>', '<script> and </script>']) {
+    it(`${tag} in a <types> comment splits cleanly`, () => {
       const s = src(tag);
       const r = splitBlocks(s, 'X.rozie');
-      const d = r.diagnostics.find((x) => x.code === 'ROZ006');
-      expect(d?.severity).toBe('error');
-      expect(s.slice(d!.loc.start, d!.loc.end)).toBe(tag.slice(0, -1));
-      expect(d!.hint).toMatch(/escape|space/i);
-      expect(r.diagnostics.filter((x) => x.code !== 'ROZ006' && x.severity === 'error')).toEqual([]);
+      expect(r.diagnostics).toEqual([]);
+      expect(r.types?.content).toContain(`whatever the ${tag} lang`);
+      expect(r.script?.content.trim()).toBe('const x = 1');
+      expect(r.template?.content).toBe('<div />');
     });
   }
-  it('compile() surfaces ROZ006 instead of the locationless ROZ977', async () => {
-    const { compile } = await import('../src/compile.js');
-    const r = compile(src('<script>'), { target: 'react', filename: 'X.rozie' });
-    expect(r.diagnostics.map((d) => d.code)).toContain('ROZ006');
-    expect(r.diagnostics.map((d) => d.code)).not.toContain('ROZ977');
+
+  const GENERIC_SRC = `<rozie name="Gen">
+<types>
+export interface Style { color: string }
+export interface Title { text: string }
+export type Styles = Array<Style>
+export type MaybeTitle = Partial<Title>
+</types>
+<emits>
+{
+  restyle: { payload: 'Array<Style>' },
+  retitle: { payload: 'Partial<Title>' },
+}
+</emits>
+<props>
+{
+  label: { type: String, default: '', docs: { description: 'Renders a <style> literal; also <script>alert(1)</script> and <textarea>.' } },
+}
+</props>
+<script>
+function go() {
+  $emit('restyle', [{ color: 'red' }])
+  $emit('retitle', {})
+}
+</script>
+<template><button @click="go()">{{ $props.label }}</button></template>
+</rozie>
+`;
+  it('`Array<Style>` / `Partial<Title>` in <types> and <emits>, `<style>` in a <props> docs string split cleanly', () => {
+    const r = splitBlocks(GENERIC_SRC, 'Gen.rozie');
+    expect(r.diagnostics).toEqual([]);
+    expect(r.types?.content).toContain('Array<Style>');
+    expect(r.emits?.content).toContain("'Partial<Title>'");
+    expect(r.props?.content).toContain('<style> literal');
+    expect(r.script?.content).toContain("$emit('restyle'");
+    expect(r.template?.content).toContain('<button');
   });
-  it('no false positive: `<scripts>` / `Array<ScriptX>` / `< style` are not raw-text tags', () => {
-    const r = splitBlocks(src('<scripts> Array<ScriptX> x < style'), 'X.rozie');
-    expect(r.diagnostics.find((x) => x.code === 'ROZ006')).toBeUndefined();
+  for (const target of TARGETS) {
+    it(`compiles on ${target} with no errors`, async () => {
+      const { compile } = await import('../src/compile.js');
+      const r = compile(GENERIC_SRC, { target, filename: 'Gen.rozie' });
+      expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      expect(r.code).toContain('Style');
+    });
+    it(`compiles the original \`// the <script> lang\` <types> comment on ${target}`, async () => {
+      const { compile } = await import('../src/compile.js');
+      const r = compile(src('<script>'), { target, filename: 'X.rozie' });
+      expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    });
+  }
+  it('a premature literal close is still ROZ005 (masking does not hide it)', () => {
+    const s = `<rozie name="X">
+<props>
+{ a: { type: String, default: '</props>' } }
+</props>
+<template><div /></template>
+</rozie>
+`;
+    const r = splitBlocks(s, 'X.rozie');
+    expect(r.diagnostics.map((d) => d.code)).toContain('ROZ005');
   });
 });

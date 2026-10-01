@@ -34,7 +34,7 @@ export const RozieErrorCode = {
   // escape (`<\/script>`) as the hint. Collateral ROZ002/003/004 noise located
   // after the premature close is suppressed.
   PREMATURE_BLOCK_CLOSE: 'ROZ005', // error — literal `</script>` (or other block close sequence) inside the block's own body ended the block early; escape it as `<\/script>`
-  RAWTEXT_TAG_IN_OPAQUE_BLOCK: 'ROZ006', // error — the text `<script`, `<style`, `<textarea`, `<title` (or another HTML raw-text tag: iframe/noembed/noframes/plaintext/xmp) appears inside a <types>/<emits>/<props>/<data>/<listeners>/<components> body, e.g. in a comment. The SFC tokenizer switches to raw-text mode there and would swallow the rest of the file; break the sequence (`< script`, `&lt;script`) or reword.
+  RAWTEXT_TAG_IN_OPAQUE_BLOCK: 'ROZ006', // retired — never emitted: an interim pre-release check for `<script`/`<style`/`<title`/`<textarea` text inside a <types>/<emits>/<props>/<data>/<listeners>/<components> body. The splitter now masks opaque block bodies before tokenizing, so such text (`Array<Style>`, a `<style>` in a docs string, a `// the <script> lang` comment) is inert; the code is kept (never reused) per the registry stability contract.
 
   // ---- Block parse — declarative <props>/<data>/<listeners> (Plan 03) — ROZ010..ROZ029 ----
   INVALID_DECLARATIVE_EXPRESSION: 'ROZ010', // error — a <props>/<data>/<components> body fails to parse as a single JS expression.

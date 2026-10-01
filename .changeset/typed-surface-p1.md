@@ -86,7 +86,7 @@ Also in this release:
 
 - The component manifest (`rozie-manifest.json`) is schema v2 and carries emit payloads, expose signatures, the `<types>` text and slot `:param-types`. The reader still accepts v1, so composing an already-published v1 package keeps working.
 - `.d.rozie.ts` sidecars now carry `<types>` and type slots exactly as each compiled module does: Solid `<slot>Slot` props and JSX.Element shapes, Svelte Snippet shapes and lowercase handler names, no spurious `render<X>` props on Vue, Angular and Lit, and no `on<X>` props on Lit. A Solid scoped default slot now accepts a function child.
-- A `<types>`/`<emits>` body containing a raw-text tag such as `<script` (even in a comment) is now ROZ006 instead of desynchronising the block splitter.
+- Text such as `<script`, `<style`, `<title` or `<textarea` inside a `<types>`, `<emits>`, `<props>`, `<data>`, `<listeners>` or `<components>` body (in a comment, a docs string, or a generic like `Array<Style>`) no longer desynchronises the block splitter. Those bodies are now opaque to the HTML tokenizer.
 
 Untyped-handler convergence (the one intentional change for components that do not opt in): an untyped event handler is now `(...args: any[]) => void` on every target. The shared `.d.ts` sidecar, Solid and Svelte used to emit `unknown[]`, which rejected handlers written with a concrete parameter type; React already used `any[]`. The generated sources of the Solid and Svelte leaves (and the React `.d.ts`) change accordingly, hence the patch bumps. `@rozie-ui/sortable-list-solid` and `@rozie-ui/switch-solid` also pick up the scoped-default-slot function-child fix.
 
