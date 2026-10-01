@@ -106,7 +106,9 @@ function collectDepth1Members(interiorText) {
 function extractPropsInterfaces(fileText) {
   const text = stripComments(fileText);
   const results = new Map();
-  const re = /interface\s+(\w+Props)\s*\{/g;
+  // The optional `extends …` clause covers the typed-surface P3 shape
+  // `interface XProps extends Omit<…HTMLAttributes<…>, …> {` (no braces inside).
+  const re = /interface\s+(\w+Props)\b(?:\s+extends\s+[^{]*)?\s*\{/g;
   let match;
   while ((match = re.exec(text))) {
     const name = match[1];
