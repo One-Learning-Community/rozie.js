@@ -38,17 +38,34 @@ export function indentContinuation(printed: string): string {
   return printed.replace(/\n/g, '\n  ');
 }
 
+/** The wrapper every authored type string is parsed inside. */
+const AUTHORED_TYPE_PREFIX = 'type __RozieAuthored = ';
+
+/**
+ * Babel's message with its wrapper-relative `(line:col)` suffix replaced by a
+ * position inside the AUTHOR's type string (final fix wave L12): line 1
+ * columns shift left by the wrapper prefix; later lines are unaffected.
+ */
+function authoredTypeErrorMessage(err: unknown): string {
+  const e = err as { message?: string; loc?: { line: number; column: number } };
+  const base = (e.message ?? 'parse failed').replace(/\s*\(\d+:\d+\)\s*$/, '');
+  if (!e.loc) return base;
+  const line = e.loc.line;
+  const column = Math.max(0, line === 1 ? e.loc.column - AUTHORED_TYPE_PREFIX.length : e.loc.column) + 1;
+  return `${base} (line ${line}, column ${column} of the type string)`;
+}
+
 /** @experimental */
 export function parseAuthoredType(src: string): AuthoredTypeResult | { error: string } {
   if (src.trim() === '') return { error: 'empty type string' };
   let file: t.File;
   try {
-    file = babelParse(`type __RozieAuthored = ${src};`, {
+    file = babelParse(`${AUTHORED_TYPE_PREFIX}${src};`, {
       sourceType: 'module',
       plugins: ['typescript'],
     });
   } catch (err) {
-    return { error: (err as Error).message };
+    return { error: authoredTypeErrorMessage(err) };
   }
   const body = file.program.body;
   if (body.length !== 1 || !t.isTSTypeAliasDeclaration(body[0])) {
