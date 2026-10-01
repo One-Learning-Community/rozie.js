@@ -204,7 +204,7 @@ The `.d.rozie.ts` sidecar for each target types slots the same way the compiled 
 
 - The **component manifest** (`rozie-manifest.json`) is now schema v2 and carries emit payloads, `$expose` signatures, the `<types>` text and each slot's authored `:param-types`. The reader still accepts v1, so a component composing an already-published v1 package keeps compiling. The reverse does not hold: composing a package whose leaves ship a v2 manifest (for example `@rozie-ui/popover` or `@rozie-ui/combobox`) from your own `.rozie` needs `@rozie/*` from this release or newer. An older compiler stops with [ROZ988](/reference/diagnostics), which tells you to upgrade the Rozie toolchain.
 - **Family READMEs** can render their event tables from `<emits>`. `@rozie-ui/popover` and `@rozie-ui/fullcalendar` do this and no longer keep a hand-written `event-manifest.mjs`.
-- **Editor support:** `<types>` and `<emits>` are highlighted by the TextMate grammar and the IntelliJ lexer, appear in the language server's outline, and are part of the Volar virtual code, so completion and hover inside the blocks work.
+- **Editor support:** `<types>` and `<emits>` are highlighted by the TextMate grammar and the IntelliJ lexer, and appear in the language server's outline. `<types>` is also part of the Volar virtual code, so TypeScript completion, hover and errors work inside it. `<emits>` payload strings are not type-checked in the editor; the compiler reports a bad one as [ROZ022](/reference/diagnostics).
 
 ## Not yet supported
 
