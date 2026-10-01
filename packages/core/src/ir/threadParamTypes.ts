@@ -595,6 +595,12 @@ export function threadParamTypes(
         } else {
           delete filler.paramTypesAuthored;
         }
+      } else {
+        // Symmetric (WR-05): a re-thread against a producer that no longer
+        // carries paramTypes must not leave a previous thread's types behind
+        // (typed-surface P1 final wave L6).
+        delete filler.paramTypes;
+        delete filler.paramTypesAuthored;
       }
 
       // D-09 / ROZ947 — validate consumer scoped-param names against producer
