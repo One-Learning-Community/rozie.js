@@ -260,12 +260,7 @@ export class Popover {
       if (isOpen && !(this.disabled() || this.__rozieCvaDisabled())) {
         // A controlled `open` write (or the handle) never ran requestOpen's capture.
         this.captureReturnFocus();
-        queueMicrotask(() => {
-          if (!this.open() || (this.disabled() || this.__rozieCvaDisabled())) return;
-          this.floatingNode = this.floatingEl()?.nativeElement;
-          this.arrowNode = this.arrowEl()?.nativeElement;
-          this.startTracking();
-        });
+        queueMicrotask(() => this.trackWhenRendered(3));
       } else {
         this.stopTracking();
         // A controlled close (the consumer wrote `open = false`); an internal close
@@ -529,6 +524,50 @@ export class Popover {
     const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1;
     Reflect.set(globalThis, '__rozieAutoId', n);
     return n;
+  };
+  // ─── open/close drives autoUpdate (lazy $watch — never fires on initial value) ──
+  //
+  // Phase 72-07 finding (canonical-Popover scope, routed here per the plan's own
+  // contingency): reading `$refs.floatingEl` SYNCHRONOUSLY inside this $watch
+  // callback gets a STALE (pre-toggle) value on Vue/Angular/Lit — Vue's `watch()`
+  // defaults to `flush:'pre'` (runs BEFORE the newly-toggled `r-if` patches the
+  // DOM), and Angular's signal `effect()` / Lit's `$watch` compilation have an
+  // analogous ordering gap relative to when `floatingEl`'s viewChild/ref actually
+  // reflects the just-rendered element. The practical effect: `floatingNode`
+  // stayed `undefined`, `startTracking()`'s own `if (!anchorNode || !floatingNode)
+  // return` guard silently no-opped, and the floating panel never got its
+  // floating-ui-computed `left`/`top`/`position` — it rendered at the stylesheet's
+  // default `position:absolute;left:0;top:0` relative to whatever positioned
+  // ancestor happened to be nearest (the viewport's initial containing block in
+  // a standalone demo; a data-table `<th>` in the pinned/sticky-header case),
+  // nowhere near the actual anchor. React/Svelte/Solid were unaffected — their
+  // own effect/reactive-statement timing already runs after the DOM commit.
+  //
+  // Fix: defer the ref read + startTracking() one microtask. A microtask
+  // boundary is always AFTER the current synchronous DOM-patch pass completes
+  // on every target (it's a JS-platform guarantee, not framework-specific), so
+  // `$refs.floatingEl` is guaranteed fresh by the time this runs — on every
+  // target, including the 3 that were already correct (their own post-render
+  // timing means the ref is already fresh even before the extra microtask
+  // delay, so the deferred read observes the same value, not a stale one).
+  // trackWhenRendered(retries): read the just-rendered panel and start tracking.
+  // The single-microtask deferral below assumes the framework's own re-render was
+  // queued BEFORE this watch's microtask. On Lit that holds only while the render
+  // watcher subscribed to `open` first: ANY re-render before the first open (e.g.
+  // the generated id base landing after mount, quick 261002-ekf) re-subscribes it
+  // behind this watch, so the microtask ran before the panel existed and
+  // startTracking() silently no-opped — an unpositioned panel. When the panel is
+  // not rendered yet, retry on the next microtask, which runs after the render
+  // that is already queued.
+  trackWhenRendered = (retries: any) => {
+    if (!this.open() || (this.disabled() || this.__rozieCvaDisabled())) return;
+    this.floatingNode = this.floatingEl()?.nativeElement;
+    this.arrowNode = this.arrowEl()?.nativeElement;
+    if (!this.floatingNode && retries > 0) {
+      queueMicrotask(() => this.trackWhenRendered(retries - 1));
+      return;
+    }
+    this.startTracking();
   };
   // ─── reconcile positioning props while open ─────────────────────────────────────
   // Restart tracking rather than repositioning once (release-0.8.0 audit B3):

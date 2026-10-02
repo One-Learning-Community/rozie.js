@@ -525,16 +525,31 @@ $onMount(() => {
 // target, including the 3 that were already correct (their own post-render
 // timing means the ref is already fresh even before the extra microtask
 // delay, so the deferred read observes the same value, not a stale one).
+// trackWhenRendered(retries): read the just-rendered panel and start tracking.
+// The single-microtask deferral below assumes the framework's own re-render was
+// queued BEFORE this watch's microtask. On Lit that holds only while the render
+// watcher subscribed to `open` first: ANY re-render before the first open (e.g.
+// the generated id base landing after mount, quick 261002-ekf) re-subscribes it
+// behind this watch, so the microtask ran before the panel existed and
+// startTracking() silently no-opped — an unpositioned panel. When the panel is
+// not rendered yet, retry on the next microtask, which runs after the render
+// that is already queued.
+const trackWhenRendered = (retries) => {
+  if (!$props.open || $props.disabled) return
+  floatingNode = $refs.floatingEl
+  arrowNode = $refs.arrowEl
+  if (!floatingNode && retries > 0) {
+    queueMicrotask(() => trackWhenRendered(retries - 1))
+    return
+  }
+  startTracking()
+}
+
 $watch(() => $props.open, (isOpen) => {
   if (isOpen && !$props.disabled) {
     // A controlled `open` write (or the handle) never ran requestOpen's capture.
     captureReturnFocus()
-    queueMicrotask(() => {
-      if (!$props.open || $props.disabled) return
-      floatingNode = $refs.floatingEl
-      arrowNode = $refs.arrowEl
-      startTracking()
-    })
+    queueMicrotask(() => trackWhenRendered(3))
   } else {
     stopTracking()
     // A controlled close (the consumer wrote `open = false`); an internal close
