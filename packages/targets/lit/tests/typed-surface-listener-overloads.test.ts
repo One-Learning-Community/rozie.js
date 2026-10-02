@@ -43,6 +43,38 @@ describe('Lit typed listener overloads (typed-surface P1)', () => {
     );
   });
 
+  // Release-0.8.0 audit B6: a model prop's `<kebab-prop>-change` event (what
+  // the controllable property dispatches) is part of the typed event map, typed
+  // with the prop's own TS type, even when <emits> declares nothing else.
+  it('model props contribute their <prop>-change events to the event map', () => {
+    const source = `<rozie name="ModelEvents">
+<props>
+{
+  open: { type: Boolean, default: false, model: true },
+  pageSize: { type: Number, default: 10, model: true },
+}
+</props>
+<emits>
+{}
+</emits>
+<template>
+<div>{{ $props.open }}</div>
+</template>
+</rozie>`;
+    const { ast } = parse(source, { filename: 'ModelEvents.rozie' });
+    const { ir } = lowerToIR(ast!, { modifierRegistry: createDefaultRegistry() });
+    const code = emitLit(ir!, { filename: 'ModelEvents.rozie', source }).code;
+    expect(code).toContain(
+      "export interface RozieModelEventsEventMap extends Omit<HTMLElementEventMap, 'open-change' | 'page-size-change'> {\n" +
+        "  'open-change': CustomEvent<boolean>;\n" +
+        "  'page-size-change': CustomEvent<number>;\n" +
+        '}',
+    );
+    // ...and the names match what the controllable properties dispatch.
+    expect(code).toContain("eventName: 'open-change'");
+    expect(code).toContain("eventName: 'page-size-change'");
+  });
+
   it('a component without <emits> gains neither the overloads nor an event map', () => {
     for (const name of ['Counter', 'Dropdown', 'Modal']) {
       const code = compileExample(name);

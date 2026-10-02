@@ -181,7 +181,8 @@ function renderType(t: PropTypeAnnotation): string {
   return 'Object';
 }
 
-function renderTsType(ann: PropTypeAnnotation): string {
+/** Also used by litEventMap for a model prop's `<prop>-change` detail type. */
+export function renderTsType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {
     switch (ann.name) {
       case 'Number':
@@ -554,13 +555,20 @@ function emitNonModelProp(prop: PropDecl): string {
   // into NaN; `type: String` never yields a number). No reflect — a union is
   // never `isPrimitiveType`.
   const unionKind = classifyUnionAttr(prop.typeAnnotation);
+  // Release-0.8.0: a multi-word prop observes its KEBAB attribute (`id-base`),
+  // matching model props (`page-size`) and what a Rozie consumer compiled for
+  // Lit writes for a static attribute. Lit's default is the lowercased name
+  // (`idbase`), so a static `id-base="x"` from a consumer never arrived.
+  // Single-word props keep Lit's default (identical name, byte-identical emit).
+  const kebab = toKebabCase(prop.name);
+  const attributeField = kebab !== prop.name.toLowerCase() ? `, attribute: '${kebab}'` : '';
   if (unionKind === 'boolean-string') {
-    return `${jsdoc}  @property({ converter: ${BOOLEAN_STRING_CONVERTER} }) ${prop.name}${fieldSuffix};`;
+    return `${jsdoc}  @property({ converter: ${BOOLEAN_STRING_CONVERTER}${attributeField} }) ${prop.name}${fieldSuffix};`;
   }
   if (unionKind === 'number-string') {
-    return `${jsdoc}  @property({ converter: ${NUMBER_STRING_CONVERTER} }) ${prop.name}${fieldSuffix};`;
+    return `${jsdoc}  @property({ converter: ${NUMBER_STRING_CONVERTER}${attributeField} }) ${prop.name}${fieldSuffix};`;
   }
-  return `${jsdoc}  @property({ type: ${litType}${reflectField} }) ${prop.name}${fieldSuffix};`;
+  return `${jsdoc}  @property({ type: ${litType}${reflectField}${attributeField} }) ${prop.name}${fieldSuffix};`;
 }
 
 interface ModelPropEmit {

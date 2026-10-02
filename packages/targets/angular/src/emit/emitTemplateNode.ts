@@ -723,6 +723,9 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
       elementTagKind: node.tagKind,
+      // Release-0.8.0 — the callee's declared props, so a STATIC kebab
+      // attribute (`id-base="x"`) reaches its camelCase input (`idBase`).
+      producerProps: node.producerProps,
       // Quick task 260520-w18 follow-up — thread the class-body injection sink so
       // a template attr expression with a double-read accessor can synthesise a
       // single-read getter member (strictTemplates double-signal-call narrowing).

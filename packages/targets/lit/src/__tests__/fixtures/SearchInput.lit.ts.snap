@@ -14,7 +14,7 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
 `;
 
   @property({ type: String, reflect: true }) placeholder: string = 'Search…';
-  @property({ type: Number, reflect: true }) minLength: number = 2;
+  @property({ type: Number, reflect: true, attribute: 'min-length' }) minLength: number = 2;
   @property({ type: Boolean, reflect: true }) autofocus: boolean = false;
   private _query = signal('');
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;

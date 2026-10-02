@@ -10,7 +10,11 @@
  *     Omit<HTMLElementEventMap, '<declared keys>'> { '<kebab>': CustomEvent<P>;
  *     … }` at module scope. Keys use the SAME `kebabize` the dispatch uses. The
  *     `Omit` makes any DOM-name collision (`select`, `click`, `toggle`, …) a
- *     replacement rather than an incompatible override (no TS2430).
+ *     replacement rather than an incompatible override (no TS2430). Every
+ *     `model: true` prop also contributes its `<kebab-prop>-change` event (the
+ *     name the controllable-property runtime dispatches), typed with the prop's
+ *     own TS type — the two-way model's change event is part of the typed
+ *     surface too (release-0.8.0 audit B6: Popover's only change signal).
  *   - `renderLitListenerOverloads(ir, mode)` — typed `addEventListener` /
  *     `removeEventListener` overloads. `'class'` appends an implementation that
  *     is a behaviour-identical `super` pass-through (the single allowed
@@ -25,6 +29,8 @@ import * as t from '@babel/types';
 import type { IRComponent } from '@rozie/core';
 import { indentContinuation, printTSType } from '@rozie/core';
 import { kebabize } from './resolveLitSetterText.js';
+import { toKebabCase } from './emitDecorator.js';
+import { renderTsType } from './emitScript.js';
 import { litEventMapName as coreLitEventMapName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
 /** `Rozie<Name>EventMap` — the exported event-map interface name. */
@@ -61,6 +67,15 @@ export function renderLitEventMap(ir: IRComponent): string {
     const payload = d.payload ? indentContinuation(printTSType(d.payload)) : 'undefined';
     return `  ${keys[i]}: CustomEvent<${payload}>;`;
   });
+  // Model change events — same name as emitScript's controllable property
+  // (`${toKebabCase(prop.name)}-change`). A declared emit of the same name wins.
+  for (const p of ir.props) {
+    if (!p.isModel) continue;
+    const key = `'${toKebabCase(p.name)}-change'`;
+    if (keys.includes(key)) continue;
+    keys.push(key);
+    members.push(`  ${key}: CustomEvent<${renderTsType(p.typeAnnotation)}>;`);
+  }
   // `Omit` the declared keys first: a declared name that collides with a DOM
   // event whose map type is NOT plain `Event` (`click` → PointerEvent, `focus`
   // → FocusEvent, `toggle` → ToggleEvent, …) would otherwise be an incompatible

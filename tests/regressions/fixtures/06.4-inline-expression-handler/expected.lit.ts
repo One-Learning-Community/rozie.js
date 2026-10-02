@@ -10,7 +10,7 @@ export default class InlineExprHandler extends SignalWatcher(LitElement) {
 .backdrop[data-rozie-s-8ec7623e] { position: fixed; inset: 0; }
 `;
 
-  @property({ type: Boolean, reflect: true }) closeOnBackdrop: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'close-on-backdrop' }) closeOnBackdrop: boolean = true;
   private _open = signal(false);
 
   private _disconnectCleanups: Array<() => void> = [];

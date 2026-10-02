@@ -84,13 +84,15 @@ export class Dropdown {
 
       effect((onCleanup) => {
         if (!(this.open() && this.closeOnOutsideClick())) return;
+        const listenTarget = typeof document === 'undefined' ? null : document;
+        if (!listenTarget) return;
         const handler = ($event: MouseEvent) => {
           const target = $event.target as Node;
           if (this.triggerEl()?.nativeElement?.contains(target) || this.panelEl()?.nativeElement?.contains(target)) return;
           ((this.close) as (...args: any[]) => any)($event);
         };
-        const unlisten = renderer.listen('document', 'click', handler);
-        onCleanup(unlisten);
+        listenTarget.addEventListener('click', handler as EventListener, true);
+        onCleanup(() => listenTarget.removeEventListener('click', handler as EventListener, true));
       });
 
       effect((onCleanup) => {

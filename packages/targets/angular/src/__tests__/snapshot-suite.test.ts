@@ -109,15 +109,19 @@ describe('emitAngular — substring invariants (Plan 05-04a Task 3 acceptance cr
     expect(code).toContain('FormsModule');
   });
 
-  it('Dropdown.ts.snap contains 3 effect((onCleanup) =>) blocks + Renderer2.listen pairs', () => {
+  it('Dropdown.ts.snap contains 3 effect((onCleanup) =>) blocks: 2 Renderer2.listen pairs + 1 capture-phase .outside pair', () => {
     const { ir, src, filename } = loadExample('Dropdown');
     const { code } = emitAngular(ir, { filename, source: src });
     const effectMatches = code.match(/effect\(\(onCleanup\) =>/g) ?? [];
     expect(effectMatches.length).toBeGreaterThanOrEqual(3);
     const rendererListenMatches = code.match(/renderer\.listen\(/g) ?? [];
-    expect(rendererListenMatches.length).toBeGreaterThanOrEqual(3);
+    expect(rendererListenMatches.length).toBeGreaterThanOrEqual(2);
     const onCleanupMatches = code.match(/onCleanup\(unlisten\)/g) ?? [];
-    expect(onCleanupMatches.length).toBeGreaterThanOrEqual(3);
+    expect(onCleanupMatches.length).toBeGreaterThanOrEqual(2);
+    // Release-0.8.0 audit A2: `.outside` listens in the CAPTURE phase (parity
+    // with the React/Vue/Solid/Lit runtime helpers), never via Renderer2.listen.
+    expect(code).toContain("listenTarget.addEventListener('click', handler as EventListener, true);");
+    expect(code).toContain("onCleanup(() => listenTarget.removeEventListener('click', handler as EventListener, true));");
   });
 
   it('TodoList.ts.snap contains @for, ngTemplateOutlet, ngTemplateContextGuard, NgTemplateOutlet import, #defaultSlot', () => {

@@ -334,8 +334,16 @@ function renderListener(
         ? classification.nativeKeyGuards.map((g) => `    ${g}`).join('\n') + '\n'
         : '';
 
-    const optsObj = renderOptionsSuffix(classification.listenerOpts);
-    const removeOptsObj = renderOptionsSuffix(classification.listenerOpts, true);
+    // Release-0.8.0 audit A2: the outside dismissal always listens in the
+    // CAPTURE phase, matching the React/Vue/Solid/Lit runtime helpers and the
+    // Angular emitter, so it runs BEFORE any consumer click handler on the
+    // path on all six targets. It then sees the click target while it is still
+    // attached (a handler that removes its own element can't make an inside
+    // click look outside), and a consumer's stopPropagation in the bubble phase
+    // no longer decides whether the dismissal runs on just some targets.
+    const outsideOpts = new Set([...classification.listenerOpts, 'capture']);
+    const optsObj = renderOptionsSuffix(outsideOpts);
+    const removeOptsObj = renderOptionsSuffix(outsideOpts, true);
 
     // Defer the document/window addEventListener by one macrotask. Svelte
     // flushes this $effect during the SAME event tick that flipped the gating

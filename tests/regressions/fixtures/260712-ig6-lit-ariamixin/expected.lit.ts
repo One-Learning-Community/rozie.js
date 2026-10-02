@@ -10,7 +10,7 @@ export default class LitAriaMixin extends SignalWatcher(LitElement) {
 .lit-ariamixin[data-rozie-s-1cf1c129] { display: block; }
 `;
 
-  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
   @property({ type: String, reflect: true }) label?: string;
 
   private _disconnectCleanups: Array<() => void> = [];

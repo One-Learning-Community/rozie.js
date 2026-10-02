@@ -9,7 +9,7 @@ export default class StyleDoubleSemicolon extends SignalWatcher(LitElement) {
 :host{display:contents}
 `;
 
-  @property({ type: String, reflect: true }) colId: string = 'a';
+  @property({ type: String, reflect: true, attribute: 'col-id' }) colId: string = 'a';
   private _pad = signal('padding-left:8px');
 
   private _disconnectCleanups: Array<() => void> = [];

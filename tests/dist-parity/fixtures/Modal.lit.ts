@@ -33,9 +33,9 @@ footer[data-rozie-s-fc45feb2] { border-top: 1px solid rgba(0, 0, 0, 0.08); justi
 
   @property({ type: Boolean, attribute: 'open' }) _open_attr: boolean = false;
   private _openControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'open-change', defaultValue: false, initialControlledValue: undefined });
-  @property({ type: Boolean, reflect: true }) closeOnEscape: boolean = true;
-  @property({ type: Boolean, reflect: true }) closeOnBackdrop: boolean = true;
-  @property({ type: Boolean, reflect: true }) lockBodyScroll: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'close-on-escape' }) closeOnEscape: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'close-on-backdrop' }) closeOnBackdrop: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'lock-body-scroll' }) lockBodyScroll: boolean = true;
   @property({ type: String, reflect: true }) title: string = '';
   @query('[data-rozie-ref="backdropEl"]') private _refBackdropEl!: HTMLElement;
   @query('[data-rozie-ref="dialogEl"]') private _refDialogEl!: HTMLElement;

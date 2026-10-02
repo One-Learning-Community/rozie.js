@@ -583,16 +583,41 @@ function isNullablePropRead(expr: bt.Expression, ir: IRComponent): boolean {
   );
 }
 
+/**
+ * The declared prop a static attribute on a component/self tag spells — exact
+ * name first, then the kebab-to-camel form (same rule as react/svelte/solid
+ * `resolveDeclaredProp`). Null when not a component tag or no declaration hit.
+ */
+function resolveStaticComponentProp(
+  name: string,
+  tagKind: 'html' | 'component' | 'self',
+  producerProps?: readonly string[],
+): string | null {
+  if (tagKind !== 'component' && tagKind !== 'self') return null;
+  if (producerProps === undefined || producerProps.length === 0) return null;
+  if (producerProps.includes(name)) return name;
+  const camel = name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+  return producerProps.includes(camel) ? camel : null;
+}
+
 function emitAttribute(
   attr: AttributeBinding,
   ir: IRComponent,
   tagName: string,
   tagKind: 'html' | 'component' | 'self' = 'html',
   opts?: EmitTemplateOpts,
+  producerProps?: readonly string[],
 ): string {
   if (attr.kind === 'static') {
-    // Pass through static attribute as-is.
-    return `${attr.name}="${attr.value}"`;
+    // Release-0.8.0 — a static attribute that spells a DECLARED prop of the
+    // composed Rozie element (`idBase="x"` or `id-base="x"`) is written as that
+    // prop's KEBAB attribute, which is what the element observes (emitScript:
+    // multi-word props declare `attribute: '<kebab>'`). HTML lowercases
+    // attribute names, so a camelCase `idBase` would otherwise arrive as
+    // `idbase`. No declared match → verbatim (a passthrough host attribute).
+    const declared = resolveStaticComponentProp(attr.name, tagKind, producerProps);
+    const name = declared === null ? attr.name : toKebabCase(declared);
+    return `${name}="${attr.value}"`;
   }
 
   // Phase 14 R2 / D-07 / D-02 / Plan 14-05 — the bare-spread `r-bind="<expr>"`
@@ -1483,7 +1508,7 @@ function emitElementOpenTag(
       // patch wave.
       if (attr.kind === 'binding' && attr.name === 'key') continue;
     }
-    const emitted = emitAttribute(attr, ir, node.tagName, node.tagKind, opts);
+    const emitted = emitAttribute(attr, ir, node.tagName, node.tagKind, opts, node.producerProps);
     if (emitted) parts.push(emitted);
   }
 

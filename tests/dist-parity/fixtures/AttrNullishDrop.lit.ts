@@ -10,7 +10,7 @@ export default class AttrNullishDrop extends SignalWatcher(LitElement) {
 :host{display:contents}
 `;
 
-  @property({ type: String, reflect: true }) maybeNullProp: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'maybe-null-prop' }) maybeNullProp: string | null = null;
   private _cond = signal(false);
   private _maybeNull = signal<any>(null);
   private _loopItems = signal(['a', 'b']);

@@ -25,8 +25,8 @@ export default class Dropdown extends SignalWatcher(LitElement) {
 
   @property({ type: Boolean, attribute: 'open' }) _open_attr: boolean = false;
   private _openControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'open-change', defaultValue: false, initialControlledValue: undefined });
-  @property({ type: Boolean, reflect: true }) closeOnOutsideClick: boolean = true;
-  @property({ type: Boolean, reflect: true }) closeOnEscape: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'close-on-outside-click' }) closeOnOutsideClick: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'close-on-escape' }) closeOnEscape: boolean = true;
   @query('[data-rozie-ref="triggerEl"]') private _refTriggerEl!: HTMLElement;
   @query('[data-rozie-ref="panelEl"]') private _refPanelEl!: HTMLElement;
 private __rozieWatchInitial_0 = true;

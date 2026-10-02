@@ -55,6 +55,16 @@ export interface EmitAttrCtx {
    */
   elementTagKind?: 'html' | 'component' | 'self';
   /**
+   * Release-0.8.0 — the composed callee's declared prop names
+   * (`TemplateElementIR.producerProps`). A STATIC kebab attribute on a
+   * component tag is renamed to the declared camelCase input it spells
+   * (`id-base="x"` → `idBase="x"`); Angular binds a static attribute to an
+   * input only under the input's exact name. Same declaration-gated rule as
+   * react/svelte/solid `resolveDeclaredProp`; no match → verbatim, so a
+   * passthrough `data-*` / `aria-*` attribute stays a plain host attribute.
+   */
+  producerProps?: readonly string[] | undefined;
+  /**
    * Quick task 260520-w18 follow-up — class-body field injections collected
    * during attribute emission. When a template attribute expression reads the
    * SAME `$props.X` / `$data.X` accessor 2+ times in a guard-and-use shape,
@@ -1411,7 +1421,7 @@ export function emitSingleAttr(
         return `#${attr.value}`;
       }
     }
-    return `${attr.name}="${escapeAttrValue(attr.value)}"`;
+    return `${resolveStaticComponentAttrName(attr.name, ctx)}="${escapeAttrValue(attr.value)}"`;
   }
 
   if (attr.kind === 'binding') {
@@ -1597,6 +1607,19 @@ export function emitSingleAttr(
   const lit = renderInterpolatedTemplateLiteral(attr.segments, ctx);
   const bindingName = resolveBindingName(attr.name, ctx);
   return `[${bindingName}]="\`${lit}\`"`;
+}
+
+/**
+ * A static attribute on a component tag whose kebab name camelizes to a
+ * DECLARED input of the callee takes that input's name; anything else (no
+ * declaration list, no match, a plain host attribute) passes through verbatim.
+ */
+function resolveStaticComponentAttrName(name: string, ctx: EmitAttrCtx): string {
+  if (!isComponentTag(ctx) || !name.includes('-')) return name;
+  const declared = ctx.producerProps;
+  if (declared === undefined || declared.length === 0 || declared.includes(name)) return name;
+  const camel = kebabToCamel(name);
+  return declared.includes(camel) ? camel : name;
 }
 
 function isComponentTag(ctx: EmitAttrCtx): boolean {

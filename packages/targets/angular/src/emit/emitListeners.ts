@@ -328,11 +328,28 @@ function renderListener(
         : '';
 
 
+    // Release-0.8.0 audit A2: the outside dismissal attaches in the CAPTURE
+    // phase, matching the React/Vue/Solid/Lit runtime helpers (and Svelte), so
+    // it runs BEFORE any consumer click handler on the path. Bubble phase
+    // (Renderer2.listen has no options) ran it AFTER: a consumer handler that
+    // repointed `reference` to the clicked element and set `open = true` was
+    // overridden, because the input signal it reads only updates on the next
+    // change detection, so the dismissal still saw the old reference and closed
+    // the panel. A capture listener attached while the opening click is already
+    // past `document` is not invoked for that click, so it cannot self-dismiss.
+    // `typeof` guards: the global is absent under SSR, where there is nothing
+    // to dismiss.
+    const captureTarget =
+      listener.target.kind === 'global'
+        ? `typeof ${listener.target.name} === 'undefined' ? null : ${listener.target.name}`
+        : targetExpr;
     return [
       `effect((onCleanup) => {`,
-      `${whenGuard}      const handler = ($event: ${evtType}) => {\n${containsGuard}${guardLines}${invocation}\n      };`,
-      `      const unlisten = renderer.listen(${targetExpr}, '${listener.event}', handler);`,
-      `      onCleanup(unlisten);`,
+      `${whenGuard}      const listenTarget = ${captureTarget};`,
+      `      if (!listenTarget) return;`,
+      `      const handler = ($event: ${evtType}) => {\n${containsGuard}${guardLines}${invocation}\n      };`,
+      `      listenTarget.addEventListener('${listener.event}', handler as EventListener, true);`,
+      `      onCleanup(() => listenTarget.removeEventListener('${listener.event}', handler as EventListener, true));`,
       `    });`,
     ].join('\n');
   }
