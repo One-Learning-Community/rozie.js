@@ -200,7 +200,12 @@ ${typesBarrel}`,
     './themes/*': './src/themes/*',
     './rozie-manifest.json': './rozie-manifest.json',
   };
-  pkg.files = ['dist', 'src', 'rozie-manifest.json'];
+  // Keep a CHANGELOG.md entry (release-precheck check (h) adds it when the leaf is
+  // released; resetting `files` would drop it and the changelog would not ship).
+  pkg.files = [
+    ...['dist', 'src', 'rozie-manifest.json'],
+    ...(Array.isArray(pkg.files) && pkg.files.includes('CHANGELOG.md') ? ['CHANGELOG.md'] : []),
+  ];
   // This leaf publishes `./themes/*` (design-token bridge CSS under src/themes/) —
   // a bare boolean `sideEffects: false` tells a bundler it may drop ANY module of
   // ours it doesn't statically import, including those CSS files a consumer pulls

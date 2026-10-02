@@ -184,7 +184,12 @@ export { default } from './${componentName}.vue';
       default: `./src/${componentName}.vue`,
     },
   };
-  pkg.files = ['dist', 'src'];
+  // Keep a CHANGELOG.md entry (release-precheck check (h) adds it when the leaf is
+  // released; resetting `files` would drop it and the changelog would not ship).
+  pkg.files = [
+    ...['dist', 'src'],
+    ...(Array.isArray(pkg.files) && pkg.files.includes('CHANGELOG.md') ? ['CHANGELOG.md'] : []),
+  ];
   pkg.sideEffects = false;
   pkg.scripts = {
     ...pkg.scripts,

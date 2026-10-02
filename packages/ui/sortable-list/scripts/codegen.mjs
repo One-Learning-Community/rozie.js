@@ -221,7 +221,17 @@ export { default } from './${componentName}.vue';
   writeFileSync(resolve(leafDir, 'web-types.json'), `${JSON.stringify(webTypesDoc, null, 2)}\n`);
   pkg['web-types'] = './web-types.json';
 
-  pkg.files = ['dist', 'src', 'web-types.json'];
+  // Keep a CHANGELOG.md entry (release-precheck check (h) adds it when the leaf is
+
+  // released; resetting `files` would drop it and the changelog would not ship).
+
+  pkg.files = [
+
+    ...['dist', 'src', 'web-types.json'],
+
+    ...(Array.isArray(pkg.files) && pkg.files.includes('CHANGELOG.md') ? ['CHANGELOG.md'] : []),
+
+  ];
   pkg.sideEffects = false;
   pkg.scripts = {
     ...pkg.scripts,
