@@ -56,22 +56,20 @@ describe('buildManifest', () => {
     expect(manifest.schemaVersion).toBe(2);
   });
 
-  it('derives emits === [\'create\', \'change\', \'search\'] from the real Combobox IR', () => {
-    // Phase 86 R3 (plan 86-06): Combobox gained a `create` emit (creatable
-    // mode). Emit order follows first-textual-occurrence in the source — the
-    // `isCreate` branch's `$emit('create', ...)` sits ahead of `change`
-    // (selectOption's single-select tail) and `search` (onInput), which is
-    // why `create` leads rather than trails. This fixture test hardcodes
-    // the live component's emit order, so it must track that surface exactly.
+  it("derives emits === ['search', 'change', 'create'] from the real Combobox IR", () => {
+    // Release-0.8.0: Combobox declares its events in an `<emits>` block, so the
+    // manifest follows the block's DECLARATION order (it used to follow the
+    // first textual `$emit` in the script: create, change, search). This
+    // fixture test hardcodes the live component's surface, so it must track it.
     const ir = loadComboboxIR();
     const manifest = buildManifest(ir);
-    expect(manifest.emits.map((e) => e.name)).toEqual(['create', 'change', 'search']);
+    expect(manifest.emits.map((e) => e.name)).toEqual(['search', 'change', 'create']);
   });
 
-  it("derives expose === ['focus', 'clear', 'seedQuery', 'pinOpen'] from the real Combobox IR", () => {
+  it("derives expose === ['focus', 'clear', 'seedQuery', 'pinOpen', 'activeOption'] from the real Combobox IR", () => {
     const ir = loadComboboxIR();
     const manifest = buildManifest(ir);
-    expect(manifest.expose.map((e) => e.name)).toEqual(['focus', 'clear', 'seedQuery', 'pinOpen']);
+    expect(manifest.expose.map((e) => e.name)).toEqual(['focus', 'clear', 'seedQuery', 'pinOpen', 'activeOption']);
   });
 
   it('at least one slot has non-empty params for the combobox scoped slots', () => {
@@ -93,11 +91,16 @@ describe('buildManifest', () => {
   });
 
   it('slot.paramTypes is null when the source SlotDecl.paramTypes is undefined', () => {
+    // Release-0.8.0: every Combobox slot now authors `:param-types`, so the
+    // undefined case is exercised by stripping them from a copy of the IR.
     const ir = loadComboboxIR();
-    const manifest = buildManifest(ir);
+    const stripped = { ...ir, slots: ir.slots.map((s) => ({ ...s, paramTypes: undefined })) };
+    const manifest = buildManifest(stripped);
     for (const slot of manifest.slots) {
       expect(slot.paramTypes).toBeNull();
     }
+    // ...and the authored ones serialize.
+    expect(buildManifest(ir).slots.every((s) => s.paramTypes !== null)).toBe(true);
   });
 
   it('serializes a SlotDecl.paramTypes TSType[] into TS source strings (synthetic fixture)', () => {

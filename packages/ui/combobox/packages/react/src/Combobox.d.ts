@@ -2,7 +2,59 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
-export interface ComboboxProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'multiple' | 'creatable' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'onCreate' | 'onChange' | 'onSearch' | 'renderChip' | 'renderOption' | 'renderEmpty' | 'renderCreate' | 'renderGroupHeading' | 'renderGroupMore' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
+// The typed public surface (typed-surface P1; always TypeScript). `value` /
+// `option` stay `any`: options are consumer-shaped objects (or primitives) the
+// component never inspects beyond the label/value/disabled resolvers.
+/** `search` payload — the current input text. */
+export interface ComboboxSearchPayload {
+  query: string;
+}
+/** `change` payload — `option` is the raw source option (`null` for a clear or a free-text commit); `text` is set ONLY on free-text commits. */
+export interface ComboboxChangePayload {
+  value: any;
+  option: any;
+  selected: boolean;
+  text?: string;
+}
+/** `create` payload — the (untrimmed) query the user asked to create. */
+export interface ComboboxCreatePayload {
+  query: string;
+}
+/** An entry of the `groups` prop. */
+export interface ComboboxGroup {
+  id: string;
+  label: string;
+}
+/** `chip` slot params — `remove()` removes the chip and refocuses the input. */
+export interface ComboboxChipSlotCtx {
+  option: any;
+  remove: () => void;
+  index: number;
+}
+/** `option` slot params. */
+export interface ComboboxOptionSlotCtx {
+  option: any;
+  index: number;
+  active: boolean;
+  selected: boolean;
+  disabled: boolean;
+}
+/** `empty` / `create` slot params. */
+export interface ComboboxQuerySlotCtx {
+  query: string;
+}
+/** `groupHeading` slot params. */
+export interface ComboboxGroupHeadingSlotCtx {
+  group: ComboboxGroup;
+}
+/** `groupMore` slot params. */
+export interface ComboboxGroupMoreSlotCtx {
+  group: ComboboxGroup | null;
+  hidden: number;
+  expand: () => void;
+}
+
+export interface ComboboxProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'multiple' | 'creatable' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'chipLayout' | 'disableOpenOnFocus' | 'hideEmpty' | 'delimiters' | 'validate' | 'selectOnTab' | 'onSearch' | 'onChange' | 'onCreate' | 'renderChip' | 'renderOption' | 'renderEmpty' | 'renderCreate' | 'renderGroupHeading' | 'renderGroupMore' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The selected option's value (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a combobox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `null` when nothing is selected.
    * @example
@@ -99,23 +151,56 @@ export interface ComboboxProps extends Omit<import('react').ComponentPropsWithou
    * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
    */
   disableShift?: boolean;
-  onCreate?: (...args: any[]) => void;
-  onChange?: (...args: any[]) => void;
-  onSearch?: (...args: any[]) => void;
-  renderChip?: (params: { option: unknown; remove: unknown; index: unknown }) => ReactNode;
-  renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
-  renderEmpty?: (params: { query: unknown }) => ReactNode;
-  renderCreate?: (params: { query: unknown }) => ReactNode;
-  renderGroupHeading?: (params: { group: unknown }) => ReactNode;
-  renderGroupMore?: (params: { group: unknown; hidden: unknown; expand: unknown }) => ReactNode;
+  /**
+   * Fill the container: the root becomes `display: block; width: 100%`, the control (chips + input) stretches to that width, and the width-matched popup follows. Adds the `rozie-combobox--block` modifier class on the root. Default `false` keeps the fixed `--rozie-combobox-width` sizing.
+   */
+  block?: boolean;
+  /**
+   * Chip rail layout under `multiple`: `'stacked'` (default) renders the chips above the input; `'inline'` puts the chips and the input on ONE wrapping row (the Tags layout), with the input taking the remaining width (`flex: 1`, never narrower than `--rozie-combobox-inline-input-min-width`). Only meaningful with `multiple`.
+   */
+  chipLayout?: string;
+  /**
+   * Do not open the list when the input gains focus. Typing and ArrowDown / ArrowUp still open it. Default `false` opens on focus.
+   */
+  disableOpenOnFocus?: boolean;
+  /**
+   * Show nothing instead of the empty state: when there are no option rows and no create row, the popup is not shown, the input reports `aria-expanded="false"`, and Escape is left to the host (not `preventDefault`ed). This is the supported way to render no popup at all; filling the `empty` slot with nothing still renders the fallback on most targets.
+   */
+  hideEmpty?: boolean;
+  /**
+   * Keys that commit the **typed text** as a value (matched against the key event's `key`), under `multiple` only — a delimiter never picks the highlighted option. Character entries (e.g. `[',', ';']`) also split pasted text: a paste containing a delimiter is split on them and every non-empty trimmed part is committed. `'Enter'` and `'Tab'` are allowed; Enter then commits the typed text only when no option is highlighted. A non-empty list (or a `validate` function) turns on free-text commits, so Enter with no highlighted option commits the typed text too. Default `[]` (off).
+   * @example
+   * <Combobox multiple value={to} onValueChange={setTo} options={contacts} delimiters={delims} />
+   */
+  delimiters?: unknown[];
+  /**
+   * Free-text gate, `(text: string) => boolean`, under `multiple` only. Called with the trimmed typed (or pasted) text before every free-text commit; return `false` to reject it — rejected text stays in the input. Setting it also turns on free-text commits (Enter with no highlighted option commits the typed text). A free-text commit appends the text to `value` (skipped when already present), clears the input, and emits `change` with `option: null` and the committed `text`.
+   * @example
+   * <Combobox multiple value={to} onValueChange={setTo} options={contacts} validate={isEmail} />
+   */
+  validate?: ((...args: any[]) => any) | null;
+  /**
+   * Tab picks the highlighted option while the popup is visible and an option is highlighted, keeping focus in the input. When nothing is picked, Tab moves focus normally. Default `false` (Tab always moves focus).
+   */
+  selectOnTab?: boolean;
+  onSearch?: (payload: ComboboxSearchPayload) => void;
+  onChange?: (payload: ComboboxChangePayload) => void;
+  onCreate?: (payload: ComboboxCreatePayload) => void;
+  renderChip?: (params: { option: any; remove: () => void; index: number }) => ReactNode;
+  renderOption?: (params: { option: any; index: number; active: boolean; selected: boolean; disabled: boolean }) => ReactNode;
+  renderEmpty?: (params: { query: string }) => ReactNode;
+  renderCreate?: (params: { query: string }) => ReactNode;
+  renderGroupHeading?: (params: { group: ComboboxGroup }) => ReactNode;
+  renderGroupMore?: (params: { group: ComboboxGroup | null; hidden: number; expand: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 
 export interface ComboboxHandle {
-  focus: (...args: any[]) => any;
-  clear: (...args: any[]) => any;
-  seedQuery: (...args: any[]) => any;
-  pinOpen: (...args: any[]) => any;
+  focus: () => void;
+  clear: () => void;
+  seedQuery: (text: string) => void;
+  pinOpen: (v: boolean) => void;
+  activeOption: () => any;
 }
 
 declare const Combobox: React.ForwardRefExoticComponent<ComboboxProps & React.RefAttributes<ComboboxHandle>>;

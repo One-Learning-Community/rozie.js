@@ -126,6 +126,14 @@ chip rail — the selected-value chips rendered inside the control, before the i
 | `--rozie-combobox-chip-remove-color` | `currentColor` |
 | `--rozie-combobox-chip-remove-size` | `1.1rem` |
 
+inline chip layout — `chipLayout="inline"` (with `multiple`) puts the chips and the input on one wrapping row inside a single bordered field. `--rozie-combobox-inline-padding` pads that field, `--rozie-combobox-inline-input-min-width` is the narrowest the input gets before it wraps onto the next row, and `--rozie-combobox-inline-input-padding` pads the (borderless) input.
+
+| Token | Default |
+| --- | --- |
+| `--rozie-combobox-inline-padding` | `0.3rem 0.45rem` |
+| `--rozie-combobox-inline-input-min-width` | `6rem` |
+| `--rozie-combobox-inline-input-padding` | `0.2rem 0.25rem` |
+
 state-dependent — declared `initial` on purpose. The component reads this token with a DIFFERENT local fallback at each read site (resting input falls back through --rozie-combobox-border-color, the :focus rule falls back through --rozie-combobox-focus-border-color), so declaring a single frozen value here would collapse the focus-state transition. `initial` resets the custom property to the guaranteed-invalid value, which makes every var() substitute its OWN local fallback — exactly today's render output, but now discoverable and overridable.
 
 | Token | Default |

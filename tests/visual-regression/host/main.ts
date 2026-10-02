@@ -787,6 +787,10 @@ export const EXAMPLES = [
   // heading, and the two-way r-model:value round-trip still commits on select.
   // See combobox-groups.spec.ts. Behavioral-only; NOT in matrix.spec.ts EXAMPLES.
   'ComboboxGroups',
+  // release-0.8.0 combobox token-input (COMBOBOX-SPEC) — the BEHAVIORAL cell
+  // (loader → examples/demos/ComboboxTokenInputDemo.rozie). See
+  // combobox-token-input.spec.ts. Behavioral-only; NOT in matrix.spec.ts EXAMPLES.
+  'ComboboxTokenInput',
   // combobox-group-cap — the BEHAVIORAL cell (loader → examples/demos/
   // ComboboxGroupCapDemo.rozie, importing packages/ui/combobox/src/Combobox.rozie)
   // proving the new opt-in `groupCap` prop: an overflowing section renders `cap`
@@ -1706,6 +1710,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // component is name="Combobox" → 'rozie-combobox', matching the *Behavior
   // cell's base). Behavioral-only, no screenshot cell.
   ComboboxGroups: 'rozie-combobox-groups',
+  // '-demo' appended on Lit → 'rozie-combobox-token-input-demo'.
+  ComboboxTokenInput: 'rozie-combobox-token-input',
   // combobox-group-cap — '-demo' appended on Lit → tag
   // 'rozie-combobox-group-cap-demo' = kebab of ComboboxGroupCapDemo (the wrapper
   // component is name="Combobox" → 'rozie-combobox', matching the *Groups cell's
@@ -2268,6 +2274,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // own OPTIONS/GROUPS + <data>.value and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props.
   ComboboxGroups: {},
+  ComboboxTokenInput: {},
   // combobox-group-cap — ComboboxGroupCapDemo is self-contained: it seeds its
   // own OPTIONS/GROUPS + <data>.value and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props.

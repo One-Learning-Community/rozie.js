@@ -162,6 +162,54 @@
   cursor: not-allowed;
   opacity: var(--rozie-combobox-option-disabled-opacity, var(--rcb-option-disabled-opacity, 0.45));
 }
+.rozie-combobox-control[data-rozie-s-9546115a] {
+  display: contents;
+}
+.rozie-combobox--block[data-rozie-s-9546115a] {
+  display: block;
+  width: 100%;
+  container-type: inline-size;
+}
+.rozie-combobox--block[data-rozie-s-9546115a] .rozie-combobox-control[data-rozie-s-9546115a] {
+  display: block;
+  width: 100cqw;
+}
+.rozie-combobox--block[data-rozie-s-9546115a] .rozie-combobox-input[data-rozie-s-9546115a] {
+  width: 100%;
+}
+.rozie-combobox--chips-inline[data-rozie-s-9546115a] {
+  container-type: inline-size;
+}
+.rozie-combobox--chips-inline[data-rozie-s-9546115a] .rozie-combobox-control[data-rozie-s-9546115a] {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rozie-combobox-chip-gap, var(--rcb-chip-gap, 0.4rem));
+  width: 100cqw;
+  padding: var(--rozie-combobox-inline-padding, var(--rcb-inline-padding, 0.3rem 0.45rem));
+  background: var(--rozie-combobox-bg, var(--rcb-bg, #fff));
+  border: var(--rozie-combobox-border-width, var(--rcb-border-width, 1px)) solid var(--rozie-combobox-border-color, var(--rcb-border-color, rgba(0, 0, 0, 0.25)));
+  border-radius: var(--rozie-combobox-radius, var(--rcb-radius, 0.5rem));
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.rozie-combobox--chips-inline[data-rozie-s-9546115a] .rozie-combobox-control[data-rozie-s-9546115a]:focus-within {
+  border-color: var(--rozie-combobox-focus-border-color, var(--rozie-combobox-accent, var(--rcb-accent, #0066cc)));
+  box-shadow: 0 0 0 var(--rozie-combobox-focus-ring-width, var(--rcb-focus-ring-width, 3px)) var(--rozie-combobox-focus-ring-color, var(--rcb-focus-ring-color, rgba(0, 102, 204, 0.25)));
+}
+.rozie-combobox--chips-inline[data-rozie-s-9546115a] .rozie-combobox-chips[data-rozie-s-9546115a] {
+  display: contents;
+}
+.rozie-combobox--chips-inline[data-rozie-s-9546115a] .rozie-combobox-input[data-rozie-s-9546115a],
+.rozie-combobox--chips-inline[data-rozie-s-9546115a] .rozie-combobox-input[data-rozie-s-9546115a]:focus {
+  flex: 1 1 var(--rozie-combobox-inline-input-min-width, var(--rcb-inline-input-min-width, 6rem));
+  width: auto;
+  min-width: var(--rozie-combobox-inline-input-min-width, var(--rcb-inline-input-min-width, 6rem));
+  padding: var(--rozie-combobox-inline-input-padding, var(--rcb-inline-input-padding, 0.2rem 0.25rem));
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
 .rozie-combobox--inline[data-rozie-s-9546115a] {
   display: block;
   width: 100%;

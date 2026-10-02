@@ -22,42 +22,94 @@ import { groupOptions } from './internal/groupOptions';
 // const). NULL until $onMount, ONLY constructed when $props.virtual. gridScrollEl is the
 // captured .rozie-combobox-list scroll div; remeasurePending dedupes the deferred sweep.
 
-interface ChipCtx {
-  $implicit: { option: any; remove: any; index: any };
+// The typed public surface (typed-surface P1; always TypeScript). `value` /
+// `option` stay `any`: options are consumer-shaped objects (or primitives) the
+// component never inspects beyond the label/value/disabled resolvers.
+/** `search` payload — the current input text. */
+export interface ComboboxSearchPayload {
+  query: string;
+}
+/** `change` payload — `option` is the raw source option (`null` for a clear or a free-text commit); `text` is set ONLY on free-text commits. */
+export interface ComboboxChangePayload {
+  value: any;
   option: any;
-  remove: any;
-  index: any;
+  selected: boolean;
+  text?: string;
+}
+/** `create` payload — the (untrimmed) query the user asked to create. */
+export interface ComboboxCreatePayload {
+  query: string;
+}
+/** An entry of the `groups` prop. */
+export interface ComboboxGroup {
+  id: string;
+  label: string;
+}
+/** `chip` slot params — `remove()` removes the chip and refocuses the input. */
+export interface ComboboxChipSlotCtx {
+  option: any;
+  remove: () => void;
+  index: number;
+}
+/** `option` slot params. */
+export interface ComboboxOptionSlotCtx {
+  option: any;
+  index: number;
+  active: boolean;
+  selected: boolean;
+  disabled: boolean;
+}
+/** `empty` / `create` slot params. */
+export interface ComboboxQuerySlotCtx {
+  query: string;
+}
+/** `groupHeading` slot params. */
+export interface ComboboxGroupHeadingSlotCtx {
+  group: ComboboxGroup;
+}
+/** `groupMore` slot params. */
+export interface ComboboxGroupMoreSlotCtx {
+  group: ComboboxGroup | null;
+  hidden: number;
+  expand: () => void;
+}
+
+interface ChipCtx {
+  $implicit: { option: any; remove: () => void; index: number };
+  option: any;
+  remove: () => void;
+  index: number;
 }
 
 interface OptionCtx {
-  $implicit: { option: any; index: any; active: any; selected: any; disabled: any };
+  $implicit: { option: any; index: number; active: boolean; selected: boolean; disabled: boolean };
   option: any;
-  index: any;
-  active: any;
-  selected: any;
-  disabled: any;
+  index: number;
+  active: boolean;
+  selected: boolean;
+  disabled: boolean;
 }
 
 interface EmptyCtx {
-  $implicit: { query: any };
-  query: any;
+  $implicit: { query: string };
+  query: string;
 }
 
 interface CreateCtx {
-  $implicit: { query: any };
-  query: any;
+  $implicit: { query: string };
+  query: string;
 }
 
 interface GroupHeadingCtx {
-  $implicit: { group: any };
-  group: any;
+  $implicit: { group: ComboboxGroup };
+  group: ComboboxGroup;
 }
 
 interface GroupMoreCtx {
-  $implicit: { group: any; hidden: any; expand: any };
-  group: any;
-  hidden: any;
-  expand: any;
+  $implicit: { group: ComboboxGroup | null; hidden: number; expand: () => void };
+  group: ComboboxGroup | null;
+  hidden: number;
+  expand: () => void;
 }
 
 @Component({
@@ -66,10 +118,12 @@ interface GroupMoreCtx {
   imports: [NgTemplateOutlet, NgClass, Popover],
   template: `
 
-    <div class="rozie-combobox" [ngClass]="{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-combobox--inline': inline(), 'rozie-combobox--multiple': multiple() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="rozie-combobox" [ngClass]="{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-combobox--inline': inline(), 'rozie-combobox--multiple': multiple(), 'rozie-combobox--block': block(), 'rozie-combobox--chips-inline': chipsInline() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
       
       <rozie-popover trigger="manual" [open]="isOpen()" (openChange)="isOpen.set($event)" [bare]="true" [matchWidth]="true" [keepMounted]="virtual()" [disablePositioning]="inline()" [disableDismiss]="inline() || pinned()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()"><ng-template #anchor>
           
+          
+          <div class="rozie-combobox-control">
           @if (multiple()) {
     <ul class="rozie-combobox-chips">
             @for (row of chipRows(); track 'chip-' + row.value; let idx = $index) {
@@ -85,10 +139,11 @@ interface GroupMoreCtx {
             </li>
     }
           </ul>
-    }<input #inputEl class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" [attr.aria-expanded]="!!isOpen()" [attr.aria-controls]="rozieAttr(listId())" [attr.aria-activedescendant]="rozieAttr(activeId())" [attr.aria-label]="rozieAttr(ariaLabel())" [value]="query()" [placeholder]="placeholder()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" autocomplete="off" (input)="onInput($event)" (focus)="onFocus($event)" (blur)="onBlur()" (keydown)="onKeydown($event)" />
+    }<input #inputEl class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" [attr.aria-expanded]="!!popupVisible()" [attr.aria-controls]="rozieAttr(listId())" [attr.aria-activedescendant]="rozieAttr(activeId())" [attr.aria-label]="rozieAttr(ariaLabel())" [value]="query()" [placeholder]="placeholder()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" autocomplete="off" (input)="onInput($event)" (focus)="onFocus($event)" (blur)="onBlur()" (keydown)="onKeydown($event)" (paste)="onPaste($event)" (change)="$event.stopPropagation(); onNativeInputChange()" />
+          </div>
         </ng-template><ng-template #defaultSlot>
         
-        @if (isOpen() && !virtual() && !isGrouped()) {
+        @if (popupVisible() && !virtual() && !isGrouped()) {
     <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox" [attr.aria-multiselectable]="rozieAttr(multiple() ? 'true' : null)">
           @for (opt of filteredOptions(); track opt.value) {
     <li class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': opt._i === activeIndex(), 'rozie-combobox-option--selected': isRowSelected(opt), 'rozie-combobox-option--disabled': opt.disabled }" [attr.id]="rozieAttr(optId(opt._i))" role="option" [attr.aria-selected]="!!isRowSelected(opt)" [attr.aria-disabled]="!!opt.disabled" (mousedown)="$event.preventDefault(); selectOption(opt)" (mouseenter)="activeIndex.set(opt._i)">
@@ -117,7 +172,7 @@ interface GroupMoreCtx {
     }
           </li>
     }</ul>
-    }@if (isOpen() && !virtual() && isGrouped() && !isCapped()) {
+    }@if (popupVisible() && !virtual() && isGrouped() && !isCapped()) {
     <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox" [attr.aria-multiselectable]="rozieAttr(multiple() ? 'true' : null)">
           @for (blk of groupBlocks(); track 'grp-' + (blk.group ? blk.group.id : '_ungrouped')) {
     <li class="rozie-combobox-group" role="group" [attr.aria-label]="rozieAttr(blk.group ? blk.group.label : null)">
@@ -158,7 +213,7 @@ interface GroupMoreCtx {
     }
           </li>
     }</ul>
-    }@if (isOpen() && !virtual() && isCapped()) {
+    }@if (popupVisible() && !virtual() && isCapped()) {
     <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox" [attr.aria-multiselectable]="rozieAttr(multiple() ? 'true' : null)">
           @for (blk of cappedBlocks(); track 'grp-' + (blk.group ? blk.group.id : '_ungrouped')) {
     <li class="rozie-combobox-group" role="group" [attr.aria-label]="rozieAttr(blk.group ? blk.group.label : null)">
@@ -411,6 +466,54 @@ interface GroupMoreCtx {
       cursor: not-allowed;
       opacity: var(--rozie-combobox-option-disabled-opacity, var(--rcb-option-disabled-opacity, 0.45));
     }
+    .rozie-combobox-control {
+      display: contents;
+    }
+    .rozie-combobox--block {
+      display: block;
+      width: 100%;
+      container-type: inline-size;
+    }
+    .rozie-combobox--block .rozie-combobox-control {
+      display: block;
+      width: 100cqw;
+    }
+    .rozie-combobox--block .rozie-combobox-input {
+      width: 100%;
+    }
+    .rozie-combobox--chips-inline {
+      container-type: inline-size;
+    }
+    .rozie-combobox--chips-inline .rozie-combobox-control {
+      box-sizing: border-box;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--rozie-combobox-chip-gap, var(--rcb-chip-gap, 0.4rem));
+      width: 100cqw;
+      padding: var(--rozie-combobox-inline-padding, var(--rcb-inline-padding, 0.3rem 0.45rem));
+      background: var(--rozie-combobox-bg, var(--rcb-bg, #fff));
+      border: var(--rozie-combobox-border-width, var(--rcb-border-width, 1px)) solid var(--rozie-combobox-border-color, var(--rcb-border-color, rgba(0, 0, 0, 0.25)));
+      border-radius: var(--rozie-combobox-radius, var(--rcb-radius, 0.5rem));
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .rozie-combobox--chips-inline .rozie-combobox-control:focus-within {
+      border-color: var(--rozie-combobox-focus-border-color, var(--rozie-combobox-accent, var(--rcb-accent, #0066cc)));
+      box-shadow: 0 0 0 var(--rozie-combobox-focus-ring-width, var(--rcb-focus-ring-width, 3px)) var(--rozie-combobox-focus-ring-color, var(--rcb-focus-ring-color, rgba(0, 102, 204, 0.25)));
+    }
+    .rozie-combobox--chips-inline .rozie-combobox-chips {
+      display: contents;
+    }
+    .rozie-combobox--chips-inline .rozie-combobox-input,
+    .rozie-combobox--chips-inline .rozie-combobox-input:focus {
+      flex: 1 1 var(--rozie-combobox-inline-input-min-width, var(--rcb-inline-input-min-width, 6rem));
+      width: auto;
+      min-width: var(--rozie-combobox-inline-input-min-width, var(--rcb-inline-input-min-width, 6rem));
+      padding: var(--rozie-combobox-inline-input-padding, var(--rcb-inline-input-padding, 0.2rem 0.25rem));
+      background: transparent;
+      border: none;
+      box-shadow: none;
+    }
     .rozie-combobox--inline {
       display: block;
       width: 100%;
@@ -534,6 +637,38 @@ export class Combobox {
    * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
    */
   disableShift = input<boolean>(false);
+  /**
+   * Fill the container: the root becomes `display: block; width: 100%`, the control (chips + input) stretches to that width, and the width-matched popup follows. Adds the `rozie-combobox--block` modifier class on the root. Default `false` keeps the fixed `--rozie-combobox-width` sizing.
+   */
+  block = input<boolean>(false);
+  /**
+   * Chip rail layout under `multiple`: `'stacked'` (default) renders the chips above the input; `'inline'` puts the chips and the input on ONE wrapping row (the Tags layout), with the input taking the remaining width (`flex: 1`, never narrower than `--rozie-combobox-inline-input-min-width`). Only meaningful with `multiple`.
+   */
+  chipLayout = input<string>('stacked');
+  /**
+   * Do not open the list when the input gains focus. Typing and ArrowDown / ArrowUp still open it. Default `false` opens on focus.
+   */
+  disableOpenOnFocus = input<boolean>(false);
+  /**
+   * Show nothing instead of the empty state: when there are no option rows and no create row, the popup is not shown, the input reports `aria-expanded="false"`, and Escape is left to the host (not `preventDefault`ed). This is the supported way to render no popup at all; filling the `empty` slot with nothing still renders the fallback on most targets.
+   */
+  hideEmpty = input<boolean>(false);
+  /**
+   * Keys that commit the **typed text** as a value (matched against the key event's `key`), under `multiple` only — a delimiter never picks the highlighted option. Character entries (e.g. `[',', ';']`) also split pasted text: a paste containing a delimiter is split on them and every non-empty trimmed part is committed. `'Enter'` and `'Tab'` are allowed; Enter then commits the typed text only when no option is highlighted. A non-empty list (or a `validate` function) turns on free-text commits, so Enter with no highlighted option commits the typed text too. Default `[]` (off).
+   * @example
+   * <rozie-combobox multiple [(value)]="to" [options]="contacts" [delimiters]="delims" />
+   */
+  delimiters = input<any[]>((() => [])());
+  /**
+   * Free-text gate, `(text: string) => boolean`, under `multiple` only. Called with the trimmed typed (or pasted) text before every free-text commit; return `false` to reject it — rejected text stays in the input. Setting it also turns on free-text commits (Enter with no highlighted option commits the typed text). A free-text commit appends the text to `value` (skipped when already present), clears the input, and emits `change` with `option: null` and the committed `text`.
+   * @example
+   * <rozie-combobox multiple [(value)]="to" [options]="contacts" [validate]="isEmail" />
+   */
+  validate = input<((...args: any[]) => any) | null>(null);
+  /**
+   * Tab picks the highlighted option while the popup is visible and an option is highlighted, keeping focus in the input. When nothing is picked, Tab moves focus normally. Default `false` (Tab always moves focus).
+   */
+  selectOnTab = input<boolean>(false);
   query = signal('');
   isOpen = signal(false);
   activeIndex = signal(-1);
@@ -545,9 +680,9 @@ export class Combobox {
   pinned = signal(false);
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
-  create = output<unknown>();
-  change = output<unknown>();
-  search = output<unknown>();
+  search = output<ComboboxSearchPayload>();
+  change = output<ComboboxChangePayload>();
+  create = output<ComboboxCreatePayload>();
   @ContentChild('chip', { read: TemplateRef }) chipTpl?: TemplateRef<ChipCtx>;
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
@@ -1535,12 +1670,33 @@ export class Combobox {
   };
   optId = (i: any) => this.idBase() + '-opt-' + i;
   listId = () => this.idBase() + '-list';
+  // popupVisible() (hideEmpty, COMBOBOX-SPEC item 4): whether the popup is actually
+  // SHOWN — open AND (unless `hideEmpty`) something to render. With `hideEmpty` an
+  // open popup with no option rows AND no create row counts as hidden: the list
+  // branches do not render, aria-expanded reports false, and Escape is left to the
+  // host (B4). Without `hideEmpty` this is exactly `$data.isOpen` (byte-identical-off).
+  popupVisible = () => {
+    if (!this.isOpen()) return false;
+    if (!this.hideEmpty()) return true;
+    return this.navRows().length > 0;
+  };
   // The active option's id for aria-activedescendant (null when none).
   activeId = () => {
     const __activeIndex = this.activeIndex();
     const list = this.navRows();
-    if (this.isOpen() && __activeIndex >= 0 && list[__activeIndex]) return this.optId(__activeIndex);
+    if (this.popupVisible() && __activeIndex >= 0 && list[__activeIndex]) return this.optId(__activeIndex);
     return null;
+  };
+  // activeOption() (handle verb, COMBOBOX-SPEC item 8): the highlighted RAW source
+  // option, or null (nothing highlighted, the popup is hidden, or the highlighted
+  // row is a synthetic "+N more" / create row).
+  activeOption: () => any = () => {
+    const list = this.navRows();
+    const ai = this.activeIndex();
+    if (!this.popupVisible() || ai < 0) return null;
+    const row = list[ai];
+    if (!row || row.isMore || row.isCreate) return null;
+    return row.option === undefined ? null : row.option;
   };
   // Next selectable index in `dir` (+1/-1), skipping disabled, clamped to ends.
   nextEnabled = (list: any, from: any, dir: any) => {
@@ -1591,6 +1747,9 @@ export class Combobox {
     if (v === true || v === false) return v;
     return !this.multiple();
   };
+  // chipsInline() (chipLayout, COMBOBOX-SPEC item 2): chips + input on one
+  // wrapping row — only meaningful under `multiple`.
+  chipsInline = () => !!this.multiple() && this.chipLayout() === 'inline';
   // ---- chip rail (Phase 86 R1, plan 86-05, D-13/D-16/D-18) ---------------
   // chipRows(): selectedValues() (already de-duplicated — see above) mapped to
   // chip-rail display rows. Each row carries the raw source `option` when it is
@@ -1729,6 +1888,13 @@ export class Combobox {
   // would remove the chip twice per pointer press. See onChipRemoveActivate()
   // below for where the removal actually happens.
   onChipRemovePointerDown = () => {};
+  // onNativeInputChange() (release-0.8.0): the `.stop` on the input's native
+  // `change` is its whole payload — the native event bubbles out of the inner
+  // <input> on blur after an edit, and on Angular (no shadow boundary) a consumer
+  // `(change)` binding on <rozie-combobox> would receive that DOM Event as well as
+  // the component's own `change` output (the same collision popover's audit B6
+  // removed). Stopping it keeps `change` meaning only the component event.
+  onNativeInputChange = () => {};
   // onChipRemoveActivate(v) (quick-260903-0s1, E1 audit finding): the CLICK half
   // of the split binding — the actual removal. `click` is the one event every
   // activation path produces: a real pointer press (mousedown+click), Enter or
@@ -1798,6 +1964,94 @@ export class Combobox {
     const opt = opts.find((o: any) => this.valueOf$local(o) === this.value());
     this.query.set(opt === undefined || opt === null ? '' : String(this.labelOf(opt)));
   };
+  // ---- free-text commits (COMBOBOX-SPEC items 5-7, multiple only) --------
+  // delimiterList(): the `delimiters` prop normalized to an array.
+  delimiterList = () => Array.isArray(this.delimiters()) ? this.delimiters() : [];
+  // splitDelimiters(): the CHARACTER delimiters (everything but 'Enter'/'Tab') —
+  // the paste split characters.
+  splitDelimiters = () => this.delimiterList().filter((k: any) => k !== 'Enter' && k !== 'Tab');
+  // freeTextOn(): free-text commits are enabled under `multiple` when a delimiter
+  // list OR a validate function is supplied.
+  freeTextOn = () => !!this.multiple() && (this.delimiterList().length > 0 || typeof this.validate() === 'function');
+  // acceptsText(t): the `validate` gate (absent ⇒ accept).
+  acceptsText = (t: any) => typeof this.validate() !== 'function' || !!this.validate()(t);
+  // commitTexts(texts): append every not-yet-present text to `value` (ONE fresh
+  // array, ONE model write) and emit one `change` per committed text, each with the
+  // running array as of that commit. Texts already present are skipped silently.
+  commitTexts = (texts: any) => {
+    let next = this.selectedValues();
+    const committed = [];
+    const snapshots = [];
+    for (let i = 0; i < texts.length; i++) {
+      const t = texts[i];
+      if (next.indexOf(t) !== -1) continue;
+      next = next.concat([t]);
+      committed.push(t);
+      snapshots.push(next);
+    }
+    if (committed.length > 0) this.value.set(next), this.__rozieCvaOnChange(next);
+    this.activeIndex.set(-1);
+    for (let i = 0; i < committed.length; i++) {
+      this.change.emit({
+        value: snapshots[i],
+        option: null,
+        selected: true,
+        text: committed[i]
+      });
+    }
+  };
+  // syncInputText(el, text): also write the LIVE input element. Angular compares a
+  // `[value]` binding against its last RENDERED value: fast typing followed by a
+  // commit in the same frame (before change detection rendered the typed text)
+  // leaves query '' === last-rendered '' — no DOM write, the typed text stays.
+  // Writing the element directly is idempotent on every other target.
+  syncInputText = (el: any, text: any) => {
+    if (el && typeof el.value === 'string' && el.value !== text) el.value = text;
+  };
+  // commitFreeText(raw, el): trim → validate → commit + clear the input. Returns
+  // true when the text was handled (committed, or already present ⇒ just cleared);
+  // false when empty or rejected — rejected text stays in the input.
+  commitFreeText = (raw: any, el: any) => {
+    const t = String(raw == null ? '' : raw).trim();
+    if (!t) return false;
+    if (!this.acceptsText(t)) return false;
+    this.query.set('');
+    this.syncInputText(el, '');
+    this.commitTexts([t]);
+    return true;
+  };
+  // onPaste(e) (item 6): under free-text mode with character delimiters, a paste
+  // containing a delimiter is split on them and every non-empty trimmed part is
+  // committed (the paste is preventDefault-ed). Parts `validate` rejects stay in the
+  // input (joined by the first delimiter). A paste with no delimiter is ordinary text.
+  onPaste = (e: any) => {
+    if (!this.freeTextOn()) return;
+    const seps = this.splitDelimiters();
+    if (seps.length === 0) return;
+    const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
+    let hasSep = false;
+    for (let s = 0; s < seps.length; s++) {
+      if (text.indexOf(seps[s]) !== -1) hasSep = true;
+    }
+    if (!hasSep) return;
+    if (e) e.preventDefault();
+    let parts = [text];
+    for (let s = 0; s < seps.length; s++) {
+      const out = [];
+      for (let p = 0; p < parts.length; p++) {
+        const pieces = String(parts[p]).split(seps[s]);
+        for (let q = 0; q < pieces.length; q++) out.push(pieces[q]);
+      }
+      parts = out;
+    }
+    const trimmed = parts.map((p: any) => String(p).trim()).filter((p: any) => p.length > 0);
+    const accepted = trimmed.filter((p: any) => this.acceptsText(p));
+    const rejected = trimmed.filter((p: any) => !this.acceptsText(p));
+    const rest = rejected.join(seps[0] + ' ');
+    this.query.set(rest);
+    this.syncInputText(e ? e.target : null, rest);
+    this.commitTexts(accepted);
+  };
   // ---- input + keyboard handlers -----------------------------------------
   onInput = (e: any) => {
     const q = e && e.target ? e.target.value : '';
@@ -1833,6 +2087,12 @@ export class Combobox {
     // moving focus away" so it can skip closing. The other 5 targets diff their
     // scoped-slot re-render and keep the existing, already-focused node — no
     // blur ever fires there, so the guard is a no-op for them.
+    // disableOpenOnFocus (item 3): focus alone never opens the list — typing
+    // (onInput) and ArrowDown/ArrowUp (onKeydown) still do.
+    if (this.disableOpenOnFocus()) {
+      if (e && e.target && e.target.select) e.target.select();
+      return;
+    }
     this.openingInProgress = true;
     this.isOpen.set(true);
     // Cleared SYNCHRONOUSLY, immediately after the write — Solid's reactive
@@ -1865,6 +2125,12 @@ export class Combobox {
     this.isOpen.set(false);
   };
   onKeydown = (e: any) => {
+    // B10: ignore every key while an IME composition is active — the Enter that
+    // confirms a composition must never pick, commit or navigate. Read through
+    // `nativeEvent` when present: React's synthetic keyboard event does not carry
+    // `isComposing` (every other target hands the native event straight through).
+    const ne = e && e.nativeEvent ? e.nativeEvent : e;
+    if (ne && (ne.isComposing || ne.keyCode === 229)) return;
     const key = e ? e.key : '';
     const list = this.navRows();
     // Capture the reactive reads into locals BEFORE any write so React never binds
@@ -1872,6 +2138,16 @@ export class Combobox {
     // is mutually exclusive, but a flow-insensitive analysis can't see that.
     const wasOpen = this.isOpen();
     const ai = this.activeIndex();
+    const visible = this.popupVisible();
+    const liveText = e && e.target ? e.target.value : '';
+    const highlighted = wasOpen && ai >= 0 && list[ai] ? list[ai] : null;
+    // Character delimiters (item 5): commit the TYPED text — never the highlighted
+    // option. 'Enter' / 'Tab' entries are handled in their own branches below.
+    if (this.freeTextOn() && key !== 'Enter' && key !== 'Tab' && this.delimiterList().indexOf(key) !== -1) {
+      if (e) e.preventDefault();
+      this.commitFreeText(liveText, e ? e.target : null);
+      return;
+    }
     if (key === 'ArrowDown') {
       if (e) e.preventDefault();
       if (!wasOpen) {
@@ -1888,12 +2164,32 @@ export class Combobox {
       }
       this.activeIndex.set(this.nextEnabled(list, ai, -1));
     } else if (key === 'Enter') {
-      if (wasOpen && ai >= 0 && list[ai]) {
+      // B9: Enter with Ctrl / Meta / Alt is left to the host (e.g. a send shortcut).
+      const modified = !!(e && (e.ctrlKey || e.metaKey || e.altKey));
+      if (!modified) {
+        if (highlighted) {
+          if (e) e.preventDefault();
+          this.selectOption(highlighted);
+        } else if (this.freeTextOn() && String(liveText).trim()) {
+          // Free-text mode (item 7): Enter with no highlighted option commits the
+          // typed text (rejected text stays in the input).
+          if (e) e.preventDefault();
+          this.commitFreeText(liveText, e ? e.target : null);
+        }
+      }
+    } else if (key === 'Tab') {
+      // selectOnTab (item 8): pick the highlighted option while the popup is
+      // visible; preventDefault ONLY when it picked. A 'Tab' delimiter commits the
+      // typed text when nothing was picked. Otherwise Tab moves focus normally.
+      if (this.selectOnTab() && visible && highlighted && !highlighted.disabled) {
         if (e) e.preventDefault();
-        this.selectOption(list[ai]);
+        this.selectOption(highlighted);
+      } else if (this.freeTextOn() && this.delimiterList().indexOf('Tab') !== -1 && String(liveText).trim()) {
+        if (this.commitFreeText(liveText, e ? e.target : null) && e) e.preventDefault();
       }
     } else if (key === 'Escape') {
-      if (wasOpen) {
+      // B4: only consume Escape when the popup is actually VISIBLE.
+      if (visible) {
         if (e) e.preventDefault();
         this.isOpen.set(false);
       }
@@ -2000,8 +2296,8 @@ export class Combobox {
   // (command-palette-sub-actions prerequisite). pinOpen(false) ONLY unpins — it
   // does NOT itself close the popup or move focus; that is the host's job.
   // Render-neutral when never called. All four are post-mount → $refs safe.
-  focus = () => this.inputEl()?.nativeElement?.focus();
-  clear = () => {
+  focus: () => void = () => this.inputEl()?.nativeElement?.focus();
+  clear: () => void = () => {
     // Fresh empty array under `multiple` (never in-place mutation), null in
     // single mode — mirrors selectOption()'s `{ value, option, selected }`
     // shape; nothing is selected after a clear, so `selected` is `false`.
@@ -2015,10 +2311,10 @@ export class Combobox {
       selected: false
     });
   };
-  seedQuery = (text: any) => {
+  seedQuery: (text: string) => void = (text: any) => {
     this.query.set(String(text == null ? '' : text));
   };
-  pinOpen = (v: any) => {
+  pinOpen: (v: boolean) => void = (v: any) => {
     this.pinned.set(!!v);
   };
 
@@ -2093,11 +2389,11 @@ export class Combobox {
     }
   });
 
-  private _chip_ctx_2 = (row: any, idx: any) => ({ $implicit: { option: row.option, remove: () => this.removeChipValue(row.value), index: idx }, option: row.option, remove: () => this.removeChipValue(row.value), index: idx });
+  private _chip_ctx_2 = (row: any, idx: any) => ({ $implicit: { option: row.option, remove: () => this.onChipRemoveActivate(row.value), index: idx }, option: row.option, remove: () => this.onChipRemoveActivate(row.value), index: idx });
 
   protected get __style() {
       const __maxHeight = this.maxHeight();
-      return (this.isOpen() ? '' : 'display:none;') + (__maxHeight ? 'height:' + __maxHeight + ';max-height:' + __maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + __maxHeight : 'overflow-y:auto');
+      return (this.popupVisible() ? '' : 'display:none;') + (__maxHeight ? 'height:' + __maxHeight + ';max-height:' + __maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + __maxHeight : 'overflow-y:auto');
     }
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }

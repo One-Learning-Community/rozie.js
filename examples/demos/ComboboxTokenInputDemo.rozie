@@ -1,0 +1,163 @@
+<!--
+  ComboboxTokenInputDemo.rozie — BEHAVIORAL cell for the release-0.8.0 combobox
+  token-input surface (COMBOBOX-SPEC): `block`, `chipLayout="inline"`,
+  `disableOpenOnFocus`, `hideEmpty`, `delimiters`, paste split, `validate`,
+  `selectOnTab`, the `activeOption()` handle, and the B4/B9/B10/B12 fixes.
+  Driven by tests/visual-regression/specs/combobox-token-input.spec.ts on all 6
+  targets. Behavioral-only — no pixel baseline.
+
+  (a) the recipient field: a 480px container holding a `block` +
+      `chipLayout="inline"` multi combobox with free-text commits (`,` / `;`,
+      validate = contains "@"), `hideEmpty`, `disableOpenOnFocus`, `selectOnTab`,
+      `disableFilter`, server-style suggestions loaded by a button, a seeded
+      chip, and a `#chip` fill whose own remove button calls `remove()`.
+  (b) a plain multi combobox (no delimiters, no selectOnTab) for plain-Tab focus
+      movement, Ctrl+Enter, IME-composing Enter and `activeOption()`, followed by
+      a focusable button that receives Tab focus.
+-->
+
+<rozie name="ComboboxTokenInputDemo">
+
+<components>
+{
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+
+<data>
+{
+  to: ['seed@x.com'],
+  suggestions: [],
+  lastChange: '',
+  plain: [],
+  plainChange: '',
+  active: '',
+}
+</data>
+
+<script>
+const SUGGESTIONS = [
+  { value: 'dana@x.com', label: 'Dana' },
+  { value: 'eli@x.com', label: 'Eli' },
+]
+
+const PLAIN_OPTIONS = [
+  { value: 'apple', label: 'Apple' },
+  { value: 'banana', label: 'Banana' },
+  { value: 'cherry', label: 'Cherry' },
+]
+
+const noop = () => {}
+
+const isEmail = (text) => String(text).indexOf('@') !== -1
+
+const loadSuggestions = () => {
+  $data.suggestions = SUGGESTIONS
+}
+const clearSuggestions = () => {
+  $data.suggestions = []
+}
+
+const onToChange = (e) => {
+  $data.lastChange = JSON.stringify({ value: e.value, option: e.option, selected: e.selected, text: e.text === undefined ? null : e.text })
+}
+const onPlainChange = (e) => {
+  $data.plainChange = JSON.stringify({ value: e.value, selected: e.selected })
+}
+
+const readActive = () => {
+  const opt = $refs.plainCombobox ? $refs.plainCombobox.activeOption() : null
+  $data.active = opt ? String(opt.value) : 'null'
+}
+const readActiveTo = () => {
+  const opt = $refs.toCombobox ? $refs.toCombobox.activeOption() : null
+  $data.active = opt ? String(opt.value) : 'null'
+}
+</script>
+
+<template>
+<div class="token-demo">
+  <div class="controls">
+    <button type="button" data-testid="load-suggestions" @click="loadSuggestions()">Load suggestions</button>
+    <button type="button" data-testid="clear-suggestions" @click="clearSuggestions()">Clear suggestions</button>
+    <button type="button" data-testid="read-active-to" @mousedown.prevent="readActiveTo()">Active (to)</button>
+  </div>
+
+  <div class="field" data-testid="token-container">
+    <Combobox
+      ref="toCombobox"
+      r-model:value="$data.to"
+      :options="$data.suggestions"
+      multiple
+      block
+      chipLayout="inline"
+      disableFilter
+      hideEmpty
+      disableOpenOnFocus
+      :delimiters="[',', ';']"
+      :validate="isEmail"
+      selectOnTab
+      ariaLabel="To"
+      idBase="token-to"
+      @change="onToChange($event)"
+    >
+      <template #chip="{ option, remove, index }">
+        <span class="custom-chip" :data-testid="'custom-chip-' + index">{{ option ? option.label : $data.to[index] }}</span>
+        <button type="button" class="custom-chip-remove" :data-testid="'custom-remove-' + index" @mousedown.prevent="noop()" @click.stop="remove()">x</button>
+      </template>
+    </Combobox>
+  </div>
+
+  <div class="readouts">
+    <span data-testid="readout-to">{{ JSON.stringify($data.to) }}</span>
+    <span data-testid="readout-last-change">{{ $data.lastChange }}</span>
+  </div>
+
+  <div class="plain">
+    <Combobox
+      ref="plainCombobox"
+      r-model:value="$data.plain"
+      :options="PLAIN_OPTIONS"
+      multiple
+      ariaLabel="Plain"
+      idBase="token-plain"
+      @change="onPlainChange($event)"
+    />
+    <button type="button" data-testid="after-plain">After</button>
+    <button type="button" data-testid="read-active" @mousedown.prevent="readActive()">Active (plain)</button>
+  </div>
+
+  <div class="readouts">
+    <span data-testid="readout-plain">{{ JSON.stringify($data.plain) }}</span>
+    <span data-testid="readout-plain-change">{{ $data.plainChange }}</span>
+    <span data-testid="readout-active">{{ $data.active }}</span>
+  </div>
+</div>
+</template>
+
+<style>
+.token-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+  min-height: 520px;
+}
+.token-demo .controls,
+.token-demo .readouts,
+.token-demo .plain {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+.token-demo .field {
+  width: 480px;
+}
+.token-demo .custom-chip-remove {
+  font: inherit;
+  padding: 0 0.25rem;
+}
+</style>
+
+</rozie>

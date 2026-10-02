@@ -12,7 +12,7 @@ Peer dependencies: `vue`. Install them alongside this package.
 
 **Required peers** — beyond the framework peer above, this package requires these non-optional peers to actually render:
 
-- `@rozie-ui/combobox-vue` `^0.5.0 || ^0.6.0` — required by `@rozie-ui/command-palette-vue`
+- `@rozie-ui/combobox-vue` `^0.5.0 || ^0.6.0 || ^0.7.0` — required by `@rozie-ui/command-palette-vue`
 - `@rozie-ui/popover-vue` `^0.2.0 || ^0.3.0` — required by `@rozie-ui/combobox-vue`
 - `@floating-ui/dom` `^1.7.2` — required by `@rozie-ui/popover-vue`
 

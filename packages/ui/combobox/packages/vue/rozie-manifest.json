@@ -162,6 +162,55 @@
       "required": false,
       "type": "Boolean",
       "tsType": null
+    },
+    {
+      "name": "block",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean",
+      "tsType": null
+    },
+    {
+      "name": "chipLayout",
+      "isModel": false,
+      "required": false,
+      "type": "String",
+      "tsType": null
+    },
+    {
+      "name": "disableOpenOnFocus",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean",
+      "tsType": null
+    },
+    {
+      "name": "hideEmpty",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean",
+      "tsType": null
+    },
+    {
+      "name": "delimiters",
+      "isModel": false,
+      "required": false,
+      "type": "Array",
+      "tsType": null
+    },
+    {
+      "name": "validate",
+      "isModel": false,
+      "required": false,
+      "type": "Function",
+      "tsType": null
+    },
+    {
+      "name": "selectOnTab",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean",
+      "tsType": null
     }
   ],
   "slots": [
@@ -178,10 +227,14 @@
           "name": "index"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "any",
+        "() => void",
+        "number"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "option",
@@ -202,10 +255,16 @@
           "name": "disabled"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "any",
+        "number",
+        "boolean",
+        "boolean",
+        "boolean"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "empty",
@@ -214,10 +273,12 @@
           "name": "query"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "string"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "create",
@@ -226,10 +287,12 @@
           "name": "query"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "string"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "groupHeading",
@@ -238,10 +301,12 @@
           "name": "group"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "ComboboxGroup"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "option",
@@ -262,10 +327,16 @@
           "name": "disabled"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "any",
+        "number",
+        "boolean",
+        "boolean",
+        "boolean"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "empty",
@@ -274,10 +345,12 @@
           "name": "query"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "string"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "create",
@@ -286,10 +359,12 @@
           "name": "query"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "string"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "groupHeading",
@@ -298,10 +373,12 @@
           "name": "group"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "ComboboxGroup"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "option",
@@ -322,10 +399,16 @@
           "name": "disabled"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "any",
+        "number",
+        "boolean",
+        "boolean",
+        "boolean"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "groupMore",
@@ -340,10 +423,14 @@
           "name": "expand"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "ComboboxGroup | null",
+        "number",
+        "() => void"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "empty",
@@ -352,10 +439,12 @@
           "name": "query"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "string"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "create",
@@ -364,10 +453,12 @@
           "name": "query"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "string"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "option",
@@ -388,10 +479,16 @@
           "name": "disabled"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "any",
+        "number",
+        "boolean",
+        "boolean",
+        "boolean"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "empty",
@@ -400,10 +497,12 @@
           "name": "query"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "string"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     },
     {
       "name": "create",
@@ -412,46 +511,58 @@
           "name": "query"
         }
       ],
-      "paramTypes": null,
+      "paramTypes": [
+        "string"
+      ],
       "isPortal": false,
       "isReactive": false,
-      "paramTypesAuthored": false
+      "paramTypesAuthored": true
     }
   ],
   "emits": [
     {
-      "name": "create",
-      "payload": null,
-      "docs": null
+      "name": "search",
+      "payload": "ComboboxSearchPayload",
+      "docs": {
+        "description": "Fired on every keystroke with the current input text. Pair with `disableFilter` for async / server-side filtering: refetch on `search` and feed the results back through `options`."
+      }
     },
     {
       "name": "change",
-      "payload": null,
-      "docs": null
+      "payload": "ComboboxChangePayload",
+      "docs": {
+        "description": "Fired after a selection commits (pick, chip removal or toggle-off, `clear()`, or a free-text commit). `value` is the new model value, `option` the raw source option (`null` for a clear or a free-text commit), `selected` whether the value was added (`false` for a removal or a clear), and `text` the committed text, set only on free-text commits (`delimiters` / `validate`)."
+      }
     },
     {
-      "name": "search",
-      "payload": null,
-      "docs": null
+      "name": "create",
+      "payload": "ComboboxCreatePayload",
+      "docs": {
+        "description": "Fired (with `creatable`) when the user commits a query that matches no option. Nothing is written to `value`: add the option to `options` and update the model yourself."
+      }
     }
   ],
   "expose": [
     {
       "name": "focus",
-      "signature": null
+      "signature": "() => void"
     },
     {
       "name": "clear",
-      "signature": null
+      "signature": "() => void"
     },
     {
       "name": "seedQuery",
-      "signature": null
+      "signature": "(text: string) => void"
     },
     {
       "name": "pinOpen",
-      "signature": null
+      "signature": "(v: boolean) => void"
+    },
+    {
+      "name": "activeOption",
+      "signature": "() => any"
     }
   ],
-  "types": null
+  "types": "// The typed public surface (typed-surface P1; always TypeScript). `value` /\n// `option` stay `any`: options are consumer-shaped objects (or primitives) the\n// component never inspects beyond the label/value/disabled resolvers.\n/** `search` payload — the current input text. */\nexport interface ComboboxSearchPayload {\n  query: string;\n}\n/** `change` payload — `option` is the raw source option (`null` for a clear or a free-text commit); `text` is set ONLY on free-text commits. */\nexport interface ComboboxChangePayload {\n  value: any;\n  option: any;\n  selected: boolean;\n  text?: string;\n}\n/** `create` payload — the (untrimmed) query the user asked to create. */\nexport interface ComboboxCreatePayload {\n  query: string;\n}\n/** An entry of the `groups` prop. */\nexport interface ComboboxGroup {\n  id: string;\n  label: string;\n}\n/** `chip` slot params — `remove()` removes the chip and refocuses the input. */\nexport interface ComboboxChipSlotCtx {\n  option: any;\n  remove: () => void;\n  index: number;\n}\n/** `option` slot params. */\nexport interface ComboboxOptionSlotCtx {\n  option: any;\n  index: number;\n  active: boolean;\n  selected: boolean;\n  disabled: boolean;\n}\n/** `empty` / `create` slot params. */\nexport interface ComboboxQuerySlotCtx {\n  query: string;\n}\n/** `groupHeading` slot params. */\nexport interface ComboboxGroupHeadingSlotCtx {\n  group: ComboboxGroup;\n}\n/** `groupMore` slot params. */\nexport interface ComboboxGroupMoreSlotCtx {\n  group: ComboboxGroup | null;\n  hidden: number;\n  expand: () => void;\n}"
 }

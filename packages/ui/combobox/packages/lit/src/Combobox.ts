@@ -21,36 +21,95 @@ import { groupOptions } from './internal/groupOptions';
 // const). NULL until $onMount, ONLY constructed when $props.virtual. gridScrollEl is the
 // captured .rozie-combobox-list scroll div; remeasurePending dedupes the deferred sweep.
 
+// The typed public surface (typed-surface P1; always TypeScript). `value` /
+// `option` stay `any`: options are consumer-shaped objects (or primitives) the
+// component never inspects beyond the label/value/disabled resolvers.
+/** `search` payload — the current input text. */
+export interface ComboboxSearchPayload {
+  query: string;
+}
+/** `change` payload — `option` is the raw source option (`null` for a clear or a free-text commit); `text` is set ONLY on free-text commits. */
+export interface ComboboxChangePayload {
+  value: any;
+  option: any;
+  selected: boolean;
+  text?: string;
+}
+/** `create` payload — the (untrimmed) query the user asked to create. */
+export interface ComboboxCreatePayload {
+  query: string;
+}
+/** An entry of the `groups` prop. */
+export interface ComboboxGroup {
+  id: string;
+  label: string;
+}
+/** `chip` slot params — `remove()` removes the chip and refocuses the input. */
+export interface ComboboxChipSlotCtx {
+  option: any;
+  remove: () => void;
+  index: number;
+}
+/** `option` slot params. */
+export interface ComboboxOptionSlotCtx {
+  option: any;
+  index: number;
+  active: boolean;
+  selected: boolean;
+  disabled: boolean;
+}
+/** `empty` / `create` slot params. */
+export interface ComboboxQuerySlotCtx {
+  query: string;
+}
+/** `groupHeading` slot params. */
+export interface ComboboxGroupHeadingSlotCtx {
+  group: ComboboxGroup;
+}
+/** `groupMore` slot params. */
+export interface ComboboxGroupMoreSlotCtx {
+  group: ComboboxGroup | null;
+  hidden: number;
+  expand: () => void;
+}
+
+export interface RozieComboboxEventMap extends Omit<HTMLElementEventMap, 'search' | 'change' | 'create' | 'value-change'> {
+  'search': CustomEvent<ComboboxSearchPayload>;
+  'change': CustomEvent<ComboboxChangePayload>;
+  'create': CustomEvent<ComboboxCreatePayload>;
+  'value-change': CustomEvent<unknown>;
+}
+
 interface RozieChipSlotCtx {
   option: any;
-  remove: any;
-  index: any;
+  remove: () => void;
+  index: number;
 }
 
 interface RozieOptionSlotCtx {
   option: any;
-  index: any;
-  active: any;
-  selected: any;
-  disabled: any;
+  index: number;
+  active: boolean;
+  selected: boolean;
+  disabled: boolean;
 }
 
 interface RozieEmptySlotCtx {
-  query: any;
+  query: string;
 }
 
 interface RozieCreateSlotCtx {
-  query: any;
+  query: string;
 }
 
 interface RozieGroupHeadingSlotCtx {
-  group: any;
+  group: ComboboxGroup;
 }
 
 interface RozieGroupMoreSlotCtx {
-  group: any;
-  hidden: any;
-  expand: any;
+  group: ComboboxGroup | null;
+  hidden: number;
+  expand: () => void;
 }
 
 @customElement('rozie-combobox')
@@ -223,6 +282,54 @@ export default class Combobox extends SignalWatcher(LitElement) {
   cursor: not-allowed;
   opacity: var(--rozie-combobox-option-disabled-opacity, var(--rcb-option-disabled-opacity, 0.45));
 }
+.rozie-combobox-control[data-rozie-s-9546115a] {
+  display: contents;
+}
+.rozie-combobox--block[data-rozie-s-9546115a] {
+  display: block;
+  width: 100%;
+  container-type: inline-size;
+}
+.rozie-combobox--block[data-rozie-s-9546115a] .rozie-combobox-control[data-rozie-s-9546115a] {
+  display: block;
+  width: 100cqw;
+}
+.rozie-combobox--block[data-rozie-s-9546115a] .rozie-combobox-input[data-rozie-s-9546115a] {
+  width: 100%;
+}
+.rozie-combobox--chips-inline[data-rozie-s-9546115a] {
+  container-type: inline-size;
+}
+.rozie-combobox--chips-inline[data-rozie-s-9546115a] .rozie-combobox-control[data-rozie-s-9546115a] {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rozie-combobox-chip-gap, var(--rcb-chip-gap, 0.4rem));
+  width: 100cqw;
+  padding: var(--rozie-combobox-inline-padding, var(--rcb-inline-padding, 0.3rem 0.45rem));
+  background: var(--rozie-combobox-bg, var(--rcb-bg, #fff));
+  border: var(--rozie-combobox-border-width, var(--rcb-border-width, 1px)) solid var(--rozie-combobox-border-color, var(--rcb-border-color, rgba(0, 0, 0, 0.25)));
+  border-radius: var(--rozie-combobox-radius, var(--rcb-radius, 0.5rem));
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.rozie-combobox--chips-inline[data-rozie-s-9546115a] .rozie-combobox-control[data-rozie-s-9546115a]:focus-within {
+  border-color: var(--rozie-combobox-focus-border-color, var(--rozie-combobox-accent, var(--rcb-accent, #0066cc)));
+  box-shadow: 0 0 0 var(--rozie-combobox-focus-ring-width, var(--rcb-focus-ring-width, 3px)) var(--rozie-combobox-focus-ring-color, var(--rcb-focus-ring-color, rgba(0, 102, 204, 0.25)));
+}
+.rozie-combobox--chips-inline[data-rozie-s-9546115a] .rozie-combobox-chips[data-rozie-s-9546115a] {
+  display: contents;
+}
+.rozie-combobox--chips-inline[data-rozie-s-9546115a] .rozie-combobox-input[data-rozie-s-9546115a],
+.rozie-combobox--chips-inline[data-rozie-s-9546115a] .rozie-combobox-input[data-rozie-s-9546115a]:focus {
+  flex: 1 1 var(--rozie-combobox-inline-input-min-width, var(--rcb-inline-input-min-width, 6rem));
+  width: auto;
+  min-width: var(--rozie-combobox-inline-input-min-width, var(--rcb-inline-input-min-width, 6rem));
+  padding: var(--rozie-combobox-inline-input-padding, var(--rcb-inline-input-padding, 0.2rem 0.25rem));
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
 .rozie-combobox--inline[data-rozie-s-9546115a] {
   display: block;
   width: 100%;
@@ -338,6 +445,38 @@ export default class Combobox extends SignalWatcher(LitElement) {
    * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
    */
   @property({ type: Boolean, reflect: true, attribute: 'disable-shift' }) disableShift: boolean = false;
+  /**
+   * Fill the container: the root becomes `display: block; width: 100%`, the control (chips + input) stretches to that width, and the width-matched popup follows. Adds the `rozie-combobox--block` modifier class on the root. Default `false` keeps the fixed `--rozie-combobox-width` sizing.
+   */
+  @property({ type: Boolean, reflect: true }) block: boolean = false;
+  /**
+   * Chip rail layout under `multiple`: `'stacked'` (default) renders the chips above the input; `'inline'` puts the chips and the input on ONE wrapping row (the Tags layout), with the input taking the remaining width (`flex: 1`, never narrower than `--rozie-combobox-inline-input-min-width`). Only meaningful with `multiple`.
+   */
+  @property({ type: String, reflect: true, attribute: 'chip-layout' }) chipLayout: string = 'stacked';
+  /**
+   * Do not open the list when the input gains focus. Typing and ArrowDown / ArrowUp still open it. Default `false` opens on focus.
+   */
+  @property({ type: Boolean, reflect: true, attribute: 'disable-open-on-focus' }) disableOpenOnFocus: boolean = false;
+  /**
+   * Show nothing instead of the empty state: when there are no option rows and no create row, the popup is not shown, the input reports `aria-expanded="false"`, and Escape is left to the host (not `preventDefault`ed). This is the supported way to render no popup at all; filling the `empty` slot with nothing still renders the fallback on most targets.
+   */
+  @property({ type: Boolean, reflect: true, attribute: 'hide-empty' }) hideEmpty: boolean = false;
+  /**
+   * Keys that commit the **typed text** as a value (matched against the key event's `key`), under `multiple` only — a delimiter never picks the highlighted option. Character entries (e.g. `[',', ';']`) also split pasted text: a paste containing a delimiter is split on them and every non-empty trimmed part is committed. `'Enter'` and `'Tab'` are allowed; Enter then commits the typed text only when no option is highlighted. A non-empty list (or a `validate` function) turns on free-text commits, so Enter with no highlighted option commits the typed text too. Default `[]` (off).
+   * @example
+   * <rozie-combobox multiple .value=${to} @value-change=${…} .options=${contacts} .delimiters=${delims}></rozie-combobox>
+   */
+  @property({ type: Array }) delimiters: any[] = [];
+  /**
+   * Free-text gate, `(text: string) => boolean`, under `multiple` only. Called with the trimmed typed (or pasted) text before every free-text commit; return `false` to reject it — rejected text stays in the input. Setting it also turns on free-text commits (Enter with no highlighted option commits the typed text). A free-text commit appends the text to `value` (skipped when already present), clears the input, and emits `change` with `option: null` and the committed `text`.
+   * @example
+   * <rozie-combobox multiple .value=${to} @value-change=${…} .options=${contacts} .validate=${isEmail}></rozie-combobox>
+   */
+  @property({ type: Function }) validate: ((...args: any[]) => any) | null = null;
+  /**
+   * Tab picks the highlighted option while the popup is visible and an option is highlighted, keeping focus in the input. When nothing is picked, Tab moves focus normally. Default `false` (Tab always moves focus).
+   */
+  @property({ type: Boolean, reflect: true, attribute: 'select-on-tab' }) selectOnTab: boolean = false;
   private _query = signal('');
   private _isOpen = signal(false);
   private _activeIndex = signal(-1);
@@ -357,22 +496,22 @@ private __rozieFirstUpdateDone = false;
 
   @state() private _hasSlotChip = false;
   @queryAssignedElements({ slot: 'chip', flatten: true }) private _slotChipElements!: Element[];
-  @property({ attribute: false }) chip?: (scope: { option: any; remove: any; index: any }) => unknown;
+  @property({ attribute: false }) chip?: (scope: { option: any; remove: () => void; index: number }) => unknown;
   @state() private _hasSlotOption = false;
   @queryAssignedElements({ slot: 'option', flatten: true }) private _slotOptionElements!: Element[];
-  @property({ attribute: false }) option?: (scope: { option: any; index: any; active: any; selected: any; disabled: any }) => unknown;
+  @property({ attribute: false }) option?: (scope: { option: any; index: number; active: boolean; selected: boolean; disabled: boolean }) => unknown;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
-  @property({ attribute: false }) empty?: (scope: { query: any }) => unknown;
+  @property({ attribute: false }) empty?: (scope: { query: string }) => unknown;
   @state() private _hasSlotCreate = false;
   @queryAssignedElements({ slot: 'create', flatten: true }) private _slotCreateElements!: Element[];
-  @property({ attribute: false }) create?: (scope: { query: any }) => unknown;
+  @property({ attribute: false }) create?: (scope: { query: string }) => unknown;
   @state() private _hasSlotGroupHeading = false;
   @queryAssignedElements({ slot: 'groupHeading', flatten: true }) private _slotGroupHeadingElements!: Element[];
-  @property({ attribute: false }) groupHeading?: (scope: { group: any }) => unknown;
+  @property({ attribute: false }) groupHeading?: (scope: { group: ComboboxGroup }) => unknown;
   @state() private _hasSlotGroupMore = false;
   @queryAssignedElements({ slot: 'groupMore', flatten: true }) private _slotGroupMoreElements!: Element[];
-  @property({ attribute: false }) groupMore?: (scope: { group: any; hidden: any; expand: any }) => unknown;
+  @property({ attribute: false }) groupMore?: (scope: { group: ComboboxGroup | null; hidden: number; expand: () => void }) => unknown;
   // Phase 79 Plan 08 (R4) contract for 79-09: the record intake for
   // record-routed slot fills. 79-09's consumer-side emitSlotFiller
   // accumulates an object literal onto the SAME `.rozieSlots=${{ ... }}`
@@ -530,21 +669,20 @@ private __rozieFirstUpdateDone = false;
 
   render() {
     return html`
-<div class="${Object.entries({ "rozie-combobox": true, 'rozie-combobox--open': this._isOpen.value, 'rozie-combobox--disabled': this.disabled, 'rozie-combobox--inline': this.inline, 'rozie-combobox--multiple': this.multiple }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-9546115a>
+<div class="${Object.entries({ "rozie-combobox": true, 'rozie-combobox--open': this._isOpen.value, 'rozie-combobox--disabled': this.disabled, 'rozie-combobox--inline': this.inline, 'rozie-combobox--multiple': this.multiple, 'rozie-combobox--block': this.block, 'rozie-combobox--chips-inline': this.chipsInline() }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-9546115a>
   
-  <rozie-popover trigger="manual" .open=${this._isOpen.value} @open-change=${($event: CustomEvent) => { this._isOpen.value = $event.detail; }} .bare=${true} .matchWidth=${true} .keepMounted=${this.virtual} .disablePositioning=${this.inline} .disableDismiss=${this.inline || this._pinned.value} .placement=${this.placement} .offset=${this.offset} .disableFlip=${this.disableFlip} .disableShift=${this.disableShift} data-rozie-s-9546115a><div slot="anchor">
-      
+  <rozie-popover trigger="manual" .open=${this._isOpen.value} @open-change=${($event: CustomEvent) => { this._isOpen.value = $event.detail; }} .bare=${true} .matchWidth=${true} .keepMounted=${this.virtual} .disablePositioning=${this.inline} .disableDismiss=${this.inline || this._pinned.value} .placement=${this.placement} .offset=${this.offset} .disableFlip=${this.disableFlip} .disableShift=${this.disableShift} data-rozie-s-9546115a><div class="rozie-combobox-control" data-rozie-s-9546115a slot="anchor">
       ${this.multiple ? html`<ul class="rozie-combobox-chips" data-rozie-s-9546115a>
         ${repeat<any>(this.chipRows(), (row, idx) => 'chip-' + row.value, (row, idx) => html`<li class="rozie-combobox-chip" data-rozie-s-9546115a>
-          ${this.chip !== undefined ? this.chip({option: row.option, remove: () => this.removeChipValue(row.value), index: idx}) : html`<slot name="chip" data-rozie-params=${(() => { try { return JSON.stringify({option: row.option, index: idx}); } catch { return '{}'; } })()} @rozie-chip-remove=${($event: CustomEvent) => ((() => this.removeChipValue(row.value)) as (...args: any[]) => any)($event.detail)}>
+          ${this.chip !== undefined ? this.chip({option: row.option, remove: () => this.onChipRemoveActivate(row.value), index: idx}) : html`<slot name="chip" data-rozie-params=${(() => { try { return JSON.stringify({option: row.option, index: idx}); } catch { return '{}'; } })()} @rozie-chip-remove=${($event: CustomEvent) => ((() => this.onChipRemoveActivate(row.value)) as (...args: any[]) => any)($event.detail)}>
             <span class="rozie-combobox-chip__label" data-rozie-s-9546115a>${rozieDisplay(row.label)}</span>
             <button class="rozie-combobox-chip__remove" type="button" ?disabled=${!!this.disabled} aria-label=${rozieAttr(this.chipRemoveLabel(row))} @mousedown=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { $event.preventDefault(); this.onChipRemovePointerDown(); }} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { $event.stopPropagation(); this.onChipRemoveActivate(row.value); }} data-rozie-s-9546115a>×</button>
           </slot>`}
         </li>`)}
-      </ul>` : nothing}<input class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded=${!!this._isOpen.value} aria-controls=${rozieAttr(this.listId())} aria-activedescendant=${rozieAttr(this.activeId())} aria-label=${rozieAttr(this.ariaLabel)} .value=${this._query.value} placeholder=${this.placeholder} ?disabled=${!!this.disabled} autocomplete="off" @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @focus=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onFocus($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} data-rozie-ref="inputEl" data-rozie-s-9546115a />
-    </div>
+      </ul>` : nothing}<input class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded=${!!this.popupVisible()} aria-controls=${rozieAttr(this.listId())} aria-activedescendant=${rozieAttr(this.activeId())} aria-label=${rozieAttr(this.ariaLabel)} .value=${this._query.value} placeholder=${this.placeholder} ?disabled=${!!this.disabled} autocomplete="off" @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @focus=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onFocus($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @paste=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onPaste($event); }} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { $event.stopPropagation(); this.onNativeInputChange(); }} data-rozie-ref="inputEl" data-rozie-s-9546115a />
+      </div>
     
-    ${this._isOpen.value && !this.virtual && !this.isGrouped() ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" aria-multiselectable=${rozieAttr(this.multiple ? 'true' : null)} data-rozie-s-9546115a>
+    ${this.popupVisible() && !this.virtual && !this.isGrouped() ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" aria-multiselectable=${rozieAttr(this.multiple ? 'true' : null)} data-rozie-s-9546115a>
       ${repeat<any>(this.filteredOptions(), (opt, _idx) => opt.value, (opt, _idx) => html`<li class="${Object.entries({ "rozie-combobox-option": true, 'rozie-combobox-option--active': opt._i === this._activeIndex.value, 'rozie-combobox-option--selected': this.isRowSelected(opt), 'rozie-combobox-option--disabled': opt.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optId(opt._i))} role="option" aria-selected=${!!this.isRowSelected(opt)} aria-disabled=${!!opt.disabled} @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(opt); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = opt._i; }} data-rozie-s-9546115a>
         ${this.option !== undefined ? this.option({option: opt.option, index: opt._i, active: opt._i === this._activeIndex.value, selected: this.isRowSelected(opt), disabled: opt.disabled}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: opt.option, index: opt._i, active: opt._i === this._activeIndex.value, selected: this.isRowSelected(opt), disabled: opt.disabled}); } catch { return '{}'; } })()}>${rozieDisplay(opt.label)}</slot>`}
       </li>`)}
@@ -553,7 +691,7 @@ private __rozieFirstUpdateDone = false;
         ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No results</slot>`}
       </li>` : nothing}${this.isCreatableQuery() ? html`<li class="${Object.entries({ "rozie-combobox-create": true, "rozie-combobox-option": true, 'rozie-combobox-option--active': this.filteredOptions().length === this._activeIndex.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optId(this.filteredOptions().length))} role="option" @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(this.createRowAt(this.filteredOptions().length)); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = this.filteredOptions().length; }} data-rozie-s-9546115a>
         ${this.create !== undefined ? this.create({query: this._query.value}) : html`<slot name="create" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>Create "${this._query.value}"</slot>`}
-      </li>` : nothing}</ul>` : nothing}${this._isOpen.value && !this.virtual && this.isGrouped() && !this.isCapped() ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" aria-multiselectable=${rozieAttr(this.multiple ? 'true' : null)} data-rozie-s-9546115a>
+      </li>` : nothing}</ul>` : nothing}${this.popupVisible() && !this.virtual && this.isGrouped() && !this.isCapped() ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" aria-multiselectable=${rozieAttr(this.multiple ? 'true' : null)} data-rozie-s-9546115a>
       ${repeat<any>(this.groupBlocks(), (blk, _idx) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped'), (blk, _idx) => html`<li class="rozie-combobox-group" role="group" aria-label=${rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-9546115a>
         ${blk.group ? html`<div class="rozie-combobox-group-heading" role="presentation" data-rozie-s-9546115a>
           ${this.groupHeading !== undefined ? this.groupHeading({group: blk.group}) : html`<slot name="groupHeading" data-rozie-params=${(() => { try { return JSON.stringify({group: blk.group}); } catch { return '{}'; } })()}>${rozieDisplay(blk.group.label)}</slot>`}
@@ -566,7 +704,7 @@ private __rozieFirstUpdateDone = false;
         ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No results</slot>`}
       </li>` : nothing}${this.isCreatableQuery() ? html`<li class="${Object.entries({ "rozie-combobox-create": true, "rozie-combobox-option": true, 'rozie-combobox-option--active': this.filteredOptions().length === this._activeIndex.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optId(this.filteredOptions().length))} role="option" @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(this.createRowAt(this.filteredOptions().length)); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = this.filteredOptions().length; }} data-rozie-s-9546115a>
         ${this.create !== undefined ? this.create({query: this._query.value}) : html`<slot name="create" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>Create "${this._query.value}"</slot>`}
-      </li>` : nothing}</ul>` : nothing}${this._isOpen.value && !this.virtual && this.isCapped() ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" aria-multiselectable=${rozieAttr(this.multiple ? 'true' : null)} data-rozie-s-9546115a>
+      </li>` : nothing}</ul>` : nothing}${this.popupVisible() && !this.virtual && this.isCapped() ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" aria-multiselectable=${rozieAttr(this.multiple ? 'true' : null)} data-rozie-s-9546115a>
       ${repeat<any>(this.cappedBlocks(), (blk, _idx) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped'), (blk, _idx) => html`<li class="rozie-combobox-group" role="group" aria-label=${rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-9546115a>
         ${blk.group ? html`<div class="rozie-combobox-group-heading" role="presentation" data-rozie-s-9546115a>
           ${this.groupHeading !== undefined ? this.groupHeading({group: blk.group}) : html`<slot name="groupHeading" data-rozie-params=${(() => { try { return JSON.stringify({group: blk.group}); } catch { return '{}'; } })()}>${rozieDisplay(blk.group.label)}</slot>`}
@@ -582,7 +720,7 @@ private __rozieFirstUpdateDone = false;
         ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No results</slot>`}
       </li>` : nothing}${this.isCreatableQuery() ? html`<li class="${Object.entries({ "rozie-combobox-create": true, "rozie-combobox-option": true, 'rozie-combobox-option--active': this.cappedRowCount() === this._activeIndex.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optId(this.cappedRowCount()))} role="option" @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(this.createRowAt(this.cappedRowCount())); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = this.cappedRowCount(); }} data-rozie-s-9546115a>
         ${this.create !== undefined ? this.create({query: this._query.value}) : html`<slot name="create" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>Create "${this._query.value}"</slot>`}
-      </li>` : nothing}</ul>` : nothing}${this.virtual ? html`<ul class="rozie-combobox-list rozie-combobox-list--virtual" id=${rozieAttr(this.listId())} role="listbox" aria-multiselectable=${rozieAttr(this.multiple ? 'true' : null)} style=${rozieStyle((this._isOpen.value ? '' : 'display:none;') + (this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + this.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a>
+      </li>` : nothing}</ul>` : nothing}${this.virtual ? html`<ul class="rozie-combobox-list rozie-combobox-list--virtual" id=${rozieAttr(this.listId())} role="listbox" aria-multiselectable=${rozieAttr(this.multiple ? 'true' : null)} style=${rozieStyle((this.popupVisible() ? '' : 'display:none;') + (this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + this.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a>
       <li class="rozie-combobox-spacer" aria-hidden="true" style=${rozieStyle('height:' + this.padTop() + 'px')} data-rozie-s-9546115a></li>
 
       ${repeat<any>(this.windowedView(), (wr, _idx) => wr.row.id, (wr, _idx) => html`<li class="${Object.entries({ "rozie-combobox-option": true, 'rozie-combobox-option--active': wr.vi.index === this._activeIndex.value, 'rozie-combobox-option--selected': this.isRowSelected(wr.row), 'rozie-combobox-option--disabled': wr.row.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optId(wr.vi.index))} data-index=${rozieAttr(wr.vi.index)} role="option" aria-selected=${!!this.isRowSelected(wr.row)} aria-disabled=${!!wr.row.disabled} @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(wr.row); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = wr.vi.index; }} data-rozie-s-9546115a>
@@ -1567,11 +1705,34 @@ private __rozieFirstUpdateDone = false;
 
   listId = () => this.idBase + '-list';
 
+  // popupVisible() (hideEmpty, COMBOBOX-SPEC item 4): whether the popup is actually
+  // SHOWN — open AND (unless `hideEmpty`) something to render. With `hideEmpty` an
+  // open popup with no option rows AND no create row counts as hidden: the list
+  // branches do not render, aria-expanded reports false, and Escape is left to the
+  // host (B4). Without `hideEmpty` this is exactly `$data.isOpen` (byte-identical-off).
+  popupVisible = () => {
+  if (!this._isOpen.value) return false;
+  if (!this.hideEmpty) return true;
+  return this.navRows().length > 0;
+};
+
   // The active option's id for aria-activedescendant (null when none).
   activeId = () => {
   const list = this.navRows();
-  if (this._isOpen.value && this._activeIndex.value >= 0 && list[this._activeIndex.value]) return this.optId(this._activeIndex.value);
+  if (this.popupVisible() && this._activeIndex.value >= 0 && list[this._activeIndex.value]) return this.optId(this._activeIndex.value);
   return null;
+};
+
+  // activeOption() (handle verb, COMBOBOX-SPEC item 8): the highlighted RAW source
+  // option, or null (nothing highlighted, the popup is hidden, or the highlighted
+  // row is a synthetic "+N more" / create row).
+  activeOption: () => any = () => {
+  const list = this.navRows();
+  const ai = this._activeIndex.value;
+  if (!this.popupVisible() || ai < 0) return null;
+  const row = list[ai];
+  if (!row || row.isMore || row.isCreate) return null;
+  return row.option === undefined ? null : row.option;
 };
 
   // Next selectable index in `dir` (+1/-1), skipping disabled, clamped to ends.
@@ -1626,6 +1787,10 @@ private __rozieFirstUpdateDone = false;
   if (v === true || v === false) return v;
   return !this.multiple;
 };
+
+  // chipsInline() (chipLayout, COMBOBOX-SPEC item 2): chips + input on one
+  // wrapping row — only meaningful under `multiple`.
+  chipsInline = () => !!this.multiple && this.chipLayout === 'inline';
 
   // ---- chip rail (Phase 86 R1, plan 86-05, D-13/D-16/D-18) ---------------
   // chipRows(): selectedValues() (already de-duplicated — see above) mapped to
@@ -1687,7 +1852,7 @@ private __rozieFirstUpdateDone = false;
     // it, but this guard is cheap insurance against a stale reference).
     if (!nq || nq === this._createdQuery.value) return;
     this._createdQuery.value = nq;
-    this.dispatchEvent(new CustomEvent("create", {
+    this.dispatchEvent(new CustomEvent<ComboboxCreatePayload>("create", {
       detail: {
         query: q
       },
@@ -1722,7 +1887,7 @@ private __rozieFirstUpdateDone = false;
     if (!opt.isRemoval) this._query.value = '';
     if (this.effectiveCloseOnSelect()) this._isOpen.value = false;
     this._activeIndex.value = -1;
-    this.dispatchEvent(new CustomEvent("change", {
+    this.dispatchEvent(new CustomEvent<ComboboxChangePayload>("change", {
       detail: {
         value: next,
         option: opt.option,
@@ -1738,7 +1903,7 @@ private __rozieFirstUpdateDone = false;
   if (this.effectiveCloseOnSelect()) this._isOpen.value = false;
   this._activeIndex.value = -1;
   // D-15: `selected` is additive and always `true` in single-select.
-  this.dispatchEvent(new CustomEvent("change", {
+  this.dispatchEvent(new CustomEvent<ComboboxChangePayload>("change", {
     detail: {
       value: opt.value,
       option: opt.option,
@@ -1778,6 +1943,14 @@ private __rozieFirstUpdateDone = false;
   // would remove the chip twice per pointer press. See onChipRemoveActivate()
   // below for where the removal actually happens.
   onChipRemovePointerDown = () => {};
+
+  // onNativeInputChange() (release-0.8.0): the `.stop` on the input's native
+  // `change` is its whole payload — the native event bubbles out of the inner
+  // <input> on blur after an edit, and on Angular (no shadow boundary) a consumer
+  // `(change)` binding on <rozie-combobox> would receive that DOM Event as well as
+  // the component's own `change` output (the same collision popover's audit B6
+  // removed). Stopping it keeps `change` meaning only the component event.
+  onNativeInputChange = () => {};
 
   // onChipRemoveActivate(v) (quick-260903-0s1, E1 audit finding): the CLICK half
   // of the split binding — the actual removal. `click` is the one event every
@@ -1849,6 +2022,106 @@ private __rozieFirstUpdateDone = false;
   this._query.value = opt === undefined || opt === null ? '' : String(this.labelOf(opt));
 };
 
+  // ---- free-text commits (COMBOBOX-SPEC items 5-7, multiple only) --------
+  // delimiterList(): the `delimiters` prop normalized to an array.
+  delimiterList = () => Array.isArray(this.delimiters) ? this.delimiters : [];
+
+  // splitDelimiters(): the CHARACTER delimiters (everything but 'Enter'/'Tab') —
+  // the paste split characters.
+  splitDelimiters = () => this.delimiterList().filter((k: any) => k !== 'Enter' && k !== 'Tab');
+
+  // freeTextOn(): free-text commits are enabled under `multiple` when a delimiter
+  // list OR a validate function is supplied.
+  freeTextOn = () => !!this.multiple && (this.delimiterList().length > 0 || typeof this.validate === 'function');
+
+  // acceptsText(t): the `validate` gate (absent ⇒ accept).
+  acceptsText = (t: any) => typeof this.validate !== 'function' || !!this.validate(t);
+
+  // commitTexts(texts): append every not-yet-present text to `value` (ONE fresh
+  // array, ONE model write) and emit one `change` per committed text, each with the
+  // running array as of that commit. Texts already present are skipped silently.
+  commitTexts = (texts: any) => {
+  let next = this.selectedValues();
+  const committed = [];
+  const snapshots = [];
+  for (let i = 0; i < texts.length; i++) {
+    const t = texts[i];
+    if (next.indexOf(t) !== -1) continue;
+    next = next.concat([t]);
+    committed.push(t);
+    snapshots.push(next);
+  }
+  if (committed.length > 0) this._valueControllable.write(next);
+  this._activeIndex.value = -1;
+  for (let i = 0; i < committed.length; i++) {
+    this.dispatchEvent(new CustomEvent<ComboboxChangePayload>("change", {
+      detail: {
+        value: snapshots[i],
+        option: null,
+        selected: true,
+        text: committed[i]
+      },
+      bubbles: true,
+      composed: true
+    }));
+  }
+};
+
+  // syncInputText(el, text): also write the LIVE input element. Angular compares a
+  // `[value]` binding against its last RENDERED value: fast typing followed by a
+  // commit in the same frame (before change detection rendered the typed text)
+  // leaves query '' === last-rendered '' — no DOM write, the typed text stays.
+  // Writing the element directly is idempotent on every other target.
+  syncInputText = (el: any, text: any) => {
+  if (el && typeof el.value === 'string' && el.value !== text) el.value = text;
+};
+
+  // commitFreeText(raw, el): trim → validate → commit + clear the input. Returns
+  // true when the text was handled (committed, or already present ⇒ just cleared);
+  // false when empty or rejected — rejected text stays in the input.
+  commitFreeText = (raw: any, el: any) => {
+  const t = String(raw == null ? '' : raw).trim();
+  if (!t) return false;
+  if (!this.acceptsText(t)) return false;
+  this._query.value = '';
+  this.syncInputText(el, '');
+  this.commitTexts([t]);
+  return true;
+};
+
+  // onPaste(e) (item 6): under free-text mode with character delimiters, a paste
+  // containing a delimiter is split on them and every non-empty trimmed part is
+  // committed (the paste is preventDefault-ed). Parts `validate` rejects stay in the
+  // input (joined by the first delimiter). A paste with no delimiter is ordinary text.
+  onPaste = (e: any) => {
+  if (!this.freeTextOn()) return;
+  const seps = this.splitDelimiters();
+  if (seps.length === 0) return;
+  const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
+  let hasSep = false;
+  for (let s = 0; s < seps.length; s++) {
+    if (text.indexOf(seps[s]) !== -1) hasSep = true;
+  }
+  if (!hasSep) return;
+  if (e) e.preventDefault();
+  let parts = [text];
+  for (let s = 0; s < seps.length; s++) {
+    const out = [];
+    for (let p = 0; p < parts.length; p++) {
+      const pieces = String(parts[p]).split(seps[s]);
+      for (let q = 0; q < pieces.length; q++) out.push(pieces[q]);
+    }
+    parts = out;
+  }
+  const trimmed = parts.map((p: any) => String(p).trim()).filter((p: any) => p.length > 0);
+  const accepted = trimmed.filter((p: any) => this.acceptsText(p));
+  const rejected = trimmed.filter((p: any) => !this.acceptsText(p));
+  const rest = rejected.join(seps[0] + ' ');
+  this._query.value = rest;
+  this.syncInputText(e ? e.target : null, rest);
+  this.commitTexts(accepted);
+};
+
   // ---- input + keyboard handlers -----------------------------------------
   onInput = (e: any) => {
   const q = e && e.target ? e.target.value : '';
@@ -1859,7 +2132,7 @@ private __rozieFirstUpdateDone = false;
   this._createdQuery.value = null;
   this._isOpen.value = true;
   this._activeIndex.value = 0;
-  this.dispatchEvent(new CustomEvent("search", {
+  this.dispatchEvent(new CustomEvent<ComboboxSearchPayload>("search", {
     detail: {
       query: q
     },
@@ -1889,6 +2162,12 @@ private __rozieFirstUpdateDone = false;
   // moving focus away" so it can skip closing. The other 5 targets diff their
   // scoped-slot re-render and keep the existing, already-focused node — no
   // blur ever fires there, so the guard is a no-op for them.
+  // disableOpenOnFocus (item 3): focus alone never opens the list — typing
+  // (onInput) and ArrowDown/ArrowUp (onKeydown) still do.
+  if (this.disableOpenOnFocus) {
+    if (e && e.target && e.target.select) e.target.select();
+    return;
+  }
   this.openingInProgress = true;
   this._isOpen.value = true;
   // Cleared SYNCHRONOUSLY, immediately after the write — Solid's reactive
@@ -1923,6 +2202,12 @@ private __rozieFirstUpdateDone = false;
 };
 
   onKeydown = (e: any) => {
+  // B10: ignore every key while an IME composition is active — the Enter that
+  // confirms a composition must never pick, commit or navigate. Read through
+  // `nativeEvent` when present: React's synthetic keyboard event does not carry
+  // `isComposing` (every other target hands the native event straight through).
+  const ne = e && e.nativeEvent ? e.nativeEvent : e;
+  if (ne && (ne.isComposing || ne.keyCode === 229)) return;
   const key = e ? e.key : '';
   const list = this.navRows();
   // Capture the reactive reads into locals BEFORE any write so React never binds
@@ -1930,6 +2215,16 @@ private __rozieFirstUpdateDone = false;
   // is mutually exclusive, but a flow-insensitive analysis can't see that.
   const wasOpen = this._isOpen.value;
   const ai = this._activeIndex.value;
+  const visible = this.popupVisible();
+  const liveText = e && e.target ? e.target.value : '';
+  const highlighted = wasOpen && ai >= 0 && list[ai] ? list[ai] : null;
+  // Character delimiters (item 5): commit the TYPED text — never the highlighted
+  // option. 'Enter' / 'Tab' entries are handled in their own branches below.
+  if (this.freeTextOn() && key !== 'Enter' && key !== 'Tab' && this.delimiterList().indexOf(key) !== -1) {
+    if (e) e.preventDefault();
+    this.commitFreeText(liveText, e ? e.target : null);
+    return;
+  }
   if (key === 'ArrowDown') {
     if (e) e.preventDefault();
     if (!wasOpen) {
@@ -1946,12 +2241,32 @@ private __rozieFirstUpdateDone = false;
     }
     this._activeIndex.value = this.nextEnabled(list, ai, -1);
   } else if (key === 'Enter') {
-    if (wasOpen && ai >= 0 && list[ai]) {
+    // B9: Enter with Ctrl / Meta / Alt is left to the host (e.g. a send shortcut).
+    const modified = !!(e && (e.ctrlKey || e.metaKey || e.altKey));
+    if (!modified) {
+      if (highlighted) {
+        if (e) e.preventDefault();
+        this.selectOption(highlighted);
+      } else if (this.freeTextOn() && String(liveText).trim()) {
+        // Free-text mode (item 7): Enter with no highlighted option commits the
+        // typed text (rejected text stays in the input).
+        if (e) e.preventDefault();
+        this.commitFreeText(liveText, e ? e.target : null);
+      }
+    }
+  } else if (key === 'Tab') {
+    // selectOnTab (item 8): pick the highlighted option while the popup is
+    // visible; preventDefault ONLY when it picked. A 'Tab' delimiter commits the
+    // typed text when nothing was picked. Otherwise Tab moves focus normally.
+    if (this.selectOnTab && visible && highlighted && !highlighted.disabled) {
       if (e) e.preventDefault();
-      this.selectOption(list[ai]);
+      this.selectOption(highlighted);
+    } else if (this.freeTextOn() && this.delimiterList().indexOf('Tab') !== -1 && String(liveText).trim()) {
+      if (this.commitFreeText(liveText, e ? e.target : null) && e) e.preventDefault();
     }
   } else if (key === 'Escape') {
-    if (wasOpen) {
+    // B4: only consume Escape when the popup is actually VISIBLE.
+    if (visible) {
       if (e) e.preventDefault();
       this._isOpen.value = false;
     }
@@ -2062,9 +2377,9 @@ private __rozieFirstUpdateDone = false;
   // (command-palette-sub-actions prerequisite). pinOpen(false) ONLY unpins — it
   // does NOT itself close the popup or move focus; that is the host's job.
   // Render-neutral when never called. All four are post-mount → $refs safe.
-  focus = () => this._refInputEl?.focus();
+  focus: () => void = () => this._refInputEl?.focus();
 
-  clear = () => {
+  clear: () => void = () => {
   // Fresh empty array under `multiple` (never in-place mutation), null in
   // single mode — mirrors selectOption()'s `{ value, option, selected }`
   // shape; nothing is selected after a clear, so `selected` is `false`.
@@ -2072,7 +2387,7 @@ private __rozieFirstUpdateDone = false;
   this._valueControllable.write(empty);
   this._query.value = '';
   this._activeIndex.value = -1;
-  this.dispatchEvent(new CustomEvent("change", {
+  this.dispatchEvent(new CustomEvent<ComboboxChangePayload>("change", {
     detail: {
       value: empty,
       option: null,
@@ -2083,16 +2398,27 @@ private __rozieFirstUpdateDone = false;
   }));
 };
 
-  seedQuery = (text: any) => {
+  seedQuery: (text: string) => void = (text: any) => {
   this._query.value = String(text == null ? '' : text);
 };
 
-  pinOpen = (v: any) => {
+  pinOpen: (v: boolean) => void = (v: any) => {
   this._pinned.value = !!v;
 };
 
   get value(): unknown { return this._valueControllable.read(); }
   set value(v: unknown) { this._valueControllable.notifyPropertyWrite(v); }
+
+  addEventListener<K extends keyof RozieComboboxEventMap>(type: K, listener: (this: Combobox, ev: RozieComboboxEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
+    super.addEventListener(type, listener, options);
+  }
+  removeEventListener<K extends keyof RozieComboboxEventMap>(type: K, listener: (this: Combobox, ev: RozieComboboxEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    super.removeEventListener(type, listener, options);
+  }
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
@@ -2113,7 +2439,7 @@ private __rozieFirstUpdateDone = false;
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'value', 'options', 'placeholder', 'disabled', 'disable-filter', 'disablefilter', 'aria-label', 'arialabel', 'id-base', 'idbase', 'inline', 'close-on-select', 'closeonselect', 'multiple', 'creatable', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'virtual', 'estimate-row-height', 'estimaterowheight', 'max-height', 'maxheight', 'groups', 'group-cap', 'groupcap', 'placement', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift']);
+    const __skip = new Set<string>(['data-rozie-ref', 'value', 'options', 'placeholder', 'disabled', 'disable-filter', 'disablefilter', 'aria-label', 'arialabel', 'id-base', 'idbase', 'inline', 'close-on-select', 'closeonselect', 'multiple', 'creatable', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'virtual', 'estimate-row-height', 'estimaterowheight', 'max-height', 'maxheight', 'groups', 'group-cap', 'groupcap', 'placement', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'block', 'chip-layout', 'chiplayout', 'disable-open-on-focus', 'disableopenonfocus', 'hide-empty', 'hideempty', 'delimiters', 'validate', 'select-on-tab', 'selectontab']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

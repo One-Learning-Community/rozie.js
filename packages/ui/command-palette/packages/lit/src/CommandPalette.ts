@@ -5,7 +5,7 @@ import { RoziePortalController, RozieSlotDistributor, adoptConsumerStyles, creat
 import { repeat } from 'lit/directives/repeat.js';
 import { ref } from 'lit/directives/ref.js';
 import '@rozie-ui/combobox-lit';
-import type { Combobox } from '@rozie-ui/combobox-lit';
+import type { Combobox, ComboboxGroup } from '@rozie-ui/combobox-lit';
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
@@ -780,7 +780,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
       </slot>`}
     </div>` : nothing}<div class="${Object.entries({ "rozie-command-palette-list-region": true, 'rozie-command-palette-list-region--inert': this._activeSurface.value === 'args' }).filter(([, v]) => v).map(([k]) => k).join(' ')}" aria-hidden=${!!(this._activeSurface.value === 'args')} data-rozie-s-768cad96>
     
-    <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.orderedItems()} .groups=${this.commandGroups()} .groupCap=${this.groupCap} .virtual=${this.currentVirtual()} .maxHeight=${this.currentVirtualMaxHeight()} .estimateRowHeight=${this.currentVirtualEstimateRowHeight()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.currentPlaceholder()} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: any; index: any; active: any; selected: any; disabled: any }) => html`
+    <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.orderedItems()} .groups=${this.commandGroups()} .groupCap=${this.groupCap} .virtual=${this.currentVirtual()} .maxHeight=${this.currentVirtualMaxHeight()} .estimateRowHeight=${this.currentVirtualEstimateRowHeight()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.currentPlaceholder()} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: any; index: number; active: boolean; selected: boolean; disabled: boolean }) => html`
         <span class="rozie-command-palette-option-anchor" data-cp-index=${rozieAttr(this.cpAnchorIndex(scope.option))} data-cp-value=${rozieAttr(this.commandValue(scope.option))} data-rozie-s-768cad96>
         ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}); } catch { return '{}'; } })()}>
           <div class="rozie-command-palette-option" data-rozie-s-768cad96>
@@ -800,9 +800,9 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
             </span>` : nothing}</div>
         </slot>`}
         </span>
-      `} .groupHeading=${(scope: { group: any }) => html`
+      `} .groupHeading=${(scope: { group: ComboboxGroup }) => html`
         ${this.groupHeading !== undefined ? this.groupHeading({group: scope.group}) : html`<slot name="groupHeading" data-rozie-params=${(() => { try { return JSON.stringify({group: scope.group}); } catch { return '{}'; } })()}>${rozieDisplay(this.groupLabel(scope.group))}</slot>`}
-      `} .empty=${(scope: { query: any }) => html`
+      `} .empty=${(scope: { query: string }) => html`
         ${this.currentStatus() === 'ready' ? html`${this.empty !== undefined ? this.empty({query: scope.query}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: scope.query}); } catch { return '{}'; } })()}>${this.emptyText}</slot>`}` : nothing}`} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}></rozie-combobox>
     </div>
 

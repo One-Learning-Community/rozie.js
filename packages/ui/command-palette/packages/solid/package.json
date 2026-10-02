@@ -53,7 +53,7 @@
   },
   "peerDependencies": {
     "solid-js": "^1.8",
-    "@rozie-ui/combobox-solid": "^0.5.0 || ^0.6.0"
+    "@rozie-ui/combobox-solid": "^0.5.0 || ^0.6.0 || ^0.7.0"
   },
   "peerDependenciesMeta": {
     "solid-js": {

@@ -120,6 +120,16 @@
   --rcb-chip-remove-color: var(--rozie-combobox-chip-remove-color, currentColor);
   --rcb-chip-remove-size: var(--rozie-combobox-chip-remove-size, 1.1rem);
 
+  /* inline chip layout — `chipLayout="inline"` (with `multiple`) puts the
+     chips and the input on one wrapping row inside a single bordered field.
+     `--rozie-combobox-inline-padding` pads that field,
+     `--rozie-combobox-inline-input-min-width` is the narrowest the input gets
+     before it wraps onto the next row, and
+     `--rozie-combobox-inline-input-padding` pads the (borderless) input. */
+  --rcb-inline-padding: var(--rozie-combobox-inline-padding, 0.3rem 0.45rem);
+  --rcb-inline-input-min-width: var(--rozie-combobox-inline-input-min-width, 6rem);
+  --rcb-inline-input-padding: var(--rozie-combobox-inline-input-padding, 0.2rem 0.25rem);
+
   /* state-dependent — declared `initial` on purpose. The component reads
      this token with a DIFFERENT local fallback at each read site (resting
      input falls back through --rozie-combobox-border-color, the :focus rule

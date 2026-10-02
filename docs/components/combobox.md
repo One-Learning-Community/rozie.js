@@ -89,12 +89,19 @@ const frameworks = [
 | `offset` | `Number` | `4` | yes | Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4` preserves the pre-Phase-86 resting gap. Ignored when `inline` is set. |
 | `disableFlip` | `Boolean` | `false` | yes | Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). Ignored when `inline` is set. |
 | `disableShift` | `Boolean` | `false` | yes | Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). Ignored when `inline` is set. |
+| `block` | `Boolean` | `false` | yes | Fill the container: the root becomes `display: block; width: 100%`, the control (chips + input) stretches to that width, and the width-matched popup follows. Adds the `rozie-combobox--block` modifier class on the root. |
+| `chipLayout` | `String` | `"stacked"` | yes | Chip rail layout under `multiple`: `'stacked'` (default) renders the chips above the input; `'inline'` puts chips and input on ONE wrapping row (the Tags layout), the input taking the remaining width (never narrower than `--rozie-combobox-inline-input-min-width`, default `6rem`). Only meaningful with `multiple`. |
+| `disableOpenOnFocus` | `Boolean` | `false` | yes | Do not open the list when the input gains focus. Typing and `↓` / `↑` still open it. |
+| `hideEmpty` | `Boolean` | `false` | yes | When there are no option rows and no create row, show **no popup at all**: the list does not render, `aria-expanded` stays `false`, and Escape is left to the host (not `preventDefault`ed). This is the supported way to show nothing — see [Hiding the empty state](#hiding-the-empty-state). |
+| `delimiters` | `Array` | `[]` | yes | Keys that commit the **typed text** as a value (matched against the key event's `key`), under `multiple` only — a delimiter never picks the highlighted option. Character entries (e.g. `[',', ';']`) also split pasted text. `'Enter'` / `'Tab'` are allowed; Enter commits the typed text only when no option is highlighted. A non-empty list turns on free-text commits — see [Token input](#token-input-recipient-field). |
+| `validate` | `Function` | `null` | yes | Free-text gate, `(text: string) => boolean`, under `multiple` only: return `false` to reject a typed or pasted text (it stays in the input). Setting it also turns on free-text commits (Enter with no highlighted option commits the typed text). |
+| `selectOnTab` | `Boolean` | `false` | yes | Tab picks the highlighted option while the popup is visible (keeping focus in the input). When nothing is picked, Tab moves focus normally. |
 
 ### Events
 
 | Event | Description |
 | --- | --- |
-| `change` | Fired when the selected value changes — a user picks an option (toggling membership in `multiple` mode), or `clear()` resets it. Payload `{ value, option, selected }`: `value` is always the model's NEW value (the whole array in `multiple` mode, the scalar or `null` in single mode); `option` is the raw source option that was toggled (`null` after `clear()`); `selected` is the direction of the toggle — `true` when added / always `true` in single-select, `false` when removed or after `clear()`. |
+| `change` | Fired when the selected value changes — a user picks an option (toggling membership in `multiple` mode), commits free text (`delimiters` / `validate`), or `clear()` resets it. Payload `{ value, option, selected, text? }` (`ComboboxChangePayload`); `text` is set **only** on free-text commits, where `option` is `null`: `value` is always the model's NEW value (the whole array in `multiple` mode, the scalar or `null` in single mode); `option` is the raw source option that was toggled (`null` after `clear()`); `selected` is the direction of the toggle — `true` when added / always `true` in single-select, `false` when removed or after `clear()`. |
 | `search` | Fired on every keystroke in the input. Payload `{ query }` — the current text. Pair it with `disableFilter` to drive async / server-side filtering. |
 | `create` | Fired when `creatable` is set and the user commits text matching no option (case-insensitive, trimmed, exact label equality — no Unicode normalization). Payload `{ query }` — the committed text. Combobox writes NOTHING to `value` when this fires — the consumer adds the option to `options` and updates the model itself. Fires at most once per distinct query (a double-commit is a no-op); composes with `multiple` (`value` stays untouched there too). |
 
@@ -107,7 +114,10 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `focus` | Move DOM focus to the text input. Deliberately named `focus`, overriding the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. This mirrors the slider / otp precedent; listbox took the other branch (`focusControl`). |
 | `clear` | Reset the selection: clear `value` (emits `change` with `{ value: null }` in single-select mode, `{ value: [] }` under `multiple`) and empty the input text. Collision-safe — not a host-element member. |
 | `seedQuery(text)` | **Imperative only** — sets the input text (and therefore the filtered option list) without touching the `value` model or selection state. Does not open the popup, select an option, or emit `change`/`search`. Not a second model (a combobox has a single `model: true` prop, `value` — a second model would forfeit the Angular `ControlValueAccessor`). Intended for repopulating the input on programmatic restore (e.g. a consumer's back-navigation). |
+| `activeOption()` | Return the currently highlighted **raw source option**, or `null` when nothing is highlighted, the popup is hidden, or the highlighted row is a synthetic "+N more" / create row. Read-only — e.g. to preview what Enter or Tab (`selectOnTab`) would pick. |
 | `pinOpen(boolean)` | **Imperative only** — pin the popup open so blurring the input into a host sub-surface (e.g. an action flyout) does not collapse the list. `pinOpen(true)` pins; `pinOpen(false)` unpins. Unpinning alone does not itself close the popup or restore focus — that is the host's responsibility. Render-neutral: never calling it leaves behavior unchanged. |
+
+Every event payload and slot-param shape is exported as a type from each leaf (`ComboboxSearchPayload`, `ComboboxChangePayload`, `ComboboxCreatePayload`, `ComboboxChipSlotCtx`, `ComboboxOptionSlotCtx`, `ComboboxQuerySlotCtx`, `ComboboxGroupHeadingSlotCtx`, `ComboboxGroupMoreSlotCtx`, `ComboboxGroup`).
 
 ### Slots
 
@@ -117,7 +127,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `empty` | `query` | Rendered inside the open popup when the filtered list is empty. `query` is the current input text. Omit it to render the default "No results". |
 | `groupHeading` | `group` | Custom rendering for a group's heading (only when grouping is active — see [Grouping options](#grouping-options)). `group` is `{ id, label }`. Omit it to render the plain `group.label`. |
 | `groupMore` | `group, hidden, expand` | Custom rendering for a capped group's "+N more" row (only when `groupCap` is set — see [Capping groups](#capping-groups)). `group` is `{ id, label }` (or `null` for the leading ungrouped section), `hidden` is the count of not-yet-shown options, `expand` is a zero-arg closure that expands the group in place. Omit it to render the default `+{hidden} more` text. |
-| `chip` | `option, remove, index` | Custom rendering for one selected-value chip in the chip rail (only when `multiple` is set — see [Multi-select](#multi-select)). `option` is the raw source option object, or `null` when it has disappeared from `options` (the chip still renders, labelled by its raw value). `remove` is a zero-arg closure that removes that value from the selection via the same toggle path a re-select uses. `index` is the chip's position in the (de-duplicated, selection-ordered) chip list. Omit it to render the default label + focusable aria-labelled remove button. |
+| `chip` | `option, remove, index` | Custom rendering for one selected-value chip in the chip rail (only when `multiple` is set — see [Multi-select](#multi-select)). `option` is the raw source option object, or `null` when it has disappeared from `options` (the chip still renders, labelled by its raw value). `remove` is a zero-arg closure that removes that value from the selection via the same toggle path a re-select uses, then refocuses the input exactly like the built-in remove button. `index` is the chip's position in the (de-duplicated, selection-ordered) chip list. Omit it to render the default label + focusable aria-labelled remove button. |
 | `create` | `query` | Custom rendering for the trailing create row (only when `creatable` is set and the query is creatable — see [Creatable](#creatable)). `query` is the current input text. Omit it to render the default `Create "{query}"`. |
 
 ## Grouping options
@@ -175,6 +185,40 @@ Set `multiple` to select many options. `value` widens to an **array** while stay
 ```
 
 Selected values render as chips **inside the control, before the input** — the whole control box becomes the popover anchor, so the width-matched popup spans the chips plus the input, not the input alone. Re-selecting an already-selected option toggles it off; chips render in selection order (the `value` array order IS the display order); duplicate values dedupe to one chip; a chip whose option has disappeared from `options` (an async `options` swap) persists, labelled with its raw value. Every chip carries a focusable, aria-labelled remove button (customize via the `chip` slot above), and Backspace on an empty input removes the last chip — Backspace with any text in the input edits the text instead. The effective `closeOnSelect` default flips to `false` under `multiple` (closing after every pick would make multi-select unusable); pass an explicit `:close-on-select="true"` to override. `aria-multiselectable="true"` and per-option `aria-selected` mark the listbox and options.
+
+## Token input (recipient field)
+
+An email-style recipient field: chips and the input share one row that fills its container, the popup shows server suggestions only when there are any, and typed addresses commit on `,` / `;`, on Enter (when no suggestion is highlighted), and on paste:
+
+```rozie
+<template>
+  <Combobox
+    r-model:value="$data.to"
+    :options="$data.suggestions"
+    multiple
+    block
+    chipLayout="inline"
+    disableFilter
+    hideEmpty
+    disableOpenOnFocus
+    :delimiters="[',', ';']"
+    :validate="isEmail"
+    selectOnTab
+    ariaLabel="To"
+    @search="onSearch"
+  />
+</template>
+```
+
+- **Free-text commits** are on under `multiple` whenever `delimiters` is non-empty or `validate` is set. A commit trims the text, runs `validate`, appends it to `value` (skipped when already present), clears the input, and emits `change` with `{ value, option: null, selected: true, text }`. Rejected text stays in the input.
+- A delimiter key always commits the **typed** text — never the highlighted suggestion. Enter picks the highlighted suggestion if there is one, and otherwise commits the typed text.
+- **Paste**: a pasted text containing a character delimiter is split on the delimiters and every non-empty trimmed part is committed; a paste with no delimiter is ordinary text.
+- `selectOnTab` makes Tab pick the highlighted suggestion; with nothing highlighted Tab moves focus as usual.
+- Enter with Ctrl / Meta / Alt never picks or commits (left to the host — e.g. a send shortcut), and keys pressed during an IME composition are ignored.
+
+### Hiding the empty state
+
+Filling the `empty` slot with nothing does **not** hide the popup: on most targets a fill that renders nothing cannot be told apart from no fill, so the default "No results" row (or an empty popup row) still renders. Use `hideEmpty` instead — it hides the popup entirely while there is nothing to show, keeps `aria-expanded="false"`, and lets Escape through to the host.
 
 ## Creatable
 
@@ -249,8 +293,12 @@ Focus the input, then type to filter and drive the popup from the keyboard:
 | typing | Filters `options` by `label` (unless `disableFilter`), opens the popup, and emits `search`. |
 | `↓` / `↑` | Open the popup (if closed) and move the active option down / up, skipping disabled options and clamping at the ends. The active option is kept scrolled into view when the list overflows the popup. |
 | `Home` / `End` | Move the active option to the first / last selectable option. |
-| `Enter` | Commit the active option (writes `value`, fires `change`, closes the popup). |
-| `Escape` | Close the popup without changing the selection. |
+| `Enter` | Commit the active option (writes `value`, fires `change`, closes the popup). With free-text commits on (`delimiters` / `validate`) and no active option, commit the typed text. Ctrl / Meta / Alt + Enter is left to the host. |
+| `Tab` | With `selectOnTab`, pick the active option while the popup is visible; otherwise move focus normally. |
+| delimiter keys | With `delimiters`, commit the typed text (never the active option). |
+| `Escape` | Close the popup without changing the selection — consumed only while the popup is visible. |
+
+Keys pressed while an IME composition is active are ignored (no pick, commit or navigation).
 
 Pointer interaction mirrors the keyboard: hovering an option makes it active, and selecting fires on `mousedown` (before the input blurs), so a click commits without the popup closing first.
 

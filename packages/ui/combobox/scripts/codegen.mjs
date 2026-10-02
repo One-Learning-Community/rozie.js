@@ -42,6 +42,7 @@
  * its src/Combobox.vue + themes + internal + README (it never cleans the leaf
  * src, so the committed barrel survives).
  */
+import { typedSurfaceBarrelLines } from '../../typed-surface-barrel.mjs';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { buildManifest, compile, createDefaultRegistry, lowerToIR, ProducerResolver, parse } from '@rozie/core';
@@ -182,14 +183,17 @@ function main() {
     // handle), forwarded verbatim; Lit's handle IS the element.
     if (cfg.build === 'tsdown') {
       const barrel =
-        (target === 'react' || target === 'solid') && ir.expose.length > 0
+        ((target === 'react' || target === 'solid') && ir.expose.length > 0
           ? `export { default as Combobox } from './Combobox';\n` +
             `export { default } from './Combobox';\n\n` +
             `/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
               .map((m) => m.name)
               .join(', ')} }. */\n` +
             `export type { ComboboxHandle } from './Combobox';\n`
-          : `export { default as Combobox } from './Combobox';\nexport { default } from './Combobox';\n`;
+          : `export { default as Combobox } from './Combobox';\nexport { default } from './Combobox';\n`) +
+        // `<types>` names (+ Lit's RozieComboboxEventMap) via the shared helper
+        // (the fullcalendar/popover typed-surface P1 precedent).
+        typedSurfaceBarrelLines(target, ir, 'Combobox');
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 
