@@ -360,7 +360,16 @@ docker run --rm \
     # at all. `|| true` swallows the resulting non-zero exit for this known
     # case; any OTHER task failure still prints in the turbo summary above and
     # will surface as missing dist output / a later container-side error.
+    touch /tmp/vr-build-start
     pnpm turbo run build --force --continue || true
+    # `|| true` must not hide a build that never ran: a turbo error before any
+    # task starts (e.g. an input glob hashing a directory in this non-git mirror,
+    # quick 261002-ekf) left the matrix testing the PREVIOUS run's dist. Require
+    # a VR host entry rebuilt by THIS invocation.
+    if [ -z "$(find tests/visual-regression/dist -name "entry.*.html" -newer /tmp/vr-build-start 2>/dev/null | head -1)" ]; then
+      echo "✗ the VR host was not rebuilt by this run (stale dist) — see the turbo output above" >&2
+      exit 3
+    fi
     cd tests/visual-regression
     ARGS=(--reporter=list)
     if [ -n "${VR_GREP:-}" ]; then
