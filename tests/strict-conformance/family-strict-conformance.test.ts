@@ -252,7 +252,8 @@ const FAMILIES: FamilySpec[] = [
         // (a nullish member of a mixed string-literal union now maps to `never`,
         // not `string`) narrows the two role/aria attr bindings that previously
         // widened to `string` and tripped Solid's strict AriaRole union.
-        TS7006: 2,
+        // TS7006 2 → 0 (quick 261002-ekf): typed `<emits>` payloads, slot
+        // :param-types and $expose signatures leave no implicit-any parameter.
       },
       'DetailPanel.tsx': {
         TS7053: 2,
@@ -276,7 +277,8 @@ const FAMILIES: FamilySpec[] = [
         // Quick 260922-mkb: 11 → 9 — resolveCellEl's `level` annotated `number | null`
         // (494ff8630). A decrease only.
         TS2345: 9,
-        TS7006: 2,
+        // TS7006 2 → 0 (quick 261002-ekf): typed `<emits>` payloads, slot
+        // :param-types and $expose signatures leave no implicit-any parameter.
         TS7024: 1,
         TS7022: 1,
         // 4 → 6 (gap-closure 87-11): same windowedHeadersFor() idxSet

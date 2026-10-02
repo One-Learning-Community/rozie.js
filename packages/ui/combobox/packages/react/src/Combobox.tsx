@@ -1757,8 +1757,8 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     const onPaste = useCallback((e: any) => {
     if (!freeTextOn()) return;
     const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
-    const custom = typeof _rozieProp_splitPaste === 'function';
-    const split = custom ? _rozieProp_splitPaste(text) : splitOnDelimiters(text);
+    // typeof checked inline (not via a local flag) so strict TS narrows the call.
+    const split = typeof _rozieProp_splitPaste === 'function' ? _rozieProp_splitPaste(text) : splitOnDelimiters(text);
     if (!Array.isArray(split)) return;
     if (e) e.preventDefault();
     const accepted = [];

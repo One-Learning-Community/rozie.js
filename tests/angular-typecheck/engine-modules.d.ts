@@ -7,7 +7,15 @@
 // resolve to `any` here. That keeps the gate dependency-free: no need to
 // install @tiptap/core, … into every per-target typecheck workspace just to
 // exercise the engine-wrapper emit path.
-declare module '@tiptap/core';
+// @tiptap/core is a block, not a shorthand module: TipTap's `<types>` imports
+// `Editor` as a TYPE (the `ready` payload), and a shorthand ambient module's
+// names cannot be used as types (TS2709). Every name stays `any`.
+declare module '@tiptap/core' {
+  export const Editor: any;
+  export type Editor = any;
+  export const Node: any;
+  export type Node = any;
+}
 declare module '@tiptap/extensions';
 declare module '@tiptap/extension-bubble-menu';
 declare module '@tiptap/extension-floating-menu';

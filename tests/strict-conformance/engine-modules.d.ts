@@ -9,5 +9,13 @@
 // to `any` here.
 declare module 'sortablejs';
 declare module 'flatpickr';
-declare module '@tiptap/core';
+// @tiptap/core is a block, not a shorthand module: TipTap's `<types>` imports
+// `Editor` as a TYPE (the `ready` payload), and a shorthand ambient module's
+// names cannot be used as types (TS2709). Every name stays `any`.
+declare module '@tiptap/core' {
+  export const Editor: any;
+  export type Editor = any;
+  export const Node: any;
+  export type Node = any;
+}
 declare module 'maplibre-gl';

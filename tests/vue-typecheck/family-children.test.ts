@@ -107,7 +107,8 @@ const FAMILIES: FamilySpec[] = [
         // passing a real level was a TS2345). A decrease only — B-03's one new call site is
         // covered by the same annotation.
         TS2345: 9,
-        TS7006: 2,
+        // TS7006 2 → 0 (quick 261002-ekf): typed `<emits>` payloads, slot
+        // :param-types and $expose signatures leave no implicit-any parameter.
         TS7022: 1,
         TS7023: 1,
         // 11 → 13 (gap-closure 87-11, correcting a misattribution recorded in

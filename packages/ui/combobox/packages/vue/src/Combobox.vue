@@ -1691,8 +1691,8 @@ const splitOnDelimiters = (text: any) => {
 const onPaste = (e: any) => {
   if (!freeTextOn()) return;
   const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
-  const custom = typeof props.splitPaste === 'function';
-  const split = custom ? props.splitPaste(text) : splitOnDelimiters(text);
+  // typeof checked inline (not via a local flag) so strict TS narrows the call.
+  const split = typeof props.splitPaste === 'function' ? props.splitPaste(text) : splitOnDelimiters(text);
   if (!Array.isArray(split)) return;
   if (e) e.preventDefault();
   const accepted = [];

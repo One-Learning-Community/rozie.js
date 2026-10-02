@@ -2122,8 +2122,8 @@ export class Combobox {
     const __splitPaste = this.splitPaste();
     if (!this.freeTextOn()) return;
     const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
-    const custom = typeof __splitPaste === 'function';
-    const split = custom ? __splitPaste(text) : this.splitOnDelimiters(text);
+    // typeof checked inline (not via a local flag) so strict TS narrows the call.
+    const split = typeof __splitPaste === 'function' ? __splitPaste(text) : this.splitOnDelimiters(text);
     if (!Array.isArray(split)) return;
     if (e) e.preventDefault();
     const accepted = [];

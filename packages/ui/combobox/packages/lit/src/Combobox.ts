@@ -2202,8 +2202,8 @@ private __rozieFirstUpdateDone = false;
   onPaste = (e: any) => {
   if (!this.freeTextOn()) return;
   const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
-  const custom = typeof this.splitPaste === 'function';
-  const split = custom ? this.splitPaste(text) : this.splitOnDelimiters(text);
+  // typeof checked inline (not via a local flag) so strict TS narrows the call.
+  const split = typeof this.splitPaste === 'function' ? this.splitPaste(text) : this.splitOnDelimiters(text);
   if (!Array.isArray(split)) return;
   if (e) e.preventDefault();
   const accepted = [];
