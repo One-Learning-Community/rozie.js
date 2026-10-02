@@ -93,6 +93,51 @@
 -->
 <components>{ Popover: '@rozie-ui/popover/Popover.rozie' }</components>
 
+<types>
+import type {
+  Column as TableColumn,
+  ColumnDef,
+  ColumnFiltersState,
+  ColumnOrderState,
+  ColumnPinningState,
+  ColumnSizingState,
+  ExpandedState,
+  GroupingState,
+  PaginationState,
+  RowSelectionState,
+  SortingState,
+  VisibilityState,
+} from '@tanstack/table-core'
+
+/** A cell position as integers over the visible (display-order) model. */
+export interface DataTableCellPosition { rowIndex: number; colIndex: number }
+/** The active (roving-focus) cell. A header cell reports `rowIndex: null` and `isHeader: true`. */
+export interface DataTableActiveCell { rowIndex: number | null; colIndex: number; isHeader: boolean }
+/** The rectangular cell-range selection. Both corners are `null` when there is no range. */
+export interface DataTableRange { anchor: DataTableCellPosition | null; focus: DataTableCellPosition | null }
+/** One data column offered to the `#groupBar` slot. */
+export interface DataTableGroupableColumn { id: string; label: string }
+/** One changed cell inside a row edit commit. */
+export interface DataTableCellChange { columnId: string; oldValue: any; newValue: any }
+
+/** The `activecell-change` payload. `isHeader` is set when the move landed on or left a header cell. */
+export interface DataTableActiveCellChangePayload { rowIndex: number | null; colIndex: number; isHeader?: boolean }
+/** The `cell-edit-commit` payload: one committed cell. */
+export interface DataTableCellEditCommitPayload { rowId: string; columnId: string; oldValue: any; newValue: any }
+/** The `row-edit-commit` payload: the row and every cell the save changed. */
+export interface DataTableRowEditCommitPayload { rowId: string; changes: DataTableCellChange[] }
+/** The `filter-change` payload: `globalFilter` for the search box, `columnFilters` for a per-column filter. Exactly one key is set. */
+export interface DataTableFilterChangePayload { globalFilter?: string; columnFilters?: ColumnFiltersState }
+/** The `history-change` payload: undo/redo availability. */
+export interface DataTableHistoryChangePayload { canUndo: boolean; canRedo: boolean }
+/** The `range-change` payload: the new range corners (both `null` when the range cleared). */
+export type DataTableRangeChangePayload = DataTableRange
+/** The `row-activate` payload. `row` is the original data object and `index` its position in the rendered model. */
+export interface DataTableRowActivatePayload { row: any; index: number; trigger: 'keyboard' | 'click' }
+/** The `visible-range-change` payload: the rendered row window, `end` exclusive. */
+export interface DataTableVisibleRangeChangePayload { start: number; end: number }
+</types>
+
 <props>
 {
   // The row data (required). Stable reference per Rozie's setup-once model — re-feed
@@ -725,6 +770,28 @@
   liveAnnounce: '',
 }
 </data>
+
+<emits>
+{
+  'activecell-change':    { payload: 'DataTableActiveCellChangePayload', docs: { description: 'Fired (grid interaction mode only) whenever the active cell moves, by keyboard navigation or a `focusCell` call.' } },
+  'cell-edit-commit':     { payload: 'DataTableCellEditCommitPayload', docs: { description: 'Fired once per committed, validated cell edit (including each cell of a paste or fill).' } },
+  'expand-change':        { payload: 'ExpandedState', docs: { description: 'Fired when the expanded-row set changes. The payload is the `true` expand-all literal or a `{ [rowId]: true }` object.' } },
+  'filter-change':        { payload: 'DataTableFilterChangePayload', docs: { description: 'Fired when a filter changes: `{ globalFilter }` for the search box, `{ columnFilters }` for a per-column filter.' } },
+  'group-change':         { payload: 'GroupingState', docs: { description: 'Fired when the grouping changes. The payload is the ordered array of grouped column ids.' } },
+  'history-change':       { payload: 'DataTableHistoryChangePayload', docs: { description: 'Fired when undo/redo availability changes. Only meaningful when `undoable` is on.' } },
+  'page-change':          { payload: 'PaginationState', docs: { description: 'Fired when the page index or page size changes.' } },
+  'pin-change':           { payload: 'ColumnPinningState', docs: { description: 'Fired when a column is pinned or unpinned. The payload lists only your own columns.' } },
+  'range-change':         { payload: 'DataTableRangeChangePayload', docs: { description: 'Fired whenever the rectangular cell-range selection changes or clears.' } },
+  'reorder-change':       { payload: 'ColumnOrderState', docs: { description: 'Fired when the column order changes. The payload is the fresh ordered array of column ids.' } },
+  'resize-change':        { payload: 'ColumnSizingState', docs: { description: 'Fired live during a column resize drag. The payload maps column ids to widths in pixels.' } },
+  'row-activate':         { payload: 'DataTableRowActivatePayload', docs: { description: 'Fired when the user opens a row with a plain click or Enter on a body row.' } },
+  'row-edit-commit':      { payload: 'DataTableRowEditCommitPayload', docs: { description: 'Fired once per full-row edit save, with every cell the save changed.' } },
+  'selection-change':     { payload: 'RowSelectionState', docs: { description: 'Fired when the row selection changes. The payload maps selected row ids to `true`.' } },
+  'sort-change':          { payload: 'SortingState', docs: { description: 'Fired when the sort state changes. The payload is the array of `{ id, desc }` sorts.' } },
+  'visibility-change':    { payload: 'VisibilityState', docs: { description: 'Fired when a column is shown or hidden. The payload maps column ids to visibility.' } },
+  'visible-range-change': { payload: 'DataTableVisibleRangeChangePayload', docs: { description: 'Fired when the rendered row window changes under row windowing (`virtual`).' } },
+}
+</emits>
 
 <script lang="ts">
 import {
@@ -1982,6 +2049,42 @@ $expose({
   canUndo,
   canRedo,
   clearHistory,
+}, {
+  sortColumn: '(colId: string, desc?: boolean) => void',
+  clearSorting: '() => void',
+  toggleRowExpanded: '(rowId: string | number) => void',
+  expandAll: '() => void',
+  collapseAll: '() => void',
+  getExpandedRows: '() => any[]',
+  applyGrouping: '(cols: string[]) => void',
+  clearGrouping: '() => void',
+  getFacetedUniqueValues: '(colId: string) => any[]',
+  getFacetedMinMaxValues: '(colId: string) => [number, number] | null',
+  getColumnDefs: '() => ColumnDef<any, any>[]',
+  toggleAllRows: '(value?: boolean) => void',
+  clearSelection: '() => void',
+  getSelectedRows: '() => any[]',
+  setPage: '(idx: number) => void',
+  setRowsPerPage: '(size: number) => void',
+  toggleColumnVisibility: '(colId: string) => void',
+  applyColumnOrder: '(order: string[]) => void',
+  resetColumnSizing: '() => void',
+  pinColumn: "(colId: string, side: 'left' | 'right' | false) => void",
+  focusCell: '(rowIndex: number, colIndex: number) => void',
+  getActiveCell: '() => DataTableActiveCell',
+  clearActiveCell: '() => void',
+  getScrollElement: '() => HTMLElement | null',
+  getRowIndexRelativeToPage: '(absRow?: number) => number',
+  editCell: '(rowIndex: number, colIndex: number) => void',
+  commitEditing: '() => void',
+  editRow: '(rowIndex: number) => void',
+  getSelectedRange: '() => DataTableRange',
+  cut: '() => void',
+  undo: '() => void',
+  redo: '() => void',
+  canUndo: '() => boolean',
+  canRedo: '() => boolean',
+  clearHistory: '() => void',
 })
 </script>
 
@@ -2080,6 +2183,7 @@ $expose({
     :groupableColumns="groupableColumns()"
     :applyGrouping="applyGrouping"
     :clearGrouping="clearGrouping"
+    :param-types="{ grouping: 'string[]', groupableColumns: 'DataTableGroupableColumn[]', applyGrouping: '(cols: string[]) => void', clearGrouping: '() => void' }"
   >
     <span
       class="rdt-group-token"
@@ -2164,6 +2268,7 @@ $expose({
             :checked="isAllRowsSelected()"
             :indeterminate="isSomeRowsSelected()"
             :toggle="onToggleAllRows"
+            :param-types="{ checked: 'boolean', indeterminate: 'boolean', toggle: '(event: any) => void' }"
           >
             <input
               r-if="$props.selectionMode === 'multiple'"
@@ -2193,12 +2298,14 @@ $expose({
                 :columnId="wh.header.column.id"
                 :column="wh.header.column"
                 :label="headerLabel(wh.header.column.id)"
+                :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', label: 'string' }"
               >
                 <slot
                   name="colHeader"
                   :columnId="wh.header.column.id"
                   :column="wh.header.column"
                   :label="headerLabel(wh.header.column.id)"
+                  :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', label: 'string' }"
                 >{{ headerLabel(wh.header.column.id) }}</slot>
               </slot>
             </span>
@@ -2211,12 +2318,14 @@ $expose({
                 :columnId="wh.header.column.id"
                 :column="wh.header.column"
                 :label="headerLabel(wh.header.column.id)"
+                :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', label: 'string' }"
               >
                 <slot
                   name="colHeader"
                   :columnId="wh.header.column.id"
                   :column="wh.header.column"
                   :label="headerLabel(wh.header.column.id)"
+                  :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', label: 'string' }"
                 >{{ headerLabel(wh.header.column.id) }}</slot>
               </slot>
             </span>
@@ -2351,6 +2460,7 @@ $expose({
               :minMax="getFacetedMinMaxValues(wh.header.column.id)"
               :columnLabel="headerLabel(wh.header.column.id)"
               :setFilter="setColumnFilter"
+              :param-types="{ columnId: 'string', value: 'any', uniqueValues: 'any[]', minMax: '[number, number] | null', columnLabel: 'string', setFilter: '(columnId: string, value: any) => void' }"
             >
               <slot
                 name="filter"
@@ -2360,6 +2470,7 @@ $expose({
                 :minMax="getFacetedMinMaxValues(wh.header.column.id)"
                 :columnLabel="headerLabel(wh.header.column.id)"
                 :setFilter="setColumnFilter"
+                :param-types="{ columnId: 'string', value: 'any', uniqueValues: 'any[]', minMax: '[number, number] | null', columnLabel: 'string', setFilter: '(columnId: string, value: any) => void' }"
               >
                 <input
                   class="rdt-col-filter"
@@ -2463,7 +2574,7 @@ $expose({
         </span>
         <span style="display:contents" r-else-if="rowIsLazyPlaceholder(wr.row) && isExpanderColumn(cell.column.id)"></span>
         <span style="display:contents" r-else-if="rowIsLazyPlaceholder(wr.row)">
-          <slot name="placeholder" :index="wr.vi.index" :columnId="cell.column.id">
+          <slot name="placeholder" :index="wr.vi.index" :columnId="cell.column.id" :param-types="{ index: 'number', columnId: 'string' }">
             <span class="rdt-skeleton" aria-hidden="true">&#8203;</span>
           </slot>
         </span>
@@ -2484,6 +2595,7 @@ $expose({
             :row="cellSlotRow(wr.row)"
             :checked="rowIsSelected(wr.row)"
             :toggle="(e) => onToggleRow(wr.row, e)"
+            :param-types="{ row: 'any', checked: 'boolean', toggle: '(event: any) => void' }"
           >
             <input
               class="rdt-select-row"
@@ -2514,6 +2626,7 @@ $expose({
               :column="cell.column"
               :row="cellSlotRow(wr.row)"
               :value="cell.getValue()"
+              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any' }"
             >
               <slot
                 name="cell"
@@ -2521,6 +2634,7 @@ $expose({
                 :column="cell.column"
                 :row="cellSlotRow(wr.row)"
                 :value="cell.getValue()"
+                :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any' }"
               >{{ cell.getValue() }}</slot>
             </slot>
           </span>
@@ -2589,6 +2703,7 @@ $expose({
               :cancel="editorCancelFor()"
               :columnLabel="headerLabel(cell.column.id)"
               :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)"
+              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any', commit: '(value: any) => void', cancel: '() => void', columnLabel: 'string', autofocus: 'boolean' }"
             >
               <slot
                 name="editor"
@@ -2600,6 +2715,7 @@ $expose({
                 :cancel="editorCancelFor()"
                 :columnLabel="headerLabel(cell.column.id)"
               :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)"
+              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any', commit: '(value: any) => void', cancel: '() => void', columnLabel: 'string', autofocus: 'boolean' }"
               >
                 <input
                   class="rdt-cell-editor"
@@ -2640,6 +2756,7 @@ $expose({
             :column="cell.column"
             :row="cellSlotRow(wr.row)"
             :value="cell.getValue()"
+            :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any' }"
           >
             <slot
               name="cell"
@@ -2647,6 +2764,7 @@ $expose({
               :column="cell.column"
               :row="cellSlotRow(wr.row)"
               :value="cell.getValue()"
+              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any' }"
             >{{ cell.getValue() }}</slot>
           </slot>
         </span>
@@ -2685,7 +2803,7 @@ $expose({
       :data-detail-row="wr.row.id"
     >
       <td class="rdt-detail-cell" :colspan="windowedColSpan()">
-        <slot name="detail" :row="wr.row.original" />
+        <slot name="detail" :row="wr.row.original" :param-types="{ row: 'any' }" />
       </td>
     </tr>
     </template>
@@ -2754,6 +2872,7 @@ $expose({
             :checked="isAllRowsSelected()"
             :indeterminate="isSomeRowsSelected()"
             :toggle="onToggleAllRows"
+            :param-types="{ checked: 'boolean', indeterminate: 'boolean', toggle: '(event: any) => void' }"
           >
             <!-- `indeterminate` is a DOM PROPERTY (inert as a bound attribute on 5/6
                  targets) — set imperatively by syncIndeterminate(); do NOT bind it here
@@ -2788,12 +2907,14 @@ $expose({
                 :columnId="header.column.id"
                 :column="header.column"
                 :label="headerLabel(header.column.id)"
+                :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', label: 'string' }"
               >
                 <slot
                   name="colHeader"
                   :columnId="header.column.id"
                   :column="header.column"
                   :label="headerLabel(header.column.id)"
+                  :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', label: 'string' }"
                 >{{ headerLabel(header.column.id) }}</slot>
               </slot>
             </span>
@@ -2807,12 +2928,14 @@ $expose({
                 :columnId="header.column.id"
                 :column="header.column"
                 :label="headerLabel(header.column.id)"
+                :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', label: 'string' }"
               >
                 <slot
                   name="colHeader"
                   :columnId="header.column.id"
                   :column="header.column"
                   :label="headerLabel(header.column.id)"
+                  :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', label: 'string' }"
                 >{{ headerLabel(header.column.id) }}</slot>
               </slot>
             </span>
@@ -2916,6 +3039,7 @@ $expose({
               :minMax="getFacetedMinMaxValues(header.column.id)"
               :columnLabel="headerLabel(header.column.id)"
               :setFilter="setColumnFilter"
+              :param-types="{ columnId: 'string', value: 'any', uniqueValues: 'any[]', minMax: '[number, number] | null', columnLabel: 'string', setFilter: '(columnId: string, value: any) => void' }"
             >
               <slot
                 name="filter"
@@ -2925,6 +3049,7 @@ $expose({
                 :minMax="getFacetedMinMaxValues(header.column.id)"
                 :columnLabel="headerLabel(header.column.id)"
                 :setFilter="setColumnFilter"
+                :param-types="{ columnId: 'string', value: 'any', uniqueValues: 'any[]', minMax: '[number, number] | null', columnLabel: 'string', setFilter: '(columnId: string, value: any) => void' }"
               >
                 <input
                   class="rdt-col-filter"
@@ -3008,6 +3133,7 @@ $expose({
             :row="cellSlotRow(row)"
             :checked="rowIsSelected(row)"
             :toggle="(e) => onToggleRow(row, e)"
+            :param-types="{ row: 'any', checked: 'boolean', toggle: '(event: any) => void' }"
           >
             <input
               class="rdt-select-row"
@@ -3041,6 +3167,7 @@ $expose({
               :column="cell.column"
               :row="cellSlotRow(row)"
               :value="cell.getValue()"
+              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any' }"
             >
               <slot
                 name="cell"
@@ -3048,6 +3175,7 @@ $expose({
                 :column="cell.column"
                 :row="cellSlotRow(row)"
                 :value="cell.getValue()"
+                :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any' }"
               >{{ cell.getValue() }}</slot>
             </slot>
           </span>
@@ -3111,6 +3239,7 @@ $expose({
               :cancel="editorCancelFor()"
               :columnLabel="headerLabel(cell.column.id)"
               :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))"
+              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any', commit: '(value: any) => void', cancel: '() => void', columnLabel: 'string', autofocus: 'boolean' }"
             >
               <slot
                 name="editor"
@@ -3122,6 +3251,7 @@ $expose({
                 :cancel="editorCancelFor()"
                 :columnLabel="headerLabel(cell.column.id)"
               :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))"
+              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any', commit: '(value: any) => void', cancel: '() => void', columnLabel: 'string', autofocus: 'boolean' }"
               >
                 <input
                   class="rdt-cell-editor"
@@ -3167,6 +3297,7 @@ $expose({
             :column="cell.column"
             :row="cellSlotRow(row)"
             :value="cell.getValue()"
+            :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any' }"
           >
             <slot
               name="cell"
@@ -3174,6 +3305,7 @@ $expose({
               :column="cell.column"
               :row="cellSlotRow(row)"
               :value="cell.getValue()"
+              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any' }"
             >{{ cell.getValue() }}</slot>
           </slot>
         </span>
@@ -3200,7 +3332,7 @@ $expose({
       :data-detail-row="row.id"
     >
       <td class="rdt-detail-cell" :colspan="visibleColCount()">
-        <slot name="detail" :row="row.original" />
+        <slot name="detail" :row="row.original" :param-types="{ row: 'any' }" />
       </td>
     </tr>
     </template>

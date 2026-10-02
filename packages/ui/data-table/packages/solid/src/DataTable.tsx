@@ -44,6 +44,78 @@ import { columnSpecsEquivalent } from './helpers/columnDefUtils';
 
 // The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
 
+import type { Column as TableColumn, ColumnDef, ColumnFiltersState, ColumnOrderState, ColumnPinningState, ColumnSizingState, ExpandedState, GroupingState, PaginationState, RowSelectionState, SortingState, VisibilityState } from '@tanstack/table-core';
+
+/** A cell position as integers over the visible (display-order) model. */
+export interface DataTableCellPosition {
+  rowIndex: number;
+  colIndex: number;
+}
+/** The active (roving-focus) cell. A header cell reports `rowIndex: null` and `isHeader: true`. */
+export interface DataTableActiveCell {
+  rowIndex: number | null;
+  colIndex: number;
+  isHeader: boolean;
+}
+/** The rectangular cell-range selection. Both corners are `null` when there is no range. */
+export interface DataTableRange {
+  anchor: DataTableCellPosition | null;
+  focus: DataTableCellPosition | null;
+}
+/** One data column offered to the `#groupBar` slot. */
+export interface DataTableGroupableColumn {
+  id: string;
+  label: string;
+}
+/** One changed cell inside a row edit commit. */
+export interface DataTableCellChange {
+  columnId: string;
+  oldValue: any;
+  newValue: any;
+}
+
+/** The `activecell-change` payload. `isHeader` is set when the move landed on or left a header cell. */
+export interface DataTableActiveCellChangePayload {
+  rowIndex: number | null;
+  colIndex: number;
+  isHeader?: boolean;
+}
+/** The `cell-edit-commit` payload: one committed cell. */
+export interface DataTableCellEditCommitPayload {
+  rowId: string;
+  columnId: string;
+  oldValue: any;
+  newValue: any;
+}
+/** The `row-edit-commit` payload: the row and every cell the save changed. */
+export interface DataTableRowEditCommitPayload {
+  rowId: string;
+  changes: DataTableCellChange[];
+}
+/** The `filter-change` payload: `globalFilter` for the search box, `columnFilters` for a per-column filter. Exactly one key is set. */
+export interface DataTableFilterChangePayload {
+  globalFilter?: string;
+  columnFilters?: ColumnFiltersState;
+}
+/** The `history-change` payload: undo/redo availability. */
+export interface DataTableHistoryChangePayload {
+  canUndo: boolean;
+  canRedo: boolean;
+}
+/** The `range-change` payload: the new range corners (both `null` when the range cleared). */
+export type DataTableRangeChangePayload = DataTableRange;
+/** The `row-activate` payload. `row` is the original data object and `index` its position in the rendered model. */
+export interface DataTableRowActivatePayload {
+  row: any;
+  index: number;
+  trigger: 'keyboard' | 'click';
+}
+/** The `visible-range-change` payload: the rendered row window, `end` exclusive. */
+export interface DataTableVisibleRangeChangePayload {
+  start: number;
+  end: number;
+}
+
 __rozieInjectStyle('DataTable-d5dcab4c', `[data-rozie-s-d5dcab4c]:host {
   --rdt-color: var(--rozie-data-table-fg, var(--rdt-ds-fg));
   --rdt-select-accent: var(--rozie-data-table-select-accent, var(--rozie-data-table-accent, var(--rdt-ds-select-accent)));
@@ -445,23 +517,23 @@ __rozieInjectStyle('DataTable-d5dcab4c', `[data-rozie-s-d5dcab4c]:host {
   accent-color: var(--rdt-select-accent, currentColor);
 }`);
 
-interface GroupBarSlotCtx { grouping: any; groupableColumns: any; applyGrouping: any; clearGrouping: any; }
+interface GroupBarSlotCtx { grouping: string[]; groupableColumns: DataTableGroupableColumn[]; applyGrouping: (cols: string[]) => void; clearGrouping: () => void; }
 
-interface SelectAllSlotCtx { checked: any; indeterminate: any; toggle: any; }
+interface SelectAllSlotCtx { checked: boolean; indeterminate: boolean; toggle: (event: any) => void; }
 
-interface PlaceholderSlotCtx { index: any; columnId: any; }
+interface PlaceholderSlotCtx { index: number; columnId: string; }
 
-interface SelectCellSlotCtx { row: any; checked: any; toggle: any; }
+interface SelectCellSlotCtx { row: any; checked: boolean; toggle: (event: any) => void; }
 
 interface DetailSlotCtx { row: any; }
 
-interface ColHeaderSlotCtx { columnId: any; column: any; label: any; }
+interface ColHeaderSlotCtx { columnId: string; column: TableColumn<any, unknown>; label: string; }
 
-interface FilterSlotCtx { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any; }
+interface FilterSlotCtx { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void; }
 
-interface CellSlotCtx { columnId: any; column: any; row: any; value: any; }
+interface CellSlotCtx { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; }
 
-interface EditorSlotCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any; }
+interface EditorSlotCtx { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean; }
 
 interface DataTableProps {
   /**
@@ -610,23 +682,23 @@ interface DataTableProps {
    * A CSS length string bounding the `rdt-scroll` container when `virtual` is on (e.g. `'400px'`). Mirrored to the `--rozie-data-table-max-height` custom property; the prop wins, the token is the fallback.
    */
   maxHeight?: string;
-  onSortChange?: (...args: any[]) => void;
-  onExpandChange?: (...args: any[]) => void;
-  onGroupChange?: (...args: any[]) => void;
-  onFilterChange?: (...args: any[]) => void;
-  onPageChange?: (...args: any[]) => void;
-  onSelectionChange?: (...args: any[]) => void;
-  onVisibilityChange?: (...args: any[]) => void;
-  onResizeChange?: (...args: any[]) => void;
-  onReorderChange?: (...args: any[]) => void;
-  onPinChange?: (...args: any[]) => void;
-  onHistoryChange?: (...args: any[]) => void;
-  onVisibleRangeChange?: (...args: any[]) => void;
-  onActivecellChange?: (...args: any[]) => void;
-  onRowActivate?: (...args: any[]) => void;
-  onRangeChange?: (...args: any[]) => void;
-  onCellEditCommit?: (...args: any[]) => void;
-  onRowEditCommit?: (...args: any[]) => void;
+  onActivecellChange?: (payload: DataTableActiveCellChangePayload) => void;
+  onCellEditCommit?: (payload: DataTableCellEditCommitPayload) => void;
+  onExpandChange?: (payload: ExpandedState) => void;
+  onFilterChange?: (payload: DataTableFilterChangePayload) => void;
+  onGroupChange?: (payload: GroupingState) => void;
+  onHistoryChange?: (payload: DataTableHistoryChangePayload) => void;
+  onPageChange?: (payload: PaginationState) => void;
+  onPinChange?: (payload: ColumnPinningState) => void;
+  onRangeChange?: (payload: DataTableRangeChangePayload) => void;
+  onReorderChange?: (payload: ColumnOrderState) => void;
+  onResizeChange?: (payload: ColumnSizingState) => void;
+  onRowActivate?: (payload: DataTableRowActivatePayload) => void;
+  onRowEditCommit?: (payload: DataTableRowEditCommitPayload) => void;
+  onSelectionChange?: (payload: RowSelectionState) => void;
+  onSortChange?: (payload: SortingState) => void;
+  onVisibilityChange?: (payload: VisibilityState) => void;
+  onVisibleRangeChange?: (payload: DataTableVisibleRangeChangePayload) => void;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   groupBarSlot?: (ctx: GroupBarSlotCtx) => JSX.Element;
@@ -638,52 +710,52 @@ interface DataTableProps {
   filterSlot?: (ctx: FilterSlotCtx) => JSX.Element;
   cellSlot?: (ctx: CellSlotCtx) => JSX.Element;
   editorSlot?: (ctx: EditorSlotCtx) => JSX.Element;
-  slots?: { [key: `colHeader-${string}`]: ((ctx: { columnId: any; column: any; label: any }) => JSX.Element) | undefined; [key: `filter-${string}`]: ((ctx: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }) => JSX.Element) | undefined; [key: `cell-${string}`]: ((ctx: { columnId: any; column: any; row: any; value: any }) => JSX.Element) | undefined; [key: `editor-${string}`]: ((ctx: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }) => JSX.Element) | undefined; [key: string]: ((...args: any[]) => JSX.Element) | undefined; };
+  slots?: { [key: `colHeader-${string}`]: ((ctx: { columnId: string; column: TableColumn<any, unknown>; label: string }) => JSX.Element) | undefined; [key: `filter-${string}`]: ((ctx: { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }) => JSX.Element) | undefined; [key: `cell-${string}`]: ((ctx: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any }) => JSX.Element) | undefined; [key: `editor-${string}`]: ((ctx: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean }) => JSX.Element) | undefined; [key: string]: ((...args: any[]) => JSX.Element) | undefined; };
   ref?: (h: DataTableHandle) => void;
 }
 
 export interface DataTableHandle {
-  sortColumn: (...args: any[]) => any;
-  clearSorting: (...args: any[]) => any;
-  toggleRowExpanded: (...args: any[]) => any;
-  expandAll: (...args: any[]) => any;
-  collapseAll: (...args: any[]) => any;
-  getExpandedRows: (...args: any[]) => any;
-  applyGrouping: (...args: any[]) => any;
-  clearGrouping: (...args: any[]) => any;
-  getFacetedUniqueValues: (...args: any[]) => any;
-  getFacetedMinMaxValues: (...args: any[]) => any;
-  getColumnDefs: (...args: any[]) => any;
-  toggleAllRows: (...args: any[]) => any;
-  clearSelection: (...args: any[]) => any;
-  getSelectedRows: (...args: any[]) => any;
-  setPage: (...args: any[]) => any;
-  setRowsPerPage: (...args: any[]) => any;
-  toggleColumnVisibility: (...args: any[]) => any;
-  applyColumnOrder: (...args: any[]) => any;
-  resetColumnSizing: (...args: any[]) => any;
-  pinColumn: (...args: any[]) => any;
-  focusCell: (...args: any[]) => any;
-  getActiveCell: (...args: any[]) => any;
-  clearActiveCell: (...args: any[]) => any;
+  sortColumn: (colId: string, desc?: boolean) => void;
+  clearSorting: () => void;
+  toggleRowExpanded: (rowId: string | number) => void;
+  expandAll: () => void;
+  collapseAll: () => void;
+  getExpandedRows: () => any[];
+  applyGrouping: (cols: string[]) => void;
+  clearGrouping: () => void;
+  getFacetedUniqueValues: (colId: string) => any[];
+  getFacetedMinMaxValues: (colId: string) => [number, number] | null;
+  getColumnDefs: () => ColumnDef<any, any>[];
+  toggleAllRows: (value?: boolean) => void;
+  clearSelection: () => void;
+  getSelectedRows: () => any[];
+  setPage: (idx: number) => void;
+  setRowsPerPage: (size: number) => void;
+  toggleColumnVisibility: (colId: string) => void;
+  applyColumnOrder: (order: string[]) => void;
+  resetColumnSizing: () => void;
+  pinColumn: (colId: string, side: 'left' | 'right' | false) => void;
+  focusCell: (rowIndex: number, colIndex: number) => void;
+  getActiveCell: () => DataTableActiveCell;
+  clearActiveCell: () => void;
   scrollToRow(index: any, options?: { align?: 'start' | 'center' | 'end' | 'auto'; behavior?: 'auto' | 'smooth' | 'instant'; }): void;
-  getScrollElement(): any;
-  getRowIndexRelativeToPage: (...args: any[]) => any;
-  editCell: (...args: any[]) => any;
-  commitEditing: (...args: any[]) => any;
-  editRow: (...args: any[]) => any;
-  getSelectedRange: (...args: any[]) => any;
-  cut: (...args: any[]) => any;
-  undo: (...args: any[]) => any;
-  redo: (...args: any[]) => any;
-  canUndo: (...args: any[]) => any;
-  canRedo: (...args: any[]) => any;
-  clearHistory: (...args: any[]) => any;
+  getScrollElement: () => HTMLElement | null;
+  getRowIndexRelativeToPage: (absRow?: number) => number;
+  editCell: (rowIndex: number, colIndex: number) => void;
+  commitEditing: () => void;
+  editRow: (rowIndex: number) => void;
+  getSelectedRange: () => DataTableRange;
+  cut: () => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  clearHistory: () => void;
 }
 
 export default function DataTable(_props: DataTableProps): JSX.Element {
   const _merged = mergeProps({ columns: (() => [])() as any[], selectionMode: 'none', manual: false, rowCount: null, pageCount: null, expandable: false, getRowId: null, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, virtual: false, estimateRowHeight: 40, autoMeasure: false, maxHeight: '' }, _props);
-  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'rowCount', 'pageCount', 'expandable', 'expanded', 'getRowId', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'singleClickEdit', 'undoable', 'undoLimit', 'virtual', 'estimateRowHeight', 'autoMeasure', 'maxHeight', 'children', 'ref', 'onSortChange', 'onExpandChange', 'onGroupChange', 'onFilterChange', 'onPageChange', 'onSelectionChange', 'onVisibilityChange', 'onResizeChange', 'onReorderChange', 'onPinChange', 'onHistoryChange', 'onVisibleRangeChange', 'onActivecellChange', 'onRowActivate', 'onRangeChange', 'onCellEditCommit', 'onRowEditCommit']);
+  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'rowCount', 'pageCount', 'expandable', 'expanded', 'getRowId', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'singleClickEdit', 'undoable', 'undoLimit', 'virtual', 'estimateRowHeight', 'autoMeasure', 'maxHeight', 'children', 'ref', 'onActivecellChange', 'onCellEditCommit', 'onExpandChange', 'onFilterChange', 'onGroupChange', 'onHistoryChange', 'onPageChange', 'onPinChange', 'onRangeChange', 'onReorderChange', 'onResizeChange', 'onRowActivate', 'onRowEditCommit', 'onSelectionChange', 'onSortChange', 'onVisibilityChange', 'onVisibleRangeChange']);
   const resolved = () => local.children;
   onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, scrollToRow, getScrollElement, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory }); });
 

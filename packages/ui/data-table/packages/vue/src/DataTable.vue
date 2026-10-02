@@ -241,11 +241,157 @@
 
 </template>
 
+<script lang="ts">
+import type { Column as TableColumn, ColumnDef, ColumnFiltersState, ColumnOrderState, ColumnPinningState, ColumnSizingState, ExpandedState, GroupingState, PaginationState, RowSelectionState, SortingState, VisibilityState } from '@tanstack/table-core';
+
+/** A cell position as integers over the visible (display-order) model. */
+export interface DataTableCellPosition {
+  rowIndex: number;
+  colIndex: number;
+}
+/** The active (roving-focus) cell. A header cell reports `rowIndex: null` and `isHeader: true`. */
+export interface DataTableActiveCell {
+  rowIndex: number | null;
+  colIndex: number;
+  isHeader: boolean;
+}
+/** The rectangular cell-range selection. Both corners are `null` when there is no range. */
+export interface DataTableRange {
+  anchor: DataTableCellPosition | null;
+  focus: DataTableCellPosition | null;
+}
+/** One data column offered to the `#groupBar` slot. */
+export interface DataTableGroupableColumn {
+  id: string;
+  label: string;
+}
+/** One changed cell inside a row edit commit. */
+export interface DataTableCellChange {
+  columnId: string;
+  oldValue: any;
+  newValue: any;
+}
+
+/** The `activecell-change` payload. `isHeader` is set when the move landed on or left a header cell. */
+export interface DataTableActiveCellChangePayload {
+  rowIndex: number | null;
+  colIndex: number;
+  isHeader?: boolean;
+}
+/** The `cell-edit-commit` payload: one committed cell. */
+export interface DataTableCellEditCommitPayload {
+  rowId: string;
+  columnId: string;
+  oldValue: any;
+  newValue: any;
+}
+/** The `row-edit-commit` payload: the row and every cell the save changed. */
+export interface DataTableRowEditCommitPayload {
+  rowId: string;
+  changes: DataTableCellChange[];
+}
+/** The `filter-change` payload: `globalFilter` for the search box, `columnFilters` for a per-column filter. Exactly one key is set. */
+export interface DataTableFilterChangePayload {
+  globalFilter?: string;
+  columnFilters?: ColumnFiltersState;
+}
+/** The `history-change` payload: undo/redo availability. */
+export interface DataTableHistoryChangePayload {
+  canUndo: boolean;
+  canRedo: boolean;
+}
+/** The `range-change` payload: the new range corners (both `null` when the range cleared). */
+export type DataTableRangeChangePayload = DataTableRange;
+/** The `row-activate` payload. `row` is the original data object and `index` its position in the rendered model. */
+export interface DataTableRowActivatePayload {
+  row: any;
+  index: number;
+  trigger: 'keyboard' | 'click';
+}
+/** The `visible-range-change` payload: the rendered row window, `end` exclusive. */
+export interface DataTableVisibleRangeChangePayload {
+  start: number;
+  end: number;
+}
+
+export interface DataTableHandle {
+  sortColumn: (colId: string, desc?: boolean) => void;
+  clearSorting: () => void;
+  toggleRowExpanded: (rowId: string | number) => void;
+  expandAll: () => void;
+  collapseAll: () => void;
+  getExpandedRows: () => any[];
+  applyGrouping: (cols: string[]) => void;
+  clearGrouping: () => void;
+  getFacetedUniqueValues: (colId: string) => any[];
+  getFacetedMinMaxValues: (colId: string) => [number, number] | null;
+  getColumnDefs: () => ColumnDef<any, any>[];
+  toggleAllRows: (value?: boolean) => void;
+  clearSelection: () => void;
+  getSelectedRows: () => any[];
+  setPage: (idx: number) => void;
+  setRowsPerPage: (size: number) => void;
+  toggleColumnVisibility: (colId: string) => void;
+  applyColumnOrder: (order: string[]) => void;
+  resetColumnSizing: () => void;
+  pinColumn: (colId: string, side: 'left' | 'right' | false) => void;
+  focusCell: (rowIndex: number, colIndex: number) => void;
+  getActiveCell: () => DataTableActiveCell;
+  clearActiveCell: () => void;
+  scrollToRow(index: any, options?: { align?: 'start' | 'center' | 'end' | 'auto'; behavior?: 'auto' | 'smooth' | 'instant'; }): void;
+  getScrollElement: () => HTMLElement | null;
+  getRowIndexRelativeToPage: (absRow?: number) => number;
+  editCell: (rowIndex: number, colIndex: number) => void;
+  commitEditing: () => void;
+  editRow: (rowIndex: number) => void;
+  getSelectedRange: () => DataTableRange;
+  cut: () => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  clearHistory: () => void;
+}
+</script>
+
 <script setup lang="ts">
 import Popover from '@rozie-ui/popover-vue';
-defineOptions({ inheritAttrs: false });
 
 import { onBeforeUnmount, onMounted, onUpdated, provide, ref, watch } from 'vue';
+
+import { isSafeKey, wrapAggregationFn, indexDefsById, editorKindWarning, collectGroupableLeafDefs } from './helpers/columnDefUtils';
+import { applyUpdater, clamp, focusables } from './helpers/indexMath';
+import { escapeTsvField, parseTsv, tileGridToBox, tileIndex } from './helpers/tsvGrid';
+import { replaceRowValue, indexOfRowIn, replaceRowValues } from './helpers/rowValueUtils';
+import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
+// Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
+// (mirrors the expand/group models) — inert until a consumer READS a column facet via the
+// getFaceted* $expose verbs or the #filter slot props, so byte-identical-off (req-10) holds.
+// getFacetedUniqueValues/getFacetedMinMaxValues default impls are CROSS-FILTERED out of the
+// box (D-03 — reflect rows passing all OTHER active column filters); unique values + min/max
+// ONLY — occurrence counts are deliberately NOT exposed (Array.from(map.keys()) — D-03).
+getFacetedRowModel,
+// Aliased to make<…> so the bare names `getFacetedUniqueValues`/`getFacetedMinMaxValues`
+// are FREE for the $expose verb helpers below. The $expose IR carries only the verb NAME
+// (the `key:value` alias is discarded — ExposedMethod.name), so an exposed
+// `getFacetedUniqueValues` lowers to the shorthand `{ getFacetedUniqueValues }`, which MUST
+// resolve to the in-scope helper, NOT this table-core factory import (the collision that made
+// the verb return the factory fn instead of the keys array — roundout facet block).
+getFacetedUniqueValues as makeFacetedUniqueValues, getFacetedMinMaxValues as makeFacetedMinMaxValues } from '@tanstack/table-core';
+// Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
+// (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
+// by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
+// guard so they never execute when off — the import token is the only static virtual-core
+// presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
+import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
+// C-09's value-equality guard. Imported HERE, in DataTable.rozie's OWN script, because that
+// is where it is USED: a `.rzts` partial's import of a symbol the partial itself never
+// references is dropped as unused, and the host script then reaches a free identifier. That
+// failed at RUNTIME, not at compile time — `ReferenceError: columnSpecsEquivalent is not
+// defined` on the first paste — which is the only way this class of mistake shows up.
+import { columnSpecsEquivalent } from './helpers/columnDefUtils';
+
+defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(
   defineProps<{
@@ -383,43 +529,43 @@ const columnPinning = defineModel<Record<string, any>>('columnPinning', { defaul
 }) });
 
 const emit = defineEmits<{
-  'sort-change': [...args: any[]];
-  'expand-change': [...args: any[]];
-  'group-change': [...args: any[]];
-  'filter-change': [...args: any[]];
-  'page-change': [...args: any[]];
-  'selection-change': [...args: any[]];
-  'visibility-change': [...args: any[]];
-  'resize-change': [...args: any[]];
-  'reorder-change': [...args: any[]];
-  'pin-change': [...args: any[]];
-  'history-change': [...args: any[]];
-  'visible-range-change': [...args: any[]];
-  'activecell-change': [...args: any[]];
-  'row-activate': [...args: any[]];
-  'range-change': [...args: any[]];
-  'cell-edit-commit': [...args: any[]];
-  'row-edit-commit': [...args: any[]];
+  'activecell-change': [payload: DataTableActiveCellChangePayload];
+  'cell-edit-commit': [payload: DataTableCellEditCommitPayload];
+  'expand-change': [payload: ExpandedState];
+  'filter-change': [payload: DataTableFilterChangePayload];
+  'group-change': [payload: GroupingState];
+  'history-change': [payload: DataTableHistoryChangePayload];
+  'page-change': [payload: PaginationState];
+  'pin-change': [payload: ColumnPinningState];
+  'range-change': [payload: DataTableRangeChangePayload];
+  'reorder-change': [payload: ColumnOrderState];
+  'resize-change': [payload: ColumnSizingState];
+  'row-activate': [payload: DataTableRowActivatePayload];
+  'row-edit-commit': [payload: DataTableRowEditCommitPayload];
+  'selection-change': [payload: RowSelectionState];
+  'sort-change': [payload: SortingState];
+  'visibility-change': [payload: VisibilityState];
+  'visible-range-change': [payload: DataTableVisibleRangeChangePayload];
 }>();
 
 defineSlots<{
   default(props: {  }): any;
-  groupBar(props: { grouping: any; groupableColumns: any; applyGrouping: any; clearGrouping: any }): any;
-  selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
-  [key: `colHeader-${string}`]: ((props: { columnId: any; column: any; label: any }) => any) | undefined;
-  [key: `filter-${string}`]: ((props: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }) => any) | undefined;
-  placeholder(props: { index: any; columnId: any }): any;
-  selectCell(props: { row: any; checked: any; toggle: any }): any;
-  [key: `cell-${string}`]: ((props: { columnId: any; column: any; row: any; value: any }) => any) | undefined;
-  [key: `editor-${string}`]: ((props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }) => any) | undefined;
+  groupBar(props: { grouping: string[]; groupableColumns: DataTableGroupableColumn[]; applyGrouping: (cols: string[]) => void; clearGrouping: () => void }): any;
+  selectAll(props: { checked: boolean; indeterminate: boolean; toggle: (event: any) => void }): any;
+  [key: `colHeader-${string}`]: ((props: { columnId: string; column: TableColumn<any, unknown>; label: string }) => any) | undefined;
+  [key: `filter-${string}`]: ((props: { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }) => any) | undefined;
+  placeholder(props: { index: number; columnId: string }): any;
+  selectCell(props: { row: any; checked: boolean; toggle: (event: any) => void }): any;
+  [key: `cell-${string}`]: ((props: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any }) => any) | undefined;
+  [key: `editor-${string}`]: ((props: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean }) => any) | undefined;
   detail(props: { row: any }): any;
-  selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
-  selectCell(props: { row: any; checked: any; toggle: any }): any;
+  selectAll(props: { checked: boolean; indeterminate: boolean; toggle: (event: any) => void }): any;
+  selectCell(props: { row: any; checked: boolean; toggle: (event: any) => void }): any;
   detail(props: { row: any }): any;
-  colHeader(props: { columnId: any; column: any; label: any }): any;
-  filter(props: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }): any;
-  cell(props: { columnId: any; column: any; row: any; value: any }): any;
-  editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }): any;
+  colHeader(props: { columnId: string; column: TableColumn<any, unknown>; label: string }): any;
+  filter(props: { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }): any;
+  cell(props: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any }): any;
+  editor(props: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean }): any;
 }>();
 
 const dataDefault = ref<any[]>([]);
@@ -474,31 +620,6 @@ const liveAnnounce = ref('');
 
 const __rozieRootRef = ref<HTMLElement>();
 
-import { isSafeKey, wrapAggregationFn, indexDefsById, editorKindWarning, collectGroupableLeafDefs } from './helpers/columnDefUtils';
-import { applyUpdater, clamp, focusables } from './helpers/indexMath';
-import { escapeTsvField, parseTsv, tileGridToBox, tileIndex } from './helpers/tsvGrid';
-import { replaceRowValue, indexOfRowIn, replaceRowValues } from './helpers/rowValueUtils';
-import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
-// Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
-// (mirrors the expand/group models) — inert until a consumer READS a column facet via the
-// getFaceted* $expose verbs or the #filter slot props, so byte-identical-off (req-10) holds.
-// getFacetedUniqueValues/getFacetedMinMaxValues default impls are CROSS-FILTERED out of the
-// box (D-03 — reflect rows passing all OTHER active column filters); unique values + min/max
-// ONLY — occurrence counts are deliberately NOT exposed (Array.from(map.keys()) — D-03).
-getFacetedRowModel,
-// Aliased to make<…> so the bare names `getFacetedUniqueValues`/`getFacetedMinMaxValues`
-// are FREE for the $expose verb helpers below. The $expose IR carries only the verb NAME
-// (the `key:value` alias is discarded — ExposedMethod.name), so an exposed
-// `getFacetedUniqueValues` lowers to the shorthand `{ getFacetedUniqueValues }`, which MUST
-// resolve to the in-scope helper, NOT this table-core factory import (the collision that made
-// the verb return the factory fn instead of the keys array — roundout facet block).
-getFacetedUniqueValues as makeFacetedUniqueValues, getFacetedMinMaxValues as makeFacetedMinMaxValues } from '@tanstack/table-core';
-// Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
-// (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
-// by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
-// guard so they never execute when off — the import token is the only static virtual-core
-// presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
-import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
 // table-core instance — top-level `let` referenced from hooks → React hoists to
 // useRef (hoistModuleLet). NULL until $onMount: createTable lives in $onMount so its
 // getRowModel-reading closures capture the LIVE instance, NOT an empty initial
@@ -3435,14 +3556,12 @@ const syncIndeterminate = () => {
   selectAllBox = __rozieRootRef.value!.querySelector('.rdt-select-all');
   if (selectAllBox) selectAllBox.indeterminate = isSomeRowsSelected() && !isAllRowsSelected();
 };
+
 // C-09's value-equality guard. Imported HERE, in DataTable.rozie's OWN script, because that
 // is where it is USED: a `.rzts` partial's import of a symbol the partial itself never
 // references is dropped as unused, and the host script then reaches a free identifier. That
 // failed at RUNTIME, not at compile time — `ReferenceError: columnSpecsEquivalent is not
 // defined` on the first paste — which is the only way this class of mistake shows up.
-import { columnSpecsEquivalent } from './helpers/columnDefUtils';
-
-// The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
 // Imperative handle (consumer-callable). Each verb is a PRE-DECLARED top-level
 // `const` (the canonical $expose contract — `$expose({ name })` references a
 // binding ALREADY in scope; an INLINE-defined verb `$expose({ name: () => {} })`
@@ -8076,7 +8195,7 @@ watch(() => [sorting.value, columnFilters.value, globalFilter.value, sortingDefa
   if (msg) liveAnnounce.value = msg;
 }, { flush: 'post' });
 
-defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, scrollToRow, getScrollElement, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory });
+defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, scrollToRow, getScrollElement, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory } as DataTableHandle);
 </script>
 
 <style scoped>

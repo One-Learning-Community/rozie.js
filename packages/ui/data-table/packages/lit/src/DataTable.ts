@@ -46,63 +46,167 @@ import { columnSpecsEquivalent } from './helpers/columnDefUtils';
 
 // The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
 
+import type { Column as TableColumn, ColumnDef, ColumnFiltersState, ColumnOrderState, ColumnPinningState, ColumnSizingState, ExpandedState, GroupingState, PaginationState, RowSelectionState, SortingState, VisibilityState } from '@tanstack/table-core';
+
+/** A cell position as integers over the visible (display-order) model. */
+export interface DataTableCellPosition {
+  rowIndex: number;
+  colIndex: number;
+}
+/** The active (roving-focus) cell. A header cell reports `rowIndex: null` and `isHeader: true`. */
+export interface DataTableActiveCell {
+  rowIndex: number | null;
+  colIndex: number;
+  isHeader: boolean;
+}
+/** The rectangular cell-range selection. Both corners are `null` when there is no range. */
+export interface DataTableRange {
+  anchor: DataTableCellPosition | null;
+  focus: DataTableCellPosition | null;
+}
+/** One data column offered to the `#groupBar` slot. */
+export interface DataTableGroupableColumn {
+  id: string;
+  label: string;
+}
+/** One changed cell inside a row edit commit. */
+export interface DataTableCellChange {
+  columnId: string;
+  oldValue: any;
+  newValue: any;
+}
+
+/** The `activecell-change` payload. `isHeader` is set when the move landed on or left a header cell. */
+export interface DataTableActiveCellChangePayload {
+  rowIndex: number | null;
+  colIndex: number;
+  isHeader?: boolean;
+}
+/** The `cell-edit-commit` payload: one committed cell. */
+export interface DataTableCellEditCommitPayload {
+  rowId: string;
+  columnId: string;
+  oldValue: any;
+  newValue: any;
+}
+/** The `row-edit-commit` payload: the row and every cell the save changed. */
+export interface DataTableRowEditCommitPayload {
+  rowId: string;
+  changes: DataTableCellChange[];
+}
+/** The `filter-change` payload: `globalFilter` for the search box, `columnFilters` for a per-column filter. Exactly one key is set. */
+export interface DataTableFilterChangePayload {
+  globalFilter?: string;
+  columnFilters?: ColumnFiltersState;
+}
+/** The `history-change` payload: undo/redo availability. */
+export interface DataTableHistoryChangePayload {
+  canUndo: boolean;
+  canRedo: boolean;
+}
+/** The `range-change` payload: the new range corners (both `null` when the range cleared). */
+export type DataTableRangeChangePayload = DataTableRange;
+/** The `row-activate` payload. `row` is the original data object and `index` its position in the rendered model. */
+export interface DataTableRowActivatePayload {
+  row: any;
+  index: number;
+  trigger: 'keyboard' | 'click';
+}
+/** The `visible-range-change` payload: the rendered row window, `end` exclusive. */
+export interface DataTableVisibleRangeChangePayload {
+  start: number;
+  end: number;
+}
+
+export interface RozieDataTableEventMap extends Omit<HTMLElementEventMap, 'activecell-change' | 'cell-edit-commit' | 'expand-change' | 'filter-change' | 'group-change' | 'history-change' | 'page-change' | 'pin-change' | 'range-change' | 'reorder-change' | 'resize-change' | 'row-activate' | 'row-edit-commit' | 'selection-change' | 'sort-change' | 'visibility-change' | 'visible-range-change' | 'data-change' | 'sorting-change' | 'global-filter-change' | 'column-filters-change' | 'pagination-change' | 'expanded-change' | 'grouping-change' | 'row-selection-change' | 'column-visibility-change' | 'column-sizing-change' | 'column-order-change' | 'column-pinning-change'> {
+  'activecell-change': CustomEvent<DataTableActiveCellChangePayload>;
+  'cell-edit-commit': CustomEvent<DataTableCellEditCommitPayload>;
+  'expand-change': CustomEvent<ExpandedState>;
+  'filter-change': CustomEvent<DataTableFilterChangePayload>;
+  'group-change': CustomEvent<GroupingState>;
+  'history-change': CustomEvent<DataTableHistoryChangePayload>;
+  'page-change': CustomEvent<PaginationState>;
+  'pin-change': CustomEvent<ColumnPinningState>;
+  'range-change': CustomEvent<DataTableRangeChangePayload>;
+  'reorder-change': CustomEvent<ColumnOrderState>;
+  'resize-change': CustomEvent<ColumnSizingState>;
+  'row-activate': CustomEvent<DataTableRowActivatePayload>;
+  'row-edit-commit': CustomEvent<DataTableRowEditCommitPayload>;
+  'selection-change': CustomEvent<RowSelectionState>;
+  'sort-change': CustomEvent<SortingState>;
+  'visibility-change': CustomEvent<VisibilityState>;
+  'visible-range-change': CustomEvent<DataTableVisibleRangeChangePayload>;
+  'data-change': CustomEvent<any[]>;
+  'sorting-change': CustomEvent<any[]>;
+  'global-filter-change': CustomEvent<string>;
+  'column-filters-change': CustomEvent<any[]>;
+  'pagination-change': CustomEvent<any>;
+  'expanded-change': CustomEvent<any | boolean>;
+  'grouping-change': CustomEvent<any[]>;
+  'row-selection-change': CustomEvent<any>;
+  'column-visibility-change': CustomEvent<any>;
+  'column-sizing-change': CustomEvent<any>;
+  'column-order-change': CustomEvent<any[]>;
+  'column-pinning-change': CustomEvent<any>;
+}
+
 const __rozieCtx_data_table_columns = createContext(Symbol.for("rozie:data-table:columns"));
 
 interface RozieGroupBarSlotCtx {
-  grouping: any;
-  groupableColumns: any;
-  applyGrouping: any;
-  clearGrouping: any;
+  grouping: string[];
+  groupableColumns: DataTableGroupableColumn[];
+  applyGrouping: (cols: string[]) => void;
+  clearGrouping: () => void;
 }
 
 interface RozieSelectAllSlotCtx {
-  checked: any;
-  indeterminate: any;
-  toggle: any;
+  checked: boolean;
+  indeterminate: boolean;
+  toggle: (event: any) => void;
 }
 
 interface RozieDynamicColHeaderSlotCtx {
-  columnId: any;
-  column: any;
-  label: any;
+  columnId: string;
+  column: TableColumn<any, unknown>;
+  label: string;
 }
 
 interface RozieDynamicFilterSlotCtx {
-  columnId: any;
+  columnId: string;
   value: any;
-  uniqueValues: any;
-  minMax: any;
-  columnLabel: any;
-  setFilter: any;
+  uniqueValues: any[];
+  minMax: [number, number] | null;
+  columnLabel: string;
+  setFilter: (columnId: string, value: any) => void;
 }
 
 interface RoziePlaceholderSlotCtx {
-  index: any;
-  columnId: any;
+  index: number;
+  columnId: string;
 }
 
 interface RozieSelectCellSlotCtx {
   row: any;
-  checked: any;
-  toggle: any;
+  checked: boolean;
+  toggle: (event: any) => void;
 }
 
 interface RozieDynamicCellSlotCtx {
-  columnId: any;
-  column: any;
+  columnId: string;
+  column: TableColumn<any, unknown>;
   row: any;
   value: any;
 }
 
 interface RozieDynamicEditorSlotCtx {
-  columnId: any;
-  column: any;
+  columnId: string;
+  column: TableColumn<any, unknown>;
   row: any;
   value: any;
-  commit: any;
-  cancel: any;
-  columnLabel: any;
-  autofocus: any;
+  commit: (value: any) => void;
+  cancel: () => void;
+  columnLabel: string;
+  autofocus: boolean;
 }
 
 interface RozieDetailSlotCtx {
@@ -110,36 +214,36 @@ interface RozieDetailSlotCtx {
 }
 
 interface RozieColHeaderSlotCtx {
-  columnId: any;
-  column: any;
-  label: any;
+  columnId: string;
+  column: TableColumn<any, unknown>;
+  label: string;
 }
 
 interface RozieFilterSlotCtx {
-  columnId: any;
+  columnId: string;
   value: any;
-  uniqueValues: any;
-  minMax: any;
-  columnLabel: any;
-  setFilter: any;
+  uniqueValues: any[];
+  minMax: [number, number] | null;
+  columnLabel: string;
+  setFilter: (columnId: string, value: any) => void;
 }
 
 interface RozieCellSlotCtx {
-  columnId: any;
-  column: any;
+  columnId: string;
+  column: TableColumn<any, unknown>;
   row: any;
   value: any;
 }
 
 interface RozieEditorSlotCtx {
-  columnId: any;
-  column: any;
+  columnId: string;
+  column: TableColumn<any, unknown>;
   row: any;
   value: any;
-  commit: any;
-  cancel: any;
-  columnLabel: any;
-  autofocus: any;
+  commit: (value: any) => void;
+  cancel: () => void;
+  columnLabel: string;
+  autofocus: boolean;
 }
 
 @customElement('rozie-data-table')
@@ -806,20 +910,20 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
   @state() private _hasSlotGroupBar = false;
   @queryAssignedElements({ slot: 'groupBar', flatten: true }) private _slotGroupBarElements!: Element[];
-  @property({ attribute: false }) groupBar?: (scope: { grouping: any; groupableColumns: any; applyGrouping: any; clearGrouping: any }) => unknown;
+  @property({ attribute: false }) groupBar?: (scope: { grouping: string[]; groupableColumns: DataTableGroupableColumn[]; applyGrouping: (cols: string[]) => void; clearGrouping: () => void }) => unknown;
   @state() private _hasSlotSelectAll = false;
   @queryAssignedElements({ slot: 'selectAll', flatten: true }) private _slotSelectAllElements!: Element[];
-  @property({ attribute: false }) selectAll?: (scope: { checked: any; indeterminate: any; toggle: any }) => unknown;
+  @property({ attribute: false }) selectAll?: (scope: { checked: boolean; indeterminate: boolean; toggle: (event: any) => void }) => unknown;
   @state() private _hasSlotDynamicColHeader = false;
   @queryAssignedElements({ flatten: true }) private _slotDynamicColHeaderElements!: Element[];
   @state() private _hasSlotDynamicFilter = false;
   @queryAssignedElements({ flatten: true }) private _slotDynamicFilterElements!: Element[];
   @state() private _hasSlotPlaceholder = false;
   @queryAssignedElements({ slot: 'placeholder', flatten: true }) private _slotPlaceholderElements!: Element[];
-  @property({ attribute: false }) placeholder?: (scope: { index: any; columnId: any }) => unknown;
+  @property({ attribute: false }) placeholder?: (scope: { index: number; columnId: string }) => unknown;
   @state() private _hasSlotSelectCell = false;
   @queryAssignedElements({ slot: 'selectCell', flatten: true }) private _slotSelectCellElements!: Element[];
-  @property({ attribute: false }) selectCell?: (scope: { row: any; checked: any; toggle: any }) => unknown;
+  @property({ attribute: false }) selectCell?: (scope: { row: any; checked: boolean; toggle: (event: any) => void }) => unknown;
   @state() private _hasSlotDynamicCell = false;
   @queryAssignedElements({ flatten: true }) private _slotDynamicCellElements!: Element[];
   @state() private _hasSlotDynamicEditor = false;
@@ -829,16 +933,16 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   @property({ attribute: false }) detail?: (scope: { row: any }) => unknown;
   @state() private _hasSlotColHeader = false;
   @queryAssignedElements({ slot: 'colHeader', flatten: true }) private _slotColHeaderElements!: Element[];
-  @property({ attribute: false }) colHeader?: (scope: { columnId: any; column: any; label: any }) => unknown;
+  @property({ attribute: false }) colHeader?: (scope: { columnId: string; column: TableColumn<any, unknown>; label: string }) => unknown;
   @state() private _hasSlotFilter = false;
   @queryAssignedElements({ slot: 'filter', flatten: true }) private _slotFilterElements!: Element[];
-  @property({ attribute: false }) filter?: (scope: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }) => unknown;
+  @property({ attribute: false }) filter?: (scope: { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }) => unknown;
   @state() private _hasSlotCell = false;
   @queryAssignedElements({ slot: 'cell', flatten: true }) private _slotCellElements!: Element[];
-  @property({ attribute: false }) cell?: (scope: { columnId: any; column: any; row: any; value: any }) => unknown;
+  @property({ attribute: false }) cell?: (scope: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any }) => unknown;
   @state() private _hasSlotEditor = false;
   @queryAssignedElements({ slot: 'editor', flatten: true }) private _slotEditorElements!: Element[];
-  @property({ attribute: false }) editor?: (scope: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }) => unknown;
+  @property({ attribute: false }) editor?: (scope: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean }) => unknown;
   // Phase 79 Plan 08 (R4) contract for 79-09: the record intake for
   // record-routed slot fills. 79-09's consumer-side emitSlotFiller
   // accumulates an object literal onto the SAME `.rozieSlots=${{ ... }}`
@@ -848,7 +952,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   // named function-prop / <slot> fallback (AC-9). Attribute
   // deserialization is disabled — this is a function-valued record,
   // never reflected to/from an HTML attribute.
-  @property({ attribute: false }) rozieSlots?: { [key: `colHeader-${string}`]: (scope: { columnId: any; column: any; label: any }) => unknown; [key: `filter-${string}`]: (scope: { columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }) => unknown; [key: `cell-${string}`]: (scope: { columnId: any; column: any; row: any; value: any }) => unknown; [key: `editor-${string}`]: (scope: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }) => unknown; } & Record<string, (scope: any) => unknown>;
+  @property({ attribute: false }) rozieSlots?: { [key: `colHeader-${string}`]: (scope: { columnId: string; column: TableColumn<any, unknown>; label: string }) => unknown; [key: `filter-${string}`]: (scope: { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }) => unknown; [key: `cell-${string}`]: (scope: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any }) => unknown; [key: `editor-${string}`]: (scope: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean }) => unknown; } & Record<string, (scope: any) => unknown>;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -2458,7 +2562,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic++;
   this._sortingDefault.value = next; // fresh array only (never in-place)
   this._sortingControllable.write(next); // two-way emit if bound (no-op-diff if not)
-  this.dispatchEvent(new CustomEvent("sort-change", {
+  this.dispatchEvent(new CustomEvent<SortingState>("sort-change", {
     detail: next,
     bubbles: true,
     composed: true
@@ -2488,7 +2592,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // → duplicate-identifier TS2300 (the model-prop==emit-name collision class). Every
   // sibling slice avoids this by stemming the event off a DISTINCT name (sorting→
   // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
-  this.dispatchEvent(new CustomEvent("expand-change", {
+  this.dispatchEvent(new CustomEvent<ExpandedState>("expand-change", {
     detail: next,
     bubbles: true,
     composed: true
@@ -2512,7 +2616,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic++;
   this._groupingDefault.value = next; // fresh ordered array only (never in-place push)
   this._groupingControllable.write(next); // two-way emit if bound (no-op-diff if not)
-  this.dispatchEvent(new CustomEvent("group-change", {
+  this.dispatchEvent(new CustomEvent<GroupingState>("group-change", {
     detail: next,
     bubbles: true,
     composed: true
@@ -2528,7 +2632,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic++;
   this._globalFilterDefault.value = next;
   this._globalFilterControllable.write(next);
-  this.dispatchEvent(new CustomEvent("filter-change", {
+  this.dispatchEvent(new CustomEvent<DataTableFilterChangePayload>("filter-change", {
     detail: {
       globalFilter: next
     },
@@ -2547,7 +2651,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic++;
   this._columnFiltersDefault.value = next;
   this._columnFiltersControllable.write(next);
-  this.dispatchEvent(new CustomEvent("filter-change", {
+  this.dispatchEvent(new CustomEvent<DataTableFilterChangePayload>("filter-change", {
     detail: {
       columnFilters: next
     },
@@ -2564,7 +2668,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic++;
   this._paginationDefault.value = next;
   this._paginationControllable.write(next);
-  this.dispatchEvent(new CustomEvent("page-change", {
+  this.dispatchEvent(new CustomEvent<PaginationState>("page-change", {
     detail: next,
     bubbles: true,
     composed: true
@@ -2580,7 +2684,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic++;
   this._rowSelectionDefault.value = next;
   this._rowSelectionControllable.write(next);
-  this.dispatchEvent(new CustomEvent("selection-change", {
+  this.dispatchEvent(new CustomEvent<RowSelectionState>("selection-change", {
     detail: next,
     bubbles: true,
     composed: true
@@ -2596,7 +2700,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic++;
   this._columnVisibilityDefault.value = next;
   this._columnVisibilityControllable.write(next);
-  this.dispatchEvent(new CustomEvent("visibility-change", {
+  this.dispatchEvent(new CustomEvent<VisibilityState>("visibility-change", {
     detail: next,
     bubbles: true,
     composed: true
@@ -2612,7 +2716,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic++;
   this._columnSizingDefault.value = next;
   this._columnSizingControllable.write(next);
-  this.dispatchEvent(new CustomEvent("resize-change", {
+  this.dispatchEvent(new CustomEvent<ColumnSizingState>("resize-change", {
     detail: next,
     bubbles: true,
     composed: true
@@ -2628,7 +2732,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic++;
   this._columnOrderDefault.value = next;
   this._columnOrderControllable.write(next);
-  this.dispatchEvent(new CustomEvent("reorder-change", {
+  this.dispatchEvent(new CustomEvent<ColumnOrderState>("reorder-change", {
     detail: next,
     bubbles: true,
     composed: true
@@ -2655,7 +2759,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.programmatic++;
   this._columnPinningDefault.value = clean;
   this._columnPinningControllable.write(clean);
-  this.dispatchEvent(new CustomEvent("pin-change", {
+  this.dispatchEvent(new CustomEvent<ColumnPinningState>("pin-change", {
     detail: clean,
     bubbles: true,
     composed: true
@@ -2767,13 +2871,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.redoStack = [];
 };
 
-  canUndo = () => this.undoStack.length > 0;
+  canUndo: () => boolean = () => this.undoStack.length > 0;
 
-  canRedo = () => this.redoStack.length > 0;
+  canRedo: () => boolean = () => this.redoStack.length > 0;
 
   // Both stacks empty — the external-swap latch (DataTable.rozie reFeed) and the
   // clearHistory() $expose verb share this single implementation.
-  clearHistory = () => {
+  clearHistory: () => void = () => {
   this.undoStack = [];
   this.redoStack = [];
 };
@@ -2783,7 +2887,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // per call per the design — NOT edge-gated there; only the writeData-triggered recording path
   // below is edge-gated, since a routine sequence of edits would otherwise spam the event).
   emitHistoryChange = () => {
-  this.dispatchEvent(new CustomEvent("history-change", {
+  this.dispatchEvent(new CustomEvent<DataTableHistoryChangePayload>("history-change", {
     detail: {
       canUndo: this.canUndo(),
       canRedo: this.canRedo()
@@ -2809,7 +2913,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // re-capture this replay (which would corrupt the stack). Replaying through writeData
   // (rather than writing $data/$model directly) is deliberate: the two-way $model.data
   // writeback, the re-feed $watch, and the echo guard all keep working with zero new code.
-  undo = () => {
+  undo: () => void = () => {
   if (!this.canUndo()) return;
   const prev = this.undoStack.pop();
   this.redoStack.push(this.currentData());
@@ -2821,7 +2925,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   // redo(): symmetric — pop the redo stack, push the CURRENT data back onto the undo stack,
   // replay through the same guarded writeData seam.
-  redo = () => {
+  redo: () => void = () => {
   if (!this.canRedo()) return;
   const next = this.redoStack.pop();
   this.undoStack.push(this.currentData());
@@ -3410,7 +3514,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (start === this.lastRangeStart && end === this.lastRangeEnd) return;
   this.lastRangeStart = start;
   this.lastRangeEnd = end;
-  this.dispatchEvent(new CustomEvent("visible-range-change", {
+  this.dispatchEvent(new CustomEvent<DataTableVisibleRangeChangePayload>("visible-range-change", {
     detail: {
       start,
       end
@@ -3447,7 +3551,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // into the internal `.rdt-scroll` class selector. Returns null when nothing is windowed:
   // gridScrollEl is only ever assigned inside the isWindowed() guard, so no extra gate is
   // needed here beyond that natural null.
-  getScrollElement = (): any => this.gridScrollEl;
+  getScrollElement: () => HTMLElement | null = (): any => this.gridScrollEl;
 
   // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
   // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
@@ -5024,39 +5128,39 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // is dropped on ALL SIX targets, only the by-reference key survives → a
   // runtime ReferenceError at `defineExpose`/`useImperativeHandle`). Sorting verbs +
   // a fresh column-def readout, selection, pagination, and column-management verbs.
-  sortColumn = (colId: any, desc: any) => {
+  sortColumn: (colId: string, desc?: boolean) => void = (colId: any, desc: any) => {
   if (this.table) this.table.getColumn(colId) && this.table.getColumn(colId).toggleSorting(desc, false);
 };
 
-  clearSorting = () => {
+  clearSorting: () => void = () => {
   if (this.table) this.table.resetSorting(true);
 };
 
-  getColumnDefs = () => this.columnDefs();
+  getColumnDefs: () => ColumnDef<any, any>[] = () => this.columnDefs();
 
   // selection verbs (req-7) — drive table-core so the onRowSelectionChange funnel
   // emits the fresh state + selection-change.
-  toggleAllRows = (value: any) => {
+  toggleAllRows: (value?: boolean) => void = (value: any) => {
   if (this.table) this.table.toggleAllRowsSelected(value);
 };
 
-  clearSelection = () => {
+  clearSelection: () => void = () => {
   if (this.table) this.table.resetRowSelection(true);
 };
 
-  getSelectedRows = () => this.table ? this.table.getSelectedRowModel().rows.map((r: any) => r.original) : [];
+  getSelectedRows: () => any[] = () => this.table ? this.table.getSelectedRowModel().rows.map((r: any) => r.original) : [];
 
   // pagination verbs.
-  setPage = (idx: any) => {
+  setPage: (idx: number) => void = (idx: any) => {
   if (this.table) this.table.setPageIndex(idx);
 };
 
-  setRowsPerPage = (size: any) => {
+  setRowsPerPage: (size: number) => void = (size: any) => {
   if (this.table) this.table.setPageSize(size);
 };
 
   // column-management verbs (req-8/9/10/11) — drive table-core so the funnels fire.
-  toggleColumnVisibility = (colId: any) => {
+  toggleColumnVisibility: (colId: string) => void = (colId: any) => {
   if (this.table) {
     const c = this.table.getColumn(colId);
     if (c && c.toggleVisibility) c.toggleVisibility();
@@ -5070,17 +5174,17 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // off-limits). So the public verb is `applyColumnOrder` (semantically: apply a
   // new column order). The other set* verbs (setPage/setRowsPerPage) do NOT match
   // any model prop's setter, so they are collision-free.
-  applyColumnOrder = (order: any) => {
+  applyColumnOrder: (order: string[]) => void = (order: any) => {
   if (this.table) this.table.setColumnOrder(order);
 };
 
-  resetColumnSizing = () => {
+  resetColumnSizing: () => void = () => {
   if (this.table) this.table.resetColumnSizing(true);
 };
 
   // pinColumn: the verb that drives column.pin; distinct from the template handler
   // onPinColumn (no shadow — the deferred-items finding #4 collision check).
-  pinColumn = (colId: any, side: any) => {
+  pinColumn: (colId: string, side: 'left' | 'right' | false) => void = (colId: any, side: any) => {
   if (this.table) {
     const c = this.table.getColumn(colId);
     if (c && c.pin) c.pin(side);
@@ -5094,7 +5198,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // there is no page (windowing replaces pagination) → the windowed model IS the full model, so it
   // returns the absolute index unchanged. Collision-safe: no *-change event, prop, React auto-setter,
   // or inherited Lit DOM method named getRowIndexRelativeToPage (ROZ121/124/137 clear).
-  getRowIndexRelativeToPage = (absRow: any) => {
+  getRowIndexRelativeToPage: (absRow?: number) => number = (absRow: any) => {
   const abs = absRow == null ? this.toAbsRow(this._activeRow.value) : Math.trunc(Number(absRow)) || 0;
   if (this.rowsWindowed()) return abs;
   return abs - this.pageRowOffset();
@@ -5106,7 +5210,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // active cell, so it cuts the current selection even when the call arrives off a control that
   // moved DOM focus off the grid. Collision-safe: no `cut` event / model prop / React auto-setter /
   // inherited Lit DOM method named `cut` (ROZ121/124/137 clear) — `cut` is not on HTMLElement.
-  cut = () => this.cutRange();
+  cut: () => void = () => this.cutRange();
 
   // 260709-8ct (grid-wide undo/redo): NO pass-through wrapper lands here for
   // undo/redo/canUndo/canRedo/clearHistory. Unlike `cut` above (which delegates to a
@@ -6117,7 +6221,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     // SAME language): a header cell has no body-row index, so emit rowIndex:null + isHeader:true
     // rather than a bogus toAbsRow(nextRow) — which would compute a real body-row absolute index
     // for a HEADER move, misleading a consumer into thinking that body row is the active cell.
-    this.dispatchEvent(new CustomEvent("activecell-change", {
+    this.dispatchEvent(new CustomEvent<DataTableActiveCellChangePayload>("activecell-change", {
       detail: nextIsHeader ? {
         rowIndex: null,
         colIndex: nextCol,
@@ -6327,7 +6431,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   activateRowAt = (index: any, trigger: any) => {
   const row = (this._rows.value || [])[index];
   if (!row || this.rowIsGrouped(row) || this.rowIsLazyPlaceholder(row)) return;
-  this.dispatchEvent(new CustomEvent("row-activate", {
+  this.dispatchEvent(new CustomEvent<DataTableRowActivatePayload>("row-activate", {
     detail: {
       row: row.original,
       index,
@@ -6734,7 +6838,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // { rowIndex, colIndex } pair (or null when no range). T-49-02: positions only, no row
   // data, no DOM node. Used by the getSelectedRange $expose verb AND every range-change emit
   // (the single payload source) AND copyRange/fillRange (the rectangle they operate over).
-  getSelectedRange = () => {
+  getSelectedRange: () => DataTableRange = () => {
   // B8: clamp the corners to the CURRENT bounds ON READ so the verb (and the range-change emit
   // payload) never reports a corner past a shrunken model — React-stale-safe (the eager
   // refreshRowModel clamp is async-defeated on React; this read-time clamp is the guarantee).
@@ -6799,7 +6903,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   emitRangeChange = (anchor: any, focus: any) => {
   this._rangeAnnounce.value = this.rangeSummary(anchor, focus);
-  this.dispatchEvent(new CustomEvent("range-change", {
+  this.dispatchEvent(new CustomEvent<DataTableRangeChangePayload>("range-change", {
     detail: {
       anchor,
       focus
@@ -7242,7 +7346,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     // is the first-party code that actually escapes.
     for (let i = 0; i < committed.length; i++) {
       try {
-        this.dispatchEvent(new CustomEvent("cell-edit-commit", {
+        this.dispatchEvent(new CustomEvent<DataTableCellEditCommitPayload>("cell-edit-commit", {
           detail: committed[i],
           bubbles: true,
           composed: true
@@ -8241,7 +8345,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     const next = replaceRowValue(this.currentData(), srcIndex, field, newValue);
     this.writeData(next);
     // Exactly one emit per commit, from this single call site (writeData does NOT emit).
-    this.dispatchEvent(new CustomEvent("cell-edit-commit", {
+    this.dispatchEvent(new CustomEvent<DataTableCellEditCommitPayload>("cell-edit-commit", {
       detail: {
         rowId,
         columnId: colId,
@@ -8326,7 +8430,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.writeData(replaceRowValue(this.currentData(), srcIndex, field, newValue));
   // Exactly one emit per toggle, from this single call site (writeData does NOT emit) —
   // mirrors commitEdit's D-07 single-emit discipline.
-  this.dispatchEvent(new CustomEvent("cell-edit-commit", {
+  this.dispatchEvent(new CustomEvent<DataTableCellEditCommitPayload>("cell-edit-commit", {
     detail: {
       rowId,
       columnId: colId,
@@ -8562,7 +8666,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     const next = replaceRowValues(this.currentData(), srcIndex, fieldValues);
     this.writeData(next);
     // EXACTLY ONE emit per row commit, from THIS single call site (React multi-emit dedup, D-07).
-    this.dispatchEvent(new CustomEvent("row-edit-commit", {
+    this.dispatchEvent(new CustomEvent<DataTableRowEditCommitPayload>("row-edit-commit", {
       detail: {
         rowId,
         changes
@@ -9107,7 +9211,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // editCell(rowIndex, colIndex) — programmatic edit-entry ($expose, req-3). Coerces +
   // clamps indices, moves the active cell, and opens the editor (no-op on a non-editable
   // cell). Collision-clean (RESEARCH name-check): not a verb/event/prop/ROZ137 member.
-  editCell = (rowIndex: any, colIndex: any) => {
+  editCell: (rowIndex: number, colIndex: number) => void = (rowIndex: any, colIndex: any) => {
   const lastRow = this.bodyRowCount() - 1;
   const maxRow = lastRow < 0 ? 0 : lastRow;
   const maxCol = this.visibleColCount() - 1;
@@ -9126,7 +9230,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // edit (editRow()/Shift+F2) drives editingRowIndex and leaves editingRow at -1, so the
   // single-cell commitEdit guard (editingRow >= 0) is false during a row edit — route to
   // commitRow() first so a programmatic commit of a row editor is not a silent no-op.
-  commitEditing = () => {
+  commitEditing: () => void = () => {
   if (this.inRowEdit()) {
     this.commitRow();
     return;
@@ -9140,7 +9244,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // name-check): `editRow` is not in the 15 existing verbs, not a prop, not a *-change/commit
   // event, not a Lit ROZ137-reserved host member. Moves the active cell to the row first so the
   // commit/cancel focus-return lands in the right row.
-  editRow = (rowIndex: any) => {
+  editRow: (rowIndex: number) => void = (rowIndex: any) => {
   const lastRow = this.bodyRowCount() - 1;
   const maxRow = lastRow < 0 ? 0 : lastRow;
   const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
@@ -9203,7 +9307,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // data-* selector is built (T-49-01/T-63-06-01: never interpolate a raw consumer string; clamp
   // the abs index into getPrePaginationRowModel bounds). The activecell-change payload + getActiveCell
   // speak the SAME absolute language (toAbsRow).
-  focusCell = (rowIndex: any, colIndex: any) => {
+  focusCell: (rowIndex: number, colIndex: number) => void = (rowIndex: any, colIndex: any) => {
   // B16: isGrid()-gate the verb. In 'table' mode there is no roving active cell, so focusCell
   // is a NO-OP (never an activecell-change emit) — the keyboard path (onGridKeyDown) is already
   // isGrid-gated; the exposed verb must mirror that so a consumer's focusCell on a table-mode
@@ -9267,7 +9371,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     }
   }
   if (absRow !== prevAbs || c !== prevCol || prevIsHeader) {
-    this.dispatchEvent(new CustomEvent("activecell-change", {
+    this.dispatchEvent(new CustomEvent<DataTableActiveCellChangePayload>("activecell-change", {
       detail: {
         rowIndex: absRow,
         colIndex: c
@@ -9287,7 +9391,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // is unchanged for the body case).
   // C1: a body cell returns the ABSOLUTE display-order rowIndex (toAbsRow) — matching focusCell's
   // addressing + the activecell-change payload — in BOTH paginated and virtual modes.
-  getActiveCell = () => this._activeIsHeader.value ? {
+  getActiveCell: () => DataTableActiveCell = () => this._activeIsHeader.value ? {
   rowIndex: null,
   colIndex: this._activeColIndex.value,
   isHeader: true
@@ -9301,7 +9405,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // exit interaction mode; the next Tab-in re-enters at the entry cell (D-01). Does NOT emit
   // (no move to a new addressable cell — a reset, not a navigation). B16: isGrid()-gated — a
   // table-mode instance has no roving active cell, so the verb is a no-op there.
-  clearActiveCell = () => {
+  clearActiveCell: () => void = () => {
   if (!this.isGrid()) return;
   this._activeIsHeader.value = false;
   this._activeInControl.value = false;
@@ -9318,7 +9422,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // toggleRowExpanded(rowId) — toggle ONE row's expanded state, addressed by the consumer's
   // row id (the data `id` field) OR the table-core row id. Scans the core flat-row set (all
   // rows regardless of current expansion) so a collapsed parent is still resolvable.
-  toggleRowExpanded = (rowId: any) => {
+  toggleRowExpanded: (rowId: string | number) => void = (rowId: any) => {
   if (!this.table) return;
   const target = String(rowId);
   const flat = this.table.getCoreRowModel().flatRows;
@@ -9332,14 +9436,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   // expandAll() — open every expandable row (table-core sets ExpandedState to the `true`
   // literal under the hood → Pitfall 2: writeExpanded passes it through verbatim).
-  expandAll = () => {
+  expandAll: () => void = () => {
   if (!this.table) return;
   this.table.toggleAllRowsExpanded(true);
 };
 
   // collapseAll() — reset to a blank expanded state ({}). resetExpanded(true) forces the
   // blank reset (NOT the initialState) and fires onExpandedChange → one expanded-change.
-  collapseAll = () => {
+  collapseAll: () => void = () => {
   if (!this.table) return;
   this.table.resetExpanded(true);
 };
@@ -9347,7 +9451,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // getExpandedRows() — return the original row data for every currently-expanded row
   // (read-verb twin of expanded-change). Integers/data only — scans the core flat rows and
   // filters by getIsExpanded(). Empty when nothing is expanded.
-  getExpandedRows = () => {
+  getExpandedRows: () => any[] = () => {
   if (!this.table) return [];
   const out = [];
   const flat = this.table.getCoreRowModel().flatRows;
@@ -9362,11 +9466,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // setColumnOrder→applyColumnOrder) + clearGrouping. Both drive @tanstack/table-core's
   // table.setGrouping so the onGroupingChange → writeGrouping funnel fires one group-change with
   // the fresh ordered key list. Also handed to the headless #groupBar slot as apply/clear helpers.
-  applyGrouping = (cols: any) => {
+  applyGrouping: (cols: string[]) => void = (cols: any) => {
   if (this.table) this.table.setGrouping(cols);
 };
 
-  clearGrouping = () => {
+  clearGrouping: () => void = () => {
   if (this.table) this.table.setGrouping([]);
 };
 
@@ -9384,7 +9488,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // column/table. NAMED to match the $expose verb exactly (the ExposedMethod.name shorthand
   // contract: an exposed verb lowers to `{ getFacetedUniqueValues }`, which must resolve to THIS
   // helper — the table-core factory was aliased to makeFacetedUniqueValues to free this name).
-  getFacetedUniqueValues = (colId: any) => {
+  getFacetedUniqueValues: (colId: string) => any[] = (colId: any) => {
   if (this.tick() < 0 || !this.table) return [];
   const col = this.table.getColumn(colId);
   if (!col || !col.getFacetedUniqueValues) return [];
@@ -9394,7 +9498,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   // getFacetedMinMaxValues: the column's [min, max] numeric range, or null when unavailable.
   // Named to match the $expose verb (same shorthand contract as getFacetedUniqueValues above).
-  getFacetedMinMaxValues = (colId: any) => {
+  getFacetedMinMaxValues: (colId: string) => [number, number] | null = (colId: any) => {
   if (this.tick() < 0 || !this.table) return null;
   const col = this.table.getColumn(colId);
   if (!col || !col.getFacetedMinMaxValues) return null;
@@ -9425,4 +9529,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   set columnOrder(v: any[]) { this._columnOrderControllable.notifyPropertyWrite(v); }
   get columnPinning(): any { return this._columnPinningControllable.read(); }
   set columnPinning(v: any) { this._columnPinningControllable.notifyPropertyWrite(v); }
+
+  addEventListener<K extends keyof RozieDataTableEventMap>(type: K, listener: (this: DataTable, ev: RozieDataTableEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
+    super.addEventListener(type, listener, options);
+  }
+  removeEventListener<K extends keyof RozieDataTableEventMap>(type: K, listener: (this: DataTable, ev: RozieDataTableEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    super.removeEventListener(type, listener, options);
+  }
 }

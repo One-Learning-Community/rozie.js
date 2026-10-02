@@ -1,3 +1,76 @@
+<script module lang="ts">
+import type { Column as TableColumn, ColumnDef, ColumnFiltersState, ColumnOrderState, ColumnPinningState, ColumnSizingState, ExpandedState, GroupingState, PaginationState, RowSelectionState, SortingState, VisibilityState } from '@tanstack/table-core';
+
+/** A cell position as integers over the visible (display-order) model. */
+export interface DataTableCellPosition {
+  rowIndex: number;
+  colIndex: number;
+}
+/** The active (roving-focus) cell. A header cell reports `rowIndex: null` and `isHeader: true`. */
+export interface DataTableActiveCell {
+  rowIndex: number | null;
+  colIndex: number;
+  isHeader: boolean;
+}
+/** The rectangular cell-range selection. Both corners are `null` when there is no range. */
+export interface DataTableRange {
+  anchor: DataTableCellPosition | null;
+  focus: DataTableCellPosition | null;
+}
+/** One data column offered to the `#groupBar` slot. */
+export interface DataTableGroupableColumn {
+  id: string;
+  label: string;
+}
+/** One changed cell inside a row edit commit. */
+export interface DataTableCellChange {
+  columnId: string;
+  oldValue: any;
+  newValue: any;
+}
+
+/** The `activecell-change` payload. `isHeader` is set when the move landed on or left a header cell. */
+export interface DataTableActiveCellChangePayload {
+  rowIndex: number | null;
+  colIndex: number;
+  isHeader?: boolean;
+}
+/** The `cell-edit-commit` payload: one committed cell. */
+export interface DataTableCellEditCommitPayload {
+  rowId: string;
+  columnId: string;
+  oldValue: any;
+  newValue: any;
+}
+/** The `row-edit-commit` payload: the row and every cell the save changed. */
+export interface DataTableRowEditCommitPayload {
+  rowId: string;
+  changes: DataTableCellChange[];
+}
+/** The `filter-change` payload: `globalFilter` for the search box, `columnFilters` for a per-column filter. Exactly one key is set. */
+export interface DataTableFilterChangePayload {
+  globalFilter?: string;
+  columnFilters?: ColumnFiltersState;
+}
+/** The `history-change` payload: undo/redo availability. */
+export interface DataTableHistoryChangePayload {
+  canUndo: boolean;
+  canRedo: boolean;
+}
+/** The `range-change` payload: the new range corners (both `null` when the range cleared). */
+export type DataTableRangeChangePayload = DataTableRange;
+/** The `row-activate` payload. `row` is the original data object and `index` its position in the rendered model. */
+export interface DataTableRowActivatePayload {
+  row: any;
+  index: number;
+  trigger: 'keyboard' | 'click';
+}
+/** The `visible-range-change` payload: the rendered row window, `end` exclusive. */
+export interface DataTableVisibleRangeChangePayload {
+  start: number;
+  end: number;
+}
+</script>
 <script lang="ts">
 import Popover from '@rozie-ui/popover-svelte';
 import { rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runtime-svelte';
@@ -129,33 +202,33 @@ interface Props {
    */
   maxHeight?: string;
   children?: Snippet;
-  groupBar?: Snippet<[{ grouping: any; groupableColumns: any; applyGrouping: any; clearGrouping: any }]>;
-  selectAll?: Snippet<[{ checked: any; indeterminate: any; toggle: any }]>;
-  placeholder?: Snippet<[{ index: any; columnId: any }]>;
-  selectCell?: Snippet<[{ row: any; checked: any; toggle: any }]>;
+  groupBar?: Snippet<[{ grouping: string[]; groupableColumns: DataTableGroupableColumn[]; applyGrouping: (cols: string[]) => void; clearGrouping: () => void }]>;
+  selectAll?: Snippet<[{ checked: boolean; indeterminate: boolean; toggle: (event: any) => void }]>;
+  placeholder?: Snippet<[{ index: number; columnId: string }]>;
+  selectCell?: Snippet<[{ row: any; checked: boolean; toggle: (event: any) => void }]>;
   detail?: Snippet<[{ row: any }]>;
-  colHeader?: Snippet<[{ columnId: any; column: any; label: any }]>;
-  filter?: Snippet<[{ columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }]>;
-  cell?: Snippet<[{ columnId: any; column: any; row: any; value: any }]>;
-  editor?: Snippet<[{ columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }]>;
-  snippets?: { [key: `colHeader-${string}`]: Snippet<[{ columnId: any; column: any; label: any }]>; [key: `filter-${string}`]: Snippet<[{ columnId: any; value: any; uniqueValues: any; minMax: any; columnLabel: any; setFilter: any }]>; [key: `cell-${string}`]: Snippet<[{ columnId: any; column: any; row: any; value: any }]>; [key: `editor-${string}`]: Snippet<[{ columnId: any; column: any; row: any; value: any; commit: any; cancel: any; columnLabel: any; autofocus: any }]>; } & Record<string, any>;
-  onsortchange?: (...args: any[]) => void;
-  onexpandchange?: (...args: any[]) => void;
-  ongroupchange?: (...args: any[]) => void;
-  onfilterchange?: (...args: any[]) => void;
-  onpagechange?: (...args: any[]) => void;
-  onselectionchange?: (...args: any[]) => void;
-  onvisibilitychange?: (...args: any[]) => void;
-  onresizechange?: (...args: any[]) => void;
-  onreorderchange?: (...args: any[]) => void;
-  onpinchange?: (...args: any[]) => void;
-  onhistorychange?: (...args: any[]) => void;
-  onvisiblerangechange?: (...args: any[]) => void;
-  onactivecellchange?: (...args: any[]) => void;
-  onrowactivate?: (...args: any[]) => void;
-  onrangechange?: (...args: any[]) => void;
-  oncelleditcommit?: (...args: any[]) => void;
-  onroweditcommit?: (...args: any[]) => void;
+  colHeader?: Snippet<[{ columnId: string; column: TableColumn<any, unknown>; label: string }]>;
+  filter?: Snippet<[{ columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }]>;
+  cell?: Snippet<[{ columnId: string; column: TableColumn<any, unknown>; row: any; value: any }]>;
+  editor?: Snippet<[{ columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean }]>;
+  snippets?: { [key: `colHeader-${string}`]: Snippet<[{ columnId: string; column: TableColumn<any, unknown>; label: string }]>; [key: `filter-${string}`]: Snippet<[{ columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }]>; [key: `cell-${string}`]: Snippet<[{ columnId: string; column: TableColumn<any, unknown>; row: any; value: any }]>; [key: `editor-${string}`]: Snippet<[{ columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean }]>; } & Record<string, any>;
+  onactivecellchange?: (payload: DataTableActiveCellChangePayload) => void;
+  oncelleditcommit?: (payload: DataTableCellEditCommitPayload) => void;
+  onexpandchange?: (payload: ExpandedState) => void;
+  onfilterchange?: (payload: DataTableFilterChangePayload) => void;
+  ongroupchange?: (payload: GroupingState) => void;
+  onhistorychange?: (payload: DataTableHistoryChangePayload) => void;
+  onpagechange?: (payload: PaginationState) => void;
+  onpinchange?: (payload: ColumnPinningState) => void;
+  onrangechange?: (payload: DataTableRangeChangePayload) => void;
+  onreorderchange?: (payload: ColumnOrderState) => void;
+  onresizechange?: (payload: ColumnSizingState) => void;
+  onrowactivate?: (payload: DataTableRowActivatePayload) => void;
+  onroweditcommit?: (payload: DataTableRowEditCommitPayload) => void;
+  onselectionchange?: (payload: RowSelectionState) => void;
+  onsortchange?: (payload: SortingState) => void;
+  onvisibilitychange?: (payload: VisibilityState) => void;
+  onvisiblerangechange?: (payload: DataTableVisibleRangeChangePayload) => void;
 }
 
 let __defaultColumns = (() => [])();
@@ -208,23 +281,23 @@ let {
   cell: __cellProp,
   editor: __editorProp,
   snippets,
-  onsortchange,
-  onexpandchange,
-  ongroupchange,
-  onfilterchange,
-  onpagechange,
-  onselectionchange,
-  onvisibilitychange,
-  onresizechange,
-  onreorderchange,
-  onpinchange,
-  onhistorychange,
-  onvisiblerangechange,
   onactivecellchange,
-  onrowactivate,
-  onrangechange,
   oncelleditcommit,
-  onroweditcommit
+  onexpandchange,
+  onfilterchange,
+  ongroupchange,
+  onhistorychange,
+  onpagechange,
+  onpinchange,
+  onrangechange,
+  onreorderchange,
+  onresizechange,
+  onrowactivate,
+  onroweditcommit,
+  onselectionchange,
+  onsortchange,
+  onvisibilitychange,
+  onvisiblerangechange
 }: Props = $props();
 
 const children = $derived(__childrenProp ?? snippets?.children);
@@ -1160,11 +1233,11 @@ const recordSnapshot = (current: any) => {
   while (undoStack.length > limit) undoStack.shift();
   redoStack = [];
 };
-export const canUndo = () => undoStack.length > 0;
-export const canRedo = () => redoStack.length > 0;
+export const canUndo: () => boolean = () => undoStack.length > 0;
+export const canRedo: () => boolean = () => redoStack.length > 0;
 // Both stacks empty — the external-swap latch (DataTable.rozie reFeed) and the
 // clearHistory() $expose verb share this single implementation.
-export const clearHistory = () => {
+export const clearHistory: () => void = () => {
   undoStack = [];
   redoStack = [];
 };
@@ -1193,7 +1266,7 @@ const emitHistoryChangeIfEdged = (prevU: any, prevR: any) => {
 // re-capture this replay (which would corrupt the stack). Replaying through writeData
 // (rather than writing $data/$model directly) is deliberate: the two-way $model.data
 // writeback, the re-feed $watch, and the echo guard all keep working with zero new code.
-export const undo = () => {
+export const undo: () => void = () => {
   if (!canUndo()) return;
   const prev = undoStack.pop();
   redoStack.push(currentData());
@@ -1204,7 +1277,7 @@ export const undo = () => {
 };
 // redo(): symmetric — pop the redo stack, push the CURRENT data back onto the undo stack,
 // replay through the same guarded writeData seam.
-export const redo = () => {
+export const redo: () => void = () => {
   if (!canRedo()) return;
   const next = redoStack.pop();
   undoStack.push(currentData());
@@ -1785,7 +1858,7 @@ export const scrollToRow = (index: any, options?: {
 // into the internal `.rdt-scroll` class selector. Returns null when nothing is windowed:
 // gridScrollEl is only ever assigned inside the isWindowed() guard, so no extra gate is
 // needed here beyond that natural null.
-export const getScrollElement = (): any => gridScrollEl;
+export const getScrollElement: () => HTMLElement | null = (): any => gridScrollEl;
 // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
 // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
 // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -3265,31 +3338,31 @@ import { columnSpecsEquivalent } from './helpers/columnDefUtils';
 // is dropped on ALL SIX targets, only the by-reference key survives → a
 // runtime ReferenceError at `defineExpose`/`useImperativeHandle`). Sorting verbs +
 // a fresh column-def readout, selection, pagination, and column-management verbs.
-export const sortColumn = (colId: any, desc: any) => {
+export const sortColumn: (colId: string, desc?: boolean) => void = (colId: any, desc: any) => {
   if (table) table.getColumn(colId) && table.getColumn(colId).toggleSorting(desc, false);
 };
-export const clearSorting = () => {
+export const clearSorting: () => void = () => {
   if (table) table.resetSorting(true);
 };
-export const getColumnDefs = () => columnDefs();
+export const getColumnDefs: () => ColumnDef<any, any>[] = () => columnDefs();
 // selection verbs (req-7) — drive table-core so the onRowSelectionChange funnel
 // emits the fresh state + selection-change.
-export const toggleAllRows = (value: any) => {
+export const toggleAllRows: (value?: boolean) => void = (value: any) => {
   if (table) table.toggleAllRowsSelected(value);
 };
-export const clearSelection = () => {
+export const clearSelection: () => void = () => {
   if (table) table.resetRowSelection(true);
 };
-export const getSelectedRows = () => table ? table.getSelectedRowModel().rows.map((r: any) => r.original) : [];
+export const getSelectedRows: () => any[] = () => table ? table.getSelectedRowModel().rows.map((r: any) => r.original) : [];
 // pagination verbs.
-export const setPage = (idx: any) => {
+export const setPage: (idx: number) => void = (idx: any) => {
   if (table) table.setPageIndex(idx);
 };
-export const setRowsPerPage = (size: any) => {
+export const setRowsPerPage: (size: number) => void = (size: any) => {
   if (table) table.setPageSize(size);
 };
 // column-management verbs (req-8/9/10/11) — drive table-core so the funnels fire.
-export const toggleColumnVisibility = (colId: any) => {
+export const toggleColumnVisibility: (colId: string) => void = (colId: any) => {
   if (table) {
     const c = table.getColumn(colId);
     if (c && c.toggleVisibility) c.toggleVisibility();
@@ -3302,15 +3375,15 @@ export const toggleColumnVisibility = (colId: any) => {
 // off-limits). So the public verb is `applyColumnOrder` (semantically: apply a
 // new column order). The other set* verbs (setPage/setRowsPerPage) do NOT match
 // any model prop's setter, so they are collision-free.
-export const applyColumnOrder = (order: any) => {
+export const applyColumnOrder: (order: string[]) => void = (order: any) => {
   if (table) table.setColumnOrder(order);
 };
-export const resetColumnSizing = () => {
+export const resetColumnSizing: () => void = () => {
   if (table) table.resetColumnSizing(true);
 };
 // pinColumn: the verb that drives column.pin; distinct from the template handler
 // onPinColumn (no shadow — the deferred-items finding #4 collision check).
-export const pinColumn = (colId: any, side: any) => {
+export const pinColumn: (colId: string, side: 'left' | 'right' | false) => void = (colId: any, side: any) => {
   if (table) {
     const c = table.getColumn(colId);
     if (c && c.pin) c.pin(side);
@@ -3323,7 +3396,7 @@ export const pinColumn = (colId: any, side: any) => {
 // there is no page (windowing replaces pagination) → the windowed model IS the full model, so it
 // returns the absolute index unchanged. Collision-safe: no *-change event, prop, React auto-setter,
 // or inherited Lit DOM method named getRowIndexRelativeToPage (ROZ121/124/137 clear).
-export const getRowIndexRelativeToPage = (absRow: any) => {
+export const getRowIndexRelativeToPage: (absRow?: number) => number = (absRow: any) => {
   const abs = absRow == null ? toAbsRow(activeRow) : Math.trunc(Number(absRow)) || 0;
   if (rowsWindowed()) return abs;
   return abs - pageRowOffset();
@@ -3334,7 +3407,7 @@ export const getRowIndexRelativeToPage = (absRow: any) => {
 // active cell, so it cuts the current selection even when the call arrives off a control that
 // moved DOM focus off the grid. Collision-safe: no `cut` event / model prop / React auto-setter /
 // inherited Lit DOM method named `cut` (ROZ121/124/137 clear) — `cut` is not on HTMLElement.
-export const cut = () => cutRange();
+export const cut: () => void = () => cutRange();
 
 // differently-named clipboardFill export, `cutRange`), the undoHistory.rzts exports already
 // use the exact public verb names and are already component-scope (imported directly into
@@ -4897,7 +4970,7 @@ const inRange = (rIdx: any, cIdx: any) => {
 // { rowIndex, colIndex } pair (or null when no range). T-49-02: positions only, no row
 // data, no DOM node. Used by the getSelectedRange $expose verb AND every range-change emit
 // (the single payload source) AND copyRange/fillRange (the rectangle they operate over).
-export const getSelectedRange = () => {
+export const getSelectedRange: () => DataTableRange = () => {
   // B8: clamp the corners to the CURRENT bounds ON READ so the verb (and the range-change emit
   // payload) never reports a corner past a shrunken model — React-stale-safe (the eager
   // refreshRowModel clamp is async-defeated on React; this read-time clamp is the guarantee).
@@ -7156,7 +7229,7 @@ const onEditorBlur = (e: any) => {
 // editCell(rowIndex, colIndex) — programmatic edit-entry ($expose, req-3). Coerces +
 // clamps indices, moves the active cell, and opens the editor (no-op on a non-editable
 // cell). Collision-clean (RESEARCH name-check): not a verb/event/prop/ROZ137 member.
-export const editCell = (rowIndex: any, colIndex: any) => {
+export const editCell: (rowIndex: number, colIndex: number) => void = (rowIndex: any, colIndex: any) => {
   const lastRow = bodyRowCount() - 1;
   const maxRow = lastRow < 0 ? 0 : lastRow;
   const maxCol = visibleColCount() - 1;
@@ -7174,7 +7247,7 @@ export const editCell = (rowIndex: any, colIndex: any) => {
 // edit (editRow()/Shift+F2) drives editingRowIndex and leaves editingRow at -1, so the
 // single-cell commitEdit guard (editingRow >= 0) is false during a row edit — route to
 // commitRow() first so a programmatic commit of a row editor is not a silent no-op.
-export const commitEditing = () => {
+export const commitEditing: () => void = () => {
   if (inRowEdit()) {
     commitRow();
     return;
@@ -7187,7 +7260,7 @@ export const commitEditing = () => {
 // name-check): `editRow` is not in the 15 existing verbs, not a prop, not a *-change/commit
 // event, not a Lit ROZ137-reserved host member. Moves the active cell to the row first so the
 // commit/cancel focus-return lands in the right row.
-export const editRow = (rowIndex: any) => {
+export const editRow: (rowIndex: number) => void = (rowIndex: any) => {
   const lastRow = bodyRowCount() - 1;
   const maxRow = lastRow < 0 ? 0 : lastRow;
   const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
@@ -7249,7 +7322,7 @@ const focusAbsCellWhenReady = (absRow: any, localRow: any, col: any) => {
 // data-* selector is built (T-49-01/T-63-06-01: never interpolate a raw consumer string; clamp
 // the abs index into getPrePaginationRowModel bounds). The activecell-change payload + getActiveCell
 // speak the SAME absolute language (toAbsRow).
-export const focusCell = (rowIndex: any, colIndex: any) => {
+export const focusCell: (rowIndex: number, colIndex: number) => void = (rowIndex: any, colIndex: any) => {
   // B16: isGrid()-gate the verb. In 'table' mode there is no roving active cell, so focusCell
   // is a NO-OP (never an activecell-change emit) — the keyboard path (onGridKeyDown) is already
   // isGrid-gated; the exposed verb must mirror that so a consumer's focusCell on a table-mode
@@ -7328,7 +7401,7 @@ export const focusCell = (rowIndex: any, colIndex: any) => {
 // is unchanged for the body case).
 // C1: a body cell returns the ABSOLUTE display-order rowIndex (toAbsRow) — matching focusCell's
 // addressing + the activecell-change payload — in BOTH paginated and virtual modes.
-export const getActiveCell = () => activeIsHeader ? {
+export const getActiveCell: () => DataTableActiveCell = () => activeIsHeader ? {
   rowIndex: null,
   colIndex: activeColIndex,
   isHeader: true
@@ -7341,7 +7414,7 @@ export const getActiveCell = () => activeIsHeader ? {
 // exit interaction mode; the next Tab-in re-enters at the entry cell (D-01). Does NOT emit
 // (no move to a new addressable cell — a reset, not a navigation). B16: isGrid()-gated — a
 // table-mode instance has no roving active cell, so the verb is a no-op there.
-export const clearActiveCell = () => {
+export const clearActiveCell: () => void = () => {
   if (!isGrid()) return;
   activeIsHeader = false;
   activeInControl = false;
@@ -7357,7 +7430,7 @@ export const clearActiveCell = () => {
 // toggleRowExpanded(rowId) — toggle ONE row's expanded state, addressed by the consumer's
 // row id (the data `id` field) OR the table-core row id. Scans the core flat-row set (all
 // rows regardless of current expansion) so a collapsed parent is still resolvable.
-export const toggleRowExpanded = (rowId: any) => {
+export const toggleRowExpanded: (rowId: string | number) => void = (rowId: any) => {
   if (!table) return;
   const target = String(rowId);
   const flat = table.getCoreRowModel().flatRows;
@@ -7370,20 +7443,20 @@ export const toggleRowExpanded = (rowId: any) => {
 };
 // expandAll() — open every expandable row (table-core sets ExpandedState to the `true`
 // literal under the hood → Pitfall 2: writeExpanded passes it through verbatim).
-export const expandAll = () => {
+export const expandAll: () => void = () => {
   if (!table) return;
   table.toggleAllRowsExpanded(true);
 };
 // collapseAll() — reset to a blank expanded state ({}). resetExpanded(true) forces the
 // blank reset (NOT the initialState) and fires onExpandedChange → one expanded-change.
-export const collapseAll = () => {
+export const collapseAll: () => void = () => {
   if (!table) return;
   table.resetExpanded(true);
 };
 // getExpandedRows() — return the original row data for every currently-expanded row
 // (read-verb twin of expanded-change). Integers/data only — scans the core flat rows and
 // filters by getIsExpanded(). Empty when nothing is expanded.
-export const getExpandedRows = () => {
+export const getExpandedRows: () => any[] = () => {
   if (!table) return [];
   const out = [];
   const flat = table.getCoreRowModel().flatRows;
@@ -7397,10 +7470,10 @@ export const getExpandedRows = () => {
 // setColumnOrder→applyColumnOrder) + clearGrouping. Both drive @tanstack/table-core's
 // table.setGrouping so the onGroupingChange → writeGrouping funnel fires one group-change with
 // the fresh ordered key list. Also handed to the headless #groupBar slot as apply/clear helpers.
-export const applyGrouping = (cols: any) => {
+export const applyGrouping: (cols: string[]) => void = (cols: any) => {
   if (table) table.setGrouping(cols);
 };
-export const clearGrouping = () => {
+export const clearGrouping: () => void = () => {
   if (table) table.setGrouping([]);
 };
 // ── Faceted filtering read helpers (phase 50 reqs 8-9, D-03) ────────────────────────────────
@@ -7417,7 +7490,7 @@ export const clearGrouping = () => {
 // column/table. NAMED to match the $expose verb exactly (the ExposedMethod.name shorthand
 // contract: an exposed verb lowers to `{ getFacetedUniqueValues }`, which must resolve to THIS
 // helper — the table-core factory was aliased to makeFacetedUniqueValues to free this name).
-export const getFacetedUniqueValues = (colId: any) => {
+export const getFacetedUniqueValues: (colId: string) => any[] = (colId: any) => {
   if (tick() < 0 || !table) return [];
   const col = table.getColumn(colId);
   if (!col || !col.getFacetedUniqueValues) return [];
@@ -7426,7 +7499,7 @@ export const getFacetedUniqueValues = (colId: any) => {
 };
 // getFacetedMinMaxValues: the column's [min, max] numeric range, or null when unavailable.
 // Named to match the $expose verb (same shorthand contract as getFacetedUniqueValues above).
-export const getFacetedMinMaxValues = (colId: any) => {
+export const getFacetedMinMaxValues: (colId: string) => [number, number] | null = (colId: any) => {
   if (tick() < 0 || !table) return null;
   const col = table.getColumn(colId);
   if (!col || !col.getFacetedMinMaxValues) return null;

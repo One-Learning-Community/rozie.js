@@ -11,3 +11,5 @@ export { default as FilterNumberRange } from './FilterNumberRange';
 export { default as FilterSelect } from './FilterSelect';
 export { default as GroupBar } from './GroupBar';
 export { default as DetailPanel } from './DetailPanel';
+export type { RozieDataTableEventMap } from './DataTable';
+export type * from './DataTable';

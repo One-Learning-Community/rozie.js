@@ -72,6 +72,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, ProducerResolver, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { typedSurfaceBarrelLines } from '../../typed-surface-barrel.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { derivePeerLabel, renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -479,7 +480,16 @@ function main() {
       // a default export: SFC default, .tsx/.ts default, angular `export default`).
       `export { default } from './DataTable${bx}';\n` +
       childExports +
-      handleType;
+      handleType +
+      // Typed public surface on the package entry: the `<types>` names (the event
+      // payloads, DataTableActiveCell, …), Lit's RozieDataTableEventMap and Vue's
+      // module-script handle type via the shared helper. Angular and Svelte need an
+      // explicit forward because this barrel re-exports the component by name
+      // (it is not the component module itself, which the helper assumes).
+      typedSurfaceBarrelLines(target, ir, 'DataTable') +
+      ((target === 'angular' || target === 'svelte') && ir.types?.exportedNames?.length
+        ? `export type * from './DataTable${bx}';\n`
+        : '');
     writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
 
     // (4) vendor the design-token presets, plus the D-22 pure-helper modules (when present)

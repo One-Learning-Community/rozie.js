@@ -11,3 +11,4 @@ export { default as FilterNumberRange } from './FilterNumberRange.vue';
 export { default as FilterSelect } from './FilterSelect.vue';
 export { default as GroupBar } from './GroupBar.vue';
 export { default as DetailPanel } from './DetailPanel.vue';
+export type * from './DataTable.vue';

@@ -11,3 +11,4 @@ export { default as FilterNumberRange } from './FilterNumberRange.svelte';
 export { default as FilterSelect } from './FilterSelect.svelte';
 export { default as GroupBar } from './GroupBar.svelte';
 export { default as DetailPanel } from './DetailPanel.svelte';
+export type * from './DataTable.svelte';
