@@ -124,12 +124,17 @@ describe('targetModuleImports catalog covers every emitted import (ROZ025 drift 
         for (const [code, isModule] of sources) {
           if (!code) continue;
           for (const body of scriptBodies(code, target, isModule)) {
-            for (const { name, from } of importBindings(
-              body,
-              target === 'react' || target === 'solid',
-            )) {
+            const bindings = importBindings(body, target === 'react' || target === 'solid');
+            // A composed child's OWN module (the one that also binds the child
+            // component) is child-derived, like the component name itself:
+            // e.g. Lit imports the child's `<types>` names a fill's threaded
+            // `:param-types` print (`import type { Combobox, ComboboxGroup }`).
+            // The emitter skips any name the consumer already binds, so these
+            // can never collide and need no ROZ025 reservation.
+            const childModules = new Set(bindings.filter((b) => own.has(b.name)).map((b) => b.from));
+            for (const { name, from } of bindings) {
               checked++;
-              if (own.has(name) || name === ir.name || from.startsWith('.')) continue;
+              if (own.has(name) || name === ir.name || from.startsWith('.') || childModules.has(from)) continue;
               if (!catalog.has(`${name}\u0000${from}`))
                 missing.add(`${target}: \`${name}\` from '${from}' (${rel})`);
             }

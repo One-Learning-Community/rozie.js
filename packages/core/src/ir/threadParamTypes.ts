@@ -90,6 +90,10 @@ import type { RozieTarget } from '../codegen/rewriteRozieImport.js';
 // (D-09) instead of resolveProducerPath + IRCache. Local `.rozie` specifiers
 // are UNCHANGED — see the isPublishedSpecifier branch below.
 import { isPublishedSpecifier, resolveManifestProducer } from '../manifest/index.js';
+import {
+  exportedTypeNamesFromSource,
+  referencedTypeNames,
+} from '../codegen/collectFillerTypeImports.js';
 
 /**
  * Recursive template walker: visit every TemplateNode in source order.
@@ -269,6 +273,11 @@ export function threadParamTypes(
     let producerSlots: readonly SlotDecl[];
     let producerProps: readonly { name: string }[];
     let producerEmits: readonly string[];
+    // Names the producer's `<types>` block exports — a threaded authored
+    // param type referencing one needs an `import type` in the consumer
+    // (`filler.paramTypeImports`). Lazily computed; 'self' needs none (the
+    // names are declared in this very module).
+    let producerTypeNames: () => ReadonlySet<string> = () => new Set();
     if (node.tagKind === 'self') {
       producerSlots = ir.slots;
       producerProps = ir.props;
@@ -312,6 +321,9 @@ export function threadParamTypes(
         producerSlots = surface.slots;
         producerProps = surface.props;
         producerEmits = surface.emits;
+        const typesSource = surface.types;
+        producerTypeNames = () =>
+          new Set(typesSource == null ? [] : exportedTypeNamesFromSource(typesSource));
       } else {
         const resolvedPath = resolver.resolveProducerPath(
           componentRef.importPath,
@@ -336,6 +348,8 @@ export function threadParamTypes(
         producerSlots = producerIR.slots;
         producerProps = producerIR.props;
         producerEmits = producerIR.emits;
+        const exported = producerIR.types?.exportedNames ?? [];
+        producerTypeNames = () => new Set(exported);
       }
     }
 
@@ -595,12 +609,21 @@ export function threadParamTypes(
         } else {
           delete filler.paramTypesAuthored;
         }
+        // Producer-`<types>` names the threaded types reference (symmetric —
+        // absent when none, so every other filler's IR is byte-identical).
+        const typeImports =
+          filler.paramTypesAuthored === true
+            ? referencedTypeNames(filler.paramTypes, producerTypeNames())
+            : [];
+        if (typeImports.length > 0) filler.paramTypeImports = typeImports;
+        else delete filler.paramTypeImports;
       } else {
         // Symmetric (WR-05): a re-thread against a producer that no longer
         // carries paramTypes must not leave a previous thread's types behind
         // (typed-surface P1 final wave L6).
         delete filler.paramTypes;
         delete filler.paramTypesAuthored;
+        delete filler.paramTypeImports;
       }
 
       // D-09 / ROZ947 — validate consumer scoped-param names against producer

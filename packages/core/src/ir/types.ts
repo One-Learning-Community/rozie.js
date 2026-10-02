@@ -531,6 +531,15 @@ export interface SlotFillerDecl {
    * @experimental — added in typed-surface P1
    */
   paramTypesAuthored?: true;
+  /**
+   * Names declared in the PRODUCER's `<types>` block that the threaded
+   * (authored) `paramTypes` reference — a target that prints `paramTypes`
+   * into consumer code must `import type` these from the child module.
+   * Absent when there are none.
+   *
+   * @experimental
+   */
+  paramTypeImports?: string[];
   /** Fill body — recursive TemplateNode tree the consumer wrote inside the directive. */
   body: TemplateNode[];
   sourceLoc: SourceLoc;

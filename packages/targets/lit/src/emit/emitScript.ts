@@ -34,6 +34,7 @@ import {
 } from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
+import { collectFillerTypeImports } from '../../../../core/src/codegen/collectFillerTypeImports.js';
 import {
   isPublishedSpecifier,
   rewriteRozieImport,
@@ -1574,7 +1575,17 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
   // element registration); this additive TYPE-only import (erased at runtime, so
   // registration still fires exactly once) brings the class NAME into type scope
   // so `private _refX!: <C>` resolves. Inert when no composed ref exists.
+  // Fill scope annotations (`(scope: { group: ComboboxGroup }) => …`) may
+  // print a name from the CHILD's `<types>` block (threaded by
+  // threadParamTypes as `filler.paramTypeImports`) — import those type-only
+  // from the same child module, merged into that path's class-type line.
+  // Empty for every consumer whose fills reference no producer type, so the
+  // import block stays byte-identical.
+  const fillerTypeImports = collectFillerTypeImports(ir);
+  const toLitImportPath = (p: string): string =>
+    isPublishedSpecifier(p) ? rewriteRozieImport(p, 'lit') : p;
   const composedTypeImportLines: string[] = [];
+  const emittedFillerTypePaths = new Set<string>();
   for (const typeName of composedTypeImports) {
     const decl = (ir.components ?? []).find((c) => c.localName === typeName);
     if (decl) {
@@ -1588,8 +1599,20 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
       const importPath = isPublishedSpecifier(decl.importPath)
         ? rewriteRozieImport(decl.importPath, 'lit')
         : decl.importPath;
-      composedTypeImportLines.push(`import type { ${typeName} } from '${importPath}';`);
+      const extra = (fillerTypeImports.get(decl.importPath) ?? []).filter(
+        (n) => n !== typeName,
+      );
+      emittedFillerTypePaths.add(decl.importPath);
+      composedTypeImportLines.push(
+        `import type { ${[typeName, ...extra].join(', ')} } from '${importPath}';`,
+      );
     }
+  }
+  for (const [path, names] of fillerTypeImports) {
+    if (emittedFillerTypePaths.has(path)) continue;
+    composedTypeImportLines.push(
+      `import type { ${names.join(', ')} } from '${toLitImportPath(path)}';`,
+    );
   }
 
   // 2. Rewrite the script Babel AST so $props.X / $data.X / etc. become this.X
