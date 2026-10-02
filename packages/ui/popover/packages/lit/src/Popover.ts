@@ -32,6 +32,9 @@ import { buildMiddleware } from './internal/middleware';
 //   Same null-let convention as the others: read/written only in handlers, `any`
 //   via typeNeutralize.
 
+/** An `aria-haspopup` token: what kind of popup a click popover's panel is (the `popupRole` prop). */
+export type PopoverPopupRole = 'dialog' | 'menu' | 'listbox' | 'tree' | 'grid';
+
 export interface RoziePopoverEventMap extends Omit<HTMLElementEventMap, 'open-change'> {
   'open-change': CustomEvent<boolean>;
 }
@@ -42,6 +45,7 @@ interface RozieAnchorSlotCtx {
   show: () => void;
   hide: () => void;
   panelId: string;
+  popupRole: PopoverPopupRole | null;
 }
 
 @customElement('rozie-popover')
@@ -105,7 +109,7 @@ export default class Popover extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) placement: string = 'bottom';
   /**
-   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur, or `'manual'` for a composing component that drives `open` itself — every built-in gesture handler no-ops. Drives both the gesture handlers and the ARIA: `'click'` sets `aria-haspopup`/`aria-expanded`/`aria-controls` on the anchor wrapper; `'hover'`/`'focus'` are tooltips (`role="tooltip"` panel, `aria-describedby` on the wrapper, no popup claim); `'manual'` makes no anchor ARIA claim. The wrapper is not focusable, so put the matching attributes on your own focusable trigger too — the `anchor` slot passes `open` and `panelId` for exactly that.
+   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur, or `'manual'` for a composing component that drives `open` itself — every built-in gesture handler no-ops. Drives both the gesture handlers and the ARIA: `'click'` sets `aria-haspopup`/`aria-expanded`/`aria-controls` on the anchor wrapper; `'hover'`/`'focus'` are tooltips (`role="tooltip"` panel, `aria-describedby` on the wrapper, no popup claim); `'manual'` makes no anchor ARIA claim. The wrapper is not focusable, so put the matching attributes on your own focusable trigger too — the `anchor` slot passes `open`, `panelId` and `popupRole` for exactly that. The `aria-haspopup` value is the `popupRole` prop (default `'dialog'`).
    */
   @property({ type: String, reflect: true }) trigger: string = 'click';
   /**
@@ -157,6 +161,10 @@ export default class Popover extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true, attribute: 'disable-dismiss' }) disableDismiss: boolean = false;
   /**
+   * The kind of popup the panel content is, announced as `aria-haspopup` on the anchor wrapper of a `click` popover: `'dialog'` (the default), `'menu'`, `'listbox'`, `'tree'` or `'grid'`; any other value is treated as `'dialog'`. Set `'menu'` when the panel hosts a menu (your content carries `role="menu"`), so a menu button keeps the click trigger and its focus return. The `anchor` slot passes the same value as `popupRole` (with `open` and `panelId`) so you can put `aria-haspopup` / `aria-expanded` / `aria-controls` on your own focusable trigger. It is `null` for the tooltip triggers (`'hover'` / `'focus'`), which claim no popup; for `'manual'` it is the prop value, for the trigger you own.
+   */
+  @property({ type: String, reflect: true, attribute: 'popup-role' }) popupRole: string = 'dialog';
+  /**
    * Id base for the floating panel, whose id is `idBase + '-panel'` — also exposed to the `anchor` slot as `panelId`, so your trigger can set `aria-controls` (click) or `aria-describedby` (tooltip) to it. Set a **distinct** value per instance when more than one popover shares a page. On Lit the panel lives in the element's shadow root, so an id reference from light DOM, including your slotted anchor content, cannot resolve to it; there the anchor wrapper's own attributes, which sit inside the shadow root, carry the reference. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   @property({ type: String, reflect: true, attribute: 'id-base' }) idBase: string = 'rozie-popover';
@@ -172,7 +180,7 @@ private __rozieFirstUpdateDone = false;
 
   @state() private _hasSlotAnchor = false;
   @queryAssignedElements({ slot: 'anchor', flatten: true }) private _slotAnchorElements!: Element[];
-  @property({ attribute: false }) anchor?: (scope: { open: boolean; toggle: () => void; show: () => void; hide: () => void; panelId: string }) => unknown;
+  @property({ attribute: false }) anchor?: (scope: { open: boolean; toggle: () => void; show: () => void; hide: () => void; panelId: string; popupRole: PopoverPopupRole | null }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
   // Phase 79 Plan 08 (R4) contract for 79-09: the record intake for
@@ -326,8 +334,8 @@ private __rozieFirstUpdateDone = false;
 <div class="rozie-popover" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-c6cf02ea>
 
   
-  <div class="rozie-popover-anchor" aria-haspopup=${rozieAttr(this.trigger === 'click' ? 'dialog' : null)} aria-expanded=${rozieAttr(this.trigger === 'click' ? !!this.open : null)} aria-controls=${rozieAttr(this.trigger === 'click' && this.open ? this.panelId() : null)} aria-describedby=${rozieAttr(this.isTooltip() && this.open ? this.panelId() : null)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'click' && this.onAnchorClick(); }} @pointerenter=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'hover' && this.onAnchorPointerEnter(); }} @pointerleave=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'hover' && this.onAnchorPointerLeave(); }} @focusin=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'focus' && this.onAnchorFocus(); }} @focusout=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'focus' && this.onAnchorBlur(); }} data-rozie-ref="anchorEl" data-rozie-s-c6cf02ea>
-    ${this.anchor !== undefined ? this.anchor({open: this.open, toggle: this.toggle, show: this.show, hide: this.hide, panelId: this.panelId()}) : html`<slot name="anchor" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open, panelId: this.panelId()}); } catch { return '{}'; } })()} @rozie-anchor-toggle=${($event: CustomEvent) => ((this.toggle) as (...args: any[]) => any)($event.detail)} @rozie-anchor-show=${($event: CustomEvent) => ((this.show) as (...args: any[]) => any)($event.detail)} @rozie-anchor-hide=${($event: CustomEvent) => ((this.hide) as (...args: any[]) => any)($event.detail)}></slot>`}
+  <div class="rozie-popover-anchor" aria-haspopup=${rozieAttr(this.anchorHaspopup())} aria-expanded=${rozieAttr(this.trigger === 'click' ? !!this.open : null)} aria-controls=${rozieAttr(this.trigger === 'click' && this.open ? this.panelId() : null)} aria-describedby=${rozieAttr(this.isTooltip() && this.open ? this.panelId() : null)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'click' && this.onAnchorClick(); }} @pointerenter=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'hover' && this.onAnchorPointerEnter(); }} @pointerleave=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'hover' && this.onAnchorPointerLeave(); }} @focusin=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'focus' && this.onAnchorFocus(); }} @focusout=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.trigger === 'focus' && this.onAnchorBlur(); }} data-rozie-ref="anchorEl" data-rozie-s-c6cf02ea>
+    ${this.anchor !== undefined ? this.anchor({open: this.open, toggle: this.toggle, show: this.show, hide: this.hide, panelId: this.panelId(), popupRole: this.anchorPopupRole()}) : html`<slot name="anchor" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open, panelId: this.panelId(), popupRole: this.anchorPopupRole()}); } catch { return '{}'; } })()} @rozie-anchor-toggle=${($event: CustomEvent) => ((this.toggle) as (...args: any[]) => any)($event.detail)} @rozie-anchor-show=${($event: CustomEvent) => ((this.show) as (...args: any[]) => any)($event.detail)} @rozie-anchor-hide=${($event: CustomEvent) => ((this.hide) as (...args: any[]) => any)($event.detail)}></slot>`}
   </div>
 
   
@@ -650,6 +658,22 @@ private __rozieFirstUpdateDone = false;
   // alike) while keeping the emitted leaf's inferred type a clean `'tooltip' | 'dialog' | undefined`.
   floatingRole = () => this.isTooltip() ? 'tooltip' : this.modal ? 'dialog' : undefined;
 
+  // The `aria-haspopup` value for the consumer's own trigger, handed to the anchor
+  // slot as `popupRole`: none for a tooltip (it describes, it does not pop up).
+  // The popupRole prop narrowed to a valid `aria-haspopup` token (an unknown value
+  // falls back to 'dialog'). Comparing against literals also gives the strict
+  // React/Solid/Vue attribute types the ARIA token union they require.
+  popupToken = () => {
+  const r = this.popupRole;
+  return r !== 'menu' && r !== 'listbox' && r !== 'tree' && r !== 'grid' ? 'dialog' : r;
+};
+
+  anchorPopupRole = () => this.isTooltip() ? null : this.popupToken();
+
+  // The anchor wrapper's own `aria-haspopup`: a click trigger only. `undefined`
+  // (not `null`) for the other triggers, for strict vue-tsc (see floatingRole).
+  anchorHaspopup = () => this.trigger === 'click' ? this.popupToken() : undefined;
+
   // The panel id (audit B1), also handed to the anchor slot as `panelId`.
   panelId = () => this.idBase + '-panel';
 
@@ -710,7 +734,7 @@ private __rozieFirstUpdateDone = false;
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disable-positioning', 'disablepositioning', 'keep-mounted', 'keepmounted', 'match-width', 'matchwidth', 'disable-dismiss', 'disabledismiss', 'id-base', 'idbase', 'reference']);
+    const __skip = new Set<string>(['data-rozie-ref', 'open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disable-positioning', 'disablepositioning', 'keep-mounted', 'keepmounted', 'match-width', 'matchwidth', 'disable-dismiss', 'disabledismiss', 'popup-role', 'popuprole', 'id-base', 'idbase', 'reference']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

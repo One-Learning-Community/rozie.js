@@ -108,6 +108,13 @@
       "tsType": null
     },
     {
+      "name": "popupRole",
+      "isModel": false,
+      "required": false,
+      "type": "String",
+      "tsType": null
+    },
+    {
       "name": "idBase",
       "isModel": false,
       "required": false,
@@ -140,6 +147,9 @@
         },
         {
           "name": "panelId"
+        },
+        {
+          "name": "popupRole"
         }
       ],
       "paramTypes": [
@@ -147,7 +157,8 @@
         "() => void",
         "() => void",
         "() => void",
-        "string"
+        "string",
+        "PopoverPopupRole | null"
       ],
       "isPortal": false,
       "isReactive": false,
@@ -181,5 +192,5 @@
       "signature": "() => void"
     }
   ],
-  "types": null
+  "types": "/** An `aria-haspopup` token: what kind of popup a click popover's panel is (the `popupRole` prop). */\nexport type PopoverPopupRole = 'dialog' | 'menu' | 'listbox' | 'tree' | 'grid';"
 }

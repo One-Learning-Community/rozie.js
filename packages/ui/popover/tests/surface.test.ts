@@ -33,7 +33,7 @@ const EXPECT = {
   // disableDismiss (veto Popover's own Escape/click-outside dismissal for a
   // composing component that drives `open` itself).
   // 260929-lyc (DD-1): + reference. Release-0.8.0 audit B1: + idBase.
-  props: ['open', 'placement', 'strategy', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss', 'reference', 'idBase'],
+  props: ['open', 'placement', 'strategy', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss', 'popupRole', 'reference', 'idBase'],
   models: ['open'],
   // Release-0.8.0 audit B6: the `change` emit is removed (it collided with the
   // native `change` bubbling out of inputs in the panel on Angular/Lit); the
@@ -137,7 +137,8 @@ describe('Popover.rozie surface gate', () => {
     expect(code).toMatch(/=== 'dialog'/);
     // The old buggy form was `isTooltip() ? 'tooltip' : 'dialog'` — a bare
     // unconditional `: 'dialog'` fallback must never reappear (role strings use
-    // single quotes; the static aria-haspopup="dialog" uses double quotes).
-    expect(code).not.toMatch(/: 'dialog'/);
+    // single quotes; the static aria-haspopup="dialog" uses double quotes). The
+    // `popupRole: 'dialog'` prop default is the aria-haspopup token, not a role.
+    expect(code).not.toMatch(/(?<!popupRole): 'dialog'/);
   });
 });

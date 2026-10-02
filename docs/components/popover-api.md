@@ -36,5 +36,5 @@ Declared once via `$expose`; obtained through each framework's native ref mechan
 
 | Slot | Params | Description |
 | --- | --- | --- |
-| `anchor` | `{ open, toggle, show, hide, panelId }` | The trigger element. The scoped params expose the open state, the open/close verbs and the panel's id (`idBase + '-panel'`) so you can build any trigger (a `<button>`, an icon, etc.) with matching `aria-expanded` / `aria-controls`; the gesture handlers wire automatically per `trigger`. |
+| `anchor` | `{ open, toggle, show, hide, panelId, popupRole }` | The trigger element. The scoped params expose the open state, the open/close verbs, the panel's id (`idBase + '-panel'`) and the `aria-haspopup` value (`popupRole`, `null` for a tooltip) so you can build any trigger (a `<button>`, an icon, etc.) with matching `aria-haspopup` / `aria-expanded` / `aria-controls`; the gesture handlers wire automatically per `trigger`. |
 | (default) | — | The floating content. Mounted while `open` (and not `disabled`); with `keepMounted` it stays mounted but hidden while closed. Floating UI positions it relative to the anchor or the `reference`. |

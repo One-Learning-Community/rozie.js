@@ -1,10 +1,14 @@
+<script module lang="ts">
+/** An `aria-haspopup` token: what kind of popup a click popover's panel is (the `popupRole` prop). */
+export type PopoverPopupRole = 'dialog' | 'menu' | 'listbox' | 'tree' | 'grid';
+</script>
 <script lang="ts">
 import { applyListeners, rozieAttr } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 import { onMount, untrack } from 'svelte';
 
-interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'open' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'idBase' | 'reference' | 'anchor' | 'children' | 'snippets'> {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'open' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'popupRole' | 'idBase' | 'reference' | 'anchor' | 'children' | 'snippets'> {
   /**
    * Whether the floating content is open. The sole `model: true` prop, and its change event is the only change signal Popover fires. Bind it two-way — Vue `v-model:open`, React/Solid `open` + `onOpenChange`, Svelte `bind:open`, Angular `[(open)]`, Lit the `open` property + the `open-change` event — and Popover writes the new state back whenever the trigger, a dismissal or the handle toggles it. Left unbound it falls back to an uncontrolled default.
    */
@@ -14,7 +18,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    */
   placement?: string;
   /**
-   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur, or `'manual'` for a composing component that drives `open` itself — every built-in gesture handler no-ops. Drives both the gesture handlers and the ARIA: `'click'` sets `aria-haspopup`/`aria-expanded`/`aria-controls` on the anchor wrapper; `'hover'`/`'focus'` are tooltips (`role="tooltip"` panel, `aria-describedby` on the wrapper, no popup claim); `'manual'` makes no anchor ARIA claim. The wrapper is not focusable, so put the matching attributes on your own focusable trigger too — the `anchor` slot passes `open` and `panelId` for exactly that.
+   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur, or `'manual'` for a composing component that drives `open` itself — every built-in gesture handler no-ops. Drives both the gesture handlers and the ARIA: `'click'` sets `aria-haspopup`/`aria-expanded`/`aria-controls` on the anchor wrapper; `'hover'`/`'focus'` are tooltips (`role="tooltip"` panel, `aria-describedby` on the wrapper, no popup claim); `'manual'` makes no anchor ARIA claim. The wrapper is not focusable, so put the matching attributes on your own focusable trigger too — the `anchor` slot passes `open`, `panelId` and `popupRole` for exactly that. The `aria-haspopup` value is the `popupRole` prop (default `'dialog'`).
    */
   trigger?: string;
   /**
@@ -66,6 +70,10 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    */
   disableDismiss?: boolean;
   /**
+   * The kind of popup the panel content is, announced as `aria-haspopup` on the anchor wrapper of a `click` popover: `'dialog'` (the default), `'menu'`, `'listbox'`, `'tree'` or `'grid'`; any other value is treated as `'dialog'`. Set `'menu'` when the panel hosts a menu (your content carries `role="menu"`), so a menu button keeps the click trigger and its focus return. The `anchor` slot passes the same value as `popupRole` (with `open` and `panelId`) so you can put `aria-haspopup` / `aria-expanded` / `aria-controls` on your own focusable trigger. It is `null` for the tooltip triggers (`'hover'` / `'focus'`), which claim no popup; for `'manual'` it is the prop value, for the trigger you own.
+   */
+  popupRole?: string;
+  /**
    * Id base for the floating panel, whose id is `idBase + '-panel'` — also exposed to the `anchor` slot as `panelId`, so your trigger can set `aria-controls` (click) or `aria-describedby` (tooltip) to it. Set a **distinct** value per instance when more than one popover shares a page. On Lit the panel lives in the element's shadow root, so an id reference from light DOM, including your slotted anchor content, cannot resolve to it; there the anchor wrapper's own attributes, which sit inside the shadow root, carry the reference. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
@@ -73,7 +81,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded`, plus `aria-controls` pointing at `idBase + '-panel'`), typically with `trigger='manual'` and a two-way-bound `open`. If a referenced Element is removed from the document while open, the popover closes. Pass a stable value — a new object on every render restarts tracking.
    */
   reference?: (Element | any) | null;
-  anchor?: Snippet<[{ open: boolean; toggle: () => void; show: () => void; hide: () => void; panelId: string }]>;
+  anchor?: Snippet<[{ open: boolean; toggle: () => void; show: () => void; hide: () => void; panelId: string; popupRole: PopoverPopupRole | null }]>;
   children?: Snippet;
   snippets?: Record<string, any>;
 }
@@ -94,6 +102,7 @@ let {
   keepMounted = false,
   matchWidth = false,
   disableDismiss = false,
+  popupRole = 'dialog',
   idBase = 'rozie-popover',
   reference = null,
   anchor: __anchorProp,
@@ -424,6 +433,19 @@ const isTooltip = () => trigger === 'hover' || trigger === 'focus';
 // `undefined` drops the attribute identically (Vue/Solid nullish-attr drop treats both
 // alike) while keeping the emitted leaf's inferred type a clean `'tooltip' | 'dialog' | undefined`.
 const floatingRole = () => isTooltip() ? 'tooltip' : modal ? 'dialog' : undefined;
+// The `aria-haspopup` value for the consumer's own trigger, handed to the anchor
+// slot as `popupRole`: none for a tooltip (it describes, it does not pop up).
+// The popupRole prop narrowed to a valid `aria-haspopup` token (an unknown value
+// falls back to 'dialog'). Comparing against literals also gives the strict
+// React/Solid/Vue attribute types the ARIA token union they require.
+const popupToken = () => {
+  const r = popupRole;
+  return r !== 'menu' && r !== 'listbox' && r !== 'tree' && r !== 'grid' ? 'dialog' : r;
+};
+const anchorPopupRole = () => isTooltip() ? null : popupToken();
+// The anchor wrapper's own `aria-haspopup`: a click trigger only. `undefined`
+// (not `null`) for the other triggers, for strict vue-tsc (see floatingRole).
+const anchorHaspopup = () => trigger === 'click' ? popupToken() : undefined;
 // The panel id (audit B1), also handed to the anchor slot as `panelId`.
 const panelId = () => idBase + '-panel';
 export function show(): void;
@@ -557,7 +579,7 @@ $effect(() => {
 });
 </script>
 
-<div {...__rozieAttrs} class={["rozie-popover", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-c6cf02ea><div class="rozie-popover-anchor" bind:this={anchorEl} aria-haspopup={rozieAttr(trigger === 'click' ? 'dialog' : null)} aria-expanded={rozieAttr(trigger === 'click' ? !!open : null)} aria-controls={rozieAttr(trigger === 'click' && open ? panelId() : null)} aria-describedby={rozieAttr(isTooltip() && open ? panelId() : null)} onclick={($event) => { trigger === 'click' && onAnchorClick(); }} onpointerenter={($event) => { trigger === 'hover' && onAnchorPointerEnter(); }} onpointerleave={($event) => { trigger === 'hover' && onAnchorPointerLeave(); }} onfocusin={($event) => { trigger === 'focus' && onAnchorFocus(); }} onfocusout={($event) => { trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea>{@render anchor?.({ open, toggle, show, hide, panelId: panelId() })}</div>{#if (open || keepMounted) && !disabled}<div class={["rozie-popover-floating", { 'rozie-popover-floating--static': disablePositioning, 'rozie-popover-floating--bare': bare, 'rozie-popover-floating--hidden': !open }]} bind:this={floatingEl} id={rozieAttr(panelId())} role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea>{#if arrow}<div class="rozie-popover-arrow" bind:this={arrowEl} data-rozie-s-c6cf02ea></div>{/if}{@render children?.()}</div>{/if}</div>
+<div {...__rozieAttrs} class={["rozie-popover", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-c6cf02ea><div class="rozie-popover-anchor" bind:this={anchorEl} aria-haspopup={rozieAttr(anchorHaspopup())} aria-expanded={rozieAttr(trigger === 'click' ? !!open : null)} aria-controls={rozieAttr(trigger === 'click' && open ? panelId() : null)} aria-describedby={rozieAttr(isTooltip() && open ? panelId() : null)} onclick={($event) => { trigger === 'click' && onAnchorClick(); }} onpointerenter={($event) => { trigger === 'hover' && onAnchorPointerEnter(); }} onpointerleave={($event) => { trigger === 'hover' && onAnchorPointerLeave(); }} onfocusin={($event) => { trigger === 'focus' && onAnchorFocus(); }} onfocusout={($event) => { trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea>{@render anchor?.({ open, toggle, show, hide, panelId: panelId(), popupRole: anchorPopupRole() })}</div>{#if (open || keepMounted) && !disabled}<div class={["rozie-popover-floating", { 'rozie-popover-floating--static': disablePositioning, 'rozie-popover-floating--bare': bare, 'rozie-popover-floating--hidden': !open }]} bind:this={floatingEl} id={rozieAttr(panelId())} role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea>{#if arrow}<div class="rozie-popover-arrow" bind:this={arrowEl} data-rozie-s-c6cf02ea></div>{/if}{@render children?.()}</div>{/if}</div>
 
 <style>
 :global {

@@ -29,6 +29,7 @@
 <data>
 {
   panelOpen: false,
+  menuOpen: false,
   lastChange: '',
 }
 </data>
@@ -64,6 +65,17 @@ const valueText = () => ($data.panelOpen ? 'open' : 'closed')
     </template>
     <div class="popover-body" data-testid="popover-content">
       <p>Floating content</p>
+    </div>
+  </Popover>
+
+  <!-- popupRole: a menu button keeps the click trigger and announces a menu,
+       on the wrapper and (via the anchor slot's popupRole) on its own button. -->
+  <Popover r-model:open="$data.menuOpen" trigger="click" popupRole="menu" idBase="demo-menu">
+    <template #anchor="{ open, panelId, popupRole }">
+      <button type="button" data-testid="menu-anchor" :aria-haspopup="popupRole" :aria-expanded="open ? 'true' : 'false'" :aria-controls="open ? panelId : null">Actions</button>
+    </template>
+    <div role="menu" data-testid="menu-content">
+      <button type="button" role="menuitem">Rename</button>
     </div>
   </Popover>
 </div>

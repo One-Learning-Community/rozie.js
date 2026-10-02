@@ -32,9 +32,12 @@ import { buildMiddleware } from './internal/middleware';
 //   Same null-let convention as the others: read/written only in handlers, `any`
 //   via typeNeutralize.
 
-interface AnchorCtx { open: boolean; toggle: () => void; show: () => void; hide: () => void; panelId: string; }
+/** An `aria-haspopup` token: what kind of popup a click popover's panel is (the `popupRole` prop). */
+export type PopoverPopupRole = 'dialog' | 'menu' | 'listbox' | 'tree' | 'grid';
 
-interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'idBase' | 'reference' | 'renderAnchor' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
+interface AnchorCtx { open: boolean; toggle: () => void; show: () => void; hide: () => void; panelId: string; popupRole: PopoverPopupRole | null; }
+
+interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'popupRole' | 'idBase' | 'reference' | 'renderAnchor' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * Whether the floating content is open. The sole `model: true` prop, and its change event is the only change signal Popover fires. Bind it two-way — Vue `v-model:open`, React/Solid `open` + `onOpenChange`, Svelte `bind:open`, Angular `[(open)]`, Lit the `open` property + the `open-change` event — and Popover writes the new state back whenever the trigger, a dismissal or the handle toggles it. Left unbound it falls back to an uncontrolled default.
    */
@@ -46,7 +49,7 @@ interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'di
    */
   placement?: string;
   /**
-   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur, or `'manual'` for a composing component that drives `open` itself — every built-in gesture handler no-ops. Drives both the gesture handlers and the ARIA: `'click'` sets `aria-haspopup`/`aria-expanded`/`aria-controls` on the anchor wrapper; `'hover'`/`'focus'` are tooltips (`role="tooltip"` panel, `aria-describedby` on the wrapper, no popup claim); `'manual'` makes no anchor ARIA claim. The wrapper is not focusable, so put the matching attributes on your own focusable trigger too — the `anchor` slot passes `open` and `panelId` for exactly that.
+   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur, or `'manual'` for a composing component that drives `open` itself — every built-in gesture handler no-ops. Drives both the gesture handlers and the ARIA: `'click'` sets `aria-haspopup`/`aria-expanded`/`aria-controls` on the anchor wrapper; `'hover'`/`'focus'` are tooltips (`role="tooltip"` panel, `aria-describedby` on the wrapper, no popup claim); `'manual'` makes no anchor ARIA claim. The wrapper is not focusable, so put the matching attributes on your own focusable trigger too — the `anchor` slot passes `open`, `panelId` and `popupRole` for exactly that. The `aria-haspopup` value is the `popupRole` prop (default `'dialog'`).
    */
   trigger?: string;
   /**
@@ -98,6 +101,10 @@ interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'di
    */
   disableDismiss?: boolean;
   /**
+   * The kind of popup the panel content is, announced as `aria-haspopup` on the anchor wrapper of a `click` popover: `'dialog'` (the default), `'menu'`, `'listbox'`, `'tree'` or `'grid'`; any other value is treated as `'dialog'`. Set `'menu'` when the panel hosts a menu (your content carries `role="menu"`), so a menu button keeps the click trigger and its focus return. The `anchor` slot passes the same value as `popupRole` (with `open` and `panelId`) so you can put `aria-haspopup` / `aria-expanded` / `aria-controls` on your own focusable trigger. It is `null` for the tooltip triggers (`'hover'` / `'focus'`), which claim no popup; for `'manual'` it is the prop value, for the trigger you own.
+   */
+  popupRole?: string;
+  /**
    * Id base for the floating panel, whose id is `idBase + '-panel'` — also exposed to the `anchor` slot as `panelId`, so your trigger can set `aria-controls` (click) or `aria-describedby` (tooltip) to it. Set a **distinct** value per instance when more than one popover shares a page. On Lit the panel lives in the element's shadow root, so an id reference from light DOM, including your slotted anchor content, cannot resolve to it; there the anchor wrapper's own attributes, which sit inside the shadow root, carry the reference. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
@@ -118,7 +125,7 @@ export interface PopoverHandle {
 }
 
 const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props: PopoverProps, ref): JSX.Element {
-  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'idBase' | 'reference'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean; keepMounted: boolean; matchWidth: boolean; disableDismiss: boolean; idBase: string; reference: (Element | Record<string, any>) | null } = {
+  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'popupRole' | 'idBase' | 'reference'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean; keepMounted: boolean; matchWidth: boolean; disableDismiss: boolean; popupRole: string; idBase: string; reference: (Element | Record<string, any>) | null } = {
     ..._props,
     placement: _props.placement ?? 'bottom',
     trigger: _props.trigger ?? 'click',
@@ -134,12 +141,13 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     keepMounted: _props.keepMounted ?? false,
     matchWidth: _props.matchWidth ?? false,
     disableDismiss: _props.disableDismiss ?? false,
+    popupRole: _props.popupRole ?? 'dialog',
     idBase: _props.idBase ?? 'rozie-popover',
     reference: _props.reference ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, matchWidth, disableDismiss, idBase, reference, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as PopoverProps & Record<string, unknown>;
-    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void matchWidth; void disableDismiss; void idBase; void reference; void defaultValue; void onOpenChange; void defaultOpen;
+    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, matchWidth, disableDismiss, popupRole, idBase, reference, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as PopoverProps & Record<string, unknown>;
+    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void matchWidth; void disableDismiss; void popupRole; void idBase; void reference; void defaultValue; void onOpenChange; void defaultOpen;
     return rest;
   })();
   const anchorNode = useRef<any>(null);
@@ -483,6 +491,23 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   function floatingRole() {
     return isTooltip() ? 'tooltip' : props.modal ? 'dialog' : undefined;
   }
+  // The `aria-haspopup` value for the consumer's own trigger, handed to the anchor
+  // slot as `popupRole`: none for a tooltip (it describes, it does not pop up).
+  // The popupRole prop narrowed to a valid `aria-haspopup` token (an unknown value
+  // falls back to 'dialog'). Comparing against literals also gives the strict
+  // React/Solid/Vue attribute types the ARIA token union they require.
+  function popupToken() {
+    const r = props.popupRole;
+    return r !== 'menu' && r !== 'listbox' && r !== 'tree' && r !== 'grid' ? 'dialog' : r;
+  }
+  function anchorPopupRole() {
+    return isTooltip() ? null : popupToken();
+  }
+  // The anchor wrapper's own `aria-haspopup`: a click trigger only. `undefined`
+  // (not `null`) for the other triggers, for strict vue-tsc (see floatingRole).
+  function anchorHaspopup() {
+    return props.trigger === 'click' ? popupToken() : undefined;
+  }
   // The panel id (audit B1), also handed to the anchor slot as `panelId`.
   function panelId() {
     return props.idBase + '-panel';
@@ -623,8 +648,8 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     <div {...attrs} className={clsx("rozie-popover", (attrs.className as string | undefined))} data-rozie-s-c6cf02ea="">
 
       
-      <div className={"rozie-popover-anchor"} ref={anchorEl} aria-haspopup={rozieAttr(props.trigger === 'click' ? 'dialog' : undefined)} aria-expanded={(props.trigger === 'click' ? !!open : undefined) ?? undefined} aria-controls={rozieAttr(props.trigger === 'click' && open ? panelId() : undefined)} aria-describedby={rozieAttr(isTooltip() && open ? panelId() : undefined)} onClick={($event) => { props.trigger === 'click' && onAnchorClick(); }} onPointerEnter={($event) => { props.trigger === 'hover' && onAnchorPointerEnter(); }} onPointerLeave={($event) => { props.trigger === 'hover' && onAnchorPointerLeave(); }} onFocus={($event) => { props.trigger === 'focus' && onAnchorFocus(); }} onBlur={($event) => { props.trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea="">
-        {(props.renderAnchor ?? props.slots?.['anchor'])?.({ open, toggle, show, hide, panelId: panelId() })}
+      <div className={"rozie-popover-anchor"} ref={anchorEl} aria-haspopup={rozieAttr(anchorHaspopup())} aria-expanded={(props.trigger === 'click' ? !!open : undefined) ?? undefined} aria-controls={rozieAttr(props.trigger === 'click' && open ? panelId() : undefined)} aria-describedby={rozieAttr(isTooltip() && open ? panelId() : undefined)} onClick={($event) => { props.trigger === 'click' && onAnchorClick(); }} onPointerEnter={($event) => { props.trigger === 'hover' && onAnchorPointerEnter(); }} onPointerLeave={($event) => { props.trigger === 'hover' && onAnchorPointerLeave(); }} onFocus={($event) => { props.trigger === 'focus' && onAnchorFocus(); }} onBlur={($event) => { props.trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea="">
+        {(props.renderAnchor ?? props.slots?.['anchor'])?.({ open, toggle, show, hide, panelId: panelId(), popupRole: anchorPopupRole() })}
       </div>
 
       

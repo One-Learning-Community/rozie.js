@@ -97,4 +97,29 @@ for (const target of TARGETS) {
     await expect(panel).toBeVisible({ timeout: 10_000 });
     await expect(value).toHaveText('open');
   });
+
+  // oinbox feedback (Popover 0.2.4, hosting a menu): `popupRole` sets the click
+  // trigger's aria-haspopup (it was hardcoded to "dialog"), and the anchor slot
+  // passes the same token so a consumer's own <button> can carry it. The default
+  // instance keeps "dialog".
+  runner(`popover [${target}]: popupRole="menu" reaches the anchor wrapper and the anchor slot`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=PopoverBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const menuButton = page.getByTestId('menu-anchor');
+    await expect(menuButton).toHaveAttribute('aria-haspopup', 'menu');
+    await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+
+    const wrappers = page.locator('.rozie-popover-anchor');
+    await expect(wrappers).toHaveCount(2);
+    await expect(wrappers.nth(0)).toHaveAttribute('aria-haspopup', 'dialog');
+    await expect(wrappers.nth(1)).toHaveAttribute('aria-haspopup', 'menu');
+
+    await menuButton.click();
+    await expect(page.locator('.rozie-popover-floating')).toHaveCount(1, { timeout: 10_000 });
+    await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+    await expect(menuButton).toHaveAttribute('aria-controls', 'demo-menu-panel');
+  });
 }

@@ -1,6 +1,6 @@
 ---
 title: Popover — comparison
-surface_hash: fb04acad1f5c
+surface_hash: 4511d327e978
 ---
 
 # Popover — how it compares
@@ -20,7 +20,7 @@ Floating UI ships first-class bindings for some frameworks and nothing for other
 
 ## vs Radix Popover / Headless UI
 
-Radix and Headless UI are React-first (Radix has a Vue port; Headless UI covers React + Vue). They bundle a rich accessibility + focus-trap layer that this primitive deliberately keeps minimal (it wires `role`/`aria-expanded`/`aria-controls`/`aria-describedby` + Escape/click-outside dismissal and returns focus on close, and leaves focus-trapping to the consumer). Choose Radix/Headless UI for a batteries-included React/Vue popover; choose `@rozie-ui/popover` when you need the **same headless positioning primitive across React, Vue, Svelte, Angular, Solid, and Lit** with a single API.
+Radix and Headless UI are React-first (Radix has a Vue port; Headless UI covers React + Vue). They bundle a rich accessibility + focus-trap layer that this primitive deliberately keeps minimal (it wires `role`/`aria-haspopup`/`aria-expanded`/`aria-controls`/`aria-describedby` + Escape/click-outside dismissal and returns focus on close, and leaves focus-trapping to the consumer). Choose Radix/Headless UI for a batteries-included React/Vue popover; choose `@rozie-ui/popover` when you need the **same headless positioning primitive across React, Vue, Svelte, Angular, Solid, and Lit** with a single API.
 
 ## vs Tippy.js / Floating Vue (tooltips)
 
@@ -30,4 +30,5 @@ Tippy.js is a popular standalone tooltip library (its v6 line is built on Popper
 
 - You need a full focus-trap + dismissable-layer stack on React only → `@floating-ui/react` or Radix.
 - You need a modal dialog (not a positioned floating element) → use [`@rozie-ui/dialog`](/components/dialog).
+- You need a complete menu button (roving focus, Home/End, typeahead, Tab closing the menu) → Popover can host the menu (`popupRole="menu"` announces it, on the wrapper and via the `anchor` slot on your own button), but the menu's keyboard model is yours; there is no Rozie Menu component yet.
 - You want a select/combobox listbox → use [`@rozie-ui/listbox`](/components/listbox) or [`@rozie-ui/combobox`](/components/combobox), which own their own keyboard/selection model.
