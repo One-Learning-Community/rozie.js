@@ -53,7 +53,7 @@ const events = ref([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
   let events = $state([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
 </script>
 
-<FullCalendar bind:view {events} oneventClick={(e) => console.log(e.event, e.el)} />
+<FullCalendar bind:view {events} oneventclick={(e) => console.log(e.event, e.el)} />
 ```
 
 ```ts [Angular]

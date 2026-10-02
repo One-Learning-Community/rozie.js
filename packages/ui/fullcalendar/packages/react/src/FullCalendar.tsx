@@ -33,14 +33,20 @@ export interface FullCalendarEventPointer {
   jsEvent: MouseEvent;
   el: HTMLElement;
 }
+/** `dateClick` payload — `dayEl` is the clicked day cell (an anchor for a popover). */
 export interface FullCalendarDateClick {
   date: Date;
   dateStr: string;
   allDay: boolean;
+  dayEl: HTMLElement;
+  jsEvent: MouseEvent;
 }
+/** `eventDrop` payload — call `revert()` to reject the move; `oldEvent` is the event before it. */
 export interface FullCalendarEventDrop {
   event: FullCalendarEventRef;
+  oldEvent: FullCalendarEventRef;
   delta: Duration;
+  revert: () => void;
 }
 export interface FullCalendarSelection {
   start: Date;
@@ -49,10 +55,13 @@ export interface FullCalendarSelection {
   endStr: string;
   allDay: boolean;
 }
+/** `eventResize` payload — call `revert()` to reject the resize; `oldEvent` is the event before it. */
 export interface FullCalendarEventResize {
   event: FullCalendarEventRef;
+  oldEvent: FullCalendarEventRef;
   startDelta: Duration;
   endDelta: Duration;
+  revert: () => void;
 }
 export interface FullCalendarDatesSet {
   start: Date;
@@ -99,7 +108,7 @@ interface NoEventsContentCtx { arg: FullCalendarNoEventsContentArg; }
 
 interface FullCalendarProps {
   /**
-   * The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
+   * The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id; an untitled event gets an `aria-label` so it still has an accessible name), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array replaces only the events this prop supplied; events from `options.eventSources` or added through the `addEvent` verb are kept.
    */
   events?: any[];
   /**
@@ -123,7 +132,7 @@ interface FullCalendarProps {
    */
   selectable?: boolean;
   /**
-   * The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. This curated prop wins over `options.height` because curated keys are applied after the `:options` spread, so size the calendar through `height` itself. Runtime-updatable via `setOption`.
+   * The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. An empty string, `null`, or a number that is not positive falls back to the default `480`. This curated prop wins over `options.height` at mount and after it (`:options` never applies a curated key), so size the calendar through `height` itself. Runtime-updatable via `setOption`.
    */
   height?: string | number;
   /**
@@ -135,9 +144,9 @@ interface FullCalendarProps {
    */
   locale?: string;
   /**
-   * First day of the week (`0` = Sunday … `1` = Monday). Runtime-updatable via `setOption`.
+   * First day of the week (`0` = Sunday … `1` = Monday). Leave it unset (`null`, the default) to use the `locale`'s first day, e.g. Monday for `de`. Runtime-updatable via `setOption`; setting it back to `null` after mount keeps the last applied day until remount.
    */
-  firstDay?: number;
+  firstDay?: (number) | null;
   /**
    * Time-grid slot length in `HH:mm:ss`. Runtime-updatable via `setOption`.
    */
@@ -151,7 +160,7 @@ interface FullCalendarProps {
    */
   headerToolbar?: Record<string, any>;
   /**
-   * Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface does not special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Spread **first** into the engine config so the curated props/events/slots win on key collision; `:options` only fills gaps. Runtime-updatable per key via `setOption` (no key-removal reset — a removed key keeps its last applied value until remount; use `getApi()` for full imperative control). The `plugins` key is the one exception that **merges** with the baked-in defaults instead of overriding them, making the wrapper consumer-extensible.
+   * Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface does not special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Curated keys (the props above, `events`, every wrapped callback and filled `*Content` slot) always win: `:options` never overrides them, at mount or later. Runtime-updatable per key via `setOption`, and only for keys whose value actually changed — plain arrays and objects compare by content, so an inline literal re-created on every parent render (an inline `eventSources` list, say) does not refetch. Functions compare by identity. A removed key keeps its last applied value until remount; use `getApi()` for full imperative control. The `plugins` key is the one exception that **merges** with the baked-in defaults instead of overriding them, making the wrapper consumer-extensible.
    */
   options?: Record<string, any>;
   onEventClick?: (payload: FullCalendarEventClick) => void;
@@ -206,7 +215,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     right: 'dayGridMonth,timeGridWeek,timeGridDay'
   }))())[0];
   const __defaultOptions = useState(() => (() => ({}))())[0];
-  const props: Omit<FullCalendarProps, 'events' | 'weekends' | 'editable' | 'selectable' | 'height' | 'defaultColor' | 'locale' | 'firstDay' | 'slotDuration' | 'nowIndicator' | 'headerToolbar' | 'options'> & { events: any[]; weekends: boolean; editable: boolean; selectable: boolean; height: string | number; defaultColor: string; locale: string; firstDay: number; slotDuration: string; nowIndicator: boolean; headerToolbar: Record<string, any>; options: Record<string, any> } = {
+  const props: Omit<FullCalendarProps, 'events' | 'weekends' | 'editable' | 'selectable' | 'height' | 'defaultColor' | 'locale' | 'firstDay' | 'slotDuration' | 'nowIndicator' | 'headerToolbar' | 'options'> & { events: any[]; weekends: boolean; editable: boolean; selectable: boolean; height: string | number; defaultColor: string; locale: string; firstDay: (number) | null; slotDuration: string; nowIndicator: boolean; headerToolbar: Record<string, any>; options: Record<string, any> } = {
     ..._props,
     events: _props.events ?? __defaultEvents,
     weekends: _props.weekends ?? true,
@@ -215,7 +224,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     height: _props.height ?? 480,
     defaultColor: _props.defaultColor ?? '#3b82f6',
     locale: _props.locale ?? 'en',
-    firstDay: _props.firstDay ?? 0,
+    firstDay: _props.firstDay ?? null,
     slotDuration: _props.slotDuration ?? '00:30:00',
     nowIndicator: _props.nowIndicator ?? false,
     headerToolbar: _props.headerToolbar ?? __defaultHeaderToolbar,
@@ -394,7 +403,10 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     },
   };
   const suppressViewSync = useRef(false);
+  const curatedKeys = useRef(new Set());
+  const appliedOptions = useRef(new Map());
   const instance = useRef<any>(null);
+  const eventsSource = useRef<any>(null);
   const [view, setView] = useControllableState({
     value: props.view,
     defaultValue: props.defaultView ?? 'dayGridMonth',
@@ -460,15 +472,30 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
   const _watch10First = useRef(true);
   const _watch11First = useRef(true);
 
+  // The `:options` values last handed to FullCalendar, per key, so the runtime
+  // reconcile only calls setOption for keys whose value actually changed.
+  // Keys the wrapper itself sets (curated props, wrapped callbacks, filled
+  // *Content slots). `:options` never overrides them, at mount or at runtime.
+  // The event source the `events` prop owns. Reconciling replaces only this
+  // source, so events from `options.eventSources` or the `addEvent` verb survive.
   const PLUGINS = useMemo(() => [dayGridPlugin, timeGridPlugin, interactionPlugin], []);
+  // Mirrors the `height` prop default.
+  const DEFAULT_HEIGHT = useMemo(() => 480, []);
   // A purely numeric string height ('600') means pixels. Needed because a static
   // Vue/Angular/Lit attribute arrives as a string, and Lit's String converter (see
   // the height prop) would otherwise regress `height="600"`, which the old Number
-  // converter turned into 600. Anything else ('auto', '100%', '32rem', a number)
-  // passes through unchanged.
+  // converter turned into 600. Any other CSS height ('auto', '100%', '32rem')
+  // passes through. An empty string, null/undefined, or a non-positive number
+  // falls back to the default so every target sizes the calendar the same way.
   const normalizeHeight = useCallback((h: any) => {
-    if (typeof h === 'string' && /^\d+(\.\d+)?$/.test(h.trim())) return Number(h);
-    return h;
+    let v = h;
+    if (typeof v === 'string') {
+      const t = v.trim();
+      if (t === '') return DEFAULT_HEIGHT;
+      if (/^\d+(\.\d+)?$/.test(t)) v = Number(t);else return t;
+    }
+    if (typeof v !== 'number' || !(v > 0)) return DEFAULT_HEIGHT;
+    return v;
   }, []);
   const normalizeEvent = useCallback((e: any) => {
     // Object spread — common reconcile shape: pass user props through, normalize
@@ -480,12 +507,38 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       color: e.color || props.defaultColor
     };
   }, [props.defaultColor]);
+  // The normalized event ref every payload carries.
+  const eventRef = useCallback((e: any) => ({
+    id: e.id,
+    title: e.title,
+    start: e.start,
+    end: e.end
+  }), []);
+  // Structural equality for plain option values (arrays and plain objects by
+  // content, everything else — functions included — by identity). Lets an inline
+  // `:options` literal re-created on every parent render stay a no-op.
+  function sameOptionValue(a: any, b: any) {
+    if (a === b) return true;
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) if (!sameOptionValue(a[i], b[i])) return false;
+      return true;
+    }
+    const isPlain = (o: any) => o !== null && typeof o === 'object' && (Object.getPrototypeOf(o) === Object.prototype || Object.getPrototypeOf(o) === null);
+    if (isPlain(a) && isPlain(b)) {
+      const ka = Object.keys(a);
+      if (ka.length !== Object.keys(b).length) return false;
+      for (const k of ka as any) if (!(k in b) || !sameOptionValue(a[k], b[k])) return false;
+      return true;
+    }
+    return false;
+  }
   // Imperative handle (Phase 21 $expose). The 16 calendar verbs a consumer can't
   // drive through props alone — exposed uniformly to all 6 targets
   // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
   // Angular+Lit public method / Solid callback ref). Each delegates to the
-  // underlying Calendar instance, which is null before $onMount (unmount
-  // destroys it but keeps the reference) — callers handle the pre-mount null.
+  // underlying Calendar instance, which is null before $onMount and again after
+  // unmount (destroyed and cleared) — callers handle the null.
   //
   // Collision discipline (the load-bearing flatpickr lesson): no exposed name may
   // collide with an emitted event (eventClick/dateClick/eventDrop/eventResize/
@@ -505,8 +558,9 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
   function changeView(...a: any[]) {
     return instance.current?.changeView(...a);
   }
-  function addEvent(...a: any[]) {
-    return instance.current?.addEvent(...a);
+  // Normalized like the `events` prop (title, defaultColor).
+  function addEvent(event: any, source: any) {
+    return instance.current?.addEvent(normalizeEvent(event), source);
   }
   function removeEvent(id: any) {
     instance.current?.getEventById(id)?.remove();
@@ -548,24 +602,23 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     instance.current?.unselect();
   }
 
-  const _normalizeEventRef = useRef(normalizeEvent);
-  _normalizeEventRef.current = normalizeEvent;
   useEffect(() => {
-    const _normalizeEventStable: typeof _normalizeEventRef.current = (...args) => _normalizeEventRef.current(...args);
-    const opts: Record<string, any> = {
-      // :options passthrough spread FIRST — the curated keys below + the portal
-      // *Content handlers added after this object override any colliding key, so
-      // an explicitly-bound prop (e.g. :height) wins over options.height.
-      //
-      // EXCEPTION — `plugins` is the one curated key that AUGMENTS rather than
-      // overrides: instead of clobbering a consumer-supplied `:options.plugins`,
-      // it MERGES the always-on baked-in defaults (dayGrid + timeGrid +
-      // interaction) with any consumer-added plugins. This makes the wrapper
-      // consumer-extensible (opt-in) — a consumer can engage list/rrule/premium/
-      // etc. via `:options="{ plugins: [listPlugin] }"` with NO bundle cost and NO
-      // per-plugin wrapper code. FullCalendar dedupes plugins by identity, so a
-      // consumer re-passing a default is harmless.
-      ..._optionsRef.current,
+    // The curated config — every key the wrapper owns. The `:options`
+    // passthrough below fills only the gaps (curated keys always win).
+    //
+    // EXCEPTION — `plugins` is the one curated key that AUGMENTS rather than
+    // overrides: instead of clobbering a consumer-supplied `:options.plugins`,
+    // it MERGES the always-on baked-in defaults (dayGrid + timeGrid +
+    // interaction) with any consumer-added plugins. This makes the wrapper
+    // consumer-extensible (opt-in) — a consumer can engage list/rrule/premium/
+    // etc. via `:options="{ plugins: [listPlugin] }"` with NO bundle cost and NO
+    // per-plugin wrapper code. FullCalendar dedupes plugins by identity, so a
+    // consumer re-passing a default is harmless.
+    // A null-let (typeNeutralize → `any` in every leaf): keys are added below
+    // (`firstDay`, the filled *Content slots), which a strict object-literal type
+    // would reject (TS2339).
+    let curated: any = null;
+    curated = {
       plugins: [...PLUGINS, ...(_optionsRef.current?.plugins ?? [])],
       initialView: _viewRef.current,
       weekends: _weekendsRef.current,
@@ -573,21 +626,14 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       selectable: _selectableRef.current,
       height: normalizeHeight(_heightRef.current),
       locale: _localeRef.current,
-      firstDay: _firstDayRef.current,
       slotDuration: _slotDurationRef.current,
       nowIndicator: _nowIndicatorRef.current,
-      events: _eventsRef.current.map(_normalizeEventStable),
       // D-02: a consumer-passed headerToolbar fully REPLACES the built-in
       // toolbar; the built-in default lives in the `headerToolbar` prop default.
       headerToolbar: _headerToolbarRef.current,
       eventClick: (info: any) => {
         _onEventClickRef.current && _onEventClickRef.current({
-          event: {
-            id: info.event.id,
-            title: info.event.title,
-            start: info.event.start,
-            end: info.event.end
-          },
+          event: eventRef(info.event),
           jsEvent: info.jsEvent,
           el: info.el
         });
@@ -596,18 +642,17 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         _onDateClickRef.current && _onDateClickRef.current({
           date: info.date,
           dateStr: info.dateStr,
-          allDay: info.allDay
+          allDay: info.allDay,
+          dayEl: info.dayEl,
+          jsEvent: info.jsEvent
         });
       },
       eventDrop: (info: any) => {
         _onEventDropRef.current && _onEventDropRef.current({
-          event: {
-            id: info.event.id,
-            title: info.event.title,
-            start: info.event.start,
-            end: info.event.end
-          },
-          delta: info.delta
+          event: eventRef(info.event),
+          oldEvent: eventRef(info.oldEvent),
+          delta: info.delta,
+          revert: info.revert
         });
       },
       select: (info: any) => {
@@ -621,14 +666,11 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       },
       eventResize: (info: any) => {
         _onEventResizeRef.current && _onEventResizeRef.current({
-          event: {
-            id: info.event.id,
-            title: info.event.title,
-            start: info.event.start,
-            end: info.event.end
-          },
+          event: eventRef(info.event),
+          oldEvent: eventRef(info.oldEvent),
           startDelta: info.startDelta,
-          endDelta: info.endDelta
+          endDelta: info.endDelta,
+          revert: info.revert
         });
       },
       datesSet: (info: any) => {
@@ -640,24 +682,14 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       },
       eventMouseEnter: (info: any) => {
         _onEventMouseEnterRef.current && _onEventMouseEnterRef.current({
-          event: {
-            id: info.event.id,
-            title: info.event.title,
-            start: info.event.start,
-            end: info.event.end
-          },
+          event: eventRef(info.event),
           jsEvent: info.jsEvent,
           el: info.el
         });
       },
       eventMouseLeave: (info: any) => {
         _onEventMouseLeaveRef.current && _onEventMouseLeaveRef.current({
-          event: {
-            id: info.event.id,
-            title: info.event.title,
-            start: info.event.start,
-            end: info.event.end
-          },
+          event: eventRef(info.event),
           jsEvent: info.jsEvent,
           el: info.el
         });
@@ -678,12 +710,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         // `eventsSet` receives the array of current EventApi objects — map each to
         // the normalized floor shape for persistence/sync consumers.
         _onEventsSetRef.current && _onEventsSetRef.current({
-          events: events.map((e: any) => ({
-            id: e.id,
-            title: e.title,
-            start: e.start,
-            end: e.end
-          }))
+          events: events.map(eventRef)
         });
       },
       viewDidMount: (info: any) => {
@@ -694,8 +721,21 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
           return;
         }
         if (info.view.type !== _viewRef.current) setView(info.view.type);
+      },
+      eventDidMount: (info: any) => {
+        // Every event is focusable (the wrapper always handles eventClick), so an
+        // untitled one needs an accessible name. A consumer's own
+        // `options.eventDidMount` still runs, read live so updates apply.
+        if (!info.event.title && info.el && !info.el.hasAttribute('aria-label')) {
+          info.el.setAttribute('aria-label', info.timeText ? `Untitled event, ${info.timeText}` : 'Untitled event');
+        }
+        const own = _optionsRef.current?.eventDidMount;
+        if (typeof own === 'function') own(info);
       }
     };
+    // Unset (null) keeps the locale's own first day. Never pass the key empty:
+    // FullCalendar's Number refiner would turn `undefined` into NaN.
+    if (typeof _firstDayRef.current === 'number') curated.firstDay = _firstDayRef.current;
 
     // Portal-slot primitive (Spike 003) — when a consumer supplies an `event`
     // slot, route every cell render through it. The portal helper mounts the
@@ -705,7 +745,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     // the cell is removed. Consumers that don't fill the slot get FullCalendar's
     // default rendering (title text) — guarded by `$slots.event`.
     if ((props.renderEvent ?? props.slots?.["event"])) {
-      opts.eventContent = (arg: any) => {
+      curated.eventContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.event(node, {
           arg
@@ -718,10 +758,11 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     }
     // The 9 remaining *Content portal-slots — wired identically to `event`, one
     // per FullCalendar per-cell content hook. Each guarded by its own slot so
-    // unfilled slots keep FullCalendar's default rendering. (10 portal-slots total
-    // counting `event` above; allDayContent + slotLaneContent are the two timeGrid
-    // axis/lane hooks, and noEventsContent is the list-view "no events" hook —
-    // inert unless the consumer engages @fullcalendar/list via :options.plugins.)
+    // unfilled slots keep FullCalendar's default rendering (or an
+    // `options.*Content` passthrough). (10 portal-slots total counting `event`
+    // above; allDayContent + slotLaneContent are the two timeGrid axis/lane
+    // hooks, and noEventsContent is the list-view "no events" hook — inert
+    // unless the consumer engages @fullcalendar/list via :options.plugins.)
     //
     // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
     // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
@@ -729,7 +770,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
     // unifies snippets and props into one `$props` namespace.
     if ((props.renderDayCell ?? props.slots?.["dayCell"])) {
-      opts.dayCellContent = (arg: any) => {
+      curated.dayCellContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.dayCell(node, {
           arg
@@ -741,7 +782,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       };
     }
     if ((props.renderDayHeader ?? props.slots?.["dayHeader"])) {
-      opts.dayHeaderContent = (arg: any) => {
+      curated.dayHeaderContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.dayHeader(node, {
           arg
@@ -753,7 +794,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       };
     }
     if ((props.renderSlotLabel ?? props.slots?.["slotLabel"])) {
-      opts.slotLabelContent = (arg: any) => {
+      curated.slotLabelContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.slotLabel(node, {
           arg
@@ -765,7 +806,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       };
     }
     if ((props.renderWeekNumber ?? props.slots?.["weekNumber"])) {
-      opts.weekNumberContent = (arg: any) => {
+      curated.weekNumberContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.weekNumber(node, {
           arg
@@ -777,7 +818,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       };
     }
     if ((props.renderNowIndicatorContent ?? props.slots?.["nowIndicatorContent"])) {
-      opts.nowIndicatorContent = (arg: any) => {
+      curated.nowIndicatorContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.nowIndicatorContent(node, {
           arg
@@ -789,7 +830,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       };
     }
     if ((props.renderMoreLink ?? props.slots?.["moreLink"])) {
-      opts.moreLinkContent = (arg: any) => {
+      curated.moreLinkContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.moreLink(node, {
           arg
@@ -801,7 +842,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       };
     }
     if ((props.renderAllDayContent ?? props.slots?.["allDayContent"])) {
-      opts.allDayContent = (arg: any) => {
+      curated.allDayContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.allDayContent(node, {
           arg
@@ -813,7 +854,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       };
     }
     if ((props.renderSlotLaneContent ?? props.slots?.["slotLaneContent"])) {
-      opts.slotLaneContent = (arg: any) => {
+      curated.slotLaneContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.slotLaneContent(node, {
           arg
@@ -831,7 +872,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     // the bundled-only plugin set there is no list view, so this hook never fires
     // — by design, documented, zero bundle cost.
     if ((props.renderNoEventsContent ?? props.slots?.["noEventsContent"])) {
-      opts.noEventsContent = (arg: any) => {
+      curated.noEventsContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.noEventsContent(node, {
           arg
@@ -842,20 +883,32 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         };
       };
     }
-    instance.current = new Calendar(__rozieRoot.current!, opts);
+
+    // `events` is curated too: the prop owns its own event source (below), so an
+    // `options.events` is ignored, exactly as before.
+    curatedKeys.current = new Set([...Object.keys(curated), 'events']);
+    const passthrough = Object.fromEntries(Object.entries(_optionsRef.current ?? {}).filter(([k]: any) => !curatedKeys.current.has(k)));
+    appliedOptions.current = new Map(Object.entries(passthrough));
+    instance.current = new Calendar(__rozieRoot.current!, {
+      ...passthrough,
+      ...curated
+    });
+    eventsSource.current = instance.current.addEventSource(_eventsRef.current.map(normalizeEvent));
     instance.current.render();
     return () => {
       for (const root of portalRoots.current) root.unmount();
   portalRoots.current.clear();
       instance.current?.destroy();
+      instance.current = null;
+      eventsSource.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     const v = props.events;
     if (!instance.current) return;
-    instance.current.removeAllEvents();
-    for (const e of v as any) instance.current.addEvent(normalizeEvent(e));
+    eventsSource.current?.remove();
+    eventsSource.current = instance.current.addEventSource((v ?? []).map(normalizeEvent));
   }, [props.events]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
@@ -893,7 +946,9 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
   useEffect(() => {
     if (_watch7First.current) { _watch7First.current = false; return; }
     const v = props.firstDay;
-    instance.current?.setOption('firstDay', v);
+    if (!instance.current || typeof v !== 'number') return;
+    curatedKeys.current.add('firstDay');
+    instance.current.setOption('firstDay', v);
   }, [props.firstDay]);
   useEffect(() => {
     if (_watch8First.current) { _watch8First.current = false; return; }
@@ -913,9 +968,14 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
   useEffect(() => {
     if (_watch11First.current) { _watch11First.current = false; return; }
     const v = props.options;
-    if (!instance.current) return;
-    for (const k in v) instance.current.setOption(k, v[k]);
-  }, [props.options]);
+    if (!instance.current || !v) return;
+    for (const k in v) {
+      if (curatedKeys.current.has(k)) continue;
+      if (sameOptionValue(appliedOptions.current.get(k), v[k])) continue;
+      appliedOptions.current.set(k, v[k]);
+      instance.current.setOption(k, v[k]);
+    }
+  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieExposeRef = useRef({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate, getDate, getEvents, scrollToTime, updateSize, prevYear, nextYear, selectRange, clearSelection });
   _rozieExposeRef.current = { getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate, getDate, getEvents, scrollToTime, updateSize, prevYear, nextYear, selectRange, clearSelection };

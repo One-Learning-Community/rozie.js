@@ -26,14 +26,20 @@ export interface FullCalendarEventPointer {
   jsEvent: MouseEvent;
   el: HTMLElement;
 }
+/** `dateClick` payload — `dayEl` is the clicked day cell (an anchor for a popover). */
 export interface FullCalendarDateClick {
   date: Date;
   dateStr: string;
   allDay: boolean;
+  dayEl: HTMLElement;
+  jsEvent: MouseEvent;
 }
+/** `eventDrop` payload — call `revert()` to reject the move; `oldEvent` is the event before it. */
 export interface FullCalendarEventDrop {
   event: FullCalendarEventRef;
+  oldEvent: FullCalendarEventRef;
   delta: Duration;
+  revert: () => void;
 }
 export interface FullCalendarSelection {
   start: Date;
@@ -42,10 +48,13 @@ export interface FullCalendarSelection {
   endStr: string;
   allDay: boolean;
 }
+/** `eventResize` payload — call `revert()` to reject the resize; `oldEvent` is the event before it. */
 export interface FullCalendarEventResize {
   event: FullCalendarEventRef;
+  oldEvent: FullCalendarEventRef;
   startDelta: Duration;
   endDelta: Duration;
+  revert: () => void;
 }
 export interface FullCalendarDatesSet {
   start: Date;
@@ -71,7 +80,7 @@ export type { Calendar, DateInput, EventApi, EventInput, EventContentArg, DayCel
 
 export interface FullCalendarProps {
   /**
-   * The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`.
+   * The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id; an untitled event gets an `aria-label` so it still has an accessible name), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array replaces only the events this prop supplied; events from `options.eventSources` or added through the `addEvent` verb are kept.
    */
   events?: unknown[];
   /**
@@ -95,7 +104,7 @@ export interface FullCalendarProps {
    */
   selectable?: boolean;
   /**
-   * The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. This curated prop wins over `options.height` because curated keys are applied after the `:options` spread, so size the calendar through `height` itself. Runtime-updatable via `setOption`.
+   * The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. An empty string, `null`, or a number that is not positive falls back to the default `480`. This curated prop wins over `options.height` at mount and after it (`:options` never applies a curated key), so size the calendar through `height` itself. Runtime-updatable via `setOption`.
    */
   height?: string | number;
   /**
@@ -107,9 +116,9 @@ export interface FullCalendarProps {
    */
   locale?: string;
   /**
-   * First day of the week (`0` = Sunday … `1` = Monday). Runtime-updatable via `setOption`.
+   * First day of the week (`0` = Sunday … `1` = Monday). Leave it unset (`null`, the default) to use the `locale`'s first day, e.g. Monday for `de`. Runtime-updatable via `setOption`; setting it back to `null` after mount keeps the last applied day until remount.
    */
-  firstDay?: number;
+  firstDay?: (number) | null;
   /**
    * Time-grid slot length in `HH:mm:ss`. Runtime-updatable via `setOption`.
    */
@@ -123,7 +132,7 @@ export interface FullCalendarProps {
    */
   headerToolbar?: Record<string, unknown>;
   /**
-   * Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface does not special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Spread **first** into the engine config so the curated props/events/slots win on key collision; `:options` only fills gaps. Runtime-updatable per key via `setOption` (no key-removal reset — a removed key keeps its last applied value until remount; use `getApi()` for full imperative control). The `plugins` key is the one exception that **merges** with the baked-in defaults instead of overriding them, making the wrapper consumer-extensible.
+   * Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface does not special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Curated keys (the props above, `events`, every wrapped callback and filled `*Content` slot) always win: `:options` never overrides them, at mount or later. Runtime-updatable per key via `setOption`, and only for keys whose value actually changed — plain arrays and objects compare by content, so an inline literal re-created on every parent render (an inline `eventSources` list, say) does not refetch. Functions compare by identity. A removed key keeps its last applied value until remount; use `getApi()` for full imperative control. The `plugins` key is the one exception that **merges** with the baked-in defaults instead of overriding them, making the wrapper consumer-extensible.
    */
   options?: Record<string, unknown>;
   onEventClick?: (payload: FullCalendarEventClick) => void;

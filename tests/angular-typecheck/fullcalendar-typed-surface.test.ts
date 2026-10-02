@@ -103,8 +103,9 @@ function tsc(files: Record<string, string>): { threw: boolean; output: string } 
 
 describe('ANGULAR-FULLCALENDAR-TYPED-SURFACE — typed outputs, portal-slot ctx, handle, barrel type exports', () => {
   const r0 = compile(SRC, { target: 'angular', filename: 'FullCalendar.rozie', sourceMap: false, angular: { cva: false } });
-  // Same strict-gate aid the family codegen applies (scripts/codegen.mjs).
-  const ng = r0.code.replace('const opts = {', 'const opts: Record<string, any> = {');
+  // No post-emit type aid: the source builds its engine options with the
+  // null-let idiom (typeNeutralize → `any`), as the published leaf does.
+  const ng = r0.code;
 
   it('compiles without errors and emits typed outputs', () => {
     expect(r0.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);

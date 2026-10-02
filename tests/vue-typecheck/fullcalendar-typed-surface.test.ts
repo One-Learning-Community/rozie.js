@@ -104,8 +104,9 @@ function run(files: Record<string, string>): { ok: boolean; out: string } {
 
 describe('VUE-FULLCALENDAR-TYPED-SURFACE — typed payloads, portal-slot arg, handle, barrel type exports', () => {
   const r0 = compile(SRC, { target: 'vue', filename: 'FullCalendar.rozie', sourceMap: false });
-  // Same strict-gate aid the family codegen applies (scripts/codegen.mjs).
-  const vue = r0.code.replace('const opts = {', 'const opts: Record<string, any> = {');
+  // No post-emit type aid: the source builds its engine options with the
+  // null-let idiom (typeNeutralize → `any`), as the published leaf does.
+  const vue = r0.code;
 
   it('compiles without errors', () => {
     expect(r0.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);

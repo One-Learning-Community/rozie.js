@@ -189,6 +189,14 @@ export const EXAMPLES = [
   // EXAMPLES. Distinct from the existing 'FullCalendar' wrapper cell
   // (FullCalendarDemo.rozie), which stays byte-untouched.
   'FullCalendarBehavior',
+  // Release-0.8.0 audit (C3–C9, C11) — FullCalendarContract is the behavioral
+  // cell for the FullCalendar consumer contract: inline `:options` churn (no
+  // refetch, curated keys win), runtime + static `height`, `el`/`dayEl`/`revert`
+  // payloads, the untitled-event aria-label, `events` reconcile keeping feed
+  // events, and `getApi()` after unmount. Loader resolves to
+  // examples/demos/FullCalendarContractDemo.rozie. Covered by
+  // full-calendar-contract.spec.ts; deliberately NOT in matrix.spec.ts EXAMPLES.
+  'FullCalendarContract',
   // Phase 28 (fullcalendar-parity-expansion) REQ-28-4 — FullCalendarSlots is
   // the date-PINNED 3-slot SCREENSHOT demo. Loader resolves to
   // examples/demos/FullCalendarSlotsDemo.rozie (which imports
@@ -1511,6 +1519,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 27 — the lit entry appends '-demo' → tag
   // 'rozie-full-calendar-behavior-demo' = kebab of FullCalendarBehaviorDemo.
   FullCalendarBehavior: 'rozie-full-calendar-behavior',
+  // The lit entry appends '-demo' → 'rozie-full-calendar-contract-demo'.
+  FullCalendarContract: 'rozie-full-calendar-contract',
   // Phase 28 — the lit entry appends '-demo' → tags
   // 'rozie-full-calendar-slots-demo' / 'rozie-full-calendar-all-slots-demo' =
   // kebab of FullCalendarSlotsDemo / FullCalendarAllSlotsDemo.
@@ -2024,6 +2034,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // $onMount. The FullCalendar wrapper itself has props, but the demo consumer
   // is self-contained, so {}.
   FullCalendarBehavior: {},
+  // Self-contained: all state lives in the demo's <data>.
+  FullCalendarContract: {},
   // Phase 28 — both FullCalendar slot demos are self-contained: all reactive
   // state lives in their <data> (view / events for Slots; view / events /
   // calendarMounted / lastEvent for AllSlots), seeded/bound internally. The

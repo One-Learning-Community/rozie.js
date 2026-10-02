@@ -271,46 +271,13 @@ function main() {
     const leafSrc = resolve(ROOT, 'packages', cfg.dir, 'src');
     mkdirSync(leafSrc, { recursive: true });
 
-    // Post-emit type-gate aid (TYPE-CHECKED leaves: the bundled tsdown leaves
-    // react/solid/lit AND — since the Vue dual-packaging rollout — the Vue leaf,
-    // whose `vue-tsc --declaration` step FULLY type-checks the SFC for the
-    // dist/index.d.ts emit; the bundled leaves' isolated-declaration emit only
-    // shallow-checks, but vue-tsc deep-checks the `<script setup>` body the same
-    // way `tsc --noEmit` does).
-    //
-    // FullCalendar.rozie's `$onMount` builds `const opts = { … }` and THEN
-    // conditionally adds `opts.eventContent = …` inside the `event` portal-slot
-    // guard. In plain JS that is fine; the engine accepts `eventContent` at
-    // runtime. But the strict gate narrows the object literal to its initial
-    // keys, so the later property add trips
-    // `TS2339: Property 'eventContent' does not exist`. flatpickr never hit this
-    // (its emit passes the options literal straight into `flatpickr(input, {…})`
-    // with no intervening mutated `const`); this is a NEW emitter/strict-tsc
-    // intersection (engine-wrapper + post-literal conditional option add). The
-    // proper home for the fix is the emitter (emit a widened annotation for a
-    // later-mutated options object), which is OUT OF SCOPE for this plan
-    // (SCOPE FENCE). As the sanctioned in-scope per-leaf type aid, widen the
-    // generated options literal to `Record<string, any>` here in codegen GLUE
-    // — durable across regeneration, scoped to the single line, and a pure
-    // type annotation (zero runtime/behavioral change). The svelte leaf
-    // (svelte-package) still never strict-body-checks at build and doesn't
-    // need it; the ANGULAR leaf, however, now compiles via ng-packagr (real
-    // ngc/tsc) under the dist+source standard, so it DOES — hence `angular`
-    // joins the type-checked set below. Tracked as a RISK / emitter follow-up.
-    let code = r.code;
-    if (cfg.build === 'tsdown' || target === 'vue' || target === 'angular') {
-      const before = code;
-      code = code.replace('const opts = {', 'const opts: Record<string, any> = {');
-      if (code === before) {
-        // Fail loud if the emit shape drifts so this aid never silently no-ops
-        // and leaves the gate red.
-        throw new Error(
-          `codegen ${target}: expected to widen the engine-options literal (\`const opts = {\`) ` +
-            `for the strict type-checked-leaf gate, but the token was not found — the emit shape ` +
-            `changed. Re-derive the type-gate aid (SCOPE FENCE: do NOT edit the emitter).`,
-        );
-      }
-    }
+    // The engine-options object is built with the null-let idiom in the source
+    // (`let curated = null; curated = { … }`), which typeNeutralize makes `any`
+    // in every leaf, so the later conditional adds (`curated.firstDay`, the
+    // filled *Content slots) typecheck with no post-emit type aid. (Before
+    // release-0.8.0 this script widened `const opts = {` to
+    // `Record<string, any>` here.)
+    const code = r.code;
     writeFileSync(resolve(leafSrc, cfg.file), code);
 
     // Vue leaf: emit the dual-packaging build config + barrel + tsconfig + patch

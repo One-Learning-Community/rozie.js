@@ -1,0 +1,141 @@
+<!--
+  FullCalendarContractDemo.rozie — behavioral cell for the FullCalendar consumer
+  contract fixed in the release-0.8.0 audit (C3–C9, C11). Behavioral-only: no
+  screenshot, covered by full-calendar-contract.spec.ts on all six targets.
+
+  Dates are pinned (`initialDate` + engine `now` through `:options`), so the
+  cell never depends on the wall clock.
+
+  Exercises:
+    - `:options` written as an INLINE literal, re-created on every demo render
+      (the `rerender` button bumps `tick`, which the template reads). Its
+      `eventSources` URL feed (the spec intercepts `/fc-feed.json`) must be
+      fetched once, not once per render (C3b). Its `height: 999` and its
+      `eventClick` must never win over the curated `height` / wrapped
+      `eventClick` (C3a).
+    - `options.firstDay: 1` reaches the engine because the curated `firstDay`
+      is unset (C4): weeks start on Monday.
+    - `height` set at runtime to `'600'`, `''` (falls back to 480) and `'auto'`
+      (C5), plus a second calendar with a STATIC `height="600"` attribute (the
+      Lit attribute-converter path, end to end).
+    - `el` + `jsEvent` on `eventClick` (pointer and Enter key) and
+      `eventMouseLeave`; `dayEl` on `dateClick`; `revert()` on `eventDrop` (C7).
+    - An untitled event carries `aria-label="Untitled event"` (C6).
+    - Replacing `events` keeps the feed's events (C8).
+    - After unmount the handle's `getApi()` returns null (C9).
+-->
+
+<rozie name="FullCalendarContractDemo">
+
+<components>
+{
+  FullCalendar: '../../packages/ui/fullcalendar/src/FullCalendar.rozie',
+}
+</components>
+
+<data>
+{
+  tick: 0,
+  heightValue: 420,
+  calendarMounted: true,
+  log: '(none)',
+  events: [
+    { id: 'drag', title: 'Drag me', start: '2026-01-13' },
+    { id: 'untitled', start: '2026-01-14' },
+  ],
+}
+</data>
+
+<script>
+// A consumer `options.eventClick` must never replace the wrapper's own.
+const leakedEventClick = () => {
+  $data.log = 'options-eventClick-LEAKED'
+}
+
+const onEventClick = (p) => {
+  $data.log = `eventClick:${p?.el?.tagName ?? '?'}:${p?.jsEvent?.type ?? '?'}:${p?.event?.id ?? '?'}`
+}
+const onEventMouseLeave = (p) => {
+  $data.log = `eventMouseLeave:${p?.el?.tagName ?? '?'}:${p?.event?.id ?? '?'}`
+}
+const onDateClick = (p) => {
+  $data.log = `dateClick:${p?.dayEl?.tagName ?? '?'}:${p?.dateStr ?? '?'}:${p?.jsEvent?.type ?? '?'}`
+}
+const onEventDrop = (p) => {
+  const reverted = typeof p?.revert === 'function'
+  if (reverted) p.revert()
+  $data.log = `eventDrop:${reverted ? 'reverted' : 'no-revert'}:old=${p?.oldEvent?.id ?? '?'}`
+}
+
+const rerender = () => { $data.tick = $data.tick + 1 }
+const setHeight600 = () => { $data.heightValue = '600' }
+const setHeightEmpty = () => { $data.heightValue = '' }
+const setHeightAuto = () => { $data.heightValue = 'auto' }
+const replaceEvents = () => {
+  $data.events = [{ id: 'replaced', title: 'Replaced', start: '2026-01-21' }]
+}
+
+let savedHandle = null
+const teardown = () => {
+  savedHandle = $refs.cal
+  $data.calendarMounted = false
+}
+const probeApi = () => {
+  const api = savedHandle?.getApi?.()
+  $data.log = `api-after-unmount:${api === null ? 'null' : api === undefined ? 'undefined' : 'live'}`
+}
+</script>
+
+<template>
+<div class="fc-contract-demo">
+  <h3>FullCalendar consumer contract</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="rerender" @click="rerender">rerender</button>
+    <button type="button" data-testid="height-600" @click="setHeight600">height '600'</button>
+    <button type="button" data-testid="height-empty" @click="setHeightEmpty">height ''</button>
+    <button type="button" data-testid="height-auto" @click="setHeightAuto">height 'auto'</button>
+    <button type="button" data-testid="replace-events" @click="replaceEvents">replace events</button>
+    <button type="button" data-testid="teardown" @click="teardown">teardown</button>
+    <button type="button" data-testid="probe-api" @click="probeApi">probe api</button>
+    <code data-testid="tick">{{ $data.tick }}</code>
+    <code data-testid="log">{{ $data.log }}</code>
+  </div>
+
+  <div class="calendar-wrap" data-testid="main-calendar" r-if="$data.calendarMounted">
+    <FullCalendar
+      ref="cal"
+      :events="$data.events"
+      :height="$data.heightValue"
+      :options="{ initialDate: '2026-01-15', now: '2026-01-15T09:00:00', firstDay: 1, height: 999, eventClick: leakedEventClick, eventSources: [{ url: '/fc-feed.json' }] }"
+      @event-click="onEventClick"
+      @event-mouse-leave="onEventMouseLeave"
+      @date-click="onDateClick"
+      @event-drop="onEventDrop"
+    />
+  </div>
+
+  <div class="calendar-wrap" data-testid="static-height-calendar">
+    <FullCalendar height="600" :options="{ initialDate: '2026-01-15', now: '2026-01-15T09:00:00' }" />
+  </div>
+</div>
+</template>
+
+<style>
+.fc-contract-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 1rem;
+}
+.fc-contract-demo .controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.fc-contract-demo .calendar-wrap {
+  width: 900px;
+  margin-bottom: 1rem;
+}
+</style>
+
+</rozie>

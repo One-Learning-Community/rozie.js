@@ -78,6 +78,18 @@ function slotParams(slot) {
   return (slot.params || []).map((p) => p.name).join(', ');
 }
 
+// How a consumer binds a slot on each target (release-0.8.0 audit C2: the bare
+// slot name is NOT the binding on React/Solid, and a wrong name is silently
+// ignored, so the table spells out the real form per target).
+const SLOT_BINDING = {
+  react: (n) => `\`render${n[0].toUpperCase()}${n.slice(1)}={({ arg }) => …}\``,
+  vue: (n) => `\`<template #${n}="{ arg }">\``,
+  svelte: (n) => `\`{#snippet ${n}({ arg })}\``,
+  angular: (n) => `\`<ng-template #${n} let-arg="arg">\``,
+  solid: (n) => `\`${n}Slot={({ arg }) => …}\``,
+  lit: (n) => '`` el.' + n + ' = ({ arg }) => html`…` ``',
+};
+
 // ---------------------------------------------------------------------------
 // Per-framework consumer usage snippets (idiomatic; short + correct).
 //
@@ -130,7 +142,7 @@ const events = ref([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
   let events = $state([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
 </script>
 
-<FullCalendar bind:view {events} oneventClick={(e) => console.log(e.event, e.el)} />`,
+<FullCalendar bind:view {events} oneventclick={(e) => console.log(e.event, e.el)} />`,
   },
   angular: {
     lang: 'ts',
@@ -404,13 +416,15 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   if (ir.slots && ir.slots.length > 0) {
     lines.push('## Slots');
     lines.push('');
-    lines.push('| Slot | Params |');
-    lines.push('| --- | --- |');
+    const bindSlot = SLOT_BINDING[target];
+    if (!bindSlot) throw new Error(`renderReadme: no slot binding for target "${target}"`);
+    lines.push('| Slot | Params | Bind as |');
+    lines.push('| --- | --- | --- |');
     const seenSlotNames = new Set();
     for (const s of ir.slots) {
       if (seenSlotNames.has(s.name)) continue;
       seenSlotNames.add(s.name);
-      lines.push(`| ${renderSlotName(s.name)} | ${slotParams(s)} |`);
+      lines.push(`| ${renderSlotName(s.name)} | ${slotParams(s)} | ${bindSlot(s.name)} |`);
     }
     lines.push('');
   }

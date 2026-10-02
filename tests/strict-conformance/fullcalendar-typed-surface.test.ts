@@ -27,10 +27,9 @@ const SRC = readFileSync(resolve(FC, 'src/FullCalendar.rozie'), 'utf8');
 function compiled(target: 'react' | 'solid' | 'lit'): string {
   const r = compile(SRC, { target, filename: 'FullCalendar.rozie', sourceMap: false });
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
-  // The same strict-gate aid the family codegen applies to every type-checked
-  // leaf (scripts/codegen.mjs): the engine-options literal is widened because
-  // portal-slot `*Content` keys are added to it after the literal.
-  return r.code.replace('const opts = {', 'const opts: Record<string, any> = {');
+  // No post-emit type aid: the source builds its engine options with the
+  // null-let idiom (typeNeutralize → `any`), as the published leaf does.
+  return r.code;
 }
 
 /** The committed leaf barrel — consumers import the package entry, not the module. */

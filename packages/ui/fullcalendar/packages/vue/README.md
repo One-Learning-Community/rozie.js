@@ -38,7 +38,7 @@ const events = ref([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
 | `height` | `String \| Number` | `480` |  |  |
 | `defaultColor` | `String` | `"#3b82f6"` |  |  |
 | `locale` | `String` | `"en"` |  |  |
-| `firstDay` | `Number` | `0` |  |  |
+| `firstDay` | `Number` | `null` |  |  |
 | `slotDuration` | `String` | `"00:30:00"` |  |  |
 | `nowIndicator` | `Boolean` | `false` |  |  |
 | `headerToolbar` | `Object` | `{…}` |  |  |
@@ -49,10 +49,10 @@ const events = ref([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
 | Event | Payload | Description |
 | --- | --- | --- |
 | `eventClick` | `FullCalendarEventClick` | Fired when a calendar event is clicked, or activated with Enter/Space (then `jsEvent` is a `KeyboardEvent`). `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip). |
-| `dateClick` | `FullCalendarDateClick` | Fired when an empty date/time cell is clicked. |
-| `eventDrop` | `FullCalendarEventDrop` | Fired after an event is dragged to a new date/time. |
+| `dateClick` | `FullCalendarDateClick` | Fired when an empty date/time cell is clicked. `dayEl` is the clicked day cell (an anchor for a popover) and `jsEvent` the click. |
+| `eventDrop` | `FullCalendarEventDrop` | Fired after an event is dragged to a new date/time. Call `revert()` to reject the move; `oldEvent` is the event before it. |
 | `select` | `FullCalendarSelection` | Fired when a date/time range is selected by drag (requires `selectable`). |
-| `eventResize` | `FullCalendarEventResize` | Fired after an event is resized by dragging its edge (requires `editable`). |
+| `eventResize` | `FullCalendarEventResize` | Fired after an event is resized by dragging its edge (requires `editable`). Call `revert()` to reject the resize; `oldEvent` is the event before it. |
 | `datesSet` | `FullCalendarDatesSet` | Fired whenever the visible date range changes (navigation or view switch). `view` is the active view type string. |
 | `eventMouseEnter` | `FullCalendarEventPointer` | Fired when the pointer enters a calendar event (payload mirrors `eventClick`, with `jsEvent` always a `MouseEvent`). |
 | `eventMouseLeave` | `FullCalendarEventPointer` | Fired when the pointer leaves a calendar event (payload mirrors `eventMouseEnter`). |
@@ -97,18 +97,18 @@ const cal = ref();          // template ref
 
 ## Slots
 
-| Slot | Params |
-| --- | --- |
-| event | arg |
-| dayCell | arg |
-| dayHeader | arg |
-| slotLabel | arg |
-| weekNumber | arg |
-| nowIndicatorContent | arg |
-| moreLink | arg |
-| allDayContent | arg |
-| slotLaneContent | arg |
-| noEventsContent | arg |
+| Slot | Params | Bind as |
+| --- | --- | --- |
+| event | arg | `<template #event="{ arg }">` |
+| dayCell | arg | `<template #dayCell="{ arg }">` |
+| dayHeader | arg | `<template #dayHeader="{ arg }">` |
+| slotLabel | arg | `<template #slotLabel="{ arg }">` |
+| weekNumber | arg | `<template #weekNumber="{ arg }">` |
+| nowIndicatorContent | arg | `<template #nowIndicatorContent="{ arg }">` |
+| moreLink | arg | `<template #moreLink="{ arg }">` |
+| allDayContent | arg | `<template #allDayContent="{ arg }">` |
+| slotLaneContent | arg | `<template #slotLaneContent="{ arg }">` |
+| noEventsContent | arg | `<template #noEventsContent="{ arg }">` |
 
 ## Gotchas
 

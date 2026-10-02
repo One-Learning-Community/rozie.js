@@ -78,7 +78,7 @@ const events = ref([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
   let events = $state([{ id: '1', title: 'Kickoff', start: '2026-06-04' }]);
 </script>
 
-<FullCalendar bind:view {events} oneventClick={(e) => console.log(e.event)} />
+<FullCalendar bind:view {events} oneventclick={(e) => console.log(e.event)} />
 ```
 
 ### Angular
@@ -144,29 +144,29 @@ el.addEventListener('event-click', (e) => {
 
 | Name | Type | Default | Two-way (model) | Description |
 | --- | --- | --- | :---: | --- |
-| `events` | `Array` | `[]` | | The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array reconciles the live calendar via `removeAllEvents` + `addEvent`. |
+| `events` | `Array` | `[]` | | The event objects rendered on the calendar. Each event is normalized: a missing `title` renders as an empty title (the wrapper never invents one from the event id; an untitled event gets an `aria-label` so it still has an accessible name), and a missing `color` inherits `defaultColor`. Runtime-updatable — changing the array replaces only the events this prop supplied; events from `options.eventSources` or the `addEvent` verb are kept. |
 | `view` | `String` | `"dayGridMonth"` | ✓ | The two-way active view name (`'dayGridMonth'`, `'timeGridWeek'`, `'timeGridDay'`, …). The calendar's own toolbar writes back through the two-way path; a consumer write calls `changeView`. |
 | `weekends` | `Boolean` | `true` | | Show Saturday/Sunday columns. Runtime-updatable via `setOption`. |
 | `editable` | `Boolean` | `true` | | Allow events to be dragged and resized. Runtime-updatable. |
 | `selectable` | `Boolean` | `true` | | Allow date/time-range selection by click-drag. Runtime-updatable. |
-| `height` | `String \| Number` | `480` | | The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. This curated prop wins over `options.height` (curated keys are applied after the `:options` spread), so size the calendar through `height` itself. Runtime-updatable. |
+| `height` | `String \| Number` | `480` | | The calendar height: a pixel number (`480`) or any CSS height FullCalendar accepts (`'auto'`, `'100%'`, `'32rem'`, …). A purely numeric string (`'600'`, e.g. from a static attribute) is treated as pixels. An empty string, `null`, or a number that is not positive falls back to the default `480`. This curated prop wins over `options.height` at mount and after it (`:options` never applies a curated key), so size the calendar through `height` itself. Runtime-updatable. |
 | `defaultColor` | `String` | `"#3b82f6"` | | Fallback event color stamped onto events that omit their own `color`. |
 | `locale` | `String` | `"en"` | | FullCalendar locale code. Runtime-updatable. An object locale is an untyped runtime escape hatch — pass it through `setOption` via the handle if needed. |
-| `firstDay` | `Number` | `0` | | First day of the week (`0` = Sunday … `1` = Monday). Runtime-updatable. |
+| `firstDay` | `Number` | `null` | | First day of the week (`0` = Sunday … `1` = Monday). Leave it unset (`null`, the default) to use the `locale`'s first day, e.g. Monday for `de`. Runtime-updatable; setting it back to `null` after mount keeps the last applied day until remount. |
 | `slotDuration` | `String` | `"00:30:00"` | | Time-grid slot length in `HH:mm:ss`. Runtime-updatable. |
 | `nowIndicator` | `Boolean` | `false` | | Render the current-time indicator line in time-grid views. Runtime-updatable. |
 | `headerToolbar` | `Object` | `{…}` | | The toolbar layout (`{ left, center, right }`). A consumer-passed object **fully replaces** the built-in default. Runtime-updatable. |
-| `options` | `Object` | `{}` | | Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface doesn't special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Spread **first** into the engine config so the curated props/events/slots **win on key collision** — the curated surface stays primary; `:options` only fills gaps. Runtime-updatable per key via `setOption` (no key-removal reset — a removed key keeps its last applied value until remount; use `getApi()` for full imperative control). |
+| `options` | `Object` | `{}` | | Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface doesn't special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Curated keys (the props above, `events`, every wrapped callback and filled `*Content` slot) always **win**: `:options` never overrides them, at mount or later, and only fills gaps. Runtime-updatable per key via `setOption`, and only for keys whose value actually changed — plain arrays and objects compare by content, so an inline literal re-created on every parent render (an inline `eventSources` list, say) does not refetch; functions compare by identity. A removed key keeps its last applied value until remount; use `getApi()` for full imperative control. |
 
 ### Events
 
 | Event | Description |
 | --- | --- |
 | `eventClick` | An event was clicked, or activated with Enter/Space. Payload: `{ event: { id, title, start, end }, jsEvent, el }` — `jsEvent` is a `MouseEvent`, or a `KeyboardEvent` for keyboard activation. `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip). |
-| `dateClick` | A date/cell was clicked. Payload: `{ date, dateStr, allDay }`. |
-| `eventDrop` | An event was dragged to a new date. Payload: `{ event: { id, title, start, end }, delta }`. |
+| `dateClick` | A date/cell was clicked. Payload: `{ date, dateStr, allDay, dayEl, jsEvent }` — `dayEl` is the clicked day cell (an anchor for a popover). |
+| `eventDrop` | An event was dragged to a new date. Payload: `{ event: { id, title, start, end }, oldEvent, delta, revert }` — call `revert()` to reject the move. |
 | `select` | A date/time range was selected. Payload: `{ start, end, startStr, endStr, allDay }`. |
-| `eventResize` | An event was resized. Payload: `{ event: { id, title, start, end }, startDelta, endDelta }`. |
+| `eventResize` | An event was resized. Payload: `{ event: { id, title, start, end }, oldEvent, startDelta, endDelta, revert }` — call `revert()` to reject the resize. |
 | `datesSet` | The visible date range changed (navigation or view switch). Payload: `{ start, end, view }`. |
 | `eventMouseEnter` | The pointer entered a calendar event. Payload: `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventClick`). |
 | `eventMouseLeave` | The pointer left a calendar event. Payload: `{ event: { id, title, start, end }, jsEvent, el }` (mirrors `eventMouseEnter`). |
@@ -254,7 +254,7 @@ Portal slots unlock the "foreign-engine cell rendering" pattern: FullCalendar ow
 <FullCalendar
   view={view()}
   events={events()}
-  event={({ arg }) => <span class="fc-event-title">{arg.event.title}</span>}
+  eventSlot={({ arg }) => <span class="fc-event-title">{arg.event.title}</span>}
 />
 ```
 
@@ -301,7 +301,7 @@ On every target the wrapper's `$portals.event(node, { arg })` closure mounts the
 
 The **`dayCell` portal slot** (FullCalendar's `dayCellContent`) replaces a day-grid cell's default content. Same authoring shape as `event` — only the slot name and `arg` payload differ (`arg.date`, `arg.dayNumberText`, …):
 
-**React / Solid** (render prop — `renderDayCell` on React, `dayCell` on Solid):
+**React / Solid** (render prop — `renderDayCell` on React, `dayCellSlot` on Solid):
 
 ```tsx
 // React
@@ -310,7 +310,7 @@ The **`dayCell` portal slot** (FullCalendar's `dayCellContent`) replaces a day-g
 
 // Solid
 <FullCalendar view={view()} events={events()}
-  dayCell={({ arg }) => <span class="my-day">{arg.dayNumberText}</span>} />
+  dayCellSlot={({ arg }) => <span class="my-day">{arg.dayNumberText}</span>} />
 ```
 
 **Vue** (scoped slot):
@@ -368,7 +368,7 @@ The **`dayHeader` portal slot** (FullCalendar's `dayHeaderContent`) replaces a c
   renderDayHeader={({ arg }) => <strong className="my-header">{arg.text}</strong>} />
 ```
 
-The Solid (`dayHeader={…}`), Svelte (`{#snippet dayHeader(…)}`), Angular (`<ng-template #dayHeader>`), and Lit (`el.dayHeader = …`) forms follow the exact shapes shown for `event`/`dayCell` above.
+The Solid (`dayHeaderSlot={…}`), Svelte (`{#snippet dayHeader(…)}`), Angular (`<ng-template #dayHeader>`), and Lit (`el.dayHeader = …`) forms follow the exact shapes shown for `event`/`dayCell` above.
 
 ### The long-tail slots
 
