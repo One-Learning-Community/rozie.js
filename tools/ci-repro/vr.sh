@@ -364,7 +364,7 @@ docker run --rm \
     pnpm turbo run build --force --continue || true
     # `|| true` must not hide a build that never ran: a turbo error before any
     # task starts (e.g. an input glob hashing a directory in this non-git mirror,
-    # quick 261002-ekf) left the matrix testing the PREVIOUS run's dist. Require
+    # quick 261002-ekf) left the matrix testing the dist of the PREVIOUS run. Require
     # a VR host entry rebuilt by THIS invocation.
     if [ -z "$(find tests/visual-regression/dist -name "entry.*.html" -newer /tmp/vr-build-start 2>/dev/null | head -1)" ]; then
       echo "✗ the VR host was not rebuilt by this run (stale dist) — see the turbo output above" >&2
