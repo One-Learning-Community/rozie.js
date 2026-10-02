@@ -3,3 +3,4 @@ export { default } from './Toaster';
 
 /** The `$expose` imperative handle received via `ref` — { show, dismiss, clear, patch, promise }. */
 export type { ToasterHandle } from './Toaster';
+export type * from './Toaster';

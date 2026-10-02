@@ -48,6 +48,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { typedSurfaceBarrelLines } from '../../typed-surface-barrel.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -139,14 +140,17 @@ function main() {
     // `$expose` handle), forwarded verbatim; Lit's handle IS the element.
     if (cfg.build === 'tsdown') {
       const barrel =
-        (target === 'react' || target === 'solid') && ir.expose.length > 0
+        ((target === 'react' || target === 'solid') && ir.expose.length > 0
           ? `export { default as Toaster } from './Toaster';\n` +
             `export { default } from './Toaster';\n\n` +
             `/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
               .map((m) => m.name)
               .join(', ')} }. */\n` +
             `export type { ToasterHandle } from './Toaster';\n`
-          : `export { default as Toaster } from './Toaster';\nexport { default } from './Toaster';\n`;
+          : `export { default as Toaster } from './Toaster';\nexport { default } from './Toaster';\n`) +
+        // `<types>` names (ToastEntry, ToastDismissedPayload, …) + Lit's
+        // RozieToasterEventMap via the shared helper (the popover precedent).
+        typedSurfaceBarrelLines(target, ir, 'Toaster');
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 

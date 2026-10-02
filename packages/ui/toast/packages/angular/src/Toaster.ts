@@ -2,10 +2,42 @@ import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
 
+/** A toast's visual/semantic kind. `error` and `warning` announce assertively; the rest are polite. */
+export type ToastType = 'info' | 'success' | 'error' | 'warning' | 'loading';
+/** Why a toast was dismissed: auto-dismiss timeout, a swipe past threshold, the built-in close button, the action button, or the `dismiss(id)` handle verb. */
+export type ToastDismissReason = 'timeout' | 'swipe' | 'close' | 'action' | 'api';
+/** A toast's action button: `onClick` runs with the toast's id and its `data`, then the toast dismisses (reason `'action'`). */
+export interface ToastAction {
+  label: string;
+  onClick: (ctx: {
+    id: string;
+    data: unknown;
+  }) => void;
+}
+/** One queue entry, as held by the Toaster and handed to the `#toast` slot and the `dismissed` event. */
+export interface ToastEntry {
+  id: string;
+  message: string;
+  type: ToastType;
+  duration: number;
+  action: ToastAction | null;
+  /** The consumer payload passed to `show({ data })`, carried untouched. `null` when none was given. */
+  data: unknown;
+  /** True once dismissal has begun (the exit animation is running). */
+  exiting?: boolean;
+  /** Set on a swipe dismissal: the direction sign the exit animation follows. */
+  swipeExitSign?: number;
+}
+/** The `dismissed` event payload. */
+export interface ToastDismissedPayload {
+  toast: ToastEntry;
+  reason: ToastDismissReason;
+}
+
 interface ToastCtx {
-  $implicit: { toast: any; dismiss: any };
-  toast: any;
-  dismiss: any;
+  $implicit: { toast: ToastEntry; dismiss: (id: string) => void };
+  toast: ToastEntry;
+  dismiss: (id: string) => void;
 }
 
 @Component({
@@ -236,7 +268,7 @@ export class Toaster {
   toasts = signal<any[]>([]);
   seq = signal(0);
   swipe = signal<any>(null);
-  dismissed = output<unknown>();
+  dismissed = output<ToastDismissedPayload>();
   @ContentChild('toast', { read: TemplateRef }) toastTpl?: TemplateRef<ToastCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   __rozieFills = contentChildren(RozieSlot, { descendants: true });

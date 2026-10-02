@@ -4,9 +4,45 @@ import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { RozieSlotDistributor, rozieAttr, rozieClass, rozieDisplay, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
+/** A toast's visual/semantic kind. `error` and `warning` announce assertively; the rest are polite. */
+export type ToastType = 'info' | 'success' | 'error' | 'warning' | 'loading';
+/** Why a toast was dismissed: auto-dismiss timeout, a swipe past threshold, the built-in close button, the action button, or the `dismiss(id)` handle verb. */
+export type ToastDismissReason = 'timeout' | 'swipe' | 'close' | 'action' | 'api';
+/** A toast's action button: `onClick` runs with the toast's id and its `data`, then the toast dismisses (reason `'action'`). */
+export interface ToastAction {
+  label: string;
+  onClick: (ctx: {
+    id: string;
+    data: unknown;
+  }) => void;
+}
+/** One queue entry, as held by the Toaster and handed to the `#toast` slot and the `dismissed` event. */
+export interface ToastEntry {
+  id: string;
+  message: string;
+  type: ToastType;
+  duration: number;
+  action: ToastAction | null;
+  /** The consumer payload passed to `show({ data })`, carried untouched. `null` when none was given. */
+  data: unknown;
+  /** True once dismissal has begun (the exit animation is running). */
+  exiting?: boolean;
+  /** Set on a swipe dismissal: the direction sign the exit animation follows. */
+  swipeExitSign?: number;
+}
+/** The `dismissed` event payload. */
+export interface ToastDismissedPayload {
+  toast: ToastEntry;
+  reason: ToastDismissReason;
+}
+
+export interface RozieToasterEventMap extends Omit<HTMLElementEventMap, 'dismissed'> {
+  'dismissed': CustomEvent<ToastDismissedPayload>;
+}
+
 interface RozieToastSlotCtx {
-  toast: any;
-  dismiss: any;
+  toast: ToastEntry;
+  dismiss: (id: string) => void;
 }
 
 @customElement('rozie-toaster')
@@ -218,7 +254,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 
   @state() private _hasSlotToast = false;
   @queryAssignedElements({ slot: 'toast', flatten: true }) private _slotToastElements!: Element[];
-  @property({ attribute: false }) toast?: (scope: { toast: any; dismiss: any }) => unknown;
+  @property({ attribute: false }) toast?: (scope: { toast: ToastEntry; dismiss: (id: string) => void }) => unknown;
   // Phase 79 Plan 08 (R4) contract for 79-09: the record intake for
   // record-routed slot fills. 79-09's consumer-side emitSlotFiller
   // accumulates an object literal onto the SAME `.rozieSlots=${{ ... }}`
@@ -539,7 +575,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   const entry = this._toasts.value.find((t: any) => t.id === id);
   if (!entry || entry.exiting) return;
   this.clearTimer(id);
-  this.dispatchEvent(new CustomEvent("dismissed", {
+  this.dispatchEvent(new CustomEvent<ToastDismissedPayload>("dismissed", {
     detail: {
       toast: entry,
       reason
@@ -870,6 +906,17 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   // Type union: 'info' | 'success' | 'error' | 'warning' | 'loading'. Only
   // error/warning interrupt (assertive); loading (like info/success) is polite.
   liveFor = (type: any) => type === 'error' || type === 'warning' ? 'assertive' : 'polite';
+
+  addEventListener<K extends keyof RozieToasterEventMap>(type: K, listener: (this: Toaster, ev: RozieToasterEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
+    super.addEventListener(type, listener, options);
+  }
+  removeEventListener<K extends keyof RozieToasterEventMap>(type: K, listener: (this: Toaster, ev: RozieToasterEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    super.removeEventListener(type, listener, options);
+  }
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the

@@ -12,6 +12,40 @@
 
 </template>
 
+<script lang="ts">
+/** A toast's visual/semantic kind. `error` and `warning` announce assertively; the rest are polite. */
+export type ToastType = 'info' | 'success' | 'error' | 'warning' | 'loading';
+/** Why a toast was dismissed: auto-dismiss timeout, a swipe past threshold, the built-in close button, the action button, or the `dismiss(id)` handle verb. */
+export type ToastDismissReason = 'timeout' | 'swipe' | 'close' | 'action' | 'api';
+/** A toast's action button: `onClick` runs with the toast's id and its `data`, then the toast dismisses (reason `'action'`). */
+export interface ToastAction {
+  label: string;
+  onClick: (ctx: {
+    id: string;
+    data: unknown;
+  }) => void;
+}
+/** One queue entry, as held by the Toaster and handed to the `#toast` slot and the `dismissed` event. */
+export interface ToastEntry {
+  id: string;
+  message: string;
+  type: ToastType;
+  duration: number;
+  action: ToastAction | null;
+  /** The consumer payload passed to `show({ data })`, carried untouched. `null` when none was given. */
+  data: unknown;
+  /** True once dismissal has begun (the exit animation is running). */
+  exiting?: boolean;
+  /** Set on a swipe dismissal: the direction sign the exit animation follows. */
+  swipeExitSign?: number;
+}
+/** The `dismissed` event payload. */
+export interface ToastDismissedPayload {
+  toast: ToastEntry;
+  reason: ToastDismissReason;
+}
+</script>
+
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from 'vue';
 
@@ -50,11 +84,11 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  dismissed: [...args: any[]];
+  dismissed: [payload: ToastDismissedPayload];
 }>();
 
 defineSlots<{
-  toast(props: { toast: any; dismiss: any }): any;
+  toast(props: { toast: ToastEntry; dismiss: (id: string) => void }): any;
 }>();
 
 const toasts = ref<any[]>([]);

@@ -2,6 +2,38 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
+/** A toast's visual/semantic kind. `error` and `warning` announce assertively; the rest are polite. */
+export type ToastType = 'info' | 'success' | 'error' | 'warning' | 'loading';
+/** Why a toast was dismissed: auto-dismiss timeout, a swipe past threshold, the built-in close button, the action button, or the `dismiss(id)` handle verb. */
+export type ToastDismissReason = 'timeout' | 'swipe' | 'close' | 'action' | 'api';
+/** A toast's action button: `onClick` runs with the toast's id and its `data`, then the toast dismisses (reason `'action'`). */
+export interface ToastAction {
+  label: string;
+  onClick: (ctx: {
+    id: string;
+    data: unknown;
+  }) => void;
+}
+/** One queue entry, as held by the Toaster and handed to the `#toast` slot and the `dismissed` event. */
+export interface ToastEntry {
+  id: string;
+  message: string;
+  type: ToastType;
+  duration: number;
+  action: ToastAction | null;
+  /** The consumer payload passed to `show({ data })`, carried untouched. `null` when none was given. */
+  data: unknown;
+  /** True once dismissal has begun (the exit animation is running). */
+  exiting?: boolean;
+  /** Set on a swipe dismissal: the direction sign the exit animation follows. */
+  swipeExitSign?: number;
+}
+/** The `dismissed` event payload. */
+export interface ToastDismissedPayload {
+  toast: ToastEntry;
+  reason: ToastDismissReason;
+}
+
 export interface ToasterProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe' | 'stacked' | 'onDismissed' | 'renderToast' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * Which corner the toast stack renders in: `'top-left'`, `'top-right'`, `'top-center'`, `'bottom-left'`, `'bottom-right'`, or `'bottom-center'`. Drives the fixed-position layout and the stack direction.
@@ -31,8 +63,8 @@ export interface ToasterProps extends Omit<import('react').ComponentPropsWithout
    * Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times.
    */
   stacked?: boolean;
-  onDismissed?: (...args: any[]) => void;
-  renderToast?: (params: { toast: unknown; dismiss: (...args: any[]) => any }) => ReactNode;
+  onDismissed?: (payload: ToastDismissedPayload) => void;
+  renderToast?: (params: { toast: ToastEntry; dismiss: (id: string) => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 
