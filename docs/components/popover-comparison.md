@@ -1,6 +1,6 @@
 ---
 title: Popover — comparison
-surface_hash: 63d30dd1ebb9
+surface_hash: fb04acad1f5c
 ---
 
 # Popover — how it compares
@@ -20,7 +20,7 @@ Floating UI ships first-class bindings for some frameworks and nothing for other
 
 ## vs Radix Popover / Headless UI
 
-Radix and Headless UI are React-first (Radix has a Vue port; Headless UI covers React + Vue). They bundle a rich accessibility + focus-trap layer that this primitive deliberately keeps minimal (it wires `role`/`aria-expanded`/`aria-describedby` + Escape/click-outside dismissal, and leaves focus-trapping to the consumer). Choose Radix/Headless UI for a batteries-included React/Vue popover; choose `@rozie-ui/popover` when you need the **same headless positioning primitive across React, Vue, Svelte, Angular, Solid, and Lit** with a single API.
+Radix and Headless UI are React-first (Radix has a Vue port; Headless UI covers React + Vue). They bundle a rich accessibility + focus-trap layer that this primitive deliberately keeps minimal (it wires `role`/`aria-expanded`/`aria-controls`/`aria-describedby` + Escape/click-outside dismissal and returns focus on close, and leaves focus-trapping to the consumer). Choose Radix/Headless UI for a batteries-included React/Vue popover; choose `@rozie-ui/popover` when you need the **same headless positioning primitive across React, Vue, Svelte, Angular, Solid, and Lit** with a single API.
 
 ## vs Tippy.js / Floating Vue (tooltips)
 

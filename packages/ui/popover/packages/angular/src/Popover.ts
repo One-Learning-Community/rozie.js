@@ -383,9 +383,25 @@ export class Popover {
     if (this.isTooltip() || !el || !el.isConnected || typeof el.focus !== 'function') return;
     let active: any = null;
     active = this.deepActiveElement();
-    const lost = !active || active === document.body || active === document.documentElement;
     const insidePanel = !!(this.floatingNode && active && this.composedContains(this.floatingNode, active));
-    if (lost || insidePanel) el.focus();
+    if (insidePanel) {
+      el.focus();
+      return;
+    }
+    const lost = !active || active === document.body || active === document.documentElement;
+    if (!lost) return;
+    // A close that runs INSIDE a blur (e.g. a composing combobox closing from its
+    // input's blur on Tab) sees <body> as active only transiently: the browser
+    // focuses the Tab destination after the blur listeners return. Judge "lost"
+    // again after the focus change settles (a macrotask), so a user-initiated
+    // focus move is never undone; focus that really fell to <body> (panel
+    // unmounted around it, a click on a non-focusable spot) is still restored.
+    setTimeout(() => {
+      let now: any = null;
+      now = this.deepActiveElement();
+      const stillLost = !now || now === document.body || now === document.documentElement;
+      if (stillLost && el.isConnected) el.focus();
+    }, 0);
   };
   // Drive the two-way model in one place. Named `requestOpen` (NOT `setOpen`)
   // to dodge the React generated `setOpen` setter for the `open` model (ROZ524).
