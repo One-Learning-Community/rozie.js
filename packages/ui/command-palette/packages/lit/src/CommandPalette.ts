@@ -26,6 +26,78 @@ import { formatKeyToken } from './internal/formatKeyToken';
 // stale-read (the plan's $data placement broke the race-drop AND the navigate
 // depth on React/Solid/Lit).
 
+/** One declared argument field on a command (`args: [...]`). Values are text-only. */
+export interface CommandPaletteArg {
+  id: string;
+  placeholder?: string;
+  required?: boolean;
+  default?: string;
+}
+/** A row-level action in a command's `actions: [...]` menu. */
+export interface CommandPaletteAction {
+  id: string;
+  label: string;
+  icon?: unknown;
+  shortcut?: string;
+  disabled?: boolean;
+  [key: string]: any;
+}
+/**
+ * A command, as the palette receives it in `items` and hands it back on `navigate`, `select`
+ * and `action-select`. Fields beyond the ones the palette reads are carried through untouched
+ * and read as `any`.
+ */
+export interface CommandPaletteItem {
+  id: string;
+  label: string;
+  group?: string;
+  keywords?: string[];
+  disabled?: boolean;
+  /** `false` marks no label characters as matching; an array of `[start, end)` pairs marks those. */
+  highlight?: false | Array<[number, number]>;
+  icon?: unknown;
+  actions?: CommandPaletteAction[];
+  args?: CommandPaletteArg[];
+  /** A static child level: selecting the item navigates into it instead of emitting `select`. */
+  children?: CommandPaletteItem[];
+  /** A lazy child level, `(query) => items` (or a Promise of them). */
+  source?: (query: string) => CommandPaletteItem[] | Promise<CommandPaletteItem[]>;
+  /** The child level's own empty-query home view. */
+  defaultItems?: CommandPaletteItem[];
+  title?: string | null;
+  placeholder?: string | null;
+  [key: string]: any;
+}
+/** The `navigate` event payload: the item navigated into and the new level depth (1 = first child level). */
+export interface CommandPaletteNavigatePayload {
+  item: CommandPaletteItem;
+  depth: number;
+}
+/**
+ * The `select` event payload. `path` is the id breadcrumb of the levels navigated through
+ * (root excluded). `args` is present only for a command that declares `args`: the trimmed
+ * values keyed by arg id.
+ */
+export interface CommandPaletteSelectPayload {
+  item: CommandPaletteItem;
+  path: Array<string | null>;
+  args?: Record<string, string>;
+}
+/** The `action-select` event payload: the chosen action and the command whose menu it came from. */
+export interface CommandPaletteActionSelectPayload {
+  item: CommandPaletteItem | null;
+  action: CommandPaletteAction;
+}
+
+export interface RozieCommandPaletteEventMap extends Omit<HTMLElementEventMap, 'navigate' | 'back' | 'select' | 'action-select' | 'open-change' | 'query-change'> {
+  'navigate': CustomEvent<CommandPaletteNavigatePayload>;
+  'back': CustomEvent<undefined>;
+  'select': CustomEvent<CommandPaletteSelectPayload>;
+  'action-select': CustomEvent<CommandPaletteActionSelectPayload>;
+  'open-change': CustomEvent<boolean>;
+  'query-change': CustomEvent<string>;
+}
+
 interface RozieBreadcrumbSlotCtx {
   stack: any;
   back: any;
@@ -439,9 +511,9 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string = 'Command palette';
   /**
-   * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Leave it empty (the default) and the inner combobox generates a unique id base per instance after mount; set it when you need a stable, predictable id. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
-  @property({ type: String, reflect: true, attribute: 'id-base' }) idBase: string = 'rozie-command-palette';
+  @property({ type: String, reflect: true, attribute: 'id-base' }) idBase: string = '';
   /**
    * Debounce (ms) applied to a nested level's ASYNC `source(query)` keystroke refetch only — sync (`children`) levels re-rank locally on every keystroke with no debounce. Defaults to ~150ms (`internal/asyncSource.ts`'s `DEFAULT_SEARCH_DEBOUNCE`).
    * @example
@@ -1284,7 +1356,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   this._activeValue.value = null;
   this._refCombobox?.clear();
   this.focusInput();
-  this.dispatchEvent(new CustomEvent("navigate", {
+  this.dispatchEvent(new CustomEvent<CommandPaletteNavigatePayload>("navigate", {
     detail: {
       item,
       depth: nextStack.length
@@ -1472,7 +1544,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
     return;
   }
   const path = this._levelStack.value.map((f: any) => f.item ? f.item.id : null);
-  this.dispatchEvent(new CustomEvent("select", {
+  this.dispatchEvent(new CustomEvent<CommandPaletteSelectPayload>("select", {
     detail: {
       item,
       path
@@ -1954,7 +2026,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   const item = state.item;
   const path = this._levelStack.value.map((f: any) => f.item ? f.item.id : null);
   const args = buildArgsPayload(argList, values);
-  this.dispatchEvent(new CustomEvent("select", {
+  this.dispatchEvent(new CustomEvent<CommandPaletteSelectPayload>("select", {
     detail: {
       item,
       path,
@@ -2013,7 +2085,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   if (!action || action.disabled) return;
   const anchor = this._actionAnchor.value;
   const item = anchor ? anchor.item : null;
-  this.dispatchEvent(new CustomEvent("action-select", {
+  this.dispatchEvent(new CustomEvent<CommandPaletteActionSelectPayload>("action-select", {
     detail: {
       item,
       action
@@ -2201,6 +2273,17 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   set open(v: boolean) { this._openControllable.notifyPropertyWrite(v); }
   get query(): string { return this._queryControllable.read(); }
   set query(v: string) { this._queryControllable.notifyPropertyWrite(v); }
+
+  addEventListener<K extends keyof RozieCommandPaletteEventMap>(type: K, listener: (this: CommandPalette, ev: RozieCommandPaletteEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
+    super.addEventListener(type, listener, options);
+  }
+  removeEventListener<K extends keyof RozieCommandPaletteEventMap>(type: K, listener: (this: CommandPalette, ev: RozieCommandPaletteEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    super.removeEventListener(type, listener, options);
+  }
 }
 
 injectGlobalStyles('rozie-command-palette-ebe3f684-global', `

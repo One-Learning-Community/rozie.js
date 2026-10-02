@@ -24,6 +24,69 @@ import { formatKeyToken } from './internal/formatKeyToken';
 // stale-read (the plan's $data placement broke the race-drop AND the navigate
 // depth on React/Solid/Lit).
 
+/** One declared argument field on a command (`args: [...]`). Values are text-only. */
+export interface CommandPaletteArg {
+  id: string;
+  placeholder?: string;
+  required?: boolean;
+  default?: string;
+}
+/** A row-level action in a command's `actions: [...]` menu. */
+export interface CommandPaletteAction {
+  id: string;
+  label: string;
+  icon?: unknown;
+  shortcut?: string;
+  disabled?: boolean;
+  [key: string]: any;
+}
+/**
+ * A command, as the palette receives it in `items` and hands it back on `navigate`, `select`
+ * and `action-select`. Fields beyond the ones the palette reads are carried through untouched
+ * and read as `any`.
+ */
+export interface CommandPaletteItem {
+  id: string;
+  label: string;
+  group?: string;
+  keywords?: string[];
+  disabled?: boolean;
+  /** `false` marks no label characters as matching; an array of `[start, end)` pairs marks those. */
+  highlight?: false | Array<[number, number]>;
+  icon?: unknown;
+  actions?: CommandPaletteAction[];
+  args?: CommandPaletteArg[];
+  /** A static child level: selecting the item navigates into it instead of emitting `select`. */
+  children?: CommandPaletteItem[];
+  /** A lazy child level, `(query) => items` (or a Promise of them). */
+  source?: (query: string) => CommandPaletteItem[] | Promise<CommandPaletteItem[]>;
+  /** The child level's own empty-query home view. */
+  defaultItems?: CommandPaletteItem[];
+  title?: string | null;
+  placeholder?: string | null;
+  [key: string]: any;
+}
+/** The `navigate` event payload: the item navigated into and the new level depth (1 = first child level). */
+export interface CommandPaletteNavigatePayload {
+  item: CommandPaletteItem;
+  depth: number;
+}
+/**
+ * The `select` event payload. `path` is the id breadcrumb of the levels navigated through
+ * (root excluded). `args` is present only for a command that declares `args`: the trimmed
+ * values keyed by arg id.
+ */
+export interface CommandPaletteSelectPayload {
+  item: CommandPaletteItem;
+  path: Array<string | null>;
+  args?: Record<string, string>;
+}
+/** The `action-select` event payload: the chosen action and the command whose menu it came from. */
+export interface CommandPaletteActionSelectPayload {
+  item: CommandPaletteItem | null;
+  action: CommandPaletteAction;
+}
+
 __rozieInjectStyle('CommandPalette-768cad96', `.rozie-command-palette[data-rozie-s-768cad96] {
   position: fixed;
   inset: 0;
@@ -396,7 +459,7 @@ interface CommandPaletteProps {
    */
   ariaLabel?: string;
   /**
-   * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Leave it empty (the default) and the inner combobox generates a unique id base per instance after mount; set it when you need a stable, predictable id. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
   /**
@@ -443,10 +506,10 @@ interface CommandPaletteProps {
    * <CommandPalette virtual virtualEstimateRowHeight={44} items={longCommandList} />
    */
   virtualEstimateRowHeight?: (number) | null;
-  onNavigate?: (...args: any[]) => void;
-  onBack?: (...args: any[]) => void;
-  onSelect?: (...args: any[]) => void;
-  onActionSelect?: (...args: any[]) => void;
+  onNavigate?: (payload: CommandPaletteNavigatePayload) => void;
+  onBack?: () => void;
+  onSelect?: (payload: CommandPaletteSelectPayload) => void;
+  onActionSelect?: (payload: CommandPaletteActionSelectPayload) => void;
   breadcrumbSlot?: (ctx: BreadcrumbSlotCtx) => JSX.Element;
   optionSlot?: (ctx: OptionSlotCtx) => JSX.Element;
   groupHeadingSlot?: (ctx: GroupHeadingSlotCtx) => JSX.Element;
@@ -473,7 +536,7 @@ export interface CommandPaletteHandle {
 }
 
 export default function CommandPalette(_props: CommandPaletteProps): JSX.Element {
-  const _merged = mergeProps({ score: null, items: (() => [])() as any[], defaultItems: (() => [])() as any[], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0, appendTo: false, virtual: false, virtualMaxHeight: null, virtualEstimateRowHeight: null }, _props);
+  const _merged = mergeProps({ score: null, items: (() => [])() as any[], defaultItems: (() => [])() as any[], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: '', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0, appendTo: false, virtual: false, virtualMaxHeight: null, virtualEstimateRowHeight: null }, _props);
   const [local, attrs] = splitProps(_merged, ['open', 'query', 'score', 'items', 'defaultItems', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase', 'searchDebounce', 'actionKey', 'closeOnAction', 'groupCap', 'appendTo', 'virtual', 'virtualMaxHeight', 'virtualEstimateRowHeight', 'ref', 'onNavigate', 'onBack', 'onSelect', 'onActionSelect']);
   onMount(() => { local.ref?.({ show, close, toggle, focus, goBack, openTo }); });
 

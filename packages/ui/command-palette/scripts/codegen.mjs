@@ -34,6 +34,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, ProducerResolver, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { typedSurfaceBarrelLines } from '../../typed-surface-barrel.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -203,14 +204,17 @@ function main() {
     // `CommandPaletteHandle` interface (the `$expose` handle), forwarded verbatim.
     if (cfg.build === 'tsdown') {
       const barrel =
-        (target === 'react' || target === 'solid') && ir.expose.length > 0
+        ((target === 'react' || target === 'solid') && ir.expose.length > 0
           ? `export { default as CommandPalette } from './CommandPalette';\n` +
             `export { default } from './CommandPalette';\n\n` +
             `/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
               .map((m) => m.name)
               .join(', ')} }. */\n` +
             `export type { CommandPaletteHandle } from './CommandPalette';\n`
-          : `export { default as CommandPalette } from './CommandPalette';\nexport { default } from './CommandPalette';\n`;
+          : `export { default as CommandPalette } from './CommandPalette';\nexport { default } from './CommandPalette';\n`) +
+        // `<types>` names (CommandPaletteItem, the event payloads, …) + Lit's
+        // RozieCommandPaletteEventMap via the shared helper (the popover precedent).
+        typedSurfaceBarrelLines(target, ir, 'CommandPalette');
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 

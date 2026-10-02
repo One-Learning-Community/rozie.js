@@ -68,10 +68,83 @@
 </div></Teleport>
 </template>
 
+<script lang="ts">
+/** One declared argument field on a command (`args: [...]`). Values are text-only. */
+export interface CommandPaletteArg {
+  id: string;
+  placeholder?: string;
+  required?: boolean;
+  default?: string;
+}
+/** A row-level action in a command's `actions: [...]` menu. */
+export interface CommandPaletteAction {
+  id: string;
+  label: string;
+  icon?: unknown;
+  shortcut?: string;
+  disabled?: boolean;
+  [key: string]: any;
+}
+/**
+ * A command, as the palette receives it in `items` and hands it back on `navigate`, `select`
+ * and `action-select`. Fields beyond the ones the palette reads are carried through untouched
+ * and read as `any`.
+ */
+export interface CommandPaletteItem {
+  id: string;
+  label: string;
+  group?: string;
+  keywords?: string[];
+  disabled?: boolean;
+  /** `false` marks no label characters as matching; an array of `[start, end)` pairs marks those. */
+  highlight?: false | Array<[number, number]>;
+  icon?: unknown;
+  actions?: CommandPaletteAction[];
+  args?: CommandPaletteArg[];
+  /** A static child level: selecting the item navigates into it instead of emitting `select`. */
+  children?: CommandPaletteItem[];
+  /** A lazy child level, `(query) => items` (or a Promise of them). */
+  source?: (query: string) => CommandPaletteItem[] | Promise<CommandPaletteItem[]>;
+  /** The child level's own empty-query home view. */
+  defaultItems?: CommandPaletteItem[];
+  title?: string | null;
+  placeholder?: string | null;
+  [key: string]: any;
+}
+/** The `navigate` event payload: the item navigated into and the new level depth (1 = first child level). */
+export interface CommandPaletteNavigatePayload {
+  item: CommandPaletteItem;
+  depth: number;
+}
+/**
+ * The `select` event payload. `path` is the id breadcrumb of the levels navigated through
+ * (root excluded). `args` is present only for a command that declares `args`: the trimmed
+ * values keyed by arg id.
+ */
+export interface CommandPaletteSelectPayload {
+  item: CommandPaletteItem;
+  path: Array<string | null>;
+  args?: Record<string, string>;
+}
+/** The `action-select` event payload: the chosen action and the command whose menu it came from. */
+export interface CommandPaletteActionSelectPayload {
+  item: CommandPaletteItem | null;
+  action: CommandPaletteAction;
+}
+</script>
+
 <script setup lang="ts">
 import Combobox from '@rozie-ui/combobox-vue';
 
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+
+import { scoreCommands, itemHighlight } from './internal/scoreCommands';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
+import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
+import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
+import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
+import { deriveCommandGroups } from './internal/commandGroups';
+import { formatKeyToken } from './internal/formatKeyToken';
 import { computed } from 'vue';
 
 const props = withDefaults(
@@ -109,7 +182,7 @@ const props = withDefaults(
      */
     ariaLabel?: string;
     /**
-     * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+     * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Leave it empty (the default) and the inner combobox generates a unique id base per instance after mount; set it when you need a stable, predictable id. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
      */
     idBase?: string;
     /**
@@ -157,7 +230,7 @@ const props = withDefaults(
      */
     virtualEstimateRowHeight?: number | null;
   }>(),
-  { score: null, items: () => [], defaultItems: () => [], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0, appendTo: false, virtual: false, virtualMaxHeight: null, virtualEstimateRowHeight: null }
+  { score: null, items: () => [], defaultItems: () => [], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: '', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0, appendTo: false, virtual: false, virtualMaxHeight: null, virtualEstimateRowHeight: null }
 );
 
 /**
@@ -172,10 +245,10 @@ const open = defineModel<boolean>('open', { default: false });
 const query = defineModel<string>('query', { default: '' });
 
 const emit = defineEmits<{
-  navigate: [...args: any[]];
-  back: [...args: any[]];
-  select: [...args: any[]];
-  'action-select': [...args: any[]];
+  navigate: [payload: CommandPaletteNavigatePayload];
+  back: [];
+  select: [payload: CommandPaletteSelectPayload];
+  'action-select': [payload: CommandPaletteActionSelectPayload];
 }>();
 
 defineSlots<{
@@ -206,13 +279,6 @@ const frameRef = ref<HTMLElement>();
 const panelRef = ref<HTMLElement>();
 const comboboxRef = ref<InstanceType<typeof Combobox>>();
 
-import { scoreCommands, itemHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
-import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
-import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
-import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
-import { deriveCommandGroups } from './internal/commandGroups';
-import { formatKeyToken } from './internal/formatKeyToken';
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
 // boundaries within a single handler (bump a token, then compare it after an
