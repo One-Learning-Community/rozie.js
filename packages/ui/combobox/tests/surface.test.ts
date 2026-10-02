@@ -46,7 +46,7 @@ const EXPECT = {
   // remove, index }`, rendered inside the control before the input under `multiple`.
   // Phase 86 (R3, plan 86-06): + `creatable` prop, `create` emit, `create`
   // scoped slot `{ query }`.
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'creatable', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift', 'block', 'chipLayout', 'disableOpenOnFocus', 'hideEmpty', 'delimiters', 'validate', 'selectOnTab'],
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'creatable', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift', 'block', 'chipLayout', 'disableOpenOnFocus', 'hideEmpty', 'delimiters', 'validate', 'selectOnTab', 'splitPaste', 'commitOnBlur'],
   models: ['value'],
   emits: ['change', 'search', 'create'],
   slots: ['option', 'empty', 'groupHeading', 'groupMore', 'chip', 'create'] as string[],
@@ -58,7 +58,8 @@ const EXPECT = {
   // onBlur() does not collapse it while a host sub-surface (e.g. an action
   // flyout) holds focus. Additive + render-neutral — never called ⇒ behavior
   // byte-identical to today.
-  expose: ['focus', 'clear', 'seedQuery', 'pinOpen', 'activeOption'],
+  // query (261002-ekf F4): read the current input text.
+  expose: ['focus', 'clear', 'seedQuery', 'pinOpen', 'activeOption', 'query'],
 } as const;
 
 const sorted = (a: readonly string[]) => [...a].sort();
@@ -80,7 +81,7 @@ describe('Combobox.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (30 props)', () => {
+  it('props surface matches (32 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -103,7 +104,7 @@ describe('Combobox.rozie surface gate', () => {
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
 
-  it('expose surface matches (focus/clear/seedQuery/pinOpen/activeOption)', () => {
+  it('expose surface matches (focus/clear/seedQuery/pinOpen/activeOption/query)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

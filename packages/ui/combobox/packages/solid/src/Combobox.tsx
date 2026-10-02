@@ -315,7 +315,7 @@ interface GroupHeadingSlotCtx { group: ComboboxGroup; }
 
 interface GroupMoreSlotCtx { group: ComboboxGroup | null; hidden: number; expand: () => void; }
 
-interface ComboboxProps extends Omit<import('solid-js').ComponentProps<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'multiple' | 'creatable' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'chipLayout' | 'disableOpenOnFocus' | 'hideEmpty' | 'delimiters' | 'validate' | 'selectOnTab' | 'onSearch' | 'onChange' | 'onCreate' | 'chipSlot' | 'optionSlot' | 'emptySlot' | 'createSlot' | 'groupHeadingSlot' | 'groupMoreSlot' | 'slots' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
+interface ComboboxProps extends Omit<import('solid-js').ComponentProps<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'multiple' | 'creatable' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'chipLayout' | 'disableOpenOnFocus' | 'hideEmpty' | 'delimiters' | 'validate' | 'splitPaste' | 'commitOnBlur' | 'selectOnTab' | 'onSearch' | 'onChange' | 'onCreate' | 'chipSlot' | 'optionSlot' | 'emptySlot' | 'createSlot' | 'groupHeadingSlot' | 'groupMoreSlot' | 'slots' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The selected option's value (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a combobox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `null` when nothing is selected.
    * @example
@@ -345,7 +345,7 @@ interface ComboboxProps extends Omit<import('solid-js').ComponentProps<'div'>, '
    */
   ariaLabel?: (string) | null;
   /**
-   * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one combobox shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the listbox, option and popup elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`, the listbox id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-combobox-<n>`); set it when you need stable, predictable ids. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
   /**
@@ -429,17 +429,27 @@ interface ComboboxProps extends Omit<import('solid-js').ComponentProps<'div'>, '
    */
   hideEmpty?: boolean;
   /**
-   * Keys that commit the **typed text** as a value (matched against the key event's `key`), under `multiple` only — a delimiter never picks the highlighted option. Character entries (e.g. `[',', ';']`) also split pasted text: a paste containing a delimiter is split on them and every non-empty trimmed part is committed. `'Enter'` and `'Tab'` are allowed; Enter then commits the typed text only when no option is highlighted. A non-empty list (or a `validate` function) turns on free-text commits, so Enter with no highlighted option commits the typed text too. Default `[]` (off).
+   * Keys that commit the **typed text** as a value (matched against the key event's `key`), under `multiple` only — a delimiter never picks the highlighted option. Character entries (e.g. `[',', ';']`) also split pasted text: a paste containing a delimiter is split on them, every non-empty trimmed part that `validate` accepts is committed, and the rejected parts are inserted at the caret (replacing the selection) like an ordinary paste, so text typed before the paste is kept. Use `splitPaste` to replace this split. `'Enter'` and `'Tab'` are allowed; Enter then commits the typed text only when no option is highlighted. A non-empty list (or `validate`, `splitPaste` or `commitOnBlur`) turns on free-text commits, so Enter with no highlighted option commits the typed text too. Default `[]` (off).
    * @example
    * <Combobox multiple value={to()} onValueChange={setTo} options={contacts} delimiters={delims} />
    */
   delimiters?: any[];
   /**
-   * Free-text gate, `(text: string) => boolean`, under `multiple` only. Called with the trimmed typed (or pasted) text before every free-text commit; return `false` to reject it — rejected text stays in the input. Setting it also turns on free-text commits (Enter with no highlighted option commits the typed text). A free-text commit appends the text to `value` (skipped when already present), clears the input, and emits `change` with `option: null` and the committed `text`.
+   * Free-text gate and normaliser, `(text: string) => string | boolean | null | undefined`, under `multiple` only. Called with the trimmed typed (or pasted) text before every free-text commit. Return the **string to store** (e.g. the bare address out of `Sam Roe <sam@x.test>`), `true` to store the text as typed, or a falsy value (`false` / `null` / `''`) to reject it — rejected text stays in the input. The same shape as Tags' `validate`. Setting it also turns on free-text commits (Enter with no highlighted option commits the typed text). A free-text commit appends the stored string to `value` (skipped when already present), clears the input, and emits `change` with `option: null` and the stored string as `text`.
    * @example
-   * <Combobox multiple value={to()} onValueChange={setTo} options={contacts} validate={isEmail} />
+   * <Combobox multiple value={to()} onValueChange={setTo} options={contacts} validate={toAddress} />
    */
   validate?: ((...args: any[]) => any) | null;
+  /**
+   * Replaces the built-in paste split, `(text: string) => string[] | null`, under `multiple` only. Called with the clipboard text on every paste. Return the parts to commit — each is trimmed and passed through `validate`; accepted parts are committed and the rejected ones are inserted at the caret — or `null` to leave the paste to the browser untouched. Use it for syntax the delimiter split cannot know about, e.g. a quoted display name containing a comma (`"Roe, Sam" <sam@x.test>`). Setting it also turns on free-text commits.
+   * @example
+   * <Combobox multiple value={to()} onValueChange={setTo} options={contacts} validate={toAddress} splitPaste={splitAddresses} />
+   */
+  splitPaste?: ((...args: any[]) => any) | null;
+  /**
+   * Commit the typed text when the input loses focus, under `multiple` only, through `validate` like every other free-text commit: accepted text is committed and the input cleared, rejected text stays. A blur into a pinned host sub-surface (`pinOpen(true)`) does not commit. Setting it also turns on free-text commits. Default `false`.
+   */
+  commitOnBlur?: boolean;
   /**
    * Tab picks the highlighted option while the popup is visible and an option is highlighted, keeping focus in the input. When nothing is picked, Tab moves focus normally. Default `false` (Tab always moves focus).
    */
@@ -463,15 +473,16 @@ export interface ComboboxHandle {
   seedQuery: (text: string) => void;
   pinOpen: (v: boolean) => void;
   activeOption: () => any;
+  query: () => string;
 }
 
 export default function Combobox(_props: ComboboxProps): JSX.Element {
-  const _merged = mergeProps({ options: (() => [])() as any[], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: null, multiple: false, creatable: false, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: (() => [])() as any[], groupCap: 0, placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false, block: false, chipLayout: 'stacked', disableOpenOnFocus: false, hideEmpty: false, delimiters: (() => [])() as any[], validate: null, selectOnTab: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'creatable', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift', 'block', 'chipLayout', 'disableOpenOnFocus', 'hideEmpty', 'delimiters', 'validate', 'selectOnTab', 'ref', 'onSearch', 'onChange', 'onCreate']);
-  onMount(() => { local.ref?.({ focus, clear, seedQuery, pinOpen, activeOption }); });
+  const _merged = mergeProps({ options: (() => [])() as any[], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: '', inline: false, closeOnSelect: null, multiple: false, creatable: false, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: (() => [])() as any[], groupCap: 0, placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false, block: false, chipLayout: 'stacked', disableOpenOnFocus: false, hideEmpty: false, delimiters: (() => [])() as any[], validate: null, splitPaste: null, commitOnBlur: false, selectOnTab: false }, _props);
+  const [local, attrs] = splitProps(_merged, ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'multiple', 'creatable', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'placement', 'offset', 'disableFlip', 'disableShift', 'block', 'chipLayout', 'disableOpenOnFocus', 'hideEmpty', 'delimiters', 'validate', 'splitPaste', 'commitOnBlur', 'selectOnTab', 'ref', 'onSearch', 'onChange', 'onCreate']);
+  onMount(() => { local.ref?.({ focus, clear, seedQuery, pinOpen, activeOption, query }); });
 
   const [value, setValue] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'value', null);
-  const [query, setQuery] = createSignal('');
+  const [inputText, setInputText] = createSignal('');
   const [isOpen, setIsOpen] = createSignal(false);
   const [activeIndex, setActiveIndex] = createSignal(-1);
   const [rows, setRows] = createSignal<any[]>([]);
@@ -480,7 +491,9 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   const [expandedGroups, setExpandedGroups] = createSignal<Record<string, any>>({});
   const [createdQuery, setCreatedQuery] = createSignal<any>(null);
   const [pinned, setPinned] = createSignal(false);
+  const [autoId, setAutoId] = createSignal('');
   onMount(() => {
+    if (!local.idBase) setAutoId('rozie-combobox-' + nextAutoId());
     syncQueryToValue();
     syncRows();
     didMount = true;
@@ -495,7 +508,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   createEffect(on(() => (() => value())(), (v) => untrack(() => (() => {
     syncQueryToValue();
   })()), { defer: true }));
-  createEffect(on(() => (() => (local.options ? local.options.length : 0) + '|' + query())(), (v) => untrack(() => (() => {
+  createEffect(on(() => (() => (local.options ? local.options.length : 0) + '|' + inputText())(), (v) => untrack(() => (() => {
     if (expandedGroups() && Object.keys(expandedGroups()).length) setExpandedGroups({});
     syncRows();
     if (local.virtual && virtualizer) {
@@ -1021,7 +1034,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   // top-level consts persist for the instance lifetime naturally.
   //
   // keyFn is the SUBSCRIBE-FIRST half (fine-grained Solid <For> / Svelte
-  // {#each}): it reads ALL FOUR reactive inputs UNCONDITIONALLY — $data.query
+  // {#each}): it reads ALL FOUR reactive inputs UNCONDITIONALLY — $data.inputText
   // even when disableFilter is true (mirrors windowing.rzts windowedRows
   // void-touch discipline) and $props.groups even when $props.virtual (so a
   // groups change while windowed still invalidates the cache once virtual
@@ -1046,7 +1059,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     const __rozieMemoKey = (() => {
       const opts = Array.isArray(local.options) ? local.options : [];
       const df = !!local.disableFilter;
-      const q = String(query() == null ? '' : query());
+      const q = String(inputText() == null ? '' : inputText());
       const groupsProp = local.groups;
       return [opts, q, df, groupsProp];
     })();
@@ -1057,7 +1070,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     const __rozieMemoVal = (() => {
       const opts = Array.isArray(local.options) ? local.options : [];
       const df = !!local.disableFilter;
-      const q = String(query() == null ? '' : query());
+      const q = String(inputText() == null ? '' : inputText());
       const groupsProp = local.groups;
       let list = opts;
       if (!df) {
@@ -1256,7 +1269,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   // comparison, never a substring search, and with NO Unicode normalization
   // (R3 locked: a composition-form difference must NOT be treated as a match).
   function normalizedQuery() {
-    return String(query() == null ? '' : query()).trim().toLowerCase();
+    return String(inputText() == null ? '' : inputText()).trim().toLowerCase();
   }
 
   // queryMatchesOption(nq): whether the (already-normalized) query is an exact,
@@ -1495,11 +1508,18 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     });
     scheduleRemeasure();
   }
+
+  // idRoot(): the id base — the `idBase` prop, else the per-instance id generated
+  // in $onMount (`autoId`), else the pre-mount fallback. Generated after mount (not
+  // during setup) so a server render and the hydrating client agree.
+  function idRoot() {
+    return local.idBase || autoId() || 'rozie-combobox';
+  }
   function optId(i: any) {
-    return local.idBase + '-opt-' + i;
+    return idRoot() + '-opt-' + i;
   }
   function listId() {
-    return local.idBase + '-list';
+    return idRoot() + '-list';
   }
 
   // popupVisible() (hideEmpty, COMBOBOX-SPEC item 4): whether the popup is actually
@@ -1644,7 +1664,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     }
     if (opt.isCreate) {
       // Read locals before any write (ROZ138 idiom).
-      const q = query();
+      const q = inputText();
       const nq = normalizedQuery();
       // The double-commit latch (D-17/D-20): a second commit of the SAME
       // normalized query — whether a rapid double gesture, or the async
@@ -1663,7 +1683,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
       // consumer's async add flows back through the ordinary `value` watch).
       // `value` itself is untouched — R3 locked.
       if (effectiveCloseOnSelect()) setIsOpen(false);
-      if (local.multiple) setQuery('');
+      if (local.multiple) clearQuery(null);
       setActiveIndex(-1);
       return;
     }
@@ -1682,7 +1702,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
       // `opt.isRemoval` (set only by removeChipValue() below) skips this —
       // removing a chip is not a pick, and clobbering whatever the user was
       // mid-typing in the search box is a separate, unrelated data loss.
-      if (!opt.isRemoval) setQuery('');
+      if (!opt.isRemoval) clearQuery(null);
       if (effectiveCloseOnSelect()) setIsOpen(false);
       setActiveIndex(-1);
       _props.onChange?.({
@@ -1693,7 +1713,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
       return;
     }
     setValue(opt.value);
-    setQuery(String(opt.label));
+    setInputText(String(opt.label));
     if (effectiveCloseOnSelect()) setIsOpen(false);
     setActiveIndex(-1);
     // D-15: `selected` is additive and always `true` in single-select.
@@ -1809,7 +1829,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     if (local.multiple) return;
     const opts = Array.isArray(local.options) ? local.options : [];
     const opt = opts.find((o: any) => valueOf(o) === value());
-    setQuery(opt === undefined || opt === null ? '' : String(labelOf(opt)));
+    setInputText(opt === undefined || opt === null ? '' : String(labelOf(opt)));
   }
 
   // ---- free-text commits (COMBOBOX-SPEC items 5-7, multiple only) --------
@@ -1823,13 +1843,19 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     return delimiterList().filter((k: any) => k !== 'Enter' && k !== 'Tab');
   }
   // freeTextOn(): free-text commits are enabled under `multiple` when a delimiter
-  // list OR a validate function is supplied.
+  // list, a validate function, a splitPaste function or commitOnBlur is supplied.
   function freeTextOn() {
-    return !!local.multiple && (delimiterList().length > 0 || typeof local.validate === 'function');
+    return !!local.multiple && (delimiterList().length > 0 || typeof local.validate === 'function' || typeof local.splitPaste === 'function' || !!local.commitOnBlur);
   }
-  // acceptsText(t): the `validate` gate (absent ⇒ accept).
-  function acceptsText(t: any) {
-    return typeof local.validate !== 'function' || !!local.validate(t);
+  // storedText(t): the `validate` gate + normaliser (Tags' shape), for an already
+  // trimmed, non-empty `t`. Returns the string to store, or null when rejected:
+  // absent validate ⇒ t; a string return ⇒ that string ('' rejects); any other
+  // truthy return (`true`) ⇒ t; a falsy return ⇒ rejected.
+  function storedText(t: any) {
+    if (typeof local.validate !== 'function') return t;
+    const r = local.validate(t);
+    if (!r) return null;
+    return typeof r === 'string' ? r : t;
   }
 
   // commitTexts(texts): append every not-yet-present text to `value` (ONE fresh
@@ -1867,56 +1893,12 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     if (el && typeof el.value === 'string' && el.value !== text) el.value = text;
   }
 
-  // commitFreeText(raw, el): trim → validate → commit + clear the input. Returns
-  // true when the text was handled (committed, or already present ⇒ just cleared);
-  // false when empty or rejected — rejected text stays in the input.
-  function commitFreeText(raw: any, el: any) {
-    const t = String(raw == null ? '' : raw).trim();
-    if (!t) return false;
-    if (!acceptsText(t)) return false;
-    setQuery('');
-    syncInputText(el, '');
-    commitTexts([t]);
-    return true;
-  }
-
-  // onPaste(e) (item 6): under free-text mode with character delimiters, a paste
-  // containing a delimiter is split on them and every non-empty trimmed part is
-  // committed (the paste is preventDefault-ed). Parts `validate` rejects stay in the
-  // input (joined by the first delimiter). A paste with no delimiter is ordinary text.
-  function onPaste(e: any) {
-    if (!freeTextOn()) return;
-    const seps = splitDelimiters();
-    if (seps.length === 0) return;
-    const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
-    let hasSep = false;
-    for (let s = 0; s < seps.length; s++) {
-      if (text.indexOf(seps[s]) !== -1) hasSep = true;
-    }
-    if (!hasSep) return;
-    if (e) e.preventDefault();
-    let parts = [text];
-    for (let s = 0; s < seps.length; s++) {
-      const out = [];
-      for (let p = 0; p < parts.length; p++) {
-        const pieces = String(parts[p]).split(seps[s]);
-        for (let q = 0; q < pieces.length; q++) out.push(pieces[q]);
-      }
-      parts = out;
-    }
-    const trimmed = parts.map((p: any) => String(p).trim()).filter((p: any) => p.length > 0);
-    const accepted = trimmed.filter((p: any) => acceptsText(p));
-    const rejected = trimmed.filter((p: any) => !acceptsText(p));
-    const rest = rejected.join(seps[0] + ' ');
-    setQuery(rest);
-    syncInputText(e ? e.target : null, rest);
-    commitTexts(accepted);
-  }
-
-  // ---- input + keyboard handlers -----------------------------------------
-  function onInput(e: any) {
-    const q = e && e.target ? e.target.value : '';
-    setQuery(q);
+  // setTypedText(q, el): the input text changed to `q` — by typing (onInput) or by a
+  // paste Combobox handled itself (insertAtCaret). Re-arms the create latch, opens
+  // the list, highlights the first row and emits `search`, exactly as typing does.
+  function setTypedText(q: any, el: any) {
+    setInputText(q);
+    syncInputText(el, q);
     // Any input change re-arms the double-commit latch (D-17/D-20) — a
     // freshly-typed query is a new gesture, never a repeat of whatever was
     // last created.
@@ -1926,6 +1908,102 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     _props.onSearch?.({
       query: q
     });
+  }
+
+  // clearQuery(el): Combobox clearing the input text ITSELF (a pick under
+  // `multiple`, a create under `multiple`, a free-text commit, clear()). Emits
+  // `search` with '' so a host tracking the query through `search` never goes
+  // stale — a free-text commit of an already-selected value fires no `change`,
+  // so this is the host's only signal. No emit when the text was already empty.
+  // The live element is consulted too: on React a commit in the same frame as the
+  // last keystroke still sees the pre-keystroke `inputText` in its closure.
+  function clearQuery(el: any) {
+    const had = inputText() !== '' || !!(el && typeof el.value === 'string' && el.value !== '');
+    setInputText('');
+    syncInputText(el, '');
+    if (had) _props.onSearch?.({
+      query: ''
+    });
+  }
+
+  // insertAtCaret(el, text): insert `text` into the input at the caret, replacing
+  // the selection — what an ordinary paste does — and leave the caret after it.
+  function insertAtCaret(el: any, text: any) {
+    const cur = el && typeof el.value === 'string' ? el.value : String(inputText());
+    const start = el && typeof el.selectionStart === 'number' ? el.selectionStart : cur.length;
+    const end = el && typeof el.selectionEnd === 'number' ? el.selectionEnd : start;
+    const next = cur.slice(0, start) + text + cur.slice(end);
+    setTypedText(next, el);
+    const caret = start + text.length;
+    if (el && typeof el.setSelectionRange === 'function') el.setSelectionRange(caret, caret);
+  }
+
+  // commitFreeText(raw, el): trim → validate (normalise) → commit + clear the input.
+  // Returns true when the text was handled (committed, or already present ⇒ just
+  // cleared); false when empty or rejected — rejected text stays in the input.
+  function commitFreeText(raw: any, el: any) {
+    const t = String(raw == null ? '' : raw).trim();
+    if (!t) return false;
+    const stored = storedText(t);
+    if (stored === null) return false;
+    clearQuery(el);
+    commitTexts([stored]);
+    return true;
+  }
+
+  // splitOnDelimiters(text): the built-in paste split — the clipboard text split on
+  // every CHARACTER delimiter, or null when it contains none (an ordinary paste).
+  function splitOnDelimiters(text: any) {
+    const seps = splitDelimiters();
+    let hasSep = false;
+    for (let s = 0; s < seps.length; s++) {
+      if (text.indexOf(seps[s]) !== -1) hasSep = true;
+    }
+    if (!hasSep) return null;
+    let parts = [text];
+    for (let s = 0; s < seps.length; s++) {
+      const out = [];
+      for (let p = 0; p < parts.length; p++) {
+        const pieces = String(parts[p]).split(seps[s]);
+        for (let q = 0; q < pieces.length; q++) out.push(pieces[q]);
+      }
+      parts = out;
+    }
+    return parts;
+  }
+
+  // onPaste(e) (item 6): under free-text mode the clipboard text is split — by
+  // `splitPaste` when supplied, else on the character delimiters — and every
+  // non-empty trimmed part `validate` accepts is committed (the paste is
+  // preventDefault-ed). The rejected parts (joined by the first delimiter) are
+  // inserted at the caret, replacing the selection, as an ordinary paste would be,
+  // so text typed before the paste is kept. A split of null (splitPaste said "not
+  // mine", or no delimiter in the text) leaves the paste to the browser.
+  function onPaste(e: any) {
+    if (!freeTextOn()) return;
+    const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
+    const custom = typeof local.splitPaste === 'function';
+    const split = custom ? local.splitPaste(text) : splitOnDelimiters(text);
+    if (!Array.isArray(split)) return;
+    if (e) e.preventDefault();
+    const accepted = [];
+    const rejected = [];
+    for (let i = 0; i < split.length; i++) {
+      const part = String(split[i] == null ? '' : split[i]).trim();
+      if (!part) continue;
+      const stored = storedText(part);
+      if (stored === null) rejected.push(part);else accepted.push(stored);
+    }
+    const seps = splitDelimiters();
+    const rest = rejected.join(seps.length > 0 ? seps[0] + ' ' : ' ');
+    if (rest) insertAtCaret(e ? e.target : null, rest);
+    commitTexts(accepted);
+  }
+
+  // ---- input + keyboard handlers -----------------------------------------
+  function onInput(e: any) {
+    const q = e && e.target ? e.target.value : '';
+    setTypedText(q, null);
   }
   function onFocus(e: any) {
     // Phase 86 R2 (plan 86-03), Solid-only reentrancy guard: the input now
@@ -1981,10 +2059,16 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   // `openingInProgress` (Solid-only, see onFocus above), early-return too — this
   // blur is a side effect of our OWN open-transition recreating the anchor's DOM,
   // not the user moving focus elsewhere.
-  function onBlur() {
+  // commitOnBlur: leaving the field commits the typed text through validate (a blur
+  // into a pinned host sub-surface, or the Solid recreate blur, returned above).
+  function onBlur(e: any) {
     if (pinned()) return;
     if (openingInProgress) return;
     setIsOpen(false);
+    if (local.commitOnBlur && freeTextOn()) {
+      const el = e ? e.target : null;
+      commitFreeText(el ? el.value : inputText(), el);
+    }
   }
   function onKeydown(e: any) {
     // B10: ignore every key while an IME composition is active — the Enter that
@@ -2069,7 +2153,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
       // Backspace-removes-last-chip (Tags.rozie precedent, Phase 86 R1 plan
       // 86-05): guarded on `multiple` AND the LIVE input value being empty —
       // read `e.target.value` directly (Tags' proven idiom), never the mirrored
-      // `$data.query`. A non-empty query falls through to normal text editing —
+      // `$data.inputText`. A non-empty query falls through to normal text editing —
       // nothing here removes a chip while there is text to delete.
       if (local.multiple) {
         const liveValue = e && e.target ? e.target.value : '';
@@ -2149,6 +2233,16 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     gridScrollEl = null;
     setWindowVer(windowVer() + 1);
   }
+
+  // nextAutoId(): a page-wide counter shared by every Rozie component instance (on
+  // globalThis, so separately bundled copies of a leaf never hand out the same id).
+  function nextAutoId() {
+    const g = globalThis as unknown as {
+      __rozieAutoId?: number;
+    };
+    g.__rozieAutoId = (g.__rozieAutoId || 0) + 1;
+    return g.__rozieAutoId;
+  }
   // focus() — focus the input (accepted ROZ137 Lit override). clear() — reset the
   // selection + query. seedQuery(text) — imperative-only: write the input text
   // (and therefore filteredOptions()'s filter) without touching the `value`
@@ -2170,7 +2264,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     // shape; nothing is selected after a clear, so `selected` is `false`.
     const empty = local.multiple ? [] : null;
     setValue(empty);
-    setQuery('');
+    clearQuery(null);
     setActiveIndex(-1);
     _props.onChange?.({
       value: empty,
@@ -2179,17 +2273,21 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     });
   }
   function seedQuery(text: any) {
-    setQuery(String(text == null ? '' : text));
+    setInputText(String(text == null ? '' : text));
   }
   function pinOpen(v: any) {
     setPinned(!!v);
+  }
+  // query() — the current input text (what the last `search` reported).
+  function query() {
+    return inputText();
   }
 
   return (
     <>
     <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-combobox" + " " + rozieClass({ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': local.disabled, 'rozie-combobox--inline': local.inline, 'rozie-combobox--multiple': local.multiple, 'rozie-combobox--block': local.block, 'rozie-combobox--chips-inline': chipsInline() }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-9546115a="">
       
-      <Popover trigger="manual" open={isOpen()} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={local.virtual} disablePositioning={local.inline} disableDismiss={local.inline || pinned()} placement={local.placement} offset={local.offset} disableFlip={local.disableFlip} disableShift={local.disableShift} data-rozie-s-9546115a="" anchorSlot={() => (<>
+      <Popover trigger="manual" open={isOpen()} onOpenChange={setIsOpen} bare={true} matchWidth={true} keepMounted={local.virtual} disablePositioning={local.inline} disableDismiss={local.inline || pinned()} placement={local.placement} offset={local.offset} disableFlip={local.disableFlip} disableShift={local.disableShift} idBase={idRoot()} data-rozie-s-9546115a="" anchorSlot={() => (<>
           
           
           <div class={"rozie-combobox-control"} data-rozie-s-9546115a="">
@@ -2197,7 +2295,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
             <Key each={chipRows() as readonly any[]} by={(row) => 'chip-' + row.value}>{(row, idx) => <li class={"rozie-combobox-chip"} data-rozie-s-9546115a="">
               {(_props.chipSlot ?? _props.slots?.['chip'])?.({ get option() { return row().option; }, remove: () => onChipRemoveActivate(row().value), get index() { return idx(); } }) ?? <><span class={"rozie-combobox-chip__label"} data-rozie-s-9546115a="">{rozieDisplay(row().label)}</span><button type="button" aria-label={rozieAttr(chipRemoveLabel(row()))} class={"rozie-combobox-chip__remove"} disabled={!!local.disabled} onMouseDown={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { $event.preventDefault(); onChipRemovePointerDown(); }} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { $event.stopPropagation(); onChipRemoveActivate(row().value); }} data-rozie-s-9546115a="">×</button></>}
             </li>}</Key>
-          </ul></Show>}<input type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!popupVisible()} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(local.ariaLabel)} autocomplete="off" ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-combobox-input"} value={query()} placeholder={local.placeholder} disabled={!!local.disabled} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onFocus={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onFocus($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onPaste={($event: ClipboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onPaste($event); }} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { $event.stopPropagation(); onNativeInputChange(); }} data-rozie-s-9546115a="" />
+          </ul></Show>}<input type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!popupVisible()} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(local.ariaLabel)} autocomplete="off" ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-combobox-input"} value={inputText()} placeholder={local.placeholder} disabled={!!local.disabled} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onFocus={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onFocus($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onPaste={($event: ClipboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onPaste($event); }} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { $event.stopPropagation(); onNativeInputChange(); }} data-rozie-s-9546115a="" />
           </div>
         </>)}>
         
@@ -2207,9 +2305,9 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
           </li>}</Key>
 
           {<Show when={filteredOptions().length === 0 && !isCreatableQuery()}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
-            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ get query() { return query(); } }) ?? "No results"}
+            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ get query() { return inputText(); } }) ?? "No results"}
           </li></Show>}{<Show when={isCreatableQuery()}><li role="option" class={"rozie-combobox-option rozie-combobox-create" + " " + rozieClass({ 'rozie-combobox-option--active': filteredOptions().length === activeIndex() })} id={rozieAttr(optId(filteredOptions().length))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(createRowAt(filteredOptions().length)); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(filteredOptions().length); }} data-rozie-s-9546115a="">
-            {(_props.createSlot ?? _props.slots?.['create'])?.({ get query() { return query(); } }) ?? <>Create "{query()}"</>}
+            {(_props.createSlot ?? _props.slots?.['create'])?.({ get query() { return inputText(); } }) ?? <>Create "{inputText()}"</>}
           </li></Show>}</ul></Show>}{<Show when={popupVisible() && !local.virtual && isGrouped() && !isCapped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" aria-multiselectable={(local.multiple ? 'true' : null) ?? undefined} data-rozie-s-9546115a="">
           <Key each={groupBlocks() as readonly any[]} by={(blk) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped')}>{(blk) => <li class={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-9546115a="">
             {<Show when={blk().group}><div class={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
@@ -2220,9 +2318,9 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
           </li>}</Key>
 
           {<Show when={groupBlocks().length === 0 && !isCreatableQuery()}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
-            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ get query() { return query(); } }) ?? "No results"}
+            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ get query() { return inputText(); } }) ?? "No results"}
           </li></Show>}{<Show when={isCreatableQuery()}><li role="option" class={"rozie-combobox-option rozie-combobox-create" + " " + rozieClass({ 'rozie-combobox-option--active': filteredOptions().length === activeIndex() })} id={rozieAttr(optId(filteredOptions().length))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(createRowAt(filteredOptions().length)); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(filteredOptions().length); }} data-rozie-s-9546115a="">
-            {(_props.createSlot ?? _props.slots?.['create'])?.({ get query() { return query(); } }) ?? <>Create "{query()}"</>}
+            {(_props.createSlot ?? _props.slots?.['create'])?.({ get query() { return inputText(); } }) ?? <>Create "{inputText()}"</>}
           </li></Show>}</ul></Show>}{<Show when={popupVisible() && !local.virtual && isCapped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" aria-multiselectable={(local.multiple ? 'true' : null) ?? undefined} data-rozie-s-9546115a="">
           <Key each={cappedBlocks() as readonly any[]} by={(blk) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped')}>{(blk) => <li class={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-9546115a="">
             {<Show when={blk().group}><div class={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
@@ -2236,9 +2334,9 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
             </div></Show>}</li>}</Key>
 
           {<Show when={cappedBlocks().length === 0 && !isCreatableQuery()}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
-            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ get query() { return query(); } }) ?? "No results"}
+            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ get query() { return inputText(); } }) ?? "No results"}
           </li></Show>}{<Show when={isCreatableQuery()}><li role="option" class={"rozie-combobox-option rozie-combobox-create" + " " + rozieClass({ 'rozie-combobox-option--active': cappedRowCount() === activeIndex() })} id={rozieAttr(optId(cappedRowCount()))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(createRowAt(cappedRowCount())); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(cappedRowCount()); }} data-rozie-s-9546115a="">
-            {(_props.createSlot ?? _props.slots?.['create'])?.({ get query() { return query(); } }) ?? <>Create "{query()}"</>}
+            {(_props.createSlot ?? _props.slots?.['create'])?.({ get query() { return inputText(); } }) ?? <>Create "{inputText()}"</>}
           </li></Show>}</ul></Show>}{<Show when={local.virtual}><ul class={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" aria-multiselectable={(local.multiple ? 'true' : null) ?? undefined} style={parseInlineStyle((popupVisible() ? '' : 'display:none;') + (local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + local.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a="">
           <li class={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a="" />
 
@@ -2249,9 +2347,9 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
           <li class={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padBottom() + 'px')} data-rozie-s-9546115a="" />
 
           {<Show when={windowSource().length === 0 && !isCreatableQuery()}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
-            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ get query() { return query(); } }) ?? "No results"}
+            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ get query() { return inputText(); } }) ?? "No results"}
           </li></Show>}{<Show when={isCreatableQuery()}><li role="option" class={"rozie-combobox-option rozie-combobox-create" + " " + rozieClass({ 'rozie-combobox-option--active': windowSource().length === activeIndex() })} id={rozieAttr(optId(windowSource().length))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(createRowAt(windowSource().length)); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(windowSource().length); }} data-rozie-s-9546115a="">
-            {(_props.createSlot ?? _props.slots?.['create'])?.({ get query() { return query(); } }) ?? <>Create "{query()}"</>}
+            {(_props.createSlot ?? _props.slots?.['create'])?.({ get query() { return inputText(); } }) ?? <>Create "{inputText()}"</>}
           </li></Show>}</ul></Show>}</Popover>
     </div>
     </>

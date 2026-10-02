@@ -17,20 +17,22 @@
  *     the slider/otp precedent (listbox took the other branch, `focusControl`).
  *     codegen's severity filter keeps only `error` diagnostics, so the
  *     deliberate ROZ137 `focus` warn never throws codegen.
- *   - `clear`, `seedQuery`, `pinOpen`, and `activeOption` are collision-safe (NOT host-element
- *     members).
+ *   - `clear`, `seedQuery`, `pinOpen`, `activeOption` and `query` are collision-safe (NOT
+ *     host-element members).
  */
 export const handleManifest = {
   focus:
     'Move DOM focus to the text input. NOTE: this deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element (ROZ137 warns, warn-only) — the public `focus()` handle is intended.',
   clear:
-    'Reset the selection: clear `value` (emits `change` with `{ value: null }` in single-select mode, `{ value: [] }` under `multiple`) and empty the input text.',
+    'Reset the selection: clear `value` (emits `change` with `{ value: null }` in single-select mode, `{ value: [] }` under `multiple`) and empty the input text (emits `search` with `{ query: \'\' }` when there was text).',
   seedQuery:
     'Imperative-only: set the input text (`text ?? \'\'`, coerced to a string) without touching the `value` model or selection state — the typed query AND the filtered option list reflect it. Does not open the popup or emit `change`/`search`.',
   pinOpen:
     'Imperative-only: pin (or unpin) the popup open, coercing its argument to a boolean. While pinned, onBlur() early-returns so the popup does NOT collapse when a host sub-surface (e.g. an action flyout) moves DOM focus out of the input. pinOpen(false) only unpins — it does not itself close the popup or restore focus (the host does that). Render-neutral when never called.',
   activeOption:
     'Return the currently highlighted RAW source option (the object from `options`), or `null` when nothing is highlighted, the popup is hidden, or the highlighted row is a synthetic "+N more" / create row. Read-only — use it e.g. to preview the option Enter or Tab (`selectOnTab`) would pick.',
+  query:
+    'Return the current input text — the value the last `search` event reported. Read-only; use `seedQuery(text)` to set it.',
 };
 
 export default handleManifest;

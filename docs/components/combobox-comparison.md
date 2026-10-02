@@ -1,5 +1,5 @@
 ---
-surface_hash: dc476610ddb1
+surface_hash: f1c8a2edb3ac
 ---
 
 # Headless combobox / autocomplete comparison
@@ -52,7 +52,7 @@ Selection uses the robust headless pattern: options select on `@mousedown.preven
 
 ## Filtering: batteries included, async escape hatch
 
-`@rozie-ui/combobox` filters the `options` you pass by `label` out of the box, with zero wiring. That is no longer the headless default: most modern headless libraries (Headless UI, downshift, Ariakit, Melt, Bits, Ark, `@angular/aria`) are deliberately bring-your-own-filter, and even Material's `mat-autocomplete` expects you to pipe the list yourself. When you do need server-side data, `disableFilter` + the `search` event turn Rozie's combobox into a controlled async typeahead: the component renders whatever `options` you hold and emits the query on each keystroke. One component covers both the "static list" and "remote search" cases.
+`@rozie-ui/combobox` filters the `options` you pass by `label` out of the box, with zero wiring. That is no longer the headless default: most modern headless libraries (Headless UI, downshift, Ariakit, Melt, Bits, Ark, `@angular/aria`) are deliberately bring-your-own-filter, and even Material's `mat-autocomplete` expects you to pipe the list yourself. When you do need server-side data, `disableFilter` + the `search` event turn Rozie's combobox into a controlled async typeahead: the component renders whatever `options` you hold and emits the query on each keystroke — and with an empty query whenever it clears the input itself, so the suggestions never go stale (`query()` reads it on demand). One component covers both the "static list" and "remote search" cases.
 
 ## Single model, real two-way value
 
@@ -64,7 +64,7 @@ Selection uses the robust headless pattern: options select on `@mousedown.preven
 - **The same component surface everywhere.** Where the ecosystem offers a different library per framework (many APIs, many filtering models, many accessibility stories), `@rozie-ui/combobox` is one `<Combobox>` with the same props, the same `change` / `search` / `create` events, the same two-way `value`, the same `#option` / `#chip` scoped slots, and the same imperative handle: one combobox to learn, document, and migrate across your stack.
 - **WAI-ARIA + keyboard for free.** `role="combobox"`/`role="listbox"`, `aria-activedescendant`, `aria-expanded`/`aria-controls`, and the full arrow/Home/End/Enter/Escape model ship in the box, uniformly rather than per-library — including `aria-multiselectable` and per-option `aria-selected` when `multiple` is on.
 - **A real two-way `value`.** `r-model:value` reads *and* writes with no glue, and the Angular output is a `ControlValueAccessor`, whether `value` holds a single value or (under `multiple`) an array.
-- **Multi-select via a widened model, not a second one.** `multiple` turns `value` into an array; selections render as chips through a `#chip` scoped slot in selection order, re-selecting a selected option toggles it off, and Backspace on an empty query removes the last chip. For token inputs (e.g. an email recipient field), `block` + `chipLayout="inline"` put the chips and the input on one full-width row, `delimiters` / `validate` commit typed or pasted free text, `selectOnTab` picks the highlighted suggestion on Tab, and `hideEmpty` shows no popup at all while there is nothing to suggest.
+- **Multi-select via a widened model, not a second one.** `multiple` turns `value` into an array; selections render as chips through a `#chip` scoped slot in selection order, re-selecting a selected option toggles it off, and Backspace on an empty query removes the last chip. For token inputs (e.g. an email recipient field), `block` + `chipLayout="inline"` put the chips and the input on one full-width row, `delimiters` / `validate` commit typed or pasted free text (`validate` can also normalise, e.g. `Name <addr>` to `addr`; `splitPaste` takes over the paste split for syntax such as quoted names; `commitOnBlur` commits on leaving the field), `selectOnTab` picks the highlighted suggestion on Tab, and `hideEmpty` shows no popup at all while there is nothing to suggest.
 - **Floating-positioned popup, composed rather than reimplemented.** The popup is positioned by Floating UI through the published `@rozie-ui/popover` leaf — auto-flip and auto-shift keep it on screen near a viewport edge, matching the incumbents that wrap Floating UI or the CDK Overlay.
 - **Creatable mode that stays consumer-owned.** `creatable` emits a `create` event with the typed text when it matches no existing option; the component writes nothing to `value` itself, so the consumer's own `options`/model update stays the single source of truth.
 - **Filtering batteries included, with an async escape hatch.** A built-in client filter where most headless incumbents now make you write it, plus `disableFilter` + `@search` for server-side data.

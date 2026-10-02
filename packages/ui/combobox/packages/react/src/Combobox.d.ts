@@ -54,7 +54,7 @@ export interface ComboboxGroupMoreSlotCtx {
   expand: () => void;
 }
 
-export interface ComboboxProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'multiple' | 'creatable' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'chipLayout' | 'disableOpenOnFocus' | 'hideEmpty' | 'delimiters' | 'validate' | 'selectOnTab' | 'onSearch' | 'onChange' | 'onCreate' | 'renderChip' | 'renderOption' | 'renderEmpty' | 'renderCreate' | 'renderGroupHeading' | 'renderGroupMore' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
+export interface ComboboxProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'value' | 'defaultValue' | 'onValueChange' | 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'multiple' | 'creatable' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'chipLayout' | 'disableOpenOnFocus' | 'hideEmpty' | 'delimiters' | 'validate' | 'splitPaste' | 'commitOnBlur' | 'selectOnTab' | 'onSearch' | 'onChange' | 'onCreate' | 'renderChip' | 'renderOption' | 'renderEmpty' | 'renderCreate' | 'renderGroupHeading' | 'renderGroupMore' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The selected option's value (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a combobox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `null` when nothing is selected.
    * @example
@@ -84,7 +84,7 @@ export interface ComboboxProps extends Omit<import('react').ComponentPropsWithou
    */
   ariaLabel?: (string) | null;
   /**
-   * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one combobox shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the listbox, option and popup elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`, the listbox id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-combobox-<n>`); set it when you need stable, predictable ids. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
   /**
@@ -168,17 +168,27 @@ export interface ComboboxProps extends Omit<import('react').ComponentPropsWithou
    */
   hideEmpty?: boolean;
   /**
-   * Keys that commit the **typed text** as a value (matched against the key event's `key`), under `multiple` only — a delimiter never picks the highlighted option. Character entries (e.g. `[',', ';']`) also split pasted text: a paste containing a delimiter is split on them and every non-empty trimmed part is committed. `'Enter'` and `'Tab'` are allowed; Enter then commits the typed text only when no option is highlighted. A non-empty list (or a `validate` function) turns on free-text commits, so Enter with no highlighted option commits the typed text too. Default `[]` (off).
+   * Keys that commit the **typed text** as a value (matched against the key event's `key`), under `multiple` only — a delimiter never picks the highlighted option. Character entries (e.g. `[',', ';']`) also split pasted text: a paste containing a delimiter is split on them, every non-empty trimmed part that `validate` accepts is committed, and the rejected parts are inserted at the caret (replacing the selection) like an ordinary paste, so text typed before the paste is kept. Use `splitPaste` to replace this split. `'Enter'` and `'Tab'` are allowed; Enter then commits the typed text only when no option is highlighted. A non-empty list (or `validate`, `splitPaste` or `commitOnBlur`) turns on free-text commits, so Enter with no highlighted option commits the typed text too. Default `[]` (off).
    * @example
    * <Combobox multiple value={to} onValueChange={setTo} options={contacts} delimiters={delims} />
    */
   delimiters?: unknown[];
   /**
-   * Free-text gate, `(text: string) => boolean`, under `multiple` only. Called with the trimmed typed (or pasted) text before every free-text commit; return `false` to reject it — rejected text stays in the input. Setting it also turns on free-text commits (Enter with no highlighted option commits the typed text). A free-text commit appends the text to `value` (skipped when already present), clears the input, and emits `change` with `option: null` and the committed `text`.
+   * Free-text gate and normaliser, `(text: string) => string | boolean | null | undefined`, under `multiple` only. Called with the trimmed typed (or pasted) text before every free-text commit. Return the **string to store** (e.g. the bare address out of `Sam Roe <sam@x.test>`), `true` to store the text as typed, or a falsy value (`false` / `null` / `''`) to reject it — rejected text stays in the input. The same shape as Tags' `validate`. Setting it also turns on free-text commits (Enter with no highlighted option commits the typed text). A free-text commit appends the stored string to `value` (skipped when already present), clears the input, and emits `change` with `option: null` and the stored string as `text`.
    * @example
-   * <Combobox multiple value={to} onValueChange={setTo} options={contacts} validate={isEmail} />
+   * <Combobox multiple value={to} onValueChange={setTo} options={contacts} validate={toAddress} />
    */
   validate?: ((...args: any[]) => any) | null;
+  /**
+   * Replaces the built-in paste split, `(text: string) => string[] | null`, under `multiple` only. Called with the clipboard text on every paste. Return the parts to commit — each is trimmed and passed through `validate`; accepted parts are committed and the rejected ones are inserted at the caret — or `null` to leave the paste to the browser untouched. Use it for syntax the delimiter split cannot know about, e.g. a quoted display name containing a comma (`"Roe, Sam" <sam@x.test>`). Setting it also turns on free-text commits.
+   * @example
+   * <Combobox multiple value={to} onValueChange={setTo} options={contacts} validate={toAddress} splitPaste={splitAddresses} />
+   */
+  splitPaste?: ((...args: any[]) => any) | null;
+  /**
+   * Commit the typed text when the input loses focus, under `multiple` only, through `validate` like every other free-text commit: accepted text is committed and the input cleared, rejected text stays. A blur into a pinned host sub-surface (`pinOpen(true)`) does not commit. Setting it also turns on free-text commits. Default `false`.
+   */
+  commitOnBlur?: boolean;
   /**
    * Tab picks the highlighted option while the popup is visible and an option is highlighted, keeping focus in the input. When nothing is picked, Tab moves focus normally. Default `false` (Tab always moves focus).
    */
@@ -201,6 +211,7 @@ export interface ComboboxHandle {
   seedQuery: (text: string) => void;
   pinOpen: (v: boolean) => void;
   activeOption: () => any;
+  query: () => string;
 }
 
 declare const Combobox: React.ForwardRefExoticComponent<ComboboxProps & React.RefAttributes<ComboboxHandle>>;

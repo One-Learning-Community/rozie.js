@@ -11,7 +11,7 @@
 
   SINGLE-SELECT, single model: `value` is the selected option's value (the sole
   model:true prop → Angular ControlValueAccessor; a combobox IS a form control).
-  The input TEXT is internal `$data.query` (NOT a second model — two models would
+  The input TEXT is internal `$data.inputText` (NOT a second model — two models would
   forfeit the CVA, ROZ125); a `search` event exposes it for async / server-side
   filtering (pair with `disableFilter`).
 
@@ -36,8 +36,8 @@
       PLAIN function (called from the r-for AND handlers) — never $computed.
     - `seedQuery(text)` is an IMPERATIVE-ONLY handle verb (added as a
       command-palette #2 levels/restore-on-pop prerequisite): it writes
-      `$data.query` directly so both the input text AND filteredOptions() (which
-      reads `$data.query`) reflect the seeded text. It is deliberately NOT a
+      `$data.inputText` directly so both the input text AND filteredOptions() (which
+      reads `$data.inputText`) reflect the seeded text. It is deliberately NOT a
       second model — combobox's sole `model: true` prop stays `value` (ROZ125: a
       second model forfeits the Angular ControlValueAccessor). Additive +
       render-neutral: never invoked ⇒ no default-render change.
@@ -158,14 +158,15 @@ export interface ComboboxGroupMoreSlotCtx { group: ComboboxGroup | null; hidden:
   },
 
   // id base for the listbox + option elements (aria-activedescendant needs real
-  // ids). Set a DISTINCT value per instance when more than one combobox is on a
-  // page. Named `idBase` (not `id`) to avoid shadowing HTMLElement.id on Lit.
+  // ids). '' (the default) → a unique per-instance base generated after mount
+  // (idRoot() below), so two default-configured comboboxes never share ids.
+  // Named `idBase` (not `id`) to avoid shadowing HTMLElement.id on Lit.
   idBase: {
     type: String,
-    default: 'rozie-combobox',
+    default: '',
     docs: {
       description:
-        'Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one combobox shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.',
+        'Id base for the listbox, option and popup elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`, the listbox id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-combobox-<n>`); set it when you need stable, predictable ids. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.',
     },
   },
 
@@ -433,19 +434,43 @@ export interface ComboboxGroupMoreSlotCtx { group: ComboboxGroup | null; hidden:
     default: () => [],
     docs: {
       description:
-        "Keys that commit the **typed text** as a value (matched against the key event's `key`), under `multiple` only — a delimiter never picks the highlighted option. Character entries (e.g. `[',', ';']`) also split pasted text: a paste containing a delimiter is split on them and every non-empty trimmed part is committed. `'Enter'` and `'Tab'` are allowed; Enter then commits the typed text only when no option is highlighted. A non-empty list (or a `validate` function) turns on free-text commits, so Enter with no highlighted option commits the typed text too. Default `[]` (off).",
+        "Keys that commit the **typed text** as a value (matched against the key event's `key`), under `multiple` only — a delimiter never picks the highlighted option. Character entries (e.g. `[',', ';']`) also split pasted text: a paste containing a delimiter is split on them, every non-empty trimmed part that `validate` accepts is committed, and the rejected parts are inserted at the caret (replacing the selection) like an ordinary paste, so text typed before the paste is kept. Use `splitPaste` to replace this split. `'Enter'` and `'Tab'` are allowed; Enter then commits the typed text only when no option is highlighted. A non-empty list (or `validate`, `splitPaste` or `commitOnBlur`) turns on free-text commits, so Enter with no highlighted option commits the typed text too. Default `[]` (off).",
       example: '<Combobox multiple r-model:value="to" :options="contacts" :delimiters="delims" />',
     },
   },
 
-  // Gate every free-text commit; enabling it alone also turns free-text commits on.
+  // Gate (and optionally normalise) every free-text commit, Tags-style: a string
+  // return is the value stored; a falsy return rejects; `true` keeps the text.
+  // Enabling it alone also turns free-text commits on.
   validate: {
     type: Function,
     default: null,
     docs: {
       description:
-        'Free-text gate, `(text: string) => boolean`, under `multiple` only. Called with the trimmed typed (or pasted) text before every free-text commit; return `false` to reject it — rejected text stays in the input. Setting it also turns on free-text commits (Enter with no highlighted option commits the typed text). A free-text commit appends the text to `value` (skipped when already present), clears the input, and emits `change` with `option: null` and the committed `text`.',
-      example: '<Combobox multiple r-model:value="to" :options="contacts" :validate="isEmail" />',
+        'Free-text gate and normaliser, `(text: string) => string | boolean | null | undefined`, under `multiple` only. Called with the trimmed typed (or pasted) text before every free-text commit. Return the **string to store** (e.g. the bare address out of `Sam Roe <sam@x.test>`), `true` to store the text as typed, or a falsy value (`false` / `null` / `\'\'`) to reject it — rejected text stays in the input. The same shape as Tags\' `validate`. Setting it also turns on free-text commits (Enter with no highlighted option commits the typed text). A free-text commit appends the stored string to `value` (skipped when already present), clears the input, and emits `change` with `option: null` and the stored string as `text`.',
+      example: '<Combobox multiple r-model:value="to" :options="contacts" :validate="toAddress" />',
+    },
+  },
+
+  // Replace the built-in delimiter split of pasted text (free-text mode). Returns
+  // the parts to commit, or null to leave the paste to the browser.
+  splitPaste: {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        "Replaces the built-in paste split, `(text: string) => string[] | null`, under `multiple` only. Called with the clipboard text on every paste. Return the parts to commit — each is trimmed and passed through `validate`; accepted parts are committed and the rejected ones are inserted at the caret — or `null` to leave the paste to the browser untouched. Use it for syntax the delimiter split cannot know about, e.g. a quoted display name containing a comma (`\"Roe, Sam\" <sam@x.test>`). Setting it also turns on free-text commits.",
+      example: '<Combobox multiple r-model:value="to" :options="contacts" :validate="toAddress" :split-paste="splitAddresses" />',
+    },
+  },
+
+  // Commit the typed text when the input loses focus (through validate).
+  commitOnBlur: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Commit the typed text when the input loses focus, under `multiple` only, through `validate` like every other free-text commit: accepted text is committed and the input cleared, rejected text stays. A blur into a pinned host sub-surface (`pinOpen(true)`) does not commit. Setting it also turns on free-text commits. Default `false`.',
     },
   },
 
@@ -464,7 +489,7 @@ export interface ComboboxGroupMoreSlotCtx { group: ComboboxGroup | null; hidden:
 
 <emits>
 {
-  search: { payload: 'ComboboxSearchPayload', docs: { description: 'Fired on every keystroke with the current input text. Pair with `disableFilter` for async / server-side filtering: refetch on `search` and feed the results back through `options`.' } },
+  search: { payload: 'ComboboxSearchPayload', docs: { description: 'Fired whenever the input text changes: on every keystroke with the current text, after a paste that Combobox handles itself (with the resulting text), and with `{ query: \'\' }` whenever Combobox clears the text itself (a pick under `multiple`, a free-text commit — including one of a value that is already selected — or `clear()`). Pair with `disableFilter` for async / server-side filtering: refetch on `search` and feed the results back through `options`. `query()` on the handle reads the current text.' } },
   change: { payload: 'ComboboxChangePayload', docs: { description: 'Fired after a selection commits (pick, chip removal or toggle-off, `clear()`, or a free-text commit). `value` is the new model value, `option` the raw source option (`null` for a clear or a free-text commit), `selected` whether the value was added (`false` for a removal or a clear), and `text` the committed text, set only on free-text commits (`delimiters` / `validate`).' } },
   create: { payload: 'ComboboxCreatePayload', docs: { description: 'Fired (with `creatable`) when the user commits a query that matches no option. Nothing is written to `value`: add the option to `options` and update the model yourself.' } },
 }
@@ -472,8 +497,9 @@ export interface ComboboxGroupMoreSlotCtx { group: ComboboxGroup | null; hidden:
 
 <data>
 {
-  // The text in the input.
-  query: '',
+  // The text in the input (read through the `query()` handle method; named
+  // `inputText`, not `query`, so the exposed `query` verb has a free name).
+  inputText: '',
   // Popup visibility.
   isOpen: false,
   // Highlighted option index (within the FILTERED list) for aria-activedescendant.
@@ -508,6 +534,8 @@ export interface ComboboxGroupMoreSlotCtx { group: ComboboxGroup | null; hidden:
   // silently closed the list out from under the pin. onBlur() below still
   // reads it too, for the ordinary blur-into-flyout path.
   pinned: false,
+  // The generated id base (idRoot()), set once in $onMount when `idBase` is empty.
+  autoId: '',
 }
 </data>
 
@@ -600,7 +628,7 @@ let didMount = false
 // top-level consts persist for the instance lifetime naturally.
 //
 // keyFn is the SUBSCRIBE-FIRST half (fine-grained Solid <For> / Svelte
-// {#each}): it reads ALL FOUR reactive inputs UNCONDITIONALLY — $data.query
+// {#each}): it reads ALL FOUR reactive inputs UNCONDITIONALLY — $data.inputText
 // even when disableFilter is true (mirrors windowing.rzts windowedRows
 // void-touch discipline) and $props.groups even when $props.virtual (so a
 // groups change while windowed still invalidates the cache once virtual
@@ -621,7 +649,7 @@ const filteredOptions = $memo(
   () => {
     const opts = Array.isArray($props.options) ? $props.options : []
     const df = !!$props.disableFilter
-    const q = String($data.query == null ? '' : $data.query)
+    const q = String($data.inputText == null ? '' : $data.inputText)
     const groupsProp = $props.groups
     let list = opts
     if (!df) {
@@ -648,7 +676,7 @@ const filteredOptions = $memo(
   () => {
     const opts = Array.isArray($props.options) ? $props.options : []
     const df = !!$props.disableFilter
-    const q = String($data.query == null ? '' : $data.query)
+    const q = String($data.inputText == null ? '' : $data.inputText)
     const groupsProp = $props.groups
     return [opts, q, df, groupsProp]
   },
@@ -780,7 +808,7 @@ const cappedBlocks = () => {
 // filteredOptions() already applies above, but for an EXACT-EQUALITY
 // comparison, never a substring search, and with NO Unicode normalization
 // (R3 locked: a composition-form difference must NOT be treated as a match).
-const normalizedQuery = () => String($data.query == null ? '' : $data.query).trim().toLowerCase()
+const normalizedQuery = () => String($data.inputText == null ? '' : $data.inputText).trim().toLowerCase()
 
 // queryMatchesOption(nq): whether the (already-normalized) query is an exact,
 // case-insensitive, trimmed match of some option's label.
@@ -996,8 +1024,12 @@ const scrollActiveIntoView = () => {
   scheduleRemeasure()
 }
 
-const optId = (i) => $props.idBase + '-opt-' + i
-const listId = () => $props.idBase + '-list'
+// idRoot(): the id base — the `idBase` prop, else the per-instance id generated
+// in $onMount (`autoId`), else the pre-mount fallback. Generated after mount (not
+// during setup) so a server render and the hydrating client agree.
+const idRoot = () => $props.idBase || $data.autoId || 'rozie-combobox'
+const optId = (i) => idRoot() + '-opt-' + i
+const listId = () => idRoot() + '-list'
 
 // popupVisible() (hideEmpty, COMBOBOX-SPEC item 4): whether the popup is actually
 // SHOWN — open AND (unless `hideEmpty`) something to render. With `hideEmpty` an
@@ -1129,7 +1161,7 @@ const selectOption = (opt) => {
   }
   if (opt.isCreate) {
     // Read locals before any write (ROZ138 idiom).
-    const q = $data.query
+    const q = $data.inputText
     const nq = normalizedQuery()
     // The double-commit latch (D-17/D-20): a second commit of the SAME
     // normalized query — whether a rapid double gesture, or the async
@@ -1146,7 +1178,7 @@ const selectOption = (opt) => {
     // consumer's async add flows back through the ordinary `value` watch).
     // `value` itself is untouched — R3 locked.
     if (effectiveCloseOnSelect()) $data.isOpen = false
-    if ($props.multiple) $data.query = ''
+    if ($props.multiple) clearQuery(null)
     $data.activeIndex = -1
     return
   }
@@ -1165,14 +1197,14 @@ const selectOption = (opt) => {
     // `opt.isRemoval` (set only by removeChipValue() below) skips this —
     // removing a chip is not a pick, and clobbering whatever the user was
     // mid-typing in the search box is a separate, unrelated data loss.
-    if (!opt.isRemoval) $data.query = ''
+    if (!opt.isRemoval) clearQuery(null)
     if (effectiveCloseOnSelect()) $data.isOpen = false
     $data.activeIndex = -1
     $emit('change', { value: next, option: opt.option, selected: !wasSelected })
     return
   }
   $model.value = opt.value
-  $data.query = String(opt.label)
+  $data.inputText = String(opt.label)
   if (effectiveCloseOnSelect()) $data.isOpen = false
   $data.activeIndex = -1
   // D-15: `selected` is additive and always `true` in single-select.
@@ -1280,7 +1312,7 @@ const syncQueryToValue = () => {
   if ($props.multiple) return
   const opts = Array.isArray($props.options) ? $props.options : []
   const opt = opts.find((o) => valueOf(o) === $props.value)
-  $data.query = opt === undefined || opt === null ? '' : String(labelOf(opt))
+  $data.inputText = opt === undefined || opt === null ? '' : String(labelOf(opt))
 }
 
 // ---- free-text commits (COMBOBOX-SPEC items 5-7, multiple only) --------
@@ -1290,10 +1322,23 @@ const delimiterList = () => (Array.isArray($props.delimiters) ? $props.delimiter
 // the paste split characters.
 const splitDelimiters = () => delimiterList().filter((k) => k !== 'Enter' && k !== 'Tab')
 // freeTextOn(): free-text commits are enabled under `multiple` when a delimiter
-// list OR a validate function is supplied.
-const freeTextOn = () => !!$props.multiple && (delimiterList().length > 0 || typeof $props.validate === 'function')
-// acceptsText(t): the `validate` gate (absent ⇒ accept).
-const acceptsText = (t) => typeof $props.validate !== 'function' || !!$props.validate(t)
+// list, a validate function, a splitPaste function or commitOnBlur is supplied.
+const freeTextOn = () =>
+  !!$props.multiple &&
+  (delimiterList().length > 0 ||
+    typeof $props.validate === 'function' ||
+    typeof $props.splitPaste === 'function' ||
+    !!$props.commitOnBlur)
+// storedText(t): the `validate` gate + normaliser (Tags' shape), for an already
+// trimmed, non-empty `t`. Returns the string to store, or null when rejected:
+// absent validate ⇒ t; a string return ⇒ that string ('' rejects); any other
+// truthy return (`true`) ⇒ t; a falsy return ⇒ rejected.
+const storedText = (t) => {
+  if (typeof $props.validate !== 'function') return t
+  const r = $props.validate(t)
+  if (!r) return null
+  return typeof r === 'string' ? r : t
+}
 
 // commitTexts(texts): append every not-yet-present text to `value` (ONE fresh
 // array, ONE model write) and emit one `change` per committed text, each with the
@@ -1325,34 +1370,69 @@ const syncInputText = (el, text) => {
   if (el && typeof el.value === 'string' && el.value !== text) el.value = text
 }
 
-// commitFreeText(raw, el): trim → validate → commit + clear the input. Returns
-// true when the text was handled (committed, or already present ⇒ just cleared);
-// false when empty or rejected — rejected text stays in the input.
+// setTypedText(q, el): the input text changed to `q` — by typing (onInput) or by a
+// paste Combobox handled itself (insertAtCaret). Re-arms the create latch, opens
+// the list, highlights the first row and emits `search`, exactly as typing does.
+const setTypedText = (q, el) => {
+  $data.inputText = q
+  syncInputText(el, q)
+  // Any input change re-arms the double-commit latch (D-17/D-20) — a
+  // freshly-typed query is a new gesture, never a repeat of whatever was
+  // last created.
+  $data.createdQuery = null
+  $data.isOpen = true
+  $data.activeIndex = 0
+  $emit('search', { query: q })
+}
+
+// clearQuery(el): Combobox clearing the input text ITSELF (a pick under
+// `multiple`, a create under `multiple`, a free-text commit, clear()). Emits
+// `search` with '' so a host tracking the query through `search` never goes
+// stale — a free-text commit of an already-selected value fires no `change`,
+// so this is the host's only signal. No emit when the text was already empty.
+// The live element is consulted too: on React a commit in the same frame as the
+// last keystroke still sees the pre-keystroke `inputText` in its closure.
+const clearQuery = (el) => {
+  const had = $data.inputText !== '' || !!(el && typeof el.value === 'string' && el.value !== '')
+  $data.inputText = ''
+  syncInputText(el, '')
+  if (had) $emit('search', { query: '' })
+}
+
+// insertAtCaret(el, text): insert `text` into the input at the caret, replacing
+// the selection — what an ordinary paste does — and leave the caret after it.
+const insertAtCaret = (el, text) => {
+  const cur = el && typeof el.value === 'string' ? el.value : String($data.inputText)
+  const start = el && typeof el.selectionStart === 'number' ? el.selectionStart : cur.length
+  const end = el && typeof el.selectionEnd === 'number' ? el.selectionEnd : start
+  const next = cur.slice(0, start) + text + cur.slice(end)
+  setTypedText(next, el)
+  const caret = start + text.length
+  if (el && typeof el.setSelectionRange === 'function') el.setSelectionRange(caret, caret)
+}
+
+// commitFreeText(raw, el): trim → validate (normalise) → commit + clear the input.
+// Returns true when the text was handled (committed, or already present ⇒ just
+// cleared); false when empty or rejected — rejected text stays in the input.
 const commitFreeText = (raw, el) => {
   const t = String(raw == null ? '' : raw).trim()
   if (!t) return false
-  if (!acceptsText(t)) return false
-  $data.query = ''
-  syncInputText(el, '')
-  commitTexts([t])
+  const stored = storedText(t)
+  if (stored === null) return false
+  clearQuery(el)
+  commitTexts([stored])
   return true
 }
 
-// onPaste(e) (item 6): under free-text mode with character delimiters, a paste
-// containing a delimiter is split on them and every non-empty trimmed part is
-// committed (the paste is preventDefault-ed). Parts `validate` rejects stay in the
-// input (joined by the first delimiter). A paste with no delimiter is ordinary text.
-const onPaste = (e) => {
-  if (!freeTextOn()) return
+// splitOnDelimiters(text): the built-in paste split — the clipboard text split on
+// every CHARACTER delimiter, or null when it contains none (an ordinary paste).
+const splitOnDelimiters = (text) => {
   const seps = splitDelimiters()
-  if (seps.length === 0) return
-  const text = (e && e.clipboardData && e.clipboardData.getData('text')) || ''
   let hasSep = false
   for (let s = 0; s < seps.length; s++) {
     if (text.indexOf(seps[s]) !== -1) hasSep = true
   }
-  if (!hasSep) return
-  if (e) e.preventDefault()
+  if (!hasSep) return null
   let parts = [text]
   for (let s = 0; s < seps.length; s++) {
     const out = []
@@ -1362,26 +1442,42 @@ const onPaste = (e) => {
     }
     parts = out
   }
-  const trimmed = parts.map((p) => String(p).trim()).filter((p) => p.length > 0)
-  const accepted = trimmed.filter((p) => acceptsText(p))
-  const rejected = trimmed.filter((p) => !acceptsText(p))
-  const rest = rejected.join(seps[0] + ' ')
-  $data.query = rest
-  syncInputText(e ? e.target : null, rest)
+  return parts
+}
+
+// onPaste(e) (item 6): under free-text mode the clipboard text is split — by
+// `splitPaste` when supplied, else on the character delimiters — and every
+// non-empty trimmed part `validate` accepts is committed (the paste is
+// preventDefault-ed). The rejected parts (joined by the first delimiter) are
+// inserted at the caret, replacing the selection, as an ordinary paste would be,
+// so text typed before the paste is kept. A split of null (splitPaste said "not
+// mine", or no delimiter in the text) leaves the paste to the browser.
+const onPaste = (e) => {
+  if (!freeTextOn()) return
+  const text = (e && e.clipboardData && e.clipboardData.getData('text')) || ''
+  const custom = typeof $props.splitPaste === 'function'
+  const split = custom ? $props.splitPaste(text) : splitOnDelimiters(text)
+  if (!Array.isArray(split)) return
+  if (e) e.preventDefault()
+  const accepted = []
+  const rejected = []
+  for (let i = 0; i < split.length; i++) {
+    const part = String(split[i] == null ? '' : split[i]).trim()
+    if (!part) continue
+    const stored = storedText(part)
+    if (stored === null) rejected.push(part)
+    else accepted.push(stored)
+  }
+  const seps = splitDelimiters()
+  const rest = rejected.join(seps.length > 0 ? seps[0] + ' ' : ' ')
+  if (rest) insertAtCaret(e ? e.target : null, rest)
   commitTexts(accepted)
 }
 
 // ---- input + keyboard handlers -----------------------------------------
 const onInput = (e) => {
   const q = e && e.target ? e.target.value : ''
-  $data.query = q
-  // Any input change re-arms the double-commit latch (D-17/D-20) — a
-  // freshly-typed query is a new gesture, never a repeat of whatever was
-  // last created.
-  $data.createdQuery = null
-  $data.isOpen = true
-  $data.activeIndex = 0
-  $emit('search', { query: q })
+  setTypedText(q, null)
 }
 
 const onFocus = (e) => {
@@ -1438,10 +1534,16 @@ const onFocus = (e) => {
 // `openingInProgress` (Solid-only, see onFocus above), early-return too — this
 // blur is a side effect of our OWN open-transition recreating the anchor's DOM,
 // not the user moving focus elsewhere.
-const onBlur = () => {
+// commitOnBlur: leaving the field commits the typed text through validate (a blur
+// into a pinned host sub-surface, or the Solid recreate blur, returned above).
+const onBlur = (e) => {
   if ($data.pinned) return
   if (openingInProgress) return
   $data.isOpen = false
+  if ($props.commitOnBlur && freeTextOn()) {
+    const el = e ? e.target : null
+    commitFreeText(el ? el.value : $data.inputText, el)
+  }
 }
 
 const onKeydown = (e) => {
@@ -1527,7 +1629,7 @@ const onKeydown = (e) => {
     // Backspace-removes-last-chip (Tags.rozie precedent, Phase 86 R1 plan
     // 86-05): guarded on `multiple` AND the LIVE input value being empty —
     // read `e.target.value` directly (Tags' proven idiom), never the mirrored
-    // `$data.query`. A non-empty query falls through to normal text editing —
+    // `$data.inputText`. A non-empty query falls through to normal text editing —
     // nothing here removes a chip while there is text to delete.
     if ($props.multiple) {
       const liveValue = e && e.target ? e.target.value : ''
@@ -1610,7 +1712,18 @@ const teardownVirtualizer = () => {
   $data.windowVer = $data.windowVer + 1
 }
 
+// nextAutoId(): a page-wide counter shared by every Rozie component instance. It
+// lives on globalThis (read through Reflect, which type-checks in the plain-JS and
+// the TS script alike) so separately bundled copies of a leaf never hand out the
+// same id. The same four lines live in Combobox, Listbox and Popover.
+const nextAutoId = () => {
+  const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1
+  Reflect.set(globalThis, '__rozieAutoId', n)
+  return n
+}
+
 $onMount(() => {
+  if (!$props.idBase) $data.autoId = 'rozie-combobox-' + nextAutoId()
   syncQueryToValue()
   syncRows()
   didMount = true
@@ -1630,7 +1743,7 @@ $watch(() => $props.value, () => {
 // indexable rows + push fresh options into the virtualizer and re-pull the window
 // (the data-table setOptions+_willUpdate re-feed precedent). Watch a derived primitive
 // (length + query), never a freshly-built array (the stale-array Pitfall).
-$watch(() => (($props.options ? $props.options.length : 0) + '|' + $data.query), () => {
+$watch(() => (($props.options ? $props.options.length : 0) + '|' + $data.inputText), () => {
   if ($data.expandedGroups && Object.keys($data.expandedGroups).length) $data.expandedGroups = {}
   syncRows()
   if ($props.virtual && virtualizer) {
@@ -1685,23 +1798,26 @@ const clear = () => {
   // shape; nothing is selected after a clear, so `selected` is `false`.
   const empty = $props.multiple ? [] : null
   $model.value = empty
-  $data.query = ''
+  clearQuery(null)
   $data.activeIndex = -1
   $emit('change', { value: empty, option: null, selected: false })
 }
 const seedQuery = (text) => {
-  $data.query = String(text == null ? '' : text)
+  $data.inputText = String(text == null ? '' : text)
 }
 const pinOpen = (v) => {
   $data.pinned = !!v
 }
+// query() — the current input text (what the last `search` reported).
+const query = () => $data.inputText
 
-$expose({ focus, clear, seedQuery, pinOpen, activeOption }, {
+$expose({ focus, clear, seedQuery, pinOpen, activeOption, query }, {
   focus: '() => void',
   clear: '() => void',
   seedQuery: '(text: string) => void',
   pinOpen: '(v: boolean) => void',
   activeOption: '() => any',
+  query: '() => string',
 })
 </script>
 
@@ -1787,6 +1903,7 @@ $expose({ focus, clear, seedQuery, pinOpen, activeOption }, {
     :offset="$props.offset"
     :disable-flip="$props.disableFlip"
     :disable-shift="$props.disableShift"
+    :id-base="idRoot()"
   >
     <template #anchor>
       <!-- Chip rail (Phase 86 R1, plan 86-05, D-13 locked one-way): renders
@@ -1839,13 +1956,13 @@ $expose({ focus, clear, seedQuery, pinOpen, activeOption }, {
         :aria-controls="listId()"
         :aria-activedescendant="activeId()"
         :aria-label="$props.ariaLabel"
-        :value="$data.query"
+        :value="$data.inputText"
         :placeholder="$props.placeholder"
         :disabled="!!$props.disabled"
         autocomplete="off"
         @input="onInput($event)"
         @focus="onFocus($event)"
-        @blur="onBlur()"
+        @blur="onBlur($event)"
         @keydown="onKeydown($event)"
         @paste="onPaste($event)"
         @change.stop="onNativeInputChange()"
@@ -1889,7 +2006,7 @@ $expose({ focus, clear, seedQuery, pinOpen, activeOption }, {
       </li>
 
       <li r-if="filteredOptions().length === 0 && !isCreatableQuery()" class="rozie-combobox-empty" role="presentation">
-        <slot name="empty" :query="$data.query" :param-types="{ query: 'string' }">No results</slot>
+        <slot name="empty" :query="$data.inputText" :param-types="{ query: 'string' }">No results</slot>
       </li>
 
       <!-- Creatable mode (Phase 86 R3, D-17/D-18/D-19): mirrors the +N more
@@ -1910,7 +2027,7 @@ $expose({ focus, clear, seedQuery, pinOpen, activeOption }, {
         @mousedown.prevent="selectOption(createRowAt(filteredOptions().length))"
         @mouseenter="$data.activeIndex = filteredOptions().length"
       >
-        <slot name="create" :query="$data.query" :param-types="{ query: 'string' }">Create "{{ $data.query }}"</slot>
+        <slot name="create" :query="$data.inputText" :param-types="{ query: 'string' }">Create "{{ $data.inputText }}"</slot>
       </li>
     </ul>
 
@@ -1958,7 +2075,7 @@ $expose({ focus, clear, seedQuery, pinOpen, activeOption }, {
       </li>
 
       <li r-if="groupBlocks().length === 0 && !isCreatableQuery()" class="rozie-combobox-empty" role="presentation">
-        <slot name="empty" :query="$data.query" :param-types="{ query: 'string' }">No results</slot>
+        <slot name="empty" :query="$data.inputText" :param-types="{ query: 'string' }">No results</slot>
       </li>
 
       <!-- Creatable mode (Phase 86 R3): renders LAST, after every group
@@ -1974,7 +2091,7 @@ $expose({ focus, clear, seedQuery, pinOpen, activeOption }, {
         @mousedown.prevent="selectOption(createRowAt(filteredOptions().length))"
         @mouseenter="$data.activeIndex = filteredOptions().length"
       >
-        <slot name="create" :query="$data.query" :param-types="{ query: 'string' }">Create "{{ $data.query }}"</slot>
+        <slot name="create" :query="$data.inputText" :param-types="{ query: 'string' }">Create "{{ $data.inputText }}"</slot>
       </li>
     </ul>
 
@@ -2034,7 +2151,7 @@ $expose({ focus, clear, seedQuery, pinOpen, activeOption }, {
       </li>
 
       <li r-if="cappedBlocks().length === 0 && !isCreatableQuery()" class="rozie-combobox-empty" role="presentation">
-        <slot name="empty" :query="$data.query" :param-types="{ query: 'string' }">No results</slot>
+        <slot name="empty" :query="$data.inputText" :param-types="{ query: 'string' }">No results</slot>
       </li>
 
       <!-- Creatable mode (Phase 86 R3): renders LAST, after every group
@@ -2051,7 +2168,7 @@ $expose({ focus, clear, seedQuery, pinOpen, activeOption }, {
         @mousedown.prevent="selectOption(createRowAt(cappedRowCount()))"
         @mouseenter="$data.activeIndex = cappedRowCount()"
       >
-        <slot name="create" :query="$data.query" :param-types="{ query: 'string' }">Create "{{ $data.query }}"</slot>
+        <slot name="create" :query="$data.inputText" :param-types="{ query: 'string' }">Create "{{ $data.inputText }}"</slot>
       </li>
     </ul>
 
@@ -2101,7 +2218,7 @@ $expose({ focus, clear, seedQuery, pinOpen, activeOption }, {
       <li class="rozie-combobox-spacer" aria-hidden="true" :style="'height:' + padBottom() + 'px'"></li>
 
       <li r-if="windowSource().length === 0 && !isCreatableQuery()" class="rozie-combobox-empty" role="presentation">
-        <slot name="empty" :query="$data.query" :param-types="{ query: 'string' }">No results</slot>
+        <slot name="empty" :query="$data.inputText" :param-types="{ query: 'string' }">No results</slot>
       </li>
 
       <!-- Creatable mode (Phase 86 R3, D-17/A3): a SYNTHETIC non-option row
@@ -2119,7 +2236,7 @@ $expose({ focus, clear, seedQuery, pinOpen, activeOption }, {
         @mousedown.prevent="selectOption(createRowAt(windowSource().length))"
         @mouseenter="$data.activeIndex = windowSource().length"
       >
-        <slot name="create" :query="$data.query" :param-types="{ query: 'string' }">Create "{{ $data.query }}"</slot>
+        <slot name="create" :query="$data.inputText" :param-types="{ query: 'string' }">Create "{{ $data.inputText }}"</slot>
       </li>
     </ul>
     </template>

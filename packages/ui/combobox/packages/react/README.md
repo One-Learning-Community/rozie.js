@@ -84,7 +84,7 @@ import '@rozie-ui/combobox-react/themes/shadcn.css';    // or material.css, boot
 | `disabled` | `Boolean` | `false` |  |  |
 | `disableFilter` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
-| `idBase` | `String` | `"rozie-combobox"` |  |  |
+| `idBase` | `String` | `''` |  |  |
 | `inline` | `Boolean` | `false` |  |  |
 | `closeOnSelect` | `Boolean` | `null` |  |  |
 | `multiple` | `Boolean` | `false` |  |  |
@@ -107,14 +107,16 @@ import '@rozie-ui/combobox-react/themes/shadcn.css';    // or material.css, boot
 | `hideEmpty` | `Boolean` | `false` |  |  |
 | `delimiters` | `Array` | `[]` |  |  |
 | `validate` | `Function` | `null` |  |  |
+| `splitPaste` | `Function` | `null` |  |  |
+| `commitOnBlur` | `Boolean` | `false` |  |  |
 | `selectOnTab` | `Boolean` | `false` |  |  |
 
 ## Events
 
 | Event | Description |
 | --- | --- |
-| `search` | Fired on every keystroke in the input. Payload `{ query }` — the current text. Pair it with `disableFilter` to drive async / server-side filtering: refetch `options` from the query and the popup re-renders the supplied list verbatim. |
-| `change` | Fired when the selected value changes — a user picks an option (toggling membership in `multiple` mode), commits free text (`delimiters` / `validate`), or `clear()` resets it. Payload `{ value, option, selected, text? }` (`ComboboxChangePayload`); `text` is set ONLY on free-text commits, where `option` is `null`. `value` is always the model's NEW value — the whole array in `multiple` mode, the scalar (or `null`) in single mode. `option` is the raw source option that was just toggled (`null` after a `clear()`). `selected` names the direction of the toggle: `true` when the option was just added (and always `true` in single-select), `false` when it was just removed or after `clear()`. |
+| `search` | Fired whenever the input text changes. Payload `{ query }` — the current text. It fires on every keystroke, after a paste Combobox handles itself (with the resulting text), and with `{ query: '' }` whenever Combobox clears the input itself: a pick or create under `multiple`, a free-text commit (including one of a value that is already selected, which fires no `change`) and `clear()`. Pair it with `disableFilter` to drive async / server-side filtering: refetch `options` from the query and the popup re-renders the supplied list verbatim. `query()` on the handle reads the current text. |
+| `change` | Fired when the selected value changes — a user picks an option (toggling membership in `multiple` mode), commits free text (`delimiters` / `validate` / `splitPaste` / `commitOnBlur`), or `clear()` resets it. Payload `{ value, option, selected, text? }` (`ComboboxChangePayload`); `text` is set ONLY on free-text commits, where `option` is `null`; it is the stored string (what `validate` returned, when it returned one). `value` is always the model's NEW value — the whole array in `multiple` mode, the scalar (or `null`) in single mode. `option` is the raw source option that was just toggled (`null` after a `clear()`). `selected` names the direction of the toggle: `true` when the option was just added (and always `true` in single-select), `false` when it was just removed or after `clear()`. |
 | `create` | Fired when `creatable` is set and the user commits text matching no option (case-insensitive, trimmed, exact label equality — no Unicode normalization). Payload `{ query }` — the committed text. Combobox writes NOTHING to `value` when this fires — the consumer is responsible for adding the option to `options` and updating the model itself. Fires at most once per distinct query (a double-commit of the same text is a no-op); composes with `multiple` (`value` stays untouched there too). |
 
 ## Imperative handle
@@ -124,10 +126,11 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | Method | Description |
 | --- | --- |
 | `focus` | Move DOM focus to the text input. NOTE: this deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element (ROZ137 warns, warn-only) — the public `focus()` handle is intended. |
-| `clear` | Reset the selection: clear `value` (emits `change` with `{ value: null }` in single-select mode, `{ value: [] }` under `multiple`) and empty the input text. |
+| `clear` | Reset the selection: clear `value` (emits `change` with `{ value: null }` in single-select mode, `{ value: [] }` under `multiple`) and empty the input text (emits `search` with `{ query: '' }` when there was text). |
 | `seedQuery` | Imperative-only: set the input text (`text ?? ''`, coerced to a string) without touching the `value` model or selection state — the typed query AND the filtered option list reflect it. Does not open the popup or emit `change`/`search`. |
 | `pinOpen` | Imperative-only: pin (or unpin) the popup open, coercing its argument to a boolean. While pinned, onBlur() early-returns so the popup does NOT collapse when a host sub-surface (e.g. an action flyout) moves DOM focus out of the input. pinOpen(false) only unpins — it does not itself close the popup or restore focus (the host does that). Render-neutral when never called. |
 | `activeOption` | Return the currently highlighted RAW source option (the object from `options`), or `null` when nothing is highlighted, the popup is hidden, or the highlighted row is a synthetic "+N more" / create row. Read-only — use it e.g. to preview the option Enter or Tab (`selectOnTab`) would pick. |
+| `query` | Return the current input text — the value the last `search` event reported. Read-only; use `seedQuery(text)` to set it. |
 
 ```tsx
 import { useRef } from 'react';

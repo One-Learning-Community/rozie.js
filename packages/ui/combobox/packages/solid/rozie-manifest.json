@@ -206,6 +206,20 @@
       "tsType": null
     },
     {
+      "name": "splitPaste",
+      "isModel": false,
+      "required": false,
+      "type": "Function",
+      "tsType": null
+    },
+    {
+      "name": "commitOnBlur",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean",
+      "tsType": null
+    },
+    {
       "name": "selectOnTab",
       "isModel": false,
       "required": false,
@@ -524,7 +538,7 @@
       "name": "search",
       "payload": "ComboboxSearchPayload",
       "docs": {
-        "description": "Fired on every keystroke with the current input text. Pair with `disableFilter` for async / server-side filtering: refetch on `search` and feed the results back through `options`."
+        "description": "Fired whenever the input text changes: on every keystroke with the current text, after a paste that Combobox handles itself (with the resulting text), and with `{ query: '' }` whenever Combobox clears the text itself (a pick under `multiple`, a free-text commit — including one of a value that is already selected — or `clear()`). Pair with `disableFilter` for async / server-side filtering: refetch on `search` and feed the results back through `options`. `query()` on the handle reads the current text."
       }
     },
     {
@@ -562,6 +576,10 @@
     {
       "name": "activeOption",
       "signature": "() => any"
+    },
+    {
+      "name": "query",
+      "signature": "() => string"
     }
   ],
   "types": "// The typed public surface (typed-surface P1; always TypeScript). `value` /\n// `option` stay `any`: options are consumer-shaped objects (or primitives) the\n// component never inspects beyond the label/value/disabled resolvers.\n/** `search` payload — the current input text. */\nexport interface ComboboxSearchPayload {\n  query: string;\n}\n/** `change` payload — `option` is the raw source option (`null` for a clear or a free-text commit); `text` is set ONLY on free-text commits. */\nexport interface ComboboxChangePayload {\n  value: any;\n  option: any;\n  selected: boolean;\n  text?: string;\n}\n/** `create` payload — the (untrimmed) query the user asked to create. */\nexport interface ComboboxCreatePayload {\n  query: string;\n}\n/** An entry of the `groups` prop. */\nexport interface ComboboxGroup {\n  id: string;\n  label: string;\n}\n/** `chip` slot params — `remove()` removes the chip and refocuses the input. */\nexport interface ComboboxChipSlotCtx {\n  option: any;\n  remove: () => void;\n  index: number;\n}\n/** `option` slot params. */\nexport interface ComboboxOptionSlotCtx {\n  option: any;\n  index: number;\n  active: boolean;\n  selected: boolean;\n  disabled: boolean;\n}\n/** `empty` / `create` slot params. */\nexport interface ComboboxQuerySlotCtx {\n  query: string;\n}\n/** `groupHeading` slot params. */\nexport interface ComboboxGroupHeadingSlotCtx {\n  group: ComboboxGroup;\n}\n/** `groupMore` slot params. */\nexport interface ComboboxGroupMoreSlotCtx {\n  group: ComboboxGroup | null;\n  hidden: number;\n  expand: () => void;\n}"

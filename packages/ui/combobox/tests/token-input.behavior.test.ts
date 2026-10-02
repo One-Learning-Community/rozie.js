@@ -267,10 +267,11 @@ describe('Combobox token input — new props', () => {
     expect(m.value()).toBe(null);
     expect(m.changes).toHaveLength(0);
     expect(m.input.value).toBe('notanemail');
-    // Paste: accepted parts commit, rejected stay in the input.
+    // Paste: accepted parts commit; rejected parts are inserted at the caret (here the
+    // end of the typed text), never replacing it (261002-ekf F1).
     await paste(m.input, 'ok@x.io, bad');
     expect(m.value()).toEqual(['ok@x.io']);
-    expect(m.input.value).toBe('bad');
+    expect(m.input.value).toBe('notanemailbad');
   });
 
   it('selectOnTab picks the highlighted option and prevents default', async () => {
