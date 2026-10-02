@@ -80,19 +80,19 @@ export default class PdfViewer extends SignalWatcher(LitElement) {
   /**
    * The PDF.js worker URL, set on `GlobalWorkerOptions.workerSrc` before loading. Defaults to the jsDelivr CDN copy matching the installed `pdfjs-dist`'s own `.version` (read at runtime, not a hand-typed string), so the component works with zero config and the default can't drift from the engine version your app resolves. Override for offline / a strict CSP / a bundled worker.
    */
-  @property({ type: String, reflect: true }) workerSrc?: string;
+  @property({ type: String, reflect: true, attribute: 'worker-src' }) workerSrc?: string;
   /**
    * The directory of PDF.js's standard-font data so the base-14 fonts (Helvetica / Times / Courier / …) render with correct glyphs. Defaults to the jsDelivr CDN dir matching the installed `pdfjs-dist`'s own `.version` (same runtime-version rationale as `workerSrc`). Override (or pass a bundled dir) for offline / a strict CSP.
    */
-  @property({ type: String, reflect: true }) standardFontDataUrl?: string;
+  @property({ type: String, reflect: true, attribute: 'standard-font-data-url' }) standardFontDataUrl?: string;
   /**
    * `false` (default) renders a single page with nav (the two-way `page` drives it). `true` renders a continuous scroll of every page; the most-visible page reflects back into `page` and the `pagechange` event via an `IntersectionObserver`.
    */
-  @property({ type: Boolean, reflect: true }) renderAllPages: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'render-all-pages' }) renderAllPages: boolean = false;
   /**
    * Render PDF.js's selectable / copyable text-layer spans over each page canvas (the differentiator vs a dumb canvas image). On by default; the required `.textLayer` CSS + `--scale-factor` var ship with the component, so no extra import is needed.
    */
-  @property({ type: Boolean, reflect: true }) textLayer: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'text-layer' }) textLayer: boolean = true;
   /**
    * Password for an encrypted PDF. If the document is encrypted and no (or a wrong) password is set, the `passwordrequest` event fires with `{ reason }`. Changing it reloads the document.
    */
@@ -104,7 +104,7 @@ export default class PdfViewer extends SignalWatcher(LitElement) {
   /**
    * Opt-in resize-observed auto-refit: `'width'` calls the equivalent of `fitWidth()` whenever the container resizes; `'page'` calls the equivalent of `fitPage()`. Unset (default) leaves today's behavior unchanged — no automatic refit; wire your own resize sensor if you need one. **Not recommended combined with a content-driven container height** (see the no-scroll container recipe): `'page'` mode measures both width and height, and a `height: auto` container can feedback-loop with the refit. `'width'` mode has no such risk — its measurement stays layout-driven either way.
    */
-  @property({ type: Object }) autoFit?: unknown;
+  @property({ type: Object, attribute: 'auto-fit' }) autoFit?: unknown;
   /**
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */

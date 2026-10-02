@@ -43,15 +43,15 @@ export default class Cropper extends SignalWatcher(LitElement) {
   /**
    * The crop box aspect ratio. `NaN` (the default) is Cropper's sentinel for a free ratio. Reconciled at runtime via `setAspectRatio`.
    */
-  @property({ type: Number, reflect: true }) aspectRatio: number = NaN;
+  @property({ type: Number, reflect: true, attribute: 'aspect-ratio' }) aspectRatio: number = NaN;
   /**
    * The view constraint mode (`0`–`3`) that governs how the crop box is restricted to the canvas. Construction-only — Cropper.js v1 has no `setViewMode`.
    */
-  @property({ type: Number, reflect: true }) viewMode: number = 0;
+  @property({ type: Number, reflect: true, attribute: 'view-mode' }) viewMode: number = 0;
   /**
    * The drag behavior: `'crop'` draws a new box, `'move'` pans the canvas, `'none'` disables dragging. Reconciled at runtime via `setDragMode`.
    */
-  @property({ type: String, reflect: true }) dragMode: string = 'crop';
+  @property({ type: String, reflect: true, attribute: 'drag-mode' }) dragMode: string = 'crop';
   /**
    * Freeze the cropper so it no longer responds to user interaction. Reconciled at runtime via `enable()` / `disable()`.
    */
@@ -87,23 +87,23 @@ export default class Cropper extends SignalWatcher(LitElement) {
   /**
    * Allow zooming the image via the mouse wheel. Construction-only — Cropper.js v1 has no runtime setter.
    */
-  @property({ type: Boolean, reflect: true }) zoomOnWheel: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'zoom-on-wheel' }) zoomOnWheel: boolean = true;
   /**
    * Allow moving the crop box. Construction-only — Cropper.js v1 has no runtime setter.
    */
-  @property({ type: Boolean, reflect: true }) cropBoxMovable: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'crop-box-movable' }) cropBoxMovable: boolean = true;
   /**
    * Allow resizing the crop box. Construction-only — Cropper.js v1 has no runtime setter.
    */
-  @property({ type: Boolean, reflect: true }) cropBoxResizable: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'crop-box-resizable' }) cropBoxResizable: boolean = true;
   /**
    * Render a crop box automatically when the cropper initializes. Construction-only — Cropper.js v1 has no runtime setter.
    */
-  @property({ type: Boolean, reflect: true }) autoCrop: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'auto-crop' }) autoCrop: boolean = true;
   /**
    * The initial crop-box size as a fraction of the canvas (`0`–`1`). Construction-only — Cropper.js v1 has no runtime setter.
    */
-  @property({ type: Number, reflect: true }) autoCropArea: number = 0.8;
+  @property({ type: Number, reflect: true, attribute: 'auto-crop-area' }) autoCropArea: number = 0.8;
   /**
    * Re-render the cropper on window resize to keep it responsive. Construction-only — Cropper.js v1 has no runtime setter.
    */

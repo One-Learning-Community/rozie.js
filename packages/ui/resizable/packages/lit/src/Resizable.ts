@@ -121,7 +121,7 @@ export default class Resizable extends SignalWatcher(LitElement) {
   /**
    * Accessible name applied to the `role="separator"` handle (its `aria-label`). The handle has no visible text of its own, so a screen reader needs this to announce it. Defaults to `"Resize panels"`.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string = 'Resize panels';
+  @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string = 'Resize panels';
   private _dragging = signal(false);
   @query('[data-rozie-ref="root"]') private _refRoot!: HTMLElement;
 

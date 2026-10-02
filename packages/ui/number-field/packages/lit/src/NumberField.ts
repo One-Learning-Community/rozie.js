@@ -84,17 +84,17 @@ export default class NumberField extends SignalWatcher(LitElement) {
   /**
    * The coarse step applied by **PageUp** / **PageDown**, for fast traversal of a wide range.
    */
-  @property({ type: Number, reflect: true }) largeStep: number = 10;
+  @property({ type: Number, reflect: true, attribute: 'large-step' }) largeStep: number = 10;
   /**
    * Options forwarded to `Intl.NumberFormat` for locale-aware **display** formatting (e.g. `{ style: "currency", currency: "USD" }` or `{ minimumFractionDigits: 2 }`). The displayed text is formatted while the field is unfocused; on commit the formatting is stripped back off and the raw number is parsed.
    * @example
    * :formatOptions="{ style: 'currency', currency: 'USD' }"
    */
-  @property({ type: Object }) formatOptions: any = {};
+  @property({ type: Object, attribute: 'format-options' }) formatOptions: any = {};
   /**
    * Opt in to **scrub-on-drag**: press and drag horizontally on the field to change the value by `step` per few pixels (a power-user affordance). Off by default.
    */
-  @property({ type: Boolean, reflect: true }) allowScrub: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'allow-scrub' }) allowScrub: boolean = false;
   /**
    * Disable the whole control — the input, both steppers, the keyboard, and scrubbing. Also sets the Angular `ControlValueAccessor` disabled state.
    */
@@ -106,7 +106,7 @@ export default class NumberField extends SignalWatcher(LitElement) {
   /**
    * Accessible name applied to the `role="spinbutton"` input (`aria-label`). Provide this (or an external `<label>`) so the control is announced.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
   private _text = signal('');
   private _focused = signal(false);
   @query('[data-rozie-ref="input"]') private _refInput!: HTMLElement;

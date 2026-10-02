@@ -212,19 +212,19 @@ export default class Slider extends SignalWatcher(LitElement) {
   /**
    * Accessible name for each native input when there is no visible `<label for>`, reflected onto the input's `aria-label`.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
   /**
    * The jump applied on `PageUp` / `PageDown`. `null` falls back to `step × 10`. Applied by a thin `@keydown` augment so it honours this value (native browsers otherwise use their own large step); arrows / `Home` / `End` stay native.
    */
-  @property({ type: Number, reflect: true }) pageStep: number | null = null;
+  @property({ type: Number, reflect: true, attribute: 'page-step' }) pageStep: number | null = null;
   /**
    * A `(value) => string` formatter for the value shown in the `bubble` slot and surfaced as `aria-valuetext`. Receives the numeric value and returns a string; `null` uses the raw value.
    */
-  @property({ type: Function }) formatValue: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'format-value' }) formatValue: ((...args: any[]) => any) | null = null;
   /**
    * Render the value-bubble overlay (one bubble per thumb in range mode). Headless and opt-in — there is no default-styled bubble; supply the `bubble` slot to control its appearance.
    */
-  @property({ type: Boolean, reflect: true }) showValue: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'show-value' }) showValue: boolean = false;
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
 
   private _rozieSlotDistributor = new RozieSlotDistributor(this);

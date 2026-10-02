@@ -118,11 +118,11 @@ export default class Carousel extends SignalWatcher(LitElement) {
   /**
    * Number of slides advanced per snap (the Embla `slidesToScroll` option). Runtime-updatable.
    */
-  @property({ type: Number, reflect: true }) slidesToScroll: number = 1;
+  @property({ type: Number, reflect: true, attribute: 'slides-to-scroll' }) slidesToScroll: number = 1;
   /**
    * Enable momentum/free-scroll dragging with no hard snapping (the Embla `dragFree` option). Runtime-updatable.
    */
-  @property({ type: Boolean, reflect: true }) dragFree: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'drag-free' }) dragFree: boolean = false;
   /**
    * Enable pointer drag (mapped to the Embla `watchDrag` option — a Vue-clarity rename). Set `false` to disable dragging and leave only programmatic/arrow navigation. Runtime-updatable.
    */
@@ -130,15 +130,15 @@ export default class Carousel extends SignalWatcher(LitElement) {
   /**
    * Edge-snap containment (the Embla `containScroll` option) — `''` (off), `'trimSnaps'`, or `'keepSnaps'`. Runtime-updatable.
    */
-  @property({ type: String, reflect: true }) containScroll: string = 'trimSnaps';
+  @property({ type: String, reflect: true, attribute: 'contain-scroll' }) containScroll: string = 'trimSnaps';
   /**
    * Initial snap index the carousel starts at (the Embla `startIndex` option). Init-only — to move after mount use the `scrollToIndex()` handle verb or the `selectedIndex` model.
    */
-  @property({ type: Number, reflect: true }) startIndex: number = 0;
+  @property({ type: Number, reflect: true, attribute: 'start-index' }) startIndex: number = 0;
   /**
    * Allow a fast flick to skip intermediate snaps (the Embla `skipSnaps` option). Runtime-updatable.
    */
-  @property({ type: Boolean, reflect: true }) skipSnaps: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'skip-snaps' }) skipSnaps: boolean = false;
   /**
    * Scroll transition duration in Embla's relative unit (the `duration` option) — lower is snappier. Runtime-updatable.
    */
@@ -154,7 +154,7 @@ export default class Carousel extends SignalWatcher(LitElement) {
   /**
    * Delay in milliseconds between auto-advances when `autoplay` is on. Runtime-updatable.
    */
-  @property({ type: Number, reflect: true }) autoplayDelay: number = 4000;
+  @property({ type: Number, reflect: true, attribute: 'autoplay-delay' }) autoplayDelay: number = 4000;
   /**
    * Show built-in dot pagination — one dot per scroll snap, the active snap highlighted, and clicking a dot scrolls to it. Opt-in, off by default.
    */

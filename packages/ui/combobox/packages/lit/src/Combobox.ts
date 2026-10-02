@@ -265,15 +265,15 @@ export default class Combobox extends SignalWatcher(LitElement) {
   /**
    * Opt **out** of built-in client filtering (async / server-side mode): render `options` exactly as supplied and rely on the `search` event to refetch. By default the component filters `options` by `label`, case-insensitively, against the typed query.
    */
-  @property({ type: Boolean, reflect: true }) disableFilter: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'disable-filter' }) disableFilter: boolean = false;
   /**
    * Accessible name for the input (`aria-label`), used when there is no visible `<label for>` pointing at it. Provide this (or an external label) so the combobox is announced.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
   /**
    * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one combobox shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
-  @property({ type: String, reflect: true }) idBase: string = 'rozie-combobox';
+  @property({ type: String, reflect: true, attribute: 'id-base' }) idBase: string = 'rozie-combobox';
   /**
    * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the combobox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
    */
@@ -281,7 +281,7 @@ export default class Combobox extends SignalWatcher(LitElement) {
   /**
    * Close the popup after a selection commits. Unset (default) resolves through `effectiveCloseOnSelect()`: `true` in single-select (today's default behavior) and `false` in `multiple` mode, where closing after every chip pick would make multi-select unusable. Pass an explicit `true` or `false` to override in either mode.
    */
-  @property({ type: Boolean, reflect: true }) closeOnSelect: boolean | null = null;
+  @property({ type: Boolean, reflect: true, attribute: 'close-on-select' }) closeOnSelect: boolean | null = null;
   /**
    * `value` widens to hold an **array** of selected values and remains the sole `model: true` prop, so the Angular `ControlValueAccessor` is preserved (a second model would forfeit it — `ROZ125`). Re-selecting an already-selected option toggles it off. Default `false` is byte-identical to single-select.
    */
@@ -293,15 +293,15 @@ export default class Combobox extends SignalWatcher(LitElement) {
   /**
    * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
    */
-  @property({ type: Function }) optionLabel: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'option-label' }) optionLabel: ((...args: any[]) => any) | null = null;
   /**
    * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
    */
-  @property({ type: Function }) optionValue: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'option-value' }) optionValue: ((...args: any[]) => any) | null = null;
   /**
    * Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.
    */
-  @property({ type: Function }) optionDisabled: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'option-disabled' }) optionDisabled: ((...args: any[]) => any) | null = null;
   /**
    * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling popup (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed combobox. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.
    */
@@ -309,11 +309,11 @@ export default class Combobox extends SignalWatcher(LitElement) {
   /**
    * Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on.
    */
-  @property({ type: Number, reflect: true }) estimateRowHeight: number = 36;
+  @property({ type: Number, reflect: true, attribute: 'estimate-row-height' }) estimateRowHeight: number = 36;
   /**
    * A CSS length string bounding the popup scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-combobox-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
    */
-  @property({ type: String, reflect: true }) maxHeight: string = '';
+  @property({ type: String, reflect: true, attribute: 'max-height' }) maxHeight: string = '';
   /**
    * Ordered section list `[{ id, label }]` setting group order + heading text. Options are partitioned by their optional `group?` string; groups present on options but absent here fall back to first-appearance order after the listed ones. Empty/absent ⇒ flat, ungrouped rendering (default).
    */
@@ -321,7 +321,7 @@ export default class Combobox extends SignalWatcher(LitElement) {
   /**
    * Cap each native section group to its first `groupCap` results, adding a keyboard-reachable '+N more' row that expands that group IN PLACE when activated. `0`/absent = uncapped (default). Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on.
    */
-  @property({ type: Number, reflect: true }) groupCap: number = 0;
+  @property({ type: Number, reflect: true, attribute: 'group-cap' }) groupCap: number = 0;
   /**
    * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` matches the pre-Phase-86 static popup alignment (flush with the control's left edge). Ignored when `inline` is set.
    */
@@ -333,11 +333,11 @@ export default class Combobox extends SignalWatcher(LitElement) {
   /**
    * Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup flips above the control when it would overflow the viewport below; set this to keep it pinned to `placement` regardless. Ignored when `inline` is set.
    */
-  @property({ type: Boolean, reflect: true }) disableFlip: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'disable-flip' }) disableFlip: boolean = false;
   /**
    * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
    */
-  @property({ type: Boolean, reflect: true }) disableShift: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'disable-shift' }) disableShift: boolean = false;
   private _query = signal('');
   private _isOpen = signal(false);
   private _activeIndex = signal(-1);

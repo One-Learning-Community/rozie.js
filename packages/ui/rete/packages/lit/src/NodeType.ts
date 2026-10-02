@@ -49,19 +49,19 @@ export default class NodeType extends SignalWatcher(LitElement) {
   /**
    * Minimum width (px) for this type. Clamps the RENDERED box whatever its size came from — auto-sized body content, an authored `width`, or a resize gesture — and bounds how far a corner-drag may shrink it. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
    */
-  @property({ type: Number, reflect: true }) minWidth: number | null = null;
+  @property({ type: Number, reflect: true, attribute: 'min-width' }) minWidth: number | null = null;
   /**
    * Minimum height (px) for this type. Clamps the RENDERED box whatever its size came from, and bounds how far a corner-drag may shrink it. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
    */
-  @property({ type: Number, reflect: true }) minHeight: number | null = null;
+  @property({ type: Number, reflect: true, attribute: 'min-height' }) minHeight: number | null = null;
   /**
    * Maximum width (px) for this type. Clamps the RENDERED box whatever its size came from — auto-sized body content, an authored `width`, or a resize gesture — so body content can never stretch a node past it. Unset = unbounded.
    */
-  @property({ type: Number, reflect: true }) maxWidth: number | null = null;
+  @property({ type: Number, reflect: true, attribute: 'max-width' }) maxWidth: number | null = null;
   /**
    * Maximum height (px) for this type. Clamps the RENDERED box whatever its size came from, so body content can never stretch a node past it. Unset = unbounded.
    */
-  @property({ type: Number, reflect: true }) maxHeight: number | null = null;
+  @property({ type: Number, reflect: true, attribute: 'max-height' }) maxHeight: number | null = null;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
 private portals = {

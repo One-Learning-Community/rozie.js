@@ -48,13 +48,23 @@ The graft is synchronous on every target, but the **idiom differs by ref-timing*
 
 The `nodeView` slot uses the same native imperative-render API as every other portal slot — `renderNodeView` render prop, `#nodeView` scoped slot / snippet / content-child, or a `nodeView` property on the Lit element:
 
-**React / Solid** (render prop):
+**React / Solid** (render prop — `renderNodeView` on React, `nodeViewSlot` on Solid):
 
 ```tsx
+// React
 <TipTap
   html={html}
   onHtmlChange={setHtml}
   renderNodeView={({ node, selected }) => (
+    <span data-selected={selected}>{node.attrs.label}</span>
+  )}
+/>
+
+// Solid
+<TipTap
+  html={html()}
+  onHtmlChange={setHtml}
+  nodeViewSlot={({ node, selected }) => (
     <span data-selected={selected}>{node.attrs.label}</span>
   )}
 />

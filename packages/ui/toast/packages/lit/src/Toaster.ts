@@ -197,15 +197,15 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   /**
    * Opt **out** of pausing the auto-dismiss timers while the pointer is over the stack. By default hovering pauses every timer and leaving restarts them; set this to keep toasts dismissing on schedule regardless of hover.
    */
-  @property({ type: Boolean, reflect: true }) disablePauseOnHover: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'disable-pause-on-hover' }) disablePauseOnHover: boolean = false;
   /**
    * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
   /**
    * Opt **out** of pointer swipe-to-dismiss. By default, dragging a toast past 45% of its own width/height (direction auto-derived from `position`) or a fast flick dismisses it with reason `'swipe'`; a short drag springs back. A drag starting on the close button (or any button/link) never swipes.
    */
-  @property({ type: Boolean, reflect: true }) disableSwipe: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'disable-swipe' }) disableSwipe: boolean = false;
   /**
    * Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times.
    */

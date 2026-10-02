@@ -398,6 +398,7 @@ const markers = ref([
 The `popup` slot mirrors `marker` exactly — drive it with the `popups` prop (entries `{ lng, lat, id?, closeButton?, closeOnClick?, anchor?, offset? }`) and fill the `#popup` scoped slot / `renderPopup` render prop / snippet / content-child. Each fragment is mounted into a `maplibregl.Popup` via `setDOMContent`, with the live `{ popup, index }` in scope:
 
 ```tsx
+// React
 <MapLibre
   center={center}
   onCenterChange={setCenter}

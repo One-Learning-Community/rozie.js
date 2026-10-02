@@ -74,19 +74,19 @@ export default class MapLibre extends SignalWatcher(LitElement) {
   /**
    * The map style — a `StyleSpecification` object **or** a style-URL string. Named `mapStyle` (not `style`) because `style` is a reserved attribute across the targets — `react-map-gl` and `vue-maplibre-gl` use the same name for the same reason. Defaults to MapLibre's official no-token demo tiles, so the component "just works" with zero config. Changing it calls `setStyle` and re-applies your `sources` / `layers` once the new style loads.
    */
-  @property({ type: Object }) mapStyle?: unknown;
+  @property({ type: Object, attribute: 'map-style' }) mapStyle?: unknown;
   /**
    * Minimum zoom level. Applied at construction and via `setMinZoom` on change.
    */
-  @property({ type: Number, reflect: true }) minZoom: number = 0;
+  @property({ type: Number, reflect: true, attribute: 'min-zoom' }) minZoom: number = 0;
   /**
    * Maximum zoom level. Applied at construction and via `setMaxZoom` on change.
    */
-  @property({ type: Number, reflect: true }) maxZoom: number = 22;
+  @property({ type: Number, reflect: true, attribute: 'max-zoom' }) maxZoom: number = 22;
   /**
    * A `LngLatBoundsLike` the camera is constrained to. Applied via `setMaxBounds` on change (pass `undefined` to clear).
    */
-  @property({ type: Object }) maxBounds?: unknown;
+  @property({ type: Object, attribute: 'max-bounds' }) maxBounds?: unknown;
   /**
    * **Construction-only** initial fit — a `LngLatBoundsLike` the map fits to on mount (overrides `center` / `zoom` when set). Pair with `fitBoundsOptions`.
    */
@@ -94,27 +94,27 @@ export default class MapLibre extends SignalWatcher(LitElement) {
   /**
    * **Construction-only** options for the initial `bounds` fit (padding, max-zoom, etc.).
    */
-  @property({ type: Object }) fitBoundsOptions: any = {};
+  @property({ type: Object, attribute: 'fit-bounds-options' }) fitBoundsOptions: any = {};
   /**
    * Toggle drag-to-pan. Applied at construction and reconciled live via the handler's `enable()` / `disable()`.
    */
-  @property({ type: Boolean, reflect: true }) dragPan: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'drag-pan' }) dragPan: boolean = true;
   /**
    * Toggle right-drag / ctrl-drag rotation. Applied at construction and reconciled live.
    */
-  @property({ type: Boolean, reflect: true }) dragRotate: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'drag-rotate' }) dragRotate: boolean = true;
   /**
    * Toggle scroll-wheel zoom. Applied at construction and reconciled live.
    */
-  @property({ type: Boolean, reflect: true }) scrollZoom: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'scroll-zoom' }) scrollZoom: boolean = true;
   /**
    * Toggle double-click zoom. Applied at construction and reconciled live.
    */
-  @property({ type: Boolean, reflect: true }) doubleClickZoom: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'double-click-zoom' }) doubleClickZoom: boolean = true;
   /**
    * Toggle shift-drag box zoom. Applied at construction and reconciled live.
    */
-  @property({ type: Boolean, reflect: true }) boxZoom: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'box-zoom' }) boxZoom: boolean = true;
   /**
    * Toggle keyboard navigation. Applied at construction and reconciled live.
    */
@@ -122,11 +122,11 @@ export default class MapLibre extends SignalWatcher(LitElement) {
   /**
    * Toggle touch pinch-zoom + rotate. Applied at construction and reconciled live.
    */
-  @property({ type: Boolean, reflect: true }) touchZoomRotate: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'touch-zoom-rotate' }) touchZoomRotate: boolean = true;
   /**
    * Toggle two-finger touch pitch. Applied at construction and reconciled live.
    */
-  @property({ type: Boolean, reflect: true }) touchPitch: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'touch-pitch' }) touchPitch: boolean = true;
   /**
    * The marker data that drives the reactive multi-instance `marker` slot — one entry per marker (`{ lng, lat, id?, anchor?, offset?, draggable?, ... }`). One portal handle mounts per entry; changing the array reconciles markers keep / update / dispose with no remount. Only meaningful when the `marker` slot is filled.
    */
@@ -146,7 +146,7 @@ export default class MapLibre extends SignalWatcher(LitElement) {
   /**
    * Layer ids whose feature `mouseenter` / `mouseleave` fire the `@mouseenter` / `@mouseleave` events (populating `e.features`). Registered / unregistered per id on change.
    */
-  @property({ type: Array }) interactiveLayerIds: any[] = [];
+  @property({ type: Array, attribute: 'interactive-layer-ids' }) interactiveLayerIds: any[] = [];
   /**
    * Standard map controls — strings (`'navigation'` / `'geolocate'` / `'scale'` / `'fullscreen'` / `'attribution'`) or `{ type, position?, options? }` objects. Reconciled (remove-all + re-add) on change.
    */

@@ -223,15 +223,15 @@ export default class TipTap extends SignalWatcher(LitElement) {
   /**
    * A CSS class applied to the contenteditable element (`editorProps.attributes.class`).
    */
-  @property({ type: String, reflect: true }) editorClass: string = '';
+  @property({ type: String, reflect: true, attribute: 'editor-class' }) editorClass: string = '';
   /**
    * The accessible name (`aria-label`) applied to the contenteditable element.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string = 'Rich text editor';
+  @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string = 'Rich text editor';
   /**
    * ProseMirror `editorProps` passthrough — `handleKeyDown`, `handlePaste`, a custom `attributes`, etc. Spread **last** so consumer `editorProps` win the wrapper's attribute defaults.
    */
-  @property({ type: Object }) editorProps: any = {};
+  @property({ type: Object, attribute: 'editor-props' }) editorProps: any = {};
   /**
    * Extra TipTap extensions composed onto `StarterKit` — the consumer-extensibility passthrough (Link, Image, Mention, custom nodes/marks, …). Consumer extensions genuinely win for a StarterKit-bundled node or mark: a same-named custom extension (e.g. a custom `Link`) auto-disables the corresponding StarterKit key (unless explicitly configured via `starterKit`), and the final extension array is name-deduped keeping the last (consumer) occurrence — so a custom Link/Underline/OrderedList replaces StarterKit's without a "Duplicate extension names" warning.
    */
@@ -239,35 +239,35 @@ export default class TipTap extends SignalWatcher(LitElement) {
   /**
    * StarterKit config passthrough — spread into `StarterKit.configure(...)`. Accepts per-extension option objects or `false` to disable an extension, e.g. `{ heading:false }`, `{ heading:{ levels:[1,2] } }`, `{ link:false }`. A StarterKit-bundled node/mark is auto-disabled when a same-named custom extension is supplied via `extensions`; an explicitly-set key here is always respected and never overridden by that auto-disable scan.
    */
-  @property({ type: Object }) starterKit: any = {};
+  @property({ type: Object, attribute: 'starter-kit' }) starterKit: any = {};
   /**
    * Custom ProseMirror node registration for the reactive `nodeView` portal slot — general facility, read ONCE at mount (setup-once construction, not reactive). Each entry: `{ name, tag, group, inline, atom, content, selectable, defining, attrs }` — `name` (required, unique node name), `tag` (required, parseHTML selector string | string[]), `group` (default `'block'`), `inline` (default `false`), `atom` (default `false` — no contentDOM), `content` (e.g. `'inline*'`; presence ⇒ the node gets an editable contentDOM), `selectable` (default `true`), `defining` (default `false`), `attrs` (`{ key: { default } }`, ProseMirror `addAttributes` shape). One `Node.create` is built per entry; all render through the SAME `nodeView` fragment, which dispatches on `scope.node.type.name`. An empty array (default) registers no custom nodes — zero overhead.
    * @example
    * <rozie-tip-tap .nodeSpecs=${[{ name: 'mention', tag: 'span[data-mention]', group: 'inline', inline: true, atom: true, attrs: { id: { default: null } } }]}></rozie-tip-tap>
    */
-  @property({ type: Array }) nodeSpecs: any[] = [];
+  @property({ type: Array, attribute: 'node-specs' }) nodeSpecs: any[] = [];
   /**
    * An async image-upload hook, signature `(file: File) => Promise<string>` resolving to a URL. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping an image file uploads it via this function then inserts the resolved URL at the caret / drop position. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.
    * @example
    * <rozie-tip-tap .uploadImage=${uploadFn}></rozie-tip-tap>
    */
-  @property({ type: Function }) uploadImage: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'upload-image' }) uploadImage: ((...args: any[]) => any) | null = null;
   /**
    * A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.
    * @example
    * <rozie-tip-tap .maxLength=${500}></rozie-tip-tap>
    */
-  @property({ type: Number, reflect: true }) maxLength: number | null = null;
+  @property({ type: Number, reflect: true, attribute: 'max-length' }) maxLength: number | null = null;
   /**
    * Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.
    */
-  @property({ type: Boolean, reflect: true }) enforceMaxLength: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'enforce-max-length' }) enforceMaxLength: boolean = false;
   /**
    * A custom `shouldShow` predicate for the GENERAL `bubbleMenu` slot — the TipTap signature `({ editor, view, state, oldState, from, to }) => boolean`. When provided, it REPLACES the general bubbleMenu's default predicate (show on a non-empty text selection), turning the `bubbleMenu` slot into a fully consumer-controllable selection-tooling surface (e.g. show only inside a table, or only for a specific mark). When `null` (default), the default non-empty-selection behavior applies. Orthogonal to the built-in link editor, which is its own bubble-menu surface with a link-aware trigger. NOTE: as a Function prop it lowers to a loosely-typed callable on some targets (React `any` / Angular `unknown`) — pass a correctly-typed predicate; the wrapper forwards it verbatim to `BubbleMenu.configure({ shouldShow })`.
    * @example
    * <rozie-tip-tap .bubbleMenuShouldShow=${({ editor }) => editor.isActive('table')}></rozie-tip-tap>
    */
-  @property({ type: Function }) bubbleMenuShouldShow: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'bubble-menu-should-show' }) bubbleMenuShouldShow: ((...args: any[]) => any) | null = null;
   private _active = signal({
   bold: false,
   italic: false,

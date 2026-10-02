@@ -207,6 +207,7 @@ The `name` prop forwards an HTML form-control `name` onto the rendered input, so
 **react-hook-form** — `register('field')` returns `{ name, onChange, onBlur, ref }`; the `name` is the load-bearing field for the submitted value:
 
 ```tsx
+// React
 const { register } = useForm<{ birthday: string }>();
 const field = register('birthday');
 <Flatpickr name={field.name} date={date} onDateChange={setDate} />;

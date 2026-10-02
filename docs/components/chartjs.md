@@ -297,7 +297,7 @@ Each target fills `#tooltip` through its native imperative-render API:
 <Chart
   type="line"
   data={data}
-  tooltip={({ model }) => <div class="my-tip"><strong>{model.title.join(' ')}</strong></div>}
+  tooltipSlot={({ model }) => <div class="my-tip"><strong>{model.title.join(' ')}</strong></div>}
 />
 ```
 

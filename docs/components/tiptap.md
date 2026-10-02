@@ -286,7 +286,7 @@ Each target fills `#toolbar` through its native imperative-render API:
 <TipTap
   html={html()}
   onHtmlChange={setHtml}
-  renderToolbar={({ editor }) => (
+  toolbarSlot={({ editor }) => (
     <button onClick={() => editor.chain().focus().toggleBold().run()}>Bold</button>
   )}
 />
@@ -440,6 +440,7 @@ An explicit key in `starterKit` is always respected — it is never overridden b
 `editorProps` is forwarded straight to ProseMirror. Override paste handling, key bindings, or the contenteditable attributes:
 
 ```tsx
+// React
 <TipTap
   html={html}
   onHtmlChange={setHtml}

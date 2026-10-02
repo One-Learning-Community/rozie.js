@@ -13,7 +13,7 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
   /**
    * The column id (mirrors the `#editor` slot scope). Used as the select `aria-label`.
    */
-  @property({ type: String, reflect: true }) columnId: string = '';
+  @property({ type: String, reflect: true, attribute: 'column-id' }) columnId: string = '';
   /**
    * The table-core column object (opaque passthrough from the `#editor` slot scope).
    */
@@ -45,7 +45,7 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
   /**
    * The column's human header, forwarded by the slot scope — used as the control's accessible name in place of the internal column id.
    */
-  @property({ type: String, reflect: true }) columnLabel: string = '';
+  @property({ type: String, reflect: true, attribute: 'column-label' }) columnLabel: string = '';
   private _draft = signal('');
   private _touched = signal(false);
   @query('[data-rozie-ref="selectEl"]') private _refSelectEl!: HTMLElement;

@@ -46,35 +46,35 @@ export default class Waveform extends SignalWatcher(LitElement) {
   /**
    * The color of the unplayed portion of the waveform. Reconciled at runtime via `setOptions`.
    */
-  @property({ type: String, reflect: true }) waveColor: string = '#8a2be2';
+  @property({ type: String, reflect: true, attribute: 'wave-color' }) waveColor: string = '#8a2be2';
   /**
    * The color of the played (progress) portion of the waveform. Reconciled at runtime via `setOptions`.
    */
-  @property({ type: String, reflect: true }) progressColor: string = '#5a189a';
+  @property({ type: String, reflect: true, attribute: 'progress-color' }) progressColor: string = '#5a189a';
   /**
    * The color of the playback cursor. Reconciled at runtime via `setOptions`.
    */
-  @property({ type: String, reflect: true }) cursorColor: string = '#333333';
+  @property({ type: String, reflect: true, attribute: 'cursor-color' }) cursorColor: string = '#333333';
   /**
    * The width of the playback cursor in pixels. Reconciled at runtime via `setOptions`.
    */
-  @property({ type: Number, reflect: true }) cursorWidth: number = 1;
+  @property({ type: Number, reflect: true, attribute: 'cursor-width' }) cursorWidth: number = 1;
   /**
    * Draw the waveform as bars of this pixel width. `null` (default) renders a continuous waveform. Reconciled at runtime via `setOptions`.
    */
-  @property({ type: Object }) barWidth: unknown = null;
+  @property({ type: Object, attribute: 'bar-width' }) barWidth: unknown = null;
   /**
    * The pixel gap between bars (when `barWidth` is set). Reconciled at runtime via `setOptions`.
    */
-  @property({ type: Object }) barGap: unknown = null;
+  @property({ type: Object, attribute: 'bar-gap' }) barGap: unknown = null;
   /**
    * The corner radius of bars (when `barWidth` is set). Reconciled at runtime via `setOptions`.
    */
-  @property({ type: Object }) barRadius: unknown = null;
+  @property({ type: Object, attribute: 'bar-radius' }) barRadius: unknown = null;
   /**
    * The minimum pixels-per-second zoom level. Reconciled at runtime via `zoom`.
    */
-  @property({ type: Number, reflect: true }) minPxPerSec: number = 1;
+  @property({ type: Number, reflect: true, attribute: 'min-px-per-sec' }) minPxPerSec: number = 1;
   /**
    * Playback volume (`0`–`1`). Reconciled at runtime via `setVolume`.
    */
@@ -82,7 +82,7 @@ export default class Waveform extends SignalWatcher(LitElement) {
   /**
    * Playback speed multiplier. Reconciled at runtime via `setPlaybackRate`.
    */
-  @property({ type: Number, reflect: true }) playbackRate: number = 1;
+  @property({ type: Number, reflect: true, attribute: 'playback-rate' }) playbackRate: number = 1;
   /**
    * Begin playback as soon as the audio is ready. Construction-only.
    */
@@ -90,19 +90,19 @@ export default class Waveform extends SignalWatcher(LitElement) {
   /**
    * Normalize the waveform by its largest peak (wavesurfer's `normalize` option). Reconciled at runtime via `setOptions`.
    */
-  @property({ type: Boolean, reflect: true }) normalizeAmplitude: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'normalize-amplitude' }) normalizeAmplitude: boolean = false;
   /**
    * Hide the horizontal scrollbar when the waveform is zoomed wider than its container. Construction-only.
    */
-  @property({ type: Boolean, reflect: true }) hideScrollbar: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'hide-scrollbar' }) hideScrollbar: boolean = false;
   /**
    * Disable click/seek interaction with the waveform (the engine defaults to interactive). Construction-only.
    */
-  @property({ type: Boolean, reflect: true }) disableInteraction: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'disable-interaction' }) disableInteraction: boolean = false;
   /**
    * Disable drag-to-seek across the waveform (the engine defaults to drag-seekable). Construction-only.
    */
-  @property({ type: Boolean, reflect: true }) disableDragToSeek: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'disable-drag-to-seek' }) disableDragToSeek: boolean = false;
   /**
    * Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Live-toggleable — registers/unregisters on the running engine, no remount.
    */
@@ -114,7 +114,7 @@ export default class Waveform extends SignalWatcher(LitElement) {
   /**
    * The line color of the Hover plugin cursor (only applies when `hover` is enabled). Read/applied when the Hover plugin is (re-)created — not live on an already-registered instance.
    */
-  @property({ type: String, reflect: true }) hoverColor: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'hover-color' }) hoverColor: string | null = null;
   /**
    * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin — at construction if it's already an array, or lazily the first time `regions` transitions from `null`/`undefined` to an array. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
    */
@@ -123,11 +123,11 @@ export default class Waveform extends SignalWatcher(LitElement) {
   /**
    * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.
    */
-  @property({ type: Boolean, reflect: true }) dragToCreateRegions: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'drag-to-create-regions' }) dragToCreateRegions: boolean = false;
   /**
    * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.
    */
-  @property({ type: String, reflect: true }) regionColor: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'region-color' }) regionColor: string | null = null;
   /**
    * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`sampleRate`, `mediaControls`, `splitChannels`, `barHeight`, …).
    */

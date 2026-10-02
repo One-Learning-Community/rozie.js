@@ -134,7 +134,7 @@ export default class Tags extends SignalWatcher(LitElement) {
   /**
    * Allow the same token value to be added more than once. Defaults to `false` — a candidate equal (case-sensitive) to an existing token is silently rejected on commit. Set `true` to permit duplicates.
    */
-  @property({ type: Boolean, reflect: true }) allowDuplicates: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'allow-duplicates' }) allowDuplicates: boolean = false;
   /**
    * Maximum number of tokens. Once the list reaches `max`, the input is disabled and further adds (type, paste, programmatic) are rejected. `null` (the default) means unlimited.
    */
@@ -160,7 +160,7 @@ export default class Tags extends SignalWatcher(LitElement) {
   /**
    * Accessible name for the whole control (`role="group"`). The inline text input is labelled with the same name so assistive tech announces what is being entered. A visually-hidden live region announces the current token count on change.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
   private _draft = signal('');
   @query('[data-rozie-ref="root"]') private _refRoot!: HTMLElement;
 

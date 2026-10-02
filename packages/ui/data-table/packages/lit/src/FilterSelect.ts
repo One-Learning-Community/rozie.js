@@ -13,7 +13,7 @@ export default class FilterSelect extends SignalWatcher(LitElement) {
   /**
    * The column id (mirrors the `#filter` slot scope) — used as the filter key and the select `aria-label`.
    */
-  @property({ type: String, reflect: true }) columnId: string = '';
+  @property({ type: String, reflect: true, attribute: 'column-id' }) columnId: string = '';
   /**
    * The table-core column object (opaque passthrough from the `#filter` slot scope).
    */
@@ -25,15 +25,15 @@ export default class FilterSelect extends SignalWatcher(LitElement) {
   /**
    * `(columnId, value) => void` — apply the column filter on change; the leading empty "All" option clears it. Null-guarded at call sites.
    */
-  @property({ type: Function }) setFilter: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'set-filter' }) setFilter: ((...args: any[]) => any) | null = null;
   /**
    * The faceted distinct keys for this column (cross-filtered, keys only — no occurrence counts) used to build the `<option>` list.
    */
-  @property({ type: Array }) uniqueValues: any[] = [];
+  @property({ type: Array, attribute: 'unique-values' }) uniqueValues: any[] = [];
   /**
    * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
    */
-  @property({ type: String, reflect: true }) columnLabel: string = '';
+  @property({ type: String, reflect: true, attribute: 'column-label' }) columnLabel: string = '';
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

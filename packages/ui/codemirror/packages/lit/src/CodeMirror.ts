@@ -131,7 +131,7 @@ export default class CodeMirror extends SignalWatcher(LitElement) {
   /**
    * Make the document read-only. Runtime-updatable via a `readOnlyCompartment` reconfigure (no remount).
    */
-  @property({ type: Boolean, reflect: true }) readOnly: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'read-only' }) readOnly: boolean = false;
   /**
    * Editor height in pixels, applied to the wrapper's host box.
    */
@@ -147,11 +147,11 @@ export default class CodeMirror extends SignalWatcher(LitElement) {
   /**
    * When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. Runtime-updatable via a `baselineCompartment` reconfigure — toggling it swaps the bundle live, no remount required.
    */
-  @property({ type: Boolean, reflect: true }) basicSetup: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'basic-setup' }) basicSetup: boolean = false;
   /**
    * The 1-based line numbers that each get a custom gutter marker rendered by the `gutter` reactive multi-instance portal slot (one portal handle per visible marker). Out-of-range lines are ignored. Runtime-updatable via a `gutterCompartment` reconfigure — changing the array re-marks the lines with no remount. Only meaningful when the `gutter` slot is filled.
    */
-  @property({ type: Array }) gutterLines: any[] = [];
+  @property({ type: Array, attribute: 'gutter-lines' }) gutterLines: any[] = [];
   /**
    * An array of `{ from, to? }` **0-based document offsets** that each get an inline widget rendered by the `decoration` reactive multi-instance portal slot (one portal handle per visible widget). A point widget is placed at `from`; `to` is passed through in scope for the consumer's awareness. Compute an offset from a line via `view.state.doc.line(n).from`. Runtime-updatable via a `decorationCompartment` reconfigure. Only meaningful when the `decoration` slot is filled.
    */

@@ -316,6 +316,6 @@ When you drive `regions` as a controlled list, include a stable `id` on each des
 
 To render a waveform without decoding audio (CI, tests, SSR-adjacent), pass a pre-computed peaks array and a duration — no `src` needed:
 
-```ts
+```vue
 <Waveform :peaks="[/* -1..1 samples */]" :duration="8" />
 ```

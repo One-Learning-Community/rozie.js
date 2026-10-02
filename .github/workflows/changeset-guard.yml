@@ -74,6 +74,9 @@ on:
       - '.github/workflows/changeset-guard.yml'
       - '**/package.json'
       - 'packages/**'
+      # check-readme-jsx-props also validates docs/components/*.md examples
+      # against the compiled Props (release-0.8.0 audit C1/C2).
+      - 'docs/components/**'
   pull_request:
     paths:
       - '.changeset/**'
@@ -84,6 +87,9 @@ on:
       - '.github/workflows/changeset-guard.yml'
       - '**/package.json'
       - 'packages/**'
+      # check-readme-jsx-props also validates docs/components/*.md examples
+      # against the compiled Props (release-0.8.0 audit C1/C2).
+      - 'docs/components/**'
   workflow_dispatch:
 
 permissions:

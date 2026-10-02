@@ -421,7 +421,7 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
    * @example
    * <rozie-command-palette .defaultItems=${recentCommands} .items=${commands}></rozie-command-palette>
    */
-  @property({ type: Array }) defaultItems: any[] = [];
+  @property({ type: Array, attribute: 'default-items' }) defaultItems: any[] = [];
   /**
    * Placeholder text shown in the search input while the query is empty.
    */
@@ -429,45 +429,45 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   /**
    * Text shown when the query matches no items. Override the whole empty state with the `empty` slot when you need richer markup.
    */
-  @property({ type: String, reflect: true }) emptyText: string = 'No results.';
+  @property({ type: String, reflect: true, attribute: 'empty-text' }) emptyText: string = 'No results.';
   /**
    * Whether choosing an item closes the palette. Defaults to `true` (the cmdk convention); set to `false` to keep the palette open after a selection — e.g. for a multi-action menu where the user runs several commands in a row.
    */
-  @property({ type: Boolean, reflect: true }) closeOnSelect: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'close-on-select' }) closeOnSelect: boolean = true;
   /**
    * Accessible name for the dialog surface (`aria-label` on the `role="dialog"` panel). Override it to match the palette's purpose (e.g. "Search commands").
    */
-  @property({ type: String, reflect: true }) ariaLabel: string = 'Command palette';
+  @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string = 'Command palette';
   /**
    * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
-  @property({ type: String, reflect: true }) idBase: string = 'rozie-command-palette';
+  @property({ type: String, reflect: true, attribute: 'id-base' }) idBase: string = 'rozie-command-palette';
   /**
    * Debounce (ms) applied to a nested level's ASYNC `source(query)` keystroke refetch only — sync (`children`) levels re-rank locally on every keystroke with no debounce. Defaults to ~150ms (`internal/asyncSource.ts`'s `DEFAULT_SEARCH_DEBOUNCE`).
    * @example
    * <rozie-command-palette .searchDebounce=${300} .items=${commands}></rozie-command-palette>
    */
-  @property({ type: Number, reflect: true }) searchDebounce: number = 150;
+  @property({ type: Number, reflect: true, attribute: 'search-debounce' }) searchDebounce: number = 150;
   /**
    * The keyboard shortcut that opens the highlighted row's action menu — a portable `$mod+<letter>` token (default `"$mod+k"`, i.e. ⌘K/Ctrl+K) matched via `(event.metaKey || event.ctrlKey) && event.key === <letter>`. A bare single-letter token (e.g. `"k"`) matches with no modifier required. Pressing it (or caret-at-end Right-arrow, or clicking the row's actions affordance) on a row with no `actions` is a no-op — the menu only opens for a row that has them.
    * @example
    * <rozie-command-palette actionKey="$mod+j" .items=${commands}></rozie-command-palette>
    */
-  @property({ type: String, reflect: true }) actionKey: string = '$mod+k';
+  @property({ type: String, reflect: true, attribute: 'action-key' }) actionKey: string = '$mod+k';
   /**
    * Whether choosing an action closes the whole palette. Defaults to `true` — running an action ALWAYS closes the action menu itself; `closeOnAction` additionally decides whether the palette dismisses too (`false` returns to the result list with the palette still open, e.g. for firing several actions in a row).
    */
-  @property({ type: Boolean, reflect: true }) closeOnAction: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'close-on-action' }) closeOnAction: boolean = true;
   /**
    * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). `groupCap` composes with per-row `actions`: the ⌘K/Right-arrow row action menu always anchors to the exact highlighted VISIBLE row (cap-aware, order-independent), and firing it on a '+N more' row is a no-op.
    */
-  @property({ type: Number, reflect: true }) groupCap: number = 0;
+  @property({ type: Number, reflect: true, attribute: 'group-cap' }) groupCap: number = 0;
   /**
    * Where the overlay portals to, escaping an ancestor `overflow:hidden`/`transform`/`filter`/`contain` that would otherwise clip a `position:fixed` overlay (e.g. an embedding iframe/app-shell with its own layout chrome). `false`/absent (default) renders in place — byte-behavior-identical to every existing consumer, zero churn. `true` or `'body'` portals to `document.body`. A CSS selector string portals to the first element that selector matches. An `Element` reference portals to that element directly. SSR-safe: falls back to in-place when `document` is unavailable. Token-placement note: theming custom properties (`--rozie-command-palette-*`) must be set on `:root` (or the `appendTo` container itself) to reach a portalled overlay — a host-scoped token does not cross the portal on any target.
    * @example
    * <rozie-command-palette appendTo="body" .items=${commands}></rozie-command-palette>
    */
-  @property({ converter: { fromAttribute: (v: string | null) => (v === null ? false : v === 'true' ? true : v === 'false' ? false : v === '' ? true : v) } }) appendTo: boolean | string = false;
+  @property({ converter: { fromAttribute: (v: string | null) => (v === null ? false : v === 'true' ? true : v === 'false' ? false : v === '' ? true : v) }, attribute: 'append-to' }) appendTo: boolean | string = false;
   /**
    * Opt-in vertical windowing for a long list, resolved PER LEVEL — this prop is the ROOT level; a navigating item's own `virtual` field windows THAT child level instead. A virtual level renders FLAT: the auto-derived groups + `groupCap` + `#groupHeading` are inactive for that level (the vendored combobox's `isGrouped` requires `!virtual`) — popping back to a grouped non-virtual level restores its groups. Windowing needs a bounded scroll height — pair with `virtualMaxHeight`. Default `false` is byte-behavior-identical to today (non-windowed).
    * @example
@@ -479,13 +479,13 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
    * @example
    * <rozie-command-palette virtual virtualMaxHeight="320px" .items=${longCommandList}></rozie-command-palette>
    */
-  @property({ type: String, reflect: true }) virtualMaxHeight: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'virtual-max-height' }) virtualMaxHeight: string | null = null;
   /**
    * Estimated option row height (px) seeding the windowing engine, resolved PER LEVEL like `virtual` above. Unset falls back to the vendored combobox's own default (36px) — but command-palette rows are typically taller (an icon + a right-aligned hotkey badge), so a consumer windowing a real palette level should usually raise this.
    * @example
    * <rozie-command-palette virtual .virtualEstimateRowHeight=${44} .items=${longCommandList}></rozie-command-palette>
    */
-  @property({ type: Number, reflect: true }) virtualEstimateRowHeight: number | null = null;
+  @property({ type: Number, reflect: true, attribute: 'virtual-estimate-row-height' }) virtualEstimateRowHeight: number | null = null;
   private _activeValue = signal<any>(null);
   private _levelStack = signal<any[]>([]);
   private _activeSurface = signal('list');

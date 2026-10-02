@@ -53,7 +53,7 @@ export default class Column extends SignalWatcher(LitElement) {
   /**
    * The table-core aggregation for this column inside a group-header cell. Either a built-in name string — `'sum'` | `'min'` | `'max'` | `'extent'` | `'mean'` | `'median'` | `'unique'` | `'uniqueCount'` | `'count'` — or a custom function `(columnId, leafRows, childRows) => any` (defensively wrapped by the parent so a throw cannot crash grouping). Null → no aggregation (the group-header cell renders as a placeholder).
    */
-  @property({ type: String }) aggregationFn: string | (((...args: any[]) => any) | null) = null;
+  @property({ type: String, attribute: 'aggregation-fn' }) aggregationFn: string | (((...args: any[]) => any) | null) = null;
   /**
    * Whether this column's cells are editable (opt-in). Default `false` → the column is read-only and the display↔editor branch never mounts an editor. Bind `:editable="true"` (a bare attr only coerces on Vue+Lit).
    */
@@ -65,7 +65,7 @@ export default class Column extends SignalWatcher(LitElement) {
   /**
    * Options for `editor: 'select'` — `[{ value, label }]`. Empty for other editor types.
    */
-  @property({ type: Array }) editorOptions: any[] = [];
+  @property({ type: Array, attribute: 'editor-options' }) editorOptions: any[] = [];
   /**
    * Synchronous per-column validator `(value, row) => true | string`. A string return is the error message (the editor stays open and the aria-live region announces it). Null → no validation. The parent wraps it defensively against a thrown/non-bool/non-string return.
    */

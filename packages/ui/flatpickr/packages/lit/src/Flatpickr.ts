@@ -36,23 +36,23 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   /**
    * flatpickr date-format token string controlling how the value is formatted and parsed. Runtime-updatable via `set()`.
    */
-  @property({ type: String, reflect: true }) dateFormat: string = 'Y-m-d';
+  @property({ type: String, reflect: true, attribute: 'date-format' }) dateFormat: string = 'Y-m-d';
   /**
    * Show a human-readable alt input (formatted with `altFormat`) while submitting the machine-format value. flatpickr creates a hidden mirror input and moves the original `name` onto it. **Construction-time only** — re-key the component to retune live.
    */
-  @property({ type: Boolean, reflect: true }) altInput: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'alt-input' }) altInput: boolean = false;
   /**
    * Format token string for the human-readable alt input (used only when `altInput` is on).
    */
-  @property({ type: String, reflect: true }) altFormat: string = 'F j, Y';
+  @property({ type: String, reflect: true, attribute: 'alt-format' }) altFormat: string = 'F j, Y';
   /**
    * Add a time picker alongside the calendar. **Construction-time only** — re-key the component to retune live.
    */
-  @property({ type: Boolean, reflect: true }) enableTime: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'enable-time' }) enableTime: boolean = false;
   /**
    * Add a seconds input to the time picker (used with `enableTime`).
    */
-  @property({ type: Boolean, reflect: true }) enableSeconds: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'enable-seconds' }) enableSeconds: boolean = false;
   /**
    * Display time in 24-hour format instead of the AM/PM clock.
    */
@@ -60,15 +60,15 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   /**
    * Hide the calendar to make a time-only picker (pair with `enableTime`). **Construction-time only** — re-key the component to retune live.
    */
-  @property({ type: Boolean, reflect: true }) noCalendar: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'no-calendar' }) noCalendar: boolean = false;
   /**
    * Earliest selectable date (a `dateFormat`-formatted string). Runtime-updatable via `set()`.
    */
-  @property({ type: String, reflect: true }) minDate: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'min-date' }) minDate: string | null = null;
   /**
    * Latest selectable date (a `dateFormat`-formatted string). Runtime-updatable via `set()`.
    */
-  @property({ type: String, reflect: true }) maxDate: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'max-date' }) maxDate: string | null = null;
   /**
    * Placeholder text for the rendered input when no date is selected.
    */
@@ -80,7 +80,7 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   /**
    * When to commit the two-way `date` in `mode="range"`: `'complete'` (the default — only once both ends are picked) or `'change'` (on every click, including the partial first click). The `change` event always fires on every click regardless, so partial ranges are observable off the event without polluting the two-way value.
    */
-  @property({ type: String, reflect: true }) commitOn: string = 'complete';
+  @property({ type: String, reflect: true, attribute: 'commit-on' }) commitOn: string = 'complete';
   /**
    * Verbatim flatpickr options pass-through for anything the named props do not cover. It is spread **after** the named props, so a key here overrides the equivalent named prop on conflict.
    */
@@ -96,7 +96,7 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   /**
    * flatpickr's `static` option — positions the calendar relative to the input rather than absolutely off `<body>`. Exposed as `staticPosition` because `static` is a JS reserved word. **Construction-time only**.
    */
-  @property({ type: Boolean, reflect: true }) staticPosition: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'static-position' }) staticPosition: boolean = false;
   /**
    * Calendar popup position: `'auto'`, `'above'`, `'below'`, or per-axis forms like `'above center'`. **Construction-time only**.
    */
@@ -104,31 +104,31 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   /**
    * A DOM element to append the calendar popup to, useful for escaping `overflow: hidden` ancestors. **Construction-time only**.
    */
-  @property({ type: Object }) appendTo: any = null;
+  @property({ type: Object, attribute: 'append-to' }) appendTo: any = null;
   /**
    * Number of calendar months to render side by side. **Construction-time only**.
    */
-  @property({ type: Number, reflect: true }) showMonths: number = 1;
+  @property({ type: Number, reflect: true, attribute: 'show-months' }) showMonths: number = 1;
   /**
    * Show ISO week numbers down the left edge of the calendar. **Construction-time only**.
    */
-  @property({ type: Boolean, reflect: true }) weekNumbers: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'week-numbers' }) weekNumbers: boolean = false;
   /**
    * Month-selector style in the calendar header: `'dropdown'` or `'static'`. **Construction-time only**.
    */
-  @property({ type: String, reflect: true }) monthSelectorType: string = 'dropdown';
+  @property({ type: String, reflect: true, attribute: 'month-selector-type' }) monthSelectorType: string = 'dropdown';
   /**
    * HTML string for the previous-month navigation arrow, overriding flatpickr's built-in SVG. **Construction-time only**.
    */
-  @property({ type: String, reflect: true }) prevArrow: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'prev-arrow' }) prevArrow: string | null = null;
   /**
    * HTML string for the next-month navigation arrow, overriding flatpickr's built-in SVG. **Construction-time only**.
    */
-  @property({ type: String, reflect: true }) nextArrow: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'next-arrow' }) nextArrow: string | null = null;
   /**
    * Allow the user to type a date directly into the input instead of only picking from the calendar. **Construction-time only**.
    */
-  @property({ type: Boolean, reflect: true }) allowInput: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'allow-input' }) allowInput: boolean = false;
   /**
    * Dates to disable: a mixed array of `Date` objects, `"Y-m-d"` strings, `{ from, to }` range objects, and/or predicate functions `(date: Date) => boolean`. Runtime-updatable via `set()` — a runtime `disable: []` clears the exclusion set.
    */
@@ -144,15 +144,15 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   /**
    * First weekday of the calendar (`0` = Sunday … `1` = Monday). Folded into the `locale` option and overrides the locale's own first weekday when set. Runtime-updatable.
    */
-  @property({ type: Number, reflect: true }) firstDayOfWeek: number = 0;
+  @property({ type: Number, reflect: true, attribute: 'first-day-of-week' }) firstDayOfWeek: number = 0;
   /**
    * Custom parser `(dateStr: string, format: string) => Date` for input formats flatpickr's token grammar cannot express. **Construction-time only** — re-key the component to change it live.
    */
-  @property({ type: Function }) parseDate: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'parse-date' }) parseDate: ((...args: any[]) => any) | null = null;
   /**
    * Custom formatter `(date: Date, format: string, locale) => string` for output formats flatpickr's token grammar cannot express. **Construction-time only** — re-key the component to change it live.
    */
-  @property({ type: Function }) formatDate: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'format-date' }) formatDate: ((...args: any[]) => any) | null = null;
   /**
    * An array of flatpickr plugin instances (imported from `flatpickr/dist/plugins/…`); the headline use is `rangePlugin` for two-input ranges. **Construction-time only** — re-key the component to swap plugins live.
    */

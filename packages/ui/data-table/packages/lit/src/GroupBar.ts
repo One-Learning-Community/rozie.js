@@ -86,15 +86,15 @@ export default class GroupBar extends SignalWatcher(LitElement) {
   /**
    * The columns offered as grouping targets — `[{ id, label }]` — rendered as draggable chips.
    */
-  @property({ type: Array }) groupableColumns: any[] = [];
+  @property({ type: Array, attribute: 'groupable-columns' }) groupableColumns: any[] = [];
   /**
    * `(cols: string[]) => void` — the only add/reorder writer for the grouping order. Null-guarded at call sites.
    */
-  @property({ type: Function }) applyGrouping: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'apply-grouping' }) applyGrouping: ((...args: any[]) => any) | null = null;
   /**
    * `() => void` — the only clear writer; resets grouping to empty. Null-guarded at call sites.
    */
-  @property({ type: Function }) clearGrouping: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'clear-grouping' }) clearGrouping: ((...args: any[]) => any) | null = null;
   private _draggingId = signal('');
   private _isOver = signal(false);
   private _dragKind = signal('');

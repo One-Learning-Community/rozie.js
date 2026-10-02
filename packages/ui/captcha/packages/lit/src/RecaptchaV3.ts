@@ -40,7 +40,7 @@ export default class RecaptchaV3 extends SignalWatcher(LitElement) {
   /**
    * Opt in to running one `execute()` at mount and emitting `@verify` with the initial token. Off by default — v3 is imperative-first and tokens are short-lived (~2 min), so fetch one at the moment of submission rather than eagerly at mount.
    */
-  @property({ type: Boolean, reflect: true }) executeOnMount: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'execute-on-mount' }) executeOnMount: boolean = false;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

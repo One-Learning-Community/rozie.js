@@ -1067,13 +1067,13 @@ $effect(() => {
   let cancelled = false;
   const timer = setTimeout(() => {
     if (cancelled) return;
-    document.addEventListener('click', handler);
+    document.addEventListener('click', handler, { capture: true });
     attached = true;
   }, 0);
   return () => {
     cancelled = true;
     clearTimeout(timer);
-    if (attached) document.removeEventListener('click', handler);
+    if (attached) document.removeEventListener('click', handler, { capture: true });
   };
 });
 </script>

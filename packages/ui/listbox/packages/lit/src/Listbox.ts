@@ -165,19 +165,19 @@ export default class Listbox extends SignalWatcher(LitElement) {
   /**
    * Close the popup after a single-select commit. Defaults `true`; multi-select keeps the popup open regardless of this setting.
    */
-  @property({ type: Boolean, reflect: true }) closeOnSelect: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'close-on-select' }) closeOnSelect: boolean = true;
   /**
    * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
    */
-  @property({ type: Function }) optionLabel: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'option-label' }) optionLabel: ((...args: any[]) => any) | null = null;
   /**
    * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
    */
-  @property({ type: Function }) optionValue: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'option-value' }) optionValue: ((...args: any[]) => any) | null = null;
   /**
    * Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.
    */
-  @property({ type: Function }) optionDisabled: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'option-disabled' }) optionDisabled: ((...args: any[]) => any) | null = null;
   /**
    * Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Give each instance on a page a distinct id so these references stay unique.
    */
@@ -185,7 +185,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
   /**
    * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
    */
-  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
   /**
    * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed listbox. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.
    */
@@ -193,11 +193,11 @@ export default class Listbox extends SignalWatcher(LitElement) {
   /**
    * Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on.
    */
-  @property({ type: Number, reflect: true }) estimateRowHeight: number = 36;
+  @property({ type: Number, reflect: true, attribute: 'estimate-row-height' }) estimateRowHeight: number = 36;
   /**
    * A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-listbox-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
    */
-  @property({ type: String, reflect: true }) maxHeight: string = '';
+  @property({ type: String, reflect: true, attribute: 'max-height' }) maxHeight: string = '';
   private _open$local = signal(false);
   private _activeIndex = signal(-1);
   private _query = signal('');

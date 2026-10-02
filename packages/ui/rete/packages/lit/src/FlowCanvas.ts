@@ -426,7 +426,7 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   /**
    * Automatic typed-socket validation (default ON). When `true`, the canvas resolves each endpoint's port type from the per-`<NodeType>` `<Port type>` schema and auto-rejects a type-mismatched connection (firing `connection-rejected`). `canConnect` survives as the optional custom-rule override that runs in addition. Set `false` for pure-`canConnect` (type as metadata only).
    */
-  @property({ type: Boolean, reflect: true }) validateTypes: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'validate-types' }) validateTypes: boolean = true;
   /**
    * The viewport zoom level (two-way `r-model`). Scroll/pinch writes the new zoom back through the model (echo-guarded against the wrapper's own programmatic zooms); a consumer write zooms the live area. There is deliberately no `zoom`/`zoomed` emit — a same-named emit collides with the model on Vue and Angular — so the two-way binding is the channel for zoom changes.
    */
@@ -451,19 +451,19 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   /**
    * Minimum zoom level — the lower bound of the area's zoom restrictor. `0` disables the bound.
    */
-  @property({ type: Number, reflect: true }) minZoom: number = 0.1;
+  @property({ type: Number, reflect: true, attribute: 'min-zoom' }) minZoom: number = 0.1;
   /**
    * Maximum zoom level — the upper bound of the area's zoom restrictor. `0` disables the bound.
    */
-  @property({ type: Number, reflect: true }) maxZoom: number = 4;
+  @property({ type: Number, reflect: true, attribute: 'max-zoom' }) maxZoom: number = 4;
   /**
    * Snap-to-grid size in pixels for node dragging. `0` turns snapping off. Applied live — changing it after mount affects the next drag. Snapping applies to user drags only; positions applied from the bound `graph` are never snapped.
    */
-  @property({ type: Number, reflect: true }) snapGrid: number = 0;
+  @property({ type: Number, reflect: true, attribute: 'snap-grid' }) snapGrid: number = 0;
   /**
    * When selectable, hold Ctrl to add to the current selection instead of replacing it.
    */
-  @property({ type: Boolean, reflect: true }) accumulateOnCtrl: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'accumulate-on-ctrl' }) accumulateOnCtrl: boolean = true;
   /**
    * The bezier curvature of connection paths (`classicConnectionPath`).
    */
@@ -471,7 +471,7 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   /**
    * After the initial graph mounts, pan/zoom the viewport to fit all nodes (`AreaExtensions.zoomAt`).
    */
-  @property({ type: Boolean, reflect: true }) fitOnMount: boolean = true;
+  @property({ type: Boolean, reflect: true, attribute: 'fit-on-mount' }) fitOnMount: boolean = true;
   /**
    * Render the built-in Controls overlay — a zoom in / zoom out / fit-view button cluster (the React Flow `<Controls/>` parity). The buttons drive the same zoom/fit path as the `zoomTo`/`zoomToFit` handle verbs (clamped to `minZoom`/`maxZoom`) and stay enabled in `readonly`. Opt out with `:controls="false"`.
    */
@@ -487,7 +487,7 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   /**
    * Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule. Note: the mid-drag incompatible-port hint (dimmed target sockets while dragging) is resolved from port TYPES only — this predicate is evaluated once, at connection time, and is deliberately not invoked per-socket during a drag.
    */
-  @property({ type: Function }) canConnect: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'can-connect' }) canConnect: ((...args: any[]) => any) | null = null;
   /**
    * Undo/redo, on by default. Every gesture (drag, connect, disconnect, delete) pushes ONE capped (~100) snapshot of the bound graph (nodes incl. x/y + connections; not the viewport), and `undo()`/`redo()` plus Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, and Ctrl/Cmd+Y restore it through the two-way `graph` model (echo-guarded). One gesture = one undo step; a fresh edit after an undo discards the redo branch. Opt out with `:history="false"` (the snapshot stack stays empty and the verbs no-op).
    */
@@ -504,7 +504,7 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   /**
    * Render the opt-in NodeToolbar (default OFF) — a floating toolbar over the single selected node (positioned from the engine node-view rect + the area transform, re-tracked on pan/zoom/drag). Default content is Delete (cascading controlled-graph `deleteNode`) + Duplicate (clone the node spec at an offset with a new id into a fresh `graph` object); both fire `@node-action` (`name: 'delete' | 'duplicate'`). Override the content by filling the `#toolbar` reactive slot.
    */
-  @property({ type: Boolean, reflect: true }) nodeToolbar: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'node-toolbar' }) nodeToolbar: boolean = false;
   private _typeReg = signal<any>({});
   private _portReg = signal<any>({});
   @query('[data-rozie-ref="canvasEl"]') private _refCanvasEl!: HTMLElement;

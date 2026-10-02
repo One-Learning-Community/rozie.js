@@ -63,7 +63,7 @@ export default class Bar extends SignalWatcher(LitElement) {
   /**
    * The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).
    */
-  @property({ type: String, reflect: true }) updateMode?: string;
+  @property({ type: String, reflect: true, attribute: 'update-mode' }) updateMode?: string;
   /**
    * When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.
    */
@@ -71,15 +71,15 @@ export default class Bar extends SignalWatcher(LitElement) {
   /**
    * Accessible label applied to the `<canvas role="img">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
+  @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
   /**
    * The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the "first dataset copied over the others" hazard.
    */
-  @property({ type: String, reflect: true }) datasetIdKey: string = 'label';
+  @property({ type: String, reflect: true, attribute: 'dataset-id-key' }) datasetIdKey: string = 'label';
   /**
    * Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.
    */
-  @property({ type: Number, reflect: true }) destroyDelay: number = 0;
+  @property({ type: Number, reflect: true, attribute: 'destroy-delay' }) destroyDelay: number = 0;
   @query('[data-rozie-ref="canvasEl"]') private _refCanvasEl!: HTMLElement;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();

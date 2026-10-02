@@ -585,7 +585,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
   /**
    * Row-selection mode: `'none'` | `'single'` | `'multiple'`. `'multiple'` auto-injects a leading checkbox column with a select-all header.
    */
-  @property({ type: String, reflect: true }) selectionMode: string = 'none';
+  @property({ type: String, reflect: true, attribute: 'selection-mode' }) selectionMode: string = 'none';
   /**
    * `SortingState` — `[{ id, desc }]`. Uncontrolled fallback when unbound. Two-way: writes funnel a fresh value through the `sort-change` event regardless of binding.
    */
@@ -619,11 +619,11 @@ export default class DataTable extends SignalWatcher(LitElement) {
   /**
    * Total server-side row count for `manual` pagination; lets the table compute page count when it doesn't hold the full dataset.
    */
-  @property({ type: Number, reflect: true }) rowCount: number | null = null;
+  @property({ type: Number, reflect: true, attribute: 'row-count' }) rowCount: number | null = null;
   /**
    * Explicit total page count for `manual` pagination; overrides rowCount-derived count.
    */
-  @property({ type: Number, reflect: true }) pageCount: number | null = null;
+  @property({ type: Number, reflect: true, attribute: 'page-count' }) pageCount: number | null = null;
   /**
    * Opt-in **expandable rows**. When `true`, a leading chevron expander column auto-injects (after the select column) and `getExpandedRowModel` activates; default `false` is byte-identical-off. Every row can expand to reveal a `#detail` panel unless `getSubRows` is supplied (then only rows with children expand). Pass `expandable` as a real boolean — a valueless attribute only coerces to `true` on Vue and Lit.
    */
@@ -636,11 +636,11 @@ export default class DataTable extends SignalWatcher(LitElement) {
   /**
    * Row identity `(originalRow, index, parentRow?) => string | number` — the key `rowSelection`, `expanded` and the per-row caches use. Default null → table-core keys rows by position (`"0"`, `"1"`, … and `"0.1"` for sub-rows), so inserting or removing rows above a selected or expanded row moves that state onto whatever row now sits at its index. Supply it whenever rows can be added or removed while state is held (server push, live lists); the result is coerced to a string.
    */
-  @property({ type: Function }) getRowId: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'get-row-id' }) getRowId: ((...args: any[]) => any) | null = null;
   /**
    * Table-level child-row accessor `(originalRow, index) => TData[] | undefined` that drives nested sub-rows. When supplied (with `expandable`), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the `#detail` scoped slot is the expand mode.
    */
-  @property({ type: Function }) getSubRows: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'get-sub-rows' }) getSubRows: ((...args: any[]) => any) | null = null;
   /**
    * Opt-in gate for the **headless `#groupBar`** host region. Default `false` is byte-identical-off. `getGroupedRowModel` is wired unconditionally (inert when `grouping` is empty), so grouping is driven by the `grouping` model; this flag only gates the consumer-facing group-bar surface (the component ships **no** built-in drag UI).
    */
@@ -684,15 +684,15 @@ export default class DataTable extends SignalWatcher(LitElement) {
   /**
    * Pure-CSS sticky header: the `<thead>` sticks to the top of the scroll container.
    */
-  @property({ type: Boolean, reflect: true }) stickyHeader: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'sticky-header' }) stickyHeader: boolean = false;
   /**
    * `'table'` (default, row-oriented, byte-behaviorally identical to a plain accessible table) | `'grid'` — lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)**: `role="grid"`, a roving single tab-stop, 2-D APG arrow-key cell navigation, range selection, and clipboard support.
    */
-  @property({ type: String, reflect: true }) interactionMode: string = 'table';
+  @property({ type: String, reflect: true, attribute: 'interaction-mode' }) interactionMode: string = 'table';
   /**
    * Grid mode only. When `true`, a plain click on an **editable** cell opens its editor immediately (single-click-to-edit) instead of just activating the cell. Default `false` keeps click-to-activate (double-click opens the editor). Shift+click (range selection) and clicks on non-editable cells are unaffected.
    */
-  @property({ type: Boolean, reflect: true }) singleClickEdit: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'single-click-edit' }) singleClickEdit: boolean = false;
   /**
    * Grid mode. When `true`, every committed data mutation (cell/row edit, paste, fill, cut, clear) becomes one undo step: Ctrl/Cmd+Z undoes, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redoes. Default `false` records no history and Ctrl+Z/Y are inert.
    */
@@ -700,7 +700,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
   /**
    * The maximum number of undo steps retained (oldest evicted past this depth). Only consulted when `undoable` is `true`.
    */
-  @property({ type: Number, reflect: true }) undoLimit: number = 100;
+  @property({ type: Number, reflect: true, attribute: 'undo-limit' }) undoLimit: number = 100;
   /**
    * Opt-in windowing grammar: `false` (default, off — byte-identical to a non-virtual table) | `true` or `'rows'` (vertical row windowing; `true` is byte-behavior-identical to every existing consumer, zero churn) | `'columns'` (horizontal column windowing) | `'both'` (both axes windowed). Row windowing renders only the visible slice of rows inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Column windowing renders only the visible slice of leaf columns inside the same `rdt-scroll` container. An unrecognised string behaves as `false`.
    */
@@ -708,15 +708,15 @@ export default class DataTable extends SignalWatcher(LitElement) {
   /**
    * Estimated row height (px) — the first-paint seed for the windowing engine before any row has been measured. Only consulted when rows are windowed. When `autoMeasure` is `true`, later renders progressively refine the estimate from measured content; when `autoMeasure` is `false` this remains the explicit override for every render.
    */
-  @property({ type: Number, reflect: true }) estimateRowHeight: number = 40;
+  @property({ type: Number, reflect: true, attribute: 'estimate-row-height' }) estimateRowHeight: number = 40;
   /**
    * Opt-in content-driven row-size estimation. When `true`, the windowing engine feeds `estimateSize()` a running mean of measured row heights instead of the fixed `estimateRowHeight` seed, so `getTotalSize()` converges to the true content total on a large table with variable-height rows. Falls back to `estimateRowHeight` before any row has been measured. Default `false` keeps the estimate fixed at `estimateRowHeight` for every render (today's behavior).
    */
-  @property({ type: Boolean, reflect: true }) autoMeasure: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'auto-measure' }) autoMeasure: boolean = false;
   /**
    * A CSS length string bounding the `rdt-scroll` container when `virtual` is on (e.g. `'400px'`). Mirrored to the `--rozie-data-table-max-height` custom property; the prop wins, the token is the fallback.
    */
-  @property({ type: String, reflect: true }) maxHeight: string = '';
+  @property({ type: String, reflect: true, attribute: 'max-height' }) maxHeight: string = '';
   private _dataDefault = signal<any[]>([]);
   private _sortingDefault = signal<any[]>([]);
   private _globalFilterDefault = signal('');

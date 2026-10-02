@@ -38,7 +38,7 @@ export default class Layer extends SignalWatcher(LitElement) {
   /**
    * Insert this layer immediately **before** the layer with this id, controlling draw order (the `addLayer` `beforeId` argument). Omit to append on top.
    */
-  @property({ type: String, reflect: true }) beforeId?: string;
+  @property({ type: String, reflect: true, attribute: 'before-id' }) beforeId?: string;
 private __rozieWatchInitial_0 = true;
 private __rozieFirstUpdateDone = false;
 private __rozieCtxConsumer_maplibre_source = new ContextConsumer(this, { context: __rozieCtx_maplibre_source, subscribe: true });

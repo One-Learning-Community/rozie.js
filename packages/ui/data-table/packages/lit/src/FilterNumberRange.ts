@@ -12,7 +12,7 @@ export default class FilterNumberRange extends SignalWatcher(LitElement) {
   /**
    * The column id (mirrors the `#filter` slot scope) — used as the filter key and the input `aria-label` base.
    */
-  @property({ type: String, reflect: true }) columnId: string = '';
+  @property({ type: String, reflect: true, attribute: 'column-id' }) columnId: string = '';
   /**
    * The table-core column object (opaque passthrough from the `#filter` slot scope).
    */
@@ -24,15 +24,15 @@ export default class FilterNumberRange extends SignalWatcher(LitElement) {
   /**
    * `(columnId, value) => void` — apply the column filter as a `[min, max]` tuple (each side coerced to a Number or `undefined`, so a one-sided range works); both empty clears the filter. Null-guarded at call sites.
    */
-  @property({ type: Function }) setFilter: ((...args: any[]) => any) | null = null;
+  @property({ type: Function, attribute: 'set-filter' }) setFilter: ((...args: any[]) => any) | null = null;
   /**
    * The faceted `[min, max]` bounds for this column (`[number, number]` or null) — drives the input placeholders only.
    */
-  @property({ type: Object }) minMax: unknown = null;
+  @property({ type: Object, attribute: 'min-max' }) minMax: unknown = null;
   /**
    * The column's human header, forwarded by the `#filter` slot scope — used as the control's accessible name in place of the internal column id.
    */
-  @property({ type: String, reflect: true }) columnLabel: string = '';
+  @property({ type: String, reflect: true, attribute: 'column-label' }) columnLabel: string = '';
   private _minDraft = signal('');
   private _maxDraft = signal('');
   private _touched = signal(false);
