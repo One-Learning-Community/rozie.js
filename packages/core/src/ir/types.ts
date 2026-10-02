@@ -84,6 +84,18 @@ export interface IRComponent {
    */
   emitDecls: EmitDecl[] | null;
   /**
+   * Removed-member tombstones (`<props>` / `<emits>` entries of the form
+   * `name: { removed: '<msg>' }`) in declaration order — props first, then
+   * events. They are NOT in `props` / `emits` / `emitDecls`, so no target
+   * gives them any runtime presence; only the React / Solid / Svelte props
+   * interfaces read them (`<key>?: never` under `@deprecated <msg>`). The
+   * field is ABSENT (not `[]`) when the component has none, so every other
+   * component's IR stays byte-identical.
+   *
+   * @experimental — added in quick 261002-ekf (F8)
+   */
+  removedMembers?: RemovedMember[];
+  /**
    * Phase 21 — `$expose({...})` method names in source order; `[]` when no
    * `$expose` call. NOT deduped via Set — `{ name, sourceLoc }` objects survive
    * in source order so emitters + the handle-type synthesizer can resolve each
@@ -1556,6 +1568,20 @@ export type { IRNodeId } from '../reactivity/ReactiveDepGraph.js';
 export interface TypesBlockIR {
   statements: import('@babel/types').Statement[]; // validated, source order
   exportedNames: string[]; // names re-exported from each leaf entry
+  sourceLoc: SourceLoc;
+}
+
+/**
+ * A removed-member tombstone — see `IRComponent.removedMembers`.
+ *
+ * @experimental — added in quick 261002-ekf (F8)
+ */
+export interface RemovedMember {
+  kind: 'prop' | 'event';
+  /** The prop name, or the DOM-facing event name (each target derives its handler key). */
+  name: string;
+  /** The author's `removed:` message — rendered as `@deprecated <message>`. */
+  message: string;
   sourceLoc: SourceLoc;
 }
 

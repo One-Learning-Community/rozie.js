@@ -97,6 +97,30 @@ function locFromNodeOffset(node: t.Node, baseOffset: number): SourceLoc {
 }
 
 /**
+ * Quick 261002-ekf (F8) — ROZ158: a `$props.x` / `$model.x` reference to a
+ * `<props>` removed-member tombstone. Returns true when it reported (the
+ * caller then skips its unknown-ref diagnostic).
+ */
+function pushRemovedPropDiagnostic(
+  ctx: ValidatorContext,
+  accessor: '$props' | '$model',
+  member: string,
+  loc: SourceLoc,
+): boolean {
+  const removed = ctx.bindings.removedProps.get(member);
+  if (removed === undefined) return false;
+  ctx.diagnostics.push({
+    code: RozieErrorCode.REMOVED_MEMBER_REFERENCED,
+    severity: 'error',
+    message: `'${accessor}.${member}' references a prop that <props> declares removed${removed.message ? ` — ${removed.message}` : ''}. A removed prop has no runtime value.`,
+    loc,
+    hint: `Use the replacement named in the tombstone's message, or delete the \`${member}: { removed: … }\` entry if the prop is live again.`,
+    related: [{ message: 'Tombstone declared here', loc: removed.sourceLoc }],
+  });
+  return true;
+}
+
+/**
  * Phase 18 (D-08): emit the right `$model.<x>` diagnostic.
  *
  * `$model`'s valid keys are exactly the `model: true` subset of <props>:
@@ -113,6 +137,7 @@ function pushModelDiagnostic(
   member: string,
   loc: SourceLoc,
 ): void {
+  if (pushRemovedPropDiagnostic(ctx, '$model', member, loc)) return;
   const decl = ctx.bindings.props.get(member);
   if (decl && !decl.isModel) {
     // Declared prop, but not model: true — ROZ205.
@@ -219,6 +244,9 @@ function checkMemberExpression(
     // only via $slots[''] which is computed access — already filtered above).
     if (member === '') return;
     known = ctx.bindings.slots.has(member);
+  }
+  if (!known && scope === 'props' && pushRemovedPropDiagnostic(ctx, '$props', member, locFromNodeOffset(node, baseOffset))) {
+    return;
   }
   if (!known) {
     pushUnknownMagicDiagnostic(ctx, scope, member, locFromNodeOffset(node, baseOffset));

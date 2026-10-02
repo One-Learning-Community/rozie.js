@@ -250,6 +250,16 @@ export interface BindingsTable {
    */
   exposeSignatures: Map<string, { node: StringLiteral }>;
   /**
+   * `<props>` removed-member tombstones (`name: { removed: … }`) — kept OUT of
+   * `props` so a tombstone is never a live binding. Keyed by prop name; the
+   * value is the raw entry (shape validated at lowering, ROZ159) plus the
+   * message when it is a string literal. `$props.x` / `$model.x` of a key here
+   * is ROZ158 rather than an unknown-ref error.
+   *
+   * @experimental — added in quick 261002-ekf (F8)
+   */
+  removedProps: Map<string, RemovedPropEntry>;
+  /**
    * Phase 21 — extracted `$expose({...})` key names from the canonical
    * top-level call, in source order. `[]` when no `$expose` call.
    */
@@ -287,4 +297,17 @@ export interface BindingsTable {
    * Quick plan 260515-u2b.
    */
   watchers: WatchEntry[];
+}
+
+/**
+ * One `<props>` removed-member tombstone (see `BindingsTable.removedProps`).
+ *
+ * @experimental — added in quick 261002-ekf (F8)
+ */
+export interface RemovedPropEntry {
+  name: string;
+  decl: import('@babel/types').ObjectProperty;
+  /** The `removed:` value when it is a string literal; `null` otherwise. */
+  message: string | null;
+  sourceLoc: SourceLoc;
 }

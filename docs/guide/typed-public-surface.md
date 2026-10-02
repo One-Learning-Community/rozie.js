@@ -139,6 +139,41 @@ When `<emits>` is absent, nothing changes: event names are inferred from the `$e
 
 Event names may be kebab-case. The name in `<emits>` is the DOM-facing name, and each target derives its own spelling from it (`row-open` becomes `onRowOpen` on React and Solid, `onrowopen` on Svelte).
 
+### Removed members {#removed-members}
+
+When you remove or rename an event or a prop, keep a **tombstone** for at least one release so a typed consumer who still passes the old name gets an error that names the replacement:
+
+```js
+<emits>
+{
+  change: { removed: 'Removed in 0.3.0 — use the `open` model change event (onOpenChange).' },
+}
+</emits>
+
+<props>
+{
+  oldName: { removed: 'Renamed to `newName`.' },
+  newName: { type: String, default: '' },
+}
+</props>
+```
+
+On React, Solid and Svelte the props interface gains the old key typed `never`, with the message as its `@deprecated` note:
+
+```ts
+/**
+ * @deprecated Removed in 0.3.0 — use the `open` model change event (onOpenChange).
+ */
+onChange?: never;   // Svelte: onchange?: never;
+```
+
+That matters most when attribute fallthrough is on, which makes the root element's HTML attributes part of the props type: without the tombstone, `<Popover onChange={…}>` would type-check as the native DOM `change` handler and never fire. The tombstone key is also left out of the `Omit<…>` HTML base, so the old name is rejected. The `.d.rozie.ts` sidecar carries the same members.
+
+- A tombstone has no runtime presence on any target: no event, output, prop, input or property is generated for it. Vue, Angular and Lit don't change. Their surfaces don't pass `on*` keys through a typed HTML base, so there is nothing to block.
+- A tombstone is exactly `{ removed: '<message>' }`. Pairing `removed` with `payload`, `docs`, `type`, `default`, `model` or `required`, or using a message that is not a non-empty string, is an error, [ROZ159](/reference/diagnostics).
+- A tombstone is not a live member. `$emit` of a removed event, or reading or writing `$props.x` / `$model.x` for a removed prop, is an error, [ROZ158](/reference/diagnostics). A removed event is not reported as declared-but-never-emitted (ROZ152).
+- Tombstones are not written to `rozie-manifest.json` and don't appear in the generated props and events tables.
+
 ## Slot parameter types {#slot-parameter-types}
 
 Add `:param-types` to a `<slot>` to type the values it passes.
@@ -234,3 +269,5 @@ Every code below is listed in the [diagnostics reference](/reference/diagnostics
 | [ROZ155](/reference/diagnostics) | error | an `$expose` signature names a verb that is not exposed |
 | [ROZ156](/reference/diagnostics) | error | the `$expose` second argument is not an object literal of function-type strings |
 | [ROZ157](/reference/diagnostics) | warning | a `$emit` call's argument count does not match the declared payload |
+| [ROZ158](/reference/diagnostics) | error | the component itself uses a member it declares removed (`$emit` of a removed event, `$props`/`$model` of a removed prop) |
+| [ROZ159](/reference/diagnostics) | error | a removed-member tombstone is not exactly `{ removed: '<message>' }` |

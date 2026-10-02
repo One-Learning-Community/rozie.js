@@ -53,6 +53,23 @@ export function collectPropDecls(props: PropsAST, bindings: BindingsTable): void
     if (FORBIDDEN_KEYS.has(name)) continue;
 
     const value = prop.value;
+
+    // Quick 261002-ekf (F8) — a `removed:` key makes the entry a tombstone: it
+    // is never a live prop binding (no runtime presence on any target). The
+    // shape is validated at lowering (ROZ159).
+    if (t.isObjectExpression(value)) {
+      const removedProp = findInnerProperty(value, 'removed');
+      if (removedProp) {
+        bindings.removedProps.set(name, {
+          name,
+          decl: prop,
+          message: t.isStringLiteral(removedProp.value) ? removedProp.value.value : null,
+          sourceLoc: locFromBabel(prop),
+        });
+        continue;
+      }
+    }
+
     let typeIdentifier: string | null = null;
     let defaultExpression: t.Expression | null = null;
     let docsExpression: t.Expression | null = null;

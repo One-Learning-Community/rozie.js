@@ -107,6 +107,10 @@ export {
   renderHtmlAttrsBaseType,
   renderHtmlAttrsExtends,
 } from './codegen/htmlAttrsExtends.js';
+// Quick 261002-ekf (F8) — removed-member tombstones (`<key>?: never` under
+// `@deprecated <msg>`) for the React/Solid/Svelte props interfaces.
+// @experimental — shape may change before v1.0
+export { renderRemovedMemberFields } from './codegen/renderRemovedMembers.js';
 export type { CompileOptions, CompileResult, CompileTarget } from './compile.js';
 // Phase 6 — public compile() entrypoint (DIST-01 / D-80).
 // Single source of truth for `.rozie` → per-target compilation. Consumed by
@@ -190,6 +194,8 @@ export type {
   // ../../core/src/ir/types.js path. Failing this re-creates the .d.ts divergence
   // bug 07.1 fixed.
   SlotFillerDecl,
+  // Quick 261002-ekf (F8) — the element type of `IRComponent.removedMembers`.
+  RemovedMember,
   StateDecl,
   StyleSection,
   TemplateConditionalIR,

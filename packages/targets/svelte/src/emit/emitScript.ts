@@ -47,6 +47,7 @@ import {
   exposeSignatureOverload,
   renderEmitHandlerType,
   renderHtmlAttrsExtends,
+  renderRemovedMemberFields,
   resolveAttrsFallthroughRoot,
   exposedVerbSurface,
 } from '@rozie/core';
@@ -704,6 +705,11 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
     lines.push(`  ${onName}?: ${renderEmitHandlerType(ir.emitDecls?.find((d) => d.name === e))};`);
   }
 
+  // Quick 261002-ekf (F8) — removed-member tombstones: `onchange?: never` /
+  // `oldName?: never` under `@deprecated <msg>` (also Omitted from the
+  // `svelte/elements` base). [] ⇒ byte-identical.
+  lines.push(...renderRemovedMemberFields(ir, svelteCallbackPropName, lines));
+
   // Synthesized `on<key>change` callback for each re-exposed model prop (a
   // model written by a child `bind:` — KanbanColumn `cards`, WrapperModal
   // `open`). Svelte models carry no change EVENT on their own; this restores
@@ -1001,6 +1007,7 @@ function emitPropsBlock(ir: IRComponent): string {
     ir.props.length === 0 &&
     ir.slots.length === 0 &&
     ir.emits.length === 0 &&
+    (ir.removedMembers?.length ?? 0) === 0 &&
     !hasAttrsFallthrough
   ) {
     return '';

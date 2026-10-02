@@ -32,7 +32,8 @@ import type { IRComponent, RefDecl, SetupBody, StyleSection } from './types.js';
 import { analyzeAST } from '../semantic/analyze.js';
 import { buildReactiveDepGraph } from '../reactivity/buildDepGraph.js';
 import { lowerProps } from './lowerers/lowerProps.js';
-import { lowerTypesBlock, lowerEmitsBlock, validateEmitCompleteness } from './lowerers/lowerTypesAndEmits.js';
+import { lowerTypesBlock, lowerEmitsBlock, lowerRemovedProps, validateEmitCompleteness } from './lowerers/lowerTypesAndEmits.js';
+import type { EmitsLoweringNotes } from './lowerers/lowerTypesAndEmits.js';
 import { lowerData } from './lowerers/lowerData.js';
 import { lowerScript } from './lowerers/lowerScript.js';
 import { lowerListeners } from './lowerers/lowerListeners.js';
@@ -255,7 +256,7 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
       });
     }
   }
-  const emitsNotes = { malformed: new Set<string>(), invalidPayload: new Set<string>() };
+  const emitsNotes: EmitsLoweringNotes = { malformed: new Set<string>(), invalidPayload: new Set<string>() };
   const emitDecls = lowerEmitsBlock(ast.emits, diagnostics, emitsNotes);
   validateEmitCompleteness(
     emitDecls,
@@ -265,6 +266,9 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     emitDecls !== null ? collectEmitCallSites(ast) : [],
     emitsNotes,
   );
+  // Quick 261002-ekf (F8) — removed-member tombstones: props first, then
+  // events. Attached ONLY when non-empty so every other IR stays identical.
+  const removedMembers = [...lowerRemovedProps(bindings.removedProps, diagnostics), ...(emitsNotes.removed ?? [])];
 
   const ir: IRComponent = {
     type: 'IRComponent',
@@ -283,6 +287,7 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     // Typed public surface (P1) — null when the block is absent.
     types,
     emitDecls,
+    ...(removedMembers.length > 0 ? { removedMembers } : {}),
     // Phase 21 — $expose({...}) method names in source order; [] when no
     // $expose call. NOT Set-deduped (per-name sourceLoc + source order must
     // survive); every emitter branches on expose.length === 0 (D-02).

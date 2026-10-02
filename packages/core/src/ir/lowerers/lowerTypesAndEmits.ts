@@ -1,7 +1,8 @@
 import * as t from '@babel/types';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
-import type { EmitDecl, PropDocs, TypesBlockIR } from '../types.js';
+import type { EmitDecl, PropDocs, RemovedMember, TypesBlockIR } from '../types.js';
+import type { RemovedPropEntry } from '../../semantic/types.js';
 import type { SourceLoc } from '../../ast/types.js';
 import type { TypesAST } from '../../ast/blocks/TypesAST.js';
 import type { EmitsAST } from '../../ast/blocks/EmitsAST.js';
@@ -43,6 +44,70 @@ function keyName(p: t.ObjectProperty): string | null {
 export interface EmitsLoweringNotes {
   malformed: Set<string>;
   invalidPayload: Set<string>;
+  /**
+   * `<emits>` removed-member tombstones (`name: { removed: '<msg>' }`), in
+   * declaration order. Kept OUT of the returned `EmitDecl[]`, so a tombstone
+   * has no runtime presence and is never counted by ROZ152; a `$emit` of one
+   * is ROZ158. Optional so existing callers keep compiling.
+   *
+   * @experimental — added in quick 261002-ekf (F8)
+   */
+  removed?: RemovedMember[];
+}
+
+/**
+ * Quick 261002-ekf (F8) — validate a removed-member tombstone object
+ * (`{ removed: '<msg>' }`) for `<props>` or `<emits>`. Reports ONE ROZ159 when
+ * the entry carries any key besides `removed` or the message is not a
+ * non-empty string literal. Returns the message (or `null` when unusable).
+ */
+function validateTombstone(
+  obj: t.ObjectExpression,
+  ownerLabel: string,
+  loc: SourceLoc,
+  diagnostics: Diagnostic[],
+): string | null {
+  const problems: string[] = [];
+  let message: string | null = null;
+  for (const member of obj.properties) {
+    const k = t.isObjectProperty(member) ? keyName(member) : null;
+    if (k === 'removed' && t.isObjectProperty(member)) {
+      if (t.isStringLiteral(member.value) && member.value.value.trim() !== '') message = member.value.value;
+      else problems.push('its `removed:` message must be a non-empty string literal');
+      continue;
+    }
+    problems.push(k === null ? 'it has a spread, method or computed key' : `it also declares \`${k}\``);
+  }
+  if (problems.length > 0) {
+    diagnostics.push({
+      code: RozieErrorCode.REMOVED_MEMBER_INVALID,
+      severity: 'error',
+      message: `${ownerLabel} is a removed-member tombstone, but ${problems.join(' and ')}. A tombstone is exactly \`{ removed: '<message>' }\`.`,
+      loc,
+      hint: "Write `{ removed: 'Renamed to `x`.' }` — the message becomes the consumer-facing @deprecated note.",
+    });
+  }
+  return message;
+}
+
+/**
+ * Quick 261002-ekf (F8) — lower `<props>` tombstones collected into
+ * `bindings.removedProps` (ROZ159 on a malformed shape).
+ *
+ * @experimental — added in quick 261002-ekf (F8)
+ */
+export function lowerRemovedProps(
+  removedProps: ReadonlyMap<string, RemovedPropEntry>,
+  diagnostics: Diagnostic[],
+): RemovedMember[] {
+  const out: RemovedMember[] = [];
+  for (const entry of removedProps.values()) {
+    if (!t.isObjectExpression(entry.decl.value)) continue; // collector only admits object values
+    const message = validateTombstone(entry.decl.value, `<props> \`${entry.name}\``, entry.sourceLoc, diagnostics);
+    if (message === null) continue;
+    out.push({ kind: 'prop', name: entry.name, message, sourceLoc: entry.sourceLoc });
+  }
+  return out;
 }
 
 export function lowerEmitsBlock(
@@ -67,6 +132,14 @@ export function lowerEmitsBlock(
     if (!t.isObjectExpression(prop.value)) {
       notes.malformed.add(name);
       bad(prop.value, `<emits> \`${name}\` must be an object: \`{}\` or \`{ payload: '<TS type>', docs: {...} }\`.`);
+      continue;
+    }
+    // Quick 261002-ekf (F8) — a `removed:` key makes the entry a tombstone:
+    // no EmitDecl (no runtime presence, not counted by ROZ152).
+    if (prop.value.properties.some((p) => t.isObjectProperty(p) && keyName(p) === 'removed')) {
+      const message = validateTombstone(prop.value, `<emits> \`${name}\``, babelLocToRozieLoc(prop), diagnostics);
+      if (message === null) notes.malformed.add(name);
+      else (notes.removed ??= []).push({ kind: 'event', name, message, sourceLoc: babelLocToRozieLoc(prop) });
       continue;
     }
     let payload: t.TSType | null = null;
@@ -125,10 +198,21 @@ export function validateEmitCompleteness(
     diagnostics.push({ code: RozieErrorCode.EMIT_UNDECLARED, severity: 'error',
       message: `\`$emit('${used}')\` names an event that <emits> does not declare. When <emits> is present it is the complete event list.`,
       loc, hint: `Add \`${used}: {}\` (or \`${used}: { payload: '<type>' }\`) to <emits>.` });
+  const removed = new Map((notes.removed ?? []).map((r) => [r.name, r] as const));
+  const removedEmitted = (r: RemovedMember, loc: SourceLoc) =>
+    diagnostics.push({ code: RozieErrorCode.REMOVED_MEMBER_REFERENCED, severity: 'error',
+      message: `\`$emit('${r.name}')\` fires an event that <emits> declares removed — ${r.message} A removed event has no runtime presence on any target.`,
+      loc, hint: `Fire the replacement named in the tombstone's message, or delete the \`${r.name}: { removed: … }\` entry if the event is live again.`,
+      related: [{ message: 'Tombstone declared here', loc: r.sourceLoc }] });
   const located = new Set<string>();
   for (const site of callSites) {
     located.add(site.name);
     if (notes.malformed.has(site.name)) continue;
+    const tomb = removed.get(site.name);
+    if (tomb !== undefined) {
+      removedEmitted(tomb, site.loc);
+      continue;
+    }
     const decl = declared.get(site.name);
     if (decl === undefined) {
       undeclared(site.name, site.loc);
@@ -152,6 +236,11 @@ export function validateEmitCompleteness(
   }
   for (const used of usedNames) {
     if (located.has(used) || declared.has(used) || notes.malformed.has(used)) continue;
+    const tomb = removed.get(used);
+    if (tomb !== undefined) {
+      removedEmitted(tomb, emitsLoc ?? { start: 0, end: 0 });
+      continue;
+    }
     undeclared(used, emitsLoc ?? { start: 0, end: 0 });
   }
   for (const d of decls) {

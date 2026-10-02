@@ -36,6 +36,7 @@ import { isSlotNameIdentifier } from './slotNameIdentifier.js';
 import { lowerSlotParamType } from './slotParamTypeLowering.js';
 import { renderRecordKey } from './escapeSingleQuotedKey.js';
 import { renderHtmlAttrsExtends, type HtmlAttrsTarget } from './htmlAttrsExtends.js';
+import { renderRemovedMemberFields } from './renderRemovedMembers.js';
 import { indentContinuation, printTSType } from './renderAuthoredType.js';
 import { renderTypesBlock } from './renderTypesBlock.js';
 import { propsInterfaceName } from './generatedTypeNames.js';
@@ -231,6 +232,19 @@ export function renderPropsInterface(
     lines.push(
       `  ${handlerName}?: ${renderEmitHandlerType(ir.emitDecls?.find((d) => d.name === e))};`,
     );
+  }
+
+  // Quick 261002-ekf (F8) — removed-member tombstones (`<key>?: never` under
+  // `@deprecated`) on the targets whose interface extends the native attrs
+  // (the same `htmlAttrs` gate), so a removed `onChange` cannot fall into the
+  // native passthrough. Mirrors the inline emitters; [] ⇒ byte-identical.
+  if (opts.htmlAttrs !== undefined) {
+    const handlerFor = (e: string) => {
+      const pascal = toPascalCase(e);
+      if (pascal.length === 0) return '';
+      return opts.emitHandlerName ? opts.emitHandlerName(e) : `on${pascal}`;
+    };
+    lines.push(...renderRemovedMemberFields(ir, handlerFor, lines.slice(1)));
   }
 
   // Slots per D-84 + D-86. The slot-children type token is the per-target

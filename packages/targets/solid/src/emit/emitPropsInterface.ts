@@ -16,7 +16,7 @@
  */
 import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation, SlotDecl } from '@rozie/core';
-import { buildPropJsdoc, renderEmitHandlerType, renderHtmlAttrsExtends } from '@rozie/core';
+import { buildPropJsdoc, renderEmitHandlerType, renderHtmlAttrsExtends, renderRemovedMemberFields } from '@rozie/core';
 // WR-05 fix (79-REVIEW-FIX): was a local copy of this exact one-line
 // escaping predicate — consolidated into core; see that module's doc
 // comment for why (drift risk on shared, security-relevant escaping logic).
@@ -236,6 +236,17 @@ export function emitPropsInterface(
       `  on${eventPascal}?: ${renderEmitHandlerType(ir.emitDecls?.find((d) => d.name === e))};`,
     );
   }
+
+  // Quick 261002-ekf (F8) — removed-member tombstones: `onChange?: never` /
+  // `oldName?: never` under `@deprecated <msg>` (also Omitted from the native
+  // attrs base below). [] ⇒ byte-identical.
+  fields.push(
+    ...renderRemovedMemberFields(
+      ir,
+      (e) => (toPascalCase(e).length === 0 ? '' : `on${toPascalCase(e)}`),
+      fields,
+    ),
+  );
 
   // Slots — use slotPropFields when provided (P2 filled by emitSlotDecl).
   if (slotPropFields !== undefined) {

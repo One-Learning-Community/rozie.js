@@ -24,7 +24,7 @@
  */
 import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation } from '@rozie/core';
-import { buildPropJsdoc, renderEmitHandlerType, renderHtmlAttrsExtends } from '@rozie/core';
+import { buildPropJsdoc, renderEmitHandlerType, renderHtmlAttrsExtends, renderRemovedMemberFields } from '@rozie/core';
 import { buildSlotsRecordType } from './refineSlotTypes.js';
 import { propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
@@ -165,6 +165,18 @@ export function emitPropsInterface(ir: IRComponent, slotPropFields?: string[]): 
       `  on${eventPascal}?: ${renderEmitHandlerType(ir.emitDecls?.find((d) => d.name === e))};`,
     );
   }
+
+  // Quick 261002-ekf (F8) — removed-member tombstones: `onChange?: never` /
+  // `oldName?: never` under `@deprecated <msg>`, so a removed member is
+  // rejected with the author's note instead of falling into the native attrs
+  // passthrough (it is also listed in the `Omit<…>` below). [] ⇒ byte-identical.
+  fields.push(
+    ...renderRemovedMemberFields(
+      ir,
+      (e) => (toPascalCase(e).length === 0 ? '' : `on${toPascalCase(e)}`),
+      fields,
+    ),
+  );
 
   // Slots — Plan 04-03 fills slotPropFields via emitSlotDecl(ir).
   // Backward-compat fallback: if no slotPropFields passed, fall through to the

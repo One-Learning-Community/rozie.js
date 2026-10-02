@@ -669,6 +669,12 @@ export const RozieErrorCode = {
   EXPOSE_SIGNATURE_UNKNOWN_VERB: 'ROZ155', // error — an $expose signature key (second argument) names a verb that the first argument does not expose.
   EXPOSE_SIGNATURES_INVALID: 'ROZ156', // error — the $expose second argument must be an object literal mapping exposed verbs to string-literal TypeScript function types, e.g. $expose({ gotoDate }, { gotoDate: '(date: DateInput) => void' }); it is compile-time only.
   EMIT_PAYLOAD_ARITY: 'ROZ157', // warning — with <emits> present, a $emit call's argument count disagrees with the declaration: arguments passed to an event declared without a payload, no argument for an event that declares one, or more than one payload argument. The typed leaf build can reject the call on some targets while others accept it silently; make the call match the declared payload.
+  // Removed-member tombstones (quick 261002-ekf F8) — `name: { removed: '<msg>' }`
+  // in <emits> / <props> keeps a removed or renamed member visible to typed
+  // React/Solid/Svelte consumers (`<handler>?: never` + `@deprecated <msg>`) with
+  // no runtime presence on any target.
+  REMOVED_MEMBER_REFERENCED: 'ROZ158', // error — the component itself uses a member it declares removed: $emit('x') of an <emits> tombstone, or a $props.x / $model.x read or write of a <props> tombstone. The tombstone has no runtime presence; fire or read the replacement named in its message instead.
+  REMOVED_MEMBER_INVALID: 'ROZ159', // error — a removed-member tombstone is malformed: it must be exactly `{ removed: '<non-empty message>' }` — no payload/docs (<emits>) or type/default/model/required/docs (<props>) alongside `removed`, and the message must be a non-empty string literal.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // error — SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
