@@ -19,4 +19,4 @@ Before this, `Popover` could only measure its own anchor wrapper, which holds wh
 
 The click-outside listener now receives the DOM event on every framework.
 
-This release has no breaking changes. `reference` defaults to `null`, which keeps the built-in anchor and behaves exactly as before.
+`reference` is additive: it defaults to `null`, which keeps the built-in anchor and behaves exactly as before. (This popover release does carry one breaking change, the removal of the `change` event; see its own entry.)

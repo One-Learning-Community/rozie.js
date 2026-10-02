@@ -92,6 +92,6 @@ Untyped-handler convergence (the one planned typing change for components that d
 
 `@rozie-ui/popover-*` and `@rozie-ui/fullcalendar-*` adopt the features and are bumped minor, because typed events can reject a previously accepted wrong-typed handler:
 
-- popover: `change` is typed `boolean`, the `anchor` slot context is typed, and the handle (`show`, `hide`, `toggle`, `reposition`) is typed.
+- popover: the `anchor` slot context is typed (including the new `panelId: string`) and the handle (`show`, `hide`, `toggle`, `reposition`) is typed. Its open state's change event is the `open` model's (Lit: `open-change`, now in `RoziePopoverEventMap` as `CustomEvent<boolean>`).
 - fullcalendar: 11 typed events (for example `eventClick` with `jsEvent: MouseEvent | KeyboardEvent`, and `unselect` with `jsEvent: UIEvent | null`), 10 typed portal slot arguments and 16 typed handle verbs. The `<types>` names are re-exported from every package entry, and the package barrels re-export the handle types and Lit event maps.
 - Both families generate their README event tables from `<emits>` and no longer ship `scripts/event-manifest.mjs`.
