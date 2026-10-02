@@ -9,6 +9,13 @@ import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock'
 // The <dialog> element, cached by sync() so $onUnmount can reach it without
 // reading $refs during teardown.
 
+/** Why the dialog closed: a scrim click, the Escape key, or a programmatic `hide()`. */
+export type DialogCloseReason = 'backdrop' | 'escape' | 'programmatic';
+/** The `close` event payload. */
+export interface DialogClosePayload {
+  reason: DialogCloseReason;
+}
+
 interface DefaultCtx {}
 
 @Component({
@@ -121,7 +128,7 @@ export class Dialog {
    */
   ariaLabelledby = input<(string) | null>(null);
   panelEl = viewChild<ElementRef<HTMLDivElement>>('panelEl');
-  close = output<unknown>();
+  close = output<DialogClosePayload>();
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   __rozieFills = contentChildren(RozieSlot, { descendants: true });

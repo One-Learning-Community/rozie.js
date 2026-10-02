@@ -7,6 +7,13 @@ import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock'
 // The <dialog> element, cached by sync() so $onUnmount can reach it without
 // reading $refs during teardown.
 
+/** Why the dialog closed: a scrim click, the Escape key, or a programmatic `hide()`. */
+export type DialogCloseReason = 'backdrop' | 'escape' | 'programmatic';
+/** The `close` event payload. */
+export interface DialogClosePayload {
+  reason: DialogCloseReason;
+}
+
 __rozieInjectStyle('Dialog-2a679072', `@media (prefers-reduced-motion: no-preference) {
   .rozie-dialog[data-rozie-s-2a679072] {
     transition: opacity var(--rozie-dialog-transition, var(--rdg-transition, 0.15s ease)), transform var(--rozie-dialog-transition, var(--rdg-transition, 0.15s ease)), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
@@ -93,7 +100,7 @@ interface DialogProps extends Omit<import('solid-js').ComponentProps<'dialog'>, 
    * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog.
    */
   ariaLabelledby?: (string) | null;
-  onClose?: (...args: any[]) => void;
+  onClose?: (payload: DialogClosePayload) => void;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;

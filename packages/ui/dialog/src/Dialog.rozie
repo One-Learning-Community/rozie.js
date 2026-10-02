@@ -49,6 +49,13 @@
 
 <rozie name="Dialog">
 
+<types>
+/** Why the dialog closed: a scrim click, the Escape key, or a programmatic `hide()`. */
+export type DialogCloseReason = 'backdrop' | 'escape' | 'programmatic'
+/** The `close` event payload. */
+export interface DialogClosePayload { reason: DialogCloseReason }
+</types>
+
 <props>
 {
   // Visibility (two-way). The sole model:true prop. Read $props.open; write
@@ -128,6 +135,12 @@
   },
 }
 </props>
+
+<emits>
+{
+  close: { payload: 'DialogClosePayload', docs: { description: 'Fired whenever the dialog dismisses: through a backdrop click, the Escape key, or a programmatic `hide()`. The payload is `{ reason }`.' } },
+}
+</emits>
 
 <script lang="ts">
 import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock'

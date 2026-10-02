@@ -8,6 +8,13 @@ import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock'
 // The <dialog> element, cached by sync() so $onUnmount can reach it without
 // reading $refs during teardown.
 
+/** Why the dialog closed: a scrim click, the Escape key, or a programmatic `hide()`. */
+export type DialogCloseReason = 'backdrop' | 'escape' | 'programmatic';
+/** The `close` event payload. */
+export interface DialogClosePayload {
+  reason: DialogCloseReason;
+}
+
 interface DialogProps extends Omit<import('react').ComponentPropsWithoutRef<'dialog'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'disableBackdropClose' | 'disableEscapeClose' | 'disableScrollLock' | 'initialFocus' | 'ariaLabel' | 'ariaLabelledby' | 'onClose' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.
@@ -43,7 +50,7 @@ interface DialogProps extends Omit<import('react').ComponentPropsWithoutRef<'dia
    * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog.
    */
   ariaLabelledby?: (string) | null;
-  onClose?: (...args: any[]) => void;
+  onClose?: (payload: DialogClosePayload) => void;
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }

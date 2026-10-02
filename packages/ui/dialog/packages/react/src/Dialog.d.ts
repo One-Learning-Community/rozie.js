@@ -2,6 +2,13 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
+/** Why the dialog closed: a scrim click, the Escape key, or a programmatic `hide()`. */
+export type DialogCloseReason = 'backdrop' | 'escape' | 'programmatic';
+/** The `close` event payload. */
+export interface DialogClosePayload {
+  reason: DialogCloseReason;
+}
+
 export interface DialogProps extends Omit<import('react').ComponentPropsWithoutRef<'dialog'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'disableBackdropClose' | 'disableEscapeClose' | 'disableScrollLock' | 'initialFocus' | 'ariaLabel' | 'ariaLabelledby' | 'onClose' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.
@@ -37,7 +44,7 @@ export interface DialogProps extends Omit<import('react').ComponentPropsWithoutR
    * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog.
    */
   ariaLabelledby?: (string) | null;
-  onClose?: (...args: any[]) => void;
+  onClose?: (payload: DialogClosePayload) => void;
   children?: ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

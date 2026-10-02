@@ -8,6 +8,18 @@ import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock'
 // The <dialog> element, cached by sync() so $onUnmount can reach it without
 // reading $refs during teardown.
 
+/** Why the dialog closed: a scrim click, the Escape key, or a programmatic `hide()`. */
+export type DialogCloseReason = 'backdrop' | 'escape' | 'programmatic';
+/** The `close` event payload. */
+export interface DialogClosePayload {
+  reason: DialogCloseReason;
+}
+
+export interface RozieDialogEventMap extends Omit<HTMLElementEventMap, 'close' | 'open-change'> {
+  'close': CustomEvent<DialogClosePayload>;
+  'open-change': CustomEvent<boolean>;
+}
+
 @customElement('rozie-dialog')
 export default class Dialog extends SignalWatcher(LitElement) {
   static styles = css`
@@ -269,7 +281,7 @@ private __rozieWatchInitial_0 = true;
   // ---- close funnel (single $emit site) ----------------------------------
   closeWith = (reason: any) => {
   this._openControllable.write(false);
-  this.dispatchEvent(new CustomEvent("close", {
+  this.dispatchEvent(new CustomEvent<DialogClosePayload>("close", {
     detail: {
       reason
     },
@@ -311,6 +323,17 @@ private __rozieWatchInitial_0 = true;
 
   get open(): boolean { return this._openControllable.read(); }
   set open(v: boolean) { this._openControllable.notifyPropertyWrite(v); }
+
+  addEventListener<K extends keyof RozieDialogEventMap>(type: K, listener: (this: Dialog, ev: RozieDialogEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
+    super.addEventListener(type, listener, options);
+  }
+  removeEventListener<K extends keyof RozieDialogEventMap>(type: K, listener: (this: Dialog, ev: RozieDialogEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    super.removeEventListener(type, listener, options);
+  }
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the

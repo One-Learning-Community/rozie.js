@@ -1,3 +1,11 @@
+<script module lang="ts">
+/** Why the dialog closed: a scrim click, the Escape key, or a programmatic `hide()`. */
+export type DialogCloseReason = 'backdrop' | 'escape' | 'programmatic';
+/** The `close` event payload. */
+export interface DialogClosePayload {
+  reason: DialogCloseReason;
+}
+</script>
 <script lang="ts">
 import { applyListeners } from '@rozie/runtime-svelte';
 
@@ -39,7 +47,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['dialo
   ariaLabelledby?: (string) | null;
   children?: Snippet;
   snippets?: Record<string, any>;
-  onclose?: (...args: any[]) => void;
+  onclose?: (payload: DialogClosePayload) => void;
 }
 
 let {

@@ -50,6 +50,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { typedSurfaceBarrelLines } from '../../typed-surface-barrel.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -151,14 +152,17 @@ function main() {
     // `$expose` handle), forwarded verbatim; Lit's handle IS the element.
     if (cfg.build === 'tsdown') {
       const barrel =
-        (target === 'react' || target === 'solid') && ir.expose.length > 0
+        ((target === 'react' || target === 'solid') && ir.expose.length > 0
           ? `export { default as Dialog } from './Dialog';\n` +
             `export { default } from './Dialog';\n\n` +
             `/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
               .map((m) => m.name)
               .join(', ')} }. */\n` +
             `export type { DialogHandle } from './Dialog';\n`
-          : `export { default as Dialog } from './Dialog';\nexport { default } from './Dialog';\n`;
+          : `export { default as Dialog } from './Dialog';\nexport { default } from './Dialog';\n`) +
+        // `<types>` names (DialogCloseReason / DialogClosePayload) + Lit's
+        // RozieDialogEventMap via the shared helper (the popover precedent).
+        typedSurfaceBarrelLines(target, ir, 'Dialog');
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 

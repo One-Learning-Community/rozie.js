@@ -9,8 +9,19 @@
 
 </template>
 
+<script lang="ts">
+/** Why the dialog closed: a scrim click, the Escape key, or a programmatic `hide()`. */
+export type DialogCloseReason = 'backdrop' | 'escape' | 'programmatic';
+/** The `close` event payload. */
+export interface DialogClosePayload {
+  reason: DialogCloseReason;
+}
+</script>
+
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+
+import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock';
 
 const props = withDefaults(
   defineProps<{
@@ -52,7 +63,7 @@ const props = withDefaults(
 const open = defineModel<boolean>('open', { default: false });
 
 const emit = defineEmits<{
-  close: [...args: any[]];
+  close: [payload: DialogClosePayload];
 }>();
 
 defineSlots<{
@@ -61,7 +72,6 @@ defineSlots<{
 
 const panelElRef = ref<HTMLElement>();
 
-import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock';
 // ---- native reconcile ---------------------------------------------------
 // The <dialog> element, cached by sync() so $onUnmount can reach it without
 // reading $refs during teardown.
