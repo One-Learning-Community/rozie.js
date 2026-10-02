@@ -1,5 +1,11 @@
 # @rozie-ui/pdf-angular
 
+## 0.2.9
+
+### Patch Changes
+
+- @rozie/runtime-angular@0.8.0
+
 ## 0.2.8
 
 ### Patch Changes

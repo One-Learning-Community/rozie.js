@@ -1,5 +1,11 @@
 # @rozie-ui/tags-angular
 
+## 0.1.12
+
+### Patch Changes
+
+- @rozie/runtime-angular@0.8.0
+
 ## 0.1.11
 
 ### Patch Changes

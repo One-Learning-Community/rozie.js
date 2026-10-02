@@ -1,5 +1,11 @@
 # @rozie-ui/codemirror-svelte
 
+## 0.1.6
+
+### Patch Changes
+
+- @rozie/runtime-svelte@0.8.0
+
 ## 0.1.5
 
 ### Patch Changes

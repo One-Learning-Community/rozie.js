@@ -1,5 +1,12 @@
 # @rozie-ui/data-table-angular
 
+## 0.7.1
+
+### Patch Changes
+
+- b58f9bb: Accept `@rozie-ui/popover-<framework>` 0.3 as a peer dependency, alongside the 0.2 range (and, for data-table, the 0.1 range). Popover 0.3 adds the `reference` prop; the popover features these components already use are unchanged.
+  - @rozie/runtime-angular@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes

@@ -1,5 +1,13 @@
 # @rozie-ui/chartjs-lit
 
+## 0.1.11
+
+### Patch Changes
+
+- f19abdb: Regenerated with kebab-case attributes for multi-word props: a prop such as `idBase` is now observed as `id-base` (it was the lowercased `idbase`), matching the model props and what a Rozie consumer writes. **If you set one of these from raw HTML with the lowercased or camelCase name, switch to the kebab attribute** (or set the property). Single-word props are unchanged.
+- Updated dependencies [a83d077]
+  - @rozie/runtime-lit@0.8.0
+
 ## 0.1.10
 
 ### Patch Changes

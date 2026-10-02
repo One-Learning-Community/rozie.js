@@ -1,5 +1,11 @@
 # @rozie-ui/codemirror-solid
 
+## 0.1.11
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.8.0
+
 ## 0.1.10
 
 ### Patch Changes

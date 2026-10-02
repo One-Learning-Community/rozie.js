@@ -1,5 +1,11 @@
 # @rozie-ui/date-picker-vue
 
+## 0.1.9
+
+### Patch Changes
+
+- @rozie/runtime-vue@0.8.0
+
 ## 0.1.8
 
 ### Patch Changes
