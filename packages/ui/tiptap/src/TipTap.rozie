@@ -67,6 +67,12 @@
 
 <rozie name="TipTap" inherit-attrs="false" inherit-listeners="false" adopt-document-styles>
 
+<types>
+import type { Editor } from '@tiptap/core'
+/** The `error` event payload: which optional extension chunk failed to load, and the load error. */
+export interface TipTapErrorPayload { extension: 'floatingMenu' | 'image' | 'count'; error: unknown }
+</types>
+
 <props>
 {
   html: {
@@ -219,6 +225,17 @@
   },
 }
 </data>
+
+<emits>
+{
+  update:          { payload: 'string', docs: { description: 'Fired on every content change with the new HTML. The same HTML is written to the two-way `html` model.' } },
+  selectionUpdate: { docs: { description: 'Fired when the selection (caret or range) changes. Carries no payload; read the editor state through the handle or the toolbar slot.' } },
+  focus:           { docs: { description: 'Fired when the editor gains focus.' } },
+  blur:            { docs: { description: 'Fired when the editor loses focus.' } },
+  ready:           { payload: 'Editor', docs: { description: 'Fired once the TipTap editor is constructed, with the live `Editor` instance.' } },
+  error:           { payload: 'TipTapErrorPayload', docs: { description: 'Fired when an optional extension chunk (floating menu, image, character count) fails to load. The editor still constructs without it. The payload is `{ extension, error }`.' } },
+}
+</emits>
 
 <script>
 import { Editor, Node } from '@tiptap/core'

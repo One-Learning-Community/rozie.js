@@ -42,6 +42,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { typedSurfaceBarrelLines } from '../../typed-surface-barrel.mjs';
 import { buildCustomElementsManifest } from './cem.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -126,14 +127,17 @@ function main() {
     // element itself, so the plain barrel is correct there.
     if (cfg.build === 'tsdown') {
       const barrel =
-        (target === 'react' || target === 'solid') && ir.expose.length > 0
+        ((target === 'react' || target === 'solid') && ir.expose.length > 0
           ? `export { default as TipTap } from './TipTap';\n` +
             `export { default } from './TipTap';\n\n` +
             `/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
               .map((m) => m.name)
               .join(', ')} }. */\n` +
             `export type { TipTapHandle } from './TipTap';\n`
-          : `export { default as TipTap } from './TipTap';\nexport { default } from './TipTap';\n`;
+          : `export { default as TipTap } from './TipTap';\nexport { default } from './TipTap';\n`) +
+        // `<types>` names (TipTapErrorPayload) + Lit's RozieTipTapEventMap via the
+        // shared helper (the popover precedent).
+        typedSurfaceBarrelLines(target, ir, 'TipTap');
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 

@@ -30,6 +30,12 @@ import { BubbleMenu } from '@tiptap/extension-bubble-menu';
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
 
+/** The `error` event payload: which optional extension chunk failed to load, and the load error. */
+export interface TipTapErrorPayload {
+  extension: 'floatingMenu' | 'image' | 'count';
+  error: unknown;
+}
+
 interface CountCtx { characters: any; words: any; maxLength: any; over: any; }
 
 interface ToolbarCtx { editor: any; }
@@ -111,12 +117,12 @@ interface TipTapProps {
    * <TipTap bubbleMenuShouldShow={({ editor }) => editor.isActive('table')} />
    */
   bubbleMenuShouldShow?: ((...args: any[]) => any) | null;
-  onUpdate?: (...args: any[]) => void;
-  onSelectionUpdate?: (...args: any[]) => void;
-  onFocus?: (...args: any[]) => void;
-  onBlur?: (...args: any[]) => void;
-  onReady?: (...args: any[]) => void;
-  onError?: (...args: any[]) => void;
+  onUpdate?: (payload: string) => void;
+  onSelectionUpdate?: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  onReady?: (payload: Editor) => void;
+  onError?: (payload: TipTapErrorPayload) => void;
   renderCount?: (ctx: CountCtx) => ReactNode;
   renderToolbar?: (ctx: ToolbarCtx) => ReactNode;
   renderBubbleMenu?: (ctx: BubbleMenuCtx) => ReactNode;

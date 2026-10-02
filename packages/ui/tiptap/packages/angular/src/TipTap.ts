@@ -28,6 +28,12 @@ import { BubbleMenu } from '@tiptap/extension-bubble-menu';
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
 
+/** The `error` event payload: which optional extension chunk failed to load, and the load error. */
+export interface TipTapErrorPayload {
+  extension: 'floatingMenu' | 'image' | 'count';
+  error: unknown;
+}
+
 interface CountCtx {
   $implicit: { characters: any; words: any; maxLength: any; over: any };
   characters: any;
@@ -353,12 +359,12 @@ export class TipTap {
   });
   toolbarEl = viewChild<ElementRef<HTMLDivElement>>('toolbarEl');
   editorEl = viewChild<ElementRef<HTMLDivElement>>('editorEl');
-  update = output<unknown>();
+  update = output<string>();
   selectionUpdate = output<void>();
   focus = output<void>();
   blur = output<void>();
-  ready = output<unknown>();
-  error = output<unknown>();
+  ready = output<Editor>();
+  error = output<TipTapErrorPayload>();
   @ContentChild('count', { read: TemplateRef }) countTpl?: TemplateRef<CountCtx>;
   @ContentChild('toolbar', { read: TemplateRef }) toolbarTpl?: TemplateRef<ToolbarCtx>;
   @ContentChild('bubbleMenu', { read: TemplateRef }) bubbleMenuTpl?: TemplateRef<BubbleMenuCtx>;

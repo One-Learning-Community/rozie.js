@@ -1,3 +1,10 @@
+<script module lang="ts">
+/** The `error` event payload: which optional extension chunk failed to load, and the load error. */
+export interface TipTapErrorPayload {
+  extension: 'floatingMenu' | 'image' | 'count';
+  error: unknown;
+}
+</script>
 <script lang="ts">
 import { rozieDisplay } from '@rozie/runtime-svelte';
 
@@ -81,12 +88,12 @@ interface Props {
   linkEditor?: Snippet<[{ editor: any; href: any; attrs: any; setLink: any; unsetLink: any; close: any }]>;
   nodeView?: Snippet<[{ node: any; selected: any; updateAttributes: any; getPos: any; editor: any; contentDOM: any }]>;
   snippets?: Record<string, any>;
-  onupdate?: (...args: any[]) => void;
-  onselectionupdate?: (...args: any[]) => void;
-  onfocus?: (...args: any[]) => void;
-  onblur?: (...args: any[]) => void;
-  onready?: (...args: any[]) => void;
-  onerror?: (...args: any[]) => void;
+  onupdate?: (payload: string) => void;
+  onselectionupdate?: () => void;
+  onfocus?: () => void;
+  onblur?: () => void;
+  onready?: (payload: Editor) => void;
+  onerror?: (payload: TipTapErrorPayload) => void;
 }
 
 let __defaultEditorProps = (() => ({}))();

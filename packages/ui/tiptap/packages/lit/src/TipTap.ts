@@ -27,6 +27,22 @@ import { BubbleMenu } from '@tiptap/extension-bubble-menu';
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
 
+/** The `error` event payload: which optional extension chunk failed to load, and the load error. */
+export interface TipTapErrorPayload {
+  extension: 'floatingMenu' | 'image' | 'count';
+  error: unknown;
+}
+
+export interface RozieTipTapEventMap extends Omit<HTMLElementEventMap, 'update' | 'selection-update' | 'focus' | 'blur' | 'ready' | 'error' | 'html-change'> {
+  'update': CustomEvent<string>;
+  'selection-update': CustomEvent<undefined>;
+  'focus': CustomEvent<undefined>;
+  'blur': CustomEvent<undefined>;
+  'ready': CustomEvent<Editor>;
+  'error': CustomEvent<TipTapErrorPayload>;
+  'html-change': CustomEvent<string>;
+}
+
 interface ReactivePortalHandle {
   update(scope: unknown): void;
   dispose(): void;
@@ -692,7 +708,7 @@ private portals = {
           if (next !== this.html) this._htmlControllable.write(next);
           this.refreshCount();
           this.refreshLink();
-          this.dispatchEvent(new CustomEvent("update", {
+          this.dispatchEvent(new CustomEvent<string>("update", {
             detail: next,
             bubbles: true,
             composed: true
@@ -797,7 +813,7 @@ private portals = {
           if (this.linkInputEl) this.linkInputEl.value = this.editor.getAttributes('link').href || '';
         }
       }
-      this.dispatchEvent(new CustomEvent("ready", {
+      this.dispatchEvent(new CustomEvent<Editor>("ready", {
         detail: this.editor,
         bubbles: true,
         composed: true
@@ -829,7 +845,7 @@ private portals = {
     const onOptionalExtensionFailed = (name: any) => (err: any) => {
       if (!disposed) {
         console.error(`[@rozie-ui/tiptap] optional extension "${name}" failed to load — constructing without it.`, err);
-        this.dispatchEvent(new CustomEvent("error", {
+        this.dispatchEvent(new CustomEvent<TipTapErrorPayload>("error", {
           detail: {
             extension: name,
             error: err
@@ -1737,6 +1753,17 @@ private portals = {
 
   get html(): string { return this._htmlControllable.read(); }
   set html(v: string) { this._htmlControllable.notifyPropertyWrite(v); }
+
+  addEventListener<K extends keyof RozieTipTapEventMap>(type: K, listener: (this: TipTap, ev: RozieTipTapEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
+    super.addEventListener(type, listener, options);
+  }
+  removeEventListener<K extends keyof RozieTipTapEventMap>(type: K, listener: (this: TipTap, ev: RozieTipTapEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    super.removeEventListener(type, listener, options);
+  }
 }
 
 injectGlobalStyles('rozie-tip-tap-232c67e9-global', `

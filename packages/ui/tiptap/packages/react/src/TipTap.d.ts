@@ -2,6 +2,13 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
+import type { Editor } from '@tiptap/core';
+/** The `error` event payload: which optional extension chunk failed to load, and the load error. */
+export interface TipTapErrorPayload {
+  extension: 'floatingMenu' | 'image' | 'count';
+  error: unknown;
+}
+
 export interface TipTapProps {
   /**
    * The editor's document content as an HTML string — the sole `model: true` prop (two-way `r-model`). Typing writes the new HTML back through the model path (TipTap's `onUpdate`); a consumer write reflects into the live document, echo-guarded so a programmatic set does not reset the selection or re-emit `update`.
@@ -71,12 +78,12 @@ export interface TipTapProps {
    * <TipTap bubbleMenuShouldShow={({ editor }) => editor.isActive('table')} />
    */
   bubbleMenuShouldShow?: ((...args: any[]) => any) | null;
-  onUpdate?: (...args: any[]) => void;
-  onSelectionUpdate?: (...args: any[]) => void;
-  onFocus?: (...args: any[]) => void;
-  onBlur?: (...args: any[]) => void;
-  onReady?: (...args: any[]) => void;
-  onError?: (...args: any[]) => void;
+  onUpdate?: (payload: string) => void;
+  onSelectionUpdate?: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  onReady?: (payload: Editor) => void;
+  onError?: (payload: TipTapErrorPayload) => void;
   renderCount?: (params: { characters: unknown; words: unknown; maxLength: number; over: unknown }) => ReactNode;
   renderToolbar?: (params: { editor: unknown }) => ReactNode;
   renderBubbleMenu?: (params: { editor: unknown }) => ReactNode;

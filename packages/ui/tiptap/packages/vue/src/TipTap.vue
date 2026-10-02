@@ -36,10 +36,39 @@
 
 </template>
 
-<script setup lang="ts">
-defineOptions({ inheritAttrs: false });
+<script lang="ts">
+/** The `error` event payload: which optional extension chunk failed to load, and the load error. */
+export interface TipTapErrorPayload {
+  extension: 'floatingMenu' | 'image' | 'count';
+  error: unknown;
+}
+</script>
 
+<script setup lang="ts">
 import { Fragment, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
+
+import { Editor, Node } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+import { Placeholder } from '@tiptap/extensions';
+// Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
+// @tiptap/extensions), version-pinned in lockstep with @tiptap/core (3.23.5).
+// Both export their extension as a NAMED export (`BubbleMenu` / `FloatingMenu`)
+// — verified against the installed dist .d.ts — and are `.configure({ element })`
+// Extensions that own Floating-UI positioning and append the host element to the
+// editor's parent automatically (no manual document insertion needed).
+//
+// BubbleMenu is imported statically and is a REQUIRED peer: the built-in link editor
+// is a BubbleMenu surface mounted on every editor. The three extensions below are
+// OPTIONAL peers and are loaded with a dynamic import() only when their feature is
+// used (see $onMount) — a static import would make every consumer install them
+// whatever `peerDependenciesMeta` says (packages/ui/tiptap/tests/lazy-extensions.test.ts):
+//   - @tiptap/extension-floating-menu   → the `floatingMenu` slot is filled
+//   - @tiptap/extension-image           → `uploadImage` is set (named export `Image`)
+//   - @tiptap/extension-character-count → `maxLength` is set or the `count` slot is filled
+// Each is version-pinned in lockstep with @tiptap/core and read by its named export.
+import { BubbleMenu } from '@tiptap/extension-bubble-menu';
+
+defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(
   defineProps<{
@@ -115,12 +144,12 @@ const props = withDefaults(
 const html = defineModel<string>('html', { default: '<p>Start writing…</p>' });
 
 const emit = defineEmits<{
-  update: [...args: any[]];
-  selectionUpdate: [...args: any[]];
-  focus: [...args: any[]];
-  blur: [...args: any[]];
-  ready: [...args: any[]];
-  error: [...args: any[]];
+  update: [payload: string];
+  selectionUpdate: [];
+  focus: [];
+  blur: [];
+  ready: [payload: Editor];
+  error: [payload: TipTapErrorPayload];
 }>();
 
 defineSlots<{
@@ -253,26 +282,6 @@ onBeforeUnmount(() => {
   portalContainers.clear();
 });
 
-import { Editor, Node } from '@tiptap/core';
-import StarterKit from '@tiptap/starter-kit';
-import { Placeholder } from '@tiptap/extensions';
-// Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
-// @tiptap/extensions), version-pinned in lockstep with @tiptap/core (3.23.5).
-// Both export their extension as a NAMED export (`BubbleMenu` / `FloatingMenu`)
-// — verified against the installed dist .d.ts — and are `.configure({ element })`
-// Extensions that own Floating-UI positioning and append the host element to the
-// editor's parent automatically (no manual document insertion needed).
-//
-// BubbleMenu is imported statically and is a REQUIRED peer: the built-in link editor
-// is a BubbleMenu surface mounted on every editor. The three extensions below are
-// OPTIONAL peers and are loaded with a dynamic import() only when their feature is
-// used (see $onMount) — a static import would make every consumer install them
-// whatever `peerDependenciesMeta` says (packages/ui/tiptap/tests/lazy-extensions.test.ts):
-//   - @tiptap/extension-floating-menu   → the `floatingMenu` slot is filled
-//   - @tiptap/extension-image           → `uploadImage` is set (named export `Image`)
-//   - @tiptap/extension-character-count → `maxLength` is set or the `count` slot is filled
-// Each is version-pinned in lockstep with @tiptap/core and read by its named export.
-import { BubbleMenu } from '@tiptap/extension-bubble-menu';
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).

@@ -27,6 +27,12 @@ import { BubbleMenu } from '@tiptap/extension-bubble-menu';
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
 
+/** The `error` event payload: which optional extension chunk failed to load, and the load error. */
+export interface TipTapErrorPayload {
+  extension: 'floatingMenu' | 'image' | 'count';
+  error: unknown;
+}
+
 __rozieInjectStyle('TipTap-2aeee876', `.rozie-tiptap[data-rozie-s-2aeee876] {
   border: var(--rozie-tiptap-border, var(--rtt-border, 1px solid rgba(0, 0, 0, 0.15)));
   border-radius: var(--rozie-tiptap-radius, 6px);
@@ -235,12 +241,12 @@ interface TipTapProps {
    * <TipTap bubbleMenuShouldShow={({ editor }) => editor.isActive('table')} />
    */
   bubbleMenuShouldShow?: ((...args: any[]) => any) | null;
-  onUpdate?: (...args: any[]) => void;
-  onSelectionUpdate?: (...args: any[]) => void;
-  onFocus?: (...args: any[]) => void;
-  onBlur?: (...args: any[]) => void;
-  onReady?: (...args: any[]) => void;
-  onError?: (...args: any[]) => void;
+  onUpdate?: (payload: string) => void;
+  onSelectionUpdate?: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  onReady?: (payload: Editor) => void;
+  onError?: (payload: TipTapErrorPayload) => void;
   countSlot?: (ctx: CountSlotCtx) => JSX.Element;
   toolbarSlot?: (ctx: ToolbarSlotCtx) => JSX.Element;
   bubbleMenuSlot?: (ctx: BubbleMenuSlotCtx) => JSX.Element;
