@@ -9,6 +9,11 @@
       "dependsOn": ["^build", "sync"],
       "outputs": ["dist/**", "src/**/*.d.rozie.ts", "app/**/*.d.rozie.ts"]
     },
+    "@rozie/visual-regression#build": {
+      "dependsOn": ["^build", "sync"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/examples/**", "$TURBO_ROOT$/packages/ui/*/src/**"],
+      "outputs": ["dist/**", "src/**/*.d.rozie.ts", "app/**/*.d.rozie.ts"]
+    },
     "@rozie/runtime-svelte#build": {
       "dependsOn": ["^build"],
       "outputs": []
