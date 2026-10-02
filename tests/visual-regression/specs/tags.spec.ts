@@ -93,4 +93,37 @@ for (const target of TARGETS) {
     await expect(count).toHaveText('2', { timeout: 10_000 });
     await expect(value).toHaveText('one,two');
   });
+
+  // quick 261002-ekf (found while fixing the same Combobox bug): a delimited paste
+  // keeps the typed draft and adds EVERY part; a paste with no separator is left to
+  // the browser (ordinary text, nothing committed).
+  runner(`tags [${target}]: a delimited paste keeps the typed draft and adds every part; a plain paste is ordinary text`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=TagsBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const value = page.getByTestId('readout-value');
+    const input = page.locator('input').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await expect(value).toHaveText('alpha');
+
+    await input.click();
+    await input.pressSequentially('dr');
+    const paste = (text: string) =>
+      input.evaluate((el, t) => {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', t);
+        const ev = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true, composed: true });
+        el.dispatchEvent(ev);
+        return ev.defaultPrevented;
+      }, text);
+
+    expect(await paste('x, y')).toBe(true);
+    await expect(value).toHaveText('alpha,x,y', { timeout: 10_000 });
+    await expect(input).toHaveValue('dr');
+
+    expect(await paste('z')).toBe(false);
+    await page.waitForTimeout(200);
+    await expect(value).toHaveText('alpha,x,y');
+  });
 }

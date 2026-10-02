@@ -1,0 +1,121 @@
+<!--
+  ComboboxRecipientDemo.rozie — BEHAVIORAL cell for the oinbox 0.8.0 follow-ups
+  (quick 261002-ekf) on a Gmail-style recipient field: `multiple` +
+  `disableFilter` + `delimiters` + a NORMALISING `validate` (returns the bare
+  address) + a quote-aware `splitPaste` + `commitOnBlur`, with the host tracking
+  the query through `search`. Driven by
+  tests/visual-regression/specs/combobox-recipient.spec.ts on all 6 targets.
+  Behavioral-only — no pixel baseline.
+
+  (a) the recipient field (`idBase` left at its default — auto-generated).
+  (b) two more default-configured comboboxes, so the spec can check that no two
+      instances share an id.
+-->
+
+<rozie name="ComboboxRecipientDemo">
+
+<components>
+{
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+
+<data>
+{
+  to: ['seed@x.com'],
+  lastSearch: '(none)',
+  searchCount: 0,
+  query: '',
+  a: [],
+  b: [],
+}
+</data>
+
+<script>
+const OPTIONS = [
+  { value: 'apple', label: 'Apple' },
+  { value: 'banana', label: 'Banana' },
+]
+
+const EMAIL = /^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/
+
+// `Name <addr>` → `addr` (lower-cased); a bare address passes through; else reject.
+const toAddress = (text) => {
+  const m = /<([^<>]+)>\s*$/.exec(text)
+  const addr = (m ? m[1] : text).trim()
+  return EMAIL.test(addr) ? addr.toLowerCase() : false
+}
+
+// Quote-aware split: a `"Last, First" <addr>` entry is one part.
+const splitAddresses = (text) => {
+  const parts = String(text).match(/"[^"]*"\s*<[^>]*>|[^,;]+/g)
+  return parts ? parts.map((p) => p.trim()) : null
+}
+
+const onSearch = (e) => {
+  $data.lastSearch = JSON.stringify(e.query)
+  $data.searchCount = $data.searchCount + 1
+}
+
+const readQuery = () => {
+  $data.query = $refs.toCombobox ? JSON.stringify($refs.toCombobox.query()) : 'null'
+}
+</script>
+
+<template>
+<div class="recipient-demo">
+  <div class="field">
+    <Combobox
+      ref="toCombobox"
+      r-model:value="$data.to"
+      :options="[]"
+      multiple
+      block
+      disableFilter
+      hideEmpty
+      :delimiters="[',', ';']"
+      :validate="toAddress"
+      :splitPaste="splitAddresses"
+      commitOnBlur
+      ariaLabel="To"
+      @search="onSearch($event)"
+    />
+  </div>
+  <button type="button" data-testid="elsewhere">Elsewhere</button>
+  <button type="button" data-testid="read-query" @mousedown.prevent="readQuery()">Read query</button>
+
+  <div class="readouts">
+    <span data-testid="readout-to">{{ JSON.stringify($data.to) }}</span>
+    <span data-testid="readout-last-search">{{ $data.lastSearch }}</span>
+    <span data-testid="readout-search-count">{{ $data.searchCount }}</span>
+    <span data-testid="readout-query">{{ $data.query }}</span>
+  </div>
+
+  <div class="pair">
+    <Combobox r-model:value="$data.a" :options="OPTIONS" multiple ariaLabel="First" />
+    <Combobox r-model:value="$data.b" :options="OPTIONS" multiple ariaLabel="Second" />
+  </div>
+</div>
+</template>
+
+<style>
+.recipient-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+  min-height: 420px;
+}
+.recipient-demo .field {
+  width: 480px;
+}
+.recipient-demo .readouts,
+.recipient-demo .pair {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+</style>
+
+</rozie>

@@ -791,6 +791,16 @@ export const EXAMPLES = [
   // (loader → examples/demos/ComboboxTokenInputDemo.rozie). See
   // combobox-token-input.spec.ts. Behavioral-only; NOT in matrix.spec.ts EXAMPLES.
   'ComboboxTokenInput',
+  // oinbox 0.8.0 follow-ups (quick 261002-ekf) — the BEHAVIORAL cell (loader →
+  // examples/demos/ComboboxRecipientDemo.rozie): paste-at-caret, splitPaste,
+  // normalising validate, search on internal clears, query(), commitOnBlur,
+  // auto idBase. See combobox-recipient.spec.ts. Behavioral-only; NOT in
+  // matrix.spec.ts EXAMPLES.
+  'ComboboxRecipient',
+  // per-instance default id base (quick 261002-ekf F6) — the BEHAVIORAL cell
+  // (loader → examples/demos/AutoIdDemo.rozie): default Listboxes/Popovers never
+  // share ids. See auto-id.spec.ts. Behavioral-only; NOT in matrix.spec.ts EXAMPLES.
+  'AutoId',
   // combobox-group-cap — the BEHAVIORAL cell (loader → examples/demos/
   // ComboboxGroupCapDemo.rozie, importing packages/ui/combobox/src/Combobox.rozie)
   // proving the new opt-in `groupCap` prop: an overflowing section renders `cap`
@@ -1712,6 +1722,10 @@ export const LIT_TAGS: Record<Example, string> = {
   ComboboxGroups: 'rozie-combobox-groups',
   // '-demo' appended on Lit → 'rozie-combobox-token-input-demo'.
   ComboboxTokenInput: 'rozie-combobox-token-input',
+  // '-demo' appended on Lit → 'rozie-combobox-recipient-demo'.
+  ComboboxRecipient: 'rozie-combobox-recipient',
+  // '-demo' appended on Lit → 'rozie-auto-id-demo'.
+  AutoId: 'rozie-auto-id',
   // combobox-group-cap — '-demo' appended on Lit → tag
   // 'rozie-combobox-group-cap-demo' = kebab of ComboboxGroupCapDemo (the wrapper
   // component is name="Combobox" → 'rozie-combobox', matching the *Groups cell's
@@ -2275,6 +2289,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // parent-supplied), so no MODEL_PROPS entry. No parent props.
   ComboboxGroups: {},
   ComboboxTokenInput: {},
+  ComboboxRecipient: {},
+  AutoId: {},
   // combobox-group-cap — ComboboxGroupCapDemo is self-contained: it seeds its
   // own OPTIONS/GROUPS + <data>.value and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props.

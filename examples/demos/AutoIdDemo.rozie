@@ -1,0 +1,55 @@
+<!--
+  AutoIdDemo.rozie — BEHAVIORAL cell for the per-instance default id base (oinbox
+  0.8.0 follow-up F6, quick 261002-ekf): two default-configured Listboxes and two
+  default-configured Popovers (keepMounted, so both panels render without a
+  gesture) must never share an id. Driven by
+  tests/visual-regression/specs/auto-id.spec.ts on all 6 targets.
+  Behavioral-only — no pixel baseline.
+-->
+
+<rozie name="AutoIdDemo">
+
+<components>
+{
+  Listbox: '../../packages/ui/listbox/src/Listbox.rozie',
+  Popover: '../../packages/ui/popover/src/Popover.rozie',
+}
+</components>
+
+<data>
+{
+  a: null,
+  b: null,
+}
+</data>
+
+<script>
+const OPTIONS = ['One', 'Two']
+</script>
+
+<template>
+<div class="auto-id-demo">
+  <Listbox r-model:value="$data.a" :options="OPTIONS" ariaLabel="List A" />
+  <Listbox r-model:value="$data.b" :options="OPTIONS" ariaLabel="List B" />
+  <Popover keepMounted>
+    <template #anchor><button type="button">Popover A</button></template>
+    <p>Panel A</p>
+  </Popover>
+  <Popover keepMounted>
+    <template #anchor><button type="button">Popover B</button></template>
+    <p>Panel B</p>
+  </Popover>
+</div>
+</template>
+
+<style>
+.auto-id-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 1rem;
+  display: flex;
+  gap: 1rem;
+  min-height: 200px;
+}
+</style>
+
+</rozie>
