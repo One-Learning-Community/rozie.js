@@ -1,5 +1,17 @@
 # @rozie-ui/toast-lit
 
+## 0.2.2
+
+### Patch Changes
+
+- a9d67cb: Regenerated with kebab-case attributes for multi-word props: a prop such as `idBase` is now observed as `id-base` (it was the lowercased `idbase`), matching the model props and what a Rozie consumer writes. **If you set one of these from raw HTML with the lowercased or camelCase name, switch to the kebab attribute** (or set the property). Single-word props are unchanged.
+- 5abc36f: Lit: a standalone `$onUnmount(() => { … })` now runs when the element is removed. The Lit emitter spliced the callback into `disconnectedCallback` as an uncalled arrow, so the teardown never ran on Lit (the other five targets were unaffected, as was an `$onMount` cleanup return or an `$onUnmount` paired with an `$onMount(fn)`). The body now runs as its own function, so an early `return` in it cannot skip the remaining teardown.
+
+  Leaves regenerated with the fix: `combobox-lit` now tears down its list virtualizer on removal, `command-palette-lit` clears its pending search debounce timer, `data-table-lit` removes its document `pointerdown` listener, and `toast-lit` stops its auto-dismiss timers (which could otherwise fire against a removed element).
+
+- Updated dependencies [a9d67cb]
+  - @rozie/runtime-lit@0.8.0
+
 ## 0.2.1
 
 ### Patch Changes

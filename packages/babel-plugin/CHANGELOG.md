@@ -1,5 +1,20 @@
 # @rozie/babel-plugin
 
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies [a9d67cb]
+- Updated dependencies [a9d67cb]
+- Updated dependencies [a9d67cb]
+- Updated dependencies [a9d67cb]
+- Updated dependencies [5abc36f]
+- Updated dependencies [a9d67cb]
+- Updated dependencies [a9d67cb]
+- Updated dependencies [a9d67cb]
+- Updated dependencies [a9d67cb]
+  - @rozie/core@0.8.0
+
 ## 0.7.5
 
 ### Patch Changes

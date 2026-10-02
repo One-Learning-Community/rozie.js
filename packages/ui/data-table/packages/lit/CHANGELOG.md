@@ -1,5 +1,18 @@
 # @rozie-ui/data-table-lit
 
+## 0.7.1
+
+### Patch Changes
+
+- a9d67cb: Accept `@rozie-ui/popover-<framework>` 0.3 as a peer dependency, alongside the 0.2 range (and, for data-table, the 0.1 range). Popover 0.3 adds the `reference` prop; the popover features these components already use are unchanged.
+- a9d67cb: Regenerated with the union-aware Lit attribute converter. On `<rozie-full-calendar>`, a numeric `height` attribute (`height="600"`) now arrives as the number `600`; on `<rozie-column>`, a numeric `width` attribute (`width="120"`) now arrives as the number `120`. A CSS string such as `height="auto"` or `width="120px"` still arrives as a string. Rendering is unchanged, because both components already treated a numeric string as pixels.
+- 5abc36f: Lit: a standalone `$onUnmount(() => { … })` now runs when the element is removed. The Lit emitter spliced the callback into `disconnectedCallback` as an uncalled arrow, so the teardown never ran on Lit (the other five targets were unaffected, as was an `$onMount` cleanup return or an `$onUnmount` paired with an `$onMount(fn)`). The body now runs as its own function, so an early `return` in it cannot skip the remaining teardown.
+
+  Leaves regenerated with the fix: `combobox-lit` now tears down its list virtualizer on removal, `command-palette-lit` clears its pending search debounce timer, `data-table-lit` removes its document `pointerdown` listener, and `toast-lit` stops its auto-dismiss timers (which could otherwise fire against a removed element).
+
+- Updated dependencies [a9d67cb]
+  - @rozie/runtime-lit@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes

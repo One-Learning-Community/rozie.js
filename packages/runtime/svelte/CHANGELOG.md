@@ -1,5 +1,11 @@
 # @rozie/runtime-svelte
 
+## 0.8.0
+
+### Patch Changes
+
+- @rozie/runtime-keynav-core@0.8.0
+
 ## 0.7.5
 
 ### Patch Changes

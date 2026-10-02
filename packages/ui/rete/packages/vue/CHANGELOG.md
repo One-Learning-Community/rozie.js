@@ -1,5 +1,11 @@
 # @rozie-ui/rete-vue
 
+## 0.3.3
+
+### Patch Changes
+
+- @rozie/runtime-vue@0.8.0
+
 ## 0.3.2
 
 ### Patch Changes
