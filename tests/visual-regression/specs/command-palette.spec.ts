@@ -371,6 +371,44 @@ for (const target of TARGETS) {
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
   const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  // oinbox feedback (CommandPalette 0.4.10): an item's `highlight` overrides the
+  // default row's query marks. `false` marks nothing (a synthetic "Create '…'"
+  // row); an array marks the item's own [start, end) ranges.
+  runner(`command-palette [${target}]: an item's highlight overrides the query marks (false / own ranges)`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    await page.getByTestId('open-palette').click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    const firstOption = page.locator('[role="option"]').first();
+    const marks = firstOption.locator('.rozie-command-palette-option-label-match');
+
+    // Control: a row without an override marks its match.
+    await input.pressSequentially('cut', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await expect(firstOption).toContainText('Cut');
+    await expect(marks).toHaveCount(1);
+    await expect(marks.first()).toHaveText('Cut');
+
+    // highlight: false — the row still matches and renders, with no marks.
+    await input.fill('');
+    await input.pressSequentially('paste', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await expect(firstOption).toContainText('Paste');
+    await expect(marks).toHaveCount(0);
+
+    // highlight: [[0, 1]] — only the item's own range, not the typed "save".
+    await input.fill('');
+    await input.pressSequentially('save', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await expect(firstOption).toContainText('Save');
+    await expect(marks).toHaveCount(1);
+    await expect(marks.first()).toHaveText('S');
+  });
+
   runner(`command-palette [${target}]: opens, type-filters, arrow+Enter selects + reports, closeOnSelect, reopen + Escape closes`, async ({
     page,
   }) => {

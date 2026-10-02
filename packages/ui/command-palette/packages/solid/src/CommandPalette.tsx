@@ -4,7 +4,7 @@ import { Portal } from 'solid-js/web';
 import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 import Combobox, { type ComboboxHandle } from '@rozie-ui/combobox-solid';
-import { scoreCommands, labelHighlight } from './internal/scoreCommands';
+import { scoreCommands, itemHighlight } from './internal/scoreCommands';
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
@@ -364,13 +364,13 @@ interface CommandPaletteProps {
   defaultQuery?: string;
   onQueryChange?: (query: string) => void;
   /**
-   * Custom ranking/exclusion hook: `(item, query) => number | null`. Return `null` to exclude an item from the results; otherwise higher numbers rank first. Leave unset (`default: null`) to use the built-in fuzzy-subsequence scorer (label weighted above keywords). A recency/frecency boost is added INSIDE `score` (e.g. `return baseScore + recencyBonus(item.id)`), not as a separate prop.
+   * Custom ranking/exclusion hook: `(item, query, defaultScore) => number | null`. Return `null` to exclude an item from the results; otherwise higher numbers rank first. Leave unset (`default: null`) to use the built-in fuzzy-subsequence scorer (label weighted above keywords). The third argument is that built-in scorer, `(item, query) => number | null`, so a hook can adjust the default ranking instead of replacing it: a recency/frecency boost is `const base = defaultScore(item, query); return base === null ? null : base + recencyBonus(item.id)`, and a row pinned last (e.g. a synthetic "Create '…'" row) is `item.id === 'create' ? -Infinity : defaultScore(item, query)`. The `query` passed in is trimmed.
    * @example
    * <CommandPalette score={(item, q) => item.label.includes(q) ? 1 : null} items={commands} />
    */
   score?: ((...args: any[]) => any) | null;
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; commands sharing an optional `group` string are bucketed under a labeled section heading (auto-derived, via the vendored combobox's native section groups) — commands with no `group` render first in a headingless block. The heading text is the `group` string itself; override its markup with the `#groupHeading` slot. Optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
+   * The command list — `[{ id, label, group?, keywords?, disabled?, highlight?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; commands sharing an optional `group` string are bucketed under a labeled section heading (auto-derived, via the vendored combobox's native section groups) — commands with no `group` render first in a headingless block. The heading text is the `group` string itself; override its markup with the `#groupHeading` slot. Optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. An optional `highlight` overrides which characters of the label are marked as matching the query: `false` marks none (e.g. a synthetic "Create '…'" row, whose label would otherwise highlight letters of "Create"), and an array of `[start, end)` index pairs into `label` marks those instead. The same ranges reach the `#option` slot as `matches`. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
    */
   items?: any[];
   /**
@@ -897,14 +897,15 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   }
 
   // Split a command's visible label into ordered { text, match } segments from
-  // labelHighlight's [start,end) ranges, for the default #option fill row to
+  // itemHighlight's [start,end) ranges, for the default #option fill row to
   // render as highlighted runs. Reflects the query-subsequence on the LABEL
   // regardless of which scorer produced the ranking (labelHighlight runs the
-  // same fuzzyMatch primitive independent of $props.score). Untyped param
+  // same fuzzyMatch primitive independent of $props.score), unless the item
+  // supplies its own `highlight` (false, or its own ranges). Untyped param
   // (neutralized to `any`) like the other display helpers above.
   function labelSegments(o: any) {
     const label = labelText(o);
-    const ranges = labelHighlight(label, query());
+    const ranges = itemHighlight(o, query());
     const segments = [];
     let cursor = 0;
     for (let i = 0; i < ranges.length; i++) {
@@ -1917,7 +1918,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
         
         <Combobox ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={local.groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} ariaLabel={local.ariaLabel} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={(_rozieSlot) => (<>
             <span class={"rozie-command-palette-option-anchor"} data-cp-index={rozieAttr(cpAnchorIndex(_rozieSlot.option))} data-cp-value={rozieAttr(commandValue(_rozieSlot.option))} data-rozie-s-768cad96="">
-            {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return _rozieSlot.option; }, get index() { return _rozieSlot.index; }, get active() { return _rozieSlot.active; }, get selected() { return _rozieSlot.selected; }, get disabled() { return _rozieSlot.disabled; }, get matches() { return labelHighlight(labelText(_rozieSlot.option), query()); } }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
+            {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return _rozieSlot.option; }, get index() { return _rozieSlot.index; }, get active() { return _rozieSlot.active; }, get selected() { return _rozieSlot.selected; }, get disabled() { return _rozieSlot.disabled; }, get matches() { return itemHighlight(_rozieSlot.option, query()); } }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {<Show when={(_props.iconSlot ?? _props.slots?.['icon'])}><span class={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
                   {(_props.iconSlot ?? _props.slots?.['icon'])?.({ get option() { return _rozieSlot.option; } })}
                 </span></Show>}<span class={"rozie-command-palette-option-main"} data-rozie-s-768cad96="">
@@ -1972,7 +1973,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
         
         <Combobox ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={local.groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} ariaLabel={local.ariaLabel} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={(_rozieSlot) => (<>
             <span class={"rozie-command-palette-option-anchor"} data-cp-index={rozieAttr(cpAnchorIndex(_rozieSlot.option))} data-cp-value={rozieAttr(commandValue(_rozieSlot.option))} data-rozie-s-768cad96="">
-            {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return _rozieSlot.option; }, get index() { return _rozieSlot.index; }, get active() { return _rozieSlot.active; }, get selected() { return _rozieSlot.selected; }, get disabled() { return _rozieSlot.disabled; }, get matches() { return labelHighlight(labelText(_rozieSlot.option), query()); } }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
+            {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return _rozieSlot.option; }, get index() { return _rozieSlot.index; }, get active() { return _rozieSlot.active; }, get selected() { return _rozieSlot.selected; }, get disabled() { return _rozieSlot.disabled; }, get matches() { return itemHighlight(_rozieSlot.option, query()); } }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {<Show when={(_props.iconSlot ?? _props.slots?.['icon'])}><span class={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
                   {(_props.iconSlot ?? _props.slots?.['icon'])?.({ get option() { return _rozieSlot.option; } })}
                 </span></Show>}<span class={"rozie-command-palette-option-main"} data-rozie-s-768cad96="">

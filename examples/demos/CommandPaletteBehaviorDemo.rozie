@@ -115,10 +115,12 @@ const items = [
   },
   // Deliberately carries NO `actions` — the ⌘K/→/click no-op-on-action-less-row proof.
   { id: 'open', label: 'Open File', group: 'File' },
-  { id: 'save', label: 'Save', group: 'File' },
+  // Per-item highlight overrides (the default row marks the query's fuzzy match):
+  // Save marks only its own [0, 1) range, Paste marks nothing.
+  { id: 'save', label: 'Save', group: 'File', highlight: [[0, 1]] },
   { id: 'cut', label: 'Cut', group: 'Edit' },
   { id: 'copy', label: 'Copy', group: 'Edit' },
-  { id: 'paste', label: 'Paste', group: 'Edit' },
+  { id: 'paste', label: 'Paste', group: 'Edit', highlight: false },
   {
     id: 'goto',
     label: 'Go to page…',

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaultScore, fuzzyMatch, labelHighlight, scoreCommands, type CommandItem } from './scoreCommands';
+import { defaultScore, fuzzyMatch, itemHighlight, labelHighlight, scoreCommands, type CommandItem } from './scoreCommands';
 
 const items: CommandItem[] = [
   { id: 'new', label: 'New File', keywords: ['create', 'add'] },
@@ -147,5 +147,67 @@ describe('labelHighlight', () => {
       [0, 1],
       [5, 6],
     ]);
+  });
+});
+
+describe('scoreCommands — defaultScore passed to a custom scorer', () => {
+  const items: CommandItem[] = [
+    { id: 'create', label: "Create 'ea'" },
+    { id: 'a', label: 'Team area' },
+    { id: 'b', label: 'Ideas' },
+  ];
+
+  it('passes the built-in scorer as the third argument', () => {
+    const seen: Array<unknown> = [];
+    scoreCommands(items, 'ea', (item, q, base) => {
+      seen.push(base);
+      return base(item, q);
+    });
+    expect(seen.length).toBe(items.length);
+    expect(seen.every((f) => f === defaultScore)).toBe(true);
+  });
+
+  it('pins a row last while every other row keeps the default ranking', () => {
+    const pinned = scoreCommands(items, 'ea', (item, q, base) =>
+      item.id === 'create' ? Number.NEGATIVE_INFINITY : base(item, q),
+    );
+    const plain = scoreCommands(items.slice(1), 'ea');
+    expect(pinned.map((i) => i.id)).toEqual([...plain.map((i) => i.id), 'create']);
+  });
+
+  it('passes the trimmed query', () => {
+    let got = '';
+    scoreCommands(items, '  ea  ', (item, q, base) => {
+      got = q;
+      return base(item, q);
+    });
+    expect(got).toBe('ea');
+  });
+});
+
+describe('itemHighlight', () => {
+  it('falls back to labelHighlight when the item has no highlight field', () => {
+    expect(itemHighlight({ id: 'x', label: 'Open file' }, 'of')).toEqual(labelHighlight('Open file', 'of'));
+  });
+
+  it('highlight: false marks nothing', () => {
+    expect(itemHighlight({ id: 'create', label: "Create 'ea'", highlight: false }, 'ea')).toEqual([]);
+  });
+
+  it('uses the item’s own ranges, sorted and merged', () => {
+    expect(itemHighlight({ id: 'c', label: "Create 'ea'", highlight: [[9, 10], [8, 9]] }, 'ea')).toEqual([[8, 10]]);
+  });
+
+  it('clamps out-of-range ranges and drops empty or malformed ones', () => {
+    const item = { id: 'c', label: 'abc', highlight: [[-2, 1], [2, 99], [1, 1], ['x', 2], [5]] } as unknown;
+    expect(itemHighlight(item, 'zz')).toEqual([[0, 1], [2, 3]]);
+  });
+
+  it('an empty ranges array marks nothing', () => {
+    expect(itemHighlight({ id: 'c', label: 'abc', highlight: [] }, 'a')).toEqual([]);
+  });
+
+  it('tolerates a null item', () => {
+    expect(itemHighlight(null, 'a')).toEqual([]);
   });
 });

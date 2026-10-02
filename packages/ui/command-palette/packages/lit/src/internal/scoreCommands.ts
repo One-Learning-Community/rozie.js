@@ -39,6 +39,9 @@ export interface CommandItem {
   // option-row slots (consumers primarily read these off the `option` slot scope).
   icon?: unknown;
   actions?: unknown;
+  // Display-only label highlighting override (see `itemHighlight`): `false`
+  // for none, or the item's own `[start, end)` ranges into `label`.
+  highlight?: false | Array<[number, number]>;
 }
 
 export interface FuzzyMatchResult {
@@ -46,7 +49,16 @@ export interface FuzzyMatchResult {
   positions: number[];
 }
 
-export type CommandScorer<T extends CommandItem = CommandItem> = (item: T, query: string) => number | null;
+/**
+ * A custom `score` hook. The third argument is the built-in scorer, so a hook
+ * can adjust the default ranking (`base + bonus`) or pin a row instead of
+ * reimplementing fuzzy matching.
+ */
+export type CommandScorer<T extends CommandItem = CommandItem> = (
+  item: T,
+  query: string,
+  defaultScore: (item: T, query: string) => number | null,
+) => number | null;
 
 // Tunable bonuses (internal — not a full fzf port; YAGNI). Adjusting these
 // never changes the public API surface.
@@ -155,7 +167,7 @@ export function scoreCommands<T extends CommandItem>(
 
   const decorated: Array<{ item: T; score: number; index: number }> = [];
   for (let i = 0; i < list.length; i++) {
-    const s = scoreFn(list[i], q);
+    const s = scoreFn(list[i], q, defaultScore<T>);
     if (s === null || s === undefined) continue;
     decorated.push({ item: list[i], score: s, index: i });
   }
@@ -196,4 +208,39 @@ export function labelHighlight(label: string, query: string): Array<[number, num
   }
   ranges.push([start, end]);
   return ranges;
+}
+
+/**
+ * Highlight ranges for one item's visible label. An item can override the
+ * query match: `highlight: false` marks nothing (e.g. a synthetic
+ * "Create '<query>'" row, whose label would otherwise highlight letters of
+ * "Create"), and `highlight: [[start, end], ...]` marks the item's own ranges.
+ * Supplied ranges are clamped to the label, empty or malformed pairs are
+ * dropped, and the rest are sorted and merged so the result has the same shape
+ * as `labelHighlight`'s. Any other value falls back to `labelHighlight`.
+ */
+export function itemHighlight(item: unknown, query: string): Array<[number, number]> {
+  const it = item as { label?: unknown; highlight?: unknown } | null | undefined;
+  const label = it && it.label != null ? String(it.label) : '';
+  const own = it ? it.highlight : undefined;
+  if (own === false) return [];
+  if (!Array.isArray(own)) return labelHighlight(label, query);
+
+  const pairs: Array<[number, number]> = [];
+  for (let i = 0; i < own.length; i++) {
+    const r = own[i];
+    if (!Array.isArray(r) || r.length < 2) continue;
+    const a = Math.max(0, Math.min(label.length, Math.floor(Number(r[0]))));
+    const b = Math.max(0, Math.min(label.length, Math.floor(Number(r[1]))));
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a >= b) continue;
+    pairs.push([a, b]);
+  }
+  pairs.sort((x, y) => x[0] - y[0]);
+  const merged: Array<[number, number]> = [];
+  for (let i = 0; i < pairs.length; i++) {
+    const last = merged[merged.length - 1];
+    if (last && pairs[i][0] <= last[1]) last[1] = Math.max(last[1], pairs[i][1]);
+    else merged.push([pairs[i][0], pairs[i][1]]);
+  }
+  return merged;
 }
