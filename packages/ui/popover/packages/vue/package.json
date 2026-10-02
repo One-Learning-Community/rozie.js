@@ -30,7 +30,8 @@
   "files": [
     "dist",
     "src",
-    "rozie-manifest.json"
+    "rozie-manifest.json",
+    "CHANGELOG.md"
   ],
   "dependencies": {
     "@rozie/runtime-vue": "workspace:^"

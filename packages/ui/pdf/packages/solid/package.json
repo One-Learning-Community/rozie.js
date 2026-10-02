@@ -40,7 +40,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "CHANGELOG.md"
   ],
   "dependencies": {
     "@rozie/runtime-solid": "workspace:^"

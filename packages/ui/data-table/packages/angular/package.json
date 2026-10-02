@@ -42,7 +42,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "CHANGELOG.md"
   ],
   "peerDependencies": {
     "@angular/core": "^19 || ^20 || ^21",

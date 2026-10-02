@@ -34,6 +34,12 @@
 //       That is exactly what makes it cheap enough to run in EVERY mode,
 //       including --skip-npm (CI). See RELEASING.md §4's covers/does-not-
 //       cover subsection for the full boundary.
+//   (h) CHANGELOG SHIPPED — a package a pending changeset will publish must
+//       list `CHANGELOG.md` in its `files` field. npm 7+ no longer adds a
+//       changelog to the tarball by itself, so without the entry the
+//       changesets-written CHANGELOG.md never reaches consumers (oinbox
+//       feedback, quick 261002-ekf: a 0.7.0 behaviour change was recorded in
+//       the repo changelog but invisible on npm). Registry-free, every mode.
 //
 // TWO-LAYER GUARD MODEL (see RELEASING.md for the full rationale):
 //   * The REAL pre-publish guard is the releaser's LOCAL pre-flight:
@@ -923,6 +929,26 @@ function buildCoverageCtx(configRef) {
 
 // Live per-package wrapper used by main()'s audit loop. Deterministic and
 // network-free, so it runs in EVERY mode including --skip-npm.
+// (h) — see the header. A package no pending changeset names is not about to
+// publish, so it is skipped: it picks the entry up at its next release. A
+// package with no `files` field ships every non-ignored file, changelog
+// included.
+function checkChangelogShipped(entry, ctx) {
+  if (ctx.ignore.has(entry.name)) {
+    return { status: 'SKIP', detail: 'in .changeset/config.json ignore list — cannot publish' };
+  }
+  const files = entry.pkg.files;
+  if (!Array.isArray(files)) return { status: 'OK', detail: 'no `files` field — npm ships CHANGELOG.md' };
+  if (files.includes('CHANGELOG.md')) return { status: 'OK', detail: 'CHANGELOG.md listed in `files`' };
+  if (!ctx.covered.has(entry.name)) {
+    return { status: 'SKIP', detail: 'no pending changeset — add CHANGELOG.md to `files` at its next release' };
+  }
+  return {
+    status: 'FAIL',
+    detail: 'a pending changeset will publish this package, but `files` does not list CHANGELOG.md, so the changelog would not ship — add "CHANGELOG.md" to `files`',
+  };
+}
+
 function checkChangesetCoverage(entry, ctx) {
   return evaluateChangesetCoverage(
     { name: entry.name, version: entry.version, dir: entry.dir, pkg: entry.pkg },
@@ -1341,6 +1367,7 @@ async function main() {
       e: await checkWorkspaceDeps(entry, byName, privateNames, opts),
       f: await checkTarballDrift(entry, opts),
       g: checkChangesetCoverage(entry, coverageCtx),
+      h: checkChangelogShipped(entry, coverageCtx),
     };
     rows.push({ entry, checks, verdict: verdictOf(checks) });
   }
@@ -1349,12 +1376,12 @@ async function main() {
   const nameW = Math.max(20, ...rows.map((r) => r.entry.name.length));
   const verW = Math.max(7, ...rows.map((r) => String(r.entry.version).length));
   console.log(
-    `${pad('package', nameW)}  ${pad('version', verW)}  ${pad('npm', 5)}  ${pad('desc', 5)}  ${pad('url', 5)}  ${pad('files', 5)}  ${pad('deps', 5)}  ${pad('tarball', 5)}  ${pad('covrg', 5)}  verdict`,
+    `${pad('package', nameW)}  ${pad('version', verW)}  ${pad('npm', 5)}  ${pad('desc', 5)}  ${pad('url', 5)}  ${pad('files', 5)}  ${pad('deps', 5)}  ${pad('tarball', 5)}  ${pad('covrg', 5)}  ${pad('chlog', 5)}  verdict`,
   );
-  console.log('-'.repeat(nameW + verW + 8 * 7 + 9));
+  console.log('-'.repeat(nameW + verW + 8 * 8 + 9));
   for (const { entry, checks, verdict } of rows) {
     console.log(
-      `${pad(entry.name, nameW)}  ${pad(entry.version, verW)}  ${pad(GLYPH[checks.a.status], 5)}  ${pad(GLYPH[checks.b.status], 5)}  ${pad(GLYPH[checks.c.status], 5)}  ${pad(GLYPH[checks.d.status], 5)}  ${pad(GLYPH[checks.e.status], 5)}  ${pad(GLYPH[checks.f.status], 5)}  ${pad(GLYPH[checks.g.status], 5)}  ${verdict}`,
+      `${pad(entry.name, nameW)}  ${pad(entry.version, verW)}  ${pad(GLYPH[checks.a.status], 5)}  ${pad(GLYPH[checks.b.status], 5)}  ${pad(GLYPH[checks.c.status], 5)}  ${pad(GLYPH[checks.d.status], 5)}  ${pad(GLYPH[checks.e.status], 5)}  ${pad(GLYPH[checks.f.status], 5)}  ${pad(GLYPH[checks.g.status], 5)}  ${pad(GLYPH[checks.h.status], 5)}  ${verdict}`,
     );
   }
   console.log('');
@@ -1377,6 +1404,7 @@ async function main() {
       ['e', 'workspace-deps'],
       ['f', 'tarball-drift'],
       ['g', 'changeset-coverage'],
+      ['h', 'changelog-shipped'],
     ]) {
       const c = checks[key];
       if (c.status === 'FAIL' || c.status === 'WARN') {

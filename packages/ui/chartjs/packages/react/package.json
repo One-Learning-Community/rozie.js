@@ -82,7 +82,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "CHANGELOG.md"
   ],
   "peerDependencies": {
     "react": "^18.2 || ^19",

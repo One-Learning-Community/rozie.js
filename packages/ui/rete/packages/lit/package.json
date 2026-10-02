@@ -43,7 +43,8 @@
   "files": [
     "dist",
     "src",
-    "custom-elements.json"
+    "custom-elements.json",
+    "CHANGELOG.md"
   ],
   "dependencies": {
     "@rozie/runtime-lit": "workspace:^"

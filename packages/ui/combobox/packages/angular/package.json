@@ -43,7 +43,8 @@
   "files": [
     "dist",
     "src",
-    "rozie-manifest.json"
+    "rozie-manifest.json",
+    "CHANGELOG.md"
   ],
   "module": "./dist/fesm2022/rozie-ui-combobox-angular.mjs",
   "types": "./dist/index.d.ts",

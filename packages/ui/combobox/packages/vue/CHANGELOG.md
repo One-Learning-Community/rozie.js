@@ -14,7 +14,7 @@
   - **Typed surface:** `search`, `change` and `create` payloads, every slot context and the handle are typed, and the types are exported (`ComboboxChangePayload`, `ComboboxChipSlotCtx`, …). Handlers typed against the payloads can now reject a wrong-typed handler that used to compile.
 
   Fixes:
-  - Ctrl/Cmd/Alt+Enter no longer picks the highlighted option, so a host's Ctrl+Enter shortcut is not doubled.
+  - **Behaviour change:** Enter with Ctrl, Cmd or Alt held no longer picks the highlighted option (0.6.0 picked it). The key is left to the host, so a Ctrl+Enter send shortcut is not doubled. If you relied on modified Enter picking, handle it yourself with `activeOption()`.
   - Keys pressed while an IME composition is in progress are ignored (the Enter that confirms a composition no longer picks).
   - Escape is consumed only when a list is actually visible.
   - The custom `chip` slot's `remove()` returns focus to the input, like the built-in remove button.

@@ -21,7 +21,8 @@
     "dist",
     "src",
     "!src/**/__tests__/**",
-    "!src/**/*.test.ts"
+    "!src/**/*.test.ts",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsdown",

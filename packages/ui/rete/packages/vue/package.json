@@ -43,7 +43,8 @@
   "files": [
     "dist",
     "src",
-    "web-types.json"
+    "web-types.json",
+    "CHANGELOG.md"
   ],
   "dependencies": {
     "@rozie/runtime-vue": "workspace:^"
