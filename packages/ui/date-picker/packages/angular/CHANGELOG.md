@@ -1,12 +1,5 @@
 # @rozie-ui/date-picker-angular
 
-## 0.1.13
-
-### Patch Changes
-
-- @rozie/runtime-keynav-core@0.8.0
-- @rozie/runtime-angular@0.8.0
-
 ## 0.1.12
 
 ### Patch Changes

@@ -1,7 +1,5 @@
 # @rozie/runtime-keynav-core
 
-## 0.8.0
-
 ## 0.7.5
 
 ## 0.7.4

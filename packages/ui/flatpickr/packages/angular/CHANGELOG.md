@@ -1,11 +1,5 @@
 # @rozie-ui/flatpickr-angular
 
-## 0.1.9
-
-### Patch Changes
-
-- @rozie/runtime-angular@0.8.0
-
 ## 0.1.8
 
 ### Patch Changes

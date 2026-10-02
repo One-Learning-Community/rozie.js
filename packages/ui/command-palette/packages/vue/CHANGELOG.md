@@ -1,12 +1,5 @@
 # @rozie-ui/command-palette-vue
 
-## 0.4.9
-
-### Patch Changes
-
-- e9b8938: Accept `@rozie-ui/combobox-<framework>` 0.7 as a peer dependency, alongside the 0.5 and 0.6 ranges. Combobox 0.7 adds opt-in token-input props and typed events; the combobox features the command palette uses are unchanged.
-  - @rozie/runtime-vue@0.8.0
-
 ## 0.4.8
 
 ### Patch Changes

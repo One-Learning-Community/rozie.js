@@ -1,12 +1,5 @@
 # @rozie-ui/codemirror-react
 
-## 0.1.10
-
-### Patch Changes
-
-- Updated dependencies [174949b]
-  - @rozie/runtime-react@0.8.0
-
 ## 0.1.9
 
 ### Patch Changes

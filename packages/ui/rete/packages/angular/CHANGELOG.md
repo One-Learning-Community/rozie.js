@@ -1,11 +1,5 @@
 # @rozie-ui/rete-angular
 
-## 0.3.7
-
-### Patch Changes
-
-- @rozie/runtime-angular@0.8.0
-
 ## 0.3.6
 
 ### Patch Changes
