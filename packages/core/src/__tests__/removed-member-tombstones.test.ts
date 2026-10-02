@@ -72,14 +72,14 @@ function compiled(target: Target, s = src()): string {
 
 function omitList(code: string): string {
   const m = /extends Omit<[^,]+, ([^>]*)>/.exec(code);
-  if (!m) throw new Error('no Omit clause in:\n' + code);
+  if (!m) throw new Error(`no Omit clause in:\n${code}`);
   return m[1]!;
 }
 
 /** The text of the `interface …Props … { … }` block (inline module or sidecar). */
 function propsInterface(code: string): string {
   const m = /(?:export )?interface (?:Probe)?Props\b[^{]*\{\n[\s\S]*?\n\}/.exec(code);
-  if (!m) throw new Error('no Props interface in:\n' + code);
+  if (!m) throw new Error(`no Props interface in:\n${code}`);
   return m[0];
 }
 

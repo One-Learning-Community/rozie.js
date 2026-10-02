@@ -139,7 +139,10 @@ export function lowerEmitsBlock(
     if (prop.value.properties.some((p) => t.isObjectProperty(p) && keyName(p) === 'removed')) {
       const message = validateTombstone(prop.value, `<emits> \`${name}\``, babelLocToRozieLoc(prop), diagnostics);
       if (message === null) notes.malformed.add(name);
-      else (notes.removed ??= []).push({ kind: 'event', name, message, sourceLoc: babelLocToRozieLoc(prop) });
+      else {
+        notes.removed ??= [];
+        notes.removed.push({ kind: 'event', name, message, sourceLoc: babelLocToRozieLoc(prop) });
+      }
       continue;
     }
     let payload: t.TSType | null = null;
